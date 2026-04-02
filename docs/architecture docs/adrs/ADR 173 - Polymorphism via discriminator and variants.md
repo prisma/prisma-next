@@ -162,6 +162,43 @@ A model can be simultaneously:
 
 These are independent properties. This composability is why we rejected labeled strategies — they create a false choice between roles that are actually orthogonal.
 
+### Value objects use the same mechanism
+
+The `discriminator`/`variants`/`base` pattern applies identically to value objects in the `valueObjects` section ([ADR 178](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md)). A base value object declares a discriminator and variants; each variant declares its base and adds type-specific fields:
+
+```json
+"valueObjects": {
+  "ContactInfo": {
+    "discriminator": { "field": "channel" },
+    "variants": {
+      "EmailContact": { "value": "email" },
+      "PhoneContact": { "value": "phone" }
+    },
+    "fields": {
+      "channel": { "nullable": false, "codecId": "mongo/string@1" }
+    }
+  },
+  "EmailContact": {
+    "base": "ContactInfo",
+    "fields": {
+      "address": { "nullable": false, "codecId": "mongo/string@1" }
+    }
+  },
+  "PhoneContact": {
+    "base": "ContactInfo",
+    "fields": {
+      "number": { "nullable": false, "codecId": "mongo/string@1" }
+    }
+  }
+}
+```
+
+The structural mechanism is identical — `discriminator`, `variants`, `base`, thin variant fields. The difference is purely in framework commitment: polymorphic value objects don't get identity, lifecycle hooks, or referential integrity. TypeScript inference produces `ContactInfo = EmailContact | PhoneContact`, narrowed by the `channel` discriminator — the same narrowing pattern the ORM already uses for model polymorphism.
+
+Real-world examples: `ContactInfo` (email vs phone vs push), `PaymentMethod` (card vs bank), `MediaAttachment` (image vs video), form field definitions (text vs select vs number).
+
+For *unstructured* unions (no discriminator, no shared fields), see [ADR 179 — Union field types](ADR%20179%20-%20Union%20field%20types.md).
+
 ## Consequences
 
 ### Benefits
@@ -171,11 +208,47 @@ These are independent properties. This composability is why we rejected labeled 
 - **Extensible**: new persistence strategies are expressed through storage mappings, not contract schema changes.
 - **Cross-family**: the same representation works for SQL STI/MTI and Mongo polymorphic collections.
 - **Neutral terminology**: `base`/`variants` describes structural facts (specialization/generalization) without prescribing OOP patterns.
+- **Reusable across models and value objects**: the same mechanism works in both `models` and `valueObjects` sections, reducing cognitive overhead.
 
 ### Costs
 
 - **Variant field resolution is implicit.** A reader must know that a variant's full field set is its own `fields` merged with its `base` model's `fields`. This convention must be documented and understood by all contract consumers.
 - **Bidirectional redundancy.** The `base` ↔ `variants` relationship is expressed on both sides. The emitter guarantees consistency; the cost is a small amount of JSON redundancy.
+
+### Indexes on variant-specific fields
+
+When variants share a storage unit (STI in SQL, single collection in Mongo), variant-specific fields are absent from rows/documents of other variants. This has direct consequences for indexing:
+
+- **Unique indexes fail.** A unique index on Bug's `severity` column sees NULL (SQL) or missing (Mongo) for every Feature row/document. In MongoDB, multiple missing values violate uniqueness. In SQL, most engines allow multiple NULLs in a unique index, but the semantics are still wrong — you want uniqueness among Bugs only, not across the whole table.
+- **Index waste.** A non-unique index on a variant-specific field indexes every row/document in the storage unit, including the ones where the field is irrelevant.
+
+The solution is **partial indexes** — indexes scoped to documents/rows matching a discriminator condition:
+
+```sql
+-- Postgres
+CREATE UNIQUE INDEX idx_bug_severity ON tasks (severity) WHERE type = 'bug';
+```
+
+```javascript
+// MongoDB
+db.tasks.createIndex({ severity: 1 }, {
+  unique: true,
+  partialFilterExpression: { type: "bug" }
+})
+```
+
+**No domain representation change is needed.** The contract already contains everything required to derive the filter: variant membership tells you which model owns the field, and `discriminator`/`variants` tells you the discriminator field and value. The emitter and migration system derive the partial index condition automatically from these domain facts.
+
+This is handled in family-specific or target-specific logic:
+
+| Target | Partial index support | Migration output |
+|---|---|---|
+| Postgres | Yes | `WHERE type = 'bug'` clause on `CREATE INDEX` |
+| SQLite | Yes | Same `WHERE` clause syntax |
+| MySQL | No | No partial indexes — application-level enforcement or generated column workaround; migration system should warn |
+| MongoDB | Yes | `partialFilterExpression` on `createIndex` |
+
+The emitter's rule is straightforward: if an index targets a field that belongs to a variant (not the base model), and the variant shares storage with the base, automatically scope the index to the variant's discriminator value. If the target doesn't support partial indexes, emit a warning.
 
 ### Open questions
 
@@ -188,5 +261,5 @@ These are independent properties. This composability is why we rejected labeled 
 
 - [ADR 172 — Contract domain-storage separation](ADR%20172%20-%20Contract%20domain-storage%20separation.md) — why `model.fields` carries `nullable` and `codecId`
 - [ADR 174 — Aggregate roots and relation strategies](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — `roots`, `reference` vs `embed`
-- [design-questions.md § DQ #6](../../planning/mongo-target/1-design-docs/design-questions.md)
-- [cross-cutting-learnings.md § learning #4](../../planning/mongo-target/cross-cutting-learnings.md)
+- [ADR 178 — Value objects in the contract](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md) — polymorphic value objects use the same discriminator/variants/base mechanism
+- [ADR 179 — Union field types](ADR%20179%20-%20Union%20field%20types.md) — unstructured unions as an alternative to discriminated polymorphism

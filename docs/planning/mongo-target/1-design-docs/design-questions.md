@@ -16,7 +16,7 @@ Relations to owned models are plain graph edges: `{ "to": "Address", "cardinalit
 
 This is a cross-family concern: SQL typed JSON/JSONB columns are the same contract-level problem (structured data nested in a parent entity). Both families need type-safe dot-notation queries, TypeScript type generation, and reusability across models. The difference is convention (Mongo: embedding is idiomatic; SQL: JSON columns are an escape hatch), not capability.
 
-Value objects (Address, GeoPoint) without identity are a separate concept — they belong in a dedicated value objects section, not `models`. See [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the entity vs value object distinction.
+Value objects (Address, GeoPoint) without identity are a separate concept — they belong in a dedicated `valueObjects` section, not `models`. See [ADR 178 — Value objects in the contract](../../../architecture%20docs/adrs/ADR%20178%20-%20Value%20objects%20in%20the%20contract.md) for the full design and [cross-cutting-learnings.md](../cross-cutting-learnings.md) for the entity vs value object distinction.
 
 See [ADR 177 — Ownership replaces relation strategy](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md) for the full rationale.
 
@@ -59,46 +59,79 @@ See [mongo-execution-components.md](mongo-execution-components.md) for the compo
 
 ---
 
-## 4. Update operators: shared ORM surface vs. Mongo-native operations
+## 4. Update operators: shared ORM surface vs. Mongo-native operations *(resolved)*
 
-SQL updates are "set field = value" operations. MongoDB updates use operators (`$set`, `$inc`, `$push`, `$pull`, `$addToSet`, etc.) that express field-level mutations.
+**Answer**: The dot-path field accessor provides type-safe access to Mongo-native update operators through a shared mutation API. Three mutation forms cover the spectrum from simple to Mongo-native:
 
-**The question**: How does the ORM mutation surface accommodate Mongo's update operators?
+```typescript
+// Plain object — partial update (shared surface)
+db.users.where({ id }).update({ name: "Bob" })
+// Compiles to: $set: { name: "Bob" }
 
-Layers:
-- **Basic updates map naturally.** `db.users.where({ id }).update({ name: "Bob" })` → `{ $set: { name: "Bob" } }`. This works today with the shared ORM interface.
-- **Atomic operators are Mongo-native.** `$inc` (increment without read-modify-write), `$push` (append to array), `$pull` (remove from array), `$addToSet` (append unique) — these have no SQL equivalent and express operations that are fundamentally different from "set field = value."
+// Field accessor — per-field Mongo-native operations
+db.users.where({ id }).update(u => [
+  u("stats.views").inc(1),
+  u("tags").push("featured"),
+])
+// Compiles to: { $inc: { "stats.views": 1 }, $push: { "tags": "featured" } }
+```
 
-Options:
-- **Shared ORM surface only**: The ORM's `update()` method always takes a plain data object. The Mongo adapter translates `{ views: 1 }` into `{ $set: { views: 1 } }`. Atomic operators are not exposed — users who want `$inc` must use a lower-level escape hatch (raw commands or a document query DSL).
-- **Family-specific ORM extensions**: The document ORM client's `update()` accepts an extended input type with operator helpers: `{ views: { $inc: 1 }, tags: { $push: "new" } }`. The shared interface still accepts plain data; the extensions are additive.
-- **Separate mutation methods**: `db.users.where({ id }).increment({ views: 1 })`, `db.users.where({ id }).push("tags", "new")`. Mongo-native operations become explicit ORM methods.
+The key design principle is that **the verb determines the behaviour**: `create()` applies defaults for omitted fields; `update()` with a plain object is always partial (omitted fields untouched); field accessor operations are explicit per-field mutations.
 
-Tensions:
-- Atomic operators are a major part of the Mongo-native experience. `$inc` avoids a read-modify-write cycle and is one of Mongo's key advantages for high-contention data. Not exposing these through the ORM would be a significant DX gap.
-- But extending the shared ORM interface with Mongo-specific operators means the interface is no longer truly shared. Consumer libraries that generate mutations would need to know about document-specific update shapes.
-- The SQL ORM already has family-specific behavior (e.g. `RETURNING` clause, upsert conflict resolution). Update operators may be another case of "shared interface, family-specific extensions."
+Mutation operators are **capability-gated by target**: Mongo gets the full suite (`inc`, `push`, `pull`, `addToSet`, `pop`, etc.); SQL is limited to `set` and `unset` for JSONB paths.
+
+This resolved the original tension: the shared ORM interface (`update()` with plain objects) remains truly shared, while Mongo-native atomic operators are exposed through the field accessor pattern — which is itself a shared mechanism (it works for SQL JSONB too, just with fewer operators).
+
+See [ADR 180 — Dot-path field accessor](../../../architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md) for the full rationale and backend translation tables.
 
 ---
 
-## 5. Schema validation and read-time guarantees
+## 5. Schema validation and read-time guarantees *(resolved — cross-family concern)*
 
-MongoDB doesn't enforce types — a field declared as `number` in the contract might contain a string in the database. Documents may not match the contract for many reasons: pre-existing data, direct writes bypassing PN, schema evolution.
+**Answer**: Read validation is configurable via the contract's existing `execution` section. Write validation is always on (non-configurable framework guarantee). Coercion is dropped — it silently changes semantics and causes subtle bugs when other consumers read the same data without coercing.
 
-**The question**: What does PN guarantee about data returned from reads?
+The fundamental problem generalizes beyond MongoDB's schemaless nature: any codec can encounter data it can't decode — a column type altered outside PN, corrupt data, schema evolution in progress. The question is always: what does the runtime do when the data doesn't match what the contract promised?
 
-Options:
-- **Validate on read, error on mismatch (strict)**: Reject documents that don't match the contract. Consistent with the runtime's existing `mode: 'strict'`. Risk: breaks reads on legacy data.
-- **Validate on read, warn on mismatch (permissive)**: Return the data but emit a diagnostic. The user sees their data, but gets notified of schema drift. The diagnostic channel is the runtime's log infrastructure — whether it pipes to error monitoring is the user's concern.
-- **Validate on write only**: Trust reads, validate writes. PN guarantees what it writes is correct; existing data is the user's problem. Lightest approach.
-- **Coerce where possible**: If the contract says `age: Int` and the doc has `age: "30"`, coerce it. This is what Mongoose does.
+**Three read validation strategies:**
 
-Tensions:
-- Strict validation on reads is the most correct behavior but may be impractical for users migrating from untyped Mongo usage — their existing data won't match the contract.
-- The runtime already has `mode: 'strict' | 'permissive'`. This is a natural place to control read validation behavior.
-- Coercion is convenient but lossy — it silently changes semantics. A string `"30"` and an integer `30` behave differently in comparisons, sorting, and aggregation.
+| Strategy | Behaviour | Use case |
+|---|---|---|
+| **`reject`** | Throw/error, row is not returned | Production, data you fully control |
+| **`warn`** | Return the raw/partial value, emit a diagnostic | Migration, data cleanup in progress |
+| **`passthrough`** | Return whatever came back, no validation | Performance-critical reads, "I know what I'm doing" |
 
-Related: Should PN optionally push `$jsonSchema` validation rules to MongoDB collections? This would give database-level write enforcement, complementing application-level validation.
+**Configuration lives in `execution`, not `models`.** The domain section (`models`) describes *what the data model is*; the execution section describes *how the runtime behaves*. This follows the same separation principle as domain/storage — execution is a third concern. The `execution` section already exists and carries mutation defaults and generated values; read validation is a new key in the same section.
+
+**Per-model and per-codec overrides within `execution`:**
+
+```json
+{
+  "execution": {
+    "readValidation": "reject",
+    "models": {
+      "LegacyEvent": { "readValidation": "warn" }
+    },
+    "codecs": {
+      "mongo/legacy_date@1": { "readValidation": "warn" }
+    },
+    "mutations": { ... }
+  }
+}
+```
+
+- **Contract-level default** (`execution.readValidation`): applies to all models. Default when omitted: `reject` (the framework protects you by default).
+- **Per-model override** (`execution.models.<Model>.readValidation`): override for a specific model. Useful during migration — flip models from `warn` to `reject` as you clean up collections.
+- **Per-codec override** (`execution.codecs.<codecId>.readValidation`): override for a specific codec type. Useful when a codec is known to encounter undecodable values (e.g., a best-effort legacy decoder, or a union codec facing type ambiguity).
+
+Resolution order: model-level > codec-level > contract default.
+
+**Design principles:**
+
+- **Write validation is non-configurable.** The framework always rejects invalid writes. This is a guarantee, not a policy. No execution config for that.
+- **Coercion is dropped.** It silently changes semantics — a string `"30"` and an integer `30` sort differently, compare differently, and aggregate differently. Coercing on read means the application sees data that doesn't match what's in the database. If coercion is needed, it belongs in a custom codec, not in the runtime's validation policy.
+- **`executionHash` implications.** Changing `readValidation` changes the `executionHash`. Switching from `warn` to `reject` is a meaningful change that could break reads at runtime — the team should be aware of it.
+- **Cross-family.** This applies to SQL too — JSONB columns can contain anything, and value objects stored in JSONB face the same validation question. Any codec encountering undecodable data hits this problem regardless of family.
+- **`$jsonSchema` is complementary.** Optionally pushing `$jsonSchema` validation rules to MongoDB collections provides database-level write enforcement, catching writes that bypass PN. This is an additional layer, not a replacement for application-level validation.
 
 ---
 
@@ -159,22 +192,18 @@ A `Comment` that can belong to either a `Post` or a `Video` (distinguished by `c
 
 ---
 
-## 7. Relation loading: application-level joining vs. `$lookup`
+## 7. Relation loading: application-level joining vs. `$lookup` *(resolved)*
 
-When the user asks to load a `User` and include their `Posts` (a referenced 1:N relation), there are two strategies.
+**Answer**: Use `$lookup` in aggregation pipelines for referenced relation loading. Application-level joining (multi-query + JS stitching) is simpler to implement but strictly inferior — it moves more data over the wire, requires multiple round trips, and is what Prisma ORM already does for Mongo (a known pain point). There's no point building the easy-but-dumb solution when `$lookup` is the correct approach.
 
-**The question**: Which strategy does the PN document ORM use, and when?
+This means the ORM's query compilation must target aggregation pipelines (not just `find()`) whenever a query involves `include` on a referenced relation. For embedded relations, no join is needed — the data comes back in the parent document's `find()` result.
 
-Options:
-- **Application-level joining**: Issue `find()` for users, then `find()` for posts where `authorId` is in the user ID set, stitch in JS. This is what the SQL ORM already does for includes, and what Prisma ORM does for Mongo.
-- **`$lookup` in aggregation pipeline**: Build a pipeline with a `$lookup` stage that joins users and posts server-side. More efficient for large result sets, but requires the ORM to compile to aggregation pipelines rather than simple `find()` calls.
+The Mongo ORM compilation target is:
+- **Basic CRUD without includes**: `find()` / `insertOne()` / `updateOne()` / `deleteOne()`
+- **Queries with referenced includes**: Aggregation pipeline with `$lookup` stages
+- **Queries with embedded includes**: `find()` with projection (data is already in the document)
 
-Tensions:
-- Application-level joining is simpler to implement and reuses existing patterns. But it requires N+1 queries (or 2 queries with an `$in` batch) and moves data over the wire that `$lookup` would handle server-side.
-- `$lookup` is more efficient but forces the ORM's query compilation to target aggregation pipelines for any query involving includes. This is a bigger implementation surface.
-- For embedded relations, neither approach is needed — the data comes back in the parent document's `find()` result. The ORM needs to know which relations are embedded and which are referenced to choose the right strategy.
-
-For the PoC: application-level joining is sufficient. But the architecture should not *prevent* `$lookup` optimization later.
+This also resolves part of [Q8](#8-aggregation-pipeline-as-the-mongo-query-builder-lane): the ORM needs pipeline compilation as a minimum for `$lookup`-based includes, which validates that building aggregation pipeline support is not optional.
 
 ---
 
@@ -228,7 +257,7 @@ For the PoC: Out of scope. The architecture constraints are:
 - **`model.storage`** — family-specific extension point (SQL: field → column; Mongo: field → codec)
 - **`relations`** — with cardinality and optional join details (`on`)
 - **`owner`** — model-level declaration of aggregate membership (see [ADR 177](../../../architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md))
-- **value objects** — named field structures without identity (not yet designed)
+- **value objects** — named field structures without identity, defined in a top-level `valueObjects` section (see [ADR 178](../../../architecture%20docs/adrs/ADR%20178%20-%20Value%20objects%20in%20the%20contract.md))
 
 This is not a mechanical extraction from either contract — it's a new abstraction rooted in domain modeling concepts:
 
@@ -236,7 +265,7 @@ This is not a mechanical extraction from either contract — it's a new abstract
 |---|---|
 | **Aggregate root** | Entry in `roots`, model with storage containing table/collection |
 | **Entity** | Entry in `models` |
-| **Value object** | Dedicated contract section (not yet designed) |
+| **Value object** | Top-level `valueObjects` section ([ADR 178](../../../architecture%20docs/adrs/ADR%20178%20-%20Value%20objects%20in%20the%20contract.md)) |
 | **Owned model** | Model with `"owner": "ParentModel"` — co-located storage |
 | **Reference** | Relation with `on` join details to an independent model |
 | **Polymorphism** | `discriminator` + `variants` on any model |
@@ -286,18 +315,71 @@ For the PoC: Out of scope. But the architecture should anticipate that MongoDB's
 
 ---
 
-## 13. Client-side field-level encryption (CSFLE) and queryable encryption
+## 13. Client-side field-level encryption (CSFLE) and queryable encryption *(partially resolved — contract placement decided)*
 
 MongoDB offers client-side field-level encryption (CSFLE) and queryable encryption (QE) — features that encrypt sensitive fields before they leave the application, so the database server never sees plaintext values.
 
 **The question**: How does PN surface encryption configuration for MongoDB?
 
-The MongoDB team rates this as **Medium priority**. It's a driver-level concern — the `mongodb` Node.js driver handles encryption/decryption transparently when configured. PN's involvement would be:
-- **Contract-level**: Declaring which fields are encrypted and their encryption metadata (key ID, algorithm, query type for QE).
-- **Adapter-level**: Passing encryption configuration to the MongoDB driver when establishing connections.
-- **ORM-level**: Ensuring that encrypted fields participate correctly in queries (QE allows equality queries on encrypted data; CSFLE does not).
+The MongoDB team rates this as **Medium priority**. It's a driver-level concern — the `mongodb` Node.js driver handles encryption/decryption transparently when configured.
 
-For the PoC: Out of scope. This is a production-readiness concern, not an architecture validation concern. But worth noting because it has no SQL equivalent — SQL databases handle encryption at the storage layer (TDE) or connection layer (TLS), not at the field level.
+### Where encryption configuration lives
+
+Encryption configuration belongs in the contract's **execution section**, not in `models` (domain) or `storage`. Encryption is about *how the runtime interacts with data* — the driver encrypts on write and decrypts on read — not about what the data model is or where data is stored. This is the same reasoning that places read validation policy in the execution section ([Q5](#5-schema-validation-and-read-time-guarantees-resolved--cross-family-concern)).
+
+The contract carries encryption *policy* (which fields, which algorithm, key references), not key material (which is a secret):
+
+```json
+"execution": {
+  "encryption": {
+    "keyVaultNamespace": "encryption.__keyVault",
+    "fields": {
+      "User.ssn": {
+        "keyAltName": "ssn-key",
+        "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+      },
+      "User.medicalRecords": {
+        "keyAltName": "medical-key",
+        "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
+      }
+    }
+  }
+}
+```
+
+The adapter reads this at connection time and passes it to the driver's `AutoEncryptionOpts`. Actual key material is resolved from the key vault at runtime — never stored in the contract.
+
+### Algorithm choice affects queryability
+
+This is the most interesting architectural implication: **encryption algorithm determines which query operators are available on a field.**
+
+- **Deterministic encryption**: produces the same ciphertext for the same plaintext. Supports equality queries (`eq`, `neq`). Does NOT support ordering, range queries, or text operations.
+- **Random encryption**: produces different ciphertext each time. Supports NO queries at all — the field is write-only from a query perspective.
+- **Queryable Encryption (QE, MongoDB 6.0+)**: supports equality queries and (in newer versions) range queries on encrypted data, via server-side encrypted indexes.
+
+This maps directly to the codec trait system ([ADR 170](../../../architecture%20docs/adrs/ADR%20170%20-%20Codec%20trait%20system.md)). An encrypted field's effective traits are the *intersection* of its codec's declared traits and the traits permitted by its encryption algorithm:
+
+| Algorithm | Effective traits |
+|---|---|
+| **Deterministic** | `equality` only (regardless of codec's declared traits) |
+| **Random** | none (field is not queryable) |
+| **QE equality** | `equality` only |
+| **QE range** | `equality`, `order` |
+
+A `mongo/string@1` field normally has `equality`, `order`, `textual` traits. If encrypted with `Random`, it has *none*. If encrypted with `Deterministic`, it has only `equality`. The query builder must respect this — `u.ssn.eq("123-45-6789")` works for deterministic encryption, but `u.ssn.like("123%")` is a type error.
+
+This means the contract's execution section has type-level implications that feed back into the query builder. The emitter would need to emit adjusted traits in `contract.d.ts` that account for encryption, or the query builder needs to intersect codec traits with encryption constraints at build time.
+
+### PN's involvement (summary)
+
+- **Contract-level** (`execution.encryption`): Declares which fields are encrypted, with which algorithm and key references.
+- **Adapter-level**: Passes encryption configuration to the MongoDB driver's `AutoEncryptionOpts` at connection time.
+- **Type-level**: Adjusts field traits based on encryption algorithm — restricts available query operators. A field encrypted with `Random` offers no query methods; `Deterministic` offers only equality.
+- **ORM-level**: Ensures the query builder respects encryption-constrained traits.
+
+For the PoC: Out of scope for implementation, but the architectural insight about trait intersection is worth recording — it validates that the trait system is the right mechanism for gating operators, even for concerns beyond data types.
+
+See also: [mongo-schema-migrations.md](mongo-schema-migrations.md) — CSFLE is client-side configuration, not a migration concern.
 
 ---
 
@@ -394,48 +476,9 @@ Not yet designed. Not blocking for April — but should be designed before the c
 
 ---
 
-## 16. Union field types (mixed-type fields)
+## 16. Union field types (mixed-type fields) *(resolved)*
 
-A MongoDB document field can hold values of different BSON types — a field `score` might be an `Int32` in some documents and a `String` in others. This is common in untyped or evolving collections.
-
-**The question**: How does the contract represent a field that can hold one of several types?
-
-### The current model
-
-Today, a field has a single `codecId`:
-
-```json
-{ "nullable": false, "codecId": "mongo/int32@1" }
-```
-
-This assumes every value in the field is the same type. For SQL, this is always true (columns are typed). For MongoDB, it's an aspiration — many real-world collections have mixed-type fields, either by design or from schema evolution.
-
-### Where this matters
-
-- **Introspection**: Introspecting an existing MongoDB collection will encounter mixed-type fields. The introspector needs to either pick one type and warn, or represent the union.
-- **Schema evolution**: Migrating a field from `string` to `int` means documents will contain both types until migration completes. The contract should be able to describe this transitional state.
-- **Intentional unions**: Some schemas intentionally use mixed types — a `metadata` field that can be a string or an object, a `value` field that can be a number or a string.
-- **TypeScript type inference**: If a field can be `int | string`, the generated TypeScript type should be `number | string`. The codec layer needs to handle multiple possible BSON types for the same field.
-
-### Options
-
-**A. Array of codec IDs**
-
-```json
-{ "nullable": false, "codecId": ["mongo/int32@1", "mongo/string@1"] }
-```
-
-Simple, but changes `codecId` from `string` to `string | string[]` everywhere it's consumed. Every consumer must handle the array case.
-
-**B. Dedicated union codec**
-
-```json
-{ "nullable": false, "codecId": "mongo/union@1", "codecParams": { "types": ["int32", "string"] } }
-```
-
-Keeps `codecId` as a single string. The union codec is itself parameterised. More complex codec implementation, but the contract field shape doesn't change.
-
-**C. Discriminated field union (inline polymorphism)**
+**Answer**: The `union` property on fields — a third mutually exclusive field type descriptor alongside `codecId` (scalar) and `type` (value object). Each union member carries either `codecId` or `type`:
 
 ```json
 {
@@ -445,21 +488,22 @@ Keeps `codecId` as a single string. The union codec is itself parameterised. Mor
       { "codecId": "mongo/int32@1" },
       { "codecId": "mongo/string@1" }
     ]
+  },
+  "location": {
+    "nullable": false,
+    "union": [
+      { "type": "Address" },
+      { "type": "GeoPoint" }
+    ]
   }
 }
 ```
 
-Extends the field shape with a `union` property. Most explicit, but changes the field schema.
+This was Option C from the original analysis. It extends the field shape with a `union` property while keeping `codecId` as a single string on non-union fields. The field type system is now: `codecId` (one scalar), `type` (one value object), `union` (multiple types — any mix of scalars and value objects). All three are mutually exclusive.
 
-### Relationship to polymorphic models
+Polymorphic value objects ([ADR 173](../../../architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)) handle *structured* unions with a discriminator and shared base. `union` handles *unstructured* unions with no discriminator.
 
-Model-level polymorphism (ADR 173) and field-level unions are different granularities of the same idea: "this location can hold one of several shapes." Model polymorphism uses a discriminator field to distinguish shapes; field unions typically don't have a discriminator (the type is inspected at runtime). This is analogous to TypeScript's discriminated unions vs. plain unions.
-
-### SQL relevance
-
-This applies directly to SQL via `JSON`/`JSONB` columns. A JSON column can hold arbitrary structures, and the content may have mixed types at any level. If the contract represents typed JSON column content (which is a natural extension of the value objects work), the same union question applies. This is not a hypothetical future concern — SQL JSON columns are widely used today, and typed access to their contents is a common request.
-
-Not yet designed. Not blocking for April — the PoC contracts all have single-type fields. But this is a prerequisite for MongoDB introspection, for accurately modeling real-world Mongo collections, and for typed SQL JSON column access.
+See [ADR 179 — Union field types](../../../architecture%20docs/adrs/ADR%20179%20-%20Union%20field%20types.md) for the full rationale.
 
 ---
 

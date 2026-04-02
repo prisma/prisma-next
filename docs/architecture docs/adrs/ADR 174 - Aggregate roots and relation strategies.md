@@ -169,14 +169,14 @@ This design means:
 
 - **Reference relation join details are now explicit.** A `"strategy": "reference"` relation carries `on: { localFields, targetFields }` to make both sides of the FK join unambiguous regardless of cardinality. A `"strategy": "embed"` relation carries `field` to identify the parent field that holds the embedded data.
 - **Many-to-many without a join model** (Mongo: `student.courseIds: ObjectId[]`) doesn't fit cleanly into `reference` or `embed`. It may need a third strategy or a way to express "this relation is stored as an array of ObjectIds on the parent." Not yet designed.
-- **Value objects** are not yet represented in the contract. There's a fundamental distinction between entities (have identity and lifecycle — a Post with its own `_id` is an entity even when embedded) and value objects (no identity — an Address defined by its field values is interchangeable with any other identical Address). Currently, value objects must be represented as models, which is semantically incorrect. A dedicated contract section for value objects would make this distinction explicit.
+- ~~**Value objects**~~: **Resolved.** Value objects are now a top-level `valueObjects` section in the contract. See [ADR 178 — Value objects in the contract](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md).
 
 ### Open questions
 
 - ~~**Relation storage details**: What's the shape of family-specific join info on `reference` relations? What field on the parent holds an `embed` relation's data?~~ **Resolved**: Reference relations use `on: { localFields, targetFields }`. Embed relations use `field: string`.
 - **Many-to-many**: Does a junction table appear as a model? Probably not — it's storage machinery, not a domain entity. But the relation needs to reference it somehow.
 - **`nullable` on relations**: Can a reference relation be nullable (User may not have an assignee)? Where does this live — on the relation, on the field, or on the storage?
-- **Entity vs value object**: When should the contract distinguish models (entities) from value objects? What triggers the need for a dedicated value objects section? (See the Costs section above.)
+- ~~**Entity vs value object**~~: **Resolved.** Value objects are defined in a top-level `valueObjects` section, distinct from `models`. See [ADR 178 — Value objects in the contract](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md).
 
 ## Related
 
