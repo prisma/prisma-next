@@ -1,3 +1,11 @@
+import {
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractOperationTypeImports,
+  extractParameterizedRenderers,
+  extractParameterizedTypeImports,
+  extractQueryOperationTypeImports,
+} from '@prisma-next/contract/assembly';
 import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
@@ -27,16 +35,7 @@ import {
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import {
-  assembleOperationRegistry,
-  extractCodecTypeImports,
-  extractExtensionIds,
-  extractOperationTypeImports,
-  extractParameterizedRenderers,
-  extractParameterizedTypeImports,
-  extractQueryOperationTypeImports,
-  type SqlControlDescriptorWithContributions,
-} from './assembly';
+import { assembleOperationRegistry, type SqlControlDescriptorWithContributions } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
 import type {
   SqlControlAdapterDescriptor,
@@ -299,7 +298,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
   const queryOperationTypeImports = extractQueryOperationTypeImports(descriptors);
-  const extensionIds = extractExtensionIds(adapter, target, extensions);
+  const extensionIds = extractExtensionIds({ id: 'sql' }, target, adapter, extensions);
   const parameterizedRenderers = extractParameterizedRenderers(descriptors);
   const parameterizedTypeImports = extractParameterizedTypeImports(descriptors);
 
