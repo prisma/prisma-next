@@ -7,11 +7,18 @@
   "profileHash": "sha256:test-profile",
   "models": {
     "User": {
-      "storage": { "table": "user" },
+      "storage": {
+        "table": "user",
+        "fields": {
+          "id": { "column": "id" },
+          "email": { "column": "email" },
+          "createdAt": { "column": "createdAt" }
+        }
+      },
       "fields": {
-        "id": { "column": "id" },
-        "email": { "column": "email" },
-        "createdAt": { "column": "createdAt" }
+        "id": { "codecId": "pg/int4@1", "nullable": false },
+        "email": { "codecId": "pg/text@1", "nullable": false },
+        "createdAt": { "codecId": "pg/timestamptz@1", "nullable": false }
       },
       "relations": {}
     }
@@ -33,7 +40,7 @@
       }
     }
   },
-  "extensions": {},
+  "extensionPacks": {},
   "capabilities": {
     "postgres": {
       "returning": true
