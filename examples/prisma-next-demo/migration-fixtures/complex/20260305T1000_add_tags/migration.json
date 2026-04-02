@@ -49,7 +49,9 @@
             }
           },
           "primaryKey": {
-            "columns": ["id"]
+            "columns": [
+              "id"
+            ]
           },
           "uniques": [],
           "indexes": [],
@@ -83,7 +85,9 @@
             }
           },
           "primaryKey": {
-            "columns": ["id"]
+            "columns": [
+              "id"
+            ]
           },
           "uniques": [],
           "indexes": [],
@@ -122,7 +126,9 @@
             }
           },
           "primaryKey": {
-            "columns": ["id"]
+            "columns": [
+              "id"
+            ]
           },
           "uniques": [],
           "indexes": [],
@@ -131,8 +137,6 @@
       }
     },
     "models": {},
-    "relations": {},
-    "mappings": {},
     "capabilities": {},
     "extensionPacks": {},
     "meta": {},
@@ -184,7 +188,9 @@
             }
           },
           "primaryKey": {
-            "columns": ["id"]
+            "columns": [
+              "id"
+            ]
           },
           "uniques": [],
           "indexes": [],
@@ -218,7 +224,9 @@
             }
           },
           "primaryKey": {
-            "columns": ["id"]
+            "columns": [
+              "id"
+            ]
           },
           "uniques": [],
           "indexes": [],
@@ -257,7 +265,9 @@
             }
           },
           "primaryKey": {
-            "columns": ["id"]
+            "columns": [
+              "id"
+            ]
           },
           "uniques": [],
           "indexes": [],
@@ -277,7 +287,9 @@
             }
           },
           "primaryKey": {
-            "columns": ["id"]
+            "columns": [
+              "id"
+            ]
           },
           "uniques": [],
           "indexes": [],
@@ -286,8 +298,6 @@
       }
     },
     "models": {},
-    "relations": {},
-    "mappings": {},
     "capabilities": {},
     "extensionPacks": {},
     "meta": {},
@@ -299,6 +309,8 @@
     "plannerVersion": "1.0.0",
     "planningStrategy": "diff"
   },
-  "labels": ["main"],
+  "labels": [
+    "main"
+  ],
   "createdAt": "2026-03-24T15:13:45.637Z"
 }

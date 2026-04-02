@@ -34,7 +34,9 @@
             }
           },
           "primaryKey": {
-            "columns": ["id"]
+            "columns": [
+              "id"
+            ]
           },
           "uniques": [],
           "indexes": [],
@@ -43,8 +45,6 @@
       }
     },
     "models": {},
-    "relations": {},
-    "mappings": {},
     "capabilities": {},
     "extensionPacks": {},
     "meta": {},
@@ -86,7 +86,9 @@
             }
           },
           "primaryKey": {
-            "columns": ["id"]
+            "columns": [
+              "id"
+            ]
           },
           "uniques": [],
           "indexes": [],
@@ -95,8 +97,6 @@
       }
     },
     "models": {},
-    "relations": {},
-    "mappings": {},
     "capabilities": {},
     "extensionPacks": {},
     "meta": {},
