@@ -1,6 +1,6 @@
 import type { AssembledComponentState } from '@prisma-next/contract/assembly';
 import { describe, expect, it } from 'vitest';
-import { MongoFamilyDescriptor } from '../src/core/control-descriptor';
+import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
 import { mongoTargetDescriptor } from '../src/core/mongo-target-descriptor';
 
@@ -16,22 +16,20 @@ function createMinimalAssembledState(): AssembledComponentState {
   };
 }
 
-describe('MongoFamilyDescriptor', () => {
+describe('mongoFamilyDescriptor', () => {
   it('throws when assembledState is missing', () => {
-    const descriptor = new MongoFamilyDescriptor();
     const stack = { target: mongoTargetDescriptor, extensions: [] };
 
-    expect(() => descriptor.create(stack as never)).toThrow(
+    expect(() => mongoFamilyDescriptor.create(stack as never)).toThrow(
       'MongoFamilyDescriptor.create() requires assembledState',
     );
   });
 
   it('returns a valid instance when assembledState is provided', () => {
-    const descriptor = new MongoFamilyDescriptor();
     const stack = { target: mongoTargetDescriptor, extensions: [] };
     const state = createMinimalAssembledState();
 
-    const instance = descriptor.create(stack as never, state);
+    const instance = mongoFamilyDescriptor.create(stack as never, state);
 
     expect(instance.familyId).toBe('mongo');
     expect(typeof instance.validateContractIR).toBe('function');
@@ -39,13 +37,11 @@ describe('MongoFamilyDescriptor', () => {
   });
 
   it('has expected descriptor shape', () => {
-    const descriptor = new MongoFamilyDescriptor();
-
-    expect(descriptor.kind).toBe('family');
-    expect(descriptor.id).toBe('mongo');
-    expect(descriptor.familyId).toBe('mongo');
-    expect(descriptor.version).toBe('0.0.1');
-    expect(descriptor.hook).toBeDefined();
+    expect(mongoFamilyDescriptor.kind).toBe('family');
+    expect(mongoFamilyDescriptor.id).toBe('mongo');
+    expect(mongoFamilyDescriptor.familyId).toBe('mongo');
+    expect(mongoFamilyDescriptor.version).toBe('0.0.1');
+    expect(mongoFamilyDescriptor.hook).toBeDefined();
   });
 });
 

@@ -1,4 +1,4 @@
-export { MongoFamilyDescriptor } from '../core/control-descriptor';
+export { mongoFamilyDescriptor } from '../core/control-descriptor';
 export {
   createMongoFamilyInstance,
   type MongoControlFamilyInstance,
