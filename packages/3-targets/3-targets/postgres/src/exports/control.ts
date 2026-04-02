@@ -15,7 +15,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
-import type { PostgresPlanTargetDetails } from '../core/migrations/planner-types';
+import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 
 function buildNativeTypeExpander(
