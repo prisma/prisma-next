@@ -8,6 +8,7 @@ export type {
 export {
   assembleAuthoringContributions,
   assembleComponents,
+  assertUniqueCodecOwner,
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,

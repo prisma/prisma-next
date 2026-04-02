@@ -1,3 +1,4 @@
+import { assertUniqueCodecOwner } from '@prisma-next/contract/assembly';
 import type {
   AuthoringContributions,
   TargetBoundComponentDescriptor,
@@ -53,23 +54,6 @@ export function assembleOperationRegistry(
 }
 
 type CodecControlHooksMap = Record<string, CodecControlHooks>;
-
-function assertUniqueCodecOwner(options: {
-  readonly codecId: string;
-  readonly owners: Map<string, string>;
-  readonly descriptorId: string;
-  readonly entityLabel: string;
-  readonly entityOwnershipLabel: string;
-}): void {
-  const existingOwner = options.owners.get(options.codecId);
-  if (existingOwner !== undefined) {
-    throw new Error(
-      `Duplicate ${options.entityLabel} for codecId "${options.codecId}". ` +
-        `Descriptor "${options.descriptorId}" conflicts with "${existingOwner}". ` +
-        `Each codecId can only have one ${options.entityOwnershipLabel}.`,
-    );
-  }
-}
 
 function hasCodecControlHooks(descriptor: unknown): descriptor is {
   readonly id: string;
