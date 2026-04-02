@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:43f728c37e9b8f369b2b8acefa387906afd4555646a08528254eceee247342d7'>;
+  StorageHashBase<'sha256:42688420507f30fe04fc98b370813fd10dd8bd336d6770eb026dd81aef527815'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:630618d96f7674c186a027d1295bfc5d688c4168c5a023a1aea01553820387dc'>;
+  ExecutionHashBase<'sha256:e1ebe2d0c623f17a7e66036721cb7b8de43c7955e72fe7d7733b88a92684b16d'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:ea5c6635c0c0bd71badced0f3ee8ba912cf72dc836ae165cd533dc8f68cbfc9f'>;
+  ProfileHashBase<'sha256:4c68d253773262f590e742c85e147dd4eb29e082c65856d97671d98ef343de04'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -200,7 +200,7 @@ type ContractBase = SqlContract<
   ProfileHash
 > & {
   readonly target: 'postgres';
-  readonly roots: { readonly Post: 'Post'; readonly User: 'User' };
+  readonly roots: Record<string, string>;
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;
