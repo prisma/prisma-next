@@ -4,9 +4,8 @@ import type {
   AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
-  NormalizedTypeRenderer,
-  TypeRenderer,
-} from './framework-components';
+} from './framework-authoring';
+import type { NormalizedTypeRenderer, TypeRenderer } from './framework-components';
 import { normalizeRenderer } from './framework-components';
 import type { TypesImportSpec } from './types';
 
