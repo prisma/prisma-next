@@ -1,4 +1,3 @@
-import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringFieldNamespace,
@@ -8,6 +7,7 @@ import type {
 } from './framework-authoring';
 import type { NormalizedTypeRenderer, TypeRenderer } from './framework-components';
 import { normalizeRenderer } from './framework-components';
+import type { TypesImportSpec } from './types';
 
 export interface AssemblyInput {
   readonly id: string;

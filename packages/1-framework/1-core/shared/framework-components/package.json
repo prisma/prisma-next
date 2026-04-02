@@ -12,8 +12,6 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:*",
-    "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
@@ -31,7 +29,6 @@
     "./components": "./dist/components.mjs",
     "./authoring": "./dist/authoring.mjs",
     "./control": "./dist/control.mjs",
-    "./execution": "./dist/execution.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
