@@ -66,6 +66,7 @@ async function main() {
   });
 
   const instance = mongoFamilyDescriptor.create(
+    // TODO(5.8): remove cast when create() accepts ControlStack directly
     { target: mongoTargetDescriptor } as never,
     controlStack,
   );

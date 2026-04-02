@@ -17,15 +17,15 @@ class MongoFamilyDescriptor
 
   create<TTargetId extends string>(
     _stack: ControlPlaneStack<'mongo', TTargetId>,
-    assembledState?: ControlStack,
+    controlStack?: ControlStack,
   ): MongoControlFamilyInstance {
-    if (!assembledState) {
+    if (!controlStack) {
       throw new Error(
-        'MongoFamilyDescriptor.create() requires assembledState. ' +
-          'Call assembleComponents() first and pass the result.',
+        'MongoFamilyDescriptor.create() requires controlStack. ' +
+          'Call createControlStack() first and pass the result.',
       );
     }
-    return createMongoFamilyInstance(assembledState);
+    return createMongoFamilyInstance(controlStack);
   }
 }
 

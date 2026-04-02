@@ -17,15 +17,15 @@ function createMinimalControlStack(): ControlStack {
 }
 
 describe('mongoFamilyDescriptor', () => {
-  it('throws when assembledState is missing', () => {
+  it('throws when controlStack is missing', () => {
     const stack = { target: mongoTargetDescriptor, extensions: [] };
 
     expect(() => mongoFamilyDescriptor.create(stack as never)).toThrow(
-      'MongoFamilyDescriptor.create() requires assembledState',
+      'MongoFamilyDescriptor.create() requires controlStack',
     );
   });
 
-  it('returns a valid instance when assembledState is provided', () => {
+  it('returns a valid instance when controlStack is provided', () => {
     const stack = { target: mongoTargetDescriptor, extensions: [] };
     const state = createMinimalControlStack();
 

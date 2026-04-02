@@ -21,10 +21,10 @@ export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo
 class MongoFamilyInstance implements MongoControlFamilyInstance {
   readonly familyId = 'mongo' as const;
 
-  private readonly assembledState: ControlStack;
+  private readonly controlStack: ControlStack;
 
-  constructor(assembledState: ControlStack) {
-    this.assembledState = assembledState;
+  constructor(controlStack: ControlStack) {
+    this.controlStack = controlStack;
   }
 
   validateContractIR(contractJson: unknown): ContractIR {
@@ -49,7 +49,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       extensionIds,
       parameterizedRenderers,
       parameterizedTypeImports,
-    } = this.assembledState;
+    } = this.controlStack;
 
     const result = await emit(
       ir,
@@ -95,8 +95,6 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
   }
 }
 
-export function createMongoFamilyInstance(
-  assembledState: ControlStack,
-): MongoControlFamilyInstance {
-  return new MongoFamilyInstance(assembledState);
+export function createMongoFamilyInstance(controlStack: ControlStack): MongoControlFamilyInstance {
+  return new MongoFamilyInstance(controlStack);
 }
