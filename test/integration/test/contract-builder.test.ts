@@ -3,6 +3,7 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
+import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { ExtractCodecTypes, ModelDefinition } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
@@ -286,6 +287,7 @@ describe('builder integration', () => {
     });
 
     const contract = defineContract({
+      family: sqlFamilyPack,
       target: postgresPack,
       storageHash: 'sha256:test-refined',
       models: {
