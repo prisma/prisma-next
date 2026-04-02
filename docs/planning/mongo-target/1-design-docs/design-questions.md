@@ -325,7 +325,7 @@ The MongoDB team rates this as **Medium priority**. It's a driver-level concern 
 
 ### Where encryption configuration lives
 
-Encryption configuration belongs in the contract's **execution section**, not in `models` (domain) or `storage`. Encryption is about *how the runtime interacts with data* — the driver encrypts on write and decrypts on read — not about what the data model is or where data is stored. This is the same reasoning that places read validation policy in the execution section ([Q5](#5-schema-validation-and-read-time-guarantees)).
+Encryption configuration belongs in the contract's **execution section**, not in `models` (domain) or `storage`. Encryption is about *how the runtime interacts with data* — the driver encrypts on write and decrypts on read — not about what the data model is or where data is stored. This is the same reasoning that places read validation policy in the execution section ([Q5](#5-schema-validation-and-read-time-guarantees-resolved--cross-family-concern)).
 
 The contract carries encryption *policy* (which fields, which algorithm, key references), not key material (which is a secret):
 
