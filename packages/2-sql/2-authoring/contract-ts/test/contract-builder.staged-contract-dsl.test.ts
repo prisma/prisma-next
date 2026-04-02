@@ -811,3 +811,92 @@ describe('staged contract DSL authoring surface', () => {
     ).toThrow('Model token "User" must be assigned to models.User. Received models.Account.');
   });
 });
+
+describe('self-referential and circular relations', () => {
+  it('lowers a self-referential tree relation (parent/children on the same model)', () => {
+    const Category = model('Category', {
+      fields: {
+        id: field.column(int4Column).id(),
+        name: field.column(textColumn),
+        parentId: field.column(int4Column).optional(),
+      },
+      relations: {
+        parent: rel.belongsTo(() => Category, { from: 'parentId', to: 'id' }),
+        children: rel.hasMany(() => Category, { by: 'parentId' }),
+      },
+    });
+
+    const contract = defineStagedContract({
+      models: { Category },
+    });
+
+    const categoryRelations = contract.relations['Category'];
+    expect(categoryRelations).toMatchObject({
+      parent: {
+        to: 'Category',
+        cardinality: 'N:1',
+        on: {
+          parentCols: ['parentId'],
+          childCols: ['id'],
+        },
+      },
+      children: {
+        to: 'Category',
+        cardinality: '1:N',
+        on: {
+          parentCols: ['id'],
+          childCols: ['parentId'],
+        },
+      },
+    });
+  });
+
+  it('lowers circular relations (A references B, B references A)', () => {
+    const Employee = model('Employee', {
+      fields: {
+        id: field.column(int4Column).id(),
+        name: field.column(textColumn),
+        departmentId: field.column(int4Column),
+      },
+      relations: {
+        department: rel.belongsTo(() => Department, { from: 'departmentId', to: 'id' }),
+      },
+    });
+
+    const Department = model('Department', {
+      fields: {
+        id: field.column(int4Column).id(),
+        name: field.column(textColumn),
+        headId: field.column(int4Column),
+      },
+      relations: {
+        head: rel.belongsTo(Employee, { from: 'headId', to: 'id' }),
+      },
+    });
+
+    const contract = defineStagedContract({
+      models: { Employee, Department },
+    });
+
+    expect(contract.relations['Employee']).toMatchObject({
+      department: {
+        to: 'Department',
+        cardinality: 'N:1',
+        on: {
+          parentCols: ['departmentId'],
+          childCols: ['id'],
+        },
+      },
+    });
+    expect(contract.relations['Department']).toMatchObject({
+      head: {
+        to: 'Employee',
+        cardinality: 'N:1',
+        on: {
+          parentCols: ['headId'],
+          childCols: ['id'],
+        },
+      },
+    });
+  });
+});
