@@ -4,6 +4,7 @@ import {
   AndExpr,
   type AnyQueryAst,
   BinaryExpr,
+  CastExpr,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
@@ -273,5 +274,58 @@ describe('Postgres adapter', () => {
     const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
 
     expect(sql).toContain('WHERE FALSE');
+  });
+
+  it('renders arithmetic operations with parentheses', () => {
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('sum', BinaryExpr.add(ColumnRef.of('user', 'id'), LiteralExpr.of(1))),
+      ProjectionItem.of('diff', BinaryExpr.sub(ColumnRef.of('user', 'id'), LiteralExpr.of(1))),
+      ProjectionItem.of('prod', BinaryExpr.mul(ColumnRef.of('user', 'id'), LiteralExpr.of(2))),
+      ProjectionItem.of('quot', BinaryExpr.div(ColumnRef.of('user', 'id'), LiteralExpr.of(2))),
+      ProjectionItem.of('rem', BinaryExpr.mod(ColumnRef.of('user', 'id'), LiteralExpr.of(2))),
+    ]);
+
+    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+
+    expect(sql).toBe(
+      'SELECT ("user"."id" + 1) AS "sum", ("user"."id" - 1) AS "diff", ("user"."id" * 2) AS "prod", ("user"."id" / 2) AS "quot", ("user"."id" % 2) AS "rem" FROM "user"',
+    );
+  });
+
+  it('renders arithmetic in WHERE clause', () => {
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withWhere(
+        BinaryExpr.gt(
+          BinaryExpr.add(ColumnRef.of('user', 'id'), LiteralExpr.of(1)),
+          LiteralExpr.of(5),
+        ),
+      );
+
+    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+
+    expect(sql).toContain('WHERE ("user"."id" + 1) > 5');
+  });
+
+  it('renders type cast with Postgres :: syntax', () => {
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('idText', CastExpr.of(ColumnRef.of('user', 'id'), 'pg/text@1')),
+    ]);
+
+    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+
+    expect(sql).toBe('SELECT ("user"."id")::text AS "idText" FROM "user"');
+  });
+
+  it('renders cast in WHERE clause', () => {
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withWhere(
+        BinaryExpr.eq(CastExpr.of(ColumnRef.of('user', 'id'), 'pg/text@1'), LiteralExpr.of('1')),
+      );
+
+    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+
+    expect(sql).toContain(`WHERE ("user"."id")::text = '1'`);
   });
 });

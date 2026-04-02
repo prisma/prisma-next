@@ -2,6 +2,7 @@ import {
   AggregateExpr,
   AndExpr,
   BinaryExpr,
+  CastExpr,
   ColumnRef,
   ExistsExpr,
   IdentifierRef,
@@ -251,6 +252,80 @@ describe('createAggregateFunctions', () => {
 
     expect(ast).toBeInstanceOf(BinaryExpr);
     expect(ast.op).toBe('eq');
+  });
+});
+
+describe('arithmetic operators', () => {
+  let fns: ReturnType<typeof createFunctions>;
+
+  beforeEach(() => {
+    fns = createFunctions({});
+  });
+
+  it('add produces BinaryExpr with op add', () => {
+    const result = fns.add(f().id, 1);
+    const ast = result.buildAst() as BinaryExpr;
+
+    expect(ast).toBeInstanceOf(BinaryExpr);
+    expect(ast.op).toBe('add');
+    expect(ast.left).toBeInstanceOf(IdentifierRef);
+    expect(ast.right).toBeInstanceOf(ParamRef);
+  });
+
+  it('sub produces BinaryExpr with op sub', () => {
+    const result = fns.sub(f().id, 1);
+    expect((result.buildAst() as BinaryExpr).op).toBe('sub');
+  });
+
+  it('mul produces BinaryExpr with op mul', () => {
+    const result = fns.mul(f().id, 2);
+    expect((result.buildAst() as BinaryExpr).op).toBe('mul');
+  });
+
+  it('div produces BinaryExpr with op div', () => {
+    const result = fns.div(f().id, 2);
+    expect((result.buildAst() as BinaryExpr).op).toBe('div');
+  });
+
+  it('mod produces BinaryExpr with op mod', () => {
+    const result = fns.mod(f().id, 2);
+    expect((result.buildAst() as BinaryExpr).op).toBe('mod');
+  });
+
+  it('preserves codec from expression operand', () => {
+    const result = fns.add(f().id, 1);
+    expect((result as ExpressionImpl).field).toEqual({ codecId: 'pg/int4@1', nullable: false });
+  });
+
+  it('two expressions produce BinaryExpr with both column refs', () => {
+    const fields = jf();
+    const result = fns.add(fields.users.id, fields.posts.id);
+    const ast = result.buildAst() as BinaryExpr;
+
+    expect(ast.op).toBe('add');
+    expect(ast.left).toBeInstanceOf(ColumnRef);
+    expect(ast.right).toBeInstanceOf(ColumnRef);
+  });
+});
+
+describe('cast', () => {
+  let fns: ReturnType<typeof createFunctions>;
+
+  beforeEach(() => {
+    fns = createFunctions({});
+  });
+
+  it('produces CastExpr with target codec id', () => {
+    const result = fns.cast(f().id, { codecId: 'pg/text@1', nullable: false });
+    const ast = result.buildAst() as CastExpr;
+
+    expect(ast).toBeInstanceOf(CastExpr);
+    expect(ast.targetCodecId).toBe('pg/text@1');
+  });
+
+  it('returns field with target codec and nullable', () => {
+    const result = fns.cast(f().id, { codecId: 'pg/text@1', nullable: true });
+    expect((result as ExpressionImpl).field).toEqual({ codecId: 'pg/text@1', nullable: true });
   });
 });
 
