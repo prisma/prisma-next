@@ -2,7 +2,6 @@ import type {
   ContractWithTypeMaps,
   ExtractCodecTypes,
   SqlContract,
-  SqlMappings,
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
@@ -46,9 +45,7 @@ type TestContract = SqlContract<
       };
     };
   },
-  Record<string, never>,
-  Record<string, never>,
-  SqlMappings
+  Record<string, never>
 >;
 
 type TestTypeMaps = TypeMaps<
@@ -92,8 +89,6 @@ describe('schema', () => {
       },
     },
     models: {},
-    relations: {},
-    mappings: {},
   });
 
   it('creates schema with tables', () => {
@@ -200,8 +195,6 @@ describe('schema', () => {
         },
       },
       models: {},
-      relations: {},
-      mappings: {},
     });
 
     const adapter = createStubAdapter();

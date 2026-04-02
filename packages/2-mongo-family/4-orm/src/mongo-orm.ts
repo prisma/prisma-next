@@ -39,7 +39,7 @@ function buildLookupStages(
   for (const [relName, shouldInclude] of Object.entries(include)) {
     if (!shouldInclude) continue;
 
-    const relation = model.relations[relName];
+    const relation = model.relations?.[relName];
     if (!relation) continue;
 
     const targetModel = contract.models[relation.to];

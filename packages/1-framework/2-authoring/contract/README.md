@@ -38,7 +38,7 @@ This package was created in Phase 2 of the contract authoring extraction. It con
 
 - Builder state types: `ColumnBuilderState`, `TableBuilderState`, `ModelBuilderState`, `ContractBuilderState`, `ForeignKeysConfigState`, `RelationDefinition`, `ColumnBuilder`
 - Builder classes: `TableBuilder`, `ModelBuilder`, `ContractBuilder`
-- Type helpers: `BuildStorageColumn`, `BuildStorage`, `BuildModels`, `BuildRelations`, extract helpers, `Mutable`
+- Type helpers: `BuildStorageColumn`, `BuildStorage`, `BuildModels`, extract helpers, `Mutable`
 - Factory function: `defineContract()` (generic)
 
 ## Usage

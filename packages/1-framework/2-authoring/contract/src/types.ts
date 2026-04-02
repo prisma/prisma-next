@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, DomainField, DomainRelation } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
   ModelBuilderState,
@@ -102,15 +102,6 @@ export type ExtractModelFields<
     ? F
     : never;
 
-export type ExtractModelRelations<
-  T extends ModelBuilderState<
-    string,
-    string,
-    Record<string, string>,
-    Record<string, RelationDefinition>
-  >,
-> = T extends ModelBuilderState<string, string, Record<string, string>, infer R> ? R : never;
-
 export type BuildModels<
   Models extends Record<
     string,
@@ -118,16 +109,11 @@ export type BuildModels<
   >,
 > = {
   readonly [K in keyof Models]: {
-    readonly storage: { readonly table: Models[K]['table'] };
-    readonly fields: BuildModelFields<ExtractModelFields<Models[K]>>;
+    readonly storage: {
+      readonly table: Models[K]['table'];
+      readonly fields: BuildModelFields<ExtractModelFields<Models[K]>>;
+    };
+    readonly fields: Record<string, DomainField>;
+    readonly relations: Record<string, DomainRelation>;
   };
-};
-
-export type BuildRelations<
-  Models extends Record<
-    string,
-    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
-  >,
-> = {
-  readonly [K in keyof Models as Models[K]['table']]: ExtractModelRelations<Models[K]>;
 };

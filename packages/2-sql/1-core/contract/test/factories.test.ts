@@ -283,18 +283,37 @@ describe('SQL contract factories', () => {
   });
 
   describe('model', () => {
-    it('creates a ModelDefinition', () => {
+    it('creates model storage fields and domain fields without optional properties', () => {
       const userModel = model('user', {
         id: { column: 'id' },
         email: { column: 'email' },
       });
       expect(userModel).toEqual({
-        storage: { table: 'user' },
+        storage: {
+          table: 'user',
+          fields: {
+            id: { column: 'id' },
+            email: { column: 'email' },
+          },
+        },
         fields: {
-          id: { column: 'id' },
-          email: { column: 'email' },
+          id: { nullable: false },
+          email: { nullable: false },
         },
         relations: {},
+      });
+    });
+
+    it('propagates codecId and nullable from storage fields to domain fields', () => {
+      const userModel = model('user', {
+        id: { column: 'id', codecId: 'pg/int4@1', nullable: false },
+        name: { column: 'name', codecId: 'pg/text@1', nullable: true },
+        email: { column: 'email' },
+      });
+      expect(userModel.fields).toEqual({
+        id: { nullable: false, codecId: 'pg/int4@1' },
+        name: { nullable: true, codecId: 'pg/text@1' },
+        email: { nullable: false },
       });
     });
 
@@ -309,7 +328,8 @@ describe('SQL contract factories', () => {
         },
       );
       expect(userModel.storage.table).toBe('user');
-      expect(userModel.fields).toEqual({ id: { column: 'id' } });
+      expect(userModel.storage.fields).toEqual({ id: { column: 'id' } });
+      expect(userModel.fields).toEqual({ id: { nullable: false } });
       expect(userModel.relations).toEqual({
         posts: { kind: 'oneToMany', model: 'Post', foreignKey: 'userId' },
       });
@@ -345,7 +365,6 @@ describe('SQL contract factories', () => {
       expect(c.storageHash).toBe('sha256:abc123');
       expect(c.storage).toEqual(s);
       expect(c.models).toEqual({});
-      expect(c.relations).toEqual({});
       expect(c.schemaVersion).toBe('1');
     });
 
@@ -368,25 +387,6 @@ describe('SQL contract factories', () => {
         models: m,
       });
       expect(c.models).toEqual(m);
-    });
-
-    it('creates contract with relations', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const relations = {
-        user: {
-          posts: { kind: 'oneToMany', model: 'Post', foreignKey: 'userId' },
-        },
-      };
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
-        relations,
-      });
-      expect(c.relations).toEqual(relations);
     });
 
     it('creates contract with profileHash', () => {
@@ -480,24 +480,6 @@ describe('SQL contract factories', () => {
         sources,
       });
       expect(c.sources).toEqual(sources);
-    });
-
-    it('creates contract with mappings', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const mappings = {
-        modelToTable: { User: 'user' },
-        tableToModel: { user: 'User' },
-      };
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
-        mappings,
-      });
-      expect(c.mappings).toEqual(mappings);
     });
   });
 });

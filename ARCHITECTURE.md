@@ -96,7 +96,7 @@ See [`architecture.config.json`](./architecture.config.json) for the complete do
 ### SQL Family Domain
 
 - **`@prisma-next/sql-contract-ts`** — SQL-specific TypeScript contract authoring surface
-- **`@prisma-next/sql-contract`** — SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`)
+- **`@prisma-next/sql-contract`** — SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlModelStorage`)
 - **`@prisma-next/sql-operations`** — SQL-specific operation definitions and assembly
 - **`@prisma-next/sql-contract-emitter`** — SQL emitter hook implementation
 - **`@prisma-next/sql-relational-core`** — Schema and column builders, operation attachment, and AST types

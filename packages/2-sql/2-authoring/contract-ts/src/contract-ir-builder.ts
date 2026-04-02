@@ -16,15 +16,11 @@ import type {
 } from '@prisma-next/contract-authoring';
 import {
   applyFkDefaults,
-  type ModelDefinition,
-  type ModelField,
-  type SqlMappings,
   type SqlStorage,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { computeMappings } from './contract';
 import type { SqlSemanticContractDefinition, SqlSemanticModelNode } from './semantic-contract';
 
 type RuntimeTableState = TableBuilderState<
@@ -211,55 +207,61 @@ export function buildContractIR(state: RuntimeBuilderState): ContractIR {
         }
       : undefined;
 
-  const models: Record<string, ModelDefinition> = {};
-
-  for (const modelName in state.models) {
-    const modelState = state.models[modelName];
-    if (!modelState) continue;
-
-    const fields: Record<string, ModelField> = {};
-    for (const fieldName in modelState.fields) {
-      const columnName = modelState.fields[fieldName];
-      if (columnName) {
-        fields[fieldName] = { column: columnName };
-      }
-    }
-
-    models[modelName] = {
-      storage: { table: modelState.table },
-      fields,
-      relations: {},
-    };
-  }
-
-  const relations: Record<string, Record<string, RelationDefinition>> = {};
+  const models: Record<string, Record<string, unknown>> = {};
 
   for (const modelName in state.models) {
     const modelState = state.models[modelName];
     if (!modelState) continue;
 
     const tableName = modelState.table;
-    if (!tableName) continue;
+    const tableState = state.tables[tableName];
+    const tableColumns = tableState
+      ? (tableState.columns as Record<string, { type: string; nullable?: boolean }>)
+      : {};
 
-    if (modelState.relations && Object.keys(modelState.relations).length > 0) {
-      if (!relations[tableName]) {
-        relations[tableName] = {};
-      }
+    const storageFields: Record<string, { readonly column: string }> = {};
+    const domainFields: Record<string, Record<string, unknown>> = {};
 
-      const tableRelations = relations[tableName];
-      if (tableRelations) {
-        for (const relationName in modelState.relations) {
-          const relation = modelState.relations[relationName];
-          if (relation) {
-            tableRelations[relationName] = relation;
-          }
-        }
+    for (const fieldName in modelState.fields) {
+      const columnName = modelState.fields[fieldName];
+      if (!columnName) continue;
+
+      storageFields[fieldName] = { column: columnName };
+
+      const column = tableColumns[columnName];
+      if (column) {
+        domainFields[fieldName] = {
+          codecId: column.type,
+          nullable: column.nullable ?? false,
+        };
       }
     }
-  }
 
-  const baseMappings = computeMappings(models, storage as SqlStorage);
-  const mappings = baseMappings as SqlMappings;
+    const modelRelations: Record<string, Record<string, unknown>> = {};
+    if (modelState.relations) {
+      for (const relName in modelState.relations) {
+        const rel = modelState.relations[relName];
+        if (!rel) continue;
+        modelRelations[relName] = {
+          to: rel.to,
+          cardinality: rel.cardinality,
+          on: {
+            localFields: rel.on.parentCols,
+            targetFields: rel.on.childCols,
+          },
+        };
+      }
+    }
+
+    models[modelName] = {
+      storage: {
+        table: tableName,
+        fields: storageFields,
+      },
+      fields: domainFields,
+      relations: modelRelations,
+    };
+  }
 
   const extensionNamespaces = state.extensionNamespaces ?? [];
   const extensionPacks: Record<string, unknown> = { ...(state.extensionPacks || {}) };
@@ -275,9 +277,8 @@ export function buildContractIR(state: RuntimeBuilderState): ContractIR {
     targetFamily: 'sql' as const,
     storageHash: state.storageHash || 'sha256:ts-builder-placeholder',
     models,
-    relations,
+    roots: {},
     storage,
-    mappings,
     ...(execution ? { execution } : {}),
     extensionPacks,
     capabilities: state.capabilities || {},

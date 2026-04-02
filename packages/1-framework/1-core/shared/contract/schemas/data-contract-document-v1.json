@@ -49,7 +49,7 @@
         }
       }
     },
-    "extensions": {
+    "extensionPacks": {
       "type": "object",
       "description": "Extension packs and their configuration",
       "additionalProperties": true

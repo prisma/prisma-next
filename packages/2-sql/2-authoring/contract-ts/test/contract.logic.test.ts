@@ -532,8 +532,10 @@ describe('validateContract logic validation', () => {
       const contract = createModelContract();
       const userModel = (contract['models'] as Record<string, Record<string, unknown>>)[
         'User'
-      ] as Record<string, unknown>;
-      userModel['fields'] = { id: { column: 'missing' } };
+      ] as Record<string, Record<string, unknown>>;
+      (userModel['storage'] as Record<string, unknown>)['fields'] = {
+        id: { column: 'missing' },
+      };
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
         /references non-existent column "missing"/,
       );
@@ -549,7 +551,7 @@ describe('validateContract logic validation', () => {
       )['relations'] = {
         posts: {
           to: 'Post',
-          on: { parentCols: ['id'], childCols: ['userId'] },
+          on: { localFields: ['id'], targetFields: ['userId'] },
           cardinality: '1:N',
         },
       };
@@ -579,7 +581,7 @@ describe('validateContract logic validation', () => {
       )['relations'] = {
         user: {
           to: 'User',
-          on: { parentCols: ['id'], childCols: ['userId'] },
+          on: { localFields: ['userId'], targetFields: ['id'] },
           cardinality: 'N:1',
         },
       };
@@ -598,7 +600,7 @@ describe('validateContract logic validation', () => {
       )['relations'] = {
         user: {
           to: 'User',
-          on: { parentCols: ['id'], childCols: ['userId'] },
+          on: { localFields: ['userId'], targetFields: ['id'] },
           cardinality: 'N:1',
         },
       };

@@ -1,6 +1,6 @@
 export interface DomainModelShape {
   readonly fields: Record<string, unknown>;
-  readonly relations: Record<string, { readonly to: string }>;
+  readonly relations?: Record<string, { readonly to: string }>;
   readonly discriminator?: { readonly field: string };
   readonly variants?: Record<string, unknown>;
   readonly base?: string;
@@ -60,7 +60,9 @@ function validateVariantsAndBases(
   modelNames: Set<string>,
   errors: string[],
 ): void {
-  for (const [modelName, model] of Object.entries(contract.models)) {
+  const models = new Map(Object.entries(contract.models));
+
+  for (const [modelName, model] of models) {
     if (model.variants) {
       for (const variantName of Object.keys(model.variants)) {
         if (!modelNames.has(variantName)) {
@@ -69,7 +71,7 @@ function validateVariantsAndBases(
           );
           continue;
         }
-        const variantModel = contract.models[variantName];
+        const variantModel = models.get(variantName);
         if (!variantModel) continue;
         if (variantModel.base !== modelName) {
           errors.push(
@@ -84,7 +86,7 @@ function validateVariantsAndBases(
         errors.push(`Model "${modelName}" has base "${model.base}" which does not exist in models`);
         continue;
       }
-      const baseModel = contract.models[model.base];
+      const baseModel = models.get(model.base);
       if (!baseModel) continue;
       if (!baseModel.variants || !Object.hasOwn(baseModel.variants, modelName)) {
         errors.push(
@@ -101,7 +103,7 @@ function validateRelationTargets(
   errors: string[],
 ): void {
   for (const [modelName, model] of Object.entries(contract.models)) {
-    for (const [relName, relation] of Object.entries(model.relations)) {
+    for (const [relName, relation] of Object.entries(model.relations ?? {})) {
       if (!modelNames.has(relation.to)) {
         errors.push(
           `Relation "${relName}" on model "${modelName}" targets "${relation.to}" which does not exist in models`,
@@ -177,7 +179,7 @@ function detectOrphanedModels(
   }
 
   for (const [modelName, model] of Object.entries(contract.models)) {
-    for (const relation of Object.values(model.relations)) {
+    for (const relation of Object.values(model.relations ?? {})) {
       referenced.add(relation.to);
     }
     if (model.variants) {

@@ -5,7 +5,7 @@ import {
 } from '@prisma-next/adapter-postgres/column-types';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import type { ExtractCodecTypes, ModelDefinition } from '@prisma-next/sql-contract/types';
+import type { ExtractCodecTypes } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { SelectAst } from '@prisma-next/sql-relational-core/ast';
@@ -339,8 +339,12 @@ describe('builder integration', () => {
       email: { codecId: fixtureContract.storage.tables.user.columns.email.codecId },
       createdAt: { codecId: fixtureContract.storage.tables.user.columns.createdAt.codecId },
     });
-    const builderUserModel = builderContract.models.User as unknown as ModelDefinition;
-    const fixtureUserModel = fixtureContract.models.User as unknown as ModelDefinition;
+    type ModelShape = {
+      storage: { table: string; fields: Record<string, unknown> };
+      fields: Record<string, unknown>;
+    };
+    const builderUserModel = builderContract.models.User as unknown as ModelShape;
+    const fixtureUserModel = fixtureContract.models.User as unknown as ModelShape;
     expect(builderUserModel.storage.table).toBe(fixtureUserModel.storage.table);
     expect(Object.keys(builderUserModel.fields)).toEqual(Object.keys(fixtureUserModel.fields));
 
@@ -453,34 +457,28 @@ describe('builder integration', () => {
         .storageHash('sha256:test-core')
         .build();
 
-      // Runtime checks
-      expect(contract.relations).toBeDefined();
-      const relations = contract.relations as Record<string, Record<string, unknown>>;
-      const userRelations = relations['user'] as Record<string, unknown>;
-      const postRelations = relations['post'] as Record<string, unknown>;
-      expect(userRelations).toBeDefined();
-      expect(userRelations['posts']).toBeDefined();
-      const userPosts = userRelations['posts'] as {
+      type RelShape = {
         to: string;
         cardinality: string;
-        on: { parentCols: readonly string[]; childCols: readonly string[] };
+        on: { localFields: readonly string[]; targetFields: readonly string[] };
       };
-      expect(userPosts.to).toBe('Post');
-      expect(userPosts.cardinality).toBe('1:N');
-      expect(userPosts.on.parentCols).toEqual(['id']);
-      expect(userPosts.on.childCols).toEqual(['userId']);
+      type ModelShape = { relations: Record<string, RelShape> };
+      const models = contract.models as Record<string, ModelShape>;
+      const userRels = models['User']!.relations;
+      const postRels = models['Post']!.relations;
+      expect(userRels).toBeDefined();
+      expect(userRels['posts']).toBeDefined();
+      expect(userRels['posts']!.to).toBe('Post');
+      expect(userRels['posts']!.cardinality).toBe('1:N');
+      expect(userRels['posts']!.on.localFields).toEqual(['id']);
+      expect(userRels['posts']!.on.targetFields).toEqual(['userId']);
 
-      expect(postRelations).toBeDefined();
-      expect(postRelations['user']).toBeDefined();
-      const postUser = postRelations['user'] as {
-        to: string;
-        cardinality: string;
-        on: { parentCols: readonly string[]; childCols: readonly string[] };
-      };
-      expect(postUser.to).toBe('User');
-      expect(postUser.cardinality).toBe('N:1');
-      expect(postUser.on.parentCols).toEqual(['userId']);
-      expect(postUser.on.childCols).toEqual(['id']);
+      expect(postRels).toBeDefined();
+      expect(postRels['user']).toBeDefined();
+      expect(postRels['user']!.to).toBe('User');
+      expect(postRels['user']!.cardinality).toBe('N:1');
+      expect(postRels['user']!.on.localFields).toEqual(['userId']);
+      expect(postRels['user']!.on.targetFields).toEqual(['id']);
     });
 
     it('builds a contract with N:M relation', () => {
@@ -549,29 +547,17 @@ describe('builder integration', () => {
         .storageHash('sha256:test-core')
         .build();
 
-      // Runtime checks
-      expect(contract.relations).toMatchObject({
-        user: {
-          roles: {
-            to: 'Role',
-            cardinality: 'N:M',
-            through: {
-              table: 'userRole',
-              parentCols: ['id'],
-              childCols: ['userId'],
-            },
-          },
+      const models = contract.models as Record<string, { relations: Record<string, unknown> }>;
+      expect(models['User']?.relations).toMatchObject({
+        roles: {
+          to: 'Role',
+          cardinality: 'N:M',
         },
-        role: {
-          users: {
-            to: 'User',
-            cardinality: 'N:M',
-            through: {
-              table: 'userRole',
-              parentCols: ['id'],
-              childCols: ['roleId'],
-            },
-          },
+      });
+      expect(models['Role']?.relations).toMatchObject({
+        users: {
+          to: 'User',
+          cardinality: 'N:M',
         },
       });
     });

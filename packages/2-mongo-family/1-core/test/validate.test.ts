@@ -11,7 +11,6 @@ function makeValidContractJson() {
       Item: {
         fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
         storage: { collection: 'items' },
-        relations: {},
       },
     },
   };
@@ -41,7 +40,6 @@ describe('validateMongoContract()', () => {
           Item: {
             fields: { _id: { codecId: 123 } },
             storage: { collection: 'items' },
-            relations: {},
           },
         },
       };
@@ -100,7 +98,6 @@ describe('validateMongoContract()', () => {
           Tag: {
             fields: { name: { codecId: 'mongo/string@1', nullable: false } },
             storage: { collection: 'tags' },
-            relations: {},
             owner: 'Item',
           },
         },

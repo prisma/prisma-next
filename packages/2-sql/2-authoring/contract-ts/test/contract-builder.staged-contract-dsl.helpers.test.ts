@@ -271,7 +271,10 @@ describe('staged contract DSL helper vocabulary', () => {
         onCreate: { kind: 'generator', id: 'uuidv4' },
       },
     ]);
-    expect(contract.models.AuditEntry.fields.actorId).toEqual({ column: 'actor_id' });
+    expect(
+      (contract.models.AuditEntry as unknown as { storage: { fields: Record<string, unknown> } })
+        .storage.fields.actorId,
+    ).toEqual({ column: 'actor_id' });
   });
 
   it('preserves literal codec ids for composed field helpers', () => {

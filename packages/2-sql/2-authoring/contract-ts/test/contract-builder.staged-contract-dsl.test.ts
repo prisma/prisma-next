@@ -191,26 +191,33 @@ describe('staged contract DSL authoring surface', () => {
         onCreate: { kind: 'generator', id: 'uuidv4' },
       },
     ]);
-    const contractModels = contract.models as Record<string, { fields: Record<string, unknown> }>;
-    expect(contractModels['User']?.fields['createdAt']).toEqual({ column: 'created_at' });
-    expect(contractModels['Post']?.fields['userId']).toEqual({ column: 'user_id' });
-    expect(contract.relations['app_user']).toMatchObject({
+    const contractModels = contract.models as Record<
+      string,
+      {
+        fields: Record<string, unknown>;
+        relations: Record<string, unknown>;
+        storage: { table: string; fields: Record<string, unknown> };
+      }
+    >;
+    expect(contractModels['User']?.storage.fields['createdAt']).toEqual({ column: 'created_at' });
+    expect(contractModels['Post']?.storage.fields['userId']).toEqual({ column: 'user_id' });
+    expect(contractModels['User']?.relations).toMatchObject({
       posts: {
         to: 'Post',
         cardinality: '1:N',
         on: {
-          parentCols: ['id'],
-          childCols: ['user_id'],
+          localFields: ['id'],
+          targetFields: ['user_id'],
         },
       },
     });
-    expect(contract.relations['blog_post']).toMatchObject({
+    expect(contractModels['Post']?.relations).toMatchObject({
       user: {
         to: 'User',
         cardinality: 'N:1',
         on: {
-          parentCols: ['user_id'],
-          childCols: ['id'],
+          localFields: ['user_id'],
+          targetFields: ['id'],
         },
       },
     });
@@ -264,7 +271,10 @@ describe('staged contract DSL authoring surface', () => {
         columns: Record<string, unknown>;
       }
     >;
-    const models = contract.models as Record<string, { fields: Record<string, unknown> }>;
+    const models = contract.models as Record<
+      string,
+      { storage: { fields: Record<string, unknown> }; fields: Record<string, unknown> }
+    >;
     expect(tables['app_user']?.primaryKey).toEqual({
       columns: ['id'],
       name: 'app_user_pkey',
@@ -287,8 +297,8 @@ describe('staged contract DSL authoring surface', () => {
         index: false,
       },
     ]);
-    expect(models['Post']?.fields['authorId']).toEqual({ column: 'author_id' });
-    expect(models['Post']?.fields['createdAt']).toEqual({ column: 'created_at' });
+    expect(models['Post']?.storage.fields['authorId']).toEqual({ column: 'author_id' });
+    expect(models['Post']?.storage.fields['createdAt']).toEqual({ column: 'created_at' });
   });
 
   it.each([
@@ -363,26 +373,20 @@ describe('staged contract DSL authoring surface', () => {
       },
     });
 
-    expect(contract.relations['post']).toMatchObject({
+    const contractModels = contract.models as Record<
+      string,
+      { relations: Record<string, unknown> }
+    >;
+    expect(contractModels['Post']?.relations).toMatchObject({
       tags: {
         to: 'Tag',
         cardinality: 'N:M',
-        through: {
-          table: 'post_tag',
-          parentCols: ['post_id'],
-          childCols: ['tag_id'],
-        },
       },
     });
-    expect(contract.relations['tag']).toMatchObject({
+    expect(contractModels['Tag']?.relations).toMatchObject({
       posts: {
         to: 'Post',
         cardinality: 'N:M',
-        through: {
-          table: 'post_tag',
-          parentCols: ['tag_id'],
-          childCols: ['post_id'],
-        },
       },
     });
   });
@@ -478,23 +482,27 @@ describe('staged contract DSL authoring surface', () => {
       ...ownershipCase,
     });
 
-    expect(contract.relations['app_user']).toMatchObject({
+    const contractModels = contract.models as Record<
+      string,
+      { relations: Record<string, unknown> }
+    >;
+    expect(contractModels['User']?.relations).toMatchObject({
       [relationName]: {
         to: targetModelName,
         cardinality: expectedCardinality,
         on: {
-          parentCols: ['id'],
-          childCols: ['user_id'],
+          localFields: ['id'],
+          targetFields: ['user_id'],
         },
       },
     });
-    expect(contract.relations[targetTable]).toMatchObject({
+    expect(contractModels[targetModelName]?.relations).toMatchObject({
       user: {
         to: 'User',
         cardinality: 'N:1',
         on: {
-          parentCols: ['user_id'],
-          childCols: ['id'],
+          localFields: ['user_id'],
+          targetFields: ['id'],
         },
       },
     });
@@ -522,9 +530,12 @@ describe('staged contract DSL authoring surface', () => {
     expect(tables['blog_post']).toBeDefined();
     expect(tables['blog_post']?.columns['created_at']).toBeDefined();
     expect(tables['blog_post']?.columns['author_identifier']).toBeDefined();
-    const models = contract.models as Record<string, { fields: Record<string, unknown> }>;
-    expect(models['BlogPost']?.fields['createdAt']).toEqual({ column: 'created_at' });
-    expect(models['BlogPost']?.fields['authorId']).toEqual({
+    const models = contract.models as Record<
+      string,
+      { storage: { fields: Record<string, unknown> } }
+    >;
+    expect(models['BlogPost']?.storage.fields['createdAt']).toEqual({ column: 'created_at' });
+    expect(models['BlogPost']?.storage.fields['authorId']).toEqual({
       column: 'author_identifier',
     });
   });
@@ -824,22 +835,24 @@ describe('self-referential and circular relations', () => {
       models: { Category },
     });
 
-    const categoryRelations = contract.relations['Category'];
-    expect(categoryRelations).toMatchObject({
+    const categoryModel = (
+      contract.models as Record<string, { relations: Record<string, unknown> }>
+    )['Category'];
+    expect(categoryModel?.relations).toMatchObject({
       parent: {
         to: 'Category',
         cardinality: 'N:1',
         on: {
-          parentCols: ['parentId'],
-          childCols: ['id'],
+          localFields: ['parentId'],
+          targetFields: ['id'],
         },
       },
       children: {
         to: 'Category',
         cardinality: '1:N',
         on: {
-          parentCols: ['id'],
-          childCols: ['parentId'],
+          localFields: ['id'],
+          targetFields: ['parentId'],
         },
       },
     });
@@ -873,23 +886,27 @@ describe('self-referential and circular relations', () => {
       models: { Employee, Department },
     });
 
-    expect(contract.relations['Employee']).toMatchObject({
+    const contractModels = contract.models as Record<
+      string,
+      { relations: Record<string, unknown> }
+    >;
+    expect(contractModels['Employee']?.relations).toMatchObject({
       department: {
         to: 'Department',
         cardinality: 'N:1',
         on: {
-          parentCols: ['departmentId'],
-          childCols: ['id'],
+          localFields: ['departmentId'],
+          targetFields: ['id'],
         },
       },
     });
-    expect(contract.relations['Department']).toMatchObject({
+    expect(contractModels['Department']?.relations).toMatchObject({
       head: {
         to: 'Employee',
         cardinality: 'N:1',
         on: {
-          parentCols: ['headId'],
-          childCols: ['id'],
+          localFields: ['headId'],
+          targetFields: ['id'],
         },
       },
     });

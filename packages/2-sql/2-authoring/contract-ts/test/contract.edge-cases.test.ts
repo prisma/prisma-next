@@ -166,7 +166,7 @@ describe('validateContract edge cases', () => {
     expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).not.toThrow();
   });
 
-  it('handles relation without parentCols', () => {
+  it('rejects relation using old parentCols/childCols format', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',
@@ -176,12 +176,12 @@ describe('validateContract edge cases', () => {
         User: {
           storage: { table: 'user' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             posts: {
               to: 'Post',
-              on: { childCols: ['userId'] },
+              on: { parentCols: ['id'], childCols: ['userId'] },
               cardinality: '1:N',
             },
           },
@@ -202,47 +202,8 @@ describe('validateContract edge cases', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    // Relations without parentCols should be skipped in validation
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).not.toThrow();
-  });
-
-  it('handles relation without childCols', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-          },
-          relations: {
-            posts: {
-              to: 'Post',
-              on: { parentCols: ['id'] },
-              cardinality: '1:N',
-            },
-          },
-        },
-      },
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
-    // Relations without childCols should be skipped in validation
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).not.toThrow();
+    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow(
+      'unsupported relation format (expected localFields/targetFields)',
+    );
   });
 });

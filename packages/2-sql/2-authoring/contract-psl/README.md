@@ -19,7 +19,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 - Support selected Postgres native-type attributes on named types for brownfield round-trips (`@db.Char`, `@db.VarChar`, `@db.Numeric`, `@db.Uuid`, `@db.SmallInt`, `@db.Real`, `@db.Timestamp`, `@db.Timestamptz`, `@db.Date`, `@db.Time`, `@db.Timetz`, `@db.Json`)
 - Support pgvector parity mapping from PSL attributes to existing TS-representable descriptor shape (`codecId`, `nativeType`, `typeParams`)
 - Map PSL relation action tokens to SQL contract referential actions and emit diagnostics for unsupported values
-- Emit deterministic relation metadata in `models.<Model>.relations` and top-level `contract.relations`
+- Emit deterministic relation metadata in `models.<Model>.relations`
 - Enforce extension composition for supported namespaced attributes (for example `@pgvector.column(...)`)
 - Validate generator applicability by declared `codecId` support on composed generator descriptors
 - Consume target-bound scalar descriptors and mutation-default registries assembled by composition layers

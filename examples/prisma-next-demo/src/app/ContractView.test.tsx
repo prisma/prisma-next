@@ -11,11 +11,18 @@ function buildContract(overrides?: Partial<Contract>): Contract {
     targetFamily: 'sql',
     models: {
       user: {
-        storage: { table: 'users' },
-        fields: {
-          id: { column: 'id' },
-          email: { column: 'email' },
+        storage: {
+          table: 'users',
+          fields: {
+            id: { column: 'id' },
+            email: { column: 'email' },
+          },
         },
+        fields: {
+          id: { codecId: 'pg/uuid@1', nullable: false },
+          email: { codecId: 'pg/text@1', nullable: false },
+        },
+        relations: {},
       },
     },
     storage: {
@@ -31,15 +38,6 @@ function buildContract(overrides?: Partial<Contract>): Contract {
           indexes: [],
         },
       },
-    },
-    relations: {
-      users: {},
-    },
-    mappings: {
-      modelToTable: { user: 'users' },
-      tableToModel: { users: 'user' },
-      fieldToColumn: { user: { id: 'id', email: 'email' } },
-      columnToField: { users: { id: 'id', email: 'email' } },
     },
     capabilities: {
       sql: { returning: true },
@@ -71,17 +69,17 @@ describe('ContractView', () => {
     const contract = buildContract({
       models: {
         [untrusted]: {
-          storage: { table: 'users' },
-          fields: {
-            [untrusted]: { column: untrusted },
+          storage: {
+            table: 'users',
+            fields: {
+              [untrusted]: { column: untrusted },
+            },
           },
+          fields: {
+            [untrusted]: { codecId: 'pg/text@1', nullable: false },
+          },
+          relations: {},
         },
-      },
-      mappings: {
-        modelToTable: { [untrusted]: 'users' },
-        tableToModel: { users: untrusted },
-        fieldToColumn: { [untrusted]: { [untrusted]: untrusted } },
-        columnToField: { users: { [untrusted]: untrusted } },
       },
     } as unknown as Partial<Contract>);
 

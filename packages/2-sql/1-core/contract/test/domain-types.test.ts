@@ -1,6 +1,6 @@
 import type { ContractBase, DomainRelation } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import type { SqlContract, SqlMappings, SqlRelation, SqlStorage } from '../src/types';
+import type { SqlContract, SqlRelation, SqlStorage } from '../src/types';
 
 type AssertExtends<T, U> = T extends U ? true : never;
 
@@ -25,23 +25,6 @@ describe('domain type compatibility', () => {
     });
   });
 
-  describe('old consumer-facing fields remain accessible', () => {
-    it('mappings accessible on SqlContract', () => {
-      type Mappings = SqlContract['mappings'];
-      const mappings: Mappings = {
-        modelToTable: { User: 'user' },
-        tableToModel: { user: 'User' },
-      };
-      expect(mappings.modelToTable).toBeDefined();
-    });
-
-    it('top-level relations accessible on SqlContract', () => {
-      type Relations = SqlContract['relations'];
-      const relations: Relations = {};
-      expect(relations).toBeDefined();
-    });
-  });
-
   describe('roots accessible on SqlContract via ContractBase', () => {
     it('roots field exists on SqlContract', () => {
       type Roots = SqlContract['roots'];
@@ -63,32 +46,27 @@ describe('domain type compatibility', () => {
         readonly User: {
           readonly fields: {
             readonly name: {
-              readonly column: 'display_name';
               readonly nullable: true;
               readonly codecId: 'pg/text@1';
             };
           };
           readonly relations: Record<string, never>;
-          readonly storage: { readonly table: 'user' };
+          readonly storage: {
+            readonly table: 'user';
+            readonly fields: { readonly name: { readonly column: 'display_name' } };
+          };
         };
       };
 
-      type ExampleContract = SqlContract<
-        SqlStorage,
-        ExampleModels,
-        Record<string, never>,
-        SqlMappings
-      >;
+      type ExampleContract = SqlContract<SqlStorage, ExampleModels>;
 
       type NameField = ExampleContract['models']['User']['fields']['name'];
 
       const _nullable: NameField['nullable'] = true;
       const _codecId: NameField['codecId'] = 'pg/text@1';
-      const _column: NameField['column'] = 'display_name';
 
       expect(_nullable).toBe(true);
       expect(_codecId).toBe('pg/text@1');
-      expect(_column).toBe('display_name');
     });
   });
 });

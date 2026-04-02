@@ -58,7 +58,7 @@ export function orm<
   const { runtime, collections, context } = options;
   const contract = context.contract;
   const ctx: CollectionContext<TContract> = { runtime, context };
-  const modelNames = new Set(Object.keys(contract.models as Record<string, unknown>));
+  const modelNames = new Set(Object.keys(contract.models));
   const collectionRegistry = createCollectionRegistry(contract, collections);
   const cache = new Map<
     ModelNames<TContract>,

@@ -1,6 +1,5 @@
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
-import type { RelationDefinition } from '@prisma-next/contract-authoring';
 import type {
   ContractWithTypeMaps,
   Index,
@@ -472,49 +471,8 @@ type StagedBuiltStorage<Definition> = {
   readonly types: StagedDefinitionTypes<Definition>;
 };
 
-type StagedBuiltMappings<Definition> = {
-  readonly modelToTable: {
-    readonly [ModelName in StagedModelNames<Definition>]: StagedBuiltModelTableName<
-      Definition,
-      ModelName
-    >;
-  };
-  readonly tableToModel: {
-    readonly [ModelName in StagedModelNames<Definition> as StagedBuiltModelTableName<
-      Definition,
-      ModelName
-    >]: ModelName;
-  };
-  readonly fieldToColumn: {
-    readonly [ModelName in StagedModelNames<Definition>]: {
-      readonly [FieldName in StagedModelFieldNames<Definition, ModelName>]: StagedModelColumnName<
-        Definition,
-        ModelName,
-        FieldName
-      >;
-    };
-  };
-  readonly columnToField: {
-    readonly [ModelName in StagedModelNames<Definition> as StagedBuiltModelTableName<
-      Definition,
-      ModelName
-    >]: {
-      readonly [FieldName in StagedModelFieldNames<Definition, ModelName> as StagedModelColumnName<
-        Definition,
-        ModelName,
-        FieldName
-      >]: FieldName;
-    };
-  };
-};
-
 export type SqlContractResult<Definition> = ContractWithTypeMaps<
-  SqlContract<
-    StagedBuiltStorage<Definition>,
-    StagedBuiltModels<Definition>,
-    Record<string, Record<string, RelationDefinition>>,
-    StagedBuiltMappings<Definition>
-  > & {
+  SqlContract<StagedBuiltStorage<Definition>, StagedBuiltModels<Definition>> & {
     readonly schemaVersion: '1';
     readonly target: StagedDefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';

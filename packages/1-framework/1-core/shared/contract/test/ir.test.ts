@@ -403,7 +403,6 @@ describe('contractIR', () => {
       meta,
       storage: { tables: {} },
       models: {},
-      relations: {},
       execution,
     });
 

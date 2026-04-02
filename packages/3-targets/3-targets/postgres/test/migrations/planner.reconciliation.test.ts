@@ -177,8 +177,6 @@ function createContract(
     storage: { tables },
     roots: {},
     models: {},
-    relations: {},
-    mappings: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},

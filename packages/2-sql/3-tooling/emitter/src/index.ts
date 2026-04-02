@@ -7,13 +7,24 @@ import type {
   ValidationContext,
 } from '@prisma-next/contract/types';
 import type {
-  ModelDefinition,
-  ModelField,
   SqlStorage,
   StorageColumn,
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+
+type IRModelField = { readonly column: string };
+type IRModelStorage = {
+  readonly table: string;
+  readonly fields?: Record<string, IRModelField>;
+};
+type IRModelDefinition = {
+  readonly storage: IRModelStorage;
+  readonly fields?: Record<string, unknown>;
+  readonly relations: Record<string, unknown>;
+  readonly owner?: string;
+};
+
 import { assertDefined } from '@prisma-next/utils/assertions';
 
 /**
@@ -80,12 +91,12 @@ export const sqlTargetFamilyHook = {
       throw new Error('SQL contract must have storage.tables');
     }
 
-    const models = ir.models as Record<string, ModelDefinition> | undefined;
+    const models = ir.models as Record<string, IRModelDefinition> | undefined;
     const tableNames = new Set(Object.keys(storage.tables));
 
     if (models) {
       for (const [modelName, modelUnknown] of Object.entries(models)) {
-        const model = modelUnknown as ModelDefinition;
+        const model = modelUnknown as IRModelDefinition;
         if (!model.storage?.table) {
           throw new Error(`Model "${modelName}" is missing storage.table`);
         }
@@ -103,12 +114,12 @@ export const sqlTargetFamilyHook = {
         }
 
         const columnNames = new Set(Object.keys(table.columns));
-        if (!model.fields || Object.keys(model.fields).length === 0) {
-          throw new Error(`Model "${modelName}" is missing fields`);
+        const storageFields = model.storage.fields;
+        if (!storageFields || Object.keys(storageFields).length === 0) {
+          throw new Error(`Model "${modelName}" is missing storage.fields`);
         }
 
-        for (const [fieldName, fieldUnknown] of Object.entries(model.fields)) {
-          const field = fieldUnknown as ModelField;
+        for (const [fieldName, field] of Object.entries(storageFields)) {
           if (!field.column) {
             throw new Error(`Model "${modelName}" field "${fieldName}" is missing column property`);
           }
@@ -236,7 +247,7 @@ export const sqlTargetFamilyHook = {
     const parameterizedRenderers = options?.parameterizedRenderers;
     const parameterizedTypeImports = options?.parameterizedTypeImports;
     const storage = ir.storage as SqlStorage;
-    const models = ir.models as Record<string, ModelDefinition>;
+    const models = ir.models as Record<string, IRModelDefinition>;
 
     // Collect all type imports from three sources:
     // 1. Codec type imports (from adapters, targets, and extensions)
@@ -296,8 +307,6 @@ export const sqlTargetFamilyHook = {
     const renderCtx: TypeRenderContext = { codecTypesName: 'CodecTypes' };
     const storageType = this.generateStorageType(storage);
     const modelsType = this.generateModelsType(models, storage, parameterizedRenderers, renderCtx);
-    const relationsType = this.generateRelationsType(ir.relations);
-    const mappingsType = this.generateMappingsType(models, storage);
     const rootsType = this.generateRootsType(ir.roots);
 
     const executionHashType = hashes.executionHash
@@ -316,9 +325,6 @@ export const sqlTargetFamilyHook = {
   } from '@prisma-next/contract/types';
   import type {
     SqlContract,
-    SqlStorage,
-    SqlMappings,
-    ModelDefinition,
     ContractWithTypeMaps,
     TypeMaps as TypeMapsType,
   } from '@prisma-next/sql-contract/types';
@@ -343,8 +349,6 @@ export const sqlTargetFamilyHook = {
   type ContractBase = SqlContract<
   ${storageType},
   ${modelsType},
-  ${relationsType},
-  ${mappingsType},
   StorageHash,
   ExecutionHash,
   ProfileHash
@@ -360,7 +364,6 @@ export const sqlTargetFamilyHook = {
 
   export type Tables = Contract['storage']['tables'];
   export type Models = Contract['models'];
-  export type Relations = Contract['relations'];
   `;
   },
 
@@ -531,7 +534,7 @@ export const sqlTargetFamilyHook = {
   },
 
   generateModelsType(
-    models: Record<string, ModelDefinition> | undefined,
+    models: Record<string, IRModelDefinition> | undefined,
     storage: SqlStorage,
     parameterizedRenderers: Map<string, TypeRenderEntry> | undefined,
     renderCtx: TypeRenderContext,
@@ -549,11 +552,12 @@ export const sqlTargetFamilyHook = {
       const tableName = model.storage.table;
       const table = storage.tables[tableName];
 
+      const storageFields = model.storage.fields ?? {};
       if (table) {
-        for (const [fieldName, field] of Object.entries(model.fields)) {
+        for (const [fieldName, field] of Object.entries(storageFields)) {
           const column = table.columns[field.column];
           if (!column) {
-            fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+            fields.push(`readonly ${fieldName}: unknown`);
             storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
             continue;
           }
@@ -568,8 +572,8 @@ export const sqlTargetFamilyHook = {
           storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
         }
       } else {
-        for (const [fieldName, field] of Object.entries(model.fields)) {
-          fields.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+        for (const [fieldName, field] of Object.entries(storageFields)) {
+          fields.push(`readonly ${fieldName}: unknown`);
           storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
         }
       }
@@ -635,130 +639,5 @@ export const sqlTargetFamilyHook = {
     const baseType = renderer ? renderer.render(typeParams, renderCtx) : fallbackType;
 
     return nullable ? `${baseType} | null` : baseType;
-  },
-
-  generateRelationsType(relations: Record<string, unknown> | undefined): string {
-    if (!relations || Object.keys(relations).length === 0) {
-      return 'Record<string, never>';
-    }
-
-    const tableEntries: string[] = [];
-    for (const [tableName, relsValue] of Object.entries(relations).sort(([a], [b]) =>
-      a.localeCompare(b),
-    )) {
-      if (typeof relsValue !== 'object' || relsValue === null) {
-        continue;
-      }
-      const rels = relsValue as Record<string, unknown>;
-      const relationEntries: string[] = [];
-      for (const [relName, relValue] of Object.entries(rels)) {
-        if (typeof relValue !== 'object' || relValue === null) {
-          relationEntries.push(`readonly ${relName}: unknown`);
-          continue;
-        }
-        const { to, cardinality, on, through } = relValue as {
-          readonly to?: string;
-          readonly cardinality?: string;
-          readonly on?: {
-            readonly parentCols?: readonly string[];
-            readonly childCols?: readonly string[];
-          };
-          readonly through?: {
-            readonly table: string;
-            readonly parentCols: readonly string[];
-            readonly childCols: readonly string[];
-          };
-        };
-
-        const parts: string[] = [];
-        if (to) {
-          parts.push(`readonly to: '${to}'`);
-        }
-        if (cardinality) {
-          parts.push(`readonly cardinality: '${cardinality}'`);
-        }
-        if (on?.parentCols && on.childCols) {
-          const parentCols = on.parentCols.map((c) => `'${c}'`).join(', ');
-          const childCols = on.childCols.map((c) => `'${c}'`).join(', ');
-          parts.push(
-            `readonly on: { readonly parentCols: readonly [${parentCols}]; readonly childCols: readonly [${childCols}] }`,
-          );
-        }
-        if (through) {
-          const parentCols = through.parentCols.map((c) => `'${c}'`).join(', ');
-          const childCols = through.childCols.map((c) => `'${c}'`).join(', ');
-          parts.push(
-            `readonly through: { readonly table: '${through.table}'; readonly parentCols: readonly [${parentCols}]; readonly childCols: readonly [${childCols}] }`,
-          );
-        }
-
-        relationEntries.push(
-          parts.length > 0
-            ? `readonly ${relName}: { ${parts.join('; ')} }`
-            : `readonly ${relName}: unknown`,
-        );
-      }
-      tableEntries.push(`readonly ${tableName}: { ${relationEntries.join('; ')} }`);
-    }
-
-    return `{ ${tableEntries.join('; ')} }`;
-  },
-
-  generateMappingsType(
-    models: Record<string, ModelDefinition> | undefined,
-    storage: SqlStorage,
-  ): string {
-    if (!models) {
-      return 'SqlMappings';
-    }
-
-    const modelToTable: string[] = [];
-    const tableToModel: string[] = [];
-    const fieldToColumn: string[] = [];
-    const columnToField: string[] = [];
-
-    for (const [modelName, model] of Object.entries(models).sort(([a], [b]) =>
-      a.localeCompare(b),
-    )) {
-      const tableName = model.storage.table;
-      modelToTable.push(`readonly ${modelName}: '${tableName}'`);
-      tableToModel.push(`readonly ${tableName}: '${modelName}'`);
-
-      const fieldMap: string[] = [];
-      for (const [fieldName, field] of Object.entries(model.fields)) {
-        fieldMap.push(`readonly ${fieldName}: '${field.column}'`);
-      }
-
-      if (fieldMap.length > 0) {
-        fieldToColumn.push(`readonly ${modelName}: { ${fieldMap.join('; ')} }`);
-      }
-
-      if (storage.tables[tableName]) {
-        const colMap: string[] = [];
-        for (const [fieldName, field] of Object.entries(model.fields)) {
-          colMap.push(`readonly ${field.column}: '${fieldName}'`);
-        }
-
-        if (colMap.length > 0) {
-          columnToField.push(`readonly ${tableName}: { ${colMap.join('; ')} }`);
-        }
-      }
-    }
-
-    const parts: string[] = [];
-    if (modelToTable.length > 0) {
-      parts.push(`modelToTable: { ${modelToTable.join('; ')} }`);
-    }
-    if (tableToModel.length > 0) {
-      parts.push(`tableToModel: { ${tableToModel.join('; ')} }`);
-    }
-    if (fieldToColumn.length > 0) {
-      parts.push(`fieldToColumn: { ${fieldToColumn.join('; ')} }`);
-    }
-    if (columnToField.length > 0) {
-      parts.push(`columnToField: { ${columnToField.join('; ')} }`);
-    }
-
-    return parts.length > 0 ? `{ ${parts.join('; ')} }` : 'SqlMappings';
   },
 } as const;

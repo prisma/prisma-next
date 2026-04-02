@@ -1,5 +1,5 @@
 import { coreHash } from '@prisma-next/contract/types';
-import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
+import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { expectTypeOf, test } from 'vitest';
 import { schema } from '../src/schema';
@@ -42,9 +42,7 @@ type ContractWithTypes = SqlContract<
       };
     };
   },
-  Record<string, never>,
-  Record<string, never>,
-  SqlMappings
+  Record<string, never>
 >;
 
 // These assignments MUST be at module level (not inside test blocks)
@@ -150,8 +148,6 @@ const contractWithTypes: ContractWithTypes = {
   },
   models: {},
   roots: {},
-  relations: {},
-  mappings: {},
   extensionPacks: {},
   capabilities: {},
   meta: {},
@@ -270,9 +266,7 @@ test('schema.types is generic record when contract does not specify types', () =
         };
       };
     },
-    Record<string, never>,
-    Record<string, never>,
-    SqlMappings
+    Record<string, never>
   >;
 
   const noTypesContract: ContractWithoutTypes = {
@@ -293,8 +287,6 @@ test('schema.types is generic record when contract does not specify types', () =
     },
     models: {},
     roots: {},
-    relations: {},
-    mappings: {},
     extensionPacks: {},
     capabilities: {},
     meta: {},

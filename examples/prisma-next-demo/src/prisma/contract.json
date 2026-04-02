@@ -2,13 +2,10 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:1d3b875f9e95f4a40e349ecc634e35b618e02ffb83906985a952a3ae312518e8",
-  "executionHash": "sha256:630618d96f7674c186a027d1295bfc5d688c4168c5a023a1aea01553820387dc",
-  "profileHash": "sha256:ea5c6635c0c0bd71badced0f3ee8ba912cf72dc836ae165cd533dc8f68cbfc9f",
-  "roots": {
-    "Post": "Post",
-    "User": "User"
-  },
+  "storageHash": "sha256:42688420507f30fe04fc98b370813fd10dd8bd336d6770eb026dd81aef527815",
+  "executionHash": "sha256:e1ebe2d0c623f17a7e66036721cb7b8de43c7955e72fe7d7733b88a92684b16d",
+  "profileHash": "sha256:4c68d253773262f590e742c85e147dd4eb29e082c65856d97671d98ef343de04",
+  "roots": {},
   "models": {
     "Post": {
       "fields": {
@@ -112,36 +109,6 @@
       }
     }
   },
-  "relations": {
-    "post": {
-      "user": {
-        "cardinality": "N:1",
-        "on": {
-          "childCols": [
-            "id"
-          ],
-          "parentCols": [
-            "userId"
-          ]
-        },
-        "to": "User"
-      }
-    },
-    "user": {
-      "posts": {
-        "cardinality": "1:N",
-        "on": {
-          "childCols": [
-            "userId"
-          ],
-          "parentCols": [
-            "id"
-          ]
-        },
-        "to": "Post"
-      }
-    }
-  },
   "storage": {
     "tables": {
       "post": {
@@ -158,7 +125,9 @@
             "codecId": "pg/vector@1",
             "nativeType": "vector",
             "nullable": true,
-            "typeRef": "Embedding1536"
+            "typeParams": {
+              "length": 1536
+            }
           },
           "id": {
             "codecId": "sql/char@1",

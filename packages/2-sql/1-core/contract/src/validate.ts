@@ -14,6 +14,38 @@ function extractDomainShape(contract: SqlContract<SqlStorage>): DomainContractSh
   };
 }
 
+function validateModelStorageReferences(contract: SqlContract<SqlStorage>): void {
+  const models = contract.models as Record<
+    string,
+    { storage?: { table?: string; fields?: Record<string, { column?: string }> } }
+  >;
+
+  for (const [modelName, model] of Object.entries(models)) {
+    const storageTable = model.storage?.table;
+    if (!storageTable) continue;
+
+    const table = contract.storage.tables[storageTable] as
+      | (typeof contract.storage.tables)[string]
+      | undefined;
+    if (!table) {
+      throw new Error(`Model "${modelName}" references non-existent table "${storageTable}"`);
+    }
+
+    const storageFields = model.storage?.fields;
+    if (!storageFields) continue;
+
+    const columnNames = new Set(Object.keys(table.columns));
+    for (const [fieldName, field] of Object.entries(storageFields)) {
+      const column = field.column;
+      if (column && !columnNames.has(column)) {
+        throw new Error(
+          `Model "${modelName}" field "${fieldName}" references non-existent column "${column}" in table "${storageTable}"`,
+        );
+      }
+    }
+  }
+}
+
 function validateContractLogic(contract: SqlContract<SqlStorage>): void {
   const tableNames = new Set(Object.keys(contract.storage.tables));
 
@@ -169,9 +201,6 @@ export function decodeContractDefaults<T extends SqlContract<SqlStorage>>(contra
     return contract;
   }
 
-  // The spread widens to SqlContract<SqlStorage>, but this transformation only
-  // decodes tagged bigint defaults for bigint-like columns and preserves all
-  // other properties of T.
   return {
     ...contract,
     storage: {
@@ -229,242 +258,17 @@ function normalizeStorage(contractObj: Record<string, unknown>): Record<string, 
   return { ...storage, tables: normalizedTables };
 }
 
-type RawModel = Record<string, unknown>;
-type RawField = Record<string, unknown>;
-type RawRelation = Record<string, unknown>;
-type RawStorageObj = { tables: Record<string, Record<string, unknown>> };
-
-function detectFormat(models: Record<string, RawModel>): 'old' | 'new' {
-  for (const model of Object.values(models)) {
-    const fields = model['fields'] as Record<string, RawField> | undefined;
-    if (!fields) continue;
-    for (const field of Object.values(fields)) {
-      if ('column' in field) return 'old';
-      if ('codecId' in field) return 'new';
-    }
-  }
-  return 'old';
-}
-
-function buildColumnToFieldMap(
-  fields: Record<string, RawField>,
-  modelName: string,
-): Record<string, string> {
-  const map: Record<string, string> = {};
-  for (const [fieldName, field] of Object.entries(fields)) {
-    const col = field['column'] as string | undefined;
-    if (!col) continue;
-    if (Object.hasOwn(map, col)) {
-      throw new Error(
-        `Model "${modelName}" has duplicate column mapping: fields "${map[col]}" and "${fieldName}" both map to column "${col}"`,
-      );
-    }
-    map[col] = fieldName;
-  }
-  return map;
-}
-
-function enrichOldFormatModels(
-  models: Record<string, RawModel>,
-  storageObj: RawStorageObj,
-  topRelations: Record<string, Record<string, RawRelation>>,
-): { enrichedModels: Record<string, RawModel>; roots: Record<string, string> } {
-  const roots: Record<string, string> = {};
-  const tableToModel: Record<string, string> = {};
-
+function normalizeModels(
+  models: Record<string, Record<string, unknown>>,
+): Record<string, Record<string, unknown>> {
+  const normalized: Record<string, Record<string, unknown>> = {};
   for (const [modelName, model] of Object.entries(models)) {
-    const modelStorage = model['storage'] as Record<string, unknown> | undefined;
-    const tableName = modelStorage?.['table'] as string | undefined;
-    if (tableName) {
-      if (!model['owner']) {
-        roots[modelName] = modelName;
-      }
-      tableToModel[tableName] = modelName;
-    }
-  }
-
-  const enrichedModels: Record<string, RawModel> = {};
-
-  for (const [modelName, model] of Object.entries(models)) {
-    const fields = (model['fields'] ?? {}) as Record<string, RawField>;
-    const modelStorage = model['storage'] as Record<string, unknown> | undefined;
-    const tableName = modelStorage?.['table'] as string | undefined;
-    const storageTable = tableName
-      ? (storageObj.tables[tableName] as Record<string, unknown> | undefined)
-      : undefined;
-    const storageColumns = (storageTable?.['columns'] ?? {}) as Record<
-      string,
-      Record<string, unknown>
-    >;
-
-    const enrichedFields: Record<string, RawField> = {};
-    const modelStorageFields: Record<string, { column: string }> = {};
-
-    const hasStorageColumns = Object.keys(storageColumns).length > 0;
-    for (const [fieldName, field] of Object.entries(fields)) {
-      const colName = field['column'] as string;
-      const storageCol = storageColumns[colName];
-      if (!storageCol && hasStorageColumns && colName) {
-        throw new Error(
-          `Model "${modelName}" field "${fieldName}" references non-existent column "${colName}" in table "${tableName}"`,
-        );
-      }
-      enrichedFields[fieldName] = {
-        ...field,
-        nullable: storageCol?.['nullable'] ?? false,
-        codecId: storageCol?.['codecId'] ?? '',
-      };
-      modelStorageFields[fieldName] = { column: colName };
-    }
-
-    const enrichedStorage = {
-      ...(modelStorage ?? {}),
-      fields: modelStorageFields,
-    };
-
-    enrichedModels[modelName] = {
+    normalized[modelName] = {
       ...model,
-      fields: enrichedFields,
-      storage: enrichedStorage,
       relations: model['relations'] ?? {},
     };
   }
-
-  for (const [tableName, tableRels] of Object.entries(topRelations)) {
-    const modelName = tableToModel[tableName];
-    if (!modelName) continue;
-    const existingModel = enrichedModels[modelName];
-    if (!existingModel) continue;
-
-    const existingRels = (existingModel['relations'] ?? {}) as Record<string, unknown>;
-    const targetColumnToField: Record<string, Record<string, string>> = {};
-
-    const modelRelations: Record<string, unknown> = { ...existingRels };
-    for (const [relName, rel] of Object.entries(tableRels)) {
-      const on = rel['on'] as { childCols?: string[]; parentCols?: string[] } | undefined;
-      const parentCols = on?.['parentCols'] ?? [];
-      const childCols = on?.['childCols'] ?? [];
-
-      const toModel = rel['to'] as string;
-      const sourceFields = (existingModel['fields'] ?? {}) as Record<string, RawField>;
-      const sourceColToField = buildColumnToFieldMap(sourceFields, modelName);
-
-      if (!targetColumnToField[toModel]) {
-        const targetModelObj = enrichedModels[toModel];
-        if (targetModelObj) {
-          targetColumnToField[toModel] = buildColumnToFieldMap(
-            (targetModelObj['fields'] ?? {}) as Record<string, RawField>,
-            toModel,
-          );
-        } else {
-          targetColumnToField[toModel] = {};
-        }
-      }
-      const targetColToField = targetColumnToField[toModel] ?? {};
-
-      // Old format: parentCols = columns on FK-holding table (local), childCols = columns on referenced table (target)
-      const localFields = parentCols.map((c: string) => sourceColToField[c] ?? c);
-      const targetFields = childCols.map((c: string) => targetColToField[c] ?? c);
-
-      modelRelations[relName] = {
-        to: toModel,
-        cardinality: rel['cardinality'],
-        on: { localFields, targetFields },
-      };
-    }
-
-    enrichedModels[modelName] = {
-      ...existingModel,
-      relations: modelRelations,
-    };
-  }
-
-  return { enrichedModels, roots };
-}
-
-function enrichNewFormatModels(models: Record<string, RawModel>): {
-  enrichedModels: Record<string, RawModel>;
-  topRelations: Record<string, Record<string, unknown>>;
-} {
-  const enrichedModels: Record<string, RawModel> = {};
-  const topRelations: Record<string, Record<string, unknown>> = {};
-  const modelToTable: Record<string, string> = {};
-
-  for (const [modelName, model] of Object.entries(models)) {
-    const modelStorage = model['storage'] as Record<string, unknown> | undefined;
-    const tableName = modelStorage?.['table'] as string | undefined;
-    if (tableName) modelToTable[modelName] = tableName;
-  }
-
-  for (const [modelName, model] of Object.entries(models)) {
-    const fields = (model['fields'] ?? {}) as Record<string, RawField>;
-    const modelStorage = model['storage'] as Record<string, unknown> | undefined;
-    const storageFields = (modelStorage?.['fields'] ?? {}) as Record<
-      string,
-      Record<string, unknown>
-    >;
-
-    const enrichedFields: Record<string, RawField> = {};
-    for (const [fieldName, field] of Object.entries(fields)) {
-      const sfEntry = storageFields[fieldName];
-      const column = sfEntry?.['column'] as string | undefined;
-      enrichedFields[fieldName] = column ? { ...field, column } : { ...field };
-    }
-
-    enrichedModels[modelName] = {
-      ...model,
-      fields: enrichedFields,
-      relations: model['relations'] ?? {},
-    };
-
-    const modelRels = (model['relations'] ?? {}) as Record<string, RawRelation>;
-    const tableName = modelToTable[modelName];
-    if (!tableName) continue;
-
-    for (const [relName, rel] of Object.entries(modelRels)) {
-      const on = rel['on'] as { localFields?: string[]; targetFields?: string[] } | undefined;
-      if (!on) continue;
-      const toModel = rel['to'] as string;
-      const toTable = modelToTable[toModel];
-      if (!toTable) continue;
-
-      const sourceFields = enrichedFields;
-      const targetModelObj = models[toModel];
-      const targetFields = (targetModelObj?.['fields'] ?? {}) as Record<string, RawField>;
-      const targetStorageObj = targetModelObj?.['storage'] as Record<string, unknown> | undefined;
-      const targetStorageFields = (targetStorageObj?.['fields'] ?? {}) as Record<
-        string,
-        Record<string, unknown>
-      >;
-
-      const parentCols = (on.localFields ?? []).map((f: string) => {
-        const sf = storageFields[f];
-        return (
-          (sf?.['column'] as string | undefined) ??
-          (sourceFields[f]?.['column'] as string | undefined) ??
-          f
-        );
-      });
-
-      const childCols = (on.targetFields ?? []).map((f: string) => {
-        const tsf = targetStorageFields[f];
-        return (
-          (tsf?.['column'] as string | undefined) ??
-          (targetFields[f]?.['column'] as string | undefined) ??
-          f
-        );
-      });
-
-      if (!topRelations[tableName]) topRelations[tableName] = {};
-      topRelations[tableName][relName] = {
-        to: toModel,
-        cardinality: rel['cardinality'],
-        on: { parentCols, childCols },
-      };
-    }
-  }
-
-  return { enrichedModels, topRelations };
+  return normalized;
 }
 
 export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
@@ -476,66 +280,31 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
   const normalizedStorage = normalizeStorage(contractObj);
 
   const rawModels = contractObj['models'];
-  if (!rawModels || typeof rawModels !== 'object' || rawModels === null) {
-    return {
-      ...contractObj,
-      roots: contractObj['roots'] ?? {},
-      models: rawModels ?? {},
-      relations: contractObj['relations'] ?? {},
-      storage: normalizedStorage,
-      extensionPacks: contractObj['extensionPacks'] ?? {},
-      capabilities: contractObj['capabilities'] ?? {},
-      meta: contractObj['meta'] ?? {},
-      sources: contractObj['sources'] ?? {},
-    } as SqlContract<SqlStorage>;
-  }
+  const models =
+    rawModels && typeof rawModels === 'object' && rawModels !== null
+      ? normalizeModels(rawModels as Record<string, Record<string, unknown>>)
+      : (rawModels ?? {});
 
-  const modelsObj = rawModels as Record<string, RawModel>;
-  const format = detectFormat(modelsObj);
-
-  let normalizedModels: Record<string, RawModel>;
-  let roots: Record<string, string>;
-  let topRelations: Record<string, Record<string, unknown>>;
-
-  if (format === 'new') {
-    const result = enrichNewFormatModels(modelsObj);
-    normalizedModels = result.enrichedModels;
-    topRelations = {
-      ...((contractObj['relations'] ?? {}) as Record<string, Record<string, unknown>>),
-      ...result.topRelations,
-    };
-    roots = (contractObj['roots'] as Record<string, string>) ?? {};
-  } else {
-    const rawStorageObj =
-      normalizedStorage && typeof normalizedStorage === 'object'
-        ? (normalizedStorage as Record<string, unknown>)
-        : {};
-    const storageObj = {
-      tables: ((rawStorageObj as Record<string, unknown>)['tables'] ?? {}) as Record<
-        string,
-        Record<string, unknown>
-      >,
-    };
-    const existingRelations = (contractObj['relations'] ?? {}) as Record<
-      string,
-      Record<string, RawRelation>
-    >;
-    const result = enrichOldFormatModels(modelsObj, storageObj, existingRelations);
-    normalizedModels = result.enrichedModels;
-    roots = result.roots;
-    topRelations = existingRelations;
-  }
+  const pick = (key: string) =>
+    key in contractObj && contractObj[key] !== undefined ? { [key]: contractObj[key] } : {};
 
   return {
-    ...contractObj,
-    roots,
-    models: normalizedModels,
-    relations: topRelations,
+    ...pick('schemaVersion'),
+    target: contractObj['target'],
+    targetFamily: contractObj['targetFamily'],
+    ...pick('coreHash'),
+    storageHash: contractObj['storageHash'],
+    ...pick('executionHash'),
+    ...pick('profileHash'),
+    ...pick('_generated'),
+    roots: contractObj['roots'] ?? {},
+    models,
     storage: normalizedStorage,
     extensionPacks: contractObj['extensionPacks'] ?? {},
     capabilities: contractObj['capabilities'] ?? {},
     meta: contractObj['meta'] ?? {},
     sources: contractObj['sources'] ?? {},
+    ...pick('execution'),
   } as SqlContract<SqlStorage>;
 }
 
@@ -549,6 +318,8 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
   validateContractDomain(extractDomainShape(structurallyValid));
 
   validateContractLogic(structurallyValid);
+
+  validateModelStorageReferences(structurallyValid);
 
   const semanticErrors = validateStorageSemantics(structurallyValid.storage);
   if (semanticErrors.length > 0) {

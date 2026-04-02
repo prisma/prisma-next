@@ -9,7 +9,6 @@ function makeIR(overrides?: Partial<ContractIR>): ContractIR {
     targetFamily: 'sql',
     target: 'postgres',
     models: {},
-    relations: {},
     storage: {},
     extensionPacks: {},
     capabilities: {},

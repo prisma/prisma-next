@@ -129,7 +129,6 @@ function createTestContractIR(
     target: 'postgres',
     storageHash: 'sha256:placeholder',
     models: {},
-    relations: {},
     storage: { tables: {} },
     extensionPacks: {},
     capabilities: {},
@@ -160,10 +159,12 @@ describe('emit parameterized codecs integration', () => {
     const contractIR = createTestContractIR({
       models: {
         Embedding: {
-          storage: { table: 'embedding' },
-          fields: {
-            id: { column: 'id' },
-            vector: { column: 'vector' },
+          storage: {
+            table: 'embedding',
+            fields: {
+              id: { column: 'id' },
+              vector: { column: 'vector' },
+            },
           },
           relations: {},
         },
@@ -234,10 +235,12 @@ describe('emit parameterized codecs integration', () => {
     const contractIR = createTestContractIR({
       models: {
         Embedding: {
-          storage: { table: 'embedding' },
-          fields: {
-            id: { column: 'id' },
-            vector: { column: 'vector' },
+          storage: {
+            table: 'embedding',
+            fields: {
+              id: { column: 'id' },
+              vector: { column: 'vector' },
+            },
           },
           relations: {},
         },
@@ -292,10 +295,12 @@ describe('emit parameterized codecs integration', () => {
     const contractIR = createTestContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            name: { column: 'name' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+              name: { column: 'name' },
+            },
           },
           relations: {},
         },
@@ -343,9 +348,11 @@ describe('emit parameterized codecs integration', () => {
     const contractIR = createTestContractIR({
       models: {
         Data: {
-          storage: { table: 'data' },
-          fields: {
-            value: { column: 'value' },
+          storage: {
+            table: 'data',
+            fields: {
+              value: { column: 'value' },
+            },
           },
           relations: {},
         },
@@ -424,11 +431,13 @@ describe('emit parameterized codecs integration', () => {
     const contractIR = createTestContractIR({
       models: {
         Data: {
-          storage: { table: 'data' },
-          fields: {
-            id: { column: 'id' },
-            vector: { column: 'vector' },
-            amount: { column: 'amount' },
+          storage: {
+            table: 'data',
+            fields: {
+              id: { column: 'id' },
+              vector: { column: 'vector' },
+              amount: { column: 'amount' },
+            },
           },
           relations: {},
         },
@@ -516,11 +525,13 @@ describe('emit parameterized codecs integration', () => {
     const contractIR = createTestContractIR({
       models: {
         VectorData: {
-          storage: { table: 'vector_data' },
-          fields: {
-            id: { column: 'id' },
-            vec: { column: 'vec' },
-            halfvec: { column: 'halfvec' },
+          storage: {
+            table: 'vector_data',
+            fields: {
+              id: { column: 'id' },
+              vec: { column: 'vec' },
+              halfvec: { column: 'halfvec' },
+            },
           },
           relations: {},
         },
@@ -605,10 +616,12 @@ describe('emit parameterized codecs integration', () => {
     const contractIR = createTestContractIR({
       models: {
         Event: {
-          storage: { table: 'event' },
-          fields: {
-            payload: { column: 'payload' },
-            metadata: { column: 'metadata' },
+          storage: {
+            table: 'event',
+            fields: {
+              payload: { column: 'payload' },
+              metadata: { column: 'metadata' },
+            },
           },
           relations: {},
         },

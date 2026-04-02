@@ -58,8 +58,6 @@ function emptyContract(): SqlContract<SqlStorage> {
     storage: { tables: {} },
     roots: {},
     models: {},
-    relations: {},
-    mappings: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},

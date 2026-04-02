@@ -120,21 +120,6 @@ export type SqlStorage = {
   readonly types?: Record<string, StorageTypeInstance>;
 };
 
-export type ModelField = {
-  readonly column: string;
-};
-
-export type ModelStorage = {
-  readonly table: string;
-};
-
-export type ModelDefinition = {
-  readonly storage: ModelStorage;
-  readonly fields: Record<string, ModelField>;
-  readonly relations: Record<string, unknown>;
-  readonly owner?: string;
-};
-
 export type SqlModelFieldStorage = {
   readonly column: string;
   readonly codecId?: string;
@@ -150,13 +135,6 @@ export type SqlRelation = {
   readonly to: string;
   readonly cardinality: '1:1' | '1:N' | 'N:1';
   readonly on: DomainRelationOn;
-};
-
-export type SqlMappings = {
-  readonly modelToTable?: Record<string, string>;
-  readonly tableToModel?: Record<string, string>;
-  readonly fieldToColumn?: Record<string, Record<string, string>>;
-  readonly columnToField?: Record<string, Record<string, string>>;
 };
 
 export const DEFAULT_FK_CONSTRAINT = true;
@@ -223,17 +201,14 @@ export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
 
 export type SqlContract<
   S extends SqlStorage = SqlStorage,
-  M extends Record<string, unknown> = Record<string, unknown>,
-  R extends Record<string, unknown> = Record<string, unknown>,
-  Map extends SqlMappings = SqlMappings,
+  TModels extends Record<string, unknown> = Record<string, unknown>,
   TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
   TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> = ContractBase<TStorageHash, TExecutionHash, TProfileHash, M> & {
+> = Omit<ContractBase<TStorageHash, TExecutionHash, TProfileHash>, 'models'> & {
   readonly targetFamily: string;
   readonly storage: S;
-  readonly relations: R;
-  readonly mappings: Map;
+  readonly models: TModels;
   readonly execution?: ExecutionSection;
 };
 

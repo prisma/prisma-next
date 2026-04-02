@@ -93,23 +93,22 @@ model Post {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      expect(result.value.relations).toMatchObject({
-        user: {
-          posts: {
-            cardinality: '1:N',
-            on: {
-              parentCols: ['id'],
-              childCols: ['userId'],
-            },
+      const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+      expect(models['User']?.relations).toMatchObject({
+        posts: {
+          cardinality: '1:N',
+          on: {
+            localFields: ['id'],
+            targetFields: ['userId'],
           },
         },
-        post: {
-          user: {
-            cardinality: 'N:1',
-            on: {
-              parentCols: ['userId'],
-              childCols: ['id'],
-            },
+      });
+      expect(models['Post']?.relations).toMatchObject({
+        user: {
+          cardinality: 'N:1',
+          on: {
+            localFields: ['userId'],
+            targetFields: ['id'],
           },
         },
       });

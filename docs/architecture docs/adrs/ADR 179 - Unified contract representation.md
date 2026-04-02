@@ -30,7 +30,7 @@ interface ContractModel<ModelStorage> {
 }
 ```
 
-The framework operates on the domain layer: `roots`, `fields`, `relations`, `discriminator`, `variants`, `base`, `owner`. These types (`DomainField`, `DomainRelation`, etc.) are family-agnostic and already live in the framework layer. The framework also reads `storage.storageHash` for verification, but does not interpret `storage` or `model.storage` beyond that.
+The framework operates on the domain layer: `roots`, `fields`, `relations`, `discriminator`, `variants`, `base`, `owner`. These types (`DomainField`, `DomainRelation`, etc.). The framework also reads `storage.storageHash` for verification, but does not interpret `storage` or `model.storage` beyond that.
 
 Each family fills in the two generic parameters with its own storage types:
 
@@ -52,15 +52,16 @@ graph TD
   TS_STAGED(contract.ts — staged) --> SCI(StagedContractInput)
   TS_CHAIN(contract.ts — chain) --> CBS(ContractBuilderState)
   SCI --> SSCD(SqlSemanticContractDef)
-  SSCD -->|lower| IR
-  AST -->|interpret| IR
-  CBS -->|.build| IR
-  IR(ContractIR)
-  IR -->|serialize| JSON(contract.json + contract.d.ts)
+  SSCD -->|lower| ContractIR
+  AST -->|interpret| ContractIR
+  CBS -->|.build| ContractIR
+  ContractIR -->|serialize| JSON(contract.json + contract.d.ts)
   JSON -->|parse + validate| SC(SqlContract)
   SC -->|reconstruct| DM(ContractBase + DomainModel)
   DM --> CONSUMERS(schema / sql / orm)
 ```
+
+
 
 And **after** — authoring surfaces lower directly to `Contract`, which survives serialization unchanged:
 
@@ -68,13 +69,15 @@ And **after** — authoring surfaces lower directly to `Contract`, which survive
 graph TD
   PSL(schema.psl) --> AST(PslDocumentAst)
   TS(contract.ts — staged) --> SCI(StagedContractInput)
-  AST -->|lower| C1
-  SCI -->|lower| C1
-  C1("Contract‹Storage, ModelStorage›")
-  C1 -->|serialize| JSON(contract.json + contract.d.ts)
-  JSON -->|parse + validate| C2("Contract‹Storage, ModelStorage›")
+  AST -->|lower| Contract
+  SCI -->|lower| Contract
+  Contract("Contract‹Storage, ModelStorage›")
+  Contract -->|serialize| JSON(contract.json + contract.d.ts)
+  JSON -->|parse + validate| C2(Contract)
   C2 --> CONSUMERS(schema / sql / orm)
 ```
+
+
 
 ## The round-trip problem
 
@@ -153,7 +156,6 @@ This is a minimal change for Mongo — `MongoContract` is already model-first wi
 The framework provides a `validateContract` function that orchestrates two passes:
 
 1. **Domain validation** (framework-owned): validates roots, relation targets, variant/base consistency, discriminators, ownership, and orphaned models. This already exists as `validateContractDomain()` in `packages/1-framework/1-core/shared/contract/src/validate-domain.ts`.
-
 2. **Storage validation** (family-provided): the family passes a storage validator function that checks family-specific invariants. For Mongo this is `validateMongoStorage()`. SQL will provide an equivalent.
 
 This pattern is already established in the Mongo family. `validateMongoContract()` follows exactly this sequence: structural parse → `validateContractDomain()` → `validateMongoStorage()` → build indices. The unified `validateContract` generalizes this into a framework-level function that accepts the family's storage validator as a parameter.
@@ -180,15 +182,17 @@ These are authoring-time representations. They exist because authoring ergonomic
 
 ## What this replaces
 
-| Current | Unified |
-|---------|---------|
-| `ContractIR` (storage-first, family-agnostic facade) | `Contract<Storage, ModelStorage>` |
-| `SqlContract<S, M, R>` (SQL instantiation of ContractIR) | `Contract<SqlStorage, SqlModelStorage>` |
+
+| Current                                                  | Unified                                                                      |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `ContractIR` (storage-first, family-agnostic facade)     | `Contract<Storage, ModelStorage>`                                            |
+| `SqlContract<S, M, R>` (SQL instantiation of ContractIR) | `Contract<SqlStorage, SqlModelStorage>`                                      |
 | `SqlSemanticContractDefinition` (authoring intermediate) | Authoring surfaces lower directly to `Contract<SqlStorage, SqlModelStorage>` |
-| `DomainModel` / `ContractBase` (runtime reconstruction) | `ContractModel<ModelStorage>` — the domain layer is already there |
-| `MongoContract` (already model-first) | `Contract<MongoStorage, MongoModelStorage>` — minimal change |
-| `mappings` section in ContractIR | Eliminated — derivable from `model.storage` |
-| Top-level `relations` section in ContractIR | Eliminated — relations live on each model |
+| `DomainModel` / `ContractBase` (runtime reconstruction)  | `ContractModel<ModelStorage>` — the domain layer is already there            |
+| `MongoContract` (already model-first)                    | `Contract<MongoStorage, MongoModelStorage>` — minimal change                 |
+| `mappings` section in ContractIR                         | Eliminated — derivable from `model.storage`                                  |
+| Top-level `relations` section in ContractIR              | Eliminated — relations live on each model                                    |
+
 
 ## Consequences
 

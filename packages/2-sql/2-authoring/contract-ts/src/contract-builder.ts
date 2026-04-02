@@ -15,7 +15,6 @@ import type {
 } from '@prisma-next/contract-authoring';
 import {
   type BuildModels,
-  type BuildRelations,
   type BuildStorageColumn,
   ContractBuilder,
   createTable,
@@ -29,7 +28,6 @@ import type {
   Index,
   ReferentialAction,
   SqlContract,
-  SqlMappings,
   StorageTypeInstance,
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
@@ -154,8 +152,6 @@ export interface SqlTableBuilder<
   >;
 }
 
-type ContractBuilderMappings = SqlMappings;
-
 type BuildStorageTable<
   _TableName extends string,
   Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
@@ -269,7 +265,7 @@ class SqlContractBuilder<
    * - `uniques`: defaults to `[]` (empty array)
    * - `indexes`: defaults to `[]` (empty array)
    * - `foreignKeys`: defaults to `[]` (empty array)
-   * - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
+   * - model `relations`: defaults to `{}` (empty object) when not populated by the builder
    * - `nativeType`: required field set from column type descriptor when columns are defined
    *
    * The contract builder is the **only** place where normalization should occur.
@@ -282,12 +278,7 @@ class SqlContractBuilder<
    */
   build(): Target extends string
     ? ContractWithTypeMaps<
-        SqlContract<
-          BuildStorage<Tables, Types>,
-          BuildModels<Models>,
-          BuildRelations<Models>,
-          ContractBuilderMappings
-        > & {
+        SqlContract<BuildStorage<Tables, Types>, BuildModels<Models>> & {
           readonly schemaVersion: '1';
           readonly target: Target;
           readonly targetFamily: 'sql';

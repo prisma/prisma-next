@@ -12,7 +12,6 @@ export function createTestContract(overrides: Partial<ContractIR> = {}): Contrac
     targetFamily: 'sql',
     target: 'postgres',
     models: {},
-    relations: {},
     storage: { tables: {} },
     extensionPacks: {},
     capabilities: {},

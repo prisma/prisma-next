@@ -1,10 +1,9 @@
-import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
 import { orm } from '../src/orm';
 import type { TestContract } from './helpers';
-import { createMockRuntime, getTestContext, getTestContract } from './helpers';
+import { createMockRuntime, getTestContext } from './helpers';
 
 class UserCollection extends Collection<TestContract, 'User'> {
   named(name: string) {
@@ -33,7 +32,6 @@ function expectCommentCollection(value: unknown): asserts value is CommentCollec
 }
 
 describe('orm()', () => {
-  const contract = getTestContract();
   const context = getTestContext();
 
   it('returns custom collections by key', () => {
@@ -74,24 +72,6 @@ describe('orm()', () => {
     expect(() => (db as Record<string, unknown>)['unknown']).toThrow(
       /No model found for 'unknown'/,
     );
-  });
-
-  it('resolves aliases when modelToTable mappings are absent', () => {
-    const runtime = createMockRuntime();
-    const withoutModelToTable = {
-      ...contract,
-      mappings: {
-        ...contract.mappings,
-        modelToTable: undefined,
-      },
-    } as unknown as TestContract;
-
-    const customContext = {
-      ...context,
-      contract: withoutModelToTable,
-    } as ExecutionContext<TestContract>;
-    const db = orm({ runtime, context: customContext });
-    expect(db.User.modelName).toBe('User');
   });
 
   it('custom collection overrides default for same key', () => {
@@ -263,59 +243,5 @@ describe('orm()', () => {
     const postInclude = withNested.state.includes[0]!;
     const commentInclude = postInclude.nested.includes[0]!;
     expect(commentInclude.nested.filters).toHaveLength(1);
-  });
-
-  it('handles empty model names in alias generation', () => {
-    const runtime = createMockRuntime();
-    const withEmptyModelName = {
-      ...contract,
-      models: {
-        ...contract.models,
-        '': {
-          storage: { table: 'empty_models' },
-          fields: {
-            id: { column: 'id' },
-          },
-          relations: {},
-        },
-      },
-      mappings: {
-        ...contract.mappings,
-        modelToTable: {
-          ...contract.mappings.modelToTable,
-          '': 'empty_models',
-        },
-        tableToModel: {
-          ...contract.mappings.tableToModel,
-          empty_models: '',
-        },
-        fieldToColumn: {
-          ...contract.mappings.fieldToColumn,
-          '': { id: 'id' },
-        },
-        columnToField: {
-          ...contract.mappings.columnToField,
-          empty_models: { id: 'id' },
-        },
-      },
-      storage: {
-        ...contract.storage,
-        tables: {
-          ...contract.storage.tables,
-          empty_models: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    } as unknown as TestContract;
-
-    const customContext = { ...context, contract: withEmptyModelName };
-    expect(() => orm({ runtime, context: customContext })).not.toThrow();
   });
 });

@@ -39,6 +39,36 @@ describe('query plan meta', () => {
       .withLimit(5);
 
     const plan = buildOrmQueryPlan(baseContract, ast, ['Alice'], [{ index: 1, source: 'dsl' }]);
-    expect(plan.meta.annotations).toEqual({ limit: 5 });
+    expect(plan.meta.annotations).toMatchObject({ limit: 5 });
+  });
+
+  it('includes projectionTypes and codec annotations for select plans', () => {
+    const ast = SelectAst.from(TableSource.named('users')).withProjection([
+      ProjectionItem.of('id', ColumnRef.of('users', 'id')),
+      ProjectionItem.of('email', ColumnRef.of('users', 'email')),
+    ]);
+
+    const plan = buildOrmQueryPlan(baseContract, ast, [], []);
+
+    const expectedCodecs: Record<string, string> = {
+      id: 'pg/int4@1',
+      email: 'pg/text@1',
+    };
+    expect(plan.meta.projectionTypes).toEqual(expectedCodecs);
+    expect(plan.meta.annotations).toEqual({ codecs: expectedCodecs });
+  });
+
+  it('includes projectionTypes for select plans with limit', () => {
+    const ast = SelectAst.from(TableSource.named('users'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
+      .withLimit(10);
+
+    const plan = buildOrmQueryPlan(baseContract, ast, [], []);
+
+    expect(plan.meta.projectionTypes).toEqual({ id: 'pg/int4@1' });
+    expect(plan.meta.annotations).toEqual({
+      codecs: { id: 'pg/int4@1' },
+      limit: 10,
+    });
   });
 });

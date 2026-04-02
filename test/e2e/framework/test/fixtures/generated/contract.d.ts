@@ -19,13 +19,7 @@ import type {
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
-import type {
-  ContractWithTypeMaps,
-  SqlContract,
-  SqlStorage,
-  SqlMappings,
-  ModelDefinition,
-} from '@prisma-next/sql-contract/types';
+import type { ContractWithTypeMaps, SqlContract } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
   StorageHashBase<'sha256:065e445e4b728f3825cd85e4a492e187aef68f257eaec630d0170e27eb41b313'>;
@@ -449,103 +443,6 @@ export type Contract = ContractWithTypeMaps<SqlContract<
       readonly relations: {};
     };
   },
-  Record<string, never>,
-  {
-    modelToTable: {
-      readonly User: 'user';
-      readonly Post: 'post';
-      readonly Comment: 'comment';
-      readonly Event: 'event';
-      readonly LiteralDefaults: 'literal_defaults';
-    };
-    tableToModel: {
-      readonly user: 'User';
-      readonly post: 'Post';
-      readonly comment: 'Comment';
-      readonly event: 'Event';
-      readonly literal_defaults: 'LiteralDefaults';
-    };
-    fieldToColumn: {
-      readonly User: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly createdAt: 'created_at';
-        readonly updatedAt: 'update_at';
-        readonly profile: 'profile';
-      };
-      readonly Post: {
-        readonly id: 'id';
-        readonly userId: 'userId';
-        readonly title: 'title';
-        readonly createdAt: 'created_at';
-        readonly updatedAt: 'update_at';
-        readonly meta: 'meta';
-      };
-      readonly Comment: {
-        readonly id: 'id';
-        readonly postId: 'postId';
-        readonly content: 'content';
-        readonly createdAt: 'created_at';
-        readonly updatedAt: 'update_at';
-      };
-      readonly Event: {
-        readonly id: 'id';
-        readonly name: 'name';
-        readonly scheduledAt: 'scheduled_at';
-        readonly createdAt: 'created_at';
-      };
-      readonly LiteralDefaults: {
-        readonly id: 'id';
-        readonly label: 'label';
-        readonly score: 'score';
-        readonly rating: 'rating';
-        readonly active: 'active';
-        readonly bigCount: 'big_count';
-        readonly metadata: 'metadata';
-        readonly tags: 'tags';
-      };
-    };
-    columnToField: {
-      readonly user: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly created_at: 'createdAt';
-        readonly update_at: 'updatedAt';
-        readonly profile: 'profile';
-      };
-      readonly post: {
-        readonly id: 'id';
-        readonly userId: 'userId';
-        readonly title: 'title';
-        readonly created_at: 'createdAt';
-        readonly update_at: 'updatedAt';
-        readonly meta: 'meta';
-      };
-      readonly comment: {
-        readonly id: 'id';
-        readonly postId: 'postId';
-        readonly content: 'content';
-        readonly created_at: 'createdAt';
-        readonly update_at: 'updatedAt';
-      };
-      readonly event: {
-        readonly id: 'id';
-        readonly name: 'name';
-        readonly scheduled_at: 'scheduledAt';
-        readonly created_at: 'createdAt';
-      };
-      readonly literal_defaults: {
-        readonly id: 'id';
-        readonly label: 'label';
-        readonly score: 'score';
-        readonly rating: 'rating';
-        readonly active: 'active';
-        readonly big_count: 'bigCount';
-        readonly metadata: 'metadata';
-        readonly tags: 'tags';
-      };
-    };
-  },
   StorageHash,
   ExecutionHash,
   ProfileHash
@@ -553,4 +450,3 @@ export type Contract = ContractWithTypeMaps<SqlContract<
 
 export type Tables = Contract['storage']['tables'];
 export type Models = Contract['models'];
-export type Relations = Contract['relations'];

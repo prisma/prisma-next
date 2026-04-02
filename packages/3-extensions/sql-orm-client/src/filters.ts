@@ -9,7 +9,7 @@ import {
   OrExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
-import { getFieldToColumnMap, resolveModelTableName } from './collection-contract';
+import { getFieldToColumnMap, modelOf, resolveModelTableName } from './collection-contract';
 import type { ShorthandWhereFilter } from './types';
 
 export function and(...exprs: AnyExpression[]): AndExpr {
@@ -70,11 +70,7 @@ function assertFieldHasEqualityTrait(
   modelName: string,
   fieldName: string,
 ): void {
-  const models = context.contract.models as Record<
-    string,
-    { fields?: Record<string, { codecId?: string }> }
-  >;
-  const codecId = models[modelName]?.fields?.[fieldName]?.codecId;
+  const codecId = modelOf(context.contract, modelName)?.fields?.[fieldName]?.codecId;
   const traits = codecId ? context.codecs.traitsOf(codecId) : [];
   if (!traits.includes('equality')) {
     throw new Error(

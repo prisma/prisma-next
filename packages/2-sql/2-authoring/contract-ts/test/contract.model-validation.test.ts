@@ -108,10 +108,8 @@ describe('validateContract model validation', () => {
       ...baseContract,
       models: {
         User: {
-          storage: { table: 'User' },
-          fields: {
-            id: { column: '' },
-          },
+          storage: { table: 'User', fields: { id: { column: '' } } },
+          fields: { id: { codecId: 'pg/int4@1', nullable: false } },
           // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
         } as any,
       },
@@ -126,10 +124,8 @@ describe('validateContract model validation', () => {
       ...baseContract,
       models: {
         User: {
-          storage: { table: 'User' },
-          fields: {
-            id: { column: 'nonExistent' },
-          },
+          storage: { table: 'User', fields: { id: { column: 'nonExistent' } } },
+          fields: { id: { codecId: 'pg/int4@1', nullable: false } },
           // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
         } as any,
       },
@@ -167,20 +163,25 @@ describe('validateContract model validation', () => {
       },
       models: {
         Post: {
-          storage: { table: 'Post' },
+          storage: {
+            table: 'Post',
+            fields: {
+              id: { column: 'id' },
+              userId: { column: 'userId' },
+            },
+          },
           fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             user: {
               to: 'User',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['userId'], targetFields: ['id'] },
               cardinality: 'N:1',
             },
           },
-          // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        } as any,
+        },
       },
     };
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
@@ -221,19 +222,23 @@ describe('validateContract model validation', () => {
       },
       models: {
         User: {
-          storage: { table: 'User' },
+          storage: {
+            table: 'User',
+            fields: {
+              id: { column: 'id' },
+            },
+          },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             posts: {
               to: 'Post',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
           },
-          // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        } as any,
+        },
       },
     };
     expect(() => validateContract<SqlContract<SqlStorage>>(valid)).not.toThrow();
@@ -272,20 +277,25 @@ describe('validateContract model validation', () => {
       },
       models: {
         Post: {
-          storage: { table: 'Post' },
+          storage: {
+            table: 'Post',
+            fields: {
+              id: { column: 'id' },
+              userId: { column: 'userId' },
+            },
+          },
           fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             user: {
               to: 'User',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['userId'], targetFields: ['id'] },
               cardinality: 'N:1',
             },
           },
-          // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        } as any,
+        },
       },
     };
     expect(() => validateContract<SqlContract<SqlStorage>>(valid)).not.toThrow();

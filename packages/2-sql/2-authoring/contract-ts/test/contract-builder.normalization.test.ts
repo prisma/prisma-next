@@ -209,15 +209,4 @@ describe('contract builder normalization', () => {
     expect(idx).not.toHaveProperty('using');
     expect(idx).not.toHaveProperty('config');
   });
-
-  it('normalizes contract-level relations to empty object', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
-      .model('User', 'user', (m) => m.field('id', 'id'))
-      .build();
-
-    expect(contract.relations).toEqual({});
-    expect(typeof contract.relations).toBe('object');
-  });
 });

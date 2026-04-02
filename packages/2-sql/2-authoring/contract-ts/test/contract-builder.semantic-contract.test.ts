@@ -131,10 +131,14 @@ describe('shared semantic contract lowering', () => {
         { readonly primaryKey?: unknown; readonly foreignKeys?: unknown }
       >;
     };
-    const relations = contract.relations as Record<string, Record<string, unknown> | undefined>;
     const models = contract.models as Record<
       string,
-      { readonly fields: Record<string, unknown> } | undefined
+      | {
+          readonly storage: { readonly fields: Record<string, unknown> };
+          readonly fields: Record<string, unknown>;
+          readonly relations: Record<string, unknown>;
+        }
+      | undefined
     >;
 
     expect(storage['types']?.['Role']).toEqual({
@@ -158,15 +162,15 @@ describe('shared semantic contract lowering', () => {
         index: true,
       },
     ]);
-    expect(relations['app_user']?.['posts']).toEqual({
+    expect(models['User']?.relations['posts']).toEqual({
       to: 'Post',
       cardinality: '1:N',
       on: {
-        parentCols: ['id'],
-        childCols: ['author_id'],
+        localFields: ['id'],
+        targetFields: ['author_id'],
       },
     });
-    expect(models['Post']?.fields['authorId']).toEqual({
+    expect(models['Post']?.storage.fields['authorId']).toEqual({
       column: 'author_id',
     });
   });

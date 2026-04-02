@@ -22,7 +22,6 @@ function createTestContract(overrides?: Partial<ContractIR>): ContractIR {
     targetFamily: 'sql',
     target: 'postgres',
     models: {},
-    relations: {},
     storage: { tables: {} },
     extensionPacks: {},
     capabilities: {},

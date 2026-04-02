@@ -547,8 +547,6 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
     },
     roots: {},
     models: {},
-    relations: {},
-    mappings: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},
