@@ -7,5 +7,6 @@ export function createMongoScalarTypeDescriptors(): ReadonlyMap<string, string> 
     ['Boolean', 'mongo/bool@1'],
     ['DateTime', 'mongo/date@1'],
     ['Bytes', 'mongo/binary@1'],
+    ['ObjectId', 'mongo/objectId@1'],
   ]);
 }

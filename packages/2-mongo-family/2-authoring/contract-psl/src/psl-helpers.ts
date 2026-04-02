@@ -12,8 +12,8 @@ export function getAttribute(
   return attributes.find((attr) => attr.name === name);
 }
 
-export function parseMapName(attributes: readonly PslAttribute[]): string | undefined {
-  const mapAttr = getAttribute(attributes, '@@map');
+export function getMapName(attributes: readonly PslAttribute[]): string | undefined {
+  const mapAttr = getAttribute(attributes, 'map');
   if (!mapAttr) return undefined;
   const arg = mapAttr.args[0];
   if (!arg) return undefined;
@@ -26,7 +26,7 @@ export function parseRelationAttribute(attributes: readonly PslAttribute[]):
       references: readonly string[];
     }
   | undefined {
-  const relationAttr = getAttribute(attributes, '@relation');
+  const relationAttr = getAttribute(attributes, 'relation');
   if (!relationAttr) return undefined;
 
   let fieldsArg: PslAttributeArgument | undefined;
