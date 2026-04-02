@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AuthoringTypeConstructorDescriptor } from '../src/framework-components';
+import type { AuthoringTypeConstructorDescriptor } from '../src/framework-authoring';
 import {
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
@@ -7,7 +7,7 @@ import {
   isAuthoringTypeConstructorDescriptor,
   resolveAuthoringTemplateValue,
   validateAuthoringHelperArguments,
-} from '../src/framework-components';
+} from '../src/framework-authoring';
 
 describe('authoring template resolution', () => {
   it('detects authoring descriptor kinds', () => {
@@ -144,6 +144,32 @@ describe('authoring template resolution', () => {
     ).toThrow(/expects 1 argument\(s\), received 2/);
   });
 
+  it('computes minimum arity from last required slot, not count of required slots', () => {
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'number', optional: true }, { kind: 'string' }],
+        [],
+      ),
+    ).toThrow(/expects 2 argument\(s\), received 0/);
+
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'number', optional: true }, { kind: 'string' }],
+        [42],
+      ),
+    ).toThrow(/expects 2 argument\(s\), received 1/);
+
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'number', optional: true }, { kind: 'string' }],
+        [42, 'hello'],
+      ),
+    ).not.toThrow();
+  });
+
   it('ignores prototype-chain values when resolving arg paths', () => {
     const descriptor = {
       kind: 'typeConstructor',
@@ -221,6 +247,28 @@ describe('authoring template resolution', () => {
     expect(() =>
       instantiateAuthoringFieldPreset(descriptor, [{ sql: 'CURRENT_TIMESTAMP' }]),
     ).toThrow(/Resolved authoring function default expression must resolve to a primitive/);
+  });
+
+  it('rejects literal defaults that resolve to undefined', () => {
+    const descriptor = {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'test/text@1',
+        nativeType: 'text',
+        default: {
+          kind: 'literal',
+          value: {
+            kind: 'arg',
+            index: 0,
+            path: ['missing'],
+          },
+        },
+      },
+    } as const;
+
+    expect(() => instantiateAuthoringFieldPreset(descriptor, [{}])).toThrow(
+      /Resolved authoring literal default must not be undefined/,
+    );
   });
 
   it('resolves literal defaults and execution defaults from field presets', () => {

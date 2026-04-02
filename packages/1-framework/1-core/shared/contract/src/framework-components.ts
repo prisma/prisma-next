@@ -1,8 +1,5 @@
-import type { RenderTypeContext, TypesImportSpec } from './types';
-
-export * from './framework-authoring';
-
 import type { AuthoringContributions } from './framework-authoring';
+import type { RenderTypeContext, TypesImportSpec } from './types';
 
 /**
  * A template-based type renderer (structured form).

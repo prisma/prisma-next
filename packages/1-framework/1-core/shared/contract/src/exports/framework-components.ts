@@ -1,9 +1,4 @@
 export type {
-  // Descriptors
-  AdapterDescriptor,
-  // Instances
-  AdapterInstance,
-  AdapterPackRef,
   AuthoringArgRef,
   AuthoringArgumentDescriptor,
   AuthoringColumnDefaultTemplate,
@@ -15,6 +10,20 @@ export type {
   AuthoringTemplateValue,
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
+} from '../framework-authoring';
+export {
+  instantiateAuthoringFieldPreset,
+  instantiateAuthoringTypeConstructor,
+  isAuthoringArgRef,
+  isAuthoringFieldPresetDescriptor,
+  isAuthoringTypeConstructorDescriptor,
+  resolveAuthoringTemplateValue,
+  validateAuthoringHelperArguments,
+} from '../framework-authoring';
+export type {
+  AdapterDescriptor,
+  AdapterInstance,
+  AdapterPackRef,
   ComponentDescriptor,
   ComponentMetadata,
   ContractComponentRequirementsCheckInput,
@@ -28,7 +37,6 @@ export type {
   FamilyDescriptor,
   FamilyInstance,
   FamilyPackRef,
-  // Type renderers for parameterized codec emission
   NormalizedTypeRenderer,
   PackRefBase,
   TargetBoundComponentDescriptor,
@@ -39,16 +47,8 @@ export type {
   TypeRendererFunction,
   TypeRendererTemplate,
 } from '../framework-components';
-
 export {
   checkContractComponentRequirements,
-  instantiateAuthoringFieldPreset,
-  instantiateAuthoringTypeConstructor,
   interpolateTypeTemplate,
-  isAuthoringArgRef,
-  isAuthoringFieldPresetDescriptor,
-  isAuthoringTypeConstructorDescriptor,
   normalizeRenderer,
-  resolveAuthoringTemplateValue,
-  validateAuthoringHelperArguments,
 } from '../framework-components';
