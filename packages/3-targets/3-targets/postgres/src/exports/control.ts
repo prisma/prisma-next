@@ -120,7 +120,6 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           toContract,
           fromContract,
         });
-
         if (!planResult.ok) {
           return { ok: false as const, conflicts: planResult.failure };
         }

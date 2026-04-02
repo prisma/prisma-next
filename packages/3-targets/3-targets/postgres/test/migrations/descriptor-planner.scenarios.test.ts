@@ -687,6 +687,23 @@ describe('dependencies', () => {
     expect(depDesc).toBeDefined();
     expect((depDesc as Record<string, unknown>)['dependencyId']).toBe('postgres.extension.vector');
   });
+
+  it('28b: pgvector dependency comes before table using vector column', () => {
+    const to = contract({
+      post: table({
+        id: uuidCol(),
+        title: textCol(),
+        embedding: col('vector', 'pg/vector@1', { nullable: true }),
+      }),
+    });
+    const result = plan(null, to, componentsWithPgvector);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const kinds = descriptorKinds(result);
+    expect(kinds).toContain('createDependency');
+    expect(kinds).toContain('createTable');
+    expect(kinds.indexOf('createDependency')).toBeLessThan(kinds.indexOf('createTable'));
+  });
 });
 
 // ============================================================================

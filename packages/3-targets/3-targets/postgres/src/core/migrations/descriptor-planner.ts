@@ -575,6 +575,9 @@ export function planDescriptors(
   }
 
   // Phase 4: Order descriptors by operation kind
+  const depOps = defaultOps.filter(
+    (op) => op.kind === 'createDependency' || op.kind === 'createEnumType',
+  );
   const dropOps = defaultOps.filter(
     (op) =>
       op.kind === 'dropTable' ||
@@ -601,6 +604,7 @@ export function planDescriptors(
   );
 
   const descriptors: MigrationOpDescriptor[] = [
+    ...depOps,
     ...dropOps,
     ...tableOps,
     ...columnOps,
