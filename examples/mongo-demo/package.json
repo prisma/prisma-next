@@ -26,6 +26,8 @@
   },
   "devDependencies": {
     "@prisma-next/family-mongo": "workspace:*",
+    "@prisma-next/mongo-contract-psl": "workspace:*",
+    "@prisma-next/psl-parser": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@types/node": "catalog:",
