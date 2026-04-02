@@ -27,6 +27,7 @@ export type {
   ExtensionPackRef,
   FamilyDescriptor,
   FamilyInstance,
+  FamilyPackRef,
   // Type renderers for parameterized codec emission
   NormalizedTypeRenderer,
   PackRefBase,

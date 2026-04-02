@@ -17,7 +17,7 @@ const nanoidOptionsArgument = {
   },
 } as const;
 
-export const portableSqlAuthoringFieldPresets = {
+export const sqlFamilyAuthoringFieldPresets = {
   text: {
     kind: 'fieldPreset',
     output: {

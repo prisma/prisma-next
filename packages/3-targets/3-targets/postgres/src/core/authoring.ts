@@ -1,7 +1,5 @@
 import type { AuthoringTypeNamespace } from '@prisma-next/contract/framework-components';
 
-export { portableSqlAuthoringFieldPresets as postgresAuthoringFieldPresets } from '@prisma-next/sql-contract/authoring';
-
 export const postgresAuthoringTypes = {
   enum: {
     kind: 'typeConstructor',

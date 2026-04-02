@@ -378,7 +378,10 @@ export interface PackRefBase<Kind extends string, TFamilyId extends string>
   readonly id: string;
   readonly familyId: TFamilyId;
   readonly targetId?: string;
+  readonly authoring?: AuthoringContributions;
 }
+
+export type FamilyPackRef<TFamilyId extends string = string> = PackRefBase<'family', TFamilyId>;
 
 export type TargetPackRef<
   TFamilyId extends string = string,
