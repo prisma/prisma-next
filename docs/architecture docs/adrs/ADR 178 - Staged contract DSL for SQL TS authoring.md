@@ -54,7 +54,7 @@ Three things to notice:
 
 ## Design principles
 
-1. **Semantic model first, storage second.** Authors describe their application's domain graph — models, fields, relations, identity — before they describe how it maps to SQL. Most contracts need no `.sql()` block at all.
+1. **Semantic model first, storage second.** Authors describe their application's domain graph — models, fields, relations, identity — before they describe how it maps to SQL. Most contracts need no `.sql()` block at all. This is a concrete application of the framework's [domain-first surfaces](../../Architecture%20Overview.md#domain-first-surfaces) principle.
 2. **Pack-driven vocabulary.** Helpers like `field.text()`, `field.id.uuidv7()`, and `field.createdAt()` come from pack-provided preset descriptors, not from hardcoded DSL internals. The vocabulary changes as framework composition changes.
 3. **Typed local references.** Inside `.sql()`, `cols` provides typed refs to the model's scalar fields only. Relation fields cannot appear in constraint authoring. Cross-model refs use model tokens.
 4. **Same canonical output.** The staged DSL lowers to the same `contract.json` and `contract.d.ts` that the chain builder produces. Downstream `schema()`, `sql()`, and `orm()` inference is unchanged.
