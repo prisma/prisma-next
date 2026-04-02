@@ -180,6 +180,24 @@ This allows phantom dependencies to accumulate (see: "Phantom `@prisma-next/cli`
 
 ---
 
+## Editing an already-applied migration silently re-attests without guard
+
+**Discovered:** 2026-04-02 | **Severity:** high
+
+**Observed:** `migration verify --dir <path>` re-evaluates migration.ts and re-attests the package with a new migrationId, even if the migration was already applied to a database. The database executed the old ops, but the on-disk package now has different ops and a different migrationId. No warning or error is emitted.
+
+**Location:**
+- `packages/1-framework/3-tooling/cli/src/commands/migration-verify.ts` — always re-evaluates migration.ts when present
+- `packages/1-framework/3-tooling/migration/src/attestation.ts` — `attestMigration` overwrites migrationId unconditionally
+
+**Impact:** Data integrity risk. The ledger records the old migrationId. The on-disk migration now has a different migrationId. A fresh database applying this migration would get different ops than the original database. The migration graph becomes inconsistent across environments.
+
+**Suggested fix:** Before re-attesting, check if the current migrationId appears in any known ledger (requires `readLedger` API — see related issue). At minimum, warn if `migrationId` is non-null and ops.json content changed. A strict mode could refuse to re-attest applied migrations entirely.
+
+**Context:** Discovered during manual workflow testing (workflow 5: edit attested migration → re-verify). Related to the `readLedger` gap in the `deriveEdgeStatuses` issue above.
+
+---
+
 ## `migration status --ref` places detached contract node on wrong branch
 
 **Discovered:** 2026-03-25 | **Severity:** medium | **Type:** rendering limitation + diagnostic gap
