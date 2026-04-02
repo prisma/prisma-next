@@ -10,7 +10,7 @@ export type {
   AuthoringTemplateValue,
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
-} from '../framework-authoring';
+} from '@prisma-next/framework-components/authoring';
 export {
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
@@ -19,7 +19,7 @@ export {
   isAuthoringTypeConstructorDescriptor,
   resolveAuthoringTemplateValue,
   validateAuthoringHelperArguments,
-} from '../framework-authoring';
+} from '@prisma-next/framework-components/authoring';
 export type {
   AdapterDescriptor,
   AdapterInstance,
@@ -46,9 +46,9 @@ export type {
   TypeRenderer,
   TypeRendererFunction,
   TypeRendererTemplate,
-} from '../framework-components';
+} from '@prisma-next/framework-components/components';
 export {
   checkContractComponentRequirements,
   interpolateTypeTemplate,
   normalizeRenderer,
-} from '../framework-components';
+} from '@prisma-next/framework-components/components';
