@@ -99,6 +99,7 @@ const ISSUE_KIND_ORDER: Record<string, number> = {
   // Dependencies and types first
   dependency_missing: 1,
   type_missing: 2,
+  type_values_mismatch: 3,
   enum_values_added: 3,
   enum_values_changed: 3,
 
@@ -390,6 +391,14 @@ function mapIssue(
         issueConflict(
           'unsupportedOperation',
           `Enum type "${issue.typeName ?? 'unknown'}" values changed — enum rebuild not yet supported by descriptor planner`,
+        ),
+      );
+
+    case 'type_values_mismatch':
+      return notOk(
+        issueConflict(
+          'unsupportedOperation',
+          `Type "${issue.typeName ?? 'unknown'}" values differ — type alteration not yet supported by descriptor planner`,
         ),
       );
 
