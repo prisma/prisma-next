@@ -127,12 +127,7 @@ function renderParameterizedTypeSql(
   return expanded !== column.nativeType ? expanded : null;
 }
 
-/**
- * Builds the DEFAULT clause for a column definition.
- * Returns empty string if no default is defined.
- *
- * Note: autoincrement is handled specially via SERIAL types, so we skip it here.
- */
+/** Autoincrement columns use SERIAL types, so this returns empty for them. */
 export function buildColumnDefaultSql(
   columnDefault: PostgresColumnDefault | undefined,
   column?: StorageColumn,
@@ -145,7 +140,6 @@ export function buildColumnDefaultSql(
     case 'literal':
       return `DEFAULT ${renderDefaultLiteral(columnDefault.value, column)}`;
     case 'function': {
-      // autoincrement is handled by SERIAL type, no explicit DEFAULT needed
       if (columnDefault.expression === 'autoincrement()') {
         return '';
       }
@@ -153,7 +147,6 @@ export function buildColumnDefaultSql(
       return `DEFAULT (${columnDefault.expression})`;
     }
     case 'sequence':
-      // Sequence names use quoteIdentifier for safe identifier handling
       return `DEFAULT nextval('${escapeLiteral(quoteIdentifier(columnDefault.name))}'::regclass)`;
   }
 }
@@ -209,7 +202,7 @@ export function buildAddColumnSql(
   return parts.join(' ');
 }
 
-export const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
+const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
   noAction: 'NO ACTION',
   restrict: 'RESTRICT',
   cascade: 'CASCADE',

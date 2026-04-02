@@ -9,6 +9,11 @@ export function toRegclassLiteral(schema: string, name: string): string {
   return `'${escapeLiteral(regclass)}'`;
 }
 
+/**
+ * When `table` is omitted the check matches by name + schema across all tables.
+ * Pass `table` to scope the check to a single table (prevents false matches on
+ * identically-named constraints in different tables).
+ */
 export function constraintExistsCheck({
   constraintName,
   schema,
