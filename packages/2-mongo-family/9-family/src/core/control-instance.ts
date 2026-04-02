@@ -1,0 +1,87 @@
+import type { AssembledComponentState } from '@prisma-next/contract/assembly';
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import { emit } from '@prisma-next/core-control-plane/emission';
+import type {
+  ControlDriverInstance,
+  ControlFamilyInstance,
+  EmitContractResult,
+  VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/core-control-plane/types';
+import type { MongoContract } from '@prisma-next/mongo-core';
+import { validateMongoContract } from '@prisma-next/mongo-core';
+import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
+
+export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo'> {
+  validateContractIR(contractJson: unknown): ContractIR;
+  emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
+}
+
+export function createMongoFamilyInstance(
+  assembledState: AssembledComponentState,
+): MongoControlFamilyInstance {
+  const {
+    codecTypeImports,
+    operationTypeImports,
+    queryOperationTypeImports,
+    extensionIds,
+    parameterizedRenderers,
+    parameterizedTypeImports,
+  } = assembledState;
+
+  return {
+    familyId: 'mongo',
+
+    validateContractIR(contractJson: unknown): ContractIR {
+      const validated = validateMongoContract<MongoContract>(contractJson);
+      return validated.contract as unknown as ContractIR;
+    },
+
+    async emitContract({ contractIR }): Promise<EmitContractResult> {
+      const ir = contractIR as ContractIR;
+
+      const result = await emit(
+        ir,
+        {
+          outputDir: '',
+          codecTypeImports,
+          operationTypeImports,
+          queryOperationTypeImports,
+          extensionIds,
+          parameterizedRenderers,
+          parameterizedTypeImports,
+        },
+        mongoTargetFamilyHook,
+      );
+
+      return {
+        contractJson: result.contractJson,
+        contractDts: result.contractDts,
+        storageHash: result.storageHash,
+        ...(result.executionHash ? { executionHash: result.executionHash } : {}),
+        profileHash: result.profileHash,
+      };
+    },
+
+    async verify(): Promise<VerifyDatabaseResult> {
+      throw new Error('Mongo verify is not implemented');
+    },
+
+    async schemaVerify(): Promise<VerifyDatabaseSchemaResult> {
+      throw new Error('Mongo schemaVerify is not implemented');
+    },
+
+    async sign() {
+      throw new Error('Mongo sign is not implemented');
+    },
+
+    async readMarker(): Promise<ContractMarkerRecord | null> {
+      throw new Error('Mongo readMarker is not implemented');
+    },
+
+    async introspect() {
+      throw new Error('Mongo introspect is not implemented');
+    },
+  };
+}
