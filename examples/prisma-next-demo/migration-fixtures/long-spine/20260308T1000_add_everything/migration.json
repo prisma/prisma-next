@@ -49,9 +49,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -85,9 +83,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -126,9 +122,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -148,9 +142,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -210,9 +202,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -246,9 +236,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -287,9 +275,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -309,9 +295,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -331,9 +315,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -358,9 +340,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
