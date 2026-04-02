@@ -24,6 +24,6 @@ test('validateContract<Contract> output is assignable to visualization shape', (
   expectTypeOf(contract.models).toHaveProperty('Post');
   expectTypeOf(contract.storage.tables).toHaveProperty('user');
   expectTypeOf(contract.storage.tables).toHaveProperty('post');
-  expectTypeOf(contract.mappings.modelToTable).toHaveProperty('User');
-  expectTypeOf(contract.mappings.tableToModel).toHaveProperty('user');
+  expectTypeOf(contract.models.User.storage.fields).toHaveProperty('email');
+  expectTypeOf(contract.models.Post.storage.fields).toHaveProperty('userId');
 });

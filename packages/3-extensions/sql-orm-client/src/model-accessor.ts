@@ -12,6 +12,7 @@ import {
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   getFieldToColumnMap,
+  modelOf,
   resolveFieldToColumn,
   resolveModelTableName,
 } from './collection-contract';
@@ -43,9 +44,10 @@ export function createModelAccessor<
   const contract = context.contract;
   const fieldToColumn = getFieldToColumnMap(contract, modelName);
   const tableName = resolveModelTableName(contract, modelName);
-  const modelRelations = ((
-    contract.models as Record<string, { relations?: Record<string, unknown> }>
-  )[modelName]?.relations ?? {}) as Record<string, RelationMeta>;
+  const modelRelations = (modelOf(contract, modelName)?.relations ?? {}) as Record<
+    string,
+    RelationMeta
+  >;
 
   return new Proxy({} as ModelAccessor<TContract, ModelName>, {
     get(_target, prop: string | symbol): unknown {
@@ -71,11 +73,7 @@ function resolveFieldTraits(
   fieldName: string,
   context: ExecutionContext,
 ): readonly string[] {
-  const models = contract.models as Record<
-    string,
-    { fields?: Record<string, { codecId?: string }> }
-  >;
-  const codecId = models[modelName]?.fields?.[fieldName]?.codecId;
+  const codecId = modelOf(contract, modelName)?.fields?.[fieldName]?.codecId;
   if (!codecId) return [];
   return context.codecs.traitsOf(codecId);
 }

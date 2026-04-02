@@ -20,17 +20,17 @@ export type Contract = ContractWithTypeMaps<SqlContract<
           readonly id: {
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
-            nullable: false;
+            readonly nullable: false;
           };
           readonly email: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
-            nullable: false;
+            readonly nullable: false;
           };
           readonly createdAt: {
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
-            nullable: false;
+            readonly nullable: false;
           };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
@@ -42,32 +42,20 @@ export type Contract = ContractWithTypeMaps<SqlContract<
   },
   {
     readonly User: {
-      readonly storage: { readonly table: 'user' };
+      readonly storage: {
+        readonly table: 'user';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly email: { readonly column: 'email' };
+          readonly createdAt: { readonly column: 'createdAt' };
+        };
+      };
       readonly fields: {
-        readonly id: { readonly column: 'id' };
-        readonly email: { readonly column: 'email' };
-        readonly createdAt: { readonly column: 'createdAt' };
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
       };
       readonly relations: Record<string, never>;
-    };
-  },
-  {},
-  {
-    readonly modelToTable: { readonly User: 'user' };
-    readonly tableToModel: { readonly user: 'User' };
-    readonly fieldToColumn: {
-      readonly User: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly createdAt: 'createdAt';
-      };
-    };
-    readonly columnToField: {
-      readonly user: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly createdAt: 'createdAt';
-      };
     };
   }
 >, TypeMaps>;

@@ -9,7 +9,6 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
     targetFamily: 'sql',
     target: 'test-db',
     models: {},
-    relations: {},
     storage: { tables: {} },
     extensions: {},
     capabilities: {},
@@ -27,10 +26,12 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           Document: {
-            storage: { table: 'document' },
-            fields: {
-              id: { column: 'id' },
-              embedding: { column: 'embedding' },
+            storage: {
+              table: 'document',
+              fields: {
+                id: { column: 'id' },
+                embedding: { column: 'embedding' },
+              },
             },
             relations: {},
           },
@@ -75,9 +76,11 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           User: {
-            storage: { table: 'user' },
-            fields: {
-              id: { column: 'id' },
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+              },
             },
             relations: {},
           },
@@ -116,9 +119,11 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           Document: {
-            storage: { table: 'document' },
-            fields: {
-              embedding: { column: 'embedding' },
+            storage: {
+              table: 'document',
+              fields: {
+                embedding: { column: 'embedding' },
+              },
             },
             relations: {},
           },
@@ -162,9 +167,11 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           Data: {
-            storage: { table: 'data' },
-            fields: {
-              value: { column: 'value' },
+            storage: {
+              table: 'data',
+              fields: {
+                value: { column: 'value' },
+              },
             },
             relations: {},
           },
@@ -214,9 +221,11 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           User: {
-            storage: { table: 'user' },
-            fields: {
-              role: { column: 'role' },
+            storage: {
+              table: 'user',
+              fields: {
+                role: { column: 'role' },
+              },
             },
             relations: {},
           },
@@ -269,9 +278,11 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           Document: {
-            storage: { table: 'document' },
-            fields: {
-              embedding: { column: 'embedding' },
+            storage: {
+              table: 'document',
+              fields: {
+                embedding: { column: 'embedding' },
+              },
             },
             relations: {},
           },
@@ -324,11 +335,13 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           Document: {
-            storage: { table: 'document' },
-            fields: {
-              embedding1: { column: 'embedding1' },
-              embedding2: { column: 'embedding2' },
-              embedding3: { column: 'embedding3' },
+            storage: {
+              table: 'document',
+              fields: {
+                embedding1: { column: 'embedding1' },
+                embedding2: { column: 'embedding2' },
+                embedding3: { column: 'embedding3' },
+              },
             },
             relations: {},
           },
@@ -395,9 +408,11 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           Data: {
-            storage: { table: 'data' },
-            fields: {
-              value: { column: 'value' },
+            storage: {
+              table: 'data',
+              fields: {
+                value: { column: 'value' },
+              },
             },
             relations: {},
           },
@@ -436,9 +451,11 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           Data: {
-            storage: { table: 'data' },
-            fields: {
-              value: { column: 'value' },
+            storage: {
+              table: 'data',
+              fields: {
+                value: { column: 'value' },
+              },
             },
             relations: {},
           },
@@ -483,9 +500,11 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           Data: {
-            storage: { table: 'data' },
-            fields: {
-              value: { column: 'value' },
+            storage: {
+              table: 'data',
+              fields: {
+                value: { column: 'value' },
+              },
             },
             relations: {},
           },
@@ -529,9 +548,11 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContractIR({
         models: {
           User: {
-            storage: { table: 'user' },
-            fields: {
-              id: { column: 'id' },
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+              },
             },
             relations: {},
           },

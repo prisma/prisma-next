@@ -19,7 +19,7 @@ export type MongoModelStorage = {
 export type MongoModelDefinition = {
   readonly fields: Record<string, DomainField>;
   readonly storage: MongoModelStorage;
-  readonly relations: Record<string, DomainRelation>;
+  readonly relations?: Record<string, DomainRelation>;
   readonly discriminator?: DomainDiscriminator;
   readonly variants?: Record<string, DomainVariantEntry>;
   readonly base?: string;

@@ -101,63 +101,6 @@ type GeneratedLikeContractBase = SqlContract<
       };
       relations: Record<string, never>;
     };
-  },
-  {
-    user: {
-      posts: {
-        to: 'Post';
-        cardinality: '1:N';
-        on: {
-          parentCols: ['id'];
-          childCols: ['userId'];
-        };
-      };
-    };
-    post: Record<string, never>;
-  },
-  {
-    modelToTable: {
-      User: 'user';
-      Post: 'post';
-    };
-    tableToModel: {
-      user: 'User';
-      post: 'Post';
-    };
-    fieldToColumn: {
-      User: {
-        id: 'id';
-        name: 'name';
-        email: 'email';
-        active: 'active';
-        metadata: 'metadata';
-      };
-      Post: {
-        id: 'id';
-        userId: 'userId';
-        title: 'title';
-      };
-    };
-    columnToField: {
-      user: {
-        id: 'id';
-        name: 'name';
-        email: 'email';
-        active: 'active';
-        metadata: 'metadata';
-      };
-      post: {
-        id: 'id';
-        userId: 'userId';
-        title: 'title';
-      };
-    };
-    codecTypes: {
-      'pg/text@1': { output: string; traits: 'equality' | 'order' | 'textual' };
-      'pg/bool@1': { output: boolean; traits: 'equality' | 'boolean' };
-      'pg/jsonb@1': { output: unknown; traits: 'equality' };
-    };
-    operationTypes: Record<string, never>;
   }
 >;
 

@@ -162,10 +162,12 @@ describe('interpretPslDocumentToSqlContractIR', () => {
     });
     expect(result.value.models).toMatchObject({
       User: {
-        storage: { table: 'user' },
-        fields: {
-          id: { column: 'id' },
-          email: { column: 'email' },
+        storage: {
+          table: 'user',
+          fields: {
+            id: { column: 'id' },
+            email: { column: 'email' },
+          },
         },
       },
     });
@@ -250,15 +252,14 @@ model Post {
         },
       },
     });
-    expect(result.value.relations).toMatchObject({
-      post: {
-        author: {
-          to: 'User',
-          cardinality: 'N:1',
-          on: {
-            parentCols: ['userId'],
-            childCols: ['id'],
-          },
+    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    expect(models['Post']?.relations).toMatchObject({
+      author: {
+        to: 'User',
+        cardinality: 'N:1',
+        on: {
+          localFields: ['userId'],
+          targetFields: ['id'],
         },
       },
     });
@@ -618,14 +619,18 @@ model Member {
     });
     expect(result.value.models).toMatchObject({
       Team: {
-        storage: { table: 'org_team' },
-        fields: { id: { column: 'team_id' } },
+        storage: {
+          table: 'org_team',
+          fields: { id: { column: 'team_id' } },
+        },
       },
       Member: {
-        storage: { table: 'team_member' },
-        fields: {
-          id: { column: 'member_id' },
-          teamId: { column: 'team_ref' },
+        storage: {
+          table: 'team_member',
+          fields: {
+            id: { column: 'member_id' },
+            teamId: { column: 'team_ref' },
+          },
         },
       },
     });

@@ -39,8 +39,6 @@ export function createTestContract(
     storageHash: 'sha256:test',
     storage: { tables, ...ifDefined('types', storageTypes) },
     models: {},
-    relations: {},
-    mappings: {},
     capabilities: {},
     meta: {},
     sources: {},

@@ -1,11 +1,6 @@
-import type {
-  ModelDefinition,
-  SqlContract,
-  SqlMappings,
-  SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { computeMappings, normalizeContract, validateContract } from '../src/contract';
+import { normalizeContract, validateContract } from '../src/contract';
 
 describe('validateContract normalization', () => {
   it('normalizes missing nullable in columns', () => {
@@ -295,12 +290,12 @@ describe('validateContract normalization', () => {
         User: {
           storage: { table: 'User' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             posts: {
               to: 'Post',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
           },
@@ -319,14 +314,12 @@ describe('validateContract normalization', () => {
           },
         },
       },
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
+    };
     const normalized = normalizeContract(contractInput);
-    // Normalization should preserve existing relations (lines 420-425)
     expect((normalized.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
-        on: { parentCols: ['id'], childCols: ['userId'] },
+        on: { localFields: ['id'], targetFields: ['userId'] },
         cardinality: '1:N',
       },
     });
@@ -342,7 +335,7 @@ describe('validateContract normalization', () => {
         User: {
           storage: { table: 'User' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
         },
       },
@@ -362,31 +355,6 @@ describe('validateContract normalization', () => {
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({});
-  });
-
-  it('normalizes missing top-level relations', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {},
-      storage: {
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.relations).toEqual({});
   });
 
   it('normalizes missing extensionPacks', () => {
@@ -499,13 +467,13 @@ describe('validateContract normalization', () => {
         User: {
           storage: { table: 'user' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
         },
         Post: {
           storage: { table: 'post' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
         },
       },
@@ -547,12 +515,12 @@ describe('validateContract normalization', () => {
         User: {
           storage: { table: 'User' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             posts: {
               to: 'Post',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
           },
@@ -560,13 +528,13 @@ describe('validateContract normalization', () => {
         Post: {
           storage: { table: 'Post' },
           fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             user: {
               to: 'User',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['userId'], targetFields: ['id'] },
               cardinality: 'N:1',
             },
           },
@@ -605,14 +573,14 @@ describe('validateContract normalization', () => {
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
-        on: { parentCols: ['id'], childCols: ['userId'] },
+        on: { localFields: ['id'], targetFields: ['userId'] },
         cardinality: '1:N',
       },
     });
     expect((contract.models['Post'] as { relations?: unknown })['relations']).toEqual({
       user: {
         to: 'User',
-        on: { parentCols: ['id'], childCols: ['userId'] },
+        on: { localFields: ['userId'], targetFields: ['id'] },
         cardinality: 'N:1',
       },
     });
@@ -628,12 +596,12 @@ describe('validateContract normalization', () => {
         User: {
           storage: { table: 'User' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             posts: {
               to: 'Post',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
           },
@@ -641,10 +609,9 @@ describe('validateContract normalization', () => {
         Post: {
           storage: { table: 'Post' },
           fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
           },
-          // Missing relations - should be normalized to {}
         },
       },
       storage: {
@@ -680,7 +647,7 @@ describe('validateContract normalization', () => {
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
-        on: { parentCols: ['id'], childCols: ['userId'] },
+        on: { localFields: ['id'], targetFields: ['userId'] },
         cardinality: '1:N',
       },
     });
@@ -820,124 +787,5 @@ describe('validateContract normalization', () => {
     } as any;
     const normalized = normalizeContract(contractInput);
     expect(normalized.models).toEqual({});
-  });
-});
-
-describe('computeMappings', () => {
-  it('computes mappings from models and storage', () => {
-    const models: Record<string, ModelDefinition> = {
-      User: {
-        storage: { table: 'user' },
-        fields: {
-          id: { column: 'id' },
-          email: { column: 'email' },
-        },
-        relations: {},
-      },
-    };
-    const storage: SqlStorage = {
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-      },
-    };
-    const mappings = computeMappings(models, storage);
-    expect(mappings.modelToTable?.['User']).toBe('user');
-    expect(mappings.tableToModel?.['user']).toBe('User');
-    expect(mappings.fieldToColumn?.['User']?.['id']).toBe('id');
-    expect(mappings.fieldToColumn?.['User']?.['email']).toBe('email');
-    expect(mappings.columnToField?.['user']?.['id']).toBe('id');
-    expect(mappings.columnToField?.['user']?.['email']).toBe('email');
-  });
-
-  it('preserves existing mappings when provided', () => {
-    const models: Record<string, ModelDefinition> = {
-      User: {
-        storage: { table: 'user' },
-        fields: {
-          id: { column: 'id' },
-        },
-        relations: {},
-      },
-    };
-    const storage: SqlStorage = {
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-      },
-    };
-    const existingMappings: Partial<SqlMappings> = {
-      modelToTable: { User: 'custom_table' },
-      tableToModel: { custom_table: 'User' },
-    };
-    const mappings = computeMappings(models, storage, existingMappings);
-    expect(mappings.modelToTable?.['User']).toBe('custom_table');
-    expect(mappings).not.toHaveProperty('codecTypes');
-    expect(mappings).not.toHaveProperty('operationTypes');
-  });
-
-  it('computes mappings for multiple models', () => {
-    const models: Record<string, ModelDefinition> = {
-      User: {
-        storage: { table: 'user' },
-        fields: {
-          id: { column: 'id' },
-        },
-        relations: {},
-      },
-      Post: {
-        storage: { table: 'post' },
-        fields: {
-          id: { column: 'id' },
-          userId: { column: 'user_id' },
-        },
-        relations: {},
-      },
-    };
-    const storage: SqlStorage = {
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-        post: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-      },
-    };
-    const mappings = computeMappings(models, storage);
-    expect(mappings.modelToTable?.['User']).toBe('user');
-    expect(mappings.modelToTable?.['Post']).toBe('post');
-    expect(mappings.tableToModel?.['user']).toBe('User');
-    expect(mappings.tableToModel?.['post']).toBe('Post');
-    expect(mappings.fieldToColumn?.['Post']?.['userId']).toBe('user_id');
-    expect(mappings.columnToField?.['post']?.['user_id']).toBe('userId');
   });
 });

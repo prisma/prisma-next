@@ -115,6 +115,14 @@ describe('SQL contract validators', () => {
       } as unknown;
       expect(() => validateModel(invalid)).toThrow();
     });
+
+    it('validates model without relations', () => {
+      const modelWithoutRelations = {
+        storage: { table: 'user', fields: { id: { column: 'id' } } },
+        fields: { id: {} },
+      };
+      expect(() => validateModel(modelWithoutRelations)).not.toThrow();
+    });
   });
 
   describe('validateSqlContract', () => {
@@ -311,6 +319,21 @@ describe('SQL contract validators', () => {
         },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
+    it('rejects unknown top-level keys', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') });
+      const s = storage({ user: userTable });
+      const base = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+      });
+      const c = {
+        ...base,
+        mappings: { modelToTable: { User: 'user' } },
+      };
+      expect(() => validateSqlContract(c)).toThrow('mappings must be removed');
     });
 
     it('validates FK with per-FK constraint and index fields', () => {
@@ -610,6 +633,29 @@ describe('SQL contract validators', () => {
       });
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(0);
+    });
+  });
+
+  describe('validateSqlContract strict mode', () => {
+    it('rejects unknown top-level properties', () => {
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        models: { User: model('users', { id: { column: 'id' } }) },
+        storage: storage({ users: table({ id: col('int4', 'pg/int4@1') }) }),
+      });
+      const withUnknown = { ...c, bogusField: 'unexpected' };
+      expect(() => validateSqlContract(withUnknown)).toThrow();
+    });
+
+    it('accepts valid contracts without unknown properties', () => {
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        models: { User: model('users', { id: { column: 'id' } }) },
+        storage: storage({ users: table({ id: col('int4', 'pg/int4@1') }) }),
+      });
+      expect(() => validateSqlContract(c)).not.toThrow();
     });
   });
 });

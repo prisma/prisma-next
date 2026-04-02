@@ -309,22 +309,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionPacks: extensions,
   });
 
-  function stripMappings(contract: unknown): unknown {
-    if (typeof contract === 'object' && contract !== null && 'mappings' in contract) {
-      const { mappings: _mappings, ...contractIR } = contract as {
-        mappings?: unknown;
-        [key: string]: unknown;
-      };
-      return contractIR;
-    }
-    return contract;
-  }
-
   function normalizeProviderContractIR(contract: unknown): ContractIR {
-    const contractWithoutMappings = stripMappings(contract);
-    const validated = validateContract<SqlContract<SqlStorage>>(contractWithoutMappings);
-    const { mappings: _mappings, ...contractIR } = validated;
-    return contractIR as ContractIR;
+    const validated = validateContract<SqlContract<SqlStorage>>(contract);
+    return validated as unknown as ContractIR;
   }
 
   return {

@@ -1,14 +1,15 @@
-import type { EmbedRelationKeys, ReferenceRelationKeys } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../1-core/test/fixtures/orm-contract';
 import type {
+  EmbedRelationKeys,
   InferFullRow,
   InferRootRow,
   MongoCollection,
   MongoIncludeSpec,
   MongoOrmClient,
   MongoWhereFilter,
+  ReferenceRelationKeys,
 } from '../src/types';
 
 // --- Root accessors ---

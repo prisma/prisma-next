@@ -3,24 +3,12 @@ import type { Contract } from '../prisma/contract.d';
 
 type ContractModel = Contract['models'][keyof Contract['models']];
 
-function ModelCard({
-  modelName,
-  model,
-  contract,
-}: {
-  modelName: string;
-  model: ContractModel;
-  contract: Contract;
-}) {
+function ModelCard({ modelName, model }: { modelName: string; model: ContractModel }) {
   const tableName = model.storage.table;
-  const relations = contract.relations as Record<
-    string,
-    Record<string, { cardinality: string; to: string }>
-  >;
-  const tableRelations = relations[tableName] ?? {};
-  const fieldToColumn =
-    (contract.mappings.fieldToColumn as Record<string, Record<string, string>>)?.[modelName] ?? {};
-  const relationEntries = Object.entries(tableRelations);
+  const fieldToColumn = Object.fromEntries(
+    Object.entries(model.storage.fields).map(([fieldName, mapping]) => [fieldName, mapping.column]),
+  );
+  const relationEntries = Object.entries(model.relations ?? {});
 
   return (
     <div className="table-card">
@@ -142,7 +130,7 @@ export function ContractView({ contract }: { contract: Contract }) {
 
       <Section title="Models">
         {Object.entries(contract.models).map(([modelName, model]) => (
-          <ModelCard key={modelName} modelName={modelName} model={model} contract={contract} />
+          <ModelCard key={modelName} modelName={modelName} model={model} />
         ))}
       </Section>
 

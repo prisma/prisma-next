@@ -60,8 +60,6 @@ const contract = validateContract<PostgresContract>({
     },
   },
   models: {},
-  relations: {},
-  mappings: {},
 });
 
 describe('Postgres adapter', () => {

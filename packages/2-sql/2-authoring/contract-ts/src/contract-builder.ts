@@ -18,7 +18,6 @@ import type {
 } from '@prisma-next/contract-authoring';
 import {
   type BuildModels,
-  type BuildRelations,
   type BuildStorageColumn,
   ContractBuilder,
   createTable,
@@ -32,17 +31,12 @@ import {
   applyFkDefaults,
   type ContractWithTypeMaps,
   type Index,
-  type ModelDefinition,
-  type ModelField,
   type ReferentialAction,
   type SqlContract,
-  type SqlMappings,
-  type SqlStorage,
   type StorageTypeInstance,
   type TypeMaps,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { computeMappings } from './contract';
 
 type ColumnDefaultForCodec<
   CodecTypes extends Record<string, { output: unknown }>,
@@ -131,8 +125,6 @@ export interface SqlTableBuilder<
     PrimaryKey
   >;
 }
-
-type ContractBuilderMappings = SqlMappings;
 
 type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
   ? C extends Record<string, { output: unknown }>
@@ -308,7 +300,7 @@ class SqlContractBuilder<
    * - `uniques`: defaults to `[]` (empty array)
    * - `indexes`: defaults to `[]` (empty array)
    * - `foreignKeys`: defaults to `[]` (empty array)
-   * - `relations`: defaults to `{}` (empty object) for both model-level and contract-level
+   * - model `relations`: defaults to `{}` (empty object) when not populated by the builder
    * - `nativeType`: required field set from column type descriptor when columns are defined
    *
    * The contract builder is the **only** place where normalization should occur.
@@ -321,12 +313,7 @@ class SqlContractBuilder<
    */
   build(): Target extends string
     ? ContractWithTypeMaps<
-        SqlContract<
-          BuildStorage<Tables, Types>,
-          BuildModels<Models>,
-          BuildRelations<Models>,
-          ContractBuilderMappings
-        > & {
+        SqlContract<BuildStorage<Tables, Types>, BuildModels<Models>> & {
           readonly schemaVersion: '1';
           readonly target: Target;
           readonly targetFamily: 'sql';
@@ -342,12 +329,7 @@ class SqlContractBuilder<
     : never {
     type BuiltContract = Target extends string
       ? ContractWithTypeMaps<
-          SqlContract<
-            BuildStorage<Tables, Types>,
-            BuildModels<Models>,
-            BuildRelations<Models>,
-            ContractBuilderMappings
-          > & {
+          SqlContract<BuildStorage<Tables, Types>, BuildModels<Models>> & {
             readonly schemaVersion: '1';
             readonly target: Target;
             readonly targetFamily: 'sql';
@@ -489,44 +471,6 @@ class SqlContractBuilder<
     // Build models - construct as partial first, then assert full type
     const modelsPartial: Partial<BuildModels<Models>> = {};
 
-    // Iterate over models - TypeScript will see keys as string, but type assertion preserves literals
-    for (const modelName in this.state.models) {
-      const modelState = this.state.models[modelName];
-      if (!modelState) continue;
-
-      const modelStateTyped = modelState as unknown as {
-        name: string;
-        table: string;
-        fields: Record<string, string>;
-      };
-
-      // Build fields object
-      const fields: Partial<Record<string, ModelField>> = {};
-
-      // Iterate over fields
-      for (const fieldName in modelStateTyped.fields) {
-        const columnName = modelStateTyped.fields[fieldName];
-        if (columnName) {
-          fields[fieldName] = {
-            column: columnName,
-          };
-        }
-      }
-
-      // Assign to models - type assertion preserves literal keys
-      (modelsPartial as unknown as Record<string, ModelDefinition>)[modelName] = {
-        storage: {
-          table: modelStateTyped.table,
-        },
-        fields: fields as Record<string, ModelField>,
-        relations: {},
-      };
-    }
-
-    // Build relations object - organized by table name
-    const relationsPartial: Partial<Record<string, Record<string, RelationDefinition>>> = {};
-
-    // Iterate over models to collect relations
     for (const modelName in this.state.models) {
       const modelState = this.state.models[modelName];
       if (!modelState) continue;
@@ -539,35 +483,60 @@ class SqlContractBuilder<
       };
 
       const tableName = modelStateTyped.table;
-      if (!tableName) continue;
-
-      // Only initialize relations object for this table if it has relations
-      if (modelStateTyped.relations && Object.keys(modelStateTyped.relations).length > 0) {
-        if (!relationsPartial[tableName]) {
-          relationsPartial[tableName] = {};
-        }
-
-        // Add relations from this model to the table's relations
-        const tableRelations = relationsPartial[tableName];
-        if (tableRelations) {
-          for (const relationName in modelStateTyped.relations) {
-            const relation = modelStateTyped.relations[relationName];
-            if (relation) {
-              tableRelations[relationName] = relation;
+      const tableState = this.state.tables[tableName as keyof Tables];
+      const tableColumns = tableState
+        ? (
+            tableState as unknown as {
+              columns: Record<string, { type: string; nullable?: boolean }>;
             }
-          }
+          ).columns
+        : {};
+
+      const storageFields: Record<string, { readonly column: string }> = {};
+      const domainFields: Record<string, Record<string, unknown>> = {};
+
+      for (const fieldName in modelStateTyped.fields) {
+        const columnName = modelStateTyped.fields[fieldName];
+        if (!columnName) continue;
+
+        storageFields[fieldName] = { column: columnName };
+
+        const column = tableColumns[columnName];
+        if (column) {
+          domainFields[fieldName] = {
+            codecId: column.type,
+            nullable: column.nullable ?? false,
+          };
         }
       }
+
+      const modelRelations: Record<string, Record<string, unknown>> = {};
+      if (modelStateTyped.relations) {
+        for (const relName in modelStateTyped.relations) {
+          const rel = modelStateTyped.relations[relName];
+          if (!rel) continue;
+          modelRelations[relName] = {
+            to: rel.to,
+            cardinality: rel.cardinality,
+            on: {
+              localFields: rel.on.parentCols,
+              targetFields: rel.on.childCols,
+            },
+          };
+        }
+      }
+
+      (modelsPartial as unknown as Record<string, Record<string, unknown>>)[modelName] = {
+        storage: {
+          table: tableName,
+          fields: storageFields,
+        },
+        fields: domainFields,
+        relations: modelRelations,
+      };
     }
 
     const models = modelsPartial as unknown as BuildModels<Models>;
-
-    const baseMappings = computeMappings(
-      models as unknown as Record<string, ModelDefinition>,
-      storage as SqlStorage,
-    );
-
-    const mappings = baseMappings as ContractBuilderMappings;
 
     const extensionNamespaces = this.state.extensionNamespaces ?? [];
     const extensionPacks: Record<string, unknown> = { ...(this.state.extensionPacks || {}) };
@@ -577,18 +546,14 @@ class SqlContractBuilder<
       }
     }
 
-    // Construct contract with explicit type that matches the generic parameters
-    // This ensures TypeScript infers literal types from the generics, not runtime values
-    // Always include relations, even if empty (normalized to empty object)
     const contract = {
       schemaVersion: '1' as const,
       target,
       targetFamily: 'sql' as const,
       storageHash: this.state.storageHash || 'sha256:ts-builder-placeholder',
       models,
-      relations: relationsPartial,
+      roots: {},
       storage,
-      mappings,
       ...(execution ? { execution } : {}),
       extensionPacks,
       capabilities: this.state.capabilities || {},

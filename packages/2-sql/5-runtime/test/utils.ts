@@ -260,7 +260,7 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
 
 /**
  * Creates a valid test contract without using validateContract.
- * Ensures all required fields are present (mappings, capabilities, extensionPacks, meta, sources)
+ * Ensures all required fields are present (capabilities, extensionPacks, meta, sources)
  * and returns the contract with proper typing.
  * This helper allows tests to create contracts without depending on sql-query.
  */
@@ -279,9 +279,7 @@ export function createTestContract(
     targetFamily: rest.targetFamily ?? 'sql',
     storage: rest.storage ?? { tables: {} },
     models: rest.models ?? {},
-    relations: rest.relations ?? {},
     roots: rest.roots ?? {},
-    mappings: rest.mappings ?? {},
     capabilities: rest.capabilities ?? {},
     extensionPacks: rest.extensionPacks ?? {},
     meta: rest.meta ?? {},

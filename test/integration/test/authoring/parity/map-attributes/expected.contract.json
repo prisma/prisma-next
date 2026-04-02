@@ -2,12 +2,9 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:6a38af603d36ab9862c3e73197e094c00b696e55a0928d0003a7b5e9201017bc",
-  "profileHash": "sha256:1628d322a01cac03524fe340fe22d19882ec5ecf0f71f9a32c6c2dfa648a903a",
-  "roots": {
-    "Member": "Member",
-    "Team": "Team"
-  },
+  "storageHash": "sha256:8a3d148525627454f6ec4ed197e2160baff36f7d623d8e2dec4c1b586688886e",
+  "profileHash": "sha256:4a1573b59c964ca68ffbb7cc76f1a5f84a5ca04847cd4b8443e3a4e244d8fc72",
+  "roots": {},
   "models": {
     "Member": {
       "fields": {
@@ -22,8 +19,8 @@
         "team": {
           "cardinality": "N:1",
           "on": {
-            "localFields": ["teamId"],
-            "targetFields": ["id"]
+            "localFields": ["team_ref"],
+            "targetFields": ["team_id"]
           },
           "to": "Team"
         }
@@ -54,18 +51,6 @@
           }
         },
         "table": "org_team"
-      }
-    }
-  },
-  "relations": {
-    "team_member": {
-      "team": {
-        "cardinality": "N:1",
-        "on": {
-          "childCols": ["team_id"],
-          "parentCols": ["team_ref"]
-        },
-        "to": "Team"
       }
     }
   },

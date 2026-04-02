@@ -17,7 +17,6 @@ export function createContractIR(
   const hasStorageHash = 'storageHash' in overrides;
   const hasSchemaVersion = 'schemaVersion' in overrides;
   const hasModels = 'models' in overrides;
-  const hasRelations = 'relations' in overrides;
   const hasStorage = 'storage' in overrides;
   const hasCapabilities = 'capabilities' in overrides;
   const hasExtensionPacks = 'extensionPacks' in overrides;
@@ -150,14 +149,6 @@ export function createContractIR(
         : hasModels && overrides.models !== undefined
           ? (overrides.models as Record<string, unknown>)
           : !hasModels
-            ? {}
-            : ({} as Record<string, unknown>),
-    relations:
-      hasRelations && overrides.relations === undefined
-        ? (undefined as unknown as Record<string, unknown>)
-        : hasRelations && overrides.relations !== undefined
-          ? (overrides.relations as Record<string, unknown>)
-          : !hasRelations
             ? {}
             : ({} as Record<string, unknown>),
   } as ContractIR;

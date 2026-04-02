@@ -11,7 +11,6 @@ type NormalizedContract = {
   profileHash?: string;
   roots?: Record<string, string>;
   models: Record<string, unknown>;
-  relations?: Record<string, unknown>;
   storage: Record<string, unknown>;
   execution?: Record<string, unknown>;
   extensionPacks: Record<string, unknown>;
@@ -25,7 +24,6 @@ export type CanonicalContractInput = {
   target: string;
   roots?: Record<string, string>;
   models: Record<string, unknown>;
-  relations?: Record<string, unknown>;
   storage: Record<string, unknown>;
   execution?: Record<string, unknown>;
   extensionPacks: Record<string, unknown>;
@@ -46,7 +44,6 @@ const TOP_LEVEL_ORDER = [
   'profileHash',
   'roots',
   'models',
-  'relations',
   'storage',
   'execution',
   'capabilities',
@@ -111,7 +108,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isCollectionEntry =
         currentPath.length === 3 &&
         isArrayEqual([currentPath[0], currentPath[1]], ['storage', 'collections']);
-      const isRequiredRelations = isArrayEqual(currentPath, ['relations']);
       const isRequiredRoots = isArrayEqual(currentPath, ['roots']);
       const isRequiredExtensionPacks = isArrayEqual(currentPath, ['extensionPacks']);
       const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
@@ -159,7 +155,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isRequiredTables &&
         !isRequiredCollections &&
         !isCollectionEntry &&
-        !isRequiredRelations &&
         !isRequiredRoots &&
         !isRequiredExtensionPacks &&
         !isRequiredCapabilities &&
@@ -288,7 +283,6 @@ export function canonicalizeContract(ir: CanonicalContractInput): string {
     target: ir.target,
     ...ifDefined('roots', ir.roots),
     models: ir.models,
-    ...ifDefined('relations', ir.relations),
     storage: ir.storage,
     ...ifDefined('execution', ir.execution),
     extensionPacks: ir.extensionPacks,

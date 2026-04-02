@@ -40,9 +40,11 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+            },
           },
           relations: {},
         },
@@ -73,8 +75,7 @@ describe('sql-target-family-hook', () => {
       const ir = createContractIR({
         models: {
           User: {
-            storage: { table: 'user' },
-            fields: { id: { column: 'id' } },
+            storage: { table: 'user', fields: { id: { column: 'id' } } },
             relations: {},
           },
         },
@@ -111,8 +112,7 @@ describe('sql-target-family-hook', () => {
       const ir = createContractIR({
         models: {
           User: {
-            storage: { table: 'user' },
-            fields: { id: { column: 'id' } },
+            storage: { table: 'user', fields: { id: { column: 'id' } } },
             relations: {},
           },
         },
@@ -135,46 +135,17 @@ describe('sql-target-family-hook', () => {
       expect(types).not.toContain("'__@prisma-next/sql-contract/operationTypes@__'");
       expect(types).not.toContain("'__@prisma-next/sql-contract/typeMaps@__'");
     });
-
-    it('Contract mappings type includes only runtime-real keys', () => {
-      const ir = createContractIR({
-        models: {
-          User: {
-            storage: { table: 'user' },
-            fields: { id: { column: 'id' }, email: { column: 'email' } },
-            relations: {},
-          },
-        },
-        storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-      });
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-      expect(types).toContain('modelToTable');
-      expect(types).toContain('tableToModel');
-      expect(types).toContain('fieldToColumn');
-      expect(types).toContain('columnToField');
-    });
   });
 
   it('generates contract types with correct import path', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+            },
           },
           relations: {},
         },
@@ -558,11 +529,13 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'email' },
-            name: { column: 'name' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+              email: { column: 'email' },
+              name: { column: 'name' },
+            },
           },
           relations: {},
         },
@@ -593,10 +566,12 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'nonexistent' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+              email: { column: 'nonexistent' },
+            },
           },
           relations: {},
         },
@@ -618,16 +593,18 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain("readonly email: { readonly column: 'nonexistent' }");
+    expect(types).toContain('readonly email: unknown');
   });
 
   it('generates contract types with model referencing missing table', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'nonexistent' },
-          fields: {
-            id: { column: 'id' },
+          storage: {
+            table: 'nonexistent',
+            fields: {
+              id: { column: 'id' },
+            },
           },
           relations: {},
         },
@@ -648,7 +625,7 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain("readonly id: { readonly column: 'id' }");
+    expect(types).toContain('readonly id: unknown');
   });
 
   it('generates contract types with undefined models', () => {
@@ -671,16 +648,18 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('Record<string, never>');
-    expect(types).toContain('SqlMappings');
+    expect(types).not.toContain('SqlMappings');
   });
 
   it('generates contract types with column nullable undefined defaults to false', () => {
     const ir = createContractIR({
       models: {
         User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
+          storage: {
+            table: 'user',
+            fields: {
+              id: { column: 'id' },
+            },
           },
           relations: {},
         },
@@ -713,10 +692,12 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         Embedding: {
-          storage: { table: 'embedding' },
-          fields: {
-            id: { column: 'id' },
-            vector: { column: 'vector' },
+          storage: {
+            table: 'embedding',
+            fields: {
+              id: { column: 'id' },
+              vector: { column: 'vector' },
+            },
           },
           relations: {},
         },
@@ -762,9 +743,11 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         Embedding: {
-          storage: { table: 'embedding' },
-          fields: {
-            vector: { column: 'vector' },
+          storage: {
+            table: 'embedding',
+            fields: {
+              vector: { column: 'vector' },
+            },
           },
           relations: {},
         },
@@ -1004,8 +987,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       models: {
         Tag: {
-          storage: { table: 'tags' },
-          fields: { id: { column: 'id' }, name: { column: 'name' } },
+          storage: { table: 'tags', fields: { id: { column: 'id' }, name: { column: 'name' } } },
           relations: {},
         },
       },

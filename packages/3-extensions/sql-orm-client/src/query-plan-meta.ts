@@ -4,6 +4,38 @@ import type { AnyQueryAst, ParamRef } from '@prisma-next/sql-relational-core/ast
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 
+function resolveProjectionCodecs(
+  contract: SqlContract<SqlStorage>,
+  ast: AnyQueryAst,
+): Record<string, string> | undefined {
+  const codecs: Record<string, string> = {};
+
+  if (ast.kind === 'select') {
+    for (const item of ast.projection) {
+      if (item.expr.kind === 'column-ref') {
+        const table = contract.storage.tables[item.expr.table];
+        const col = table?.columns[item.expr.column];
+        if (col?.codecId) {
+          codecs[item.alias] = col.codecId;
+        }
+      }
+    }
+  } else if (ast.returning) {
+    const tableName = ast.table.name;
+    const table = contract.storage.tables[tableName];
+    if (!table) return undefined;
+
+    for (const colRef of ast.returning) {
+      const col = table.columns[colRef.column];
+      if (col?.codecId) {
+        codecs[colRef.column] = col.codecId;
+      }
+    }
+  }
+
+  return Object.keys(codecs).length > 0 ? codecs : undefined;
+}
+
 export function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }): {
   params: unknown[];
   paramDescriptors: ParamDescriptor[];
@@ -50,15 +82,24 @@ export function buildOrmQueryPlan<Row>(
   params: readonly unknown[],
   paramDescriptors: readonly ParamDescriptor[] = [],
 ): SqlQueryPlan<Row> {
-  const annotations =
+  const projectionTypes = resolveProjectionCodecs(contract, ast);
+  const codecAnnotations = projectionTypes
+    ? { codecs: Object.freeze({ ...projectionTypes }) }
+    : undefined;
+  const limitAnnotation =
     ast.kind === 'select' && ast.limit !== undefined ? { limit: ast.limit } : undefined;
+  const annotations =
+    codecAnnotations || limitAnnotation
+      ? Object.freeze({ ...codecAnnotations, ...limitAnnotation })
+      : undefined;
 
   return Object.freeze({
     ast,
     params: [...params],
     meta: {
       ...buildOrmPlanMeta(contract, paramDescriptors),
-      ...(annotations ? { annotations } : {}),
+      ...ifDefined('projectionTypes', projectionTypes),
+      ...ifDefined('annotations', annotations),
     },
   });
 }

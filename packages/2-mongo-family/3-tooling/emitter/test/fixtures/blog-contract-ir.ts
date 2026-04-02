@@ -59,7 +59,6 @@ export const blogContractIR: ContractIR = {
       owner: 'Post',
     },
   },
-  relations: {},
   storage: {
     collections: {
       users: {},

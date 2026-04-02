@@ -80,20 +80,34 @@ describe('contract.d.ts imports resolution', () => {
         },
         models: {
           User: {
-            storage: { table: 'user' },
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+                email: { column: 'email' },
+                createdAt: { column: 'createdAt' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              email: { column: 'email' },
-              createdAt: { column: 'createdAt' },
+              id: { codecId: 'pg/int4@1', nullable: false },
+              email: { codecId: 'pg/text@1', nullable: false },
+              createdAt: { codecId: 'pg/timestamptz@1', nullable: false },
             },
             relations: {},
           },
           Post: {
-            storage: { table: 'post' },
+            storage: {
+              table: 'post',
+              fields: {
+                id: { column: 'id' },
+                title: { column: 'title' },
+                userId: { column: 'userId' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              title: { column: 'title' },
-              userId: { column: 'userId' },
+              id: { codecId: 'pg/int4@1', nullable: false },
+              title: { codecId: 'pg/text@1', nullable: false },
+              userId: { codecId: 'pg/int4@1', nullable: false },
             },
             relations: {},
           },
@@ -155,9 +169,7 @@ describe('contract.d.ts imports resolution', () => {
       const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
       expect(contractDtsContent).toContain("from '@prisma-next/sql-contract/types'");
       expect(contractDtsContent).toContain('SqlContract');
-      expect(contractDtsContent).toContain('SqlStorage');
-      expect(contractDtsContent).toContain('SqlMappings');
-      expect(contractDtsContent).toContain('ModelDefinition');
+      expect(contractDtsContent).toContain('ContractWithTypeMaps');
       expect(contractDtsContent).not.toContain("from './contract-types'");
 
       // Create a test TypeScript file that imports the generated contract.d.ts
@@ -236,10 +248,16 @@ type UserIdColumn = UserColumns['id'];
         },
         models: {
           User: {
-            storage: { table: 'user' },
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+                email: { column: 'email' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              email: { column: 'email' },
+              id: { codecId: 'pg/int4@1', nullable: false },
+              email: { codecId: 'pg/text@1', nullable: false },
             },
             relations: {},
           },
@@ -287,7 +305,7 @@ type UserIdColumn = UserColumns['id'];
       expect(contractDtsContent).toContain("from '@prisma-next/adapter-postgres/codec-types'");
 
       // Create a comprehensive test file that uses all exported types
-      const testFileContent = `import type { Contract, CodecTypes, Tables, Models, Relations } from './contract';
+      const testFileContent = `import type { Contract, CodecTypes, Tables, Models } from './contract';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import contractJson from './contract.json' with { type: 'json' };
 
@@ -297,7 +315,6 @@ const contract = validateContract<Contract>(contractJson);
 // Verify we can access all exported types
 const _tables: Tables = contract.storage.tables;
 const _models: Models = contract.models;
-const _relations: Relations = contract.relations;
 
 // Verify we can access nested types
 type UserTable = Tables['user'];

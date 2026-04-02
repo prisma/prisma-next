@@ -101,7 +101,7 @@ describe('contract builder methods', () => {
         return builder;
       })
       .build();
-    expect(contract.models.User.fields.id).toBeDefined();
+    expect(contract.models.User.storage.fields.id).toBeDefined();
   });
 
   it('builds table without primary key', () => {
@@ -113,7 +113,7 @@ describe('contract builder methods', () => {
     expect(contract.storage.tables.user['primaryKey']).toBeUndefined();
   });
 
-  it('builds model with relations', () => {
+  it('builds multi-table models with field mappings', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
@@ -141,9 +141,11 @@ describe('contract builder methods', () => {
           }),
       )
       .build();
-    expect((contract.models['Post'] as { relations?: unknown })['relations']).toBeDefined();
-    expect(contract.relations.post).toBeDefined();
-    expect(contract.relations.post?.user).toBeDefined();
+    const post = contract.models.Post as {
+      storage: { fields: Record<string, { column: string }> };
+    };
+    expect(post.storage.fields['id']).toEqual({ column: 'id' });
+    expect(post.storage.fields['userId']).toEqual({ column: 'userId' });
   });
 
   it('builds contract with multiple tables and models', () => {
@@ -383,8 +385,8 @@ describe('builder branch guards', () => {
     userModel.fields['empty'] = '';
 
     const contract = builder.build();
-    expect(contract.models.User.fields.id).toEqual({ column: 'id' });
-    expect(contract.models.User.fields).not.toHaveProperty('empty');
+    expect(contract.models.User.storage.fields.id).toEqual({ column: 'id' });
+    expect(contract.models.User.storage.fields).not.toHaveProperty('empty');
   });
 
   it('skips undefined relation entries during relation map assembly', () => {
@@ -427,7 +429,8 @@ describe('builder branch guards', () => {
     postModel.relations = { user: undefined };
 
     const contract = builder.build();
-    expect(contract.relations.post).toEqual({});
+    const builtPost = contract.models.Post as { relations?: Record<string, unknown> };
+    expect(builtPost.relations).toEqual({});
   });
 });
 

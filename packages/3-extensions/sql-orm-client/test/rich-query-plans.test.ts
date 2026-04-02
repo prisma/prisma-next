@@ -46,7 +46,7 @@ describe('SQL ORM rich AST query plans', () => {
 
     expect(plan.ast.kind).toBe('select');
     expect(plan.params).toEqual([100, 'Alice']);
-    expect(plan.meta.annotations).toEqual({ limit: 5 });
+    expect(plan.meta.annotations).toMatchObject({ limit: 5 });
 
     const ast = plan.ast as SelectAst;
     expect(ast.where?.kind).toBe('binary');

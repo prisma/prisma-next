@@ -80,7 +80,6 @@
       }
     }
   },
-  "relations": {},
   "storage": {
     "collections": {
       "posts": {},

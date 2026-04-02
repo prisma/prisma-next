@@ -8,7 +8,7 @@ This package provides TypeScript type definitions, Arktype validators, and facto
 
 ## Responsibilities
 
-- **SQL Contract Types**: Defines SQL-specific contract types (`SqlContract`, `SqlStorage`, `StorageTable`, `ModelDefinition`, `SqlMappings`, `ForeignKeysConfig`) that extend framework-level contract types
+- **SQL Contract Types**: Defines SQL-specific contract types (`SqlContract`, `SqlStorage`, `StorageTable`, `SqlModelStorage`, `SqlModelFieldStorage`, `ForeignKeysConfig`) that extend framework-level contract types
 - **Contract Validation**: Provides Arktype-based structural validators and the shared `validateContract` entrypoint for runtime-safe contract validation
 - **IR Factories**: Provides pure factory functions for constructing contract IR structures in tests and authoring
 - **Shared Plane Access**: Enables both migration-plane and runtime-plane packages to import SQL contract types without violating plane boundaries
@@ -25,7 +25,7 @@ Both `nativeType` and `codecId` are required to ensure contracts are consumable 
 
 ## Package Contents
 
-- **TypeScript Types**: Type definitions for `SqlContract`, `SqlStorage`, `StorageTable`, `ModelDefinition`, `ForeignKeysConfig`, and related types
+- **TypeScript Types**: Type definitions for `SqlContract`, `SqlStorage`, `StorageTable`, `SqlModelStorage`, `SqlModelFieldStorage`, `ForeignKeysConfig`, and related types
 - **Validators**: Arktype-based validators for structural validation of contracts, storage, and models
 - **Factories**: Pure factory functions for constructing contract IR structures in tests and authoring
 
@@ -40,7 +40,7 @@ import type {
   SqlContract,
   SqlStorage,
   StorageTable,
-  ModelDefinition,
+  SqlModelStorage,
   ForeignKeysConfig,
 } from '@prisma-next/sql-contract/types';
 ```
@@ -123,14 +123,9 @@ const contract = validateContract<Contract>(contractJson);
 ```
 
 `validateContract` returns a constructed contract that:
-- Computes runtime-real `mappings` (modelToTable, tableToModel, fieldToColumn, columnToField) from models/storage
 - Strips `_generated` if present on input (emitter metadata is excluded from the returned value)
+- Validates model-to-storage cross-references (table existence, column existence)
 - Does not require execution stack or runtime descriptors
-
-Mapping overrides in `contract.mappings` follow strict pair semantics:
-- `modelToTable` and `tableToModel` must either both be omitted (auto-computed) or both be provided as inverse maps.
-- `fieldToColumn` and `columnToField` must either both be omitted (auto-computed) or both be provided as inverse maps.
-- Codec and operation type maps are type-only (phantom channel) and are not present at runtime.
 
 ### Factories
 

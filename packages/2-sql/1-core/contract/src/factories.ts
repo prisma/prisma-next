@@ -8,12 +8,10 @@ import type {
   ForeignKeyOptions,
   ForeignKeyReferences,
   Index,
-  ModelDefinition,
-  ModelField,
-  ModelStorage,
   PrimaryKey,
   SqlContract,
-  SqlMappings,
+  SqlModelFieldStorage,
+  SqlModelStorage,
   SqlStorage,
   StorageColumn,
   StorageTable,
@@ -21,14 +19,6 @@ import type {
 } from './types';
 import { applyFkDefaults } from './types';
 
-/**
- * Creates a StorageColumn with nativeType and codecId.
- *
- * @param nativeType - Native database type identifier (e.g., 'int4', 'text', 'vector')
- * @param codecId - Codec identifier (e.g., 'pg/int4@1', 'pg/text@1')
- * @param nullable - Whether the column is nullable (default: false)
- * @returns StorageColumn with nativeType and codecId
- */
 export function col(nativeType: string, codecId: string, nullable = false): StorageColumn {
   return {
     nativeType,
@@ -95,14 +85,27 @@ export function table(
 }
 
 export function model(
-  table: string,
-  fields: Record<string, ModelField>,
+  tableName: string,
+  fields: Record<string, SqlModelFieldStorage>,
   relations: Record<string, unknown> = {},
-): ModelDefinition {
-  const storage: ModelStorage = { table };
+): {
+  storage: SqlModelStorage;
+  fields: Record<string, { nullable: boolean; codecId?: string }>;
+  relations: Record<string, unknown>;
+} {
+  const storage: SqlModelStorage = { table: tableName, fields };
+  const domainFields = Object.fromEntries(
+    Object.entries(fields).map(([name, field]) => [
+      name,
+      {
+        nullable: field.nullable ?? false,
+        ...(field.codecId !== undefined ? { codecId: field.codecId } : {}),
+      },
+    ]),
+  ) as Record<string, { nullable: boolean; codecId?: string }>;
   return {
     storage,
-    fields,
+    fields: domainFields,
     relations,
   };
 }
@@ -120,9 +123,7 @@ export function contract<
   storageHash: TStorageHash;
   executionHash?: TExecutionHash;
   storage: SqlStorage;
-  models?: Record<string, ModelDefinition>;
-  relations?: Record<string, unknown>;
-  mappings?: Partial<SqlMappings>;
+  models?: Record<string, unknown>;
   schemaVersion?: '1';
   targetFamily?: 'sql';
   profileHash?: TProfileHash;
@@ -130,15 +131,7 @@ export function contract<
   extensionPacks?: Record<string, unknown>;
   meta?: Record<string, unknown>;
   sources?: Record<string, unknown>;
-}): SqlContract<
-  SqlStorage,
-  Record<string, unknown>,
-  Record<string, unknown>,
-  SqlMappings,
-  TStorageHash,
-  TExecutionHash,
-  TProfileHash
-> {
+}): SqlContract<SqlStorage, Record<string, unknown>, TStorageHash, TExecutionHash, TProfileHash> {
   return {
     schemaVersion: opts.schemaVersion ?? '1',
     target: opts.target,
@@ -147,20 +140,11 @@ export function contract<
     ...(opts.executionHash !== undefined && { executionHash: opts.executionHash }),
     storage: opts.storage,
     models: opts.models ?? {},
-    relations: opts.relations ?? {},
-    mappings: (opts.mappings ?? {}) as SqlMappings,
+    roots: {},
     ...(opts.profileHash !== undefined && { profileHash: opts.profileHash }),
     ...(opts.capabilities !== undefined && { capabilities: opts.capabilities }),
     ...(opts.extensionPacks !== undefined && { extensionPacks: opts.extensionPacks }),
     ...(opts.meta !== undefined && { meta: opts.meta }),
     ...(opts.sources !== undefined && { sources: opts.sources as Record<string, unknown> }),
-  } as SqlContract<
-    SqlStorage,
-    Record<string, unknown>,
-    Record<string, unknown>,
-    SqlMappings,
-    TStorageHash,
-    TExecutionHash,
-    TProfileHash
-  >;
+  } as SqlContract<SqlStorage, Record<string, unknown>, TStorageHash, TExecutionHash, TProfileHash>;
 }

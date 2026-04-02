@@ -9,125 +9,247 @@
     "Comment": {
       "fields": {
         "content": {
-          "column": "content"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "createdAt": {
-          "column": "created_at"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "id": {
-          "column": "id"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "postId": {
-          "column": "postId"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "updatedAt": {
-          "column": "update_at"
+          "codecId": "pg/timestamptz@1",
+          "nullable": true
         }
       },
       "relations": {},
       "storage": {
-        "table": "comment"
+        "table": "comment",
+        "fields": {
+          "content": {
+            "column": "content"
+          },
+          "createdAt": {
+            "column": "created_at"
+          },
+          "id": {
+            "column": "id"
+          },
+          "postId": {
+            "column": "postId"
+          },
+          "updatedAt": {
+            "column": "update_at"
+          }
+        }
       }
     },
     "Event": {
       "fields": {
         "createdAt": {
-          "column": "created_at"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "id": {
-          "column": "id"
+          "codecId": "sql/char@1",
+          "nullable": false
         },
         "name": {
-          "column": "name"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "scheduledAt": {
-          "column": "scheduled_at"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         }
       },
       "relations": {},
       "storage": {
-        "table": "event"
+        "table": "event",
+        "fields": {
+          "createdAt": {
+            "column": "created_at"
+          },
+          "id": {
+            "column": "id"
+          },
+          "name": {
+            "column": "name"
+          },
+          "scheduledAt": {
+            "column": "scheduled_at"
+          }
+        }
       }
     },
     "LiteralDefaults": {
       "fields": {
         "active": {
-          "column": "active"
+          "codecId": "pg/bool@1",
+          "nullable": false
         },
         "bigCount": {
-          "column": "big_count"
+          "codecId": "pg/int8@1",
+          "nullable": false
         },
         "id": {
-          "column": "id"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "label": {
-          "column": "label"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "metadata": {
-          "column": "metadata"
+          "codecId": "pg/jsonb@1",
+          "nullable": false
         },
         "rating": {
-          "column": "rating"
+          "codecId": "pg/float8@1",
+          "nullable": false
         },
         "score": {
-          "column": "score"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "tags": {
-          "column": "tags"
+          "codecId": "pg/jsonb@1",
+          "nullable": false
         }
       },
       "relations": {},
       "storage": {
-        "table": "literal_defaults"
+        "table": "literal_defaults",
+        "fields": {
+          "active": {
+            "column": "active"
+          },
+          "bigCount": {
+            "column": "big_count"
+          },
+          "id": {
+            "column": "id"
+          },
+          "label": {
+            "column": "label"
+          },
+          "metadata": {
+            "column": "metadata"
+          },
+          "rating": {
+            "column": "rating"
+          },
+          "score": {
+            "column": "score"
+          },
+          "tags": {
+            "column": "tags"
+          }
+        }
       }
     },
     "Post": {
       "fields": {
         "createdAt": {
-          "column": "created_at"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "id": {
-          "column": "id"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "meta": {
-          "column": "meta"
+          "codecId": "pg/json@1",
+          "nullable": true
         },
         "title": {
-          "column": "title"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "updatedAt": {
-          "column": "update_at"
+          "codecId": "pg/timestamptz@1",
+          "nullable": true
         },
         "userId": {
-          "column": "userId"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {},
       "storage": {
-        "table": "post"
+        "table": "post",
+        "fields": {
+          "createdAt": {
+            "column": "created_at"
+          },
+          "id": {
+            "column": "id"
+          },
+          "meta": {
+            "column": "meta"
+          },
+          "title": {
+            "column": "title"
+          },
+          "updatedAt": {
+            "column": "update_at"
+          },
+          "userId": {
+            "column": "userId"
+          }
+        }
       }
     },
     "User": {
       "fields": {
         "createdAt": {
-          "column": "created_at"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "email": {
-          "column": "email"
+          "codecId": "sql/varchar@1",
+          "nullable": false
         },
         "id": {
-          "column": "id"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "profile": {
-          "column": "profile"
+          "codecId": "pg/jsonb@1",
+          "nullable": true
         },
         "updatedAt": {
-          "column": "update_at"
+          "codecId": "pg/timestamptz@1",
+          "nullable": true
         }
       },
       "relations": {},
       "storage": {
-        "table": "user"
+        "table": "user",
+        "fields": {
+          "createdAt": {
+            "column": "created_at"
+          },
+          "email": {
+            "column": "email"
+          },
+          "id": {
+            "column": "id"
+          },
+          "profile": {
+            "column": "profile"
+          },
+          "updatedAt": {
+            "column": "update_at"
+          }
+        }
       }
     }
   },
@@ -569,9 +691,8 @@
   },
   "extensionPacks": {},
   "meta": {},
-  "relations": {},
   "_generated": {
-    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "warning": "\u26a0\ufe0f  GENERATED FILE - DO NOT EDIT",
     "message": "This file is automatically generated by \"prisma-next contract emit\".",
     "regenerate": "To regenerate, run: prisma-next contract emit"
   }

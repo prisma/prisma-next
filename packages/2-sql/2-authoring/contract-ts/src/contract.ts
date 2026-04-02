@@ -1,10 +1,6 @@
 import type {
-  ModelDefinition,
-  ModelField,
-  ModelStorage,
   PrimaryKey,
   SqlContract,
-  SqlMappings,
   SqlStorage,
   StorageTypeInstance,
   UniqueConstraint,
@@ -61,15 +57,21 @@ const StorageSchema = type({
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
 
-const ModelFieldSchema = type.declare<ModelField>().type({
+const ModelFieldSchema = type({
+  'nullable?': 'boolean',
+  'codecId?': 'string',
+});
+
+const ModelStorageFieldSchema = type({
   column: 'string',
 });
 
-const ModelStorageSchema = type.declare<ModelStorage>().type({
+const ModelStorageSchema = type({
   table: 'string',
+  'fields?': type({ '[string]': ModelStorageFieldSchema }),
 });
 
-const ModelSchema = type.declare<ModelDefinition>().type({
+const ModelSchema = type({
   storage: ModelStorageSchema,
   fields: type({ '[string]': ModelFieldSchema }),
   relations: type({ '[string]': 'unknown' }),
@@ -162,51 +164,6 @@ function validateContractStructure<T extends SqlContract<SqlStorage>>(
 }
 
 /**
- * Computes mapping dictionaries from models and storage structures.
- * Assumes valid input - validation happens separately in validateContractLogic().
- *
- * @param models - Models object from contract
- * @param storage - Storage object from contract
- * @param existingMappings - Existing mappings from contract input (optional)
- * @returns Computed mappings dictionary
- */
-export function computeMappings(
-  models: Record<string, ModelDefinition>,
-  _storage: SqlStorage,
-  existingMappings?: Partial<SqlMappings>,
-): SqlMappings {
-  const modelToTable: Record<string, string> = {};
-  const tableToModel: Record<string, string> = {};
-  const fieldToColumn: Record<string, Record<string, string>> = {};
-  const columnToField: Record<string, Record<string, string>> = {};
-
-  for (const [modelName, model] of Object.entries(models)) {
-    const tableName = model.storage.table;
-    modelToTable[modelName] = tableName;
-    tableToModel[tableName] = modelName;
-
-    const modelFieldToColumn: Record<string, string> = {};
-    for (const [fieldName, field] of Object.entries(model.fields)) {
-      const columnName = field.column;
-      modelFieldToColumn[fieldName] = columnName;
-
-      if (!columnToField[tableName]) {
-        columnToField[tableName] = {};
-      }
-      columnToField[tableName][columnName] = fieldName;
-    }
-    fieldToColumn[modelName] = modelFieldToColumn;
-  }
-
-  return {
-    modelToTable: existingMappings?.modelToTable ?? modelToTable,
-    tableToModel: existingMappings?.tableToModel ?? tableToModel,
-    fieldToColumn: existingMappings?.fieldToColumn ?? fieldToColumn,
-    columnToField: existingMappings?.columnToField ?? columnToField,
-  };
-}
-
-/**
  * Validates logical consistency of a **structurally validated** SqlContract.
  * This checks that references (e.g., foreign keys, primary keys, uniques) point to storage objects that already exist.
  * Structural validation is expected to have already completed before this helper runs.
@@ -281,11 +238,12 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
     }
   }
 
-  // Validate models
   for (const [modelName, modelUnknown] of Object.entries(models)) {
-    // normalizeContract() ensures models have both domain (DomainModel) and SQL-specific (ModelDefinition) properties
-    const model = modelUnknown as unknown as ModelDefinition;
-    // Validate model has storage.table
+    const model = modelUnknown as {
+      storage?: { table?: string; fields?: Record<string, { column?: string }> };
+      fields?: Record<string, unknown>;
+      relations?: Record<string, unknown>;
+    };
     if (!model.storage?.table) {
       /* c8 ignore next */
       throw new Error(`Model "${modelName}" is missing storage.table`);
@@ -293,7 +251,6 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
 
     const tableName = model.storage.table;
 
-    // Validate model's table exists in storage
     if (!tableNames.has(tableName)) {
       /* c8 ignore next */
       throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
@@ -305,7 +262,6 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
       throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
     }
 
-    // Validate model's table has a primary key
     if (!table.primaryKey) {
       /* c8 ignore next */
       throw new Error(`Model "${modelName}" table "${tableName}" is missing a primary key`);
@@ -313,70 +269,59 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
 
     const columnNames = new Set(Object.keys(table.columns));
 
-    // Validate model fields
-    if (!model.fields) {
-      /* c8 ignore next */
-      throw new Error(`Model "${modelName}" is missing fields`);
-    }
+    const storageFields = model.storage.fields;
+    if (storageFields) {
+      for (const [fieldName, storageField] of Object.entries(storageFields)) {
+        if (!storageField.column) {
+          /* c8 ignore next */
+          throw new Error(`Model "${modelName}" field "${fieldName}" is missing column property`);
+        }
 
-    for (const [fieldName, fieldUnknown] of Object.entries(model.fields)) {
-      const field = fieldUnknown as { column: string };
-      // Validate field has column property
-      if (!field.column) {
-        /* c8 ignore next */
-        throw new Error(`Model "${modelName}" field "${fieldName}" is missing column property`);
-      }
-
-      // Validate field's column exists in the model's backing table
-      if (!columnNames.has(field.column)) {
-        /* c8 ignore next */
-        throw new Error(
-          `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${tableName}"`,
-        );
+        if (!columnNames.has(storageField.column)) {
+          /* c8 ignore next */
+          throw new Error(
+            `Model "${modelName}" field "${fieldName}" references non-existent column "${storageField.column}" in table "${tableName}"`,
+          );
+        }
       }
     }
 
-    // Validate model relations have corresponding foreign keys
     if (model.relations) {
       for (const [relationName, relation] of Object.entries(model.relations)) {
-        // For now, we'll do basic validation. Full FK validation can be added later
-        // This would require checking that the relation's on.parentCols/childCols match FKs
         if (
           typeof relation === 'object' &&
           relation !== null &&
           'on' in relation &&
           'to' in relation
         ) {
-          const on = relation.on as { parentCols?: string[]; childCols?: string[] };
+          const on = relation.on as { localFields?: string[]; targetFields?: string[] };
           const cardinality = (relation as { cardinality?: string }).cardinality;
-          if (on.parentCols && on.childCols) {
-            // For 1:N relations, the foreign key is on the child table
-            // For N:1 relations, the foreign key is on the parent table (this table)
-            // For now, we'll skip validation for 1:N relations as the FK is on the child table
-            // and we'll validate it when we process the child model
-            if (cardinality === '1:N') {
-              // Foreign key is on the child table, skip validation here
-              // It will be validated when we process the child model
-              continue;
-            }
+          const localFields = on.localFields;
+          const targetFields = on.targetFields;
+          if (!localFields || !targetFields) {
+            throw new Error(
+              `Model "${modelName}" relation "${relationName}" uses unsupported relation format (expected localFields/targetFields)`,
+            );
+          }
+          if (cardinality === '1:N') {
+            continue;
+          }
 
-            // For N:1 relations, check that there's a foreign key matching this relation
-            const hasMatchingFk = table.foreignKeys?.some((fk) => {
-              return (
-                fk.columns.length === on.childCols?.length &&
-                fk.columns.every((col, i) => col === on.childCols?.[i]) &&
-                fk.references.table &&
-                fk.references.columns.length === on.parentCols?.length &&
-                fk.references.columns.every((col, i) => col === on.parentCols?.[i])
-              );
-            });
+          const hasMatchingFk = table.foreignKeys?.some((fk) => {
+            return (
+              fk.columns.length === localFields.length &&
+              fk.columns.every((col, i) => col === localFields[i]) &&
+              fk.references.table &&
+              fk.references.columns.length === targetFields.length &&
+              fk.references.columns.every((col, i) => col === targetFields[i])
+            );
+          });
 
-            if (!hasMatchingFk) {
-              /* c8 ignore next */
-              throw new Error(
-                `Model "${modelName}" relation "${relationName}" does not have a corresponding foreign key in table "${tableName}"`,
-              );
-            }
+          if (!hasMatchingFk) {
+            /* c8 ignore next */
+            throw new Error(
+              `Model "${modelName}" relation "${relationName}" does not have a corresponding foreign key in table "${tableName}"`,
+            );
           }
         }
       }
@@ -518,29 +463,7 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
 
   const contractForValidation = structurallyValid as SqlContract<SqlStorage>;
 
-  // Validate contract logic (contracts must already have fully qualified type IDs)
   validateContractLogic(contractForValidation);
 
-  // Extract existing mappings (optional - will be computed if missing)
-  const existingMappings = (contractForValidation as { mappings?: Partial<SqlMappings> }).mappings;
-
-  // Compute mappings from models and storage
-  const mappings = computeMappings(
-    contractForValidation.models as Record<string, ModelDefinition>,
-    contractForValidation.storage,
-    existingMappings,
-  );
-
-  // Add default values for optional metadata fields if missing
-  const contractWithMappings = {
-    ...structurallyValid,
-    models: contractForValidation.models,
-    relations: contractForValidation.relations,
-    storage: contractForValidation.storage,
-    mappings,
-  };
-
-  // Type assertion: The caller provides the strict type via TContract.
-  // We validate the structure matches, but the precise types come from contract.d.ts
-  return decodeContractDefaults(contractWithMappings) as TContract;
+  return decodeContractDefaults(contractForValidation) as TContract;
 }

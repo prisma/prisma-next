@@ -7,38 +7,53 @@
   "profileHash": "sha256:test-profile-relations",
   "models": {
     "User": {
-      "storage": { "table": "user" },
+      "storage": {
+        "table": "user",
+        "fields": {
+          "id": { "column": "id" },
+          "email": { "column": "email" },
+          "createdAt": { "column": "createdAt" }
+        }
+      },
       "fields": {
-        "id": { "column": "id" },
-        "email": { "column": "email" },
-        "createdAt": { "column": "createdAt" }
+        "id": { "codecId": "pg/int4@1", "nullable": false },
+        "email": { "codecId": "pg/text@1", "nullable": false },
+        "createdAt": { "codecId": "pg/timestamptz@1", "nullable": false }
       },
       "relations": {
         "posts": {
           "to": "Post",
           "cardinality": "1:N",
           "on": {
-            "parentCols": ["id"],
-            "childCols": ["userId"]
+            "localFields": ["id"],
+            "targetFields": ["userId"]
           }
         }
       }
     },
     "Post": {
-      "storage": { "table": "post" },
+      "storage": {
+        "table": "post",
+        "fields": {
+          "id": { "column": "id" },
+          "title": { "column": "title" },
+          "userId": { "column": "userId" },
+          "createdAt": { "column": "createdAt" }
+        }
+      },
       "fields": {
-        "id": { "column": "id" },
-        "title": { "column": "title" },
-        "userId": { "column": "userId" },
-        "createdAt": { "column": "createdAt" }
+        "id": { "codecId": "pg/int4@1", "nullable": false },
+        "title": { "codecId": "pg/text@1", "nullable": false },
+        "userId": { "codecId": "pg/int4@1", "nullable": false },
+        "createdAt": { "codecId": "pg/timestamptz@1", "nullable": false }
       },
       "relations": {
         "user": {
           "to": "User",
           "cardinality": "N:1",
           "on": {
-            "parentCols": ["id"],
-            "childCols": ["userId"]
+            "localFields": ["userId"],
+            "targetFields": ["id"]
           }
         }
       }
@@ -92,65 +107,7 @@
       }
     }
   },
-  "relations": {
-    "user": {
-      "posts": {
-        "to": "Post",
-        "cardinality": "1:N",
-        "on": {
-          "parentCols": ["id"],
-          "childCols": ["userId"]
-        }
-      }
-    },
-    "post": {
-      "user": {
-        "to": "User",
-        "cardinality": "N:1",
-        "on": {
-          "parentCols": ["id"],
-          "childCols": ["userId"]
-        }
-      }
-    }
-  },
-  "mappings": {
-    "modelToTable": {
-      "User": "user",
-      "Post": "post"
-    },
-    "tableToModel": {
-      "user": "User",
-      "post": "Post"
-    },
-    "fieldToColumn": {
-      "User": {
-        "id": "id",
-        "email": "email",
-        "createdAt": "createdAt"
-      },
-      "Post": {
-        "id": "id",
-        "title": "title",
-        "userId": "userId",
-        "createdAt": "createdAt"
-      }
-    },
-    "columnToField": {
-      "user": {
-        "id": "id",
-        "email": "email",
-        "createdAt": "createdAt"
-      },
-      "post": {
-        "id": "id",
-        "title": "title",
-        "userId": "userId",
-        "createdAt": "createdAt"
-      }
-    }
-  },
-  "extensions": {},
+  "extensionPacks": {},
   "capabilities": {
     "postgres": {
       "returning": true,
