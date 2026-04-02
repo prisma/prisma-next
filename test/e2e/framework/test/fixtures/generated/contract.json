@@ -9,16 +9,20 @@
     "Comment": {
       "fields": {
         "content": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "createdAt": {
-          "codecId": "pg/timestamptz@1"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "postId": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "updatedAt": {
           "codecId": "pg/timestamptz@1",
@@ -50,16 +54,20 @@
     "Event": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "sql/char@1"
+          "codecId": "sql/char@1",
+          "nullable": false
         },
         "name": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "scheduledAt": {
-          "codecId": "pg/timestamptz@1"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -84,28 +92,36 @@
     "LiteralDefaults": {
       "fields": {
         "active": {
-          "codecId": "pg/bool@1"
+          "codecId": "pg/bool@1",
+          "nullable": false
         },
         "bigCount": {
-          "codecId": "pg/int8@1"
+          "codecId": "pg/int8@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "label": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "metadata": {
-          "codecId": "pg/jsonb@1"
+          "codecId": "pg/jsonb@1",
+          "nullable": false
         },
         "rating": {
-          "codecId": "pg/float8@1"
+          "codecId": "pg/float8@1",
+          "nullable": false
         },
         "score": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "tags": {
-          "codecId": "pg/jsonb@1"
+          "codecId": "pg/jsonb@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -142,24 +158,28 @@
     "Post": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "meta": {
           "codecId": "pg/json@1",
           "nullable": true
         },
         "title": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "updatedAt": {
           "codecId": "pg/timestamptz@1",
           "nullable": true
         },
         "userId": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -190,13 +210,16 @@
     "User": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "email": {
-          "codecId": "sql/varchar@1"
+          "codecId": "sql/varchar@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "profile": {
           "codecId": "pg/jsonb@1",
