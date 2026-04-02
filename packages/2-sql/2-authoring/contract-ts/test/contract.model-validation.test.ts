@@ -163,10 +163,16 @@ describe('validateContract model validation', () => {
       },
       models: {
         Post: {
-          storage: { table: 'Post' },
+          storage: {
+            table: 'Post',
+            fields: {
+              id: { column: 'id' },
+              userId: { column: 'userId' },
+            },
+          },
           fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             user: {
@@ -175,8 +181,7 @@ describe('validateContract model validation', () => {
               cardinality: 'N:1',
             },
           },
-          // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        } as any,
+        },
       },
     };
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
@@ -217,9 +222,14 @@ describe('validateContract model validation', () => {
       },
       models: {
         User: {
-          storage: { table: 'User' },
+          storage: {
+            table: 'User',
+            fields: {
+              id: { column: 'id' },
+            },
+          },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             posts: {
@@ -228,8 +238,7 @@ describe('validateContract model validation', () => {
               cardinality: '1:N',
             },
           },
-          // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        } as any,
+        },
       },
     };
     expect(() => validateContract<SqlContract<SqlStorage>>(valid)).not.toThrow();
@@ -268,10 +277,16 @@ describe('validateContract model validation', () => {
       },
       models: {
         Post: {
-          storage: { table: 'Post' },
+          storage: {
+            table: 'Post',
+            fields: {
+              id: { column: 'id' },
+              userId: { column: 'userId' },
+            },
+          },
           fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             user: {
@@ -280,8 +295,7 @@ describe('validateContract model validation', () => {
               cardinality: 'N:1',
             },
           },
-          // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        } as any,
+        },
       },
     };
     expect(() => validateContract<SqlContract<SqlStorage>>(valid)).not.toThrow();
