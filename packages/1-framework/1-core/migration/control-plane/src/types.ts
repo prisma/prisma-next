@@ -1,3 +1,4 @@
+import type { AssembledComponentState } from '@prisma-next/contract/assembly';
 import type {
   AdapterDescriptor,
   AdapterInstance,
@@ -265,7 +266,10 @@ export interface ControlFamilyDescriptor<
   TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
 > extends FamilyDescriptor<TFamilyId> {
   readonly hook: TargetFamilyHook;
-  create<TTargetId extends string>(stack: ControlPlaneStack<TFamilyId, TTargetId>): TFamilyInstance;
+  create<TTargetId extends string>(
+    stack: ControlPlaneStack<TFamilyId, TTargetId>,
+    assembledState?: AssembledComponentState,
+  ): TFamilyInstance;
 }
 
 /**
