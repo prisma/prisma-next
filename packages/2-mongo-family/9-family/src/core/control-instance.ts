@@ -4,6 +4,7 @@ import { emit } from '@prisma-next/core-control-plane/emission';
 import type {
   ControlFamilyInstance,
   EmitContractResult,
+  SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
@@ -81,7 +82,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     throw new Error('Mongo schemaVerify is not implemented');
   }
 
-  async sign() {
+  async sign(): Promise<SignDatabaseResult> {
     throw new Error('Mongo sign is not implemented');
   }
 

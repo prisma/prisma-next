@@ -16,8 +16,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/core-control-plane": "workspace:*",
-    "@prisma-next/framework-components": "workspace:*"
+    "@prisma-next/core-control-plane": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
