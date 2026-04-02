@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { TypesImportSpec } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/emitter';
 import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
 
@@ -60,31 +61,20 @@ const blogIR: ContractIR = {
   sources: {},
 };
 
-const MONGO_CODEC_TYPES = `{
-  readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
-  readonly 'mongo/string@1': { readonly input: string; readonly output: string };
-  readonly 'mongo/int32@1': { readonly input: number; readonly output: number };
-  readonly 'mongo/int64@1': { readonly input: bigint; readonly output: bigint };
-  readonly 'mongo/double@1': { readonly input: number; readonly output: number };
-  readonly 'mongo/bool@1': { readonly input: boolean; readonly output: boolean };
-  readonly 'mongo/date@1': { readonly input: Date; readonly output: Date };
-  readonly 'mongo/binary@1': { readonly input: Uint8Array; readonly output: Uint8Array };
-}`;
+const codecTypeImports: TypesImportSpec[] = [
+  {
+    package: '@prisma-next/mongo-core/codec-types',
+    named: 'CodecTypes',
+    alias: 'MongoCodecTypes',
+  },
+];
 
 async function main() {
-  const result = await emit(blogIR, { outputDir: '.' }, mongoTargetFamilyHook);
-
-  const contractDts = result.contractDts.replace(
-    'export type CodecTypes = Record<string, never>;',
-    `export type CodecTypes = ${MONGO_CODEC_TYPES};`,
-  );
-  if (contractDts === result.contractDts) {
-    throw new Error('Failed to inject CodecTypes -- emitter output format may have changed');
-  }
+  const result = await emit(blogIR, { outputDir: '.', codecTypeImports }, mongoTargetFamilyHook);
 
   const srcDir = resolve(import.meta.dirname, '..', 'src');
   writeFileSync(resolve(srcDir, 'contract.json'), result.contractJson + '\n');
-  writeFileSync(resolve(srcDir, 'contract.d.ts'), contractDts);
+  writeFileSync(resolve(srcDir, 'contract.d.ts'), result.contractDts);
   console.log('Generated contract.json and contract.d.ts in src/');
 }
 
