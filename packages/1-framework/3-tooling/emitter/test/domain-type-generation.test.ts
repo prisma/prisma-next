@@ -157,6 +157,18 @@ describe('generateModelRelationsType', () => {
     });
     expect(result).toBe('Record<string, never>');
   });
+
+  it('throws when relation has on but missing localFields/targetFields', () => {
+    expect(() =>
+      generateModelRelationsType({
+        author: {
+          to: 'User',
+          cardinality: 'N:1',
+          on: { parentCols: ['userId'], childCols: ['id'] },
+        },
+      }),
+    ).toThrow('missing localFields or targetFields');
+  });
 });
 
 describe('deduplicateImports', () => {
