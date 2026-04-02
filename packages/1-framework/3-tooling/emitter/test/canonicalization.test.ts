@@ -291,6 +291,67 @@ describe('canonicalization', () => {
     expect(columnKeys).toEqual(['a_field', 'm_field', 'z_field']);
   });
 
+  describe('Mongo storage.collections preservation', () => {
+    it('preserves empty storage.collections container', () => {
+      const ir = createContractIR({
+        targetFamily: 'mongo',
+        target: 'mongo',
+        storage: { collections: {} },
+      });
+
+      const result = canonicalizeContract(ir);
+      const parsed = JSON.parse(result) as Record<string, unknown>;
+      const storage = parsed['storage'] as Record<string, unknown>;
+      expect(storage['collections']).toEqual({});
+    });
+
+    it('preserves collection entries with empty payloads', () => {
+      const ir = createContractIR({
+        targetFamily: 'mongo',
+        target: 'mongo',
+        storage: { collections: { users: {}, posts: {} } },
+      });
+
+      const result = canonicalizeContract(ir);
+      const parsed = JSON.parse(result) as Record<string, unknown>;
+      const storage = parsed['storage'] as Record<string, unknown>;
+      const collections = storage['collections'] as Record<string, unknown>;
+      expect(collections['users']).toEqual({});
+      expect(collections['posts']).toEqual({});
+    });
+
+    it('sorts collection names lexicographically', () => {
+      const ir = createContractIR({
+        targetFamily: 'mongo',
+        target: 'mongo',
+        storage: { collections: { zebras: {}, apples: {}, mangoes: {} } },
+      });
+
+      const result = canonicalizeContract(ir);
+      const parsed = JSON.parse(result) as Record<string, unknown>;
+      const storage = parsed['storage'] as Record<string, unknown>;
+      const collections = storage['collections'] as Record<string, unknown>;
+      expect(Object.keys(collections)).toEqual(['apples', 'mangoes', 'zebras']);
+    });
+
+    it('produces different hashes when collections differ', () => {
+      const ir1 = createContractIR({
+        targetFamily: 'mongo',
+        target: 'mongo',
+        storage: { collections: { users: {} } },
+      });
+      const ir2 = createContractIR({
+        targetFamily: 'mongo',
+        target: 'mongo',
+        storage: { collections: { users: {}, posts: {} } },
+      });
+
+      const result1 = canonicalizeContract(ir1);
+      const result2 = canonicalizeContract(ir2);
+      expect(result1).not.toBe(result2);
+    });
+  });
+
   it('sorts extension namespaces lexicographically', () => {
     const ir = createContractIR({
       extensionPacks: {
