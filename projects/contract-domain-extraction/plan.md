@@ -102,14 +102,16 @@ This milestone is the forcing function that defines the shared generation API. I
 - **3.6** ✅ Set up a minimal Mongo demo/fixture contract to exercise the Mongo emitter end-to-end. — Blog fixture (User/Post/Comment with owner/embed) in `packages/2-mongo-family/3-tooling/emitter/test/fixtures/blog-contract-ir.ts`.
 - **3.7** ✅ Create a Mongo demo app (`examples/mongo-demo/`) that wires the emitted contract through the full Mongo stack end-to-end. ADR 177 contract artifacts (no `strategy`, `owner` on embedded models, `storage.relations` on owning models), `db.ts` setup module composing `createMongoAdapter()` + `createMongoDriver()` → `createMongoRuntime()` → `mongoOrm()`, integration test with `MongoMemoryReplSet` covering findMany, include/$lookup, and embedded documents. Prerequisite: aligned the Mongo runtime stack to ADR 177 — split `DomainRelation` into `DomainReferenceRelation | DomainEmbedRelation`, moved `ReferenceRelationKeys`/`EmbedRelationKeys` to framework, updated contract types/schema/validation/ORM to use `owner`-based embed detection, updated all test fixtures. 164 package tests pass, 0 dependency violations, 4 demo integration tests pass.
 - **3.8** ✅ Wire the Mongo demo app through the emitter pipeline. The current demo uses hand-authored `contract.json` and `contract.d.ts` — it does not consume emitter output. Simplify the demo schema to User/Post with a reference relation (drop polymorphism, embedded documents, and ownership — these are workstream task 3 concerns and the contract authoring surface cannot yet express them). Create a generation script (`scripts/generate-contract.ts`) that constructs a `ContractIR` and calls `emit(ir, options, mongoTargetFamilyHook)` to produce `contract.json` + `contract.d.ts`. The demo imports the generated artifacts. Update tests to cover the simplified schema (findMany, findMany with include/$lookup). This closes the ContractIR → emitter → runtime loop for M3. See detailed task description below.
-- **3.9** _(Follow-up)_ Extract descriptor-based assembly operations into shared framework code and build a Mongo control plane. **Prerequisite (done):** PR #261 extracted the SQL family descriptor (including field presets) into `@prisma-next/family-sql` (layer 3/tooling), made framework composition generic over family, and introduced `assembleAuthoringContributions()`. Field presets now flow exclusively through framework composition — the authoring DSL at layer 2 cannot import them from the family package at layer 3. This task picks up the remaining pieces. The demo still manually constructs `EmitOptions` and calls `emit()` directly — there is no Mongo equivalent of the SQL control plane (`createSqlFamilyInstance`) that assembles descriptors, extracts codec/operation type imports, and orchestrates emission. The assembly machinery (`DescriptorWithTypes`, `extractCodecTypeImports()`, `extractOperationTypeImports()`, etc.) is largely family-agnostic. Extract any remaining SQL-specific assembly into shared framework code, create Mongo descriptor types, and build a Mongo control plane instance that consumes them — following spike-and-refactor.
-- **3.10** _(Follow-up, M3 addendum)_ Build a Mongo PSL interpreter and wire it into the demo app, completing the full authoring → emit → runtime pipeline. Create `packages/2-mongo-family/2-authoring/contract-psl/` with `interpretPslDocumentToMongoContractIR()` that maps PSL scalar types to Mongo codec IDs (`String` → `mongo/string@1`, `Int` → `mongo/int32@1`, `DateTime` → `mongo/date@1`, `@id` → `mongo/objectId@1`), models to collections, and `@relation` fields to Mongo reference relations. Replace the demo's hand-built `ContractIR` with a `.psl` schema file parsed by `@prisma-next/psl-parser` and interpreted by the new Mongo PSL interpreter. This completes the full authoring → emit → runtime pipeline, matching the SQL demo's pattern (`examples/prisma-next-demo/`). Polymorphism support in the PSL interpreter is deferred to workstream task 3 (ORM polymorphic models).
+- **3.9** *(Follow-up)* Extract family-agnostic descriptor assembly into the framework and build a Mongo control plane at layer 9. **Prerequisite:** Alberto's TS contract authoring redesign ([PR #261](https://github.com/prisma/prisma-next/pull/261)) — our base branch. The family-agnostic assembly functions (`extractCodecTypeImports()`, `extractOperationTypeImports()`, `extractParameterizedRenderers()`, `extractExtensionIds()`, `assembleAuthoringContributions()`, etc.) currently live in `packages/2-sql/3-tooling/family/src/core/assembly.ts` but operate on `ComponentMetadata`, a framework type. Extract them to `@prisma-next/contract/assembly`, co-located with the types they operate on. Create `packages/2-mongo-family/9-family/` (`@prisma-next/family-mongo`) with a `MongoFamilyDescriptor`, `createMongoFamilyInstance()`, and a Mongo target descriptor carrying codec type imports. Build the Mongo family using the inverted pattern: the framework drives assembly, not the family. Wire the demo through the control plane. The SQL family continues to call assembly functions internally (just imports changed) — the full inversion is deferred to task 3.11. SQL-specific assembly (`assembleOperationRegistry()`, mutation defaults, PSL interpretation) stays in the SQL package. See [detailed plan](plans/3.9-extract-assembly-mongo-control-plane-plan.md).
+- **3.10** *(Follow-up, M3 addendum)* Build a Mongo PSL interpreter and wire it into the demo app, completing the full authoring → emit → runtime pipeline. Create `packages/2-mongo-family/2-authoring/contract-psl/` with `interpretPslDocumentToMongoContractIR()` that maps PSL scalar types to Mongo codec IDs (`String` → `mongo/string@1`, `Int` → `mongo/int32@1`, `DateTime` → `mongo/date@1`, `@id` → `mongo/objectId@1`), models to collections, and `@relation` fields to Mongo reference relations. Replace the demo's hand-built `ContractIR` with a `.psl` schema file parsed by `@prisma-next/psl-parser` and interpreted by the new Mongo PSL interpreter. This completes the full authoring → emit → runtime pipeline, matching the SQL demo's pattern (`examples/prisma-next-demo/`). Polymorphism support in the PSL interpreter is deferred to workstream task 3 (ORM polymorphic models).
+- **3.11** *(Follow-up)* Complete the control flow inversion for descriptor assembly. Task 3.9 extracts assembly to the framework and builds the Mongo family using the inverted pattern; this task migrates the SQL family to the same pattern. The framework orchestration layer (`ControlClient`, CLI `executeContractEmit`) calls `assembleComponents()` and `emit()` directly — family instances no longer own emission. `ControlFamilyDescriptor.create()` receives pre-assembled state. Move the SQL family package from `packages/2-sql/3-tooling/family/` to `packages/2-sql/9-family/` (layer 9, top of the import hierarchy). Update runtime assembly if applicable. See [detailed plan](plans/3.11-control-flow-inversion-plan.md).
 
 #### Task 3.8 — Detailed task description
 
 **Goal:** Make the Mongo demo app consume emitter-generated artifacts (`contract.json` + `contract.d.ts`) instead of hand-authored ones. This proves the ContractIR → emitter → runtime pipeline works end-to-end for the Mongo family.
 
 **Context:**
+
 - The demo currently has hand-authored `src/contract.json` and `src/contract.d.ts` with a polymorphic task-tracker schema (Task/Bug/Feature, User/Address, Comment). These files are not produced by the emitter.
 - The `emit()` function in `@prisma-next/core-control-plane/emission` takes a `ContractIR`, `EmitOptions`, and a `TargetFamilyHook`, and returns `{ contractJson, contractDts }`. It is family-agnostic.
 - The `mongoTargetFamilyHook` in `@prisma-next/mongo-emitter` implements `TargetFamilyHook` for Mongo.
@@ -119,52 +121,44 @@ This milestone is the forcing function that defines the shared generation API. I
 **Steps:**
 
 1. **Simplify the demo schema.** Replace the polymorphic task-tracker schema with a simple blog schema:
-   - `User`: `_id` (objectId), `name` (string), `email` (string) + `posts` relation (1:N)
-   - `Post`: `_id` (objectId), `title` (string), `content` (string), `authorId` (objectId), `createdAt` (date) + `author` relation (N:1)
-   - Two collections: `users`, `posts`
-   - Two roots: `users` → `User`, `posts` → `Post`
-   - No polymorphism, no embedded documents, no ownership
-
+  - `User`: `_id` (objectId), `name` (string), `email` (string) + `posts` relation (1:N)
+  - `Post`: `_id` (objectId), `title` (string), `content` (string), `authorId` (objectId), `createdAt` (date) + `author` relation (N:1)
+  - Two collections: `users`, `posts`
+  - Two roots: `users` → `User`, `posts` → `Post`
+  - No polymorphism, no embedded documents, no ownership
 2. **Create the generation script.** Add `examples/mongo-demo/scripts/generate-contract.ts`:
-   - Import `ContractIR` from `@prisma-next/contract/ir`
-   - Import `emit` from `@prisma-next/emitter` (re-exports from `@prisma-next/core-control-plane/emission`)
-   - Import `mongoTargetFamilyHook` from `@prisma-next/mongo-emitter`
-   - Define the blog `ContractIR` inline (model it after the existing blog fixture at `packages/2-mongo-family/3-tooling/emitter/test/fixtures/blog-contract-ir.ts`). Required fields: `schemaVersion: '1'`, `targetFamily: 'mongo'`, `target: 'mongo'`, `roots`, `models`, `relations: {}`, `storage: { collections: { ... } }`, `extensionPacks: {}`, `capabilities: {}`, `meta: {}`, `sources: {}`
-   - Call `emit(ir, { outputDir: '.' }, mongoTargetFamilyHook)` — most `EmitOptions` fields are optional
-   - Write `result.contractJson` to `src/contract.json`
-   - Write `result.contractDts` to `src/contract.d.ts`
-   - Log success
-
+  - Import `ContractIR` from `@prisma-next/contract/ir`
+  - Import `emit` from `@prisma-next/emitter` (re-exports from `@prisma-next/core-control-plane/emission`)
+  - Import `mongoTargetFamilyHook` from `@prisma-next/mongo-emitter`
+  - Define the blog `ContractIR` inline (model it after the existing blog fixture at `packages/2-mongo-family/3-tooling/emitter/test/fixtures/blog-contract-ir.ts`). Required fields: `schemaVersion: '1'`, `targetFamily: 'mongo'`, `target: 'mongo'`, `roots`, `models`, `relations: {}`, `storage: { collections: { ... } }`, `extensionPacks: {}`, `capabilities: {}`, `meta: {}`, `sources: {}`
+  - Call `emit(ir, { outputDir: '.' }, mongoTargetFamilyHook)` — most `EmitOptions` fields are optional
+  - Write `result.contractJson` to `src/contract.json`
+  - Write `result.contractDts` to `src/contract.d.ts`
+  - Log success
 3. **Add dependencies and scripts to `package.json`:**
-   - Add dev dependencies: `@prisma-next/emitter`, `@prisma-next/mongo-emitter`, `@prisma-next/core-control-plane`
-   - Add script: `"emit": "tsx scripts/generate-contract.ts"`
-
+  - Add dev dependencies: `@prisma-next/emitter`, `@prisma-next/mongo-emitter`, `@prisma-next/core-control-plane`
+  - Add script: `"emit": "tsx scripts/generate-contract.ts"`
 4. **Run the emit script** to generate `contract.json` and `contract.d.ts`. Verify the generated files are valid.
-
 5. **Update `src/db.ts`:** Verify it still works with the generated contract artifacts (it should — same import pattern, different contract shape).
-
 6. **Update `src/types.ts`:** Simplify type definitions for the blog schema (UserRow, PostRow — no TaskRow, BugRow, etc.).
-
 7. **Update `src/server.ts`:** Simplify to User/Post endpoints (drop Task-related endpoints, polymorphism UI, etc.).
-
 8. **Update `src/app/`:** Simplify the React frontend (or remove if not needed — the proof is in the integration test, not the UI).
-
 9. **Update `test/blog.test.ts`:** Rewrite integration tests for the blog schema:
-   - Seed users and posts
-   - `findMany` returns users
-   - `findMany` with `include: { author: true }` resolves reference relations via `$lookup`
-   - Remove polymorphism and embedded document tests
-
+  - Seed users and posts
+  - `findMany` returns users
+  - `findMany` with `include: { author: true }` resolves reference relations via `$lookup`
+  - Remove polymorphism and embedded document tests
 10. **Run tests:** `pnpm test` in the demo, verify all pass.
-
 11. **Run `pnpm install`** at the repo root to update `pnpm-lock.yaml`.
 
 **Verification:**
+
 - The demo's `contract.json` and `contract.d.ts` are produced by `emit()`, not hand-authored
 - The demo's integration test passes, proving the emitted contract works with the Mongo runtime stack
 - The generation script runs successfully: `pnpm emit` in `examples/mongo-demo/`
 
 **Reference files:**
+
 - Emitter: `packages/1-framework/1-core/migration/control-plane/src/emission/emit.ts`
 - EmitOptions/EmitResult: `packages/1-framework/1-core/migration/control-plane/src/emission/types.ts`
 - Mongo hook: `packages/2-mongo-family/3-tooling/emitter/src/index.ts`
@@ -258,7 +252,10 @@ Migrates the SQL emitter hook onto the shared domain-level generation utilities 
 | Shared domain-level generation utilities used by Mongo hook (M3)                                                      | Unit + Regression  | 3.5            | SQL output unchanged after shared extraction                            |
 | Mongo demo app wires emitted contract through adapter → runtime → ORM end-to-end (M3)                                 | Integration        | 3.7, 3.8       | Seeds data, executes find + include queries via `mongodb-memory-server` |
 | Mongo demo consumes emitter-generated `contract.json` + `contract.d.ts` (M3)                                          | Integration        | 3.8            | Generation script calls `emit()` with `mongoTargetFamilyHook`           |
-| Mongo PSL interpreter produces valid ContractIR from `.psl` schema (M3 addendum)                                       | Unit               | 3.9            | Follow-up: full authoring → emit → runtime pipeline                    |
+| Family-agnostic assembly extracted to framework; SQL behavior unchanged (M3)                                          | Unit + Regression  | 3.9            | SQL family/emitter tests pass; `pnpm lint:deps` clean                   |
+| Mongo control plane at layer 9 consumes framework assembly and emits contract (M3)                                    | Unit + Integration | 3.9            | Mongo demo uses control plane; demo tests pass                          |
+| Mongo PSL interpreter produces valid ContractIR from `.psl` schema (M3 addendum)                                      | Unit               | 3.10           | Follow-up: full authoring → emit → runtime pipeline                     |
+| Framework drives assembly; families receive pre-assembled state (M3)                                                  | Unit + Regression  | 3.11           | ControlClient/CLI call assembleComponents() and emit() directly         |
 | `mappings` removed from `SqlContract` (M4)                                                                            | Type test + CI     | 4.1, 4.7       | Compile-time verification                                               |
 | Top-level `relations` removed (M4)                                                                                    | Type test + CI     | 4.2, 4.7       | Compile-time verification                                               |
 | Old field shape removed (M4)                                                                                          | Type test + CI     | 4.3, 4.7       | Compile-time verification                                               |
@@ -279,5 +276,5 @@ Migrates the SQL emitter hook onto the shared domain-level generation utilities 
 3. **M2 coordination with Alexey.** The ORM client migration (tasks 2.1–2.5) touches core ORM internals. This must be sequenced to avoid conflicts with Alexey's active ORM development. The widened types from M1 allow him to migrate incrementally.
 4. `**paradedb` extension (`packages/3-extensions/paradedb/`).** Task 2.7 covers BM25 index column resolution. Confirm this extension is actively maintained and whether its owner needs notification.
 5. **M3 sequencing.** The Mongo emitter hook (M3) can run in parallel with M2 since it doesn't touch the SQL emitter. It establishes the shared domain-level generation API that M6 later migrates the SQL hook onto.
-6. **Descriptor assembly consolidation (blocking, task 3.10).** The descriptor-based codec/operation type contribution machinery (`extractCodecTypeImports`, `extractOperationTypeImports`, `DescriptorWithTypes`, control-plane assembly) currently lives in `packages/2-sql/3-tooling/family/src/core/assembly.ts`. This is family-agnostic logic that should be shared framework code. The Mongo family needs the same pattern but currently uses a string-replacement hack. Task 3.10 extracts this into the framework and builds a Mongo control plane that consumes it.
+6. **Descriptor assembly consolidation (task 3.9) and control flow inversion (task 3.11).** The descriptor-based assembly machinery (`extractCodecTypeImports`, `extractOperationTypeImports`, `DescriptorWithTypes`, etc.) currently lives in `packages/2-sql/3-tooling/family/src/core/assembly.ts`. This is family-agnostic logic that operates on `ComponentMetadata`. Task 3.9 extracts it into `@prisma-next/contract/assembly` and builds a Mongo control plane at layer 9 using the inverted pattern. Task 3.11 completes the inversion: the framework orchestration layer (`ControlClient`, CLI) drives assembly and calls `emit()` directly, family instances no longer own emission, and the SQL family package moves to layer 9.
 
