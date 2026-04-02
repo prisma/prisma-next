@@ -1,0 +1,42 @@
+{
+  "name": "@prisma-next/framework-components",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Framework component types, assembly logic, and stack creation for Prisma Next",
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    "./components": "./dist/components.mjs",
+    "./authoring": "./dist/authoring.mjs",
+    "./control": "./dist/control.mjs",
+    "./execution": "./dist/execution.mjs",
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/1-framework/1-core/shared/framework-components"
+  }
+}
