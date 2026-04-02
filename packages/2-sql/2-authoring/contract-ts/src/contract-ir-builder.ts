@@ -40,7 +40,7 @@ type RuntimeModelState = ModelBuilderState<
   Record<string, RelationDefinition>
 >;
 
-type RuntimeBuilderState = ContractBuilderState<
+export type RuntimeBuilderState = ContractBuilderState<
   string | undefined,
   Record<string, RuntimeTableState>,
   Record<string, RuntimeModelState>,

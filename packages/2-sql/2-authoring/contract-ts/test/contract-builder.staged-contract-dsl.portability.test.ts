@@ -1,27 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
-import {
-  defineContract,
-  field,
-  model,
-  rel,
-  type StagedModelBuilder,
-} from '../src/contract-builder';
-import type {
-  ModelAttributesSpec,
-  RelationBuilder,
-  RelationState,
-  ScalarFieldBuilder,
-  SqlStageSpec,
-} from '../src/staged-contract-dsl';
-
-type AnyModel = StagedModelBuilder<
-  string | undefined,
-  Record<string, ScalarFieldBuilder>,
-  Record<string, RelationBuilder<RelationState>>,
-  ModelAttributesSpec | undefined,
-  SqlStageSpec | undefined
->;
+import { defineContract, field, model, rel } from '../src/contract-builder';
 
 import { columnDescriptor } from './helpers/column-descriptor';
 
@@ -63,14 +42,11 @@ const textColumn = columnDescriptor('sql/text@1');
 const timestampColumn = columnDescriptor('sql/timestamp@1');
 
 function buildPortableContract<TTarget extends string>(target: PortableTargetPack<TTarget>) {
-  const User: AnyModel = model('User', {
+  const UserBase = model('User', {
     fields: {
       id: field.column(uuidColumn).id({ name: 'app_user_pkey' }),
       email: field.column(textColumn).unique({ name: 'app_user_email_key' }),
       createdAt: field.column(timestampColumn).defaultSql('CURRENT_TIMESTAMP'),
-    },
-    relations: {
-      posts: rel.hasMany(() => Post, { by: 'authorId' }),
     },
   }).sql({
     table: 'app_user',
@@ -83,17 +59,21 @@ function buildPortableContract<TTarget extends string>(target: PortableTargetPac
       title: field.column(textColumn),
     },
     relations: {
-      author: rel.belongsTo(User, { from: 'authorId', to: 'id' }),
+      author: rel.belongsTo(UserBase, { from: 'authorId', to: 'id' }),
     },
   }).sql(({ cols, constraints }) => ({
     table: 'blog_post',
     foreignKeys: [
-      constraints.foreignKey([cols.authorId], [User.refs['id']!], {
+      constraints.foreignKey([cols.authorId], [UserBase.refs['id']!], {
         name: 'blog_post_author_id_fkey',
         onDelete: 'cascade',
       }),
     ],
   }));
+
+  const User = UserBase.relations({
+    posts: rel.hasMany(() => Post, { by: 'authorId' }),
+  });
 
   return defineContract({
     family: bareFamilyPack,

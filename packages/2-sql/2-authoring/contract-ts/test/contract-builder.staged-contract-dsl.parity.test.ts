@@ -4,28 +4,7 @@ import type {
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
-import {
-  defineContract,
-  field,
-  model,
-  rel,
-  type StagedModelBuilder,
-} from '../src/contract-builder';
-import type {
-  ModelAttributesSpec,
-  RelationBuilder,
-  RelationState,
-  ScalarFieldBuilder,
-  SqlStageSpec,
-} from '../src/staged-contract-dsl';
-
-type AnyModel = StagedModelBuilder<
-  string | undefined,
-  Record<string, ScalarFieldBuilder>,
-  Record<string, RelationBuilder<RelationState>>,
-  ModelAttributesSpec | undefined,
-  SqlStageSpec | undefined
->;
+import { defineContract, field, model, rel } from '../src/contract-builder';
 
 import { columnDescriptor } from './helpers/column-descriptor';
 
@@ -274,17 +253,10 @@ describe('staged contract DSL parity with legacy builder', () => {
       table: 'post_tag',
     });
 
-    const Post: AnyModel = model('Post', {
+    const PostBase = model('Post', {
       fields: {
         id: field.column(textColumn).id(),
         title: field.column(textColumn),
-      },
-      relations: {
-        tags: rel.manyToMany(() => Tag, {
-          through: () => PostTag,
-          from: 'postId',
-          to: 'tagId',
-        }),
       },
     }).sql({
       table: 'post',
@@ -296,7 +268,7 @@ describe('staged contract DSL parity with legacy builder', () => {
         label: field.column(textColumn),
       },
       relations: {
-        posts: rel.manyToMany(Post, {
+        posts: rel.manyToMany(PostBase, {
           through: () => PostTag,
           from: 'tagId',
           to: 'postId',
@@ -304,6 +276,14 @@ describe('staged contract DSL parity with legacy builder', () => {
       },
     }).sql({
       table: 'tag',
+    });
+
+    const Post = PostBase.relations({
+      tags: rel.manyToMany(() => Tag, {
+        through: () => PostTag,
+        from: 'postId',
+        to: 'tagId',
+      }),
     });
 
     const refined = defineContract({

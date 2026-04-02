@@ -27,6 +27,7 @@ import {
 import type {
   ContractWithTypeMaps,
   Index,
+  ReferentialAction,
   SqlContract,
   SqlMappings,
   StorageTypeInstance,

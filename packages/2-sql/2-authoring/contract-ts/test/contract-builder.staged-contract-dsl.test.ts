@@ -6,23 +6,7 @@ import {
   model,
   rel,
   type StagedContractInput,
-  type StagedModelBuilder,
 } from '../src/contract-builder';
-import type {
-  ModelAttributesSpec,
-  RelationBuilder,
-  RelationState,
-  ScalarFieldBuilder,
-  SqlStageSpec,
-} from '../src/staged-contract-dsl';
-
-type AnyModel = StagedModelBuilder<
-  string | undefined,
-  Record<string, ScalarFieldBuilder>,
-  Record<string, RelationBuilder<RelationState>>,
-  ModelAttributesSpec | undefined,
-  SqlStageSpec | undefined
->;
 
 import { columnDescriptor } from './helpers/column-descriptor';
 
@@ -66,7 +50,7 @@ type OwnershipRelationCase = {
 };
 
 function buildOwnershipRelationContract(ownershipCase: OwnershipRelationCase) {
-  const User: AnyModel = model('User', {
+  const User = model('User', {
     fields: {
       id: field.column(textColumn).id(),
       ...(ownershipCase.label === 'hasMany' ? { email: field.column(textColumn) } : {}),
@@ -111,7 +95,7 @@ describe('staged contract DSL authoring surface', () => {
       },
     } as const;
 
-    const User: AnyModel = model('User', {
+    const UserBase = model('User', {
       fields: {
         id: field
           .generated({
@@ -122,9 +106,6 @@ describe('staged contract DSL authoring surface', () => {
         email: field.column(textColumn).unique({ name: 'app_user_email_key' }),
         role: field.namedType(types.Role),
         createdAt: field.column(timestamptzColumn).column('created_at').defaultSql('now()'),
-      },
-      relations: {
-        posts: rel.hasMany(() => Post, { by: 'userId' }),
       },
     }).sql({
       table: 'app_user',
@@ -137,18 +118,22 @@ describe('staged contract DSL authoring surface', () => {
         title: field.column(textColumn),
       },
       relations: {
-        user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+        user: rel.belongsTo(UserBase, { from: 'userId', to: 'id' }),
       },
     }).sql(({ cols, constraints }) => ({
       table: 'blog_post',
       indexes: [constraints.index(cols.userId, { name: 'blog_post_user_id_idx' })],
       foreignKeys: [
-        constraints.foreignKey([cols.userId], [User.refs['id']!], {
+        constraints.foreignKey([cols.userId], [UserBase.refs['id']!], {
           name: 'blog_post_user_id_fkey',
           onDelete: 'cascade',
         }),
       ],
     }));
+
+    const User = UserBase.relations({
+      posts: rel.hasMany(() => Post, { by: 'userId' }),
+    });
 
     const contract = defineStagedContract({
       storageHash: 'sha256:staged-contract-dsl',
@@ -337,17 +322,10 @@ describe('staged contract DSL authoring surface', () => {
       table: 'post_tag',
     });
 
-    const Post: AnyModel = model('Post', {
+    const PostBase = model('Post', {
       fields: {
         id: field.column(textColumn).id(),
         title: field.column(textColumn),
-      },
-      relations: {
-        tags: rel.manyToMany(() => Tag, {
-          through: () => PostTag,
-          from: 'postId',
-          to: 'tagId',
-        }),
       },
     }).sql({
       table: 'post',
@@ -359,7 +337,7 @@ describe('staged contract DSL authoring surface', () => {
         label: field.column(textColumn),
       },
       relations: {
-        posts: rel.manyToMany(Post, {
+        posts: rel.manyToMany(PostBase, {
           through: () => PostTag,
           from: 'tagId',
           to: 'postId',
@@ -367,6 +345,14 @@ describe('staged contract DSL authoring surface', () => {
       },
     }).sql({
       table: 'tag',
+    });
+
+    const Post = PostBase.relations({
+      tags: rel.manyToMany(() => Tag, {
+        through: () => PostTag,
+        from: 'postId',
+        to: 'tagId',
+      }),
     });
 
     const contract = defineStagedContract({
@@ -822,16 +808,16 @@ describe('staged contract DSL authoring surface', () => {
 
 describe('self-referential and circular relations', () => {
   it('lowers a self-referential tree relation (parent/children on the same model)', () => {
-    const Category = model('Category', {
+    const CategoryBase = model('Category', {
       fields: {
         id: field.column(int4Column).id(),
         name: field.column(textColumn),
         parentId: field.column(int4Column).optional(),
       },
-      relations: {
-        parent: rel.belongsTo(() => Category, { from: 'parentId', to: 'id' }),
-        children: rel.hasMany(() => Category, { by: 'parentId' }),
-      },
+    });
+    const Category = CategoryBase.relations({
+      parent: rel.belongsTo(() => CategoryBase, { from: 'parentId', to: 'id' }),
+      children: rel.hasMany(() => CategoryBase, { by: 'parentId' }),
     });
 
     const contract = defineStagedContract({
@@ -860,14 +846,11 @@ describe('self-referential and circular relations', () => {
   });
 
   it('lowers circular relations (A references B, B references A)', () => {
-    const Employee = model('Employee', {
+    const EmployeeBase = model('Employee', {
       fields: {
         id: field.column(int4Column).id(),
         name: field.column(textColumn),
         departmentId: field.column(int4Column),
-      },
-      relations: {
-        department: rel.belongsTo(() => Department, { from: 'departmentId', to: 'id' }),
       },
     });
 
@@ -878,8 +861,12 @@ describe('self-referential and circular relations', () => {
         headId: field.column(int4Column),
       },
       relations: {
-        head: rel.belongsTo(Employee, { from: 'headId', to: 'id' }),
+        head: rel.belongsTo(EmployeeBase, { from: 'headId', to: 'id' }),
       },
+    });
+
+    const Employee = EmployeeBase.relations({
+      department: rel.belongsTo(() => Department, { from: 'departmentId', to: 'id' }),
     });
 
     const contract = defineStagedContract({
