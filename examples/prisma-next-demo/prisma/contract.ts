@@ -9,12 +9,17 @@ import { uuidv4 } from '@prisma-next/ids';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
+const types = {
+  Embedding1536: vector(1536),
+  user_type: enumType('user_type', ['admin', 'user']),
+} as const;
+
 const User = model('User', {
   fields: {
     id: field.generated(uuidv4()).id(),
     email: field.column(textColumn),
     createdAt: field.column(timestamptzColumn).defaultSql('now()'),
-    kind: field.namedType('user_type'),
+    kind: field.namedType(types.user_type),
   },
 });
 
@@ -24,7 +29,7 @@ const Post = model('Post', {
     title: field.column(textColumn),
     userId: field.column(textColumn),
     createdAt: field.column(timestamptzColumn).defaultSql('now()'),
-    embedding: field.namedType('Embedding1536').optional(),
+    embedding: field.namedType(types.Embedding1536).optional(),
   },
 });
 
@@ -57,10 +62,7 @@ export const contract = defineContract({
       'defaults.now': true,
     },
   },
-  types: {
-    Embedding1536: vector(1536),
-    user_type: enumType('user_type', ['admin', 'user']),
-  },
+  types,
   models: {
     User: UserModel,
     Post: PostModel,
