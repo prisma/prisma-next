@@ -19,58 +19,16 @@ function stripStrategyFromRelations(
   return result;
 }
 
-function toDomainModel(models: Record<string, unknown>): Record<string, unknown> {
+function stripRelationStrategies(models: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [modelName, modelUnknown] of Object.entries(models)) {
     const model = modelUnknown as Record<string, unknown>;
     const relations = model['relations'] as Record<string, Record<string, unknown>> | undefined;
     const cleanedRelations = stripStrategyFromRelations(relations);
 
-    const fields = model['fields'] as Record<string, Record<string, unknown>> | undefined;
-    if (!fields) {
-      result[modelName] = {
-        ...model,
-        ...(cleanedRelations !== undefined ? { relations: cleanedRelations } : {}),
-      };
-      continue;
-    }
-
-    const hasEnrichedFields = Object.values(fields).some((f) => f['codecId'] !== undefined);
-    if (!hasEnrichedFields) {
-      result[modelName] = {
-        ...model,
-        ...(cleanedRelations !== undefined ? { relations: cleanedRelations } : {}),
-      };
-      continue;
-    }
-
-    const storage = (model['storage'] ?? {}) as Record<string, unknown>;
-    const existingStorageFields = (storage['fields'] ?? {}) as Record<
-      string,
-      Record<string, unknown>
-    >;
-    const mergedStorageFields: Record<string, Record<string, unknown>> = {
-      ...existingStorageFields,
-    };
-
-    const cleanedFields: Record<string, Record<string, unknown>> = {};
-    for (const [fieldName, field] of Object.entries(fields)) {
-      const { column, ...domainOnly } = field;
-      if (domainOnly['nullable'] === undefined) {
-        domainOnly['nullable'] = false;
-      }
-      cleanedFields[fieldName] = domainOnly;
-
-      if (column !== undefined && !mergedStorageFields[fieldName]) {
-        mergedStorageFields[fieldName] = { column };
-      }
-    }
-
     result[modelName] = {
       ...model,
-      fields: cleanedFields,
       ...(cleanedRelations !== undefined ? { relations: cleanedRelations } : {}),
-      storage: { ...storage, fields: mergedStorageFields },
     };
   }
   return result;
@@ -170,7 +128,7 @@ export async function emit(
     targetFamily: ir.targetFamily,
     target: ir.target,
     ...ifDefined('roots', ir.roots),
-    models: toDomainModel(ir.models as Record<string, unknown>),
+    models: stripRelationStrategies(ir.models as Record<string, unknown>),
     storage: ir.storage,
     ...ifDefined('execution', ir.execution),
     extensionPacks: ir.extensionPacks,
