@@ -236,7 +236,6 @@ describe('buildCreateTableSql', () => {
       columns: {
         value: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
       },
-      primaryKey: undefined,
       uniques: [],
       foreignKeys: [],
       indexes: [],

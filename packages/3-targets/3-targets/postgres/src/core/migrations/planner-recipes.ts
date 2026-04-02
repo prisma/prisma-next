@@ -1,15 +1,14 @@
 import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
-import type { PostgresPlanTargetDetails } from './planner';
+import { buildAddColumnSql } from './planner-ddl-builders';
 import {
-  buildAddColumnSql,
   columnExistsCheck,
   columnHasNoDefaultCheck,
   columnNullabilityCheck,
   qualifyTableName,
-} from './planner-sql';
-import { buildTargetDetails } from './planner-target-details';
+} from './planner-sql-checks';
+import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-types';
 
 export function buildAddColumnOperationIdentity(
   schema: string,
