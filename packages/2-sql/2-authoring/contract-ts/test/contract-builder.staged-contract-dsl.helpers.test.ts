@@ -5,7 +5,7 @@ import type {
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
-import { defineContract, field, model, rel } from '../src/contract-builder';
+import { defineContract, rel } from '../src/contract-builder';
 
 type PortableSqlCodecTypes = {
   readonly 'pg/enum@1': { output: string };

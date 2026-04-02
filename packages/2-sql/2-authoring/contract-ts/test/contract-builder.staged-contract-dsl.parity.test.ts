@@ -1,4 +1,8 @@
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
+import type {
+  ExtensionPackRef,
+  FamilyPackRef,
+  TargetPackRef,
+} from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
 import {
   defineContract,
@@ -24,6 +28,13 @@ type AnyModel = StagedModelBuilder<
 >;
 
 import { columnDescriptor } from './helpers/column-descriptor';
+
+const bareFamilyPack: FamilyPackRef<'sql'> = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  version: '0.0.1',
+};
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
@@ -82,6 +93,7 @@ describe('staged contract DSL parity with legacy builder', () => {
     });
 
     const refined = defineContract({
+      family: bareFamilyPack,
       target: postgresTargetPack,
       extensionPacks: { pgvector: pgvectorPack },
       naming: { tables: 'snake_case', columns: 'snake_case' },
@@ -226,6 +238,7 @@ describe('staged contract DSL parity with legacy builder', () => {
       .sql({});
 
     const refined = defineContract({
+      family: bareFamilyPack,
       target: postgresTargetPack,
       naming: { tables: 'snake_case', columns: 'snake_case' },
       models: {
@@ -294,6 +307,7 @@ describe('staged contract DSL parity with legacy builder', () => {
     });
 
     const refined = defineContract({
+      family: bareFamilyPack,
       target: postgresTargetPack,
       models: {
         Post,

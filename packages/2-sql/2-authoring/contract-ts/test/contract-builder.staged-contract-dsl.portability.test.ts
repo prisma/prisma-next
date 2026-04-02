@@ -1,4 +1,4 @@
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { FamilyPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
 import {
   defineContract,
@@ -33,6 +33,13 @@ type PortableSqlCodecTypes = {
 
 type PortableTargetPack<TTarget extends string> = TargetPackRef<'sql', TTarget> & {
   readonly __codecTypes?: PortableSqlCodecTypes;
+};
+
+const bareFamilyPack: FamilyPackRef<'sql'> = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  version: '0.0.1',
 };
 
 const postgresTargetPack = {
@@ -89,6 +96,7 @@ function buildPortableContract<TTarget extends string>(target: PortableTargetPac
   }));
 
   return defineContract({
+    family: bareFamilyPack,
     target,
     naming: { tables: 'snake_case', columns: 'snake_case' },
     storageHash: 'sha256:portable-staged-contract-dsl',

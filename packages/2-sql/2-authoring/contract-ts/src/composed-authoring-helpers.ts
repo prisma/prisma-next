@@ -236,10 +236,13 @@ export function createComposedAuthoringHelpers<
   readonly target: Target;
   readonly extensionPacks?: ExtensionPacks;
 }): ComposedAuthoringHelpers<Family, Target, ExtensionPacks> {
+  const extensionValues: readonly ExtensionPackRef<'sql', string>[] = Object.values(
+    (options.extensionPacks ?? {}) as Record<string, ExtensionPackRef<'sql', string>>,
+  );
   const components: readonly AuthoringComponent[] = [
     options.family,
     options.target,
-    ...Object.values(options.extensionPacks ?? {}),
+    ...extensionValues,
   ];
 
   return {

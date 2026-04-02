@@ -1,4 +1,4 @@
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { FamilyPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   defineContract,
@@ -28,6 +28,13 @@ import { columnDescriptor } from './helpers/column-descriptor';
 
 const typecheckOnly = process.env['PN_TYPECHECK_ONLY'] === 'true';
 
+const bareFamilyPack: FamilyPackRef<'sql'> = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  version: '0.0.1',
+};
+
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
   id: 'postgres',
@@ -40,10 +47,11 @@ const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 const timestamptzColumn = columnDescriptor('pg/timestamptz@1');
 
-function defineStagedContract<const Definition extends Omit<StagedContractInput, 'target'>>(
-  definition: Definition,
-) {
+function defineStagedContract<
+  const Definition extends Omit<StagedContractInput, 'target' | 'family'>,
+>(definition: Definition) {
   return defineContract({
+    family: bareFamilyPack,
     target: postgresTargetPack,
     ...definition,
   });

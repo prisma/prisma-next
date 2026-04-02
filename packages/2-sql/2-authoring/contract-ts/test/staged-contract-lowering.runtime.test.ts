@@ -1,9 +1,16 @@
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { FamilyPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
 import { field, model, rel } from '../src/contract-builder';
 import { ScalarFieldBuilder, StagedModelBuilder } from '../src/staged-contract-dsl';
 import { buildStagedSemanticContractDefinition } from '../src/staged-contract-lowering';
 import { columnDescriptor } from './helpers/column-descriptor';
+
+const bareFamilyPack: FamilyPackRef<'sql'> = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  version: '0.0.1',
+};
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
@@ -17,9 +24,13 @@ const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 
 function buildSemantic(
-  definition: Omit<Parameters<typeof buildStagedSemanticContractDefinition>[0], 'target'>,
+  definition: Omit<
+    Parameters<typeof buildStagedSemanticContractDefinition>[0],
+    'target' | 'family'
+  >,
 ) {
   return buildStagedSemanticContractDefinition({
+    family: bareFamilyPack,
     target: postgresTargetPack,
     ...definition,
   });
