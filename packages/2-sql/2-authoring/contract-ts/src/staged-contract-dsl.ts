@@ -15,6 +15,7 @@ import type {
 } from '@prisma-next/contract-authoring';
 import { portableSqlAuthoringFieldPresets } from '@prisma-next/sql-contract/authoring';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   createFieldHelpersFromNamespace,
   createFieldPresetHelper,
@@ -381,10 +382,11 @@ export function buildFieldPreset(
     kind: 'scalar',
     descriptor: preset.descriptor,
     nullable: preset.nullable,
-    ...(preset.default ? { default: preset.default as ColumnDefault } : {}),
-    ...(preset.executionDefault
-      ? { executionDefault: preset.executionDefault as ExecutionMutationDefaultValue }
-      : {}),
+    ...ifDefined('default', preset.default as ColumnDefault | undefined),
+    ...ifDefined(
+      'executionDefault',
+      preset.executionDefault as ExecutionMutationDefaultValue | undefined,
+    ),
     ...(preset.id
       ? {
           id: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
