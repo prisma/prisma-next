@@ -1,10 +1,10 @@
-import type { AssembledComponentState } from '@prisma-next/contract/assembly';
+import type { ControlStack } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
 import { mongoTargetDescriptor } from '../src/core/mongo-target-descriptor';
 
-function createMinimalAssembledState(): AssembledComponentState {
+function createMinimalControlStack(): ControlStack {
   return {
     codecTypeImports: [],
     operationTypeImports: [],
@@ -27,7 +27,7 @@ describe('mongoFamilyDescriptor', () => {
 
   it('returns a valid instance when assembledState is provided', () => {
     const stack = { target: mongoTargetDescriptor, extensions: [] };
-    const state = createMinimalAssembledState();
+    const state = createMinimalControlStack();
 
     const instance = mongoFamilyDescriptor.create(stack as never, state);
 
@@ -61,7 +61,7 @@ describe('mongoTargetDescriptor', () => {
 
 describe('createMongoFamilyInstance', () => {
   it('returns an instance with familyId "mongo"', () => {
-    const instance = createMongoFamilyInstance(createMinimalAssembledState());
+    const instance = createMongoFamilyInstance(createMinimalControlStack());
     expect(instance.familyId).toBe('mongo');
   });
 
@@ -69,7 +69,7 @@ describe('createMongoFamilyInstance', () => {
 
   for (const method of stubMethods) {
     it(`${method}() throws "not implemented"`, async () => {
-      const instance = createMongoFamilyInstance(createMinimalAssembledState());
+      const instance = createMongoFamilyInstance(createMinimalControlStack());
       await expect(instance[method]()).rejects.toThrow('not implemented');
     });
   }

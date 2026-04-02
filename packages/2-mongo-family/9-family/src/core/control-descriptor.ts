@@ -1,8 +1,8 @@
-import type { AssembledComponentState } from '@prisma-next/contract/assembly';
 import type {
   ControlFamilyDescriptor,
   ControlPlaneStack,
 } from '@prisma-next/core-control-plane/types';
+import type { ControlStack } from '@prisma-next/framework-components/control';
 import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
 import { createMongoFamilyInstance, type MongoControlFamilyInstance } from './control-instance';
 
@@ -17,7 +17,7 @@ class MongoFamilyDescriptor
 
   create<TTargetId extends string>(
     _stack: ControlPlaneStack<'mongo', TTargetId>,
-    assembledState?: AssembledComponentState,
+    assembledState?: ControlStack,
   ): MongoControlFamilyInstance {
     if (!assembledState) {
       throw new Error(
