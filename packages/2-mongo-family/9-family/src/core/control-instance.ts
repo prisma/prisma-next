@@ -3,7 +3,6 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type {
-  ControlDriverInstance,
   ControlFamilyInstance,
   EmitContractResult,
   VerifyDatabaseResult,
