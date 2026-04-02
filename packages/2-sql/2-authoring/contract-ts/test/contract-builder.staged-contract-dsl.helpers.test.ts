@@ -273,7 +273,7 @@ describe('staged contract DSL helper vocabulary', () => {
     ]);
     expect(
       (contract.models.AuditEntry as unknown as { storage: { fields: Record<string, unknown> } })
-        .storage.fields.actorId,
+        .storage.fields['actorId'],
     ).toEqual({ column: 'actor_id' });
   });
 
