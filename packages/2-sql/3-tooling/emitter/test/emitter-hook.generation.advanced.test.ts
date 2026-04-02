@@ -534,8 +534,8 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain("modelToTable: { readonly User: 'user'; readonly Post: 'post' }");
-    expect(types).toContain("tableToModel: { readonly user: 'User'; readonly post: 'Post' }");
+    expect(types).toContain("modelToTable: { readonly Post: 'post'; readonly User: 'user' }");
+    expect(types).toContain("tableToModel: { readonly post: 'Post'; readonly user: 'User' }");
   });
 
   it('generates mappings type as SqlMappings when no models', () => {

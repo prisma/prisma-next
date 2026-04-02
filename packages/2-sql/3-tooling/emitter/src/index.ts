@@ -378,7 +378,9 @@ export const sqlTargetFamilyHook = {
 
   generateStorageType(storage: SqlStorage): string {
     const tables: string[] = [];
-    for (const [tableName, table] of Object.entries(storage.tables)) {
+    for (const [tableName, table] of Object.entries(storage.tables).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
       const columns: string[] = [];
       for (const [colName, col] of Object.entries(table.columns)) {
         const nullable = col.nullable ? 'true' : 'false';
@@ -539,7 +541,9 @@ export const sqlTargetFamilyHook = {
     }
 
     const modelTypes: string[] = [];
-    for (const [modelName, model] of Object.entries(models)) {
+    for (const [modelName, model] of Object.entries(models).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
       const fields: string[] = [];
       const storageFieldParts: string[] = [];
       const tableName = model.storage.table;
@@ -639,7 +643,9 @@ export const sqlTargetFamilyHook = {
     }
 
     const tableEntries: string[] = [];
-    for (const [tableName, relsValue] of Object.entries(relations)) {
+    for (const [tableName, relsValue] of Object.entries(relations).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
       if (typeof relsValue !== 'object' || relsValue === null) {
         continue;
       }
@@ -711,7 +717,9 @@ export const sqlTargetFamilyHook = {
     const fieldToColumn: string[] = [];
     const columnToField: string[] = [];
 
-    for (const [modelName, model] of Object.entries(models)) {
+    for (const [modelName, model] of Object.entries(models).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
       const tableName = model.storage.table;
       modelToTable.push(`readonly ${modelName}: '${tableName}'`);
       tableToModel.push(`readonly ${tableName}: '${modelName}'`);
