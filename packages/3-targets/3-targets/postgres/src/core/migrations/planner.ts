@@ -1,5 +1,4 @@
 import {
-  escapeLiteral,
   normalizeSchemaNativeType,
   parsePostgresDefault,
   quoteIdentifier,
@@ -23,7 +22,6 @@ import {
 } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type {
-  ForeignKey,
   StorageColumn,
   StorageTable,
   StorageTypeInstance,
@@ -31,6 +29,7 @@ import type {
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { buildAddColumnSql, buildCreateTableSql, buildForeignKeySql } from './planner-ddl-builders';
 import { resolveIdentityValue } from './planner-identity-values';
 import {
   buildAddColumnOperationIdentity,
@@ -38,27 +37,27 @@ import {
 } from './planner-recipes';
 import { buildReconciliationPlan } from './planner-reconciliation';
 import {
-  buildAddColumnSql,
-  buildCreateTableSql,
-  buildForeignKeySql,
+  buildSchemaLookupMap,
+  hasForeignKey,
+  hasIndex,
+  hasUniqueConstraint,
+  type SchemaTableLookup,
+} from './planner-schema-lookup';
+import {
   columnExistsCheck,
   columnNullabilityCheck,
   constraintExistsCheck,
   qualifyTableName,
+  tableHasPrimaryKeyCheck,
   tableIsEmptyCheck,
   toRegclassLiteral,
-} from './planner-sql';
-import { buildTargetDetails } from './planner-target-details';
-
-export type OperationClass =
-  | 'dependency'
-  | 'type'
-  | 'table'
-  | 'column'
-  | 'primaryKey'
-  | 'unique'
-  | 'index'
-  | 'foreignKey';
+} from './planner-sql-checks';
+import {
+  buildTargetDetails,
+  type OperationClass,
+  type PlanningMode,
+  type PostgresPlanTargetDetails,
+} from './planner-target-details';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -80,21 +79,8 @@ type PlannerDatabaseDependency = {
   readonly install: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
 };
 
-export interface PostgresPlanTargetDetails {
-  readonly schema: string;
-  readonly objectType: OperationClass;
-  readonly name: string;
-  readonly table?: string;
-}
-
 interface PlannerConfig {
   readonly defaultSchema: string;
-}
-
-export interface PlanningMode {
-  readonly includeExtraObjects: boolean;
-  readonly allowWidening: boolean;
-  readonly allowDestructive: boolean;
 }
 
 const DEFAULT_PLANNER_CONFIG: PlannerConfig = {
@@ -836,76 +822,4 @@ function isPostgresPlannerDependency(
 
 function sortedEntries<V>(record: Readonly<Record<string, V>>): Array<[string, V]> {
   return Object.entries(record).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, V]>;
-}
-
-function tableHasPrimaryKeyCheck(
-  schema: string,
-  table: string,
-  exists: boolean,
-  constraintName?: string,
-): string {
-  const comparison = exists ? '' : 'NOT ';
-  const constraintFilter = constraintName
-    ? `AND c2.relname = '${escapeLiteral(constraintName)}'`
-    : '';
-  return `SELECT ${comparison}EXISTS (
-  SELECT 1
-  FROM pg_index i
-  JOIN pg_class c ON c.oid = i.indrelid
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  LEFT JOIN pg_class c2 ON c2.oid = i.indexrelid
-  WHERE n.nspname = '${escapeLiteral(schema)}'
-    AND c.relname = '${escapeLiteral(table)}'
-    AND i.indisprimary
-    ${constraintFilter}
-)`;
-}
-
-/**
- * Pre-computed lookup sets for a schema table's constraints.
- * Converts O(n*m) linear scans to O(1) Set lookups per constraint check.
- */
-interface SchemaTableLookup {
-  readonly uniqueKeys: Set<string>;
-  readonly indexKeys: Set<string>;
-  readonly uniqueIndexKeys: Set<string>;
-  readonly fkKeys: Set<string>;
-}
-
-function buildSchemaLookupMap(schema: SqlSchemaIR): ReadonlyMap<string, SchemaTableLookup> {
-  const map = new Map<string, SchemaTableLookup>();
-  for (const [tableName, table] of Object.entries(schema.tables)) {
-    map.set(tableName, buildSchemaTableLookup(table));
-  }
-  return map;
-}
-
-function buildSchemaTableLookup(table: SqlSchemaIR['tables'][string]): SchemaTableLookup {
-  const uniqueKeys = new Set(table.uniques.map((u) => u.columns.join(',')));
-  const indexKeys = new Set(table.indexes.map((i) => i.columns.join(',')));
-  const uniqueIndexKeys = new Set(
-    table.indexes.filter((i) => i.unique).map((i) => i.columns.join(',')),
-  );
-  const fkKeys = new Set(
-    table.foreignKeys.map(
-      (fk) => `${fk.columns.join(',')}|${fk.referencedTable}|${fk.referencedColumns.join(',')}`,
-    ),
-  );
-  return { uniqueKeys, indexKeys, uniqueIndexKeys, fkKeys };
-}
-
-function hasUniqueConstraint(lookup: SchemaTableLookup, columns: readonly string[]): boolean {
-  const key = columns.join(',');
-  return lookup.uniqueKeys.has(key) || lookup.uniqueIndexKeys.has(key);
-}
-
-function hasIndex(lookup: SchemaTableLookup, columns: readonly string[]): boolean {
-  const key = columns.join(',');
-  return lookup.indexKeys.has(key) || lookup.uniqueKeys.has(key);
-}
-
-function hasForeignKey(lookup: SchemaTableLookup, fk: ForeignKey): boolean {
-  return lookup.fkKeys.has(
-    `${fk.columns.join(',')}|${fk.references.table}|${fk.references.columns.join(',')}`,
-  );
 }

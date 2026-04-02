@@ -9,6 +9,7 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { PostgresColumnDefault } from '../types';
+import { qualifyTableName } from './planner-sql-checks';
 
 export function buildCreateTableSql(
   qualifiedTableName: string,
@@ -95,9 +96,7 @@ export function buildColumnTypeSql(
   }
 
   if (column.typeRef) {
-    assertSafeNativeType(resolved.nativeType);
-    const needsQuoting = resolved.nativeType !== resolved.nativeType.toLowerCase();
-    return needsQuoting ? quoteIdentifier(resolved.nativeType) : resolved.nativeType;
+    return quoteIdentifier(resolved.nativeType);
   }
 
   assertSafeNativeType(resolved.nativeType);
@@ -162,6 +161,7 @@ function resolveColumnTypeMetadata(
   };
 }
 
+/** Autoincrement columns use SERIAL types, so this returns empty for them. */
 export function buildColumnDefaultSql(
   columnDefault: PostgresColumnDefault | undefined,
   column?: StorageColumn,
@@ -181,7 +181,7 @@ export function buildColumnDefaultSql(
       return `DEFAULT (${columnDefault.expression})`;
     }
     case 'sequence':
-      return `DEFAULT nextval(${quoteIdentifier(columnDefault.name)}::regclass)`;
+      return `DEFAULT nextval('${escapeLiteral(quoteIdentifier(columnDefault.name))}'::regclass)`;
   }
 }
 
@@ -216,209 +216,18 @@ export function renderDefaultLiteral(value: unknown, column?: StorageColumn): st
   return `'${escapeLiteral(json)}'`;
 }
 
-export function qualifyTableName(schema: string, table: string): string {
-  return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
-}
-
-export function toRegclassLiteral(schema: string, name: string): string {
-  const regclass = `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
-  return `'${escapeLiteral(regclass)}'`;
-}
-
-export function constraintExistsCheck({
-  constraintName,
-  schema,
-  table,
-  exists = true,
-}: {
-  constraintName: string;
-  schema: string;
-  table: string;
-  exists?: boolean;
-}): string {
-  const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
-  return `SELECT ${existsClause} (
-  SELECT 1 FROM pg_constraint c
-  JOIN pg_namespace n ON c.connamespace = n.oid
-  WHERE c.conname = '${escapeLiteral(constraintName)}'
-  AND n.nspname = '${escapeLiteral(schema)}'
-  AND c.conrelid = to_regclass(${toRegclassLiteral(schema, table)})
-)`;
-}
-
-export function columnExistsCheck({
-  schema,
-  table,
-  column,
-  exists = true,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  exists?: boolean;
-}): string {
-  const existsClause = exists ? '' : 'NOT ';
-  return `SELECT ${existsClause}EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-)`;
-}
-
-export function columnNullabilityCheck({
-  schema,
-  table,
-  column,
-  nullable,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  nullable: boolean;
-}): string {
-  const expected = nullable ? 'YES' : 'NO';
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-    AND is_nullable = '${expected}'
-)`;
-}
-
-/**
- * Maps contract native type names to the display form returned by PostgreSQL's
- * `format_type()`. Base types use short names in the contract (e.g., `int4`)
- * but `format_type()` returns SQL-standard names (e.g., `integer`).
- *
- * NOTE: The inverse mapping lives in `normalizeFormattedType` in control-adapter.ts.
- * These two maps must stay in sync. A shared bidirectional map in
- * @prisma-next/adapter-postgres would eliminate the drift risk.
- */
-const FORMAT_TYPE_DISPLAY: ReadonlyMap<string, string> = new Map([
-  ['int2', 'smallint'],
-  ['int4', 'integer'],
-  ['int8', 'bigint'],
-  ['float4', 'real'],
-  ['float8', 'double precision'],
-  ['bool', 'boolean'],
-  ['timestamp', 'timestamp without time zone'],
-  ['timestamptz', 'timestamp with time zone'],
-  ['time', 'time without time zone'],
-  ['timetz', 'time with time zone'],
-]);
-
-/**
- * Builds the string that `format_type(atttypid, atttypmod)` would return for a
- * contract column. Used for postchecks — separate from `buildColumnTypeSql` which
- * produces DDL-safe strings (e.g., quoted identifiers, SERIAL).
- */
-export function buildExpectedFormatType(
-  column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
-  storageTypes: Record<string, StorageTypeInstance> = {},
-): string {
-  const resolved = resolveColumnTypeMetadata(column, storageTypes);
-  const expanded = expandParameterizedTypeSql(resolved, codecHooks);
-  if (expanded !== null) {
-    return expanded;
-  }
-
-  // User-defined types (enums, composites): format_type() double-quotes names
-  // that contain uppercase characters (e.g., "StatusType") but returns lowercase
-  // names bare (e.g., status_type). We can't use quoteIdentifier() here because
-  // it always quotes, which would break the lowercase case.
-  if (column.typeRef) {
-    const needsQuoting = resolved.nativeType !== resolved.nativeType.toLowerCase();
-    return needsQuoting ? `"${resolved.nativeType}"` : resolved.nativeType;
-  }
-
-  // Base types: map contract short names to format_type() display names.
-  return FORMAT_TYPE_DISPLAY.get(resolved.nativeType) ?? resolved.nativeType;
-}
-
-/** Checks that the column's full type (including typmods) matches the expected type via `format_type()`. */
-export function columnTypeCheck({
-  schema,
-  table,
-  column,
-  expectedType,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  expectedType: string;
-}): string {
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM pg_attribute a
-  JOIN pg_class c ON c.oid = a.attrelid
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname = '${escapeLiteral(schema)}'
-    AND c.relname = '${escapeLiteral(table)}'
-    AND a.attname = '${escapeLiteral(column)}'
-    AND format_type(a.atttypid, a.atttypmod) = '${escapeLiteral(expectedType)}'
-    AND NOT a.attisdropped
-)`;
-}
-
-/** Checks that a column default exists (or does not exist) via `information_schema.columns.column_default`. */
-export function columnDefaultExistsCheck({
-  schema,
-  table,
-  column,
-  exists = true,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-  exists?: boolean;
-}): string {
-  const nullCheck = exists ? 'IS NOT NULL' : 'IS NULL';
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-    AND column_default ${nullCheck}
-)`;
-}
-
-export function tableIsEmptyCheck(qualifiedTableName: string): string {
-  return `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedTableName} LIMIT 1)`;
-}
-
-export function columnHasNoDefaultCheck(opts: {
-  schema: string;
-  table: string;
-  column: string;
-}): string {
-  return `SELECT NOT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(opts.schema)}'
-    AND table_name = '${escapeLiteral(opts.table)}'
-    AND column_name = '${escapeLiteral(opts.column)}'
-    AND column_default IS NOT NULL
-)`;
-}
-
 export function buildAddColumnSql(
   qualifiedTableName: string,
   columnName: string,
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
-  defaultLiteral?: string | null,
+  temporaryDefault?: string | null,
   storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
   const typeSql = buildColumnTypeSql(column, codecHooks, storageTypes);
   const defaultSql =
     buildColumnDefaultSql(column.default, column) ||
-    (defaultLiteral != null ? `DEFAULT ${defaultLiteral}` : '');
+    (temporaryDefault ? `DEFAULT ${temporaryDefault}` : '');
   const parts = [
     `ALTER TABLE ${qualifiedTableName}`,
     `ADD COLUMN ${quoteIdentifier(columnName)} ${typeSql}`,
