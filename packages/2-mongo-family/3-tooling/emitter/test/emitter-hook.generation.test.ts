@@ -53,14 +53,14 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
     const ir = createMongoIR();
     const codecImports: TypesImportSpec[] = [
       {
-        package: '@prisma-next/target-mongo/codec-types',
+        package: '@prisma-next/mongo-core/codec-types',
         named: 'CodecTypes',
         alias: 'MongoCodecTypes',
       },
     ];
     const types = mongoTargetFamilyHook.generateContractTypes(ir, codecImports, [], testHashes);
     expect(types).toContain(
-      "import type { CodecTypes as MongoCodecTypes } from '@prisma-next/target-mongo/codec-types'",
+      "import type { CodecTypes as MongoCodecTypes } from '@prisma-next/mongo-core/codec-types'",
     );
     expect(types).toContain('export type CodecTypes = MongoCodecTypes');
   });
