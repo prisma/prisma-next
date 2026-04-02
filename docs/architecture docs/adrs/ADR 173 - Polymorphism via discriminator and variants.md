@@ -263,5 +263,3 @@ The emitter's rule is straightforward: if an index targets a field that belongs 
 - [ADR 174 — Aggregate roots and relation strategies](ADR%20174%20-%20Aggregate%20roots%20and%20relation%20strategies.md) — `roots`, `reference` vs `embed`
 - [ADR 178 — Value objects in the contract](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md) — polymorphic value objects use the same discriminator/variants/base mechanism
 - [ADR 179 — Union field types](ADR%20179%20-%20Union%20field%20types.md) — unstructured unions as an alternative to discriminated polymorphism
-- [design-questions.md § DQ #6](../../planning/mongo-target/1-design-docs/design-questions.md)
-- [cross-cutting-learnings.md § learning #4](../../planning/mongo-target/cross-cutting-learnings.md)

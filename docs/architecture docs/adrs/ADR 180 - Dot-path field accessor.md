@@ -208,4 +208,3 @@ The accessor serves three roles across the API:
 - [ADR 178 — Value objects in the contract](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md) — value objects as a contract concept
 - [ADR 170 — Codec trait system](ADR%20170%20-%20Codec%20trait%20system.md) — trait-gating extends to expressions returned by the dot-path accessor
 - [ADR 179 — Union field types](ADR%20179%20-%20Union%20field%20types.md) — union types reachable through dot-paths
-- [Value objects design doc](../../planning/mongo-target/1-design-docs/value-objects.md) — full design exploration including mutation semantics

@@ -121,7 +121,7 @@ The fundamental problem generalizes beyond MongoDB's schemaless nature: any code
 
 - **Contract-level default** (`execution.readValidation`): applies to all models. Default when omitted: `reject` (the framework protects you by default).
 - **Per-model override** (`execution.models.<Model>.readValidation`): override for a specific model. Useful during migration — flip models from `warn` to `reject` as you clean up collections.
-- **Per-codec override** (`execution.codecs.<codecId>.readValidation`): override for a specific codec type. Useful when a codec is known to encounter undecable values (e.g., a best-effort legacy decoder, or a union codec facing type ambiguity).
+- **Per-codec override** (`execution.codecs.<codecId>.readValidation`): override for a specific codec type. Useful when a codec is known to encounter undecodable values (e.g., a best-effort legacy decoder, or a union codec facing type ambiguity).
 
 Resolution order: model-level > codec-level > contract default.
 
@@ -130,7 +130,7 @@ Resolution order: model-level > codec-level > contract default.
 - **Write validation is non-configurable.** The framework always rejects invalid writes. This is a guarantee, not a policy. No execution config for that.
 - **Coercion is dropped.** It silently changes semantics — a string `"30"` and an integer `30` sort differently, compare differently, and aggregate differently. Coercing on read means the application sees data that doesn't match what's in the database. If coercion is needed, it belongs in a custom codec, not in the runtime's validation policy.
 - **`executionHash` implications.** Changing `readValidation` changes the `executionHash`. Switching from `warn` to `reject` is a meaningful change that could break reads at runtime — the team should be aware of it.
-- **Cross-family.** This applies to SQL too — JSONB columns can contain anything, and value objects stored in JSONB face the same validation question. Any codec encountering undecable data hits this problem regardless of family.
+- **Cross-family.** This applies to SQL too — JSONB columns can contain anything, and value objects stored in JSONB face the same validation question. Any codec encountering undecodable data hits this problem regardless of family.
 - **`$jsonSchema` is complementary.** Optionally pushing `$jsonSchema` validation rules to MongoDB collections provides database-level write enforcement, catching writes that bypass PN. This is an additional layer, not a replacement for application-level validation.
 
 ---
