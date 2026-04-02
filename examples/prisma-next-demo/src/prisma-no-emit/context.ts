@@ -3,10 +3,13 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import { orm } from '@prisma-next/sql-orm-client';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
+import type { Runtime } from '@prisma-next/sql-runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { contract } from '../../prisma/contract';
+import { PostCollection, UserCollection } from '../orm-client/collections';
 // SqlContractResult<Definition> is too deeply nested for TypeScript to reduce
 // to literal table keys, so the emitted Contract type is still needed for
 // full type inference in the SQL builder and ORM surfaces.
@@ -29,3 +32,14 @@ export const context = createExecutionContext({
 export const schema = schemaBuilder(context);
 export const tables = schema.tables;
 export const sql = sqlBuilder<Contract>({ context });
+
+export function createOrmClient(runtime: Runtime) {
+  return orm({
+    runtime,
+    context,
+    collections: {
+      User: UserCollection,
+      Post: PostCollection,
+    },
+  });
+}
