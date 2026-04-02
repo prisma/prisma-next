@@ -1,37 +1,27 @@
 import type {
   AuthoringArgumentDescriptor,
   AuthoringFieldNamespace,
-  AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
   ExtensionPackRef,
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
 import {
-  instantiateAuthoringFieldPreset,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
 } from '@prisma-next/contract/framework-components';
-import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import {
   createFieldHelpersFromNamespace,
   createFieldPresetHelper,
   createTypeHelpersFromNamespace,
 } from './authoring-helper-runtime';
 import type {
-  NamedConstraintSpec,
-  NamedConstraintState,
-  SupportsNamedConstraintOptions,
+  FieldHelpersFromNamespace,
+  ResolveTemplateValue,
   TupleFromArgumentDescriptors,
   UnionToIntersection,
 } from './authoring-type-utils';
-import {
-  field,
-  model,
-  rel,
-  ScalarFieldBuilder,
-  type ScalarFieldState,
-} from './staged-contract-dsl';
+import { buildFieldPreset, field, model, rel } from './staged-contract-dsl';
 
 type ExtractTypeNamespaceFromPack<Pack> = Pack extends {
   readonly authoring?: { readonly type?: infer Namespace extends AuthoringTypeNamespace };
@@ -67,47 +57,6 @@ type MergeExtensionFieldNamespaces<ExtensionPacks> =
         >
     : Record<never, never>;
 
-type ResolveTemplateValue<Template, Args extends readonly unknown[]> = Template extends {
-  readonly kind: 'arg';
-  readonly index: infer Index extends number;
-  readonly path?: infer Path extends readonly string[] | undefined;
-  readonly default?: infer Default;
-}
-  ? ResolveTemplateArgValue<Args[Index], Path, Default, Args>
-  : Template extends readonly unknown[]
-    ? { readonly [K in keyof Template]: ResolveTemplateValue<Template[K], Args> }
-    : Template extends Record<string, unknown>
-      ? { readonly [K in keyof Template]: ResolveTemplateValue<Template[K], Args> }
-      : Template;
-
-type ResolveTemplatePathValue<
-  Value,
-  Path extends readonly string[] | undefined,
-> = Path extends readonly [infer Segment extends string, ...infer Rest extends readonly string[]]
-  ? Segment extends keyof NonNullable<Value>
-    ? ResolveTemplatePathValue<NonNullable<Value>[Segment], Rest>
-    : never
-  : Value;
-
-type ResolveTemplateDefaultValue<
-  Value,
-  Default,
-  Args extends readonly unknown[],
-> = Default extends undefined
-  ? Value
-  : [Value] extends [never]
-    ? ResolveTemplateValue<Default, Args>
-    : undefined extends Value
-      ? Exclude<Value, undefined> | ResolveTemplateValue<Default, Args>
-      : Value;
-
-type ResolveTemplateArgValue<
-  Value,
-  Path extends readonly string[] | undefined,
-  Default,
-  Args extends readonly unknown[],
-> = ResolveTemplateDefaultValue<ResolveTemplatePathValue<Value, Path>, Default, Args>;
-
 type StorageTypeFromDescriptor<
   Descriptor extends AuthoringTypeConstructorDescriptor,
   Args extends readonly unknown[],
@@ -134,61 +83,6 @@ type TypeHelpersFromNamespace<Namespace> = {
     ? TypeHelperFunction<Namespace[K]>
     : Namespace[K] extends Record<string, unknown>
       ? TypeHelpersFromNamespace<Namespace[K]>
-      : never;
-};
-
-type FieldBuilderFromPresetDescriptor<
-  Descriptor extends AuthoringFieldPresetDescriptor,
-  Args extends readonly unknown[],
-  ConstraintName extends string | undefined = undefined,
-> = ScalarFieldBuilder<
-  ScalarFieldState<
-    ResolveTemplateValue<Descriptor['output']['codecId'], Args> extends string
-      ? ResolveTemplateValue<Descriptor['output']['codecId'], Args>
-      : string,
-    undefined,
-    ResolveTemplateValue<Descriptor['output']['nullable'], Args> extends true ? true : false,
-    undefined,
-    NamedConstraintState<
-      ResolveTemplateValue<Descriptor['output']['id'], Args> extends true ? true : false,
-      ConstraintName
-    >,
-    NamedConstraintState<
-      ResolveTemplateValue<Descriptor['output']['unique'], Args> extends true ? true : false,
-      ConstraintName
-    >
-  >
->;
-
-type FieldHelperFunctionWithoutNamedConstraint<Descriptor extends AuthoringFieldPresetDescriptor> =
-  Descriptor extends { readonly args: infer Args extends readonly AuthoringArgumentDescriptor[] }
-    ? <const Params extends TupleFromArgumentDescriptors<Args>>(
-        ...args: Params
-      ) => FieldBuilderFromPresetDescriptor<Descriptor, Params>
-    : () => FieldBuilderFromPresetDescriptor<Descriptor, readonly []>;
-
-type FieldHelperFunctionWithNamedConstraint<Descriptor extends AuthoringFieldPresetDescriptor> =
-  Descriptor extends { readonly args: infer Args extends readonly AuthoringArgumentDescriptor[] }
-    ? <
-        const Params extends TupleFromArgumentDescriptors<Args>,
-        const Name extends string | undefined = undefined,
-      >(
-        ...args: [...params: Params, options?: NamedConstraintSpec<Name>]
-      ) => FieldBuilderFromPresetDescriptor<Descriptor, Params, Name>
-    : <const Name extends string | undefined = undefined>(
-        options?: NamedConstraintSpec<Name>,
-      ) => FieldBuilderFromPresetDescriptor<Descriptor, readonly [], Name>;
-
-type FieldHelperFunction<Descriptor extends AuthoringFieldPresetDescriptor> =
-  SupportsNamedConstraintOptions<Descriptor> extends true
-    ? FieldHelperFunctionWithNamedConstraint<Descriptor>
-    : FieldHelperFunctionWithoutNamedConstraint<Descriptor>;
-
-type FieldHelpersFromNamespace<Namespace> = {
-  readonly [K in keyof Namespace]: Namespace[K] extends AuthoringFieldPresetDescriptor
-    ? FieldHelperFunction<Namespace[K]>
-    : Namespace[K] extends Record<string, unknown>
-      ? FieldHelpersFromNamespace<Namespace[K]>
       : never;
 };
 
@@ -331,29 +225,8 @@ function createComposedFieldHelpers(
       createFieldPresetHelper({
         helperPath,
         descriptor,
-        build: ({ args, namedConstraintOptions }) => {
-          const preset = instantiateAuthoringFieldPreset(descriptor, args);
-
-          return new ScalarFieldBuilder({
-            kind: 'scalar',
-            descriptor: preset.descriptor,
-            nullable: preset.nullable,
-            ...(preset.default ? { default: preset.default as ColumnDefault } : {}),
-            ...(preset.executionDefault
-              ? { executionDefault: preset.executionDefault as ExecutionMutationDefaultValue }
-              : {}),
-            ...(preset.id
-              ? {
-                  id: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
-                }
-              : {}),
-            ...(preset.unique
-              ? {
-                  unique: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
-                }
-              : {}),
-          });
-        },
+        build: ({ args, namedConstraintOptions }) =>
+          buildFieldPreset(descriptor, args, namedConstraintOptions),
       }),
   );
   const coreFieldHelpers = {

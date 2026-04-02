@@ -1,5 +1,4 @@
 import type {
-  AuthoringArgumentDescriptor,
   AuthoringFieldPresetDescriptor,
   ExtensionPackRef,
   TargetPackRef,
@@ -20,12 +19,7 @@ import {
   createFieldHelpersFromNamespace,
   createFieldPresetHelper,
 } from './authoring-helper-runtime';
-import type {
-  NamedConstraintSpec,
-  NamedConstraintState,
-  SupportsNamedConstraintOptions,
-  TupleFromArgumentDescriptors,
-} from './authoring-type-utils';
+import type { FieldHelpersFromNamespace, NamedConstraintSpec } from './authoring-type-utils';
 
 export type NamingStrategy = 'identity' | 'snake_case';
 
@@ -142,55 +136,6 @@ export type GeneratedFieldSpec = {
   readonly type: ColumnTypeDescriptor;
   readonly typeParams?: Record<string, unknown>;
   readonly generated: ExecutionMutationDefaultValue;
-};
-
-type FieldBuilderFromPresetDescriptor<
-  Descriptor extends AuthoringFieldPresetDescriptor,
-  Name extends string | undefined = undefined,
-> = ScalarFieldBuilder<
-  ScalarFieldState<
-    Descriptor['output']['codecId'] extends string ? Descriptor['output']['codecId'] : string,
-    undefined,
-    Descriptor['output'] extends { readonly nullable: true } ? true : false,
-    undefined,
-    NamedConstraintState<Descriptor['output'] extends { readonly id: true } ? true : false, Name>,
-    NamedConstraintState<
-      Descriptor['output'] extends { readonly unique: true } ? true : false,
-      Name
-    >
-  >
->;
-
-type FieldHelperFunctionWithoutNamedConstraint<Descriptor extends AuthoringFieldPresetDescriptor> =
-  Descriptor extends { readonly args: infer Args extends readonly AuthoringArgumentDescriptor[] }
-    ? <const Params extends TupleFromArgumentDescriptors<Args>>(
-        ...args: Params
-      ) => FieldBuilderFromPresetDescriptor<Descriptor>
-    : () => FieldBuilderFromPresetDescriptor<Descriptor>;
-
-type FieldHelperFunctionWithNamedConstraint<Descriptor extends AuthoringFieldPresetDescriptor> =
-  Descriptor extends { readonly args: infer Args extends readonly AuthoringArgumentDescriptor[] }
-    ? <
-        const Params extends TupleFromArgumentDescriptors<Args>,
-        const Name extends string | undefined = undefined,
-      >(
-        ...args: [...params: Params, options?: NamedConstraintSpec<Name>]
-      ) => FieldBuilderFromPresetDescriptor<Descriptor, Name>
-    : <const Name extends string | undefined = undefined>(
-        options?: NamedConstraintSpec<Name>,
-      ) => FieldBuilderFromPresetDescriptor<Descriptor, Name>;
-
-type FieldHelperFunction<Descriptor extends AuthoringFieldPresetDescriptor> =
-  SupportsNamedConstraintOptions<Descriptor> extends true
-    ? FieldHelperFunctionWithNamedConstraint<Descriptor>
-    : FieldHelperFunctionWithoutNamedConstraint<Descriptor>;
-
-type FieldHelpersFromNamespace<Namespace> = {
-  readonly [K in keyof Namespace]: Namespace[K] extends AuthoringFieldPresetDescriptor
-    ? FieldHelperFunction<Namespace[K]>
-    : Namespace[K] extends Record<string, unknown>
-      ? FieldHelpersFromNamespace<Namespace[K]>
-      : never;
 };
 
 function isColumnDefault(value: unknown): value is ColumnDefault {
@@ -425,14 +370,11 @@ function namedTypeField(
   });
 }
 
-function buildFieldPreset<
-  Descriptor extends AuthoringFieldPresetDescriptor,
-  const Name extends string | undefined = undefined,
->(
-  descriptor: Descriptor,
+export function buildFieldPreset(
+  descriptor: AuthoringFieldPresetDescriptor,
   args: readonly unknown[],
-  namedConstraintOptions?: NamedConstraintSpec<Name>,
-): FieldBuilderFromPresetDescriptor<Descriptor, Name> {
+  namedConstraintOptions?: NamedConstraintSpec,
+): ScalarFieldBuilder {
   const preset = instantiateAuthoringFieldPreset(descriptor, args);
 
   return new ScalarFieldBuilder({
@@ -453,7 +395,7 @@ function buildFieldPreset<
           unique: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
         }
       : {}),
-  }) as FieldBuilderFromPresetDescriptor<Descriptor, Name>;
+  });
 }
 
 const portableFieldHelpers = createFieldHelpersFromNamespace(
