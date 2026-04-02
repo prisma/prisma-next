@@ -690,6 +690,28 @@ describe('validateContract', () => {
       expect(result['roots']).toEqual({});
     });
 
+    it('strips legacy top-level relations and mappings', () => {
+      const contract = {
+        ...baseContract,
+        relations: { user: { posts: { to: 'Post' } } },
+        mappings: { modelToTable: { User: 'user' } },
+      };
+
+      const result = normalizeContract(contract) as Record<string, unknown>;
+      expect(result['relations']).toBeUndefined();
+      expect(result['mappings']).toBeUndefined();
+    });
+
+    it('validates a contract with legacy top-level relations (normalizer strips them)', () => {
+      const contract = {
+        ...baseContract,
+        relations: { user: { posts: { to: 'Post' } } },
+        mappings: { modelToTable: { User: 'user' } },
+      };
+
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
+    });
+
     it('handles new-format contract without explicit roots', () => {
       const contract = {
         schemaVersion: '1',

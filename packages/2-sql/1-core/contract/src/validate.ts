@@ -285,8 +285,18 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
       ? normalizeModels(rawModels as Record<string, Record<string, unknown>>)
       : (rawModels ?? {});
 
+  const pick = (key: string) =>
+    key in contractObj && contractObj[key] !== undefined ? { [key]: contractObj[key] } : {};
+
   return {
-    ...contractObj,
+    ...pick('schemaVersion'),
+    target: contractObj['target'],
+    targetFamily: contractObj['targetFamily'],
+    ...pick('coreHash'),
+    storageHash: contractObj['storageHash'],
+    ...pick('executionHash'),
+    ...pick('profileHash'),
+    ...pick('_generated'),
     roots: contractObj['roots'] ?? {},
     models,
     storage: normalizedStorage,
@@ -294,6 +304,7 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
     capabilities: contractObj['capabilities'] ?? {},
     meta: contractObj['meta'] ?? {},
     sources: contractObj['sources'] ?? {},
+    ...pick('execution'),
   } as SqlContract<SqlStorage>;
 }
 
