@@ -86,7 +86,6 @@ const CanonicalContractSchema = type({
   targetFamily: 'string',
   target: 'string',
   models: type({ '[string]': 'unknown' }),
-  'relations?': type({ '[string]': 'unknown' }),
   'roots?': 'Record<string, string>',
   storage: type({ '[string]': 'unknown' }),
   'execution?': type({ '[string]': 'unknown' }),
@@ -127,9 +126,6 @@ function validateCoreStructure(ir: ContractIR): void {
   }
   if (!ir.storage || typeof ir.storage !== 'object') {
     throw new Error('ContractIR must have storage');
-  }
-  if (ir.relations !== undefined && typeof ir.relations !== 'object') {
-    throw new Error('ContractIR relations must be an object when provided');
   }
   if (!ir.extensionPacks || typeof ir.extensionPacks !== 'object') {
     throw new Error('ContractIR must have extensionPacks');
@@ -175,7 +171,6 @@ export async function emit(
     target: ir.target,
     ...ifDefined('roots', ir.roots),
     models: toDomainModel(ir.models as Record<string, unknown>),
-    ...ifDefined('relations', ir.relations),
     storage: ir.storage,
     ...ifDefined('execution', ir.execution),
     extensionPacks: ir.extensionPacks,

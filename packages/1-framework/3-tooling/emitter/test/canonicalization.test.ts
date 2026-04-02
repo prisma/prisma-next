@@ -17,7 +17,6 @@ describe('canonicalization', () => {
     const targetFamilyIndex = keys.indexOf('targetFamily');
     const targetIndex = keys.indexOf('target');
     const modelsIndex = keys.indexOf('models');
-    const relationsIndex = keys.indexOf('relations');
     const storageIndex = keys.indexOf('storage');
     const capabilitiesIndex = keys.indexOf('capabilities');
     const metaIndex = keys.indexOf('meta');
@@ -25,8 +24,6 @@ describe('canonicalization', () => {
     expect(schemaVersionIndex).toBeLessThan(targetFamilyIndex);
     expect(targetFamilyIndex).toBeLessThan(targetIndex);
     expect(targetIndex).toBeLessThan(modelsIndex);
-    expect(modelsIndex).toBeLessThan(relationsIndex);
-    expect(relationsIndex).toBeLessThan(storageIndex);
     expect(modelsIndex).toBeLessThan(storageIndex);
     expect(storageIndex).toBeLessThan(capabilitiesIndex);
     expect(capabilitiesIndex).toBeLessThan(metaIndex);
@@ -136,13 +133,13 @@ describe('canonicalization', () => {
         tables: expect.anything(),
       },
     });
-    // Required top-level fields (capabilities, extensionPacks, meta, relations) are preserved even when empty.
+    // Required top-level fields (capabilities, extensionPacks, meta) are preserved even when empty.
     expect(parsed).toMatchObject({
       capabilities: expect.anything(),
       extensionPacks: expect.anything(),
       meta: expect.anything(),
-      relations: expect.anything(),
     });
+    expect(parsed).not.toHaveProperty('relations');
   });
 
   it('preserves semantic array order for column lists', () => {

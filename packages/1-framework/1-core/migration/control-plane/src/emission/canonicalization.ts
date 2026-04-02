@@ -108,7 +108,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isCollectionEntry =
         currentPath.length === 3 &&
         isArrayEqual([currentPath[0], currentPath[1]], ['storage', 'collections']);
-      const isRequiredRelations = isArrayEqual(currentPath, ['relations']);
       const isRequiredRoots = isArrayEqual(currentPath, ['roots']);
       const isRequiredExtensionPacks = isArrayEqual(currentPath, ['extensionPacks']);
       const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
@@ -156,7 +155,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isRequiredTables &&
         !isRequiredCollections &&
         !isCollectionEntry &&
-        !isRequiredRelations &&
         !isRequiredRoots &&
         !isRequiredExtensionPacks &&
         !isRequiredCapabilities &&
