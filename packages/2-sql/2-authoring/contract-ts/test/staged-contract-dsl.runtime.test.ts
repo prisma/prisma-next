@@ -191,3 +191,47 @@ describe('staged contract DSL runtime helpers', () => {
     );
   });
 });
+
+describe('applyNaming', () => {
+  it('converts camelCase to snake_case', () => {
+    expect(applyNaming('UserProfile', 'snake_case')).toBe('user_profile');
+    expect(applyNaming('createdAt', 'snake_case')).toBe('created_at');
+  });
+
+  it('handles consecutive uppercase runs', () => {
+    expect(applyNaming('HTTPRequestLog', 'snake_case')).toBe('http_request_log');
+    expect(applyNaming('XMLParser', 'snake_case')).toBe('xml_parser');
+  });
+
+  it('handles all-uppercase input', () => {
+    expect(applyNaming('HTTP', 'snake_case')).toBe('http');
+    expect(applyNaming('URL', 'snake_case')).toBe('url');
+  });
+
+  it('passes through already-lowercase input', () => {
+    expect(applyNaming('users', 'snake_case')).toBe('users');
+    expect(applyNaming('created_at', 'snake_case')).toBe('created_at');
+  });
+
+  it('handles single-character input', () => {
+    expect(applyNaming('A', 'snake_case')).toBe('a');
+    expect(applyNaming('z', 'snake_case')).toBe('z');
+  });
+
+  it('handles empty string', () => {
+    expect(applyNaming('', 'snake_case')).toBe('');
+  });
+
+  it('handles mixed number/letter boundaries', () => {
+    expect(applyNaming('user2Profile', 'snake_case')).toBe('user2_profile');
+  });
+
+  it('returns input unchanged for identity strategy', () => {
+    expect(applyNaming('UserProfile', 'identity')).toBe('UserProfile');
+    expect(applyNaming('HTTPRequestLog', 'identity')).toBe('HTTPRequestLog');
+  });
+
+  it('returns input unchanged for undefined strategy', () => {
+    expect(applyNaming('UserProfile', undefined)).toBe('UserProfile');
+  });
+});

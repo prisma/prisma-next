@@ -9,6 +9,8 @@ const embedding1536Type = {
   typeParams: { length: 1536 },
 } as const;
 
+// Uses typeRef to exercise the named-type-reference resolution path
+// (the storage layer resolves column type metadata from the named type above).
 const embedding1536Column = {
   codecId: 'pg/vector@1',
   nativeType: 'vector',
