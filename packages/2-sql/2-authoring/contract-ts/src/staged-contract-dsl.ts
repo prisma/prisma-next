@@ -14,14 +14,9 @@ import type {
   ColumnTypeDescriptor,
   ForeignKeyDefaultsState,
 } from '@prisma-next/contract-authoring';
-import { portableSqlAuthoringFieldPresets } from '@prisma-next/sql-contract/authoring';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import {
-  createFieldHelpersFromNamespace,
-  createFieldPresetHelper,
-} from './authoring-helper-runtime';
-import type { FieldHelpersFromNamespace, NamedConstraintSpec } from './authoring-type-utils';
+import type { NamedConstraintSpec } from './authoring-type-utils';
 
 export type NamingStrategy = 'identity' | 'snake_case';
 
@@ -400,17 +395,6 @@ export function buildFieldPreset(
       : {}),
   });
 }
-
-const portableFieldHelpers = createFieldHelpersFromNamespace(
-  portableSqlAuthoringFieldPresets,
-  ({ helperPath, descriptor }) =>
-    createFieldPresetHelper({
-      helperPath: `field.${helperPath}`,
-      descriptor,
-      build: ({ args, namedConstraintOptions }) =>
-        buildFieldPreset(descriptor, args, namedConstraintOptions),
-    }),
-) as FieldHelpersFromNamespace<typeof portableSqlAuthoringFieldPresets>;
 
 type RelationModelRefSource = 'string' | 'token' | 'lazyToken';
 type TargetFieldRefSource = 'string' | 'token';
@@ -1384,12 +1368,7 @@ export const field = {
   column: columnField,
   generated: generatedField,
   namedType: namedTypeField,
-  ...portableFieldHelpers,
-} satisfies {
-  readonly column: typeof columnField;
-  readonly generated: typeof generatedField;
-  readonly namedType: typeof namedTypeField;
-} & FieldHelpersFromNamespace<typeof portableSqlAuthoringFieldPresets>;
+};
 
 export function isStagedContractInput(value: unknown): value is StagedContractInput {
   if (typeof value !== 'object' || value === null || !('target' in value) || !('family' in value)) {
