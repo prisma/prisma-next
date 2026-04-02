@@ -34,9 +34,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -137,25 +135,19 @@
           },
           "foreignKeys": [
             {
-              "columns": [
-                "userId"
-              ],
+              "columns": ["userId"],
               "constraint": true,
               "index": true,
               "name": "post_userId_fkey",
               "references": {
-                "columns": [
-                  "id"
-                ],
+                "columns": ["id"],
                 "table": "user"
               }
             }
           ],
           "indexes": [],
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": []
         },
@@ -201,9 +193,7 @@
           "foreignKeys": [],
           "indexes": [],
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": []
         }
@@ -213,10 +203,7 @@
           "codecId": "pg/enum@1",
           "nativeType": "user_type",
           "typeParams": {
-            "values": [
-              "admin",
-              "user"
-            ]
+            "values": ["admin", "user"]
           }
         }
       }

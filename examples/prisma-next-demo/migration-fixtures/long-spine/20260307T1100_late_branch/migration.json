@@ -49,9 +49,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -85,9 +83,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -126,9 +122,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -148,9 +142,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -195,9 +187,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -217,9 +207,7 @@
             }
           },
           "primaryKey": {
-            "columns": [
-              "id"
-            ]
+            "columns": ["id"]
           },
           "uniques": [],
           "indexes": [],
@@ -239,8 +227,6 @@
     "plannerVersion": "1.0.0",
     "planningStrategy": "diff"
   },
-  "labels": [
-    "staging"
-  ],
+  "labels": ["staging"],
   "createdAt": "2026-03-24T15:13:45.649Z"
 }
