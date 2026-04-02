@@ -291,8 +291,8 @@ describe('buildExpectedFormatType', () => {
               typeParams,
             }: {
               nativeType: string;
-              typeParams: Record<string, unknown>;
-            }) => `${nativeType}(${typeParams['precision']},${typeParams['scale']})`,
+              typeParams?: Record<string, unknown>;
+            }) => `${nativeType}(${typeParams?.['precision']},${typeParams?.['scale']})`,
           },
         ],
       ]);
