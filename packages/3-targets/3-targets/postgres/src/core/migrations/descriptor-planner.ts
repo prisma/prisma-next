@@ -91,6 +91,106 @@ export const notNullBackfillMatcher: PatternMatcher = (issues, ctx) => {
   };
 };
 
+export const typeChangeMatcher: PatternMatcher = (issues, ctx) => {
+  const matched: SchemaIssue[] = [];
+  const ops: MigrationOpDescriptor[] = [];
+
+  function isSafeWidening(fromType: string, toType: string): boolean {
+    const str = `${fromType}-${toType}`;
+    switch (str) {
+      case 'int2-int4':
+        return true;
+      case 'int2-int8':
+        return true;
+      case 'int4-int8':
+        return true;
+      case 'float4-float8':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  for (const issue of issues) {
+    // we're only interested in type changes
+    if (issue.kind !== 'type_mismatch') {
+      continue;
+    }
+    if (!issue.table || !issue.column) {
+      continue;
+    }
+    const fromColumn = ctx.fromContract?.storage.tables[issue.table]?.columns[issue.column];
+    const toColumn = ctx.toContract?.storage.tables[issue.table]?.columns[issue.column];
+    if (!fromColumn || !toColumn) {
+      continue;
+    }
+    const fromType = fromColumn.nativeType;
+    const toType = toColumn.nativeType;
+    if (fromType === toType) {
+      continue;
+    }
+    matched.push(issue);
+    if (isSafeWidening(fromType, toType)) {
+      ops.push(alterColumnType(issue.table, issue.column));
+    } else {
+      ops.push(
+        dataTransform(`typechange-${issue.table}-${issue.column}`, {
+          check: false,
+          run: {
+            kind: 'todo',
+            sql: `-- TODO: ALTER TABLE "${issue.table}" ALTER COLUMN "${issue.column}" TYPE ${toType} USING <conversion expression>`,
+          },
+        }),
+      );
+    }
+  }
+  if (matched.length === 0) return { kind: 'no_match' };
+  return {
+    kind: 'match',
+    issues: issues.filter((i) => !matched.includes(i)),
+    ops,
+  };
+};
+
+/**
+ * Nullable → NOT NULL tightening pattern.
+ *
+ * When an existing column changes from nullable to NOT NULL, existing rows
+ * may have NULLs that violate the constraint. Emit:
+ *   dataTransform (user fills in NULL handling) → setNotNull
+ */
+export const nullableTighteningMatcher: PatternMatcher = (issues, ctx) => {
+  const matched: SchemaIssue[] = [];
+  const ops: MigrationOpDescriptor[] = [];
+
+  for (const issue of issues) {
+    if (issue.kind !== 'nullability_mismatch' || !issue.table || !issue.column) continue;
+
+    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    if (!column) continue;
+    if (column.nullable === true) continue;
+
+    matched.push(issue);
+    ops.push(
+      dataTransform(`handle-nulls-${issue.table}-${issue.column}`, {
+        check: false,
+        run: {
+          kind: 'todo',
+          sql: `-- TODO: handle NULL values in "${issue.column}" on "${issue.table}" before adding NOT NULL constraint`,
+        },
+      }),
+      setNotNull(issue.table, issue.column),
+    );
+  }
+
+  if (matched.length === 0) return { kind: 'no_match' };
+  return {
+    kind: 'match',
+    issues: issues.filter((i) => !matched.includes(i)),
+    ops,
+  };
+};
+
 // ============================================================================
 // Issue kind ordering (dependency order)
 // ============================================================================
@@ -436,7 +536,11 @@ export function planDescriptors(
     fromContract: options.fromContract,
   };
 
-  const matchers = options.matchers ?? [notNullBackfillMatcher];
+  const matchers = options.matchers ?? [
+    notNullBackfillMatcher,
+    typeChangeMatcher,
+    nullableTighteningMatcher,
+  ];
 
   // Phase 1: Pattern matching — consume recognized issues
   let remaining = options.issues;

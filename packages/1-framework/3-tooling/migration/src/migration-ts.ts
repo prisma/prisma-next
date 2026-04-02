@@ -31,46 +31,46 @@ function serializeQueryNode(node: unknown): string {
 function descriptorToBuilderCall(desc: OperationDescriptor): string {
   switch (desc.kind) {
     case 'createTable':
-      return `createTable(${JSON.stringify(desc.table)})`;
+      return `createTable(${JSON.stringify(desc['table'])})`;
     case 'dropTable':
-      return `dropTable(${JSON.stringify(desc.table)})`;
+      return `dropTable(${JSON.stringify(desc['table'])})`;
     case 'addColumn': {
-      const args = [JSON.stringify(desc.table), JSON.stringify(desc.column)];
-      if (desc.overrides) {
-        args.push(JSON.stringify(desc.overrides));
+      const args = [JSON.stringify(desc['table']), JSON.stringify(desc['column'])];
+      if (desc['overrides']) {
+        args.push(JSON.stringify(desc['overrides']));
       }
       return `addColumn(${args.join(', ')})`;
     }
     case 'dropColumn':
-      return `dropColumn(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+      return `dropColumn(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
     case 'alterColumnType':
-      return `alterColumnType(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+      return `alterColumnType(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
     case 'setNotNull':
-      return `setNotNull(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+      return `setNotNull(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
     case 'dropNotNull':
-      return `dropNotNull(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+      return `dropNotNull(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
     case 'setDefault':
-      return `setDefault(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+      return `setDefault(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
     case 'dropDefault':
-      return `dropDefault(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.column)})`;
+      return `dropDefault(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
     case 'addPrimaryKey':
-      return `addPrimaryKey(${JSON.stringify(desc.table)})`;
+      return `addPrimaryKey(${JSON.stringify(desc['table'])})`;
     case 'addUnique':
-      return `addUnique(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.columns)})`;
+      return `addUnique(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['columns'])})`;
     case 'addForeignKey':
-      return `addForeignKey(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.columns)})`;
+      return `addForeignKey(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['columns'])})`;
     case 'dropConstraint':
-      return `dropConstraint(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.constraintName)})`;
+      return `dropConstraint(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['constraintName'])})`;
     case 'createIndex':
-      return `createIndex(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.columns)})`;
+      return `createIndex(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['columns'])})`;
     case 'dropIndex':
-      return `dropIndex(${JSON.stringify(desc.table)}, ${JSON.stringify(desc.indexName)})`;
+      return `dropIndex(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['indexName'])})`;
     case 'createEnumType':
-      return `createEnumType(${JSON.stringify(desc.typeName)})`;
+      return `createEnumType(${JSON.stringify(desc['typeName'])})`;
     case 'createDependency':
-      return `createDependency(${JSON.stringify(desc.dependencyId)})`;
+      return `createDependency(${JSON.stringify(desc['dependencyId'])})`;
     case 'dataTransform':
-      return `dataTransform(${JSON.stringify(desc.name)}, {\n    check: ${serializeQueryNode(desc.check)},\n    run: ${serializeQueryNode(desc.run)},\n  })`;
+      return `dataTransform(${JSON.stringify(desc['name'])}, {\n    check: ${serializeQueryNode(desc['check'])},\n    run: ${serializeQueryNode(desc['run'])},\n  })`;
     default:
       throw new Error(`Unknown descriptor kind: ${desc.kind}`);
   }

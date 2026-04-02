@@ -199,8 +199,12 @@ export function dropColumn(table: string, column: string): DropColumnDescriptor 
   return { kind: 'dropColumn', table, column };
 }
 
-export function alterColumnType(table: string, column: string): AlterColumnTypeDescriptor {
-  return { kind: 'alterColumnType', table, column };
+export function alterColumnType(
+  table: string,
+  column: string,
+  using?: string,
+): AlterColumnTypeDescriptor {
+  return { kind: 'alterColumnType', table, column, ...ifDefined('using', using) };
 }
 
 export function setNotNull(table: string, column: string): SetNotNullDescriptor {

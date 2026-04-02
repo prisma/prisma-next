@@ -68,7 +68,8 @@ async function executeMigrationVerifyCommand(
         );
       }
 
-      const resolvedOps = migrations.resolveDescriptors(descriptors, {
+      // TODO: evaluateMigrationTs returns unknown[] — needs proper validation
+      const resolvedOps = migrations.resolveDescriptors(descriptors as never, {
         fromContract: pkg.manifest.fromContract,
         toContract: pkg.manifest.toContract,
       });
