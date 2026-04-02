@@ -70,23 +70,33 @@ function assertSafeDefaultExpression(expression: string): void {
   }
 }
 
+/**
+ * Renders the SQL type for a column in DDL context.
+ *
+ * @param allowPseudoTypes - When true (default), autoincrement integer columns
+ *   produce SERIAL/BIGSERIAL/SMALLSERIAL pseudo-types. Set to false for contexts
+ *   like ALTER COLUMN TYPE where pseudo-types are invalid.
+ */
 export function buildColumnTypeSql(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
   storageTypes: Record<string, StorageTypeInstance> = {},
+  allowPseudoTypes = true,
 ): string {
   const resolved = resolveColumnTypeMetadata(column, storageTypes);
-  const columnDefault = column.default;
 
-  if (columnDefault?.kind === 'function' && columnDefault.expression === 'autoincrement()') {
-    if (resolved.nativeType === 'int4' || resolved.nativeType === 'integer') {
-      return 'SERIAL';
-    }
-    if (resolved.nativeType === 'int8' || resolved.nativeType === 'bigint') {
-      return 'BIGSERIAL';
-    }
-    if (resolved.nativeType === 'int2' || resolved.nativeType === 'smallint') {
-      return 'SMALLSERIAL';
+  if (allowPseudoTypes) {
+    const columnDefault = column.default;
+    if (columnDefault?.kind === 'function' && columnDefault.expression === 'autoincrement()') {
+      if (resolved.nativeType === 'int4' || resolved.nativeType === 'integer') {
+        return 'SERIAL';
+      }
+      if (resolved.nativeType === 'int8' || resolved.nativeType === 'bigint') {
+        return 'BIGSERIAL';
+      }
+      if (resolved.nativeType === 'int2' || resolved.nativeType === 'smallint') {
+        return 'SMALLSERIAL';
+      }
     }
   }
 

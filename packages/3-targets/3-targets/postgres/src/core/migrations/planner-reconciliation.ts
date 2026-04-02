@@ -537,7 +537,7 @@ function buildAlterColumnTypeOperation(
   storageTypes: Record<string, StorageTypeInstance>,
 ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
   const qualified = qualifyTableName(schemaName, tableName);
-  const expectedType = buildColumnTypeSql(column, codecHooks, storageTypes);
+  const expectedType = buildColumnTypeSql(column, codecHooks, storageTypes, false);
   return {
     id: `alterType.${tableName}.${columnName}`,
     label: `Alter type for ${columnName} on ${tableName}`,
