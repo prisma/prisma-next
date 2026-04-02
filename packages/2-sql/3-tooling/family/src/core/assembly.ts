@@ -1,6 +1,5 @@
 import type {
   AuthoringContributions,
-  NormalizedTypeRenderer,
   TargetBoundComponentDescriptor,
   TypeRenderer,
 } from '@prisma-next/contract/framework-components';
@@ -14,17 +13,6 @@ import type {
   PslScalarTypeDescriptor,
   SqlControlStaticContributions,
 } from './migrations/types';
-
-export type { AssembledAuthoringContributions } from '@prisma-next/contract/assembly';
-export {
-  assembleAuthoringContributions,
-  extractCodecTypeImports,
-  extractComponentIds,
-  extractOperationTypeImports,
-  extractParameterizedRenderers,
-  extractParameterizedTypeImports,
-  extractQueryOperationTypeImports,
-} from '@prisma-next/contract/assembly';
 
 export interface SqlControlDescriptorWithContributions extends SqlControlStaticContributions {
   readonly id: string;

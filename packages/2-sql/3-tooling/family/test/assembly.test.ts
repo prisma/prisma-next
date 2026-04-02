@@ -1,14 +1,14 @@
+import {
+  extractCodecTypeImports,
+  extractComponentIds,
+  extractParameterizedRenderers,
+} from '@prisma-next/contract/assembly';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import {
-  extractCodecTypeImports,
-  extractComponentIds,
-  extractParameterizedRenderers,
-} from '../src/core/assembly';
 
 // Minimal mock descriptors for testing
 function createMockTarget(
