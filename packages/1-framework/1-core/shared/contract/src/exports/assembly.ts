@@ -1,18 +1,18 @@
 export type {
-  AssembleComponentsInput,
   AssembledAuthoringContributions,
-  AssembledComponentState,
   AssemblyInput,
-} from '../assembly';
+  ControlStack as AssembledComponentState,
+  CreateControlStackInput as AssembleComponentsInput,
+} from '@prisma-next/framework-components/control';
 
 export {
   assembleAuthoringContributions,
-  assembleComponents,
   assertUniqueCodecOwner,
+  createControlStack as assembleComponents,
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,
   extractParameterizedRenderers,
   extractParameterizedTypeImports,
   extractQueryOperationTypeImports,
-} from '../assembly';
+} from '@prisma-next/framework-components/control';
