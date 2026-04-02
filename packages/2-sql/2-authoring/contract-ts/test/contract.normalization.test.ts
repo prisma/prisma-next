@@ -517,12 +517,12 @@ describe('validateContract normalization', () => {
         User: {
           storage: { table: 'User' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             posts: {
               to: 'Post',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
           },
@@ -530,13 +530,13 @@ describe('validateContract normalization', () => {
         Post: {
           storage: { table: 'Post' },
           fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             user: {
               to: 'User',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['userId'], targetFields: ['id'] },
               cardinality: 'N:1',
             },
           },
@@ -575,14 +575,14 @@ describe('validateContract normalization', () => {
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
-        on: { parentCols: ['id'], childCols: ['userId'] },
+        on: { localFields: ['id'], targetFields: ['userId'] },
         cardinality: '1:N',
       },
     });
     expect((contract.models['Post'] as { relations?: unknown })['relations']).toEqual({
       user: {
         to: 'User',
-        on: { parentCols: ['id'], childCols: ['userId'] },
+        on: { localFields: ['userId'], targetFields: ['id'] },
         cardinality: 'N:1',
       },
     });
@@ -598,12 +598,12 @@ describe('validateContract normalization', () => {
         User: {
           storage: { table: 'User' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             posts: {
               to: 'Post',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
           },
@@ -611,10 +611,9 @@ describe('validateContract normalization', () => {
         Post: {
           storage: { table: 'Post' },
           fields: {
-            id: { column: 'id' },
-            userId: { column: 'userId' },
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
           },
-          // Missing relations - should be normalized to {}
         },
       },
       storage: {
@@ -650,7 +649,7 @@ describe('validateContract normalization', () => {
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
-        on: { parentCols: ['id'], childCols: ['userId'] },
+        on: { localFields: ['id'], targetFields: ['userId'] },
         cardinality: '1:N',
       },
     });

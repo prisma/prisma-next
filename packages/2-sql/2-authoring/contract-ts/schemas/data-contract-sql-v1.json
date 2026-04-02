@@ -555,7 +555,7 @@
     },
     "ModelRelation": {
       "type": "object",
-      "description": "Model relation definition (domain format with localFields/targetFields, or storage format with parentCols/childCols)",
+      "description": "Model relation definition (domain format with localFields/targetFields)",
       "properties": {
         "to": {
           "type": "string",
@@ -575,24 +575,14 @@
           "type": "object",
           "description": "Relation field mappings",
           "properties": {
-            "parentCols": {
-              "type": "array",
-              "description": "Parent table columns (storage format)",
-              "items": { "type": "string" }
-            },
-            "childCols": {
-              "type": "array",
-              "description": "Child table columns (storage format)",
-              "items": { "type": "string" }
-            },
             "localFields": {
               "type": "array",
-              "description": "Local model fields (domain format)",
+              "description": "Local model fields",
               "items": { "type": "string" }
             },
             "targetFields": {
               "type": "array",
-              "description": "Target model fields (domain format)",
+              "description": "Target model fields",
               "items": { "type": "string" }
             }
           }

@@ -298,27 +298,30 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
           const cardinality = (relation as { cardinality?: string }).cardinality;
           const localFields = on.localFields;
           const targetFields = on.targetFields;
-          if (localFields && targetFields) {
-            if (cardinality === '1:N') {
-              continue;
-            }
+          if (!localFields || !targetFields) {
+            throw new Error(
+              `Model "${modelName}" relation "${relationName}" uses unsupported relation format (expected localFields/targetFields)`,
+            );
+          }
+          if (cardinality === '1:N') {
+            continue;
+          }
 
-            const hasMatchingFk = table.foreignKeys?.some((fk) => {
-              return (
-                fk.columns.length === localFields.length &&
-                fk.columns.every((col, i) => col === localFields[i]) &&
-                fk.references.table &&
-                fk.references.columns.length === targetFields.length &&
-                fk.references.columns.every((col, i) => col === targetFields[i])
-              );
-            });
+          const hasMatchingFk = table.foreignKeys?.some((fk) => {
+            return (
+              fk.columns.length === localFields.length &&
+              fk.columns.every((col, i) => col === localFields[i]) &&
+              fk.references.table &&
+              fk.references.columns.length === targetFields.length &&
+              fk.references.columns.every((col, i) => col === targetFields[i])
+            );
+          });
 
-            if (!hasMatchingFk) {
-              /* c8 ignore next */
-              throw new Error(
-                `Model "${modelName}" relation "${relationName}" does not have a corresponding foreign key in table "${tableName}"`,
-              );
-            }
+          if (!hasMatchingFk) {
+            /* c8 ignore next */
+            throw new Error(
+              `Model "${modelName}" relation "${relationName}" does not have a corresponding foreign key in table "${tableName}"`,
+            );
           }
         }
       }
