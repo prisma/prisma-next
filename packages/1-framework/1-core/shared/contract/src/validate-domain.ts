@@ -101,7 +101,7 @@ function validateRelationTargets(
   errors: string[],
 ): void {
   for (const [modelName, model] of Object.entries(contract.models)) {
-    for (const [relName, relation] of Object.entries(model?.relations ?? {})) {
+    for (const [relName, relation] of Object.entries(model.relations ?? {})) {
       if (!modelNames.has(relation.to)) {
         errors.push(
           `Relation "${relName}" on model "${modelName}" targets "${relation.to}" which does not exist in models`,
@@ -177,7 +177,7 @@ function detectOrphanedModels(
   }
 
   for (const [modelName, model] of Object.entries(contract.models)) {
-    for (const relation of Object.values(model?.relations ?? {})) {
+    for (const relation of Object.values(model.relations ?? {})) {
       referenced.add(relation.to);
     }
     if (model.variants) {
