@@ -6,7 +6,7 @@ import type {
 import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
 import { createMongoFamilyInstance, type MongoControlFamilyInstance } from './control-instance';
 
-export class MongoFamilyDescriptor
+class MongoFamilyDescriptor
   implements ControlFamilyDescriptor<'mongo', MongoControlFamilyInstance>
 {
   readonly kind = 'family' as const;
@@ -28,3 +28,6 @@ export class MongoFamilyDescriptor
     return createMongoFamilyInstance(assembledState);
   }
 }
+
+export const mongoFamilyDescriptor: ControlFamilyDescriptor<'mongo', MongoControlFamilyInstance> =
+  new MongoFamilyDescriptor();
