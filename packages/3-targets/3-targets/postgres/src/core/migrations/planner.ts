@@ -53,7 +53,7 @@ import {
   type OperationClass,
   type PlanningMode,
   type PostgresPlanTargetDetails,
-} from './planner-types';
+} from './planner-target-details';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;

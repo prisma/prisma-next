@@ -24,7 +24,7 @@ import {
   buildTargetDetails,
   type PlanningMode,
   type PostgresPlanTargetDetails,
-} from './planner-types';
+} from './planner-target-details';
 
 // ============================================================================
 // Public API

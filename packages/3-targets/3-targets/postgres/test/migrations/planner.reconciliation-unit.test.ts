@@ -8,7 +8,7 @@ import {
   buildExpectedFormatType,
   constraintExistsCheck,
 } from '../../src/core/migrations/planner-sql-checks';
-import type { PlanningMode } from '../../src/core/migrations/planner-types';
+import type { PlanningMode } from '../../src/core/migrations/planner-target-details';
 
 // ---------------------------------------------------------------------------
 // Policies

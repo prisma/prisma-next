@@ -8,7 +8,7 @@ import {
   columnNullabilityCheck,
   qualifyTableName,
 } from './planner-sql-checks';
-import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-types';
+import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 
 export function buildAddColumnOperationIdentity(
   schema: string,
