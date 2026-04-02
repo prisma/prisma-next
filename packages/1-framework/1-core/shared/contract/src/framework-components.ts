@@ -578,9 +578,14 @@ export function instantiateAuthoringFieldPreset(
   };
 }
 
-/** Base descriptor for any framework component. */
+/**
+ * Base descriptor for any framework component.
+ * @template Kind — discriminant identifying the component type (e.g. `'family'`, `'target'`).
+ */
 export interface ComponentDescriptor<Kind extends string> extends ComponentMetadata {
+  /** Discriminant identifying the component type. */
   readonly kind: Kind;
+  /** Unique identifier for this component instance. */
   readonly id: string;
 }
 
@@ -637,15 +642,25 @@ export function checkContractComponentRequirements(
   };
 }
 
-/** A family groups data sources with shared semantics (e.g., SQL, document). */
+/**
+ * A family groups data sources with shared semantics (e.g., SQL, document).
+ * @template TFamilyId — literal string identifying this family (e.g. `'sql'`).
+ */
 export interface FamilyDescriptor<TFamilyId extends string> extends ComponentDescriptor<'family'> {
+  /** The family this component belongs to. */
   readonly familyId: TFamilyId;
 }
 
-/** A specific database within a family (e.g., Postgres, MySQL). */
+/**
+ * A specific database within a family (e.g., Postgres, MySQL).
+ * @template TFamilyId — literal string identifying the family (e.g. `'sql'`).
+ * @template TTargetId — literal string identifying this target (e.g. `'postgres'`).
+ */
 export interface TargetDescriptor<TFamilyId extends string, TTargetId extends string>
   extends ComponentDescriptor<'target'> {
+  /** The family this target belongs to. */
   readonly familyId: TFamilyId;
+  /** Unique identifier for this target within its family. */
   readonly targetId: TTargetId;
 }
 
@@ -689,24 +704,42 @@ export type DriverPackRef<
   readonly targetId: TTargetId;
 };
 
-/** Protocol and dialect implementation for a target. */
+/**
+ * Protocol and dialect implementation for a target.
+ * @template TFamilyId — literal string identifying the family.
+ * @template TTargetId — literal string identifying the target.
+ */
 export interface AdapterDescriptor<TFamilyId extends string, TTargetId extends string>
   extends ComponentDescriptor<'adapter'> {
+  /** The family this adapter belongs to. */
   readonly familyId: TFamilyId;
+  /** The target this adapter implements. */
   readonly targetId: TTargetId;
 }
 
-/** Connection and execution layer for a target. */
+/**
+ * Connection and execution layer for a target.
+ * @template TFamilyId — literal string identifying the family.
+ * @template TTargetId — literal string identifying the target.
+ */
 export interface DriverDescriptor<TFamilyId extends string, TTargetId extends string>
   extends ComponentDescriptor<'driver'> {
+  /** The family this driver belongs to. */
   readonly familyId: TFamilyId;
+  /** The target this driver connects to. */
   readonly targetId: TTargetId;
 }
 
-/** Optional capability addition to a target (e.g., pgvector). */
+/**
+ * Optional capability addition to a target (e.g., pgvector).
+ * @template TFamilyId — literal string identifying the family.
+ * @template TTargetId — literal string identifying the target.
+ */
 export interface ExtensionDescriptor<TFamilyId extends string, TTargetId extends string>
   extends ComponentDescriptor<'extension'> {
+  /** The family this extension belongs to. */
   readonly familyId: TFamilyId;
+  /** The target this extension augments. */
   readonly targetId: TTargetId;
 }
 
