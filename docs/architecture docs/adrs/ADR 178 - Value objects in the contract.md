@@ -231,4 +231,3 @@ Value objects can be polymorphic using the same `discriminator`/`variants`/`base
 - [ADR 177 — Ownership replaces relation strategy](ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md) — owned models vs value objects
 - [ADR 179 — Union field types](ADR%20179%20-%20Union%20field%20types.md) — `union` as a third field type descriptor
 - [ADR 180 — Dot-path field accessor](ADR%20180%20-%20Dot-path%20field%20accessor.md) — querying and mutating value object fields
-- [Value objects design doc](../../planning/mongo-target/1-design-docs/value-objects.md) — working document with full design exploration

@@ -117,4 +117,3 @@ This represents an array where each element is either a string or an int32 (`(st
 
 - [ADR 178 — Value objects in the contract](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md) — `type` as a field type descriptor
 - [ADR 173 — Polymorphism via discriminator and variants](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) — structured polymorphism as an alternative to unstructured unions
-- [design-questions.md § Q16](../../planning/mongo-target/1-design-docs/design-questions.md#16-union-field-types-mixed-type-fields) — the design question this resolves
