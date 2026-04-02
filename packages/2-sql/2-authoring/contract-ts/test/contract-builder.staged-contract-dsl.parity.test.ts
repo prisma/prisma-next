@@ -7,9 +7,21 @@ import {
   rel,
   type StagedModelBuilder,
 } from '../src/contract-builder';
+import type {
+  ModelAttributesSpec,
+  RelationBuilder,
+  RelationState,
+  ScalarFieldBuilder,
+  SqlStageSpec,
+} from '../src/staged-contract-dsl';
 
-// biome-ignore lint/suspicious/noExplicitAny: widening for test convenience
-type AnyModel = StagedModelBuilder<any, any, any, any, any>;
+type AnyModel = StagedModelBuilder<
+  string | undefined,
+  Record<string, ScalarFieldBuilder>,
+  Record<string, RelationBuilder<RelationState>>,
+  ModelAttributesSpec | undefined,
+  SqlStageSpec | undefined
+>;
 
 import { columnDescriptor } from './helpers/column-descriptor';
 

@@ -331,13 +331,12 @@ type StagedModelAttributes<
   ? AttributesSpec
   : undefined;
 
-type Defined<T> = Present<T>;
 
-type FieldDescriptorOf<FieldState> = Defined<
+type FieldDescriptorOf<FieldState> = Present<
   FieldState extends { readonly descriptor?: infer Descriptor } ? Descriptor : never
 >;
 
-type FieldTypeRefOf<FieldState> = Defined<
+type FieldTypeRefOf<FieldState> = Present<
   FieldState extends { readonly typeRef?: infer TypeRef } ? TypeRef : never
 >;
 
@@ -347,11 +346,11 @@ type FieldNullableOf<FieldState> = FieldState extends {
   ? Nullable
   : boolean;
 
-type FieldColumnOverrideOf<FieldState> = Defined<
+type FieldColumnOverrideOf<FieldState> = Present<
   FieldState extends { readonly columnName?: infer ColumnName } ? ColumnName : never
 >;
 
-type FieldInlineIdSpecOf<FieldState> = Defined<
+type FieldInlineIdSpecOf<FieldState> = Present<
   FieldState extends { readonly id?: infer IdSpec } ? IdSpec : never
 >;
 
@@ -423,14 +422,14 @@ type ResolveFieldColumnTypeParams<Definition, FieldState> = [
   : DescriptorTypeParams<FieldDescriptorOf<FieldState>>;
 
 type StagedModelTableName<Definition, ModelName extends StagedModelNames<Definition>> = [
-  Defined<
+  Present<
     StagedModelSql<Definition, ModelName> extends { readonly table?: infer TableName }
       ? TableName
       : never
   >,
 ] extends [never]
   ? ApplyNamingType<ModelName, StagedDefinitionTableNaming<Definition>>
-  : Defined<
+  : Present<
         StagedModelSql<Definition, ModelName> extends { readonly table?: infer TableName }
           ? TableName
           : never
@@ -493,7 +492,7 @@ type StagedAttributeIdFieldNames<
   ModelName extends StagedModelNames<Definition>,
 > = AttributeStageIdFieldNames<StagedModelAttributes<Definition, ModelName>>;
 
-type StagedAttributeIdName<Definition, ModelName extends StagedModelNames<Definition>> = Defined<
+type StagedAttributeIdName<Definition, ModelName extends StagedModelNames<Definition>> = Present<
   StagedModelAttributes<Definition, ModelName> extends {
     readonly id?: { readonly name?: infer Name extends string };
   }
@@ -510,7 +509,7 @@ type StagedModelIdFieldNames<Definition, ModelName extends StagedModelNames<Defi
 type StagedModelIdName<Definition, ModelName extends StagedModelNames<Definition>> = [
   StagedAttributeIdName<Definition, ModelName>,
 ] extends [never]
-  ? Defined<StagedInlineIdName<Definition, ModelName>>
+  ? Present<StagedInlineIdName<Definition, ModelName>>
   : StagedAttributeIdName<Definition, ModelName>;
 
 type StagedStorageColumn<
@@ -659,7 +658,7 @@ type StagedBuiltMappings<Definition> = {
   };
 };
 
-type BuiltStagedContract<Definition> = ContractWithTypeMaps<
+type SqlContractResult<Definition> = ContractWithTypeMaps<
   SqlContract<
     StagedBuiltStorage<Definition>,
     StagedBuiltModels<Definition>,
@@ -1077,10 +1076,10 @@ export function buildSqlContractFromSemanticDefinition(
 
 function buildStagedContract<Definition extends StagedContractInput>(
   definition: Definition,
-): BuiltStagedContract<Definition> {
+): SqlContractResult<Definition> {
   return buildSqlContractFromSemanticDefinition(
     buildStagedSemanticContractDefinition(definition),
-  ) as BuiltStagedContract<Definition>;
+  ) as SqlContractResult<Definition>;
 }
 
 class SqlContractBuilder<
@@ -1179,6 +1178,11 @@ class SqlContractBuilder<
 
     const target = this.state.target as Target & string;
 
+    // build() constructs the contract object imperatively from mutable builder state,
+    // but the return type is a deeply-generic computed type (BuildStorage, BuildModels, etc.).
+    // TypeScript cannot narrow the intermediate partial objects through spreads and
+    // indexed assignments to match these computed generics, so `as unknown as` casts
+    // bridge the gap between the runtime representation and the generic return type.
     const storageTables = {} as Partial<Mutable<BuildStorageTables<Tables>>>;
     const executionDefaults: ExecutionMutationDefault[] = [];
 
@@ -1599,6 +1603,9 @@ class SqlContractBuilder<
     Capabilities
   > {
     const tableBuilder = createTable(name);
+    // Double cast: createTable returns an unparameterized builder; we first narrow
+    // to SqlTableBuilder with the caller's generic params, then to the public
+    // TableBuilder facade that the callback expects.
     const result = callback(
       tableBuilder as unknown as SqlTableBuilder<
         TableName,
@@ -1800,7 +1807,7 @@ export function defineContract<
     StorageHash,
     ForeignKeyDefaults
   >,
-): BuiltStagedContract<
+): SqlContractResult<
   StagedContractDefinition<
     Target,
     Types,
@@ -1833,7 +1840,7 @@ export function defineContract<
     ForeignKeyDefaults
   >,
   factory: StagedContractFactory<Target, Types, Models, ExtensionPacks>,
-): BuiltStagedContract<
+): SqlContractResult<
   StagedContractDefinition<
     Target,
     Types,
@@ -1855,7 +1862,7 @@ export function defineContract<
     Record<string, StagedModelLike>,
     Record<string, ExtensionPackRef<'sql', string>> | undefined
   >,
-): SqlContractBuilder<CodecTypes> | BuiltStagedContract<StagedContractInput> {
+): SqlContractBuilder<CodecTypes> | SqlContractResult<StagedContractInput> {
   if (definition && isStagedContractInput(definition)) {
     if (factory) {
       const builtDefinition = {
