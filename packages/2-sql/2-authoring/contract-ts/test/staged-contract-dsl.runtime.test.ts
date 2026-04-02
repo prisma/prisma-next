@@ -63,8 +63,12 @@ describe('staged contract DSL runtime helpers', () => {
     expect(resolveRelationModelName(lazyBelongsTo.toModel)).toBe('User');
     expect(applyNaming('HTTPRequestLog', 'snake_case')).toBe('http_request_log');
     expect(applyNaming('UserProfile', 'identity')).toBe('UserProfile');
-    expect(isStagedContractInput({ target: postgresTargetPack })).toBe(true);
-    expect(isStagedContractInput({ target: { kind: 'extension' } })).toBe(false);
+    const familyPack = { kind: 'family', id: 'sql', familyId: 'sql', version: '0.0.1' };
+    expect(isStagedContractInput({ family: familyPack, target: postgresTargetPack })).toBe(true);
+    expect(isStagedContractInput({ target: postgresTargetPack })).toBe(false);
+    expect(isStagedContractInput({ family: familyPack, target: { kind: 'extension' } })).toBe(
+      false,
+    );
     expect(isStagedContractInput(null)).toBe(false);
   });
 
