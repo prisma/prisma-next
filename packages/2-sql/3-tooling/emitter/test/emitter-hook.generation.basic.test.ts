@@ -593,7 +593,7 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain("readonly email: { readonly column: 'nonexistent' }");
+    expect(types).toContain('readonly email: unknown');
   });
 
   it('generates contract types with model referencing missing table', () => {
@@ -625,7 +625,7 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain("readonly id: { readonly column: 'id' }");
+    expect(types).toContain('readonly id: unknown');
   });
 
   it('generates contract types with undefined models', () => {
