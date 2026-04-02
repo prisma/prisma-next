@@ -10,6 +10,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type { PostgresColumnDefault } from '../types';
 import { qualifyTableName } from './planner-sql-checks';
+import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 export function buildCreateTableSql(
   qualifiedTableName: string,
@@ -147,28 +148,6 @@ function expandParameterizedTypeSql(
   });
 
   return expanded !== column.nativeType ? expanded : null;
-}
-
-type ResolvedColumnTypeMetadata = Pick<StorageColumn, 'nativeType' | 'codecId' | 'typeParams'>;
-
-function resolveColumnTypeMetadata(
-  column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance>,
-): ResolvedColumnTypeMetadata {
-  if (!column.typeRef) {
-    return column;
-  }
-
-  if (!Object.hasOwn(storageTypes, column.typeRef)) {
-    return column;
-  }
-  const referencedType = storageTypes[column.typeRef];
-
-  return {
-    codecId: referencedType.codecId,
-    nativeType: referencedType.nativeType,
-    typeParams: referencedType.typeParams,
-  };
 }
 
 /** Autoincrement columns use SERIAL types, so this returns empty for them. */

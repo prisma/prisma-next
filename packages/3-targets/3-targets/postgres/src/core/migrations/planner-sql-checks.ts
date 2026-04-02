@@ -1,6 +1,7 @@
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 export function qualifyTableName(schema: string, table: string): string {
   return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
@@ -100,28 +101,6 @@ export function columnHasNoDefaultCheck(opts: {
     AND column_name = '${escapeLiteral(opts.column)}'
     AND column_default IS NOT NULL
 )`;
-}
-
-type ResolvedColumnTypeMetadata = Pick<StorageColumn, 'nativeType' | 'codecId' | 'typeParams'>;
-
-function resolveColumnTypeMetadata(
-  column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance>,
-): ResolvedColumnTypeMetadata {
-  if (!column.typeRef) {
-    return column;
-  }
-
-  if (!Object.hasOwn(storageTypes, column.typeRef)) {
-    return column;
-  }
-  const referencedType = storageTypes[column.typeRef];
-
-  return {
-    codecId: referencedType.codecId,
-    nativeType: referencedType.nativeType,
-    typeParams: referencedType.typeParams,
-  };
 }
 
 const FORMAT_TYPE_DISPLAY: ReadonlyMap<string, string> = new Map([
