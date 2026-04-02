@@ -10,10 +10,10 @@ import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sq
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { contract } from '../../prisma/contract';
 import { PostCollection, UserCollection } from '../orm-client/collections';
-// The staged DSL's inferred type (SqlContractResult<Definition>) is too deeply
-// nested for TypeScript to reduce to literal table/field keys. Until the type
-// pipeline is simplified (tracked in contract-domain-extraction), the emitted
-// Contract type is still needed for full type inference in downstream surfaces.
+// TODO: this import defeats the purpose of the no-emit flow. The staged DSL's
+// inferred type (SqlContractResult<Definition>) is too deeply nested for
+// TypeScript to reduce to literal table/field keys. Fixing this is a failing
+// acceptance criterion for the ts-contract-authoring-redesign project.
 import type { Contract } from '../prisma/contract.d';
 
 export const stack = createSqlExecutionStack({
