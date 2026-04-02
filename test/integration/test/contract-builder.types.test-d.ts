@@ -6,6 +6,7 @@ import {
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import type { ExtensionPackRef } from '@prisma-next/contract/framework-components';
+import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -149,6 +150,7 @@ test('refined object contract preserves downstream schema and model token infere
   });
 
   const contract = defineContract({
+    family: sqlFamilyPack,
     target: postgresPack,
     storageHash: 'sha256:test-refined',
     models: {
@@ -197,6 +199,7 @@ test('refined object contract preserves downstream schema and model token infere
 test('integrated callback authoring exposes composition-shaped type helpers', () => {
   const contract = defineContract(
     {
+      family: sqlFamilyPack,
       target: postgresPack,
       extensionPacks: {
         pgvector: pgvectorPack,
@@ -243,6 +246,7 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
 test('integrated callback authoring hides extension namespaces when packs are absent', () => {
   defineContract(
     {
+      family: sqlFamilyPack,
       target: postgresPack,
     },
     ({ type }) => {
@@ -261,113 +265,140 @@ test('integrated callback authoring hides extension namespaces when packs are ab
 });
 
 test('local field and belongsTo sql overlays stay typed', () => {
-  const User = model('User', {
-    fields: {
-      id: field.id.uuidv4().sql({ id: { name: 'user_pkey' } }),
-      email: field
-        .text()
-        .unique()
-        .sql({ unique: { name: 'user_email_key' } }),
+  defineContract(
+    {
+      family: sqlFamilyPack,
+      target: postgresPack,
     },
-  });
+    ({ field }) => {
+      const User = model('User', {
+        fields: {
+          id: field.id.uuidv4().sql({ id: { name: 'user_pkey' } }),
+          email: field
+            .text()
+            .unique()
+            .sql({ unique: { name: 'user_email_key' } }),
+        },
+      });
 
-  const Post = model('Post', {
-    fields: {
-      id: field.id.uuidv4(),
-      authorId: field.uuid().sql({ column: 'author_id' }),
-    },
-    relations: {
-      author: rel
-        .belongsTo(User, { from: 'authorId', to: 'id' })
-        .sql({ fk: { name: 'post_author_id_fkey', onDelete: 'cascade' } }),
-    },
-  });
+      const Post = model('Post', {
+        fields: {
+          id: field.id.uuidv4(),
+          authorId: field.uuid().sql({ column: 'author_id' }),
+        },
+        relations: {
+          author: rel
+            .belongsTo(User, { from: 'authorId', to: 'id' })
+            .sql({ fk: { name: 'post_author_id_fkey', onDelete: 'cascade' } }),
+        },
+      });
 
-  expectTypeOf(User.buildAttributesSpec()).toEqualTypeOf<undefined>();
-  expectTypeOf(Post.buildSqlSpec()).toExtend<
-    | {
-        readonly table?: string;
-        readonly indexes?: readonly unknown[];
-        readonly foreignKeys?: readonly unknown[];
+      expectTypeOf(User.buildAttributesSpec()).toEqualTypeOf<undefined>();
+      expectTypeOf(Post.buildSqlSpec()).toExtend<
+        | {
+            readonly table?: string;
+            readonly indexes?: readonly unknown[];
+            readonly foreignKeys?: readonly unknown[];
+          }
+        | undefined
+      >();
+
+      if (typecheckOnly) {
+        // @ts-expect-error relation-local sql is only supported on belongsTo relations
+        rel.hasMany(Post, { by: 'authorId' }).sql({ fk: { name: 'post_author_id_fkey' } });
       }
-    | undefined
-  >();
 
-  if (typecheckOnly) {
-    // @ts-expect-error relation-local sql is only supported on belongsTo relations
-    rel.hasMany(Post, { by: 'authorId' }).sql({ fk: { name: 'post_author_id_fkey' } });
-  }
+      return { models: {} };
+    },
+  );
 });
 
 test('explicit generated id helpers stay typed', () => {
-  const ShortLink = model('ShortLink', {
-    fields: {
-      id: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }),
-      ownerId: field.uuid(),
-      publicId: field.nanoid({ size: 16 }),
+  defineContract(
+    {
+      family: sqlFamilyPack,
+      target: postgresPack,
     },
-  }).sql({
-    table: 'short_link',
-  });
+    ({ field }) => {
+      const ShortLink = model('ShortLink', {
+        fields: {
+          id: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }),
+          ownerId: field.uuid(),
+          publicId: field.nanoid({ size: 16 }),
+        },
+      }).sql({
+        table: 'short_link',
+      });
 
-  expectTypeOf(ShortLink.buildSqlSpec()).toExtend<
-    | {
-        readonly table?: string;
-        readonly indexes?: readonly unknown[];
-        readonly foreignKeys?: readonly unknown[];
+      expectTypeOf(ShortLink.buildSqlSpec()).toExtend<
+        | {
+            readonly table?: string;
+            readonly indexes?: readonly unknown[];
+            readonly foreignKeys?: readonly unknown[];
+          }
+        | undefined
+      >();
+
+      if (typecheckOnly) {
+        // @ts-expect-error uuidv7 helper accepts only an optional trailing PK-name object
+        field.id.uuidv7({ size: 16 });
+
+        // @ts-expect-error nanoid size must be a number
+        field.id.nanoid({ size: '16' });
+
+        // @ts-expect-error scalar nanoid size must be a number
+        field.nanoid({ size: '16' });
       }
-    | undefined
-  >();
 
-  if (typecheckOnly) {
-    // @ts-expect-error uuidv7 helper accepts only an optional trailing PK-name object
-    field.id.uuidv7({ size: 16 });
-
-    // @ts-expect-error nanoid size must be a number
-    field.id.nanoid({ size: '16' });
-
-    // @ts-expect-error scalar nanoid size must be a number
-    field.nanoid({ size: '16' });
-  }
+      return { models: {} };
+    },
+  );
 });
 
-test('portable refined helpers preserve downstream schema inference', () => {
-  const UserBase = model('User', {
-    fields: {
-      id: field.id.uuidv7(),
-      email: field.text(),
-      createdAt: field.createdAt(),
+test('composed field helpers preserve downstream schema inference', () => {
+  const contract = defineContract(
+    {
+      family: sqlFamilyPack,
+      target: postgresPack,
+      storageHash: 'sha256:test-refined-helpers',
     },
-  });
+    ({ field, model }) => {
+      const UserBase = model('User', {
+        fields: {
+          id: field.id.uuidv7(),
+          email: field.text(),
+          createdAt: field.createdAt(),
+        },
+      });
 
-  const Post = model('Post', {
-    fields: {
-      id: field.id.uuidv7(),
-      authorId: field.uuid(),
-      title: field.text(),
-    },
-    relations: {
-      user: rel.belongsTo(UserBase, { from: 'authorId', to: 'id' }),
-    },
-  }).sql(({ cols, constraints }) => ({
-    table: 'post',
-    foreignKeys: [constraints.foreignKey(cols.authorId, UserBase.refs.id)],
-  }));
+      const Post = model('Post', {
+        fields: {
+          id: field.id.uuidv7(),
+          authorId: field.uuid(),
+          title: field.text(),
+        },
+        relations: {
+          user: rel.belongsTo(UserBase, { from: 'authorId', to: 'id' }),
+        },
+      }).sql(({ cols, constraints }) => ({
+        table: 'post',
+        foreignKeys: [constraints.foreignKey(cols.authorId, UserBase.refs.id)],
+      }));
 
-  const User = UserBase.relations({
-    posts: rel.hasMany(() => Post, { by: 'authorId' }),
-  }).sql({
-    table: 'user',
-  });
+      const User = UserBase.relations({
+        posts: rel.hasMany(() => Post, { by: 'authorId' }),
+      }).sql({
+        table: 'user',
+      });
 
-  const contract = defineContract({
-    target: postgresPack,
-    storageHash: 'sha256:test-refined-helpers',
-    models: {
-      User,
-      Post,
+      return {
+        models: {
+          User,
+          Post,
+        },
+      };
     },
-  });
+  );
 
   const validated = validateContract<typeof contract>(contract);
   const adapter = createStubAdapter();
@@ -375,15 +406,15 @@ test('portable refined helpers preserve downstream schema inference', () => {
   const tables = schema(context).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');
-  type PortableUserColumns = NonNullable<
+  type ComposedUserColumns = NonNullable<
     NonNullable<(typeof validated.storage.tables)['user']>['columns']
   >;
-  type PortablePostColumns = NonNullable<
+  type ComposedPostColumns = NonNullable<
     NonNullable<(typeof validated.storage.tables)['post']>['columns']
   >;
 
-  expectTypeOf<PortableUserColumns>().toExtend<Record<string, { readonly codecId: string }>>();
-  expectTypeOf<PortablePostColumns>().toExtend<Record<string, { readonly codecId: string }>>();
+  expectTypeOf<ComposedUserColumns>().toExtend<Record<string, { readonly codecId: string }>>();
+  expectTypeOf<ComposedPostColumns>().toExtend<Record<string, { readonly codecId: string }>>();
 });
 
 test('codec type inference via type option', () => {

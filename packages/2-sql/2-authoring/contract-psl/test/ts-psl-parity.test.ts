@@ -1,6 +1,7 @@
 import type {
   AuthoringContributions,
   ExtensionPackRef,
+  FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
@@ -10,11 +11,10 @@ import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContractIR } from '../src/interpreter';
 import { createBuiltinLikeControlMutationDefaults } from './fixtures';
 
-const portablePostgresTargetPack = {
-  kind: 'target',
-  id: 'postgres',
+const sqlFamilyPack = {
+  kind: 'family',
+  id: 'sql',
   familyId: 'sql',
-  targetId: 'postgres',
   version: '0.0.1',
   authoring: {
     field: {
@@ -37,6 +37,16 @@ const portablePostgresTargetPack = {
         },
       },
     },
+  },
+} as const satisfies FamilyPackRef<'sql'>;
+
+const portablePostgresTargetPack = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+  authoring: {
     type: {
       enum: {
         kind: 'typeConstructor',
@@ -79,7 +89,7 @@ const pgvectorExtensionPack = {
 } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
 
 const authoringContributions = {
-  field: portablePostgresTargetPack.authoring.field,
+  field: sqlFamilyPack.authoring.field,
   type: {
     ...portablePostgresTargetPack.authoring.type,
     ...pgvectorExtensionPack.authoring.type,
@@ -126,7 +136,7 @@ model Post {
 `;
 
 const representativeTsAuthoring = `defineContract(
-  { target: portablePostgresTargetPack, extensionPacks: { pgvector: pgvectorExtensionPack } },
+  { family: sqlFamilyPack, target: portablePostgresTargetPack, extensionPacks: { pgvector: pgvectorExtensionPack } },
   ({ type, field, model, rel }) => {
     const types = {
       Role: type.enum('Role', ['USER', 'ADMIN'] as const),
@@ -161,6 +171,7 @@ const representativeTsAuthoring = `defineContract(
 function buildTsContract() {
   return defineContract(
     {
+      family: sqlFamilyPack,
       target: portablePostgresTargetPack,
       extensionPacks: { pgvector: pgvectorExtensionPack },
     },

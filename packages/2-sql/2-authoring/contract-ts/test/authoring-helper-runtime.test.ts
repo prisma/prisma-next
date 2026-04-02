@@ -2,9 +2,9 @@ import type {
   AuthoringFieldNamespace,
   AuthoringTypeNamespace,
   ExtensionPackRef,
+  FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
-import { portableSqlAuthoringFieldPresets } from '@prisma-next/sql-contract/authoring';
 import { describe, expect, it } from 'vitest';
 import {
   createFieldHelpersFromNamespace,
@@ -13,6 +13,51 @@ import {
   isNamedConstraintOptionsLike,
 } from '../src/authoring-helper-runtime';
 import { createComposedAuthoringHelpers } from '../src/composed-authoring-helpers';
+
+const textPreset = {
+  kind: 'fieldPreset',
+  output: { codecId: 'sql/text@1', nativeType: 'text' },
+} as const;
+
+const createdAtPreset = {
+  kind: 'fieldPreset',
+  output: {
+    codecId: 'sql/timestamp@1',
+    nativeType: 'timestamp',
+    default: { kind: 'function', expression: 'CURRENT_TIMESTAMP' },
+  },
+} as const;
+
+const nanoidIdPreset = {
+  kind: 'fieldPreset',
+  args: [
+    {
+      kind: 'object',
+      optional: true,
+      properties: {
+        size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
+      },
+    },
+  ],
+  output: {
+    codecId: 'sql/char@1',
+    nativeType: 'character',
+    typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
+    executionDefault: {
+      kind: 'generator',
+      id: 'nanoid',
+      params: { size: { kind: 'arg', index: 0, path: ['size'] } },
+    },
+    id: true,
+  },
+} as const;
+
+const bareFamilyPack = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  version: '0.0.1',
+} as const satisfies FamilyPackRef<'sql'>;
 
 const bareTargetPack = {
   kind: 'target',
@@ -40,15 +85,15 @@ const nestedTypeNamespace = {
 
 const nestedFieldNamespace = {
   audit: {
-    createdAt: portableSqlAuthoringFieldPresets.createdAt,
+    createdAt: createdAtPreset,
   },
 } as const satisfies AuthoringFieldNamespace;
 
 const uniqueTextFieldNamespace = {
   slug: {
-    ...portableSqlAuthoringFieldPresets.text,
+    ...textPreset,
     output: {
-      ...portableSqlAuthoringFieldPresets.text.output,
+      ...textPreset.output,
       unique: true,
     },
   },
@@ -127,7 +172,7 @@ describe('authoring helper runtime', () => {
   it('rejects blocked path segments when building field helpers', () => {
     const unsafeNamespace = {
       nested: withBlockedKey({
-        createdAt: portableSqlAuthoringFieldPresets.createdAt,
+        createdAt: createdAtPreset,
       }),
     } as unknown as AuthoringFieldNamespace;
 
@@ -146,7 +191,7 @@ describe('authoring helper runtime', () => {
   it('passes optional named constraint options through field preset helpers', () => {
     const helper = createFieldPresetHelper({
       helperPath: 'field.id.nanoid',
-      descriptor: portableSqlAuthoringFieldPresets.id.nanoid,
+      descriptor: nanoidIdPreset,
       build: ({ args, namedConstraintOptions }) => ({
         args,
         namedConstraintOptions,
@@ -162,7 +207,7 @@ describe('authoring helper runtime', () => {
   it('rejects extra arguments for helpers that accept named constraint options', () => {
     const helper = createFieldPresetHelper({
       helperPath: 'field.id.nanoid',
-      descriptor: portableSqlAuthoringFieldPresets.id.nanoid,
+      descriptor: nanoidIdPreset,
       build: ({ args, namedConstraintOptions }) => ({
         args,
         namedConstraintOptions,
@@ -177,7 +222,7 @@ describe('authoring helper runtime', () => {
   it('rejects malformed named constraint option objects', () => {
     const helper = createFieldPresetHelper({
       helperPath: 'field.id.nanoid',
-      descriptor: portableSqlAuthoringFieldPresets.id.nanoid,
+      descriptor: nanoidIdPreset,
       build: ({ args, namedConstraintOptions }) => ({
         args,
         namedConstraintOptions,
@@ -204,6 +249,7 @@ describe('createComposedAuthoringHelpers', () => {
     } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
 
     const helpers = createComposedAuthoringHelpers({
+      family: bareFamilyPack,
       target: bareTargetPack,
       extensionPacks: {
         slugPack,
@@ -237,6 +283,7 @@ describe('createComposedAuthoringHelpers', () => {
 
     expect(() =>
       createComposedAuthoringHelpers({
+        family: bareFamilyPack,
         target: targetPack,
         extensionPacks: {
           conflictingPack,
@@ -256,13 +303,14 @@ describe('createComposedAuthoringHelpers', () => {
       version: '0.0.1',
       authoring: {
         field: {
-          column: portableSqlAuthoringFieldPresets.text,
+          column: textPreset,
         },
       },
     } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
 
     expect(() =>
       createComposedAuthoringHelpers({
+        family: bareFamilyPack,
         target: bareTargetPack,
         extensionPacks: {
           reservedFieldPack,

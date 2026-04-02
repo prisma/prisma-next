@@ -1,9 +1,9 @@
 import type {
   AuthoringFieldNamespace,
   ExtensionPackRef,
+  FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/contract/framework-components';
-import { portableSqlAuthoringFieldPresets } from '@prisma-next/sql-contract/authoring';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { defineContract, field, model, rel } from '../src/contract-builder';
 
@@ -14,6 +14,103 @@ type PortableSqlCodecTypes = {
   readonly 'sql/timestamp@1': { output: string };
 };
 
+const sqlFamilyPack = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  version: '0.0.1',
+  authoring: {
+    field: {
+      text: {
+        kind: 'fieldPreset',
+        output: { codecId: 'sql/text@1', nativeType: 'text' },
+      },
+      timestamp: {
+        kind: 'fieldPreset',
+        output: { codecId: 'sql/timestamp@1', nativeType: 'timestamp' },
+      },
+      createdAt: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'sql/timestamp@1',
+          nativeType: 'timestamp',
+          default: { kind: 'function', expression: 'CURRENT_TIMESTAMP' },
+        },
+      },
+      uuid: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'sql/char@1',
+          nativeType: 'character',
+          typeParams: { length: 36 },
+        },
+      },
+      nanoid: {
+        kind: 'fieldPreset',
+        args: [
+          {
+            kind: 'object',
+            optional: true,
+            properties: {
+              size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
+            },
+          },
+        ],
+        output: {
+          codecId: 'sql/char@1',
+          nativeType: 'character',
+          typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
+        },
+      },
+      id: {
+        uuidv4: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'sql/char@1',
+            nativeType: 'character',
+            typeParams: { length: 36 },
+            executionDefault: { kind: 'generator', id: 'uuidv4' },
+            id: true,
+          },
+        },
+        uuidv7: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'sql/char@1',
+            nativeType: 'character',
+            typeParams: { length: 36 },
+            executionDefault: { kind: 'generator', id: 'uuidv7' },
+            id: true,
+          },
+        },
+        nanoid: {
+          kind: 'fieldPreset',
+          args: [
+            {
+              kind: 'object',
+              optional: true,
+              properties: {
+                size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
+              },
+            },
+          ],
+          output: {
+            codecId: 'sql/char@1',
+            nativeType: 'character',
+            typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
+            executionDefault: {
+              kind: 'generator',
+              id: 'nanoid',
+              params: { size: { kind: 'arg', index: 0, path: ['size'] } },
+            },
+            id: true,
+          },
+        },
+      },
+    },
+  },
+} as const satisfies FamilyPackRef<'sql'>;
+
 const postgresTargetPack = {
   kind: 'target',
   id: 'postgres',
@@ -21,7 +118,6 @@ const postgresTargetPack = {
   targetId: 'postgres',
   version: '0.0.1',
   authoring: {
-    field: portableSqlAuthoringFieldPresets,
     type: {
       enum: {
         kind: 'typeConstructor',
@@ -73,25 +169,6 @@ const roleTypes = {
   },
 } as const;
 
-type PortableFieldSurface = Pick<
-  typeof field,
-  'text' | 'timestamp' | 'createdAt' | 'uuid' | 'nanoid'
-> & {
-  readonly id: Pick<typeof field.id, 'uuidv7' | 'nanoid'>;
-};
-
-function buildPortableFieldStates(currentField: PortableFieldSurface) {
-  return {
-    text: currentField.text().build(),
-    timestamp: currentField.timestamp().build(),
-    createdAt: currentField.createdAt().build(),
-    uuid: currentField.uuid().build(),
-    nanoid: currentField.nanoid({ size: 16 }).build(),
-    uuidv7Id: currentField.id.uuidv7({ name: 'audit_entry_pkey' }).build(),
-    nanoidId: currentField.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }).build(),
-  };
-}
-
 function expectTypedFallbackWarnings(run: () => void, expectedFragments: readonly string[]): void {
   const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
 
@@ -123,26 +200,29 @@ function expectNoTypedFallbackWarnings(run: () => void): void {
 }
 
 describe('staged contract DSL helper vocabulary', () => {
-  it('lowers portable scalar helpers and explicit uuidv4 primary keys', () => {
-    const AuditEntry = model('AuditEntry', {
-      fields: {
-        id: field.id.uuidv4({ name: 'audit_entry_pkey' }),
-        actorId: field.uuid().column('actor_id'),
-        shortCode: field.nanoid({ size: 16 }).column('short_code'),
-        email: field.text().unique({ name: 'audit_entry_email_key' }),
-        createdAt: field.createdAt().column('created_at'),
-        reviewedAt: field.timestamp().optional().column('reviewed_at'),
+  it('lowers portable scalar helpers and explicit uuidv4 primary keys via factory callback', () => {
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
       },
-    }).sql({
-      table: 'audit_entry',
-    });
-
-    const contract = defineContract({
-      target: postgresTargetPack,
-      models: {
-        AuditEntry,
-      },
-    });
+      ({ field, model }) => ({
+        models: {
+          AuditEntry: model('AuditEntry', {
+            fields: {
+              id: field.id.uuidv4({ name: 'audit_entry_pkey' }),
+              actorId: field.uuid().column('actor_id'),
+              shortCode: field.nanoid({ size: 16 }).column('short_code'),
+              email: field.text().unique({ name: 'audit_entry_email_key' }),
+              createdAt: field.createdAt().column('created_at'),
+              reviewedAt: field.timestamp().optional().column('reviewed_at'),
+            },
+          }).sql({
+            table: 'audit_entry',
+          }),
+        },
+      }),
+    );
 
     expect(contract.storage.tables.audit_entry.primaryKey).toEqual({
       columns: ['id'],
@@ -194,87 +274,68 @@ describe('staged contract DSL helper vocabulary', () => {
     expect(contract.models.AuditEntry.fields.actorId).toEqual({ column: 'actor_id' });
   });
 
-  it('preserves literal codec ids for portable field helpers and explicit id generators', () => {
-    const textState = field.text().build();
-    const timestampState = field.timestamp().build();
-    const uuidState = field.uuid().build();
-    const nanoidState = field.nanoid({ size: 16 }).build();
-    const uuidV4IdState = field.id.uuidv4().build();
-    const uuidV7IdState = field.id.uuidv7().build();
-    const nanoidIdState = field.id.nanoid({ size: 16 }).build();
-
-    expectTypeOf(textState.descriptor?.codecId).toEqualTypeOf<'sql/text@1' | undefined>();
-    expectTypeOf(timestampState.descriptor?.codecId).toEqualTypeOf<'sql/timestamp@1' | undefined>();
-    expectTypeOf(uuidState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
-    expectTypeOf(nanoidState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
-    expectTypeOf(uuidV4IdState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
-    expectTypeOf(uuidV7IdState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
-    expectTypeOf(nanoidIdState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
-
-    expect(uuidState.descriptor?.typeParams).toEqual({ length: 36 });
-    expect(nanoidState.descriptor?.typeParams).toEqual({ length: 16 });
-    expect(uuidV4IdState.executionDefault).toEqual({ kind: 'generator', id: 'uuidv4' });
-    expect(uuidV7IdState.executionDefault).toEqual({ kind: 'generator', id: 'uuidv7' });
-    expect(nanoidIdState.executionDefault).toEqual({
-      kind: 'generator',
-      id: 'nanoid',
-      params: { size: 16 },
-    });
-    expect(uuidV4IdState.id).toEqual({});
-    expect(uuidV7IdState.id).toEqual({});
-    expect(nanoidIdState.id).toEqual({});
-  });
-
-  it('keeps top-level field helpers aligned with target-composed field presets', () => {
-    const topLevelStates = buildPortableFieldStates(field);
-    let callbackStates: ReturnType<typeof buildPortableFieldStates> | undefined;
-
+  it('preserves literal codec ids for composed field helpers', () => {
     defineContract(
       {
+        family: sqlFamilyPack,
         target: postgresTargetPack,
       },
       ({ field }) => {
-        callbackStates = buildPortableFieldStates(field);
+        const textState = field.text().build();
+        const timestampState = field.timestamp().build();
+        const uuidState = field.uuid().build();
+        const nanoidState = field.nanoid({ size: 16 }).build();
+        const uuidV4IdState = field.id.uuidv4().build();
+        const uuidV7IdState = field.id.uuidv7().build();
+        const nanoidIdState = field.id.nanoid({ size: 16 }).build();
 
-        return {
-          models: {},
-        };
+        expectTypeOf(textState.descriptor?.codecId).toEqualTypeOf<'sql/text@1' | undefined>();
+        expectTypeOf(timestampState.descriptor?.codecId).toEqualTypeOf<
+          'sql/timestamp@1' | undefined
+        >();
+        expectTypeOf(uuidState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
+        expectTypeOf(nanoidState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
+        expectTypeOf(uuidV4IdState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
+        expectTypeOf(uuidV7IdState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
+        expectTypeOf(nanoidIdState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
+
+        expect(uuidState.descriptor?.typeParams).toEqual({ length: 36 });
+        expect(nanoidState.descriptor?.typeParams).toEqual({ length: 16 });
+        expect(uuidV4IdState.executionDefault).toEqual({ kind: 'generator', id: 'uuidv4' });
+        expect(uuidV7IdState.executionDefault).toEqual({ kind: 'generator', id: 'uuidv7' });
+        expect(nanoidIdState.executionDefault).toEqual({
+          kind: 'generator',
+          id: 'nanoid',
+          params: { size: 16 },
+        });
+        expect(uuidV4IdState.id).toEqual({});
+        expect(uuidV7IdState.id).toEqual({});
+        expect(nanoidIdState.id).toEqual({});
+
+        return { models: {} };
       },
-    );
-
-    expect(callbackStates).toEqual(topLevelStates);
-  });
-
-  it('derives the top-level portable field namespace from the shared preset registry', () => {
-    const topLevelPortableHelpers = Object.keys(field)
-      .filter((helperName) => !['column', 'generated', 'namedType', 'id'].includes(helperName))
-      .sort();
-    const portableRegistryHelpers = Object.keys(portableSqlAuthoringFieldPresets)
-      .filter((helperName) => helperName !== 'id')
-      .sort();
-
-    expect(topLevelPortableHelpers).toEqual(portableRegistryHelpers);
-    expect(Object.keys(field.id).sort()).toEqual(
-      Object.keys(portableSqlAuthoringFieldPresets.id).sort(),
     );
   });
 
   it('supports trailing inline primary-key names on generated id helpers', () => {
-    const ShortLink = model('ShortLink', {
-      fields: {
-        id: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }),
-        destination: field.text(),
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
       },
-    }).sql({
-      table: 'short_link',
-    });
-
-    const contract = defineContract({
-      target: postgresTargetPack,
-      models: {
-        ShortLink,
-      },
-    });
+      ({ field, model }) => ({
+        models: {
+          ShortLink: model('ShortLink', {
+            fields: {
+              id: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }),
+              destination: field.text(),
+            },
+          }).sql({
+            table: 'short_link',
+          }),
+        },
+      }),
+    );
 
     expect(contract.storage.tables.short_link.primaryKey).toEqual({
       columns: ['id'],
@@ -294,21 +355,24 @@ describe('staged contract DSL helper vocabulary', () => {
   });
 
   it('accepts named storage type refs from the local types object', () => {
-    const User = model('User', {
-      fields: {
-        role: field.namedType(roleTypes.Role),
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
       },
-    }).sql({
-      table: 'app_user',
-    });
-
-    const contract = defineContract({
-      target: postgresTargetPack,
-      types: roleTypes,
-      models: {
-        User,
-      },
-    });
+      ({ field, model }) => ({
+        types: roleTypes,
+        models: {
+          User: model('User', {
+            fields: {
+              role: field.namedType(roleTypes.Role),
+            },
+          }).sql({
+            table: 'app_user',
+          }),
+        },
+      }),
+    );
 
     expect(contract.storage.tables.app_user.columns.role).toMatchObject({
       codecId: 'pg/enum@1',
@@ -323,50 +387,61 @@ describe('staged contract DSL helper vocabulary', () => {
     {
       name: 'a string named type ref',
       run: () =>
-        defineContract({
-          target: postgresTargetPack,
-          types: roleTypes,
-          models: {
-            User: model('User', {
-              fields: {
-                role: field.namedType('Role'),
-              },
-            }).sql({
-              table: 'app_user',
-            }),
+        defineContract(
+          {
+            family: sqlFamilyPack,
+            target: postgresTargetPack,
           },
-        }),
+          ({ field, model }) => ({
+            types: roleTypes,
+            models: {
+              User: model('User', {
+                fields: {
+                  role: field.namedType('Role'),
+                },
+              }).sql({
+                table: 'app_user',
+              }),
+            },
+          }),
+        ),
       expectedFragments: [`field.namedType('Role')`],
     },
     {
       name: 'a string relation target',
-      run: () => {
-        const User = model('User', {
-          fields: {
-            id: field.id.uuidv7(),
+      run: () =>
+        defineContract(
+          {
+            family: sqlFamilyPack,
+            target: postgresTargetPack,
           },
-        }).sql({
-          table: 'app_user',
-        });
-
-        return defineContract({
-          target: postgresTargetPack,
-          models: {
-            User,
-            Post: model('Post', {
+          ({ field, model }) => {
+            const User = model('User', {
               fields: {
                 id: field.id.uuidv7(),
-                userId: field.uuid(),
-              },
-              relations: {
-                user: rel.belongsTo('User', { from: 'userId', to: 'id' }),
               },
             }).sql({
-              table: 'blog_post',
-            }),
+              table: 'app_user',
+            });
+
+            return {
+              models: {
+                User,
+                Post: model('Post', {
+                  fields: {
+                    id: field.id.uuidv7(),
+                    userId: field.uuid(),
+                  },
+                  relations: {
+                    user: rel.belongsTo('User', { from: 'userId', to: 'id' }),
+                  },
+                }).sql({
+                  table: 'blog_post',
+                }),
+              },
+            };
           },
-        });
-      },
+        ),
       expectedFragments: [
         `rel.belongsTo('User', { from: 'userId', to: 'id' })`,
         `Use rel.belongsTo(User, { from: 'userId', to: 'id' })`,
@@ -374,31 +449,37 @@ describe('staged contract DSL helper vocabulary', () => {
     },
     {
       name: 'constraints.ref fallback',
-      run: () => {
-        const User = model('User', {
-          fields: {
-            id: field.id.uuidv7(),
+      run: () =>
+        defineContract(
+          {
+            family: sqlFamilyPack,
+            target: postgresTargetPack,
           },
-        }).sql({
-          table: 'app_user',
-        });
-
-        return defineContract({
-          target: postgresTargetPack,
-          models: {
-            User,
-            Post: model('Post', {
+          ({ field, model }) => {
+            const User = model('User', {
               fields: {
                 id: field.id.uuidv7(),
-                userId: field.uuid(),
               },
-            }).sql(({ cols, constraints }) => ({
-              table: 'blog_post',
-              foreignKeys: [constraints.foreignKey(cols.userId, constraints.ref('User', 'id'))],
-            })),
+            }).sql({
+              table: 'app_user',
+            });
+
+            return {
+              models: {
+                User,
+                Post: model('Post', {
+                  fields: {
+                    id: field.id.uuidv7(),
+                    userId: field.uuid(),
+                  },
+                }).sql(({ cols, constraints }) => ({
+                  table: 'blog_post',
+                  foreignKeys: [constraints.foreignKey(cols.userId, constraints.ref('User', 'id'))],
+                })),
+              },
+            };
           },
-        });
-      },
+        ),
       expectedFragments: [`constraints.ref('User', 'id')`, 'Use User.refs.id'],
     },
   ])('emits typed fallback guidance for $name', ({ run, expectedFragments }) => {
@@ -407,25 +488,31 @@ describe('staged contract DSL helper vocabulary', () => {
 
   it('does not warn when named storage types use the local types object directly', () => {
     expectNoTypedFallbackWarnings(() =>
-      defineContract({
-        target: postgresTargetPack,
-        types: roleTypes,
-        models: {
-          User: model('User', {
-            fields: {
-              role: field.namedType(roleTypes.Role),
-            },
-          }).sql({
-            table: 'app_user',
-          }),
+      defineContract(
+        {
+          family: sqlFamilyPack,
+          target: postgresTargetPack,
         },
-      }),
+        ({ field, model }) => ({
+          types: roleTypes,
+          models: {
+            User: model('User', {
+              fields: {
+                role: field.namedType(roleTypes.Role),
+              },
+            }).sql({
+              table: 'app_user',
+            }),
+          },
+        }),
+      ),
     );
   });
 
   it('supports integrated contract callbacks with target-owned type helpers', () => {
     const contract = defineContract(
       {
+        family: sqlFamilyPack,
         target: postgresTargetPack,
       },
       ({ type, field, model }) => {
@@ -460,9 +547,10 @@ describe('staged contract DSL helper vocabulary', () => {
     });
   });
 
-  it('supports integrated contract callbacks with target-owned field presets', () => {
+  it('supports integrated contract callbacks with family-owned field presets', () => {
     const contract = defineContract(
       {
+        family: sqlFamilyPack,
         target: postgresTargetPack,
       },
       ({ field, model }) => ({
@@ -508,6 +596,7 @@ describe('staged contract DSL helper vocabulary', () => {
   it('supports integrated contract callbacks with extension-owned type helpers', () => {
     const contract = defineContract(
       {
+        family: sqlFamilyPack,
         target: postgresTargetPack,
         extensionPacks: {
           pgvector: pgvectorExtensionPack,
@@ -598,6 +687,7 @@ describe('staged contract DSL helper vocabulary', () => {
     expect(() =>
       defineContract(
         {
+          family: sqlFamilyPack,
           target: postgresTargetPack,
           extensionPacks: {
             conflictingPack,
@@ -640,6 +730,7 @@ describe('staged contract DSL helper vocabulary', () => {
       expect(() =>
         defineContract(
           {
+            family: sqlFamilyPack,
             target: postgresTargetPack,
             extensionPacks: {
               maliciousPack,
