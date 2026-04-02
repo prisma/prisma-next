@@ -290,12 +290,12 @@ describe('validateContract normalization', () => {
         User: {
           storage: { table: 'User' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
           relations: {
             posts: {
               to: 'Post',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
           },
@@ -314,14 +314,12 @@ describe('validateContract normalization', () => {
           },
         },
       },
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
+    };
     const normalized = normalizeContract(contractInput);
-    // Normalization should preserve existing relations (lines 420-425)
     expect((normalized.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
-        on: { parentCols: ['id'], childCols: ['userId'] },
+        on: { localFields: ['id'], targetFields: ['userId'] },
         cardinality: '1:N',
       },
     });
@@ -337,7 +335,7 @@ describe('validateContract normalization', () => {
         User: {
           storage: { table: 'User' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
         },
       },
@@ -469,13 +467,13 @@ describe('validateContract normalization', () => {
         User: {
           storage: { table: 'user' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
         },
         Post: {
           storage: { table: 'post' },
           fields: {
-            id: { column: 'id' },
+            id: { codecId: 'pg/text@1', nullable: false },
           },
         },
       },
