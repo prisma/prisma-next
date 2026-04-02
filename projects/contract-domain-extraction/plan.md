@@ -201,8 +201,9 @@ Replaces `ContractIR`, `SqlSemanticContractDefinition`, and `ContractBase` with 
 - **5.5** Populate `roots` in the SQL contract authoring layer. Currently the SQL contract builder hardcodes `roots: {}` and the SQL PSL interpreter omits it entirely. Derive root entries from models (e.g. `User` → `users: 'User'`) in both the chain builder and the staged DSL, matching how the Mongo stack already handles roots. Update the SQL ORM client to read collection accessors from `contract.roots` instead of deriving them from storage table names.
 - **5.6** Move `validateContract` to the framework layer with two-pass validation: framework-owned domain validation (`validateContractDomain()`) followed by a family-provided storage validator. Follows the pattern already established by `validateMongoContract()`.
 - **5.7** Remove `ContractIR`, `ContractBase`, and `SqlSemanticContractDefinition`. Remove `DomainModel` if fully superseded by `ContractModel<ModelStorage>`.
-- **5.8** Update all tests, fixtures, and type tests for the unified contract type.
-- **5.9** Run full test suite and typecheck.
+- **5.8** Move `@prisma-next/family-sql` to the highest SQL layer (layer 9). Currently at layer 3 (tooling), which is above the authoring DSL (layer 2) but below lanes, runtime, and adapters. Moving it to a dedicated top-level layer ensures no other SQL package depends on the family descriptor — the family package composes all lower layers but nothing depends on it except the entry point. Add a `family` layer to the SQL layer order in `architecture.config.json` above `drivers`. Update `packages/2-sql/` directory structure accordingly.
+- **5.9** Update all tests, fixtures, and type tests for the unified contract type.
+- **5.10** Run full test suite and typecheck.
 
 ### Milestone 6: SQL emitter migration to shared generation
 
