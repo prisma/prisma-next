@@ -148,7 +148,7 @@ describe('contract.d.ts imports resolution', () => {
       const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(adapter, target, extensions);
+      const extensionIds = extractExtensionIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,
@@ -282,7 +282,7 @@ type UserIdColumn = UserColumns['id'];
       const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(adapter, target, extensions);
+      const extensionIds = extractExtensionIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,

@@ -441,8 +441,8 @@ describe('extractExtensionIds', () => {
     const extension1 = createMockExtension('pgvector');
     const extension2 = createMockExtension('postgis');
 
-    const result = extractExtensionIds(adapter, target, [extension1, extension2]);
+    const result = extractExtensionIds({ id: 'sql' }, target, adapter, [extension1, extension2]);
 
-    expect(result).toEqual(['postgres', 'pgvector', 'postgis']);
+    expect(result).toEqual(['sql', 'postgres', 'pgvector', 'postgis']);
   });
 });

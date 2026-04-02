@@ -41,7 +41,7 @@ describe('emit command functionality', () => {
       operationRegistry: assembleOperationRegistry(descriptors),
       codecTypeImports: extractCodecTypeImports(descriptors),
       operationTypeImports: extractOperationTypeImports(descriptors),
-      extensionIds: extractExtensionIds(adapter, target, extensions),
+      extensionIds: extractExtensionIds({ id: 'sql' }, target, adapter, extensions),
     };
   };
 
