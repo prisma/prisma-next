@@ -1,7 +1,3 @@
-import {
-  extractCodecTypeImports,
-  extractOperationTypeImports,
-} from '@prisma-next/contract/assembly';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TypeRenderEntry } from '@prisma-next/contract/types';
 import type {
@@ -9,6 +5,10 @@ import type {
   ControlExtensionDescriptor,
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
+import {
+  extractCodecTypeImports,
+  extractOperationTypeImports,
+} from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 

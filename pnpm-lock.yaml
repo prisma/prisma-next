@@ -311,6 +311,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../shared/contract
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../shared/framework-components
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../shared/operations
@@ -1249,6 +1252,9 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/migration/control-plane
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/framework-components
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -1282,6 +1288,9 @@ importers:
       '@prisma-next/core-execution-plane':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/runtime/execution-plane
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/framework-components
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/shared/operations

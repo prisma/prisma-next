@@ -18,9 +18,6 @@ import { createControlStack, ControlStack } from '@prisma-next/framework-compone
 
 ## Relationship to other packages
 
-This package is the canonical source for framework component types and assembly logic. The following packages re-export from here for backward compatibility:
-
-- `@prisma-next/contract/framework-components` re-exports `./components` and `./authoring`
-- `@prisma-next/contract/assembly` re-exports `./control` with old names (`assembleComponents` → `createControlStack`, `AssembledComponentState` → `ControlStack`)
+This package is the canonical source for framework component types and assembly logic. `@prisma-next/contract/framework-components` re-exports `./components` and `./authoring` for backward compatibility (~70 consumers on main).
 
 New code should import directly from `@prisma-next/framework-components`.

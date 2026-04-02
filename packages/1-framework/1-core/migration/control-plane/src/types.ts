@@ -1,4 +1,3 @@
-import type { AssembledComponentState } from '@prisma-next/contract/assembly';
 import type {
   AdapterDescriptor,
   AdapterInstance,
@@ -14,6 +13,7 @@ import type {
 } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ContractMarkerRecord, TargetFamilyHook } from '@prisma-next/contract/types';
+import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { TargetMigrationsCapability } from './migrations';
 import type { CoreSchemaView } from './schema-view';
 
@@ -268,7 +268,7 @@ export interface ControlFamilyDescriptor<
   readonly hook: TargetFamilyHook;
   create<TTargetId extends string>(
     stack: ControlPlaneStack<TFamilyId, TTargetId>,
-    controlStack?: AssembledComponentState,
+    controlStack?: ControlStack,
   ): TFamilyInstance;
 }
 
