@@ -62,6 +62,7 @@ export const contract = defineContract({
       returning: true,
       'pgvector/cosine': true,
       'defaults.now': true,
+      'defaults.uuidv4': true,
     },
   },
   types,

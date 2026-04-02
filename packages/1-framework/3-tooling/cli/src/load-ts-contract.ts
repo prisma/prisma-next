@@ -1,10 +1,10 @@
 import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { Plugin } from 'esbuild';
 import { build } from 'esbuild';
+import { join } from 'pathe';
 
 export interface LoadTsContractOptions {
   readonly allowlist?: ReadonlyArray<string>;
