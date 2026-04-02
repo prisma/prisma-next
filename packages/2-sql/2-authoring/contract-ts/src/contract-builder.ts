@@ -503,11 +503,10 @@ class SqlContractBuilder<
 
         const column = tableColumns[columnName];
         if (column) {
-          const field: Record<string, unknown> = { codecId: column.type };
-          if (column.nullable) {
-            field['nullable'] = true;
-          }
-          domainFields[fieldName] = field;
+          domainFields[fieldName] = {
+            codecId: column.type,
+            nullable: column.nullable ?? false,
+          };
         }
       }
 

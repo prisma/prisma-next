@@ -90,7 +90,7 @@ export function model(
   relations: Record<string, unknown> = {},
 ): {
   storage: SqlModelStorage;
-  fields: Record<string, { nullable?: boolean; codecId?: string }>;
+  fields: Record<string, { nullable: boolean; codecId?: string }>;
   relations: Record<string, unknown>;
 } {
   const storage: SqlModelStorage = { table: tableName, fields };
@@ -98,11 +98,11 @@ export function model(
     Object.entries(fields).map(([name, field]) => [
       name,
       {
+        nullable: field.nullable ?? false,
         ...(field.codecId !== undefined ? { codecId: field.codecId } : {}),
-        ...(field.nullable !== undefined ? { nullable: field.nullable } : {}),
       },
     ]),
-  ) as Record<string, { nullable?: boolean; codecId?: string }>;
+  ) as Record<string, { nullable: boolean; codecId?: string }>;
   return {
     storage,
     fields: domainFields,
