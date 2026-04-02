@@ -149,6 +149,91 @@ describe('extractParameterizedRenderers', () => {
     expect(r?.render({ length: 1536 }, { codecTypesName: 'CodecTypes' })).toBe('Vector<1536>');
   });
 
+  it('extracts and normalizes raw string template renderers', () => {
+    const renderers = extractParameterizedRenderers([
+      createDescriptor({
+        types: {
+          codecTypes: {
+            parameterized: {
+              'pg/vector@1': 'Vector<{{length}}>',
+            },
+          },
+        },
+      }),
+    ]);
+    expect(renderers.size).toBe(1);
+    const r = renderers.get('pg/vector@1');
+    expect(r?.render({ length: 1536 }, { codecTypesName: 'CodecTypes' })).toBe('Vector<1536>');
+  });
+
+  it('extracts and normalizes raw function renderers', () => {
+    const renderers = extractParameterizedRenderers([
+      createDescriptor({
+        types: {
+          codecTypes: {
+            parameterized: {
+              'test/custom@1': (params, ctx) =>
+                `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
+            },
+          },
+        },
+      }),
+    ]);
+    expect(renderers.size).toBe(1);
+    const r = renderers.get('test/custom@1');
+    expect(r?.render({ precision: 10 }, { codecTypesName: 'CodecTypes' })).toBe(
+      'Custom<10, CodecTypes>',
+    );
+  });
+
+  it('extracts structured function-based renderers', () => {
+    const renderers = extractParameterizedRenderers([
+      createDescriptor({
+        types: {
+          codecTypes: {
+            parameterized: {
+              'test/custom@1': {
+                kind: 'function',
+                render: (params, ctx) => `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    expect(renderers.size).toBe(1);
+    const r = renderers.get('test/custom@1');
+    expect(r?.render({ precision: 10 }, { codecTypesName: 'CodecTypes' })).toBe(
+      'Custom<10, CodecTypes>',
+    );
+  });
+
+  it('collects renderers from multiple descriptors', () => {
+    const renderers = extractParameterizedRenderers([
+      createDescriptor({
+        id: 'adapter',
+        types: {
+          codecTypes: {
+            parameterized: {
+              'pg/numeric@1': { kind: 'template', template: 'Decimal<{{precision}}, {{scale}}>' },
+            },
+          },
+        },
+      }),
+      createDescriptor({
+        id: 'ext',
+        types: {
+          codecTypes: {
+            parameterized: {
+              'pg/vector@1': { kind: 'template', template: 'Vector<{{length}}>' },
+            },
+          },
+        },
+      }),
+    ]);
+    expect(Array.from(renderers.keys())).toEqual(['pg/numeric@1', 'pg/vector@1']);
+  });
+
   it('throws on duplicate codecId across descriptors', () => {
     expect(() =>
       extractParameterizedRenderers([
@@ -170,6 +255,45 @@ describe('extractParameterizedRenderers', () => {
         }),
       ]),
     ).toThrow(/Duplicate.*"dup@1".*"second" conflicts with "first"/);
+  });
+
+  it('interpolates {{CodecTypes}} placeholder with context value', () => {
+    const renderers = extractParameterizedRenderers([
+      createDescriptor({
+        types: {
+          codecTypes: {
+            parameterized: {
+              'test/custom@1': {
+                kind: 'template',
+                template: "{{CodecTypes}}['test/custom@1']['output'] & { length: {{length}} }",
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    const r = renderers.get('test/custom@1');
+    expect(r?.render({ length: 256 }, { codecTypesName: 'MyCodecTypes' })).toBe(
+      "MyCodecTypes['test/custom@1']['output'] & { length: 256 }",
+    );
+  });
+
+  it('throws for missing template parameter', () => {
+    const renderers = extractParameterizedRenderers([
+      createDescriptor({
+        types: {
+          codecTypes: {
+            parameterized: {
+              'test/vector@1': { kind: 'template', template: 'Vector<{{length}}>' },
+            },
+          },
+        },
+      }),
+    ]);
+    const r = renderers.get('test/vector@1')!;
+    expect(() => r.render({}, { codecTypesName: 'CodecTypes' })).toThrow(
+      /Missing template parameter "length" in template "Vector<\{\{length\}\}>"/,
+    );
   });
 });
 
