@@ -1,3 +1,7 @@
+import {
+  extractCodecTypeImports,
+  extractOperationTypeImports,
+} from '@prisma-next/contract/assembly';
 import type { NormalizedTypeRenderer } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
@@ -6,10 +10,6 @@ import type {
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import {
-  extractCodecTypeImports,
-  extractOperationTypeImports,
-} from '../../family/src/core/assembly';
 import { sqlTargetFamilyHook } from '../src/index';
 
 type TestDescriptor =

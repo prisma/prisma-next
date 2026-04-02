@@ -1,5 +1,6 @@
 import { SqlFamilyDescriptor } from '../core/control-descriptor';
 
+export { assembleAuthoringContributions } from '@prisma-next/contract/assembly';
 // Re-export core types from canonical source
 export type {
   MigrationOperationClass,
@@ -13,7 +14,6 @@ export type {
 } from '@prisma-next/core-control-plane/types';
 export type { SqlControlDescriptorWithContributions } from '../core/assembly';
 export {
-  assembleAuthoringContributions,
   assembleControlMutationDefaultContributions,
   assemblePslInterpretationContributions,
   extractCodecControlHooks,
