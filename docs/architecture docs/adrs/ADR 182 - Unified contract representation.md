@@ -49,8 +49,8 @@ Here is the contract pipeline **today** — four representations, with a storage
 ```mermaid
 graph TD
   PSL(schema.psl) --> AST(PslDocumentAst)
-  TS_STAGED(contract.ts — staged) --> SCI(StagedContractInput)
-  TS_CHAIN(contract.ts — chain) --> CBS(ContractBuilderState)
+  TS_STAGED(contract.ts - staged) --> SCI(StagedInput)
+  TS_CHAIN(contract.ts - chain) --> CBS(BuilderState)
   SCI --> SSCD(SqlSemanticContractDef)
   SSCD -->|lower| IR
   AST -->|interpret| IR
@@ -66,10 +66,10 @@ And **after** — authoring surfaces lower directly to `Contract`, which survive
 ```mermaid
 graph TD
   PSL(schema.psl) --> AST(PslDocumentAst)
-  TS(contract.ts — staged) --> SCI(StagedContractInput)
+  TS(contract.ts - staged) --> SCI(StagedInput)
   AST -->|lower| Contract
   SCI -->|lower| Contract
-  Contract("Contract‹Storage, ModelStorage›")
+  Contract("Contract<Storage, ModelStorage>")
   Contract -->|serialize| JSON(contract.json + contract.d.ts)
   JSON -->|parse + validate| C2(Contract)
   C2 --> CONSUMERS(schema / sql / orm)

@@ -154,7 +154,7 @@ Inside `.sql()`, `cols` exposes only scalar fields — relation fields are exclu
 
 The staged DSL doesn't produce `ContractIR` directly. Instead, it lowers through an intermediate representation called `SqlSemanticContractDefinition`:
 
-```
+```text
 model() + field.* + rel.*                →  StagedModelBuilder instances
           ↓
 defineContract({ target, models, ... })
