@@ -2,174 +2,230 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:66156b32794cfd2e278065ac87508e4dc6a3157e778f83c36fd976b65d973579",
-  "executionHash": "sha256:b667fade3a4d71590247b5a1fc013558869bc7f4a54e27060a0242faae3619f2",
-  "profileHash": "sha256:a246c1ceb7b2680efaf1e28032a46faa765c06f898f2fea1687b107b68b8340f",
+  "storageHash": "sha256:53ddbcbb7c51252e81bf3d593ac785329b1ad41d01a7f8cb97bf604f5b883775",
+  "executionHash": "sha256:3799b761ae6ab41489db39f42919160264dd9bfc87dcf81ef7cf826ab1e6191d",
+  "profileHash": "sha256:4de522912e1428d81da3867223cb20cef72526f8e9e2f34dbea4cab7cfa30cf8",
+  "roots": {},
   "models": {
     "Article": {
       "fields": {
         "id": {
-          "column": "id"
+          "codecId": "sql/char@1"
         },
         "title": {
-          "column": "title"
+          "codecId": "pg/text@1"
         }
       },
       "relations": {},
       "storage": {
+        "fields": {
+          "id": {
+            "column": "id"
+          },
+          "title": {
+            "column": "title"
+          }
+        },
         "table": "articles"
       }
     },
     "Comment": {
       "fields": {
         "body": {
-          "column": "body"
+          "codecId": "pg/text@1"
         },
         "id": {
-          "column": "id"
+          "codecId": "pg/int4@1"
         },
         "postId": {
-          "column": "post_id"
+          "codecId": "pg/int4@1"
         }
       },
       "relations": {},
       "storage": {
+        "fields": {
+          "body": {
+            "column": "body"
+          },
+          "id": {
+            "column": "id"
+          },
+          "postId": {
+            "column": "post_id"
+          }
+        },
         "table": "comments"
       }
     },
     "Post": {
       "fields": {
         "id": {
-          "column": "id"
+          "codecId": "pg/int4@1"
         },
         "title": {
-          "column": "title"
+          "codecId": "pg/text@1"
         },
         "userId": {
-          "column": "user_id"
+          "codecId": "pg/int4@1"
         },
         "views": {
-          "column": "views"
+          "codecId": "pg/int4@1"
         }
       },
-      "relations": {},
+      "relations": {
+        "author": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "user_id"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "to": "User"
+        },
+        "comments": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "post_id"
+            ]
+          },
+          "to": "Comment"
+        }
+      },
       "storage": {
+        "fields": {
+          "id": {
+            "column": "id"
+          },
+          "title": {
+            "column": "title"
+          },
+          "userId": {
+            "column": "user_id"
+          },
+          "views": {
+            "column": "views"
+          }
+        },
         "table": "posts"
       }
     },
     "Profile": {
       "fields": {
         "bio": {
-          "column": "bio"
+          "codecId": "pg/text@1"
         },
         "id": {
-          "column": "id"
+          "codecId": "pg/int4@1"
         },
         "userId": {
-          "column": "user_id"
+          "codecId": "pg/int4@1"
         }
       },
       "relations": {},
       "storage": {
+        "fields": {
+          "bio": {
+            "column": "bio"
+          },
+          "id": {
+            "column": "id"
+          },
+          "userId": {
+            "column": "user_id"
+          }
+        },
         "table": "profiles"
       }
     },
     "User": {
       "fields": {
         "email": {
-          "column": "email"
+          "codecId": "pg/text@1"
         },
         "id": {
-          "column": "id"
+          "codecId": "pg/int4@1"
         },
         "invitedById": {
-          "column": "invited_by_id"
+          "codecId": "pg/int4@1",
+          "nullable": true
         },
         "name": {
-          "column": "name"
+          "codecId": "pg/text@1"
         }
       },
-      "relations": {},
+      "relations": {
+        "invitedBy": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "invited_by_id"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "to": "User"
+        },
+        "invitedUsers": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "invited_by_id"
+            ]
+          },
+          "to": "User"
+        },
+        "posts": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "user_id"
+            ]
+          },
+          "to": "Post"
+        },
+        "profile": {
+          "cardinality": "1:1",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "user_id"
+            ]
+          },
+          "to": "Profile"
+        }
+      },
       "storage": {
+        "fields": {
+          "email": {
+            "column": "email"
+          },
+          "id": {
+            "column": "id"
+          },
+          "invitedById": {
+            "column": "invited_by_id"
+          },
+          "name": {
+            "column": "name"
+          }
+        },
         "table": "users"
-      }
-    }
-  },
-  "relations": {
-    "posts": {
-      "author": {
-        "cardinality": "N:1",
-        "on": {
-          "childCols": [
-            "id"
-          ],
-          "parentCols": [
-            "user_id"
-          ]
-        },
-        "to": "User"
-      },
-      "comments": {
-        "cardinality": "1:N",
-        "on": {
-          "childCols": [
-            "post_id"
-          ],
-          "parentCols": [
-            "id"
-          ]
-        },
-        "to": "Comment"
-      }
-    },
-    "users": {
-      "invitedBy": {
-        "cardinality": "N:1",
-        "on": {
-          "childCols": [
-            "id"
-          ],
-          "parentCols": [
-            "invited_by_id"
-          ]
-        },
-        "to": "User"
-      },
-      "invitedUsers": {
-        "cardinality": "1:N",
-        "on": {
-          "childCols": [
-            "invited_by_id"
-          ],
-          "parentCols": [
-            "id"
-          ]
-        },
-        "to": "User"
-      },
-      "posts": {
-        "cardinality": "1:N",
-        "on": {
-          "childCols": [
-            "user_id"
-          ],
-          "parentCols": [
-            "id"
-          ]
-        },
-        "to": "Post"
-      },
-      "profile": {
-        "cardinality": "1:1",
-        "on": {
-          "childCols": [
-            "user_id"
-          ],
-          "parentCols": [
-            "id"
-          ]
-        },
-        "to": "Profile"
       }
     }
   },

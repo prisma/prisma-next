@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:66156b32794cfd2e278065ac87508e4dc6a3157e778f83c36fd976b65d973579'>;
+  StorageHashBase<'sha256:53ddbcbb7c51252e81bf3d593ac785329b1ad41d01a7f8cb97bf604f5b883775'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:b667fade3a4d71590247b5a1fc013558869bc7f4a54e27060a0242faae3619f2'>;
+  ExecutionHashBase<'sha256:3799b761ae6ab41489db39f42919160264dd9bfc87dcf81ef7cf826ab1e6191d'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:a246c1ceb7b2680efaf1e28032a46faa765c06f898f2fea1687b107b68b8340f'>;
+  ProfileHashBase<'sha256:4de522912e1428d81da3867223cb20cef72526f8e9e2f34dbea4cab7cfa30cf8'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -183,42 +183,133 @@ type ContractBase = SqlContract<
   },
   {
     readonly User: {
-      storage: { readonly table: 'users' };
+      storage: {
+        readonly table: 'users';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly name: { readonly column: 'name' };
+          readonly email: { readonly column: 'email' };
+          readonly invitedById: { readonly column: 'invited_by_id' };
+        };
+      };
       fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly name: CodecTypes['pg/text@1']['output'];
         readonly email: CodecTypes['pg/text@1']['output'];
         readonly invitedById: CodecTypes['pg/int4@1']['output'] | null;
       };
+      relations: {
+        readonly invitedUsers: {
+          readonly to: 'User';
+          readonly cardinality: '1:N';
+          readonly on: {
+            readonly localFields: readonly ['id'];
+            readonly targetFields: readonly ['invited_by_id'];
+          };
+        };
+        readonly invitedBy: {
+          readonly to: 'User';
+          readonly cardinality: 'N:1';
+          readonly on: {
+            readonly localFields: readonly ['invited_by_id'];
+            readonly targetFields: readonly ['id'];
+          };
+        };
+        readonly posts: {
+          readonly to: 'Post';
+          readonly cardinality: '1:N';
+          readonly on: {
+            readonly localFields: readonly ['id'];
+            readonly targetFields: readonly ['user_id'];
+          };
+        };
+        readonly profile: {
+          readonly to: 'Profile';
+          readonly cardinality: '1:1';
+          readonly on: {
+            readonly localFields: readonly ['id'];
+            readonly targetFields: readonly ['user_id'];
+          };
+        };
+      };
     };
     readonly Post: {
-      storage: { readonly table: 'posts' };
+      storage: {
+        readonly table: 'posts';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly title: { readonly column: 'title' };
+          readonly userId: { readonly column: 'user_id' };
+          readonly views: { readonly column: 'views' };
+        };
+      };
       fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly title: CodecTypes['pg/text@1']['output'];
         readonly userId: CodecTypes['pg/int4@1']['output'];
         readonly views: CodecTypes['pg/int4@1']['output'];
       };
+      relations: {
+        readonly comments: {
+          readonly to: 'Comment';
+          readonly cardinality: '1:N';
+          readonly on: {
+            readonly localFields: readonly ['id'];
+            readonly targetFields: readonly ['post_id'];
+          };
+        };
+        readonly author: {
+          readonly to: 'User';
+          readonly cardinality: 'N:1';
+          readonly on: {
+            readonly localFields: readonly ['user_id'];
+            readonly targetFields: readonly ['id'];
+          };
+        };
+      };
     };
     readonly Comment: {
-      storage: { readonly table: 'comments' };
+      storage: {
+        readonly table: 'comments';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly body: { readonly column: 'body' };
+          readonly postId: { readonly column: 'post_id' };
+        };
+      };
       fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly body: CodecTypes['pg/text@1']['output'];
         readonly postId: CodecTypes['pg/int4@1']['output'];
       };
+      relations: {};
     };
     readonly Profile: {
-      storage: { readonly table: 'profiles' };
+      storage: {
+        readonly table: 'profiles';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly userId: { readonly column: 'user_id' };
+          readonly bio: { readonly column: 'bio' };
+        };
+      };
       fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly userId: CodecTypes['pg/int4@1']['output'];
         readonly bio: CodecTypes['pg/text@1']['output'];
       };
+      relations: {};
     };
     readonly Article: {
-      storage: { readonly table: 'articles' };
+      storage: {
+        readonly table: 'articles';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly title: { readonly column: 'title' };
+        };
+      };
       fields: { readonly id: Char<36>; readonly title: CodecTypes['pg/text@1']['output'] };
+      relations: {};
     };
   },
   StorageHash,
@@ -226,6 +317,7 @@ type ContractBase = SqlContract<
   ProfileHash
 > & {
   readonly target: 'postgres';
+  readonly roots: Record<string, string>;
   readonly capabilities: {
     readonly pgvector: { readonly hnsw: true; readonly ivfflat: true; readonly vector: true };
     readonly postgres: {
@@ -297,6 +389,16 @@ type ContractBase = SqlContract<
         ];
       };
       readonly version: '0.0.1';
+    };
+  };
+  readonly execution: {
+    readonly mutations: {
+      readonly defaults: readonly [
+        {
+          readonly ref: { readonly table: 'articles'; readonly column: 'id' };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+      ];
     };
   };
 };
