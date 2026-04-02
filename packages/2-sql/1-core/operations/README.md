@@ -1,6 +1,6 @@
 # @prisma-next/sql-operations
 
-SQL-specific operation types and registry helpers for Prisma Next.
+SQL-specific operation types and registry for Prisma Next.
 
 ## Package Classification
 
@@ -10,18 +10,18 @@ SQL-specific operation types and registry helpers for Prisma Next.
 
 ## Overview
 
-This package provides SQL-specific operation types and typed registry helpers. It lives in the shared plane to allow both migration-plane (emitter/CLI) and runtime-plane (lanes/runtime) packages to import operation types without violating plane boundaries. The package contains only types and pure helpers (no pack I/O, no manifest assembly); manifest assembly is handled by the CLI/tooling layer.
+This package provides SQL-specific operation types that extend the generic `OperationRegistry` from `@prisma-next/operations` with SQL lowering specs. It lives in the shared plane to allow both migration-plane (emitter/CLI) and runtime-plane (lanes/runtime) packages to import operation types without violating plane boundaries. The package contains only types and pure helpers (no pack I/O, no manifest assembly); manifest assembly is handled by the CLI/tooling layer.
 
 ## Responsibilities
 
-- **SQL Operation Types**: SQL-specific operation signature types
-  - `SqlOperationSignature`: SQL-specific operation signature (extends core `OperationSignature` with lowering specs)
-  - `SqlLoweringSpec`: SQL-specific lowering specification (target family, strategy, template)
-  - `SqlOperationRegistry`: Typed registry alias for SQL operations
+- **SQL Operation Types**: SQL-specific operation entry and descriptor types
+  - `SqlOperationEntry`: Extends `OperationEntry` with a `lowering` field (`SqlLoweringSpec`)
+  - `SqlOperationDescriptor`: Extends `OperationDescriptor<SqlOperationEntry>` (entry plus `method` name)
+  - `SqlLoweringSpec`: SQL-specific lowering specification (`targetFamily`, `strategy`, `template`)
+  - `SqlOperationRegistry`: Typed registry alias (`OperationRegistry<SqlOperationEntry>`)
 
-- **Registry Helpers**: Typed helpers for creating and using SQL operation registries
-  - `createSqlOperationRegistry()`: Creates a typed SQL operation registry
-  - `register()`: Typed wrapper for registering operations in a registry
+- **Registry Factory**: Typed factory for creating SQL operation registries
+  - `createSqlOperationRegistry()`: Creates a typed `SqlOperationRegistry`
 
 ## Dependencies
 
@@ -66,17 +66,15 @@ flowchart TD
 ```typescript
 import {
   createSqlOperationRegistry,
-  register,
-  type SqlOperationSignature,
+  type SqlOperationDescriptor,
 } from '@prisma-next/sql-operations';
 
 const registry = createSqlOperationRegistry();
 
-const signature: SqlOperationSignature = {
-  forTypeId: 'pgvector/vector@1',
+const descriptor: SqlOperationDescriptor = {
   method: 'cosineDistance',
-  args: [{ kind: 'typeId', type: 'pgvector/vector@1' }],
-  returns: { kind: 'builtin', type: 'number' },
+  args: [{ codecId: 'pg/vector@1', nullable: false }],
+  returns: { codecId: 'pg/float8@1', nullable: false },
   lowering: {
     targetFamily: 'sql',
     strategy: 'infix',
@@ -84,9 +82,9 @@ const signature: SqlOperationSignature = {
   },
 };
 
-register(registry, signature);
+registry.register(descriptor);
 
-const operations = registry.byType('pgvector/vector@1');
+const entries = registry.entries(); // Record<string, SqlOperationEntry>
 ```
 
 ### Assembling Operations from Extension Packs (CLI/Tooling)

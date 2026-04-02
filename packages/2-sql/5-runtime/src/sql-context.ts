@@ -13,9 +13,12 @@ import {
   type RuntimeTargetDescriptor,
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
-import { createOperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import {
+  createSqlOperationRegistry,
+  type SqlOperationDescriptor,
+} from '@prisma-next/sql-operations';
 import type {
   Adapter,
   AnyQueryAst,
@@ -33,8 +36,6 @@ import type {
   MutationDefaultsOptions,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
-import type { QueryOperationDescriptor } from '@prisma-next/sql-relational-core/query-operations';
-import { createQueryOperationRegistry } from '@prisma-next/sql-relational-core/query-operations';
 import { type as arktype } from 'arktype';
 
 /**
@@ -54,7 +55,7 @@ export interface SqlStaticContributions {
   readonly codecs: () => CodecRegistry;
   // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
   readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
-  readonly queryOperations?: () => ReadonlyArray<QueryOperationDescriptor>;
+  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
   readonly mutationDefaultGenerators?: () => ReadonlyArray<RuntimeMutationDefaultGenerator>;
 }
 
@@ -454,7 +455,6 @@ export function createExecutionContext<
   assertExecutionStackContractRequirements(contract, stack);
 
   const codecRegistry = createCodecRegistry();
-  const operationRegistry = createOperationRegistry();
 
   const contributors: Array<SqlStaticContributions & ComponentDescriptor<string>> = [
     stack.target,
@@ -466,12 +466,9 @@ export function createExecutionContext<
     for (const c of contributor.codecs().values()) {
       codecRegistry.register(c);
     }
-    for (const operation of contributor.operationSignatures?.() ?? []) {
-      operationRegistry.register(operation);
-    }
   }
 
-  const queryOperationRegistry = createQueryOperationRegistry();
+  const queryOperationRegistry = createSqlOperationRegistry();
   for (const contributor of contributors) {
     for (const op of contributor.queryOperations?.() ?? []) {
       queryOperationRegistry.register(op);
@@ -495,7 +492,6 @@ export function createExecutionContext<
 
   return {
     contract,
-    operations: operationRegistry,
     codecs: codecRegistry,
     queryOperations: queryOperationRegistry,
     types,

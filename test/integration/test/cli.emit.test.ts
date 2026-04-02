@@ -12,7 +12,7 @@ import {
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { assembleOperationRegistry, getSqlDescriptorBundle } from '../utils/framework-components';
+import { getSqlDescriptorBundle } from '../utils/framework-components';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = resolve(__dirname, '../../../packages/1-framework/3-tooling/cli/test/fixtures');
@@ -37,7 +37,6 @@ describe('emit command functionality', () => {
   const buildEmitterArtifacts = () => {
     const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
     return {
-      operationRegistry: assembleOperationRegistry(descriptors),
       codecTypeImports: extractCodecTypeImports(descriptors),
       operationTypeImports: extractOperationTypeImports(descriptors),
       extensionIds: extractComponentIds({ id: 'sql' }, target, adapter, extensions),
@@ -49,13 +48,11 @@ describe('emit command functionality', () => {
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
       const contract = await loadContractFromTs(contractPath);
-      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-        buildEmitterArtifacts();
+      const { codecTypeImports, operationTypeImports, extensionIds } = buildEmitterArtifacts();
 
       const result = await emit(
         contract,
         {
-          operationRegistry,
           codecTypeImports,
           operationTypeImports,
           extensionIds,
@@ -95,13 +92,11 @@ describe('emit command functionality', () => {
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
       const contract = await loadContractFromTs(contractPath);
-      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-        buildEmitterArtifacts();
+      const { codecTypeImports, operationTypeImports, extensionIds } = buildEmitterArtifacts();
 
       const result = await emit(
         contract,
         {
-          operationRegistry,
           codecTypeImports,
           operationTypeImports,
           extensionIds,
@@ -120,13 +115,11 @@ describe('emit command functionality', () => {
       const newOutputDir = join(tmpdir(), `prisma-next-test-new-${Date.now()}`);
       const contractPath = join(fixturesDir, 'valid-contract.ts');
       const contract = await loadContractFromTs(contractPath);
-      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
-        buildEmitterArtifacts();
+      const { codecTypeImports, operationTypeImports, extensionIds } = buildEmitterArtifacts();
 
       const result = await emit(
         contract,
         {
-          operationRegistry,
           codecTypeImports,
           operationTypeImports,
           extensionIds,

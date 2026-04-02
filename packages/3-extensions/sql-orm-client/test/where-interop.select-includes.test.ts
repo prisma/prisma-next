@@ -25,7 +25,6 @@ const literal = (value: unknown) => LiteralExpr.of(value);
 function op(self: ColumnRef, args: Array<ColumnRef | ParamRef | LiteralExpr>): OperationExpr {
   return new OperationExpr({
     method: 'op',
-    forTypeId: 'sql/text@1',
     self,
     args,
     returns: {} as never,

@@ -32,7 +32,7 @@ const slugidDefaultsPack: SqlControlExtensionDescriptor<'postgres'> = {
   version: '0.0.1',
   familyId: 'sql',
   targetId: 'postgres',
-  operationSignatures: () => [],
+
   controlMutationDefaults: () => ({
     defaultFunctionRegistry: new Map([
       ['slugid', { lower: slugidDefaultHandler, usageSignatures: ['slugid()'] }],

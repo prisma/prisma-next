@@ -1,5 +1,4 @@
-import { createOperationRegistry } from '@prisma-next/operations';
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
+import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../src/exports/runtime';
@@ -22,17 +21,13 @@ describe('pgvector operations', () => {
     expect(vectorCodec?.id).toBe('pg/vector@1');
   });
 
-  it('descriptor provides operation signatures', () => {
-    expect(pgvectorDescriptor.operationSignatures).toBeDefined();
-    const operations = (pgvectorDescriptor.operationSignatures?.() ??
-      []) as SqlOperationSignature[];
+  it('descriptor provides query operations', () => {
+    const operations = pgvectorDescriptor.queryOperations!();
+    expect(operations).toBeDefined();
     expect(operations.length).toBe(2);
 
     const cosineDistanceOp = operations.find((op) => op.method === 'cosineDistance');
     expect(cosineDistanceOp).toBeDefined();
-    expect(cosineDistanceOp?.forTypeId).toBe('pg/vector@1');
-    expect(cosineDistanceOp?.args).toEqual([{ kind: 'param' }]);
-    expect(cosineDistanceOp?.returns).toEqual({ kind: 'builtin', type: 'number' });
     expect(cosineDistanceOp?.lowering).toEqual({
       targetFamily: 'sql',
       strategy: 'function',
@@ -41,9 +36,6 @@ describe('pgvector operations', () => {
 
     const cosineSimilarityOp = operations.find((op) => op.method === 'cosineSimilarity');
     expect(cosineSimilarityOp).toBeDefined();
-    expect(cosineSimilarityOp?.forTypeId).toBe('pg/vector@1');
-    expect(cosineSimilarityOp?.args).toEqual([{ kind: 'param' }]);
-    expect(cosineSimilarityOp?.returns).toEqual({ kind: 'builtin', type: 'number' });
     expect(cosineSimilarityOp?.lowering).toEqual({
       targetFamily: 'sql',
       strategy: 'function',
@@ -51,19 +43,17 @@ describe('pgvector operations', () => {
     });
   });
 
-  it('operations can be registered in operation registry', () => {
-    expect(pgvectorDescriptor.operationSignatures).toBeDefined();
-    const operations = pgvectorDescriptor.operationSignatures?.() ?? [];
+  it('operations can be registered in registry', () => {
+    const operations = pgvectorDescriptor.queryOperations!();
 
-    const registry = createOperationRegistry();
+    const registry = createSqlOperationRegistry();
     for (const op of operations) {
       registry.register(op);
     }
 
-    const registeredOps = registry.byType('pg/vector@1');
-    expect(registeredOps.length).toBe(2);
-    expect(registeredOps.find((op) => op.method === 'cosineDistance')).toBeDefined();
-    expect(registeredOps.find((op) => op.method === 'cosineSimilarity')).toBeDefined();
+    const entries = registry.entries();
+    expect(entries['cosineDistance']).toBeDefined();
+    expect(entries['cosineSimilarity']).toBeDefined();
   });
 
   it('codecs can be registered in codec registry', () => {

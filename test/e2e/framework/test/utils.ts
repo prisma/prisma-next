@@ -13,7 +13,6 @@ import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
@@ -153,8 +152,6 @@ export interface TestRuntimeContext<TContract extends Contract<SqlStorage>> {
   readonly context: ReturnType<typeof createTestContext>;
   /** The test runtime for executing queries */
   readonly runtime: Awaited<ReturnType<typeof createTestRuntimeFromClient>>;
-  /** The schema tables extracted from the contract */
-  readonly tables: ReturnType<typeof schema<TContract>>['tables'];
   /** The sql-builder Db proxy for building and executing queries */
   readonly db: Db<TContract>;
   /** The raw pg client for direct SQL queries */
@@ -169,15 +166,14 @@ export interface TestRuntimeContext<TContract extends Contract<SqlStorage>> {
  * - Loads contract from disk
  * - Spins up a dev database
  * - Runs db init (migrations)
- * - Creates adapter, context, runtime, and tables
+ * - Creates adapter, context, and runtime
  * - Ensures runtime is closed after the test
  *
  * @example
  * ```typescript
  * it('runs a query', async () => {
- *   await withTestRuntime<Contract>(contractJsonPath, async ({ tables, runtime, context }) => {
- *     const user = tables.user!;
- *     const plan = sql({ context }).from(user).select({ id: user.columns.id! }).build();
+ *   await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
+ *     const plan = db.user.select('id').build();
  *     const rows = await executePlanAndCollect(runtime, plan);
  *     expect(rows.length).toBeGreaterThan(0);
  *   });
@@ -201,9 +197,8 @@ export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
       const runtime = await createTestRuntimeFromClient(contract, client);
 
       try {
-        const tables = schema<TContract>(context).tables;
         const db = sqlBuilder<TContract>({ context });
-        await callback({ contract, context, runtime, tables, db, client, sql });
+        await callback({ contract, context, runtime, db, client, sql });
       } finally {
         await runtime.close();
       }

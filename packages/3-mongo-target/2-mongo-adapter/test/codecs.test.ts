@@ -10,7 +10,7 @@ import {
   mongoStringCodec,
   mongoVectorCodec,
 } from '../src/core/codecs';
-import { mongoVectorNearOperation, mongoVectorOperationSignatures } from '../src/core/operations';
+import { mongoVectorNearOperation, mongoVectorOperationDescriptors } from '../src/core/operations';
 
 describe('mongoObjectIdCodec', () => {
   it('decodes ObjectId to hex string', () => {
@@ -98,34 +98,30 @@ describe('mongoVectorCodec', () => {
   });
 });
 
-describe('vector operation signatures (production-defined)', () => {
-  it('mongoVectorNearOperation targets mongo/vector@1', () => {
-    expect(mongoVectorNearOperation.forTypeId).toBe(MONGO_VECTOR_CODEC_ID);
+describe('vector operation descriptors (production-defined)', () => {
+  it('mongoVectorNearOperation has method near', () => {
     expect(mongoVectorNearOperation.method).toBe('near');
+    expect(mongoVectorNearOperation.args[0]?.codecId).toBe(MONGO_VECTOR_CODEC_ID);
   });
 
-  it('mongoVectorOperationSignatures includes near', () => {
-    expect(mongoVectorOperationSignatures).toHaveLength(1);
-    expect(mongoVectorOperationSignatures[0]).toBe(mongoVectorNearOperation);
+  it('mongoVectorOperationDescriptors includes near', () => {
+    expect(mongoVectorOperationDescriptors).toHaveLength(1);
+    expect(mongoVectorOperationDescriptors[0]).toBe(mongoVectorNearOperation);
   });
 
   it('registers production-defined operations in registry', () => {
     const registry = createOperationRegistry();
-    for (const op of mongoVectorOperationSignatures) {
+    for (const op of mongoVectorOperationDescriptors) {
       registry.register(op);
     }
 
-    const ops = registry.byType(MONGO_VECTOR_CODEC_ID);
-    expect(ops).toHaveLength(1);
-    expect(ops[0]?.method).toBe('near');
+    const entries = registry.entries();
+    expect(entries['near']).toBeDefined();
+    expect(entries['near']?.args[0]?.codecId).toBe(MONGO_VECTOR_CODEC_ID);
   });
 
-  it('returns no operations for types without registered extensions', () => {
+  it('returns empty entries for fresh registry', () => {
     const registry = createOperationRegistry();
-    for (const op of mongoVectorOperationSignatures) {
-      registry.register(op);
-    }
-
-    expect(registry.byType('mongo/string@1')).toHaveLength(0);
+    expect(Object.keys(registry.entries())).toHaveLength(0);
   });
 });

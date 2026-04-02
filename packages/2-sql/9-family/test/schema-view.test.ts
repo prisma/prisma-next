@@ -32,7 +32,7 @@ function createMockStack() {
       version: '0.0.1',
       familyId: 'sql',
       targetId: 'postgres',
-      operationSignatures: () => [],
+
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     adapter: {
@@ -41,7 +41,7 @@ function createMockStack() {
       version: '0.0.1',
       familyId: 'sql',
       targetId: 'postgres',
-      operationSignatures: () => [],
+
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     extensionPacks: [],

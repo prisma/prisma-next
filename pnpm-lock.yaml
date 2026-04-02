@@ -1515,6 +1515,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/framework-components
+      '@prisma-next/sql-operations':
+        specifier: workspace:*
+        version: link:../../1-core/operations
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../relational-core

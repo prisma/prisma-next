@@ -15,7 +15,7 @@ import {
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { assembleOperationRegistry, getSqlDescriptorBundle } from '../utils/framework-components';
+import { getSqlDescriptorBundle } from '../utils/framework-components';
 
 const execFileAsync = promisify(execFile);
 
@@ -147,12 +147,10 @@ describe('contract.d.ts imports resolution', () => {
       });
 
       const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
-      const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitStackInput = {
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,
@@ -283,12 +281,10 @@ type UserIdColumn = UserColumns['id'];
       });
 
       const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
-      const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitStackInput = {
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,

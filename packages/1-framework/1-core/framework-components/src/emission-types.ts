@@ -1,5 +1,4 @@
 import type { Contract, ContractModel } from '@prisma-next/contract/types';
-import type { OperationRegistry } from '@prisma-next/operations';
 import type { RenderTypeContext, TypeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types-import-spec';
 
@@ -15,7 +14,6 @@ export interface GenerateContractTypesOptions {
 }
 
 export interface ValidationContext {
-  readonly operationRegistry?: OperationRegistry;
   readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly operationTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds?: ReadonlyArray<string>;

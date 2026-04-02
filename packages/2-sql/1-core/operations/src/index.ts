@@ -1,5 +1,6 @@
 import type {
-  OperationSignature as CoreOperationSignature,
+  OperationDescriptor,
+  OperationEntry,
   OperationRegistry,
 } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
@@ -10,16 +11,14 @@ export interface SqlLoweringSpec {
   readonly template: string;
 }
 
-export interface SqlOperationSignature extends CoreOperationSignature {
+export interface SqlOperationEntry extends OperationEntry {
   readonly lowering: SqlLoweringSpec;
 }
 
-export type SqlOperationRegistry = OperationRegistry<SqlOperationSignature>;
+export type SqlOperationDescriptor = OperationDescriptor<SqlOperationEntry>;
+
+export type SqlOperationRegistry = OperationRegistry<SqlOperationEntry>;
 
 export function createSqlOperationRegistry(): SqlOperationRegistry {
-  return createOperationRegistry<SqlOperationSignature>();
-}
-
-export function register(registry: SqlOperationRegistry, signature: SqlOperationSignature): void {
-  registry.register(signature);
+  return createOperationRegistry<SqlOperationEntry>();
 }
