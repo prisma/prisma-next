@@ -10,11 +10,6 @@ import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sq
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { contract } from '../../prisma/contract';
 import { PostCollection, UserCollection } from '../orm-client/collections';
-// TODO: this import defeats the purpose of the no-emit flow. The staged DSL's
-// inferred type (SqlContractResult<Definition>) is too deeply nested for
-// TypeScript to reduce to literal table/field keys. Fixing this is a failing
-// acceptance criterion for the ts-contract-authoring-redesign project.
-import type { Contract } from '../prisma/contract.d';
 
 export const stack = createSqlExecutionStack({
   target: postgresTarget,
@@ -23,7 +18,7 @@ export const stack = createSqlExecutionStack({
   extensionPacks: [pgvector],
 });
 
-const validatedContract = validateContract<Contract>(contract);
+const validatedContract = validateContract<typeof contract>(contract);
 
 export const context = createExecutionContext({
   contract: validatedContract,
@@ -32,7 +27,7 @@ export const context = createExecutionContext({
 
 export const schema = schemaBuilder(context);
 export const tables = schema.tables;
-export const sql = sqlBuilder<Contract>({ context });
+export const sql = sqlBuilder<typeof contract>({ context });
 
 export function createOrmClient(runtime: Runtime) {
   return orm({

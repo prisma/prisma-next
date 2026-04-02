@@ -18,10 +18,7 @@ import { expectTypeOf, test } from 'vitest';
 //
 // Each test uses `typeof contract` (the inferred type from the staged DSL),
 // NOT an emitted Contract type. If TypeScript cannot reduce the inferred type
-// to literal table/column/model keys, these tests fail — documenting the gap.
-//
-// The fix is expected to land with ADR 182 (unified contract representation),
-// which simplifies the type pipeline enough for TypeScript to reduce literals.
+// to literal table/column/model keys, these tests fail.
 // ---------------------------------------------------------------------------
 
 // -- Fixtures ---------------------------------------------------------------
@@ -33,7 +30,7 @@ const User = model('User', {
   },
 }).sql({ table: 'user' });
 
-const PostBase = model('Post', {
+const Post = model('Post', {
   fields: {
     id: field.column(int4Column).id(),
     userId: field.column(int4Column),
@@ -122,12 +119,11 @@ const multiModelContract = defineContract({
   target: postgresPack,
   models: {
     User,
-    Post: PostBase,
+    Post,
   },
 });
 
 test('multi-model contract preserves table name literals', () => {
-  // @ts-expect-error table keys degrade to `string` with multiple models (acceptance criterion gap)
   expectTypeOf<keyof typeof multiModelContract.storage.tables>().toEqualTypeOf<'user' | 'post'>();
 });
 
@@ -145,8 +141,6 @@ test('multi-model sql() dot access works for all tables', () => {
   const context = createTestContext(validated, createStubAdapter());
   const db = sql({ context });
 
-  // @ts-expect-error table keys degrade to index signatures with multiple models (acceptance criterion gap)
   db.user.select('id', 'email').build();
-  // @ts-expect-error table keys degrade to index signatures with multiple models (acceptance criterion gap)
   db.post.select('id', 'title').build();
 });

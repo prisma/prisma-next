@@ -1032,12 +1032,14 @@ export class StagedModelBuilder<
   }
 
   sql<const NextSqlSpec extends SqlStageSpec>(
-    specOrFactory: StageInput<
-      SqlContext<Fields>,
-      ValidateSqlStageSpec<Fields, AttributesSpec, NextSqlSpec>
-    >,
-  ): StagedModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec> {
-    return new StagedModelBuilder(this.stageOne, this.attributesFactory, specOrFactory);
+    specOrFactory: StageInput<SqlContext<Fields>, NextSqlSpec>,
+  ): [ValidateSqlStageSpec<Fields, AttributesSpec, NextSqlSpec>] extends [never]
+    ? StagedModelBuilder<ModelName, Fields, Relations, AttributesSpec, never>
+    : StagedModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec> {
+    // Conditional return type cannot be verified by the implementation; the
+    // runtime value is always a valid StagedModelBuilder regardless of the
+    // validation outcome (validation is type-level only).
+    return new StagedModelBuilder(this.stageOne, this.attributesFactory, specOrFactory) as never;
   }
 
   buildAttributesSpec(): AttributesSpec {
