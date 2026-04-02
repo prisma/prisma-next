@@ -580,12 +580,28 @@ export function instantiateAuthoringFieldPreset(
 
 /**
  * Base descriptor for any framework component.
- * @template Kind — discriminant identifying the component type (e.g. `'family'`, `'target'`).
+ *
+ * All component descriptors share these fundamental properties that identify
+ * the component and provide its metadata. This interface is extended by
+ * specific descriptor types (FamilyDescriptor, TargetDescriptor, etc.).
+ *
+ * @template Kind - Discriminator literal identifying the component type.
+ *   Built-in kinds are 'family', 'target', 'adapter', 'driver', 'extension',
+ *   but the type accepts any string to allow ecosystem extensions.
+ *
+ * @example
+ * ```ts
+ * // All descriptors have these properties
+ * descriptor.kind     // The Kind type parameter (e.g., 'family', 'target', or custom kinds)
+ * descriptor.id       // Unique string identifier (e.g., 'sql', 'postgres')
+ * descriptor.version  // Component version (semver)
+ * ```
  */
 export interface ComponentDescriptor<Kind extends string> extends ComponentMetadata {
-  /** Discriminant identifying the component type. */
+  /** Discriminator identifying the component type */
   readonly kind: Kind;
-  /** Unique identifier for this component instance. */
+
+  /** Unique identifier for this component (e.g., 'sql', 'postgres', 'pgvector') */
   readonly id: string;
 }
 
@@ -643,24 +659,70 @@ export function checkContractComponentRequirements(
 }
 
 /**
- * A family groups data sources with shared semantics (e.g., SQL, document).
- * @template TFamilyId — literal string identifying this family (e.g. `'sql'`).
+ * Descriptor for a family component.
+ *
+ * A "family" represents a category of data sources with shared semantics
+ * (e.g., SQL databases, document stores). Families define:
+ * - Query semantics and operations (SELECT, INSERT, find, aggregate, etc.)
+ * - Contract structure (tables vs collections, columns vs fields)
+ * - Type system and codecs
+ *
+ * Families are the top-level grouping. Each family contains multiple targets
+ * (e.g., SQL family contains Postgres, MySQL, SQLite targets).
+ *
+ * Extended by plane-specific descriptors:
+ * - `ControlFamilyDescriptor` - adds `hook` for CLI/tooling operations
+ * - `RuntimeFamilyDescriptor` - adds runtime-specific factory methods
+ *
+ * @template TFamilyId - Literal type for the family identifier (e.g., 'sql', 'document')
+ *
+ * @example
+ * ```ts
+ * import sql from '@prisma-next/family-sql/control';
+ *
+ * sql.kind     // 'family'
+ * sql.familyId // 'sql'
+ * sql.id       // 'sql'
+ * ```
  */
 export interface FamilyDescriptor<TFamilyId extends string> extends ComponentDescriptor<'family'> {
-  /** The family this component belongs to. */
+  /** The family identifier (e.g., 'sql', 'document') */
   readonly familyId: TFamilyId;
 }
 
 /**
- * A specific database within a family (e.g., Postgres, MySQL).
- * @template TFamilyId — literal string identifying the family (e.g. `'sql'`).
- * @template TTargetId — literal string identifying this target (e.g. `'postgres'`).
+ * Descriptor for a target component.
+ *
+ * A "target" represents a specific database or data store within a family
+ * (e.g., Postgres, MySQL, MongoDB). Targets define:
+ * - Native type mappings (e.g., Postgres int4 → TypeScript number)
+ * - Target-specific capabilities (e.g., RETURNING, LATERAL joins)
+ *
+ * Targets are bound to a family and provide the target-specific implementation
+ * details that adapters and drivers use.
+ *
+ * Extended by plane-specific descriptors:
+ * - `ControlTargetDescriptor` - adds optional `migrations` capability
+ * - `RuntimeTargetDescriptor` - adds runtime factory method
+ *
+ * @template TFamilyId - Literal type for the family identifier
+ * @template TTargetId - Literal type for the target identifier (e.g., 'postgres', 'mysql')
+ *
+ * @example
+ * ```ts
+ * import postgres from '@prisma-next/target-postgres/control';
+ *
+ * postgres.kind     // 'target'
+ * postgres.familyId // 'sql'
+ * postgres.targetId // 'postgres'
+ * ```
  */
 export interface TargetDescriptor<TFamilyId extends string, TTargetId extends string>
   extends ComponentDescriptor<'target'> {
-  /** The family this target belongs to. */
+  /** The family this target belongs to */
   readonly familyId: TFamilyId;
-  /** Unique identifier for this target within its family. */
+
+  /** The target identifier (e.g., 'postgres', 'mysql', 'mongodb') */
   readonly targetId: TTargetId;
 }
 
@@ -705,41 +767,114 @@ export type DriverPackRef<
 };
 
 /**
- * Protocol and dialect implementation for a target.
- * @template TFamilyId — literal string identifying the family.
- * @template TTargetId — literal string identifying the target.
+ * Descriptor for an adapter component.
+ *
+ * An "adapter" provides the protocol and dialect implementation for a target.
+ * Adapters handle:
+ * - SQL/query generation (lowering AST to target-specific syntax)
+ * - Codec registration (encoding/decoding between JS and wire types)
+ * - Type mappings and coercions
+ *
+ * Adapters are bound to a specific family+target combination and work with
+ * any compatible driver for that target.
+ *
+ * Extended by plane-specific descriptors:
+ * - `ControlAdapterDescriptor` - control-plane factory
+ * - `RuntimeAdapterDescriptor` - runtime factory
+ *
+ * @template TFamilyId - Literal type for the family identifier
+ * @template TTargetId - Literal type for the target identifier
+ *
+ * @example
+ * ```ts
+ * import postgresAdapter from '@prisma-next/adapter-postgres/control';
+ *
+ * postgresAdapter.kind     // 'adapter'
+ * postgresAdapter.familyId // 'sql'
+ * postgresAdapter.targetId // 'postgres'
+ * ```
  */
 export interface AdapterDescriptor<TFamilyId extends string, TTargetId extends string>
   extends ComponentDescriptor<'adapter'> {
-  /** The family this adapter belongs to. */
+  /** The family this adapter belongs to */
   readonly familyId: TFamilyId;
-  /** The target this adapter implements. */
+
+  /** The target this adapter is designed for */
   readonly targetId: TTargetId;
 }
 
 /**
- * Connection and execution layer for a target.
- * @template TFamilyId — literal string identifying the family.
- * @template TTargetId — literal string identifying the target.
+ * Descriptor for a driver component.
+ *
+ * A "driver" provides the connection and execution layer for a target.
+ * Drivers handle:
+ * - Connection management (pooling, timeouts, retries)
+ * - Query execution (sending SQL/commands, receiving results)
+ * - Transaction management
+ * - Wire protocol communication
+ *
+ * Drivers are bound to a specific family+target and work with any compatible
+ * adapter. Multiple drivers can exist for the same target (e.g., node-postgres
+ * vs postgres.js for Postgres).
+ *
+ * Extended by plane-specific descriptors:
+ * - `ControlDriverDescriptor` - creates driver from connection URL
+ * - `RuntimeDriverDescriptor` - creates driver with runtime options
+ *
+ * @template TFamilyId - Literal type for the family identifier
+ * @template TTargetId - Literal type for the target identifier
+ *
+ * @example
+ * ```ts
+ * import postgresDriver from '@prisma-next/driver-postgres/control';
+ *
+ * postgresDriver.kind     // 'driver'
+ * postgresDriver.familyId // 'sql'
+ * postgresDriver.targetId // 'postgres'
+ * ```
  */
 export interface DriverDescriptor<TFamilyId extends string, TTargetId extends string>
   extends ComponentDescriptor<'driver'> {
-  /** The family this driver belongs to. */
+  /** The family this driver belongs to */
   readonly familyId: TFamilyId;
-  /** The target this driver connects to. */
+
+  /** The target this driver connects to */
   readonly targetId: TTargetId;
 }
 
 /**
- * Optional capability addition to a target (e.g., pgvector).
- * @template TFamilyId — literal string identifying the family.
- * @template TTargetId — literal string identifying the target.
+ * Descriptor for an extension component.
+ *
+ * An "extension" adds optional capabilities to a target. Extensions can provide:
+ * - Additional operations (e.g., vector similarity search with pgvector)
+ * - Custom types and codecs (e.g., vector type)
+ * - Extended query capabilities
+ *
+ * Extensions are bound to a specific family+target and are registered in the
+ * config alongside the core components. Multiple extensions can be used together.
+ *
+ * Extended by plane-specific descriptors:
+ * - `ControlExtensionDescriptor` - control-plane extension factory
+ * - `RuntimeExtensionDescriptor` - runtime extension factory
+ *
+ * @template TFamilyId - Literal type for the family identifier
+ * @template TTargetId - Literal type for the target identifier
+ *
+ * @example
+ * ```ts
+ * import pgvector from '@prisma-next/extension-pgvector/control';
+ *
+ * pgvector.kind     // 'extension'
+ * pgvector.familyId // 'sql'
+ * pgvector.targetId // 'postgres'
+ * ```
  */
 export interface ExtensionDescriptor<TFamilyId extends string, TTargetId extends string>
   extends ComponentDescriptor<'extension'> {
-  /** The family this extension belongs to. */
+  /** The family this extension belongs to */
   readonly familyId: TFamilyId;
-  /** The target this extension augments. */
+
+  /** The target this extension is designed for */
   readonly targetId: TTargetId;
 }
 
