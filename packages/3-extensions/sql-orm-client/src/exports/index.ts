@@ -7,14 +7,17 @@ export type {
   AggregateBuilder,
   AggregateResult,
   AggregateSpec,
+  AnyOrderBy,
   CollectionContext,
   CollectionModelName,
   CollectionState,
   CollectionTypeState,
+  ColumnOrderBy,
   ComparisonMethods,
   CreateInput,
   DefaultCollectionTypeState,
   DefaultModelRow,
+  ExpressionOrderBy,
   IncludeExpr,
   ModelAccessor,
   OrderByDirective,
@@ -30,4 +33,4 @@ export type {
   ShorthandWhereFilter,
   UniqueConstraintCriterion,
 } from '../types';
-export { emptyState } from '../types';
+export { emptyState, isColumnOrderBy } from '../types';

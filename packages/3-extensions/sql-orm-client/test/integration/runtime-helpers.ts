@@ -2,9 +2,10 @@ import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { Pool } from 'pg';
+import { encodeParams } from '../../../../2-sql/5-runtime/src/codecs/encoding';
 import { createPostgresAdapter } from '../../../../3-targets/6-adapters/postgres/src/core/adapter';
 import type { RuntimeQueryable } from '../../src/types';
-import { getTestContract } from '../helpers';
+import { getTestContext, getTestContract } from '../helpers';
 
 interface SeedUser {
   id: number;
@@ -18,6 +19,7 @@ interface SeedPost {
   title: string;
   userId: number | null;
   views: number;
+  embedding?: number[] | null;
 }
 
 interface SeedProfile {
@@ -91,9 +93,8 @@ export async function createPgIntegrationRuntime(
       const executablePlan = toExecutionPlan(plan);
       executions.push(executablePlan as ExecutionPlan);
 
-      const runQuery = pool.query<Record<string, unknown>>(executablePlan.sql, [
-        ...executablePlan.params,
-      ]);
+      const encodedParams = encodeParams(executablePlan as ExecutionPlan, getTestContext().codecs);
+      const runQuery = pool.query<Record<string, unknown>>(executablePlan.sql, [...encodedParams]);
       const generator = async function* (): AsyncGenerator<Row, void, unknown> {
         const result = await runQuery;
         for (const row of result.rows) {
@@ -109,6 +110,8 @@ export async function createPgIntegrationRuntime(
 }
 
 export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<void> {
+  await runtime.query('create extension if not exists vector');
+
   await runtime.query('drop table if exists tags');
   await runtime.query('drop table if exists comments');
   await runtime.query('drop table if exists profiles');
@@ -129,7 +132,8 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
       id integer primary key,
       title text not null,
       user_id integer,
-      views integer not null
+      views integer not null,
+      embedding vector
     )
   `);
 
@@ -174,12 +178,16 @@ export async function seedPosts(
   posts: readonly SeedPost[],
 ): Promise<void> {
   for (const post of posts) {
-    await runtime.query('insert into posts (id, title, user_id, views) values ($1, $2, $3, $4)', [
-      post.id,
-      post.title,
-      post.userId,
-      post.views,
-    ]);
+    await runtime.query(
+      'insert into posts (id, title, user_id, views, embedding) values ($1, $2, $3, $4, $5)',
+      [
+        post.id,
+        post.title,
+        post.userId,
+        post.views,
+        post.embedding ? `[${post.embedding.join(',')}]` : null,
+      ],
+    );
   }
 }
 

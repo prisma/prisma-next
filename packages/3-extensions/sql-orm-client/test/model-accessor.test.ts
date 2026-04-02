@@ -10,6 +10,8 @@ import {
   LiteralExpr,
   NotExpr,
   NullCheckExpr,
+  OperationExpr,
+  ParamRef,
   ProjectionItem,
   SelectAst,
   TableSource,
@@ -419,6 +421,73 @@ describe('createModelAccessor', () => {
       expect(() => accessor['comments']!.some({ postId: 42 })).toThrow(
         /does not support equality comparisons/,
       );
+    });
+  });
+
+  describe('extension operations', () => {
+    it('attaches cosineDistance to vector field, not to text field', () => {
+      const accessor = createModelAccessor(context, 'Post');
+      const embedding = accessor['embedding'] as unknown as Record<string, unknown>;
+      const title = accessor['title'] as unknown as Record<string, unknown>;
+
+      expect(typeof embedding['cosineDistance']).toBe('function');
+      expect(title['cosineDistance']).toBeUndefined();
+    });
+
+    it('cosineDistance() returns expression result with comparison and ordering methods', () => {
+      const accessor = createModelAccessor(context, 'Post');
+      const embedding = accessor['embedding'] as unknown as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
+      const result = embedding['cosineDistance']!([1, 2, 3]) as Record<string, unknown>;
+
+      expect(typeof result['lt']).toBe('function');
+      expect(typeof result['gt']).toBe('function');
+      expect(typeof result['eq']).toBe('function');
+      expect(typeof result['asc']).toBe('function');
+      expect(typeof result['desc']).toBe('function');
+      expect(typeof result['isNull']).toBe('function');
+      expect(result['like']).toBeUndefined();
+    });
+
+    it('cosineDistance().lt() produces BinaryExpr(lt, OperationExpr, LiteralExpr)', () => {
+      const accessor = createModelAccessor(context, 'Post');
+      const embedding = accessor['embedding'] as unknown as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
+      const result = embedding['cosineDistance']!([1, 2, 3]) as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
+      const expr = result['lt']!(0.2);
+
+      expect(expr).toBeInstanceOf(BinaryExpr);
+      const binary = expr as unknown as BinaryExpr;
+      expect(binary.op).toBe('lt');
+      expect(binary.left).toBeInstanceOf(OperationExpr);
+      expect(binary.right).toBeInstanceOf(LiteralExpr);
+
+      const opExpr = binary.left as unknown as OperationExpr;
+      expect(opExpr.method).toBe('cosineDistance');
+      expect(opExpr.forTypeId).toBe('pg/vector@1');
+      expect(opExpr.self).toEqual(ColumnRef.of('posts', 'embedding'));
+      expect(opExpr.args[0]).toEqual(ParamRef.of([1, 2, 3], { codecId: 'pg/vector@1' }));
+    });
+
+    it('cosineDistance().asc() produces ExpressionOrderBy', () => {
+      const accessor = createModelAccessor(context, 'Post');
+      const embedding = accessor['embedding'] as unknown as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
+      const result = embedding['cosineDistance']!([1, 2, 3]) as Record<string, () => unknown>;
+      const order = result['asc']!() as { expr: OperationExpr; direction: string };
+
+      expect(order.direction).toBe('asc');
+      expect(order.expr).toBeInstanceOf(OperationExpr);
+      expect(order.expr.method).toBe('cosineDistance');
     });
   });
 });

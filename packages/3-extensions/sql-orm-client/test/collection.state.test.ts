@@ -4,6 +4,7 @@ import {
   ColumnRef,
   LiteralExpr,
   NullCheckExpr,
+  OperationExpr,
   ParamRef,
   type ToWhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -120,6 +121,44 @@ describe('Collection', () => {
       expect(reordered.state.orderBy).toEqual([
         { column: 'user_id', direction: 'asc' },
         { column: 'id', direction: 'desc' },
+      ]);
+    });
+
+    it('orderBy() accepts expression-based orders', () => {
+      const { collection: postCollection } = createCollectionFor('Post', baseContract);
+
+      const opExpr = OperationExpr.function({
+        method: 'cosineDistance',
+        forTypeId: 'pg/vector@1',
+        self: ColumnRef.of('posts', 'embedding'),
+        args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+        returns: { kind: 'builtin', type: 'number' },
+        template: '1 - ({{self}} <=> {{arg0}})',
+      });
+
+      const ordered = postCollection.orderBy(() => ({ expr: opExpr, direction: 'asc' as const }));
+      expect(ordered.state.orderBy).toEqual([{ expr: opExpr, direction: 'asc' }]);
+    });
+
+    it('orderBy() mixes column-based and expression-based orders', () => {
+      const { collection: postCollection } = createCollectionFor('Post', baseContract);
+
+      const opExpr = OperationExpr.function({
+        method: 'cosineDistance',
+        forTypeId: 'pg/vector@1',
+        self: ColumnRef.of('posts', 'embedding'),
+        args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+        returns: { kind: 'builtin', type: 'number' },
+        template: '1 - ({{self}} <=> {{arg0}})',
+      });
+
+      const ordered = postCollection
+        .orderBy((p) => p.id.asc())
+        .orderBy(() => ({ expr: opExpr, direction: 'desc' as const }));
+
+      expect(ordered.state.orderBy).toEqual([
+        { column: 'id', direction: 'asc' },
+        { expr: opExpr, direction: 'desc' },
       ]);
     });
 
