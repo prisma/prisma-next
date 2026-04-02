@@ -6,7 +6,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 import {
   extractCodecTypeImports,
-  extractExtensionIds,
+  extractComponentIds,
   extractParameterizedRenderers,
 } from '../src/core/assembly';
 
@@ -434,14 +434,14 @@ describe('extractCodecTypeImports', () => {
   });
 });
 
-describe('extractExtensionIds', () => {
-  it('extracts extension IDs in deterministic order', () => {
+describe('extractComponentIds', () => {
+  it('extracts component IDs in deterministic order', () => {
     const target = createMockTarget();
     const adapter = createMockAdapter();
     const extension1 = createMockExtension('pgvector');
     const extension2 = createMockExtension('postgis');
 
-    const result = extractExtensionIds({ id: 'sql' }, target, adapter, [extension1, extension2]);
+    const result = extractComponentIds({ id: 'sql' }, target, adapter, [extension1, extension2]);
 
     expect(result).toEqual(['sql', 'postgres', 'pgvector', 'postgis']);
   });

@@ -9,7 +9,7 @@ export {
   assembleAuthoringContributions,
   assembleComponents,
   extractCodecTypeImports,
-  extractExtensionIds,
+  extractComponentIds,
   extractOperationTypeImports,
   extractParameterizedRenderers,
   extractParameterizedTypeImports,

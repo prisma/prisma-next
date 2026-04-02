@@ -5,7 +5,7 @@
 export {
   assembleOperationRegistry,
   extractCodecTypeImports,
-  extractExtensionIds,
+  extractComponentIds,
   extractOperationTypeImports,
   extractQueryOperationTypeImports,
 } from '../core/assembly';

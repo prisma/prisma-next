@@ -118,7 +118,7 @@ export function extractQueryOperationTypeImports(
   return imports;
 }
 
-export function extractExtensionIds(
+export function extractComponentIds(
   family: { readonly id: string },
   target: { readonly id: string },
   adapter: { readonly id: string } | undefined,
@@ -291,7 +291,7 @@ export function assembleComponents(input: AssembleComponentsInput): AssembledCom
     codecTypeImports: extractCodecTypeImports(allDescriptors),
     operationTypeImports: extractOperationTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
-    extensionIds: extractExtensionIds(family, target, adapter, extensionPacks),
+    extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
     parameterizedRenderers: extractParameterizedRenderers(allDescriptors),
     parameterizedTypeImports: extractParameterizedTypeImports(allDescriptors),
     authoringContributions: assembleAuthoringContributions(allDescriptors),

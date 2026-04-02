@@ -19,7 +19,7 @@ export type { AssembledAuthoringContributions } from '@prisma-next/contract/asse
 export {
   assembleAuthoringContributions,
   extractCodecTypeImports,
-  extractExtensionIds,
+  extractComponentIds,
   extractOperationTypeImports,
   extractParameterizedRenderers,
   extractParameterizedTypeImports,

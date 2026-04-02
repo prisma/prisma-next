@@ -1,6 +1,6 @@
 import {
   extractCodecTypeImports,
-  extractExtensionIds,
+  extractComponentIds,
   extractOperationTypeImports,
   extractParameterizedRenderers,
   extractParameterizedTypeImports,
@@ -298,7 +298,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
   const queryOperationTypeImports = extractQueryOperationTypeImports(descriptors);
-  const extensionIds = extractExtensionIds({ id: 'sql' }, target, adapter, extensions);
+  const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
   const parameterizedRenderers = extractParameterizedRenderers(descriptors);
   const parameterizedTypeImports = extractParameterizedTypeImports(descriptors);
 

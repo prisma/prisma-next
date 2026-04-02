@@ -7,7 +7,7 @@ import { emit } from '@prisma-next/emitter';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
-  extractExtensionIds,
+  extractComponentIds,
   extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
@@ -41,7 +41,7 @@ describe('emit command functionality', () => {
       operationRegistry: assembleOperationRegistry(descriptors),
       codecTypeImports: extractCodecTypeImports(descriptors),
       operationTypeImports: extractOperationTypeImports(descriptors),
-      extensionIds: extractExtensionIds({ id: 'sql' }, target, adapter, extensions),
+      extensionIds: extractComponentIds({ id: 'sql' }, target, adapter, extensions),
     };
   };
 

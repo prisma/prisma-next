@@ -10,7 +10,7 @@ import { createContractIR } from '@prisma-next/emitter/test/utils';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
-  extractExtensionIds,
+  extractComponentIds,
   extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
@@ -148,7 +148,7 @@ describe('contract.d.ts imports resolution', () => {
       const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds({ id: 'sql' }, target, adapter, extensions);
+      const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,
@@ -282,7 +282,7 @@ type UserIdColumn = UserColumns['id'];
       const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds({ id: 'sql' }, target, adapter, extensions);
+      const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,
