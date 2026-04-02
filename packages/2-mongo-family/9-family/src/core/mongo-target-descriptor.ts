@@ -1,4 +1,4 @@
-import type { TargetDescriptor } from '@prisma-next/contract/framework-components';
+import type { TargetDescriptor } from '@prisma-next/framework-components/components';
 
 export const mongoTargetDescriptor = {
   kind: 'target',

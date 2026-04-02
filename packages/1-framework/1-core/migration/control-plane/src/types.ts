@@ -268,7 +268,7 @@ export interface ControlFamilyDescriptor<
   readonly hook: TargetFamilyHook;
   create<TTargetId extends string>(
     stack: ControlPlaneStack<TFamilyId, TTargetId>,
-    assembledState?: AssembledComponentState,
+    controlStack?: AssembledComponentState,
   ): TFamilyInstance;
 }
 
