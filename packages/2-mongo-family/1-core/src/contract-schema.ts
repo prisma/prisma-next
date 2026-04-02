@@ -32,17 +32,7 @@ const StorageRelationEntrySchema = type({
 const ModelStorageSchema = type({
   '+': 'reject',
   'collection?': 'string',
-  'relations?': type('Record<string, unknown>').pipe((relations) => {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(relations)) {
-      const parsed = StorageRelationEntrySchema(value);
-      if (parsed instanceof type.errors) {
-        throw new Error(`Invalid storage relation "${key}": ${parsed.summary}`);
-      }
-      result[key] = parsed;
-    }
-    return result;
-  }),
+  'relations?': type({ '[string]': StorageRelationEntrySchema }),
 });
 
 const DiscriminatorSchema = type({
@@ -57,41 +47,11 @@ const VariantEntrySchema = type({
 
 const ModelDefinitionSchema = type({
   '+': 'reject',
-  fields: type('Record<string, unknown>').pipe((fields) => {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(fields)) {
-      const parsed = FieldSchema(value);
-      if (parsed instanceof type.errors) {
-        throw new Error(`Invalid field "${key}": ${parsed.summary}`);
-      }
-      result[key] = parsed;
-    }
-    return result;
-  }),
+  fields: type({ '[string]': FieldSchema }),
   storage: ModelStorageSchema,
-  relations: type('Record<string, unknown>').pipe((relations) => {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(relations)) {
-      const parsed = RelationSchema(value);
-      if (parsed instanceof type.errors) {
-        throw new Error(`Invalid relation "${key}": ${parsed.summary}`);
-      }
-      result[key] = parsed;
-    }
-    return result;
-  }),
+  relations: type({ '[string]': RelationSchema }),
   'discriminator?': DiscriminatorSchema,
-  'variants?': type('Record<string, unknown>').pipe((variants) => {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(variants)) {
-      const parsed = VariantEntrySchema(value);
-      if (parsed instanceof type.errors) {
-        throw new Error(`Invalid variant "${key}": ${parsed.summary}`);
-      }
-      result[key] = parsed;
-    }
-    return result;
-  }),
+  'variants?': type({ '[string]': VariantEntrySchema }),
   'base?': 'string',
   'owner?': 'string',
 });
@@ -114,27 +74,7 @@ export const MongoContractSchema = type({
   '_generated?': 'Record<string, unknown>',
   storage: type({
     '+': 'reject',
-    collections: type('Record<string, unknown>').pipe((collections) => {
-      const result: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(collections)) {
-        const parsed = StorageCollectionSchema(value);
-        if (parsed instanceof type.errors) {
-          throw new Error(`Invalid collection "${key}": ${parsed.summary}`);
-        }
-        result[key] = parsed;
-      }
-      return result;
-    }),
+    collections: type({ '[string]': StorageCollectionSchema }),
   }),
-  models: type('Record<string, unknown>').pipe((models) => {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(models)) {
-      const parsed = ModelDefinitionSchema(value);
-      if (parsed instanceof type.errors) {
-        throw new Error(`Invalid model "${key}": ${parsed.summary}`);
-      }
-      result[key] = parsed;
-    }
-    return result;
-  }),
+  models: type({ '[string]': ModelDefinitionSchema }),
 });
