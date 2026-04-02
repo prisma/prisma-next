@@ -122,12 +122,9 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
     devDependencies:
-      '@prisma-next/emitter':
+      '@prisma-next/family-mongo':
         specifier: workspace:*
-        version: link:../../packages/1-framework/3-tooling/emitter
-      '@prisma-next/mongo-emitter':
-        specifier: workspace:*
-        version: link:../../packages/2-mongo-family/3-tooling/emitter
+        version: link:../../packages/2-mongo-family/9-family
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../test/utils

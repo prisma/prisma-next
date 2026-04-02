@@ -1,9 +1,8 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { assembleComponents } from '@prisma-next/contract/assembly';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TypesImportSpec } from '@prisma-next/contract/types';
-import { emit } from '@prisma-next/emitter';
-import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
+import { MongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
 
 const blogIR: ContractIR = {
   schemaVersion: '1',
@@ -60,16 +59,17 @@ const blogIR: ContractIR = {
   sources: {},
 };
 
-const codecTypeImports: TypesImportSpec[] = [
-  {
-    package: '@prisma-next/mongo-core/codec-types',
-    named: 'CodecTypes',
-    alias: 'MongoCodecTypes',
-  },
-];
-
 async function main() {
-  const result = await emit(blogIR, { outputDir: '.', codecTypeImports }, mongoTargetFamilyHook);
+  const familyDescriptor = new MongoFamilyDescriptor();
+
+  const assembledState = assembleComponents({
+    family: familyDescriptor,
+    target: mongoTargetDescriptor,
+  });
+
+  const instance = familyDescriptor.create({ target: mongoTargetDescriptor }, assembledState);
+
+  const result = await instance.emitContract({ contractIR: blogIR });
 
   const srcDir = resolve(import.meta.dirname, '..', 'src');
   writeFileSync(resolve(srcDir, 'contract.json'), result.contractJson + '\n');

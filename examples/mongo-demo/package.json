@@ -24,8 +24,7 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
-    "@prisma-next/emitter": "workspace:*",
-    "@prisma-next/mongo-emitter": "workspace:*",
+    "@prisma-next/family-mongo": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@types/node": "catalog:",
