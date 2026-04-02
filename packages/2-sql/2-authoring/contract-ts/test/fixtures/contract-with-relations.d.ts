@@ -14,9 +14,9 @@ export type Contract = ContractWithTypeMaps<SqlContract<
     readonly tables: {
       readonly user: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly email: { readonly type: 'pg/text@1'; nullable: false };
-          readonly createdAt: { readonly type: 'pg/timestamptz@1'; nullable: false };
+          readonly id: { readonly nativeType: 'int4'; readonly codecId: 'pg/int4@1'; readonly nullable: false };
+          readonly email: { readonly nativeType: 'text'; readonly codecId: 'pg/text@1'; readonly nullable: false };
+          readonly createdAt: { readonly nativeType: 'timestamptz'; readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: ReadonlyArray<never>;
@@ -25,10 +25,10 @@ export type Contract = ContractWithTypeMaps<SqlContract<
       };
       readonly post: {
         readonly columns: {
-          readonly id: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly title: { readonly type: 'pg/text@1'; nullable: false };
-          readonly userId: { readonly type: 'pg/int4@1'; nullable: false };
-          readonly createdAt: { readonly type: 'pg/timestamptz@1'; nullable: false };
+          readonly id: { readonly nativeType: 'int4'; readonly codecId: 'pg/int4@1'; readonly nullable: false };
+          readonly title: { readonly nativeType: 'text'; readonly codecId: 'pg/text@1'; readonly nullable: false };
+          readonly userId: { readonly nativeType: 'int4'; readonly codecId: 'pg/int4@1'; readonly nullable: false };
+          readonly createdAt: { readonly nativeType: 'timestamptz'; readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: ReadonlyArray<never>;
@@ -39,74 +39,55 @@ export type Contract = ContractWithTypeMaps<SqlContract<
   },
   {
     readonly User: {
-      readonly storage: { readonly table: 'user' };
-      readonly fields: {
-        readonly id: { readonly column: 'id' };
-        readonly email: { readonly column: 'email' };
-        readonly createdAt: { readonly column: 'createdAt' };
+      readonly storage: {
+        readonly table: 'user';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly email: { readonly column: 'email' };
+          readonly createdAt: { readonly column: 'createdAt' };
+        };
       };
-      readonly relations: Record<string, never>;
+      readonly fields: {
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+      };
+      readonly relations: {
+        readonly posts: {
+          readonly to: 'Post';
+          readonly cardinality: '1:N';
+          readonly on: {
+            readonly localFields: readonly ['id'];
+            readonly targetFields: readonly ['userId'];
+          };
+        };
+      };
     };
     readonly Post: {
-      readonly storage: { readonly table: 'post' };
+      readonly storage: {
+        readonly table: 'post';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly title: { readonly column: 'title' };
+          readonly userId: { readonly column: 'userId' };
+          readonly createdAt: { readonly column: 'createdAt' };
+        };
+      };
       readonly fields: {
-        readonly id: { readonly column: 'id' };
-        readonly title: { readonly column: 'title' };
-        readonly userId: { readonly column: 'userId' };
-        readonly createdAt: { readonly column: 'createdAt' };
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly userId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
       };
-      readonly relations: Record<string, never>;
-    };
-  },
-  {
-    readonly user: {
-      readonly posts: {
-        readonly to: 'Post';
-        readonly cardinality: '1:N';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['userId'];
+      readonly relations: {
+        readonly user: {
+          readonly to: 'User';
+          readonly cardinality: 'N:1';
+          readonly on: {
+            readonly localFields: readonly ['userId'];
+            readonly targetFields: readonly ['id'];
+          };
         };
-      };
-    };
-    readonly post: {
-      readonly user: {
-        readonly to: 'User';
-        readonly cardinality: 'N:1';
-        readonly on: {
-          readonly parentCols: readonly ['id'];
-          readonly childCols: readonly ['userId'];
-        };
-      };
-    };
-  },
-  {
-    readonly modelToTable: { readonly User: 'user'; readonly Post: 'post' };
-    readonly tableToModel: { readonly user: 'User'; readonly post: 'Post' };
-    readonly fieldToColumn: {
-      readonly User: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly createdAt: 'createdAt';
-      };
-      readonly Post: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly userId: 'userId';
-        readonly createdAt: 'createdAt';
-      };
-    };
-    readonly columnToField: {
-      readonly user: {
-        readonly id: 'id';
-        readonly email: 'email';
-        readonly createdAt: 'createdAt';
-      };
-      readonly post: {
-        readonly id: 'id';
-        readonly title: 'title';
-        readonly userId: 'userId';
-        readonly createdAt: 'createdAt';
       };
     };
   }
