@@ -53,7 +53,7 @@ function addUniqueId(ids: string[], seen: Set<string>, id: string): void {
   }
 }
 
-function assertUniqueCodecOwner(options: {
+export function assertUniqueCodecOwner(options: {
   readonly codecId: string;
   readonly owners: Map<string, string>;
   readonly descriptorId: string;
