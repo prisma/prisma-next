@@ -22,6 +22,9 @@ CLAUDE.local.md
 
 # Review artifacts (transient, local-only)
 **/specs/reviews/
+**/reviews/system-design-review.md
+**/reviews/code-review.md
+**/reviews/walkthrough.md
 
 # Generated contract files in test fixtures
 test/**/fixtures/generated/
