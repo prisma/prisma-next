@@ -297,8 +297,8 @@ describe('SQL contract factories', () => {
           },
         },
         fields: {
-          id: {},
-          email: {},
+          id: { nullable: false },
+          email: { nullable: false },
         },
         relations: {},
       });
@@ -311,9 +311,9 @@ describe('SQL contract factories', () => {
         email: { column: 'email' },
       });
       expect(userModel.fields).toEqual({
-        id: { codecId: 'pg/int4@1', nullable: false },
-        name: { codecId: 'pg/text@1', nullable: true },
-        email: {},
+        id: { nullable: false, codecId: 'pg/int4@1' },
+        name: { nullable: true, codecId: 'pg/text@1' },
+        email: { nullable: false },
       });
     });
 
@@ -329,7 +329,7 @@ describe('SQL contract factories', () => {
       );
       expect(userModel.storage.table).toBe('user');
       expect(userModel.storage.fields).toEqual({ id: { column: 'id' } });
-      expect(userModel.fields).toEqual({ id: {} });
+      expect(userModel.fields).toEqual({ id: { nullable: false } });
       expect(userModel.relations).toEqual({
         posts: { kind: 'oneToMany', model: 'Post', foreignKey: 'userId' },
       });

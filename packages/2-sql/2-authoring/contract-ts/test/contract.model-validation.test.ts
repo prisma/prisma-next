@@ -171,7 +171,7 @@ describe('validateContract model validation', () => {
           relations: {
             user: {
               to: 'User',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['userId'], targetFields: ['id'] },
               cardinality: 'N:1',
             },
           },
@@ -224,7 +224,7 @@ describe('validateContract model validation', () => {
           relations: {
             posts: {
               to: 'Post',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
           },
@@ -276,7 +276,7 @@ describe('validateContract model validation', () => {
           relations: {
             user: {
               to: 'User',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['userId'], targetFields: ['id'] },
               cardinality: 'N:1',
             },
           },
