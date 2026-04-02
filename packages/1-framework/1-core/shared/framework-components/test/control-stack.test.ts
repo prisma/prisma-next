@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   type AssemblyInput,
   assembleAuthoringContributions,
-  assembleComponents,
+  createControlStack,
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,
   extractParameterizedRenderers,
   extractParameterizedTypeImports,
   extractQueryOperationTypeImports,
-} from '../src/assembly';
+} from '../src/control-stack';
 
 function createDescriptor(overrides: Partial<AssemblyInput> = {}): AssemblyInput {
   return {
@@ -367,9 +367,9 @@ describe('assembleAuthoringContributions', () => {
   });
 });
 
-describe('assembleComponents', () => {
+describe('createControlStack', () => {
   it('assembles all component state from family + target + adapter + extensions', () => {
-    const state = assembleComponents({
+    const state = createControlStack({
       family: createDescriptor({ id: 'sql' }),
       target: createDescriptor({
         id: 'target',
@@ -415,7 +415,7 @@ describe('assembleComponents', () => {
   });
 
   it('preserves ID ordering: family, target, adapter, extensions', () => {
-    const state = assembleComponents({
+    const state = createControlStack({
       family: createDescriptor({ id: 'fam' }),
       target: createDescriptor({ id: 'tgt' }),
       adapter: createDescriptor({ id: 'adp' }),
@@ -425,7 +425,7 @@ describe('assembleComponents', () => {
   });
 
   it('works with family + target only (Mongo case)', () => {
-    const state = assembleComponents({
+    const state = createControlStack({
       family: createDescriptor({ id: 'mongo' }),
       target: createDescriptor({
         id: 'mongo',
@@ -448,7 +448,7 @@ describe('assembleComponents', () => {
   });
 
   it('returns empty state when descriptors have no types', () => {
-    const state = assembleComponents({
+    const state = createControlStack({
       family: createDescriptor({ id: 'fam' }),
       target: createDescriptor({ id: 'tgt' }),
     });
