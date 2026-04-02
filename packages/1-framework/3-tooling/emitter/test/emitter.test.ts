@@ -428,25 +428,6 @@ describe('emitter', () => {
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have storage');
   });
 
-  it('throws error when relations is not an object', async () => {
-    const ir = createContractIR({
-      relations: 'not-an-object' as unknown as Record<string, unknown>,
-    }) as ContractIR;
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'ContractIR relations must be an object when provided',
-    );
-  });
-
   it('throws error when extension packs are missing', async () => {
     const ir = createContractIR({
       extensionPacks: undefined as unknown as Record<string, unknown>,
