@@ -233,10 +233,13 @@ export function validateAuthoringHelperArguments(
   args: readonly unknown[],
 ): void {
   const expected = descriptors ?? [];
-  const requiredCount = expected.filter((descriptor) => !descriptor.optional).length;
-  if (args.length < requiredCount || args.length > expected.length) {
+  const minimumArgs = expected.reduce(
+    (count, descriptor, index) => (descriptor.optional ? count : index + 1),
+    0,
+  );
+  if (args.length < minimumArgs || args.length > expected.length) {
     throw new Error(
-      `${helperPath} expects ${requiredCount === expected.length ? expected.length : `${requiredCount}-${expected.length}`} argument(s), received ${args.length}`,
+      `${helperPath} expects ${minimumArgs === expected.length ? expected.length : `${minimumArgs}-${expected.length}`} argument(s), received ${args.length}`,
     );
   }
 
@@ -289,9 +292,13 @@ function resolveAuthoringColumnDefaultTemplate(
       readonly expression: string;
     } {
   if (template.kind === 'literal') {
+    const value = resolveAuthoringTemplateValue(template.value, args);
+    if (value === undefined) {
+      throw new Error('Resolved authoring literal default must not be undefined');
+    }
     return {
       kind: 'literal',
-      value: resolveAuthoringTemplateValue(template.value, args),
+      value,
     };
   }
 
