@@ -72,6 +72,8 @@ export function validateContract<TContract extends Contract>(
     throw new Error(`Invalid contract structure: ${parsed.summary}`);
   }
 
+  // Arktype verified the structural shape; Contract adds branded hash types and
+  // ContractModel generics that can't be expressed in the schema.
   const contract = parsed as unknown as Contract;
 
   const domainResult: DomainValidationResult = validateContractDomain(extractDomainShape(contract));
