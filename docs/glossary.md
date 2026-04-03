@@ -63,6 +63,20 @@ Which specific database you're using — Postgres, MySQL, MongoDB, etc. Each tar
 
 A category of databases that share fundamental characteristics. SQL is a family — Postgres, MySQL, and SQLite are all SQL targets that share concepts like tables, columns, and joins. MongoDB is its own family (not a target under a generic "document" family). Prisma Next defines shared behavior at the family level so individual targets only need to handle what's specific to them.
 
+### Framework Component
+
+The umbrella term for the five kinds of building blocks that make up a Prisma Next configuration: **family**, **target**, **adapter**, **driver**, and **extension**. Each framework component follows the same structural pattern: a `ComponentDescriptor` (declarative metadata — identity, version, capabilities, type imports) plus plane-specific descriptor and instance types (see [Descriptor](#descriptor), [Instance](#instance) in the Architecture section).
+
+Framework components are composed into stacks via `create*Stack()` functions. The framework-components package (`@prisma-next/framework-components`) owns the base types and assembly logic that operate on framework components generically, without knowing which family or target they belong to.
+
+### Contract IR
+
+The in-memory intermediate representation of a contract, produced by authoring (PSL parsing or TypeScript builders) and consumed by the emitter. Contract IR contains models, fields, relations, storage mappings, and metadata — everything needed to generate the emitted artifacts. It is not the same as `contract.json`: the IR may include transient state (e.g., authoring metadata) that is stripped during emission, and `contract.json` includes derived fields (e.g., hashes) that are computed during emission.
+
+### Emission
+
+The process of generating `contract.json` and `contract.d.ts` from a Contract IR. The emitter validates the IR, computes hashes, resolves type imports from the control stack, and writes the two output files. Emission is a control-plane concern — it runs at build time, not at runtime. The control plane orchestrates emission through `ControlFamilyInstance.emitContract()`.
+
 ---
 
 ## Domain Modeling
@@ -127,6 +141,49 @@ A higher-level query interface that coordinates multiple queries on your behalf.
 ### Collection
 
 The primary ORM abstraction for querying a model. Each aggregate root gets a `Collection` instance (e.g., `db.users` is a `Collection<Contract, 'User'>`). Collections use immutable fluent chaining — each method call (`.where()`, `.include()`, `.take()`) returns a new Collection with accumulated state. Nothing executes until a terminal method (`.all()`, `.first()`) compiles the state into a family-specific query plan. The Collection interface is shared across families; only the terminal compilation differs. See [ADR 175](architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md).
+
+---
+
+## Architecture
+
+### Plane
+
+One of three isolation zones that split the system by lifecycle phase. Each plane has its own packages, types, and import boundaries — code in one plane must not import executable code from another plane.
+
+| Plane | Phase | Concern |
+|---|---|---|
+| **Control plane** | Build / migration time | Authoring contracts, emitting artifacts, planning and running migrations, verifying database state |
+| **Execution plane** | Runtime | Validating contracts, building and executing query plans, ORM, middleware |
+| **Shared plane** | Both | Type-only code and validators safe for either plane (contract IR types, codec types, operation types) |
+
+The control plane produces artifacts (contract JSON, `.d.ts`, migrations); the execution plane consumes them. Both planes share types from the shared plane but never import across the control/execution boundary.
+
+### Descriptor
+
+A declarative, immutable object that describes *what* something is and *what it provides*, without carrying mutable state. Descriptors are configuration inputs — they declare identity, capabilities, and contributions so that the framework can compose them without executing anything.
+
+The pattern is used throughout Prisma Next, not only for [framework components](#framework-component). For example, codec descriptors declare type mappings and encoding/decoding behavior. The most prominent use is in framework components, where each component kind has a base descriptor (`FamilyDescriptor`, `TargetDescriptor`, `AdapterDescriptor`, `DriverDescriptor`, `ExtensionDescriptor`) plus plane-specific extensions (`ControlFamilyDescriptor`, `RuntimeTargetDescriptor`, etc.) that add factory methods for creating instances.
+
+Descriptors are typically exported as singleton const values (e.g., `mongoFamilyDescriptor`, `postgresTargetDescriptor`).
+
+### Instance
+
+A runtime object created from a descriptor via a factory method (typically `create()` on the descriptor). Instances carry state and behavior specific to one plane — a `ControlFamilyInstance` knows how to emit contracts and run migrations; a `RuntimeAdapterInstance` knows how to encode/decode values and lower queries to a target dialect.
+
+Instances are created during stack assembly or instantiation, not imported directly.
+
+### Stack
+
+A bundle of descriptors (or derived state) produced by a `create*Stack()` factory function. Stacks aggregate contributions from all [framework components](#framework-component) in a configuration (family + target + adapter + extensions) into a single value that downstream code can consume without knowing which component contributed what.
+
+| Stack | Plane | Inputs | Produces |
+|---|---|---|---|
+| `ControlStack` | Control (shared framework) | Descriptors' `ComponentMetadata` (type imports, renderers, authoring contributions) | Aggregated codec/operation type imports, parameterized renderers, extension IDs, authoring contributions |
+| `ControlPlaneStack` | Control | Control-plane descriptors (target, adapter, driver, extensions) | Typed bundle of control-plane descriptors for migration/emission orchestration |
+| `ExecutionStack` | Execution | Runtime descriptors (target, adapter, driver, extensions) | Typed bundle of runtime descriptors, ready for instantiation |
+| `ExecutionStackInstance` | Execution | An `ExecutionStack` | Instantiated runtime components (target, adapter, driver, extension instances) |
+
+Stack creation follows the naming convention `create{Plane}Stack()` (e.g., `createControlStack()`, `createControlPlaneStack()`, `createExecutionStack()`).
 
 ---
 
