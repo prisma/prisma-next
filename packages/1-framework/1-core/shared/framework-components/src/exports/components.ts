@@ -15,18 +15,18 @@ export type {
   FamilyDescriptor,
   FamilyInstance,
   FamilyPackRef,
-  NormalizedTypeRenderer,
   PackRefBase,
   TargetBoundComponentDescriptor,
   TargetDescriptor,
   TargetInstance,
   TargetPackRef,
+} from '../framework-components';
+export { checkContractComponentRequirements } from '../framework-components';
+export type {
+  NormalizedTypeRenderer,
+  RenderTypeContext,
   TypeRenderer,
   TypeRendererFunction,
   TypeRendererTemplate,
-} from '../framework-components';
-export {
-  checkContractComponentRequirements,
-  interpolateTypeTemplate,
-  normalizeRenderer,
-} from '../framework-components';
+} from '../type-renderers';
+export { interpolateTypeTemplate, normalizeRenderer } from '../type-renderers';

@@ -1,11 +1,4 @@
 /**
- * Context passed to type renderers during contract.d.ts generation.
- */
-export interface RenderTypeContext {
-  readonly codecTypesName: string;
-}
-
-/**
  * Specifies how to import TypeScript types from a package.
  * Used in extension pack manifests to declare codec and operation type imports.
  */

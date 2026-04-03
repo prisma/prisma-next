@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { interpolateTypeTemplate, normalizeRenderer } from '../src/framework-components';
+import { interpolateTypeTemplate, normalizeRenderer } from '../src/type-renderers';
 
 describe('interpolateTypeTemplate', () => {
   it('replaces placeholders with params values', () => {
