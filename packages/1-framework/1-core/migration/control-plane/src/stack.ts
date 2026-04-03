@@ -1,3 +1,5 @@
+export { createControlStack } from '@prisma-next/framework-components/control';
+
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -6,6 +8,10 @@ import type {
   ControlTargetDescriptor,
 } from './types';
 
+/**
+ * @deprecated Use `createControlStack()` from `@prisma-next/framework-components/control` instead.
+ * This factory is retained for backward compatibility.
+ */
 export function createControlPlaneStack<TFamilyId extends string, TTargetId extends string>(input: {
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;

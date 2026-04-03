@@ -128,7 +128,7 @@ export function assertFrameworkComponentsCompatible<
  *
  * const config = await loadConfig();
  * const contractIR = await loadContractJson(config.contract.output);
- * const stack = createControlPlaneStack({ target: config.target, adapter: config.adapter, ... });
+ * const stack = createControlStack({ family: config.family, target: config.target, adapter: config.adapter, ... });
  *
  * // Throws if contract is incompatible with config
  * assertContractRequirementsSatisfied({ contract: contractIR, stack });
