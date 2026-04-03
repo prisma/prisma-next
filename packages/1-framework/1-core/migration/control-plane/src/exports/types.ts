@@ -1,5 +1,5 @@
 export type {
-  // Control* types (ADR 151)
+  // Control* types (re-exported from @prisma-next/framework-components/control)
   ControlAdapterDescriptor,
   ControlAdapterInstance,
   ControlDriverDescriptor,
@@ -9,10 +9,13 @@ export type {
   ControlFamilyDescriptor,
   ControlFamilyInstance,
   ControlPlaneStack,
+  ControlStack,
   ControlTargetDescriptor,
   ControlTargetInstance,
   EmitContractResult,
   IntrospectSchemaResult,
+  // Capability interfaces
+  MigratableTargetDescriptor,
   // Migration types (canonical, family-agnostic)
   MigrationOperationClass,
   MigrationOperationPolicy,
@@ -31,8 +34,11 @@ export type {
   OperationContext,
   SchemaIssue,
   SchemaVerificationNode,
+  SchemaViewCapable,
   SignDatabaseResult,
   TargetMigrationsCapability,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '../types';
+
+export { hasMigrations, hasSchemaView } from '../types';

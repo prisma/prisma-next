@@ -37,7 +37,7 @@ export interface ControlClientOptions {
   // biome-ignore lint/suspicious/noExplicitAny: required for contravariance - SqlFamilyDescriptor.create has specific parameter types
   readonly family: ControlFamilyDescriptor<any, any>;
   // biome-ignore lint/suspicious/noExplicitAny: required for contravariance - SqlControlTargetDescriptor extends with additional methods
-  readonly target: ControlTargetDescriptor<any, any, any, any>;
+  readonly target: ControlTargetDescriptor<any, any, any>;
   // biome-ignore lint/suspicious/noExplicitAny: required for contravariance in adapter.create()
   readonly adapter: ControlAdapterDescriptor<any, any, any>;
   /** Optional - control client can be created without driver for offline operations */

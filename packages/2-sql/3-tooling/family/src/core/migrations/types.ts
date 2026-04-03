@@ -3,8 +3,7 @@ import type {
   ControlAdapterDescriptor,
   ControlDriverInstance,
   ControlExtensionDescriptor,
-  ControlTargetDescriptor,
-  ControlTargetInstance,
+  MigratableTargetDescriptor,
   MigrationOperationPolicy,
   MigrationPlan,
   MigrationPlannerConflict,
@@ -385,12 +384,7 @@ export interface SqlMigrationRunner<TTargetDetails> {
 }
 
 export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDetails>
-  extends ControlTargetDescriptor<
-      'sql',
-      TTargetId,
-      ControlTargetInstance<'sql', TTargetId>,
-      SqlControlFamilyInstance
-    >,
+  extends MigratableTargetDescriptor<'sql', TTargetId, SqlControlFamilyInstance>,
     SqlControlStaticContributions {
   createPlanner(family: SqlControlFamilyInstance): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;

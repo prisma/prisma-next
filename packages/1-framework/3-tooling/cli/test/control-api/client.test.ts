@@ -81,7 +81,7 @@ function createMockComponents() {
     targetId: 'postgres',
     familyId: 'sql',
     // biome-ignore lint/suspicious/noExplicitAny: required for mock flexibility
-  } as unknown as ControlTargetDescriptor<any, any, any, any>;
+  } as unknown as ControlTargetDescriptor<any, any, any>;
 
   const mockAdapter = {
     kind: 'adapter',
@@ -623,7 +623,7 @@ describe('ControlClient progress emission', () => {
         familyId: 'sql',
         migrations: mockMigrations,
         // biome-ignore lint/suspicious/noExplicitAny: required for mock flexibility
-      } as unknown as ControlTargetDescriptor<any, any, any, any>;
+      } as unknown as ControlTargetDescriptor<any, any, any>;
 
       return {
         mockDriver,

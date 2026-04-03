@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
+import { hasMigrations } from '@prisma-next/core-control-plane/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import type { Command } from 'commander';
 import { loadConfig } from '../config-loader';
@@ -139,11 +140,7 @@ export async function prepareMigrationContext(
     );
   }
 
-  // Check target supports migrations via optional descriptor capability
-  const targetWithMigrations = config.target as typeof config.target & {
-    readonly migrations?: unknown;
-  };
-  if (!targetWithMigrations.migrations) {
+  if (!hasMigrations(config.target)) {
     return notOk(
       errorTargetMigrationNotSupported({
         why: `Target "${config.target.id}" does not support migrations`,
