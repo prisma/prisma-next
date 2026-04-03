@@ -20,6 +20,7 @@
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-errors": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",

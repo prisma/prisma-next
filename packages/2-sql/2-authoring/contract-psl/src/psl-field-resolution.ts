@@ -1,7 +1,7 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { AuthoringContributions } from '@prisma-next/contract/framework-components';
-import { instantiateAuthoringTypeConstructor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import { instantiateAuthoringTypeConstructor } from '@prisma-next/framework-components/authoring';
 import type { PslField, PslModel } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {

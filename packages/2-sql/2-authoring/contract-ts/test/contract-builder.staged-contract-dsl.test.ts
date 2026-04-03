@@ -1,4 +1,4 @@
-import type { FamilyPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   defineContract,

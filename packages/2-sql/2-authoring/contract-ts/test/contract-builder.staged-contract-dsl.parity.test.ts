@@ -2,7 +2,7 @@ import type {
   ExtensionPackRef,
   FamilyPackRef,
   TargetPackRef,
-} from '@prisma-next/contract/framework-components';
+} from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model, rel } from '../src/contract-builder';
 

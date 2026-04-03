@@ -19,6 +19,7 @@
     "@prisma-next/contract-authoring": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",

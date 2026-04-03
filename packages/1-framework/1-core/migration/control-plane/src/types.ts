@@ -1,3 +1,5 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ContractMarkerRecord, TargetFamilyHook } from '@prisma-next/contract/types';
 import type {
   AdapterDescriptor,
   AdapterInstance,
@@ -10,9 +12,7 @@ import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
   TargetInstance,
-} from '@prisma-next/contract/framework-components';
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ContractMarkerRecord, TargetFamilyHook } from '@prisma-next/contract/types';
+} from '@prisma-next/framework-components/components';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { TargetMigrationsCapability } from './migrations';
 import type { CoreSchemaView } from './schema-view';

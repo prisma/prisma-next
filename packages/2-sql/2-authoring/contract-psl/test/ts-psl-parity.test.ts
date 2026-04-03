@@ -1,10 +1,10 @@
+import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
+import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type {
-  AuthoringContributions,
   ExtensionPackRef,
   FamilyPackRef,
   TargetPackRef,
-} from '@prisma-next/contract/framework-components';
-import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
+} from '@prisma-next/framework-components/components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, it } from 'vitest';

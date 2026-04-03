@@ -1,4 +1,4 @@
-import type { FamilyPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import { field, model, rel } from '../src/contract-builder';
 import { ScalarFieldBuilder, StagedModelBuilder } from '../src/staged-contract-dsl';

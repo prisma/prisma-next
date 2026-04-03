@@ -1,4 +1,4 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import type { ComponentDatabaseDependency } from '../src/core/migrations/types';
 import { verifyDatabaseDependencies } from '../src/core/schema-verify/verify-helpers';

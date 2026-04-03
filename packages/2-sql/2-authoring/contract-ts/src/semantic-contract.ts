@@ -1,9 +1,9 @@
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
   ColumnTypeDescriptor,
   ForeignKeyDefaultsState,
 } from '@prisma-next/contract-authoring';
+import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { ReferentialAction, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 
 export interface SqlSemanticFieldNode {

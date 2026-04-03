@@ -1,4 +1,4 @@
-import type { AuthoringTypeNamespace } from '@prisma-next/contract/framework-components';
+import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
 
 export const postgresAuthoringTypes = {
   enum: {

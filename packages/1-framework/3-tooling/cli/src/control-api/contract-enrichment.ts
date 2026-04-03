@@ -1,5 +1,5 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 
 type CapabilityMatrix = Record<string, Record<string, boolean>>;
 

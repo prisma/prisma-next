@@ -1,4 +1,3 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
   ControlTargetInstance,
@@ -10,6 +9,7 @@ import type {
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR, extractCodecControlHooks } from '@prisma-next/family-sql/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';

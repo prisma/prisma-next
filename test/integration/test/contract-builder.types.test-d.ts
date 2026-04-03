@@ -5,8 +5,8 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import type { ExtensionPackRef } from '@prisma-next/contract/framework-components';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
+import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';

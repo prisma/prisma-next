@@ -1,9 +1,9 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ControlPlaneStack } from '@prisma-next/core-control-plane/types';
 import {
   checkContractComponentRequirements,
   type TargetBoundComponentDescriptor,
-} from '@prisma-next/contract/framework-components';
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ControlPlaneStack } from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/components';
 import { errorConfigValidation, errorContractMissingExtensionPacks } from './cli-errors';
 
 /**

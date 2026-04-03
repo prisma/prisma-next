@@ -1,11 +1,4 @@
 import type {
-  AuthoringFieldPresetDescriptor,
-  ExtensionPackRef,
-  FamilyPackRef,
-  TargetPackRef,
-} from '@prisma-next/contract/framework-components';
-import { instantiateAuthoringFieldPreset } from '@prisma-next/contract/framework-components';
-import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
   ExecutionMutationDefaultValue,
@@ -14,6 +7,13 @@ import type {
   ColumnTypeDescriptor,
   ForeignKeyDefaultsState,
 } from '@prisma-next/contract-authoring';
+import type { AuthoringFieldPresetDescriptor } from '@prisma-next/framework-components/authoring';
+import { instantiateAuthoringFieldPreset } from '@prisma-next/framework-components/authoring';
+import type {
+  ExtensionPackRef,
+  FamilyPackRef,
+  TargetPackRef,
+} from '@prisma-next/framework-components/components';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { NamedConstraintSpec } from './authoring-type-utils';

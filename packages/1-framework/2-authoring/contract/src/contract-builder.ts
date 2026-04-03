@@ -1,4 +1,4 @@
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ColumnBuilderState,
   ContractBuilderState,

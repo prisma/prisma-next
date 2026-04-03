@@ -6,7 +6,6 @@
  * by migration planners and other tools that need to compare schema states.
  */
 
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type {
@@ -15,6 +14,7 @@ import type {
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   SqlContract,
   SqlStorage,

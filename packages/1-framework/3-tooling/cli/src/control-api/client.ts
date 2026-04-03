@@ -1,4 +1,3 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
@@ -11,6 +10,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';

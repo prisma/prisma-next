@@ -1,10 +1,10 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringTypeConstructorDescriptor,
-} from '@prisma-next/contract/framework-components';
-import { isAuthoringTypeConstructorDescriptor } from '@prisma-next/contract/framework-components';
-import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+} from '@prisma-next/framework-components/authoring';
+import { isAuthoringTypeConstructorDescriptor } from '@prisma-next/framework-components/authoring';
 import type { PslAttribute, PslField } from '@prisma-next/psl-parser';
 import type {
   ControlMutationDefaultRegistry,

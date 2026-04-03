@@ -1,4 +1,4 @@
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import type { ColumnTypeDescriptor } from '../src/builder-state';
 import { ContractBuilder, defineContract } from '../src/contract-builder';

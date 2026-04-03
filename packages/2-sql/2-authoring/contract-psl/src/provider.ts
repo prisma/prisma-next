@@ -1,10 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
-import type {
-  AuthoringContributions,
-  ExtensionPackRef,
-  TargetPackRef,
-} from '@prisma-next/contract/framework-components';
+import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';

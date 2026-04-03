@@ -1,4 +1,4 @@
-import type { TargetDescriptor } from '@prisma-next/contract/framework-components';
+import type { TargetDescriptor } from '@prisma-next/framework-components/components';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';

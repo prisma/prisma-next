@@ -47,6 +47,7 @@
     "arktype": "catalog:"
   },
   "devDependencies": {
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@types/pg": "catalog:",

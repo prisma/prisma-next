@@ -3,14 +3,16 @@ import type {
   AuthoringFieldNamespace,
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
-  ExtensionPackRef,
-  FamilyPackRef,
-  TargetPackRef,
-} from '@prisma-next/contract/framework-components';
+} from '@prisma-next/framework-components/authoring';
 import {
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
-} from '@prisma-next/contract/framework-components';
+} from '@prisma-next/framework-components/authoring';
+import type {
+  ExtensionPackRef,
+  FamilyPackRef,
+  TargetPackRef,
+} from '@prisma-next/framework-components/components';
 import {
   createFieldHelpersFromNamespace,
   createFieldPresetHelper,
