@@ -1,5 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type {
   ControlFamilyInstance,
@@ -14,8 +13,8 @@ import { validateMongoContract } from '@prisma-next/mongo-core';
 import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
 
 export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo'> {
-  validateContractIR(contractJson: unknown): ContractIR;
-  emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
+  validateContractIR(contractJson: unknown): Contract;
+  emitContract(options: { readonly contractIR: Contract | unknown }): Promise<EmitContractResult>;
 }
 
 class MongoFamilyInstance implements MongoControlFamilyInstance {
@@ -27,21 +26,21 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     this.controlStack = controlStack;
   }
 
-  validateContractIR(contractJson: unknown): ContractIR {
+  validateContractIR(contractJson: unknown): Contract {
     const validated = validateMongoContract<MongoContract>(contractJson);
-    // MongoContract and ContractIR share structure but are typed independently;
+    // MongoContract and Contract share structure but are typed independently;
     // validateMongoContract guarantees the shape, so the double cast is safe.
-    return validated.contract as unknown as ContractIR;
+    return validated.contract as unknown as Contract;
   }
 
   async emitContract({
     contractIR,
   }: {
-    readonly contractIR: ContractIR | unknown;
+    readonly contractIR: Contract | unknown;
   }): Promise<EmitContractResult> {
     // The caller validates via validateContractIR before calling emitContract,
-    // so contractIR is guaranteed to be ContractIR at this point.
-    const ir = contractIR as ContractIR;
+    // so contractIR is guaranteed to be Contract at this point.
+    const ir = contractIR as Contract;
     const {
       codecTypeImports,
       operationTypeImports,

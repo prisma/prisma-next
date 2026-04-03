@@ -1,8 +1,8 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
-  type InterpretPslDocumentToSqlContractIRInput,
-  interpretPslDocumentToSqlContractIR as interpretPslDocumentToSqlContractIRInternal,
+  type InterpretPslDocumentToSqlContractInput,
+  interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
@@ -10,12 +10,12 @@ import {
   postgresTarget,
 } from './fixtures';
 
-describe('interpretPslDocumentToSqlContractIR default lowering', () => {
+describe('interpretPslDocumentToSqlContract default lowering', () => {
   const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
-  const interpretPslDocumentToSqlContractIR = (
-    input: Omit<InterpretPslDocumentToSqlContractIRInput, 'target' | 'scalarTypeDescriptors'>,
+  const interpretPslDocumentToSqlContract = (
+    input: Omit<InterpretPslDocumentToSqlContractInput, 'target' | 'scalarTypeDescriptors'>,
   ) =>
-    interpretPslDocumentToSqlContractIRInternal({
+    interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       ...input,
@@ -36,7 +36,7 @@ describe('interpretPslDocumentToSqlContractIR default lowering', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -118,7 +118,7 @@ describe('interpretPslDocumentToSqlContractIR default lowering', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -161,7 +161,7 @@ describe('interpretPslDocumentToSqlContractIR default lowering', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -192,7 +192,7 @@ describe('interpretPslDocumentToSqlContractIR default lowering', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });

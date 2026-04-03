@@ -1,5 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlDriverInstance,
@@ -15,7 +14,7 @@ import { createControlStack } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
-import { enrichContractIR } from './contract-enrichment';
+import { enrichContract } from './contract-enrichment';
 import { ContractValidationError } from './errors';
 import { executeDbInit } from './operations/db-init';
 import { executeDbUpdate } from './operations/db-update';
@@ -187,7 +186,7 @@ class ControlClientImpl implements ControlClient {
     const { driver, familyInstance } = await this.ensureConnected();
 
     // Validate contract using family instance
-    let contractIR: ContractIR;
+    let contractIR: Contract;
     try {
       contractIR = familyInstance.validateContractIR(options.contractIR);
     } catch (error) {
@@ -240,7 +239,7 @@ class ControlClientImpl implements ControlClient {
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
     // Validate contract using family instance
-    let contractIR: ContractIR;
+    let contractIR: Contract;
     try {
       contractIR = familyInstance.validateContractIR(options.contractIR);
     } catch (error) {
@@ -291,7 +290,7 @@ class ControlClientImpl implements ControlClient {
     const { driver, familyInstance } = await this.ensureConnected();
 
     // Validate contract using family instance
-    let contractIR: ContractIR;
+    let contractIR: Contract;
     try {
       contractIR = familyInstance.validateContractIR(options.contractIR);
     } catch (error) {
@@ -344,7 +343,7 @@ class ControlClientImpl implements ControlClient {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
-    let contractIR: ContractIR;
+    let contractIR: Contract;
     try {
       contractIR = familyInstance.validateContractIR(options.contractIR);
     } catch (error) {
@@ -372,7 +371,7 @@ class ControlClientImpl implements ControlClient {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
-    let contractIR: ContractIR;
+    let contractIR: Contract;
     try {
       contractIR = familyInstance.validateContractIR(options.contractIR);
     } catch (error) {
@@ -549,10 +548,7 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
-      const enrichedIR = enrichContractIR(
-        contractRaw as ContractIR,
-        this.frameworkComponents ?? [],
-      );
+      const enrichedIR = enrichContract(contractRaw as Contract, this.frameworkComponents ?? []);
 
       try {
         this.familyInstance.validateContractIR(enrichedIR);

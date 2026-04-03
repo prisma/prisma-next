@@ -4,7 +4,7 @@ import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
-import { interpretPslDocumentToMongoContractIR } from './interpreter';
+import { interpretPslDocumentToMongoContract } from './interpreter';
 import { createMongoScalarTypeDescriptors } from './scalar-type-descriptors';
 
 export interface MongoContractOptions {
@@ -39,7 +39,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         sourceId: schemaPath,
       });
 
-      const interpreted = interpretPslDocumentToMongoContractIR({
+      const interpreted = interpretPslDocumentToMongoContract({
         document,
         scalarTypeDescriptors: options?.scalarTypeDescriptors ?? createMongoScalarTypeDescriptors(),
       });

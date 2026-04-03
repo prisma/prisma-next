@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 
 type CapabilityMatrix = Record<string, Record<string, boolean>>;
@@ -83,14 +83,14 @@ function extractExtensionPackMeta(
 }
 
 /**
- * Enriches a raw contract IR with framework-derived metadata:
+ * Enriches a raw contract with framework-derived metadata:
  * capabilities from all component descriptors and extension pack metadata
  * from extension descriptors. Produces deterministically sorted output.
  */
-export function enrichContractIR(
-  ir: ContractIR,
+export function enrichContract(
+  ir: Contract,
   components: ReadonlyArray<TargetBoundComponentDescriptor<string, string>>,
-): ContractIR {
+): Contract {
   let mergedCapabilities = ir.capabilities;
   const extensionPacksMeta: Record<string, unknown> = {};
 

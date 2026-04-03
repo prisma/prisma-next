@@ -1,8 +1,13 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import {
+  computeExecutionHash,
+  computeProfileHash,
+  computeStorageHash,
+} from '@prisma-next/contract/hashing';
 import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
   ColumnDefaultLiteralValue,
+  Contract,
   ExecutionMutationDefault,
   ExecutionMutationDefaultValue,
   TaggedRaw,
@@ -98,12 +103,13 @@ function assertStorageSemantics(storage: SqlStorage): void {
   }
 }
 
-export function buildContractIR(state: RuntimeBuilderState): ContractIR {
+export function buildContract(state: RuntimeBuilderState): Contract {
   if (!state.target) {
     throw new Error('target is required. Call .target() before .build()');
   }
 
   const target = state.target;
+  const targetFamily = 'sql';
 
   const storageTables: Record<
     string,
@@ -187,12 +193,18 @@ export function buildContractIR(state: RuntimeBuilderState): ContractIR {
   }
 
   const storageTypes = (state.storageTypes ?? {}) as Record<string, StorageTypeInstance>;
-  const storage = {
+  const storageWithoutHash = {
     tables: storageTables,
     types: storageTypes,
   };
+  const storageHash = computeStorageHash({
+    target,
+    targetFamily,
+    storage: storageWithoutHash,
+  });
+  const storage = { ...storageWithoutHash, storageHash };
 
-  const execution =
+  const executionSection =
     executionDefaults.length > 0
       ? {
           mutations: {
@@ -207,13 +219,27 @@ export function buildContractIR(state: RuntimeBuilderState): ContractIR {
         }
       : undefined;
 
+  const execution = executionSection
+    ? {
+        ...executionSection,
+        executionHash: computeExecutionHash({
+          target,
+          targetFamily,
+          execution: executionSection,
+        }),
+      }
+    : undefined;
+
   const models: Record<string, Record<string, unknown>> = {};
+  const roots: Record<string, string> = {};
 
   for (const modelName in state.models) {
     const modelState = state.models[modelName];
     if (!modelState) continue;
 
     const tableName = modelState.table;
+    roots[tableName] = modelName;
+
     const tableState = state.tables[tableName];
     const tableColumns = tableState
       ? (tableState.columns as Record<string, { type: string; nullable?: boolean }>)
@@ -271,24 +297,25 @@ export function buildContractIR(state: RuntimeBuilderState): ContractIR {
     }
   }
 
+  const capabilities = state.capabilities || {};
+  const profileHash = computeProfileHash({ target, targetFamily, capabilities });
+
   const contract = {
-    schemaVersion: '1' as const,
     target,
-    targetFamily: 'sql' as const,
-    storageHash: state.storageHash || 'sha256:ts-builder-placeholder',
+    targetFamily,
     models,
-    roots: {},
+    roots,
     storage,
     ...(execution ? { execution } : {}),
     extensionPacks,
-    capabilities: state.capabilities || {},
+    capabilities,
+    profileHash,
     meta: {},
-    sources: {},
   };
 
   assertStorageSemantics(contract.storage as SqlStorage);
 
-  return contract as ContractIR;
+  return contract as Contract;
 }
 
 function assertKnownTargetModel(
@@ -321,7 +348,7 @@ function assertTargetTableMatches(
 
 export function buildSqlContractFromSemanticDefinition(
   definition: SqlSemanticContractDefinition,
-): ContractIR {
+): Contract {
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
 
   const tables: Record<string, RuntimeTableState> = {};
@@ -471,5 +498,5 @@ export function buildSqlContractFromSemanticDefinition(
     ...ifDefined('extensionNamespaces', extensionNamespaces),
   };
 
-  return buildContractIR(state);
+  return buildContract(state);
 }

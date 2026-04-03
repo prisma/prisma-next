@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type { ControlPlaneStack } from '@prisma-next/core-control-plane/types';
 import {
   checkContractComponentRequirements,
@@ -114,7 +114,7 @@ export function assertFrameworkComponentsCompatible<
  * This check ensures the emitted contract matches the CLI config before running
  * commands that depend on the contract (e.g., db verify, db sign).
  *
- * @param contract - The contract IR to validate (must include targetFamily, target, extensionPacks).
+ * @param contract - The contract to validate (must include targetFamily, target, extensionPacks).
  * @param stack - The control plane stack (target, adapter, driver, extensionPacks).
  *
  * @throws {CliStructuredError} errorConfigValidation when contract.targetFamily or contract.target
@@ -141,7 +141,7 @@ export function assertContractRequirementsSatisfied<
   contract,
   stack,
 }: {
-  readonly contract: Pick<ContractIR, 'targetFamily' | 'target' | 'extensionPacks'>;
+  readonly contract: Pick<Contract, 'targetFamily' | 'target' | 'extensionPacks'>;
   readonly stack: ControlPlaneStack<TFamilyId, TTargetId>;
 }): void {
   const providedComponentIds = new Set<string>([

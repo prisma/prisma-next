@@ -5,16 +5,16 @@ import type {
   ParsedDefaultFunctionCall,
 } from '../src/default-function-registry';
 import {
-  type InterpretPslDocumentToSqlContractIRInput,
-  interpretPslDocumentToSqlContractIR as interpretPslDocumentToSqlContractIRInternal,
+  type InterpretPslDocumentToSqlContractInput,
+  interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
 import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
 
 describe('composed mutation default registries', () => {
-  const interpretPslDocumentToSqlContractIR = (
-    input: Omit<InterpretPslDocumentToSqlContractIRInput, 'target' | 'scalarTypeDescriptors'>,
+  const interpretPslDocumentToSqlContract = (
+    input: Omit<InterpretPslDocumentToSqlContractInput, 'target' | 'scalarTypeDescriptors'>,
   ) =>
-    interpretPslDocumentToSqlContractIRInternal({
+    interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       ...input,
@@ -30,7 +30,7 @@ describe('composed mutation default registries', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ document });
+    const result = interpretPslDocumentToSqlContract({ document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -55,7 +55,7 @@ describe('composed mutation default registries', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: {
         defaultFunctionRegistry: new Map([
@@ -112,7 +112,7 @@ describe('composed mutation default registries', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: {
         defaultFunctionRegistry: new Map([

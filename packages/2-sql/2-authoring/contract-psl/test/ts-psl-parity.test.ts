@@ -8,7 +8,7 @@ import type {
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, it } from 'vitest';
-import { interpretPslDocumentToSqlContractIR } from '../src/interpreter';
+import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import { createBuiltinLikeControlMutationDefaults } from './fixtures';
 
 const sqlFamilyPack = {
@@ -243,7 +243,7 @@ describe('TS and PSL authoring parity', () => {
       sourceId: 'schema.prisma',
     });
 
-    const interpreted = interpretPslDocumentToSqlContractIR({
+    const interpreted = interpretPslDocumentToSqlContract({
       document: pslDocument,
       target: portablePostgresTargetPack,
       scalarTypeDescriptors,

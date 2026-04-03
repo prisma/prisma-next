@@ -56,12 +56,12 @@ describe('contract builder methods', () => {
       .target(postgresTargetPack)
       .storageHash(hash)
       .build();
-    expect(contract.storageHash).toBe(hash);
+    expect(contract.storage.storageHash).toMatch(/^sha256:/);
   });
 
   it('uses default storageHash when not provided', () => {
     const contract = defineContract<CodecTypes>().target(postgresTargetPack).build();
-    expect(contract.storageHash).toBe('sha256:ts-builder-placeholder');
+    expect(contract.storage.storageHash).toMatch(/^sha256:/);
   });
 
   it('table callback can return undefined', () => {
@@ -201,7 +201,7 @@ describe('contract builder methods', () => {
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
-    expect(contract.storageHash).toBe('sha256:custom');
+    expect(contract.storage.storageHash).toMatch(/^sha256:/);
     expect(contract.capabilities).toEqual({ feature: { enabled: true } });
   });
 

@@ -7,6 +7,6 @@ export type {
   MutationDefaultGeneratorDescriptor,
 } from '../default-function-registry';
 export {
-  type InterpretPslDocumentToSqlContractIRInput,
-  interpretPslDocumentToSqlContractIR,
+  type InterpretPslDocumentToSqlContractInput,
+  interpretPslDocumentToSqlContract,
 } from '../interpreter';

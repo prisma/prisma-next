@@ -1,7 +1,7 @@
 import type { Contract } from './contract-types';
 import type { ContractModel, ModelStorageBase } from './domain-types';
 import { computeProfileHash, computeStorageHash } from './hashing';
-import type { ProfileHashBase, StorageBase, StorageHashBase } from './types';
+import type { ExecutionSection, ProfileHashBase, StorageBase } from './types';
 import { coreHash, profileHash as toProfileHash } from './types';
 
 type ContractOverrides<
@@ -15,7 +15,7 @@ type ContractOverrides<
   storage?: Omit<TStorage, 'storageHash'>;
   capabilities?: Record<string, Record<string, boolean>>;
   extensionPacks?: Record<string, unknown>;
-  execution?: Record<string, unknown>;
+  execution?: ExecutionSection;
   profileHash?: ProfileHashBase<string>;
   meta?: Record<string, unknown>;
 };

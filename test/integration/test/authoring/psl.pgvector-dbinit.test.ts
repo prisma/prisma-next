@@ -1,6 +1,6 @@
 import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { createControlClient, enrichContractIR } from '@prisma-next/cli/control-api';
+import { createControlClient, enrichContract } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql, {
@@ -60,7 +60,7 @@ describe(
         throw new Error('expected pgvector PSL source emission to succeed');
       }
 
-      const enrichedIR = enrichContractIR(pslResult.value, frameworkComponents);
+      const enrichedIR = enrichContract(pslResult.value, frameworkComponents);
       const familyInstance = sql.create(
         createControlStack({
           family: sql,

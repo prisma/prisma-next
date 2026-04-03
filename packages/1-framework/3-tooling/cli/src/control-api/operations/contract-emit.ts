@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
+import type { Contract } from '@prisma-next/contract/types';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -6,7 +7,7 @@ import { dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
-import { enrichContractIR } from '../contract-enrichment';
+import { enrichContract } from '../contract-enrichment';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
 interface ProviderFailureLike {
@@ -105,21 +106,21 @@ export async function executeContractEmit(
     }
     throw errorRuntime('Failed to resolve contract source', {
       why: error instanceof Error ? error.message : String(error),
-      fix: 'Ensure contract.source resolves to ok(contractIR) or returns structured diagnostics.',
+      fix: 'Ensure contract.source resolves to ok(Contract) or returns structured diagnostics.',
     });
   }
 
   if (!isRecord(providerResult) || typeof providerResult.ok !== 'boolean') {
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed result shape.',
-      fix: 'Ensure contract.source resolves to ok(contractIR) or notOk({ summary, diagnostics }).',
+      fix: 'Ensure contract.source resolves to ok(Contract) or notOk({ summary, diagnostics }).',
     });
   }
 
   if (providerResult.ok && !('value' in providerResult)) {
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed success result: missing value.',
-      fix: 'Ensure contract.source success payload is ok(contractIR).',
+      fix: 'Ensure contract.source success payload is ok(Contract).',
     });
   }
 
@@ -133,7 +134,7 @@ export async function executeContractEmit(
   if (!providerResult.ok) {
     throw errorRuntime('Failed to resolve contract source', {
       why: providerResult.failure.summary,
-      fix: 'Fix contract source diagnostics and return ok(contractIR).',
+      fix: 'Fix contract source diagnostics and return ok(Contract).',
       meta: {
         diagnostics: providerResult.failure.diagnostics,
         ...ifDefined('providerMeta', providerResult.failure.meta),
@@ -150,7 +151,7 @@ export async function executeContractEmit(
     config.target.targetId,
     rawComponents,
   );
-  const enrichedIR = enrichContractIR(providerResult.value, frameworkComponents);
+  const enrichedIR = enrichContract(providerResult.value as Contract, frameworkComponents);
 
   // Emit contract via family instance
   const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: enrichedIR }));

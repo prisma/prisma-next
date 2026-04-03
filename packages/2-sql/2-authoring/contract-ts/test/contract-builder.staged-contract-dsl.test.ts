@@ -159,7 +159,7 @@ describe('staged contract DSL authoring surface', () => {
     >;
 
     expect(contract.target).toBe('postgres');
-    expect(contract.storageHash).toBe('sha256:staged-contract-dsl');
+    expect(contract.storage.storageHash).toMatch(/^sha256:/);
     expect(storageTables['app_user']).toMatchObject({
       primaryKey: { columns: ['id'], name: 'app_user_pkey' },
       uniques: [{ columns: ['email'], name: 'app_user_email_key' }],

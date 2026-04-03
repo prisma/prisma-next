@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
@@ -25,7 +25,7 @@ const DB_UPDATE_POLICY = {
 export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId>;
-  readonly contractIR: ContractIR;
+  readonly contractIR: Contract;
   readonly mode: 'plan' | 'apply';
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,

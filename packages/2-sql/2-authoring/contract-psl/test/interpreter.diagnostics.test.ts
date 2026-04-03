@@ -1,6 +1,6 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
-import { interpretPslDocumentToSqlContractIR } from '../src/interpreter';
+import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
 
 const baseInput = {
@@ -8,7 +8,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
 } as const;
 
-describe('interpretPslDocumentToSqlContractIR diagnostics', () => {
+describe('interpretPslDocumentToSqlContract diagnostics', () => {
   it('maps pgvector attributes on named types and fields to vector descriptor shape', () => {
     const namedTypeDocument = parsePslDocument({
       schema: `types {
@@ -23,7 +23,7 @@ model Document {
       sourceId: 'schema.prisma',
     });
 
-    const namedTypeResult = interpretPslDocumentToSqlContractIR({
+    const namedTypeResult = interpretPslDocumentToSqlContract({
       ...baseInput,
       document: namedTypeDocument,
       composedExtensionPacks: ['pgvector'],
@@ -48,7 +48,7 @@ model Document {
 `,
       sourceId: 'schema.prisma',
     });
-    const fieldResult = interpretPslDocumentToSqlContractIR({
+    const fieldResult = interpretPslDocumentToSqlContract({
       ...baseInput,
       document: fieldDocument,
       composedExtensionPacks: ['pgvector'],
@@ -80,7 +80,7 @@ model Document {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       document,
       composedExtensionPacks: [],
@@ -88,7 +88,7 @@ model Document {
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -112,12 +112,12 @@ model Document {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -146,7 +146,7 @@ model InvalidNativeTypes {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -191,12 +191,12 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -223,12 +223,12 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -255,12 +255,12 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -285,12 +285,12 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -319,12 +319,12 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -348,12 +348,12 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

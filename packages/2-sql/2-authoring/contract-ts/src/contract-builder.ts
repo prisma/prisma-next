@@ -36,7 +36,7 @@ import {
   createComposedAuthoringHelpers,
 } from './composed-authoring-helpers';
 import {
-  buildContractIR,
+  buildContract,
   buildSqlContractFromSemanticDefinition,
   type RuntimeBuilderState,
 } from './contract-ir-builder';
@@ -292,7 +292,7 @@ class SqlContractBuilder<
         TypeMaps<CodecTypes, Record<string, never>>
       >
     : never {
-    return buildContractIR(this.state as unknown as RuntimeBuilderState) as unknown as ReturnType<
+    return buildContract(this.state as unknown as RuntimeBuilderState) as unknown as ReturnType<
       SqlContractBuilder<
         CodecTypes,
         Target,

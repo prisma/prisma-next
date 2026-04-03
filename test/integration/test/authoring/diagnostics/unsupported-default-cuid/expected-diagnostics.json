@@ -1,5 +1,5 @@
 {
-  "failureSummary": "PSL to SQL Contract IR normalization failed",
+  "failureSummary": "PSL to SQL contract interpretation failed",
   "diagnostics": [
     {
       "code": "PSL_UNKNOWN_DEFAULT_FUNCTION",

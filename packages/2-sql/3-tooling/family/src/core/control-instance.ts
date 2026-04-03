@@ -1,5 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
@@ -187,7 +186,7 @@ export interface SchemaVerifyOptions {
 export interface SqlControlFamilyInstance
   extends ControlFamilyInstance<'sql'>,
     SqlFamilyInstanceState {
-  validateContractIR(contractJson: unknown): ContractIR;
+  validateContractIR(contractJson: unknown): Contract;
 
   verify(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
@@ -213,7 +212,7 @@ export interface SqlControlFamilyInstance
 
   toSchemaView(schema: SqlSchemaIR): CoreSchemaView;
 
-  emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
+  emitContract(options: { readonly contractIR: Contract | unknown }): Promise<EmitContractResult>;
 }
 
 export type SqlFamilyInstance = SqlControlFamilyInstance;
@@ -308,9 +307,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionPacks: extensions,
   });
 
-  function normalizeProviderContractIR(contract: unknown): ContractIR {
+  function normalizeProviderContractIR(contract: unknown): Contract {
     const validated = validateContract<SqlContract<SqlStorage>>(contract);
-    return validated as unknown as ContractIR;
+    return validated as unknown as Contract;
   }
 
   return {
@@ -321,7 +320,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionIds,
     typeMetadataRegistry,
 
-    validateContractIR(contractJson: unknown): ContractIR {
+    validateContractIR(contractJson: unknown): Contract {
       return normalizeProviderContractIR(contractJson);
     },
 

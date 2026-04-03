@@ -1,6 +1,6 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
-import { interpretPslDocumentToSqlContractIR } from '../src/interpreter';
+import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
 
 const baseInput = {
@@ -8,7 +8,7 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
 } as const;
 
-describe('interpretPslDocumentToSqlContractIR relations', () => {
+describe('interpretPslDocumentToSqlContract relations', () => {
   it('accepts relation navigation list fields and emits relation metadata for both sides', () => {
     const document = parsePslDocument({
       schema: `model User {
@@ -25,7 +25,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -72,7 +72,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -124,7 +124,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -153,7 +153,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -193,12 +193,12 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -228,7 +228,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;

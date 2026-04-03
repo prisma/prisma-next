@@ -7,7 +7,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
 import type { ControlMutationDefaults } from './default-function-registry';
-import { interpretPslDocumentToSqlContractIR } from './interpreter';
+import { interpretPslDocumentToSqlContract } from './interpreter';
 
 export interface PrismaContractOptions {
   readonly output?: string;
@@ -58,7 +58,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         ...(options.composedExtensionPacks ?? []),
       ];
 
-      const interpreted = interpretPslDocumentToSqlContractIR({
+      const interpreted = interpretPslDocumentToSqlContract({
         document,
         target: options.target,
         ...ifDefined('authoringContributions', options.authoringContributions),

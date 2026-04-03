@@ -62,7 +62,7 @@ function mapEmitFailure(
     const issues = mapDiagnosticsToIssues(failure);
     return errorRuntime(failure.summary, {
       why: failure.why ?? 'Contract source provider failed',
-      fix: 'Check your contract source provider in prisma-next.config.ts and ensure it returns Result<ContractIR, Diagnostics>',
+      fix: 'Check your contract source provider in prisma-next.config.ts and ensure it returns Result<Contract, Diagnostics>',
       ...(issues.length > 0 ? { meta: { issues } } : {}),
     });
   }

@@ -1,7 +1,7 @@
 import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type { Plugin } from 'esbuild';
 import { build } from 'esbuild';
 import { join } from 'pathe';
@@ -98,7 +98,7 @@ function createImportAllowlistPlugin(allowlist: ReadonlyArray<string>, entryPath
 }
 
 /**
- * Loads a contract from a TypeScript file and returns it as ContractIR.
+ * Loads a contract from a TypeScript file and returns it as Contract.
  *
  * **Responsibility: Parsing Only**
  * This function loads and parses a TypeScript contract file. It does NOT normalize the contract.
@@ -109,13 +109,13 @@ function createImportAllowlistPlugin(allowlist: ReadonlyArray<string>, entryPath
  *
  * @param entryPath - Path to the TypeScript contract file
  * @param options - Optional configuration (import allowlist)
- * @returns The contract as ContractIR (should already be normalized)
+ * @returns The contract as Contract (should already be normalized)
  * @throws Error if the contract cannot be loaded or is not JSON-serializable
  */
 export async function loadContractFromTs(
   entryPath: string,
   options?: LoadTsContractOptions,
-): Promise<ContractIR> {
+): Promise<Contract> {
   const allowlist = options?.allowlist ?? DEFAULT_ALLOWLIST;
 
   if (!existsSync(entryPath)) {
@@ -205,7 +205,7 @@ export async function loadContractFromTs(
 
     validatePurity(contract);
 
-    return contract as ContractIR;
+    return contract as Contract;
   } catch (error) {
     try {
       if (tempFile) {
