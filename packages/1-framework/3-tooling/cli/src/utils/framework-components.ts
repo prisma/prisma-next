@@ -144,7 +144,10 @@ export function assertContractRequirementsSatisfied<
   readonly contract: Pick<ContractIR, 'targetFamily' | 'target' | 'extensionPacks'>;
   readonly stack: ControlPlaneStack<TFamilyId, TTargetId>;
 }): void {
-  const providedComponentIds = new Set<string>([stack.target.id, stack.adapter.id]);
+  const providedComponentIds = new Set<string>([
+    stack.target.id,
+    ...(stack.adapter ? [stack.adapter.id] : []),
+  ]);
   for (const extension of stack.extensionPacks) {
     providedComponentIds.add(extension.id);
   }

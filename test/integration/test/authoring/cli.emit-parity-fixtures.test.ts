@@ -4,6 +4,7 @@ import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-em
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/cli/config-types';
 import { enrichContractIR } from '@prisma-next/cli/control-api';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { executeCommand, setupCommandMocks } from '../utils/cli-test-helpers';
@@ -105,12 +106,15 @@ describe('emit parity fixtures', () => {
             throw new Error(`PSL provider failed: ${pslProviderResultFirst.failure.summary}`);
           }
 
-          const familyInstance = tsConfig.family.create({
-            target: tsConfig.target,
-            adapter: tsConfig.adapter,
-            driver: tsConfig.driver,
-            extensionPacks: tsConfig.extensionPacks ?? [],
-          });
+          const familyInstance = tsConfig.family.create(
+            createControlStack({
+              family: tsConfig.family,
+              target: tsConfig.target,
+              adapter: tsConfig.adapter,
+              driver: tsConfig.driver,
+              extensionPacks: tsConfig.extensionPacks ?? [],
+            }),
+          );
 
           const frameworkComponents = [
             tsConfig.target,

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers';
@@ -55,12 +56,15 @@ describe('emitContract API', () => {
       if (!config.driver) {
         throw new Error('Config.driver is required');
       }
-      const familyInstance = config.family.create({
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
+      const familyInstance = config.family.create(
+        createControlStack({
+          family: config.family,
+          target: config.target,
+          adapter: config.adapter,
+          driver: config.driver,
+          extensionPacks: config.extensionPacks ?? [],
+        }),
+      );
 
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
@@ -114,12 +118,15 @@ describe('emitContract API', () => {
       if (!config.driver) {
         throw new Error('Config.driver is required');
       }
-      const familyInstance = config.family.create({
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
+      const familyInstance = config.family.create(
+        createControlStack({
+          family: config.family,
+          target: config.target,
+          adapter: config.adapter,
+          driver: config.driver,
+          extensionPacks: config.extensionPacks ?? [],
+        }),
+      );
 
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
@@ -168,12 +175,15 @@ describe('emitContract API', () => {
         if (!config.driver) {
           throw new Error('Config.driver is required');
         }
-        const familyInstance = config.family.create({
-          target: config.target,
-          adapter: config.adapter,
-          driver: config.driver,
-          extensionPacks: config.extensionPacks ?? [],
-        });
+        const familyInstance = config.family.create(
+          createControlStack({
+            family: config.family,
+            target: config.target,
+            adapter: config.adapter,
+            driver: config.driver,
+            extensionPacks: config.extensionPacks ?? [],
+          }),
+        );
 
         // emitContract handles stripping mappings and validation internally
         const result = await familyInstance.emitContract({ contractIR: contractRaw });
@@ -214,12 +224,15 @@ describe('emitContract API', () => {
       if (!config.driver) {
         throw new Error('Config.driver is required');
       }
-      const familyInstance = config.family.create({
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
+      const familyInstance = config.family.create(
+        createControlStack({
+          family: config.family,
+          target: config.target,
+          adapter: config.adapter,
+          driver: config.driver,
+          extensionPacks: config.extensionPacks ?? [],
+        }),
+      );
 
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
@@ -251,12 +264,15 @@ describe('emitContract API', () => {
       if (!config.driver) {
         throw new Error('Config.driver is required');
       }
-      const familyInstance = config.family.create({
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
+      const familyInstance = config.family.create(
+        createControlStack({
+          family: config.family,
+          target: config.target,
+          adapter: config.adapter,
+          driver: config.driver,
+          extensionPacks: config.extensionPacks ?? [],
+        }),
+      );
 
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
@@ -288,12 +304,15 @@ describe('emitContract API', () => {
       if (!config.driver) {
         throw new Error('Config.driver is required');
       }
-      const familyInstance = config.family.create({
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
+      const familyInstance = config.family.create(
+        createControlStack({
+          family: config.family,
+          target: config.target,
+          adapter: config.adapter,
+          driver: config.driver,
+          extensionPacks: config.extensionPacks ?? [],
+        }),
+      );
 
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });

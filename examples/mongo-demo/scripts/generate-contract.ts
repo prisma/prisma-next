@@ -65,11 +65,7 @@ async function main() {
     target: mongoTargetDescriptor,
   });
 
-  const instance = mongoFamilyDescriptor.create(
-    // TODO: remove cast when create() accepts ControlStack directly (F13 stack consolidation)
-    { target: mongoTargetDescriptor } as never,
-    controlStack,
-  );
+  const instance = mongoFamilyDescriptor.create(controlStack);
 
   const result = await instance.emitContract({ contractIR: blogIR });
 

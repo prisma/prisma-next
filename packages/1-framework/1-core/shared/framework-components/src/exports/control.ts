@@ -23,7 +23,11 @@ export type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '../control-result-types';
-export type { ControlStack } from '../control-stack';
+export type {
+  AssembledAuthoringContributions,
+  ControlStack,
+  CreateControlStackInput,
+} from '../control-stack';
 export {
   assembleAuthoringContributions,
   assertUniqueCodecOwner,

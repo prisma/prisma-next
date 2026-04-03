@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { dirname, isAbsolute, join, resolve } from 'pathe';
@@ -141,8 +141,7 @@ export async function executeContractEmit(
     });
   }
 
-  // Create control plane stack from config
-  const stack = createControlPlaneStack(config);
+  const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
 
   const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];

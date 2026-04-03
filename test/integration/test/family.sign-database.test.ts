@@ -5,6 +5,7 @@ import type { SignDatabaseResult } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { readMarker } from '@prisma-next/family-sql/verify';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -97,12 +98,15 @@ describe('family instance sign', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
 
           const result = (await familyInstance.sign({
             driver,
@@ -179,12 +183,15 @@ describe('family instance sign', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
 
           const result = (await familyInstance.sign({
             driver,
@@ -258,12 +265,15 @@ describe('family instance sign', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
 
           // First sign - creates marker
           const firstResult = (await familyInstance.sign({

@@ -2,6 +2,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -19,12 +20,15 @@ async function withIntrospection<T>(
 ): Promise<T> {
   const driver = await postgresDriver.create(connectionString);
   try {
-    const familyInstance = sql.create({
-      target: postgres,
-      adapter: postgresAdapter,
-      driver: postgresDriver,
-      extensionPacks: [],
-    });
+    const familyInstance = sql.create(
+      createControlStack({
+        family: sql,
+        target: postgres,
+        adapter: postgresAdapter,
+        driver: postgresDriver,
+        extensionPacks: [],
+      }),
+    );
 
     const schemaIR = await familyInstance.introspect({ driver });
     return await fn(schemaIR);
@@ -205,12 +209,15 @@ describe('family instance introspect', () => {
           create: () => ({}),
         } as unknown as typeof postgresAdapter;
 
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: adapterWithInvalidCreate,
-          driver: postgresDriver,
-          extensionPacks: [],
-        });
+        const familyInstance = sql.create(
+          createControlStack({
+            family: sql,
+            target: postgres,
+            adapter: adapterWithInvalidCreate,
+            driver: postgresDriver,
+            extensionPacks: [],
+          }),
+        );
 
         const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
           familyId: 'sql',
