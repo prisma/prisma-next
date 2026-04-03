@@ -1869,6 +1869,9 @@ importers:
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../../2-mongo-family/1-core
+      '@prisma-next/mongo-query-ast':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/2-query/query-ast
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0

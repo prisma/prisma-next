@@ -1,1 +1,1 @@
-export { createMongoAdapter } from '../mongo-adapter';
+export { createMongoAdapter, lowerReadPlan } from '../mongo-adapter';
