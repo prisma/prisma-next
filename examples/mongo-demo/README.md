@@ -4,7 +4,7 @@ End-to-end example of Prisma Next with MongoDB, demonstrating the full **authori
 
 ## What it shows
 
-- PSL schema (`prisma/schema.psl`) as the authoring surface for MongoDB
+- PSL schema (`prisma/contract.prisma`) as the authoring surface for MongoDB
 - Contract emission via `prisma-next.config.ts` and the CLI (`prisma-next contract emit`)
 - Runtime query execution using `mongoOrm()` with the emitted contract
 - Reference relation resolution via `$lookup` (Post → User)
@@ -18,7 +18,7 @@ The demo uses a blog schema with two models and a reference relation:
 User (id, name, email, bio?) ←1:N→ Post (id, title, content, authorId, createdAt)
 ```
 
-See [`prisma/schema.psl`](prisma/schema.psl).
+See [`prisma/contract.prisma`](prisma/contract.prisma).
 
 ## Quick start
 
@@ -47,7 +47,7 @@ pnpm test
 `prisma-next.config.ts` wires the Mongo family, target, and adapter descriptors together with a `mongoContract()` provider. Running `pnpm emit` invokes the CLI's `contract emit` command, which:
 
 1. Loads `prisma-next.config.ts` and creates a control stack
-2. Reads and parses `prisma/schema.psl` via the `mongoContract()` provider
+2. Reads and parses `prisma/contract.prisma` via the `mongoContract()` provider
 3. Interprets the parsed document into a `ContractIR`
 4. Emits `src/contract.json` and `src/contract.d.ts`
 
@@ -64,7 +64,7 @@ pnpm test
 
 | File                            | Purpose                                            |
 | ------------------------------- | -------------------------------------------------- |
-| `prisma/schema.psl`            | PSL schema (authoring surface)                     |
+| `prisma/contract.prisma`       | PSL schema (authoring surface)                     |
 | `prisma-next.config.ts`        | CLI config (family + target + adapter + contract provider) |
 | `src/contract.json`            | Emitted contract (generated, do not edit)           |
 | `src/contract.d.ts`            | Emitted type definitions (generated, do not edit)   |
@@ -76,7 +76,7 @@ pnpm test
 | Aspect        | `prisma-next-demo` (SQL)                    | `mongo-demo` (MongoDB)                      |
 | ------------- | ------------------------------------------- | ------------------------------------------- |
 | Target        | PostgreSQL                                  | MongoDB                                     |
-| Schema        | `schema.prisma` (PSL)                       | `schema.psl` (PSL)                          |
+| Schema        | `schema.prisma` (PSL)                       | `contract.prisma` (PSL)                     |
 | Emission      | CLI (`prisma-next contract emit`)           | CLI (`prisma-next contract emit`)           |
 | Runtime       | `postgres()` one-liner                      | `createMongoAdapter()` + `createMongoDriver()` + `createMongoRuntime()` + `mongoOrm()` |
 | Relations     | SQL joins                                   | `$lookup` aggregation pipeline              |
