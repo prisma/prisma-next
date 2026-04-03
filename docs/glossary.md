@@ -174,16 +174,16 @@ Instances are created during stack assembly or instantiation, not imported direc
 
 ### Stack
 
-A bundle of descriptors (or derived state) produced by a `create*Stack()` factory function. Stacks aggregate contributions from all [framework components](#framework-component) in a configuration (family + target + adapter + extensions) into a single value that downstream code can consume without knowing which component contributed what.
+A composition of [framework components](#framework-component) for a given plane. A stack carries pre-computed aggregations of the contributions from all its components (type imports, renderers, capabilities, authoring contributions, etc.), so downstream code can consume the combined result without knowing which component contributed what.
 
-| Stack | Plane | Inputs | Produces |
-|---|---|---|---|
-| `ControlStack` | Control (shared framework) | Descriptors' `ComponentMetadata` (type imports, renderers, authoring contributions) | Aggregated codec/operation type imports, parameterized renderers, extension IDs, authoring contributions |
-| `ControlPlaneStack` | Control | Control-plane descriptors (target, adapter, driver, extensions) | Typed bundle of control-plane descriptors for migration/emission orchestration |
-| `ExecutionStack` | Execution | Runtime descriptors (target, adapter, driver, extensions) | Typed bundle of runtime descriptors, ready for instantiation |
-| `ExecutionStackInstance` | Execution | An `ExecutionStack` | Instantiated runtime components (target, adapter, driver, extension instances) |
+Each plane has its own stack type:
 
-Stack creation follows the naming convention `create{Plane}Stack()` (e.g., `createControlStack()`, `createControlPlaneStack()`, `createExecutionStack()`).
+| Stack | Plane | What it carries |
+|---|---|---|
+| `ControlStack` | Control | The component descriptors and their aggregated contributions (type imports, renderers, extension IDs, authoring contributions) needed for contract emission and migration |
+| `ExecutionStack` | Execution | Runtime descriptors (target, adapter, driver, extensions), ready for instantiation |
+
+> **Divergence:** The codebase currently has both `ControlStack` (aggregated metadata) and `ControlPlaneStack` (descriptor bundle) as separate types. These should be consolidated into a single `ControlStack`. **Status: pending.**
 
 ---
 
