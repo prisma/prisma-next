@@ -1,3 +1,4 @@
+import type { OperationSignature } from '@prisma-next/operations';
 import type { AuthoringContributions } from './framework-authoring';
 import type { TypeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types-import-spec';
@@ -68,6 +69,12 @@ export interface ComponentMetadata {
    * project them into concrete helper functions for TS-first workflows.
    */
   readonly authoring?: AuthoringContributions;
+
+  /**
+   * Operation signatures contributed by this component.
+   * Used to build the framework-level operation registry during stack assembly.
+   */
+  readonly operationSignatures?: () => ReadonlyArray<OperationSignature>;
 }
 
 /**

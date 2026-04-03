@@ -1,3 +1,5 @@
+import type { OperationRegistry } from '@prisma-next/operations';
+import { createOperationRegistry } from '@prisma-next/operations';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -38,6 +40,7 @@ export interface ControlStack<
   readonly extensionIds: ReadonlyArray<string>;
   readonly parameterizedRenderers: Map<string, NormalizedTypeRenderer>;
   readonly parameterizedTypeImports: ReadonlyArray<TypesImportSpec>;
+  readonly operationRegistry: OperationRegistry;
   readonly authoringContributions: AssembledAuthoringContributions;
 }
 
@@ -295,6 +298,15 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
 
   const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...extensionPacks];
 
+  const operationRegistry = createOperationRegistry();
+  for (const descriptor of allDescriptors) {
+    if (descriptor.operationSignatures) {
+      for (const signature of descriptor.operationSignatures()) {
+        operationRegistry.register(signature);
+      }
+    }
+  }
+
   return {
     family,
     target,
@@ -308,6 +320,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
     parameterizedRenderers: extractParameterizedRenderers(allDescriptors),
     parameterizedTypeImports: extractParameterizedTypeImports(allDescriptors),
+    operationRegistry,
     authoringContributions: assembleAuthoringContributions(allDescriptors),
   };
 }
