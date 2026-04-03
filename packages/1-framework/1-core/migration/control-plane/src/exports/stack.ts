@@ -1,1 +1,1 @@
-export { createControlPlaneStack } from '../stack';
+export { createControlPlaneStack, createControlStack } from '../stack';
