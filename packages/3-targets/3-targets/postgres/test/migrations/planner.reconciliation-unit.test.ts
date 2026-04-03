@@ -55,7 +55,7 @@ function emptyContract(): SqlContract<SqlStorage> {
     targetFamily: 'sql',
     storageHash: coreHash('sha256:test'),
     profileHash: profileHash('sha256:test'),
-    storage: { tables: {} },
+    storage: { storageHash: coreHash('sha256:test'), tables: {} },
     roots: {},
     models: {},
     capabilities: {},
@@ -75,6 +75,7 @@ function contractWithColumn(
   return {
     ...contract,
     storage: {
+      storageHash: coreHash('sha256:test'),
       tables: {
         [table]: {
           columns: {
@@ -101,6 +102,7 @@ function contractWithColumnDefault(
   return {
     ...contract,
     storage: {
+      storageHash: coreHash('sha256:test'),
       tables: {
         [table]: {
           columns: {
@@ -131,6 +133,7 @@ function contractWithTypeRef(
   return {
     ...contract,
     storage: {
+      storageHash: coreHash('sha256:test'),
       tables: {
         [table]: {
           columns: {

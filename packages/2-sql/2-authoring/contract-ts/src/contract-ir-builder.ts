@@ -300,7 +300,6 @@ export function buildContract(state: RuntimeBuilderState): Contract {
   const contract = {
     target,
     targetFamily,
-    storageHash,
     models,
     roots,
     storage,
@@ -314,7 +313,7 @@ export function buildContract(state: RuntimeBuilderState): Contract {
 
   assertStorageSemantics(contract.storage as SqlStorage);
 
-  return contract as Contract;
+  return contract as unknown as Contract;
 }
 
 function assertKnownTargetModel(

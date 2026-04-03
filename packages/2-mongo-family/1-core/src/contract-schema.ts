@@ -75,6 +75,7 @@ export const MongoContractSchema = type({
   storage: type({
     '+': 'reject',
     collections: type({ '[string]': StorageCollectionSchema }),
+    'storageHash?': 'string',
   }),
   models: type({ '[string]': ModelDefinitionSchema }),
 });

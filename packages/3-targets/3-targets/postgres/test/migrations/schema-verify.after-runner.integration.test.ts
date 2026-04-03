@@ -113,6 +113,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         storageHash: coreHash('sha256:contract-with-defaults'),
         profileHash: profileHash('sha256:profile-with-defaults'),
         storage: {
+          storageHash: coreHash('sha256:test'),
           tables: {
             user: {
               columns: {
@@ -173,6 +174,7 @@ describe.sequential('Schema verification after runner - integration', () => {
           storageHash: coreHash('sha256:contract-enum-mixed-case'),
           profileHash: profileHash('sha256:profile-enum-mixed-case'),
           storage: {
+            storageHash: coreHash('sha256:test'),
             tables: {
               Organization: {
                 columns: {

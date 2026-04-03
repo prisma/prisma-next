@@ -20,6 +20,7 @@ export const contract: SqlContract<SqlStorage> = {
   storageHash: coreHash('sha256:contract'),
   profileHash: profileHash('sha256:profile'),
   storage: {
+    storageHash: coreHash('sha256:contract'),
     tables: {
       user: {
         columns: {

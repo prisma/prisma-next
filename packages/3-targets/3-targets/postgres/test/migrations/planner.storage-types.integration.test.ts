@@ -23,6 +23,7 @@ const contractWithEnum: SqlContract<SqlStorage> = {
   storageHash: coreHash('sha256:enum-test'),
   profileHash: profileHash('sha256:profile'),
   storage: {
+    storageHash: coreHash('sha256:test'),
     tables: {
       user: {
         columns: {

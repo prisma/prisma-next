@@ -39,6 +39,7 @@ describe('builder integration', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storage: {
+        storageHash: expect.stringMatching(/^sha256:/),
         tables: expect.objectContaining({
           user: expect.anything(),
         }),
@@ -75,6 +76,7 @@ describe('builder integration', () => {
     // Type checks - verify literal types are preserved
     expectTypeOf(contract.target).toEqualTypeOf<'postgres'>();
     expectTypeOf(contract.targetFamily).toEqualTypeOf<'sql'>();
+
     // Verify table name is literal 'user', not string
     expectTypeOf(contract.storage.tables).toHaveProperty('user');
 
@@ -190,7 +192,7 @@ describe('builder integration', () => {
 
     // Runtime checks
     expect(plan.ast).toBeInstanceOf(SelectAst);
-    expect(plan.meta.storageHash).toMatch(/^sha256:/);
+    expect(plan.meta.storageHash).toBe(contract.storage.storageHash);
 
     // Type checks - verify plan types are specific
     expectTypeOf(plan.meta.storageHash).toEqualTypeOf<string>();

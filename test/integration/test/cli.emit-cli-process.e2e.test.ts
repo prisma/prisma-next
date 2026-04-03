@@ -4,7 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { StorageHashBase } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -18,6 +19,7 @@ const fixtureSubdir = 'emit-command';
 
 type EmittedContract = SqlContract<
   {
+    readonly storageHash: StorageHashBase<string>;
     readonly tables: {
       readonly user: {
         readonly columns: {
@@ -161,8 +163,10 @@ describe('contract emit command (CLI process e2e)', () => {
 
       expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
       expect(validatedContract.target).toBe(originalContract.target);
-      const tables = validatedContract.storage['tables'] as Record<string, unknown> | undefined;
-      const originalTables = originalContract.storage?.['tables'] as
+      const tables = (validatedContract.storage as SqlStorage).tables as
+        | Record<string, unknown>
+        | undefined;
+      const originalTables = (originalContract.storage as SqlStorage | undefined)?.tables as
         | Record<string, unknown>
         | undefined;
       const userTable = tables?.['user'] as Record<string, unknown> | undefined;

@@ -101,11 +101,11 @@ export async function runDbInit(options: {
   readonly contractJsonPath: string;
 }): Promise<void> {
   const { connectionString, contractJsonPath } = options;
-  const contract = await loadRawContractFromDisk(contractJsonPath);
+  const contractJson = await loadRawContractFromDisk(contractJsonPath);
   const controlClient = createControlClientForTests(connectionString);
 
   try {
-    const result = await controlClient.dbInit({ contract, mode: 'apply' });
+    const result = await controlClient.dbInit({ contract: contractJson, mode: 'apply' });
     if (!result.ok) {
       throw new Error(
         `dbInit failed: ${result.failure.summary}\n${JSON.stringify(result.failure, null, 2)}`,
@@ -186,11 +186,11 @@ export async function withTestRuntime<TContract extends SqlContract<SqlStorage>>
   contractJsonPath: string,
   callback: (ctx: TestRuntimeContext<TContract>) => Promise<void>,
 ): Promise<void> {
-  const rawContract = await loadRawContractFromDisk(contractJsonPath);
-  const contract = validateContract<TContract>(rawContract);
+  const contractJson = await loadRawContractFromDisk(contractJsonPath);
+  const contract = validateContract<TContract>(contractJson);
 
   await withDevDatabase(async ({ connectionString }) => {
-    const sql = await getPlannedDdlSql({ connectionString, contract });
+    const sql = await getPlannedDdlSql({ connectionString, contract: contractJson });
     await runDbInit({ connectionString, contractJsonPath });
 
     await withClient(connectionString, async (client: Client) => {

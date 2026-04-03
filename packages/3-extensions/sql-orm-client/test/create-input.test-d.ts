@@ -1,8 +1,10 @@
+import type { StorageHashBase } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import type { CreateInput } from '../src/types';
 
 type CreateInputContract = SqlContract<
   {
+    storageHash: StorageHashBase<string>;
     tables: {
       user: {
         columns: {

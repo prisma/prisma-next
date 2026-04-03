@@ -1,10 +1,5 @@
 import { createSqlContract } from '@prisma-next/contract/testing';
-import type {
-  Contract,
-  TypeRenderEntry,
-  TypeRenderer,
-  TypesImportSpec,
-} from '@prisma-next/contract/types';
+import type { TypeRenderEntry, TypeRenderer, TypesImportSpec } from '@prisma-next/contract/types';
 import type { TargetDescriptor } from '@prisma-next/framework-components/components';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
@@ -130,7 +125,7 @@ function createTestContract(overrides: Record<string, unknown> = {}): Record<str
   return {
     schemaVersion: '1',
     ...base,
-    storageHash: (base.storage as Record<string, unknown>)['storageHash'] ?? 'sha256:test',
+    storageHash: base.storage.storageHash,
   };
 }
 

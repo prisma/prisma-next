@@ -1,4 +1,4 @@
-import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type { ExecutionMutationDefaultValue, StorageHashBase } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
@@ -192,6 +192,7 @@ type BuildStorage<
   >,
   Types extends Record<string, StorageTypeInstance>,
 > = {
+  readonly storageHash: StorageHashBase<string>;
   readonly tables: {
     readonly [K in keyof Tables]: BuildStorageTable<
       K & string,
@@ -225,7 +226,7 @@ function buildStagedContract<Definition extends StagedContractInput>(
 ): SqlContractResult<Definition> {
   return buildSqlContractFromSemanticDefinition(
     buildStagedSemanticContractDefinition(definition),
-  ) as SqlContractResult<Definition>;
+  ) as unknown as SqlContractResult<Definition>;
 }
 
 class SqlContractBuilder<

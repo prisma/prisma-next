@@ -1,3 +1,4 @@
+import type { StorageHashBase } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -13,6 +14,7 @@ import { col, simpleSelect, table } from './test-helpers';
 
 type TestContract = SqlContract<
   {
+    readonly storageHash: StorageHashBase<string>;
     readonly tables: {
       readonly user: {
         readonly columns: {

@@ -2,6 +2,7 @@
 // Example: This pattern allows multiple contracts (e.g., authDataContract.d.ts, salesDataContract.d.ts)
 // without namespace collisions. Each contract can have its own namespace name.
 
+import type { StorageHashBase } from '@prisma-next/contract/types';
 import type { ContractWithTypeMaps, SqlContract } from '@prisma-next/sql-contract/types';
 // Minimal CodecTypes for testing - matches adapter-postgres structure
 type CodecTypes = {
@@ -39,6 +40,7 @@ export type Contract = ContractWithTypeMaps<SqlContract<
         readonly foreignKeys: ReadonlyArray<never>;
       };
     };
+    readonly storageHash: StorageHashBase<string>;
   },
   {
     readonly User: {

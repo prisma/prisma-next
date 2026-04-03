@@ -31,7 +31,7 @@ function makeContract(
     targetFamily: 'sql',
     storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`),
     profileHash: profileHash(`sha256:reconciliation-integ-${hashSuffix}`),
-    storage: { tables },
+    storage: { storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`), tables },
     roots: {},
     models: {},
     capabilities: {},
@@ -976,6 +976,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
       profileHash: profileHash('sha256:reconciliation-integ-text-to-enum-updated'),
       storage: {
+        storageHash: coreHash('sha256:test'),
         tables: {
           item: {
             columns: {
@@ -1256,6 +1257,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
         profileHash: profileHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
         storage: {
+          storageHash: coreHash('sha256:test'),
           tables: {
             item: {
               columns: {

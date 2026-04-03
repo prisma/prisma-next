@@ -38,6 +38,7 @@ function createParamTypesTestContract(
     models: {},
     roots: {},
     storage: {
+      storageHash: coreHash('sha256:test'),
       tables: {
         test: {
           columns: options?.tableColumns ?? {

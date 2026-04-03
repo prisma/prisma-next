@@ -22,7 +22,7 @@ const testContract: SqlContract<SqlStorage> = {
   storageHash: coreHash('sha256:test'),
   models: {},
   roots: {},
-  storage: { tables: {} },
+  storage: { storageHash: coreHash('sha256:test'), tables: {} },
   extensionPacks: {},
   capabilities: {},
   meta: {},
@@ -316,6 +316,7 @@ describe('applyMutationDefaults', () => {
   const contractWithDefaults: SqlContract<SqlStorage> = {
     ...testContract,
     storage: {
+      storageHash: coreHash('sha256:test'),
       tables: {
         user: {
           columns: {

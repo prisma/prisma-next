@@ -39,6 +39,7 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
     storageHash: coreHash('sha256:contract'),
     profileHash: profileHash('sha256:profile'),
     storage: {
+      storageHash: coreHash('sha256:contract'),
       tables: {
         user: {
           columns: {
@@ -197,6 +198,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       storageHash: coreHash('sha256:contract'),
       profileHash: profileHash('sha256:profile'),
       storage: {
+        storageHash: coreHash('sha256:test'),
         tables: {
           params: {
             columns: {
@@ -290,6 +292,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       storageHash: coreHash('sha256:contract'),
       profileHash: profileHash('sha256:profile'),
       storage: {
+        storageHash: coreHash('sha256:test'),
         tables: {
           documents: {
             columns: {
@@ -507,6 +510,7 @@ describe('PostgresMigrationPlanner - composite unique constraint DDL', () => {
       storageHash: coreHash('sha256:composite-unique'),
       profileHash: profileHash('sha256:composite-unique-profile'),
       storage: {
+        storageHash: coreHash('sha256:test'),
         tables: {
           user: {
             columns: {
@@ -575,6 +579,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       storageHash: coreHash('sha256:test-defaults'),
       profileHash: profileHash('sha256:test-defaults-profile'),
       storage: {
+        storageHash: coreHash('sha256:test'),
         tables: {
           [tableName]: {
             columns,

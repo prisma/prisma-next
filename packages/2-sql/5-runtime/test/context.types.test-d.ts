@@ -1,3 +1,4 @@
+import type { StorageHashBase } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type { ExecutionContext, TypeHelperRegistry } from '../src/sql-context';
@@ -5,6 +6,7 @@ import type { ExecutionContext, TypeHelperRegistry } from '../src/sql-context';
 // Contract type with storage.types using literal types (matching emission output)
 type TestContract = SqlContract<
   {
+    readonly storageHash: StorageHashBase<string>;
     readonly tables: {
       readonly document: {
         readonly columns: {

@@ -19,10 +19,7 @@ describe('query plan meta', () => {
   });
 
   it('omits profileHash when the contract does not declare one', () => {
-    const contractWithoutProfile = {
-      ...baseContract,
-      profileHash: undefined,
-    };
+    const { profileHash: _, ...contractWithoutProfile } = baseContract;
 
     expect(buildOrmPlanMeta(contractWithoutProfile)).toEqual({
       target: contractWithoutProfile.target,

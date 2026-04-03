@@ -305,7 +305,7 @@ export const sqlTargetFamilyHook = {
       .join(' & ');
 
     const renderCtx: TypeRenderContext = { codecTypesName: 'CodecTypes' };
-    const storageType = this.generateStorageType(storage);
+    const storageType = this.generateStorageType(storage, 'StorageHash');
     const modelsType = this.generateModelsType(models, storage, parameterizedRenderers, renderCtx);
     const rootsType = this.generateRootsType(contract.roots);
 
@@ -347,7 +347,7 @@ export const sqlTargetFamilyHook = {
   export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
   type ContractBase = SqlContract<
-  ${storageType} & { readonly storageHash: StorageHash },
+  ${storageType},
   ${modelsType},
   StorageHash,
   ExecutionHash,
@@ -379,7 +379,7 @@ export const sqlTargetFamilyHook = {
     return `{ ${entries} }`;
   },
 
-  generateStorageType(storage: SqlStorage): string {
+  generateStorageType(storage: SqlStorage, storageHashType: string): string {
     const tables: string[] = [];
     for (const [tableName, table] of Object.entries(storage.tables).sort(([a], [b]) =>
       a.localeCompare(b),
@@ -448,7 +448,7 @@ export const sqlTargetFamilyHook = {
 
     const typesType = this.generateStorageTypesType(storage.types);
 
-    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType} }`;
+    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType}; readonly storageHash: ${storageHashType} }`;
   },
 
   /**
