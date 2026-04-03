@@ -79,10 +79,10 @@ async function main() {
   const server = createServer(async (req, res) => {
     try {
       if (req.method === 'GET' && req.url === '/api/posts') {
-        const posts = await orm.posts.findMany({ include: { author: true } });
+        const posts = await orm.posts.include('author').all();
         jsonResponse(res, posts);
       } else if (req.method === 'GET' && req.url === '/api/users') {
-        const users = await orm.users.findMany();
+        const users = await orm.users.all();
         jsonResponse(res, users);
       } else {
         jsonResponse(res, { error: 'Not found' }, 404);

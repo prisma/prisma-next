@@ -1,13 +1,12 @@
-import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../1-core/test/fixtures/orm-contract';
+import type { MongoCollection } from '../src/collection';
+import type { MongoOrmClient } from '../src/mongo-orm';
 import type {
   EmbedRelationKeys,
   InferFullRow,
   InferRootRow,
-  MongoCollection,
   MongoIncludeSpec,
-  MongoOrmClient,
   MongoWhereFilter,
   ReferenceRelationKeys,
 } from '../src/types';
@@ -24,14 +23,6 @@ test('root accessors are MongoCollection instances', () => {
   type Client = MongoOrmClient<Contract>;
   expectTypeOf<Client['tasks']>().toExtend<MongoCollection<Contract, 'Task'>>();
   expectTypeOf<Client['users']>().toExtend<MongoCollection<Contract, 'User'>>();
-});
-
-// --- findMany return type ---
-
-test('findMany returns AsyncIterableResult', () => {
-  type Client = MongoOrmClient<Contract>;
-  type Result = ReturnType<Client['users']['findMany']>;
-  expectTypeOf<Result>().toExtend<AsyncIterableResult<unknown>>();
 });
 
 // --- Default row includes embedded fields ---

@@ -2259,6 +2259,9 @@ importers:
       '@prisma-next/mongo-orm':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/4-orm
+      '@prisma-next/mongo-query-ast':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/2-query/query-ast
       '@prisma-next/mongo-runtime':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/5-runtime

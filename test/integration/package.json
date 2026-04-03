@@ -41,6 +41,7 @@
     "@prisma-next/driver-mongo": "workspace:*",
     "@prisma-next/mongo-core": "workspace:*",
     "@prisma-next/mongo-orm": "workspace:*",
+    "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/mongo-runtime": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "@prisma-next/vite-plugin-contract-emit": "workspace:*",
