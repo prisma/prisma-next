@@ -1879,6 +1879,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/contract
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/shared/operations
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
