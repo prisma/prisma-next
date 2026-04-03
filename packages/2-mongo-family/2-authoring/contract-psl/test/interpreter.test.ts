@@ -44,14 +44,11 @@ describe('interpretPslDocumentToMongoContractIR', () => {
     it('maps standard PSL types to Mongo codec IDs', () => {
       const ir = interpretOk(`
         model Item {
-          id    ObjectId @id @map("_id")
-          name  String
-          count Int
-          big   BigInt
-          score Float
+          id     ObjectId @id @map("_id")
+          name   String
+          count  Int
           active Boolean
-          at    DateTime
-          data  Bytes
+          at     DateTime
         }
       `);
 
@@ -60,13 +57,41 @@ describe('interpretPslDocumentToMongoContractIR', () => {
           _id: { codecId: 'mongo/objectId@1', nullable: false },
           name: { codecId: 'mongo/string@1', nullable: false },
           count: { codecId: 'mongo/int32@1', nullable: false },
-          big: { codecId: 'mongo/int64@1', nullable: false },
-          score: { codecId: 'mongo/double@1', nullable: false },
           active: { codecId: 'mongo/bool@1', nullable: false },
           at: { codecId: 'mongo/date@1', nullable: false },
-          data: { codecId: 'mongo/binary@1', nullable: false },
         },
       });
+    });
+
+    it('produces diagnostics for PSL types without runtime codec support', () => {
+      const result = interpret(`
+        model Item {
+          id    ObjectId @id @map("_id")
+          big   BigInt
+          score Float
+          data  Bytes
+        }
+      `);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toHaveLength(3);
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+            message: expect.stringContaining('BigInt'),
+          }),
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+            message: expect.stringContaining('Float'),
+          }),
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+            message: expect.stringContaining('Bytes'),
+          }),
+        ]),
+      );
     });
 
     it('uses custom scalar type descriptors when provided', () => {
@@ -91,6 +116,26 @@ describe('interpretPslDocumentToMongoContractIR', () => {
           name: { codecId: 'custom/text@2' },
         },
       });
+    });
+
+    it('produces a diagnostic for scalar list fields', () => {
+      const result = interpret(`
+        model Item {
+          id   ObjectId @id @map("_id")
+          tags String[]
+        }
+      `);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_LIST_FIELD',
+            message: expect.stringContaining('tags'),
+          }),
+        ]),
+      );
     });
 
     it('produces a diagnostic for unsupported field types', () => {
@@ -344,6 +389,42 @@ describe('interpretPslDocumentToMongoContractIR', () => {
           }),
         ]),
       );
+    });
+
+    it('creates 1:1 inverse relation for singular non-FK relation field', () => {
+      const ir = interpretOk(`
+        model User {
+          id      ObjectId @id @map("_id")
+          profile Profile?
+        }
+
+        model Profile {
+          id     ObjectId @id @map("_id")
+          userId ObjectId
+          user   User @relation(fields: [userId], references: [id])
+        }
+      `);
+
+      expect(model(ir, 'User').relations).toMatchObject({
+        profile: {
+          to: 'Profile',
+          cardinality: '1:1',
+          on: {
+            localFields: ['_id'],
+            targetFields: ['userId'],
+          },
+        },
+      });
+      expect(model(ir, 'Profile').relations).toMatchObject({
+        user: {
+          to: 'User',
+          cardinality: 'N:1',
+          on: {
+            localFields: ['userId'],
+            targetFields: ['_id'],
+          },
+        },
+      });
     });
 
     it('emits diagnostic for orphaned backrelation with no matching FK', () => {

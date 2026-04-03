@@ -78,6 +78,7 @@ export function interpretPslDocumentToMongoContractIR(
     readonly fieldName: string;
     readonly targetModelName: string;
     readonly relationName?: string;
+    readonly cardinality: '1:1' | '1:N';
     readonly field: PslField;
   }
   const backrelationCandidates: BackrelationCandidate[] = [];
@@ -91,21 +92,22 @@ export function interpretPslDocumentToMongoContractIR(
 
     for (const field of pslModel.fields) {
       if (isRelationField(field, modelNames)) {
-        if (field.list) {
-          const listRelation = parseRelationAttribute(field.attributes);
+        const relation = parseRelationAttribute(field.attributes);
+
+        if (field.list || !(relation?.fields && relation?.references)) {
           backrelationCandidates.push({
             modelName: pslModel.name,
             fieldName: field.name,
             targetModelName: field.typeName,
-            ...(listRelation?.relationName !== undefined
-              ? { relationName: listRelation.relationName }
+            ...(relation?.relationName !== undefined
+              ? { relationName: relation.relationName }
               : {}),
+            cardinality: field.list ? '1:N' : '1:1',
             field,
           });
           continue;
         }
 
-        const relation = parseRelationAttribute(field.attributes);
         if (relation?.fields && relation?.references) {
           const localMapped = relation.fields.map((f) => fieldMappings.pslNameToMapped.get(f) ?? f);
 
@@ -133,6 +135,16 @@ export function interpretPslDocumentToMongoContractIR(
             targetFields: targetMapped,
           });
         }
+        continue;
+      }
+
+      if (field.list) {
+        diagnostics.push({
+          code: 'PSL_UNSUPPORTED_LIST_FIELD',
+          message: `Field "${pslModel.name}.${field.name}" is a scalar list (${field.typeName}[]). Scalar list fields are not yet supported in the Mongo interpreter.`,
+          sourceId,
+          span: field.span,
+        });
         continue;
       }
 
@@ -211,7 +223,7 @@ export function interpretPslDocumentToMongoContractIR(
     if (!modelEntry) continue;
     modelEntry.relations[candidate.fieldName] = {
       to: candidate.targetModelName,
-      cardinality: '1:N' as const,
+      cardinality: candidate.cardinality,
       on: {
         localFields: fk.targetFields,
         targetFields: fk.localFields,
