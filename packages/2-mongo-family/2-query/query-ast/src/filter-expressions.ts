@@ -7,6 +7,8 @@ abstract class MongoFilterExpression extends MongoAstNode {
   abstract rewrite(rewriter: MongoFilterRewriter): MongoFilterExpr;
 
   not(): MongoNotExpr {
+    // MongoFilterExpression is the hidden abstract base; all concrete subclasses
+    // are members of MongoFilterExpr, so this cast is structurally safe.
     return new MongoNotExpr(this as unknown as MongoFilterExpr);
   }
 }
@@ -55,6 +57,14 @@ export class MongoFieldFilter extends MongoFilterExpression {
 
   static in(field: string, values: MongoValue): MongoFieldFilter {
     return new MongoFieldFilter(field, '$in', values);
+  }
+
+  static isNull(field: string): MongoFieldFilter {
+    return new MongoFieldFilter(field, '$eq', null);
+  }
+
+  static isNotNull(field: string): MongoFieldFilter {
+    return new MongoFieldFilter(field, '$ne', null);
   }
 
   accept<R>(visitor: MongoFilterVisitor<R>): R {

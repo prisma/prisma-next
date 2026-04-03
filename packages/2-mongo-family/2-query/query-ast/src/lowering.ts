@@ -32,7 +32,7 @@ export function lowerFilter(filter: MongoFilterExpr): Document {
     case 'or':
       return { $or: filter.exprs.map((e) => lowerFilter(e)) };
     case 'not':
-      return { $not: lowerFilter(filter.expr) };
+      return { $nor: [lowerFilter(filter.expr)] };
     case 'exists':
       return { [filter.field]: { $exists: filter.exists } };
   }

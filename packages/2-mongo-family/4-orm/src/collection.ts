@@ -45,15 +45,7 @@ export class MongoCollection<
     this.state = init.state ?? emptyCollectionState();
   }
 
-  where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName>;
-  where(
-    fn: (model: MongoWhereAccessor<TContract, ModelName>) => MongoFilterExpr,
-  ): MongoCollection<TContract, ModelName>;
-  where(
-    input: MongoFilterExpr | ((model: MongoWhereAccessor<TContract, ModelName>) => MongoFilterExpr),
-  ): MongoCollection<TContract, ModelName> {
-    const filter =
-      typeof input === 'function' ? input({} as MongoWhereAccessor<TContract, ModelName>) : input;
+  where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName> {
     return this.#clone({
       filters: [...this.state.filters, filter],
     });
@@ -149,8 +141,3 @@ export class MongoCollection<
     });
   }
 }
-
-export type MongoWhereAccessor<
-  _TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  _ModelName extends string,
-> = Record<string, never>;
