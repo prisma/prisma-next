@@ -19,11 +19,16 @@ const ContractSchema = type({
   roots: 'Record<string, string>',
   models: 'Record<string, unknown>',
   storage: 'Record<string, unknown>',
-  capabilities: 'Record<string, unknown>',
+  capabilities: 'Record<string, Record<string, boolean>>',
   extensionPacks: 'Record<string, unknown>',
   meta: 'Record<string, unknown>',
-  'execution?': 'unknown',
-  'profileHash?': 'unknown',
+  'execution?': {
+    executionHash: 'string',
+    mutations: {
+      defaults: 'unknown[]',
+    },
+  },
+  'profileHash?': 'string',
 });
 
 function stripPersistenceFields(raw: Record<string, unknown>): Record<string, unknown> {

@@ -55,7 +55,7 @@ describe('validateContract', () => {
     };
     validateContract<Contract>(minimalContract(), storageValidator);
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.target).toBe('postgres');
+    expect(calls[0]!.target).toBe('postgres');
   });
 
   it('propagates storage validator errors', () => {
