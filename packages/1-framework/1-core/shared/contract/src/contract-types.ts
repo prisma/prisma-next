@@ -1,5 +1,26 @@
 import type { ContractModel } from './domain-types';
-import type { ExecutionSection, ProfileHashBase, StorageBase } from './types';
+import type {
+  ExecutionHashBase,
+  ExecutionMutationDefault,
+  ProfileHashBase,
+  StorageBase,
+} from './types';
+
+/**
+ * Execution section for the unified contract (ADR 182).
+ *
+ * Unlike the legacy {@link import('./types').ExecutionSection}, this type
+ * requires `executionHash` — when an execution section is present, its
+ * hash must be too (consistent with `StorageBase.storageHash`).
+ *
+ * @template THash  Literal hash string type for type-safe hash tracking.
+ */
+export type ContractExecutionSection<THash extends string = string> = {
+  readonly executionHash: ExecutionHashBase<THash>;
+  readonly mutations: {
+    readonly defaults: ReadonlyArray<ExecutionMutationDefault>;
+  };
+};
 
 /**
  * Unified contract representation (ADR 182).
@@ -27,7 +48,7 @@ export interface Contract<
   readonly storage: TStorage;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;
-  readonly execution?: ExecutionSection;
+  readonly execution?: ContractExecutionSection;
   readonly profileHash?: ProfileHashBase<string>;
   readonly meta: Record<string, unknown>;
 }

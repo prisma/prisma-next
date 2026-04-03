@@ -1,4 +1,4 @@
-export type { Contract } from '../contract-types';
+export type { Contract, ContractExecutionSection } from '../contract-types';
 export type {
   ContractDiscriminator,
   ContractEmbedRelation,
