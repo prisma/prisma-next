@@ -21,7 +21,7 @@ Provides the Mongo family descriptor (`ControlFamilyDescriptor`) that includes:
 ## Usage
 
 ```typescript
-import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo';
+import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 
 const stack = createControlStack({
@@ -44,7 +44,7 @@ const result = await familyInstance.emitContract({ contractIR });
 
 ## Entrypoints
 
-- **`.`** (root): Control plane entry point — exports `mongoFamilyDescriptor`, `mongoTargetDescriptor`, `createMongoFamilyInstance`, and `MongoControlFamilyInstance`
+- **`./control`**: Control plane entry point — exports `mongoFamilyDescriptor`, `mongoTargetDescriptor`, `createMongoFamilyInstance`, and `MongoControlFamilyInstance`
 
 ## Dependencies
 

@@ -14,7 +14,7 @@ End-to-end example of Prisma Next with MongoDB, demonstrating the full **authori
 
 The demo uses a blog schema with two models and a reference relation:
 
-```
+```text
 User (id, name, email, bio?) ←1:N→ Post (id, title, content, authorId, createdAt)
 ```
 

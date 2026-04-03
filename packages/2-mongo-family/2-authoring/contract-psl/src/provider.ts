@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import type { ContractConfig } from '@prisma-next/config/config-types';
+import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -14,7 +14,7 @@ export interface MongoContractOptions {
 
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
   return {
-    source: async () => {
+    source: async (_context: ContractSourceContext) => {
       const absoluteSchemaPath = resolve(schemaPath);
       let schema: string;
       try {
