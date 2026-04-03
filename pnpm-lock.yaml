@@ -986,6 +986,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../../1-framework/3-tooling/emitter
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/framework-components
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../../1-core
