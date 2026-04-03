@@ -1,3 +1,4 @@
+import { computeStorageHash } from '@prisma-next/contract/hashing';
 import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
 import { isTaggedBigInt, isTaggedRaw } from '@prisma-next/contract/types';
 import type { DomainContractShape, DomainModelShape } from '@prisma-next/contract/validate-domain';
@@ -288,18 +289,28 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
   const pick = (key: string) =>
     key in contractObj && contractObj[key] !== undefined ? { [key]: contractObj[key] } : {};
 
+  const target = contractObj['target'] as string;
+  const targetFamily = contractObj['targetFamily'] as string;
+
+  const storageHash =
+    (contractObj['storageHash'] as string | undefined) ??
+    ((normalizedStorage as Record<string, unknown>)['storageHash'] as string | undefined) ??
+    computeStorageHash({ target, targetFamily, storage: normalizedStorage });
+
+  const storageWithHash = { ...normalizedStorage, storageHash };
+
   return {
     ...pick('schemaVersion'),
-    target: contractObj['target'],
-    targetFamily: contractObj['targetFamily'],
+    target,
+    targetFamily,
     ...pick('coreHash'),
-    storageHash: contractObj['storageHash'],
+    storageHash,
     ...pick('executionHash'),
     ...pick('profileHash'),
     ...pick('_generated'),
     roots: contractObj['roots'] ?? {},
     models,
-    storage: normalizedStorage,
+    storage: storageWithHash,
     extensionPacks: contractObj['extensionPacks'] ?? {},
     capabilities: contractObj['capabilities'] ?? {},
     meta: contractObj['meta'] ?? {},

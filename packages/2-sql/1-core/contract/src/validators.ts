@@ -128,6 +128,7 @@ const StorageTableSchema = type({
 
 const StorageSchema = type({
   '+': 'reject',
+  storageHash: 'string',
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
