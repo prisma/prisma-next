@@ -3,6 +3,7 @@ import type {
   ContractSourceDiagnostics,
 } from '@prisma-next/config/config-types';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { DomainField, DomainReferenceRelation } from '@prisma-next/contract/types';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { getMapName, lowerFirst, parseRelationAttribute } from './psl-helpers';
@@ -20,8 +21,13 @@ interface FkRelation {
   readonly declaringModel: string;
   readonly fieldName: string;
   readonly targetModel: string;
+  readonly relationName?: string;
   readonly localFields: readonly string[];
   readonly targetFields: readonly string[];
+}
+
+function fkRelationPairKey(declaringModel: string, targetModel: string): string {
+  return `${declaringModel}::${targetModel}`;
 }
 
 function resolveFieldMappings(model: PslModel): FieldMappings {
@@ -56,7 +62,13 @@ export function interpretPslDocumentToMongoContractIR(
   const diagnostics: ContractSourceDiagnostic[] = [];
   const modelNames = new Set(document.ast.models.map((m) => m.name));
 
-  const models: Record<string, unknown> = {};
+  interface MutableDomainModel {
+    readonly fields: Record<string, DomainField>;
+    readonly relations: Record<string, DomainReferenceRelation>;
+    readonly storage: { readonly collection: string };
+  }
+
+  const models: Record<string, MutableDomainModel> = {};
   const collections: Record<string, Record<string, unknown>> = {};
   const roots: Record<string, string> = {};
   const allFkRelations: FkRelation[] = [];
@@ -65,6 +77,8 @@ export function interpretPslDocumentToMongoContractIR(
     readonly modelName: string;
     readonly fieldName: string;
     readonly targetModelName: string;
+    readonly relationName?: string;
+    readonly field: PslField;
   }
   const backrelationCandidates: BackrelationCandidate[] = [];
 
@@ -72,22 +86,25 @@ export function interpretPslDocumentToMongoContractIR(
     const collectionName = resolveCollectionName(pslModel);
     const fieldMappings = resolveFieldMappings(pslModel);
 
-    const fields: Record<string, { codecId: string; nullable: boolean }> = {};
-    const relations: Record<string, unknown> = {};
+    const fields: Record<string, DomainField> = {};
+    const relations: Record<string, DomainReferenceRelation> = {};
 
     for (const field of pslModel.fields) {
       if (isRelationField(field, modelNames)) {
         if (field.list) {
+          const listRelation = parseRelationAttribute(field.attributes);
           backrelationCandidates.push({
             modelName: pslModel.name,
             fieldName: field.name,
             targetModelName: field.typeName,
+            relationName: listRelation?.relationName,
+            field,
           });
           continue;
         }
 
         const relation = parseRelationAttribute(field.attributes);
-        if (relation) {
+        if (relation?.fields && relation?.references) {
           const localMapped = relation.fields.map((f) => fieldMappings.pslNameToMapped.get(f) ?? f);
 
           const targetModel = document.ast.models.find((m) => m.name === field.typeName);
@@ -109,6 +126,7 @@ export function interpretPslDocumentToMongoContractIR(
             declaringModel: pslModel.name,
             fieldName: field.name,
             targetModel: field.typeName,
+            relationName: relation.relationName,
             localFields: localMapped,
             targetFields: targetMapped,
           });
@@ -139,16 +157,46 @@ export function interpretPslDocumentToMongoContractIR(
     roots[collectionName] = pslModel.name;
   }
 
-  for (const candidate of backrelationCandidates) {
-    const fk = allFkRelations.find(
-      (r) =>
-        r.declaringModel === candidate.targetModelName && r.targetModel === candidate.modelName,
-    );
-    if (!fk) continue;
+  const fkRelationsByPair = new Map<string, FkRelation[]>();
+  for (const fk of allFkRelations) {
+    const key = fkRelationPairKey(fk.declaringModel, fk.targetModel);
+    const existing = fkRelationsByPair.get(key);
+    if (existing) {
+      existing.push(fk);
+    } else {
+      fkRelationsByPair.set(key, [fk]);
+    }
+  }
 
-    const modelEntry = models[candidate.modelName] as {
-      relations: Record<string, unknown>;
-    };
+  for (const candidate of backrelationCandidates) {
+    const pairKey = fkRelationPairKey(candidate.targetModelName, candidate.modelName);
+    const pairMatches = fkRelationsByPair.get(pairKey) ?? [];
+    const matches = candidate.relationName
+      ? pairMatches.filter((r) => r.relationName === candidate.relationName)
+      : [...pairMatches];
+
+    if (matches.length === 0) {
+      diagnostics.push({
+        code: 'PSL_ORPHANED_BACKRELATION',
+        message: `Backrelation list field "${candidate.modelName}.${candidate.fieldName}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+        sourceId,
+        span: candidate.field.span,
+      });
+      continue;
+    }
+    if (matches.length > 1) {
+      diagnostics.push({
+        code: 'PSL_AMBIGUOUS_BACKRELATION',
+        message: `Backrelation list field "${candidate.modelName}.${candidate.fieldName}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation("...") to both sides to disambiguate.`,
+        sourceId,
+        span: candidate.field.span,
+      });
+      continue;
+    }
+
+    const fk = matches[0]!;
+    const modelEntry = models[candidate.modelName];
+    if (!modelEntry) continue;
     modelEntry.relations[candidate.fieldName] = {
       to: candidate.targetModelName,
       cardinality: '1:N' as const,
