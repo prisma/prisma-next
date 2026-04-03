@@ -1,6 +1,12 @@
 {
   "packages": [
     {
+      "glob": "packages/1-framework/0-foundation/shared/**",
+      "domain": "framework",
+      "layer": "foundation",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/1-framework/1-core/shared/**",
       "domain": "framework",
       "layer": "core",
@@ -344,7 +350,7 @@
   },
   "crossDomainExceptions": [],
   "layerOrder": {
-    "framework": ["core", "authoring", "tooling", "runtime-executor"],
+    "framework": ["foundation", "core", "authoring", "tooling", "runtime-executor"],
     "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"],
     "mongo": ["core", "authoring", "query", "tooling", "lanes", "orm", "runtime", "family"]
   }
