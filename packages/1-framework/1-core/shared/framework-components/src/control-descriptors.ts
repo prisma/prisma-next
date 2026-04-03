@@ -1,4 +1,3 @@
-import type { TargetFamilyHook } from '@prisma-next/contract/types';
 import type {
   ControlAdapterInstance,
   ControlDriverInstance,
@@ -7,6 +6,7 @@ import type {
   ControlTargetInstance,
 } from './control-instances';
 import type { ControlStack } from './control-stack';
+import type { TargetFamilyHook } from './emission-types';
 import type {
   AdapterDescriptor,
   DriverDescriptor,

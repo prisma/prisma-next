@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/operations": "workspace:*",
     "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
@@ -30,6 +31,7 @@
     "./authoring": "./dist/authoring.mjs",
     "./components": "./dist/components.mjs",
     "./control": "./dist/control.mjs",
+    "./emission": "./dist/emission.mjs",
     "./execution": "./dist/execution.mjs",
     "./package.json": "./package.json"
   },
