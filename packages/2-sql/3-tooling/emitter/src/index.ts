@@ -1,11 +1,11 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type {
-  Contract,
   GenerateContractTypesOptions,
   TypeRenderContext,
   TypeRenderEntry,
   TypesImportSpec,
   ValidationContext,
-} from '@prisma-next/contract/types';
+} from '@prisma-next/framework-components/emission';
 import type {
   SqlStorage,
   StorageColumn,

@@ -1,4 +1,5 @@
-import type { Contract, ValidationContext } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 
