@@ -52,7 +52,7 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
     readonly contractIR?: unknown;
   }): Promise<TSchemaIR>;
 
-  emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
+  emitContract(options: { readonly contractIR: unknown }): Promise<EmitContractResult>;
 }
 
 export interface ControlTargetInstance<TFamilyId extends string, TTargetId extends string>

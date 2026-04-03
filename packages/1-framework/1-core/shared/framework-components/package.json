@@ -9,7 +9,7 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --error-on-warnings",
-    "clean": "rm -rf dist coverage"
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage"
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
