@@ -1,13 +1,8 @@
-import type {
-  DomainDiscriminator,
-  DomainField,
-  DomainRelation,
-  DomainVariantEntry,
-} from '@prisma-next/contract/types';
+import type { Contract, ContractModel, StorageBase } from '@prisma-next/contract/types';
 
 export type MongoStorageCollection = Record<string, never>;
 
-export type MongoStorage = {
+export type MongoStorage<THash extends string = string> = StorageBase<THash> & {
   readonly collections: Record<string, MongoStorageCollection>;
 };
 
@@ -16,27 +11,12 @@ export type MongoModelStorage = {
   readonly relations?: Record<string, { readonly field: string }>;
 };
 
-export type MongoModelDefinition = {
-  readonly fields: Record<string, DomainField>;
-  readonly storage: MongoModelStorage;
-  readonly relations?: Record<string, DomainRelation>;
-  readonly discriminator?: DomainDiscriminator;
-  readonly variants?: Record<string, DomainVariantEntry>;
-  readonly base?: string;
-  readonly owner?: string;
-};
+export type MongoModelDefinition = ContractModel<MongoModelStorage>;
 
 export type MongoContract<
-  Roots extends Record<string, string> = Record<string, string>,
   S extends MongoStorage = MongoStorage,
   M extends Record<string, MongoModelDefinition> = Record<string, MongoModelDefinition>,
-> = {
-  readonly targetFamily: string;
-  readonly storageHash: string;
-  readonly roots: Roots;
-  readonly storage: S;
-  readonly models: M;
-};
+> = Contract<S, M>;
 
 export type MongoTypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, { output: unknown }>,
