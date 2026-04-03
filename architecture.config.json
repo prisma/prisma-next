@@ -79,21 +79,21 @@
       "plane": "migration"
     },
     {
-      "glob": "packages/2-sql/3-tooling/family/src/core/**",
+      "glob": "packages/2-sql/9-family/src/core/**",
       "domain": "sql",
-      "layer": "tooling",
+      "layer": "family",
       "plane": "shared"
     },
     {
-      "glob": "packages/2-sql/3-tooling/family/src/exports/control.ts",
+      "glob": "packages/2-sql/9-family/src/exports/control.ts",
       "domain": "sql",
-      "layer": "tooling",
+      "layer": "family",
       "plane": "migration"
     },
     {
-      "glob": "packages/2-sql/3-tooling/family/src/exports/runtime.ts",
+      "glob": "packages/2-sql/9-family/src/exports/runtime.ts",
       "domain": "sql",
-      "layer": "tooling",
+      "layer": "family",
       "plane": "runtime"
     },
     {
@@ -351,7 +351,7 @@
   "crossDomainExceptions": [],
   "layerOrder": {
     "framework": ["foundation", "core", "authoring", "tooling", "runtime-executor"],
-    "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"],
+    "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers", "family"],
     "mongo": ["core", "authoring", "query", "tooling", "lanes", "orm", "runtime", "family"]
   }
 }
