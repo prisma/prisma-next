@@ -1,5 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   EmitContractResult,
   SignDatabaseResult,
@@ -17,7 +16,7 @@ import type {
 
 export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unknown>
   extends FamilyInstance<TFamilyId> {
-  validateContractIR(contractJson: unknown): ContractIR;
+  validateContractIR(contractJson: unknown): Contract;
 
   verify(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;

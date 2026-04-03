@@ -1,8 +1,8 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
-  type InterpretPslDocumentToSqlContractIRInput,
-  interpretPslDocumentToSqlContractIR as interpretPslDocumentToSqlContractIRInternal,
+  type InterpretPslDocumentToSqlContractInput,
+  interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
@@ -11,12 +11,12 @@ import {
   postgresTarget,
 } from './fixtures';
 
-describe('interpretPslDocumentToSqlContractIR', () => {
+describe('interpretPslDocumentToSqlContract', () => {
   const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
-  const interpretPslDocumentToSqlContractIR = (
-    input: Omit<InterpretPslDocumentToSqlContractIRInput, 'target' | 'scalarTypeDescriptors'>,
+  const interpretPslDocumentToSqlContract = (
+    input: Omit<InterpretPslDocumentToSqlContractInput, 'target' | 'scalarTypeDescriptors'>,
   ) =>
-    interpretPslDocumentToSqlContractIRInternal({
+    interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       ...input,
@@ -31,10 +31,10 @@ describe('interpretPslDocumentToSqlContractIR', () => {
     });
 
     // Intentionally bypasses strict input typing to verify missing target diagnostics.
-    const result = interpretPslDocumentToSqlContractIRInternal({
+    const result = interpretPslDocumentToSqlContractInternal({
       document,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
-    } as unknown as InterpretPslDocumentToSqlContractIRInput);
+    } as unknown as InterpretPslDocumentToSqlContractInput);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -56,7 +56,7 @@ describe('interpretPslDocumentToSqlContractIR', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIRInternal({
+    const result = interpretPslDocumentToSqlContractInternal({
       document,
       target: postgresTarget,
       scalarTypeDescriptors: new Map([
@@ -91,7 +91,7 @@ describe('interpretPslDocumentToSqlContractIR', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIRInternal({
+    const result = interpretPslDocumentToSqlContractInternal({
       document,
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
@@ -140,7 +140,7 @@ describe('interpretPslDocumentToSqlContractIR', () => {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -206,7 +206,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -291,7 +291,7 @@ model Event {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -391,7 +391,7 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -457,7 +457,7 @@ model Event {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -549,7 +549,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -557,7 +557,7 @@ model Post {
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -589,7 +589,7 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -627,7 +627,7 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -689,14 +689,14 @@ model Member {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -724,14 +724,14 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -759,14 +759,14 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -794,14 +794,14 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -822,14 +822,14 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -850,14 +850,14 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       composedExtensionPacks: [],
     });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -882,7 +882,7 @@ model Document {
       sourceId: 'schema.prisma',
     });
 
-    const namedTypeResult = interpretPslDocumentToSqlContractIR({
+    const namedTypeResult = interpretPslDocumentToSqlContract({
       document: namedTypeDocument,
       composedExtensionPacks: ['pgvector'],
     });
@@ -906,7 +906,7 @@ model Document {
 `,
       sourceId: 'schema.prisma',
     });
-    const fieldResult = interpretPslDocumentToSqlContractIR({
+    const fieldResult = interpretPslDocumentToSqlContract({
       document: fieldDocument,
       composedExtensionPacks: ['pgvector'],
     });
@@ -941,7 +941,7 @@ model Document {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       composedExtensionPacks: ['pgvector'],
       composedExtensionPackRefs: [pgvectorExtensionPack],
@@ -976,7 +976,7 @@ model Document {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       composedExtensionPacks: ['pgvector'],
       authoringContributions: {
@@ -1053,14 +1053,14 @@ model Document {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       composedExtensionPacks: [],
     });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1084,7 +1084,7 @@ model Document {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -1092,7 +1092,7 @@ model Document {
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'PSL_UNSUPPORTED_FIELD_LIST' })]),
     );
@@ -1111,7 +1111,7 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -1119,7 +1119,7 @@ model User {
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1149,7 +1149,7 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -1217,7 +1217,7 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContractIR({
+    const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });

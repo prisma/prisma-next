@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
@@ -25,7 +25,7 @@ function createMockFamilyInstance(overrides?: {
     familyId: 'sql',
     readMarker: overrides?.readMarker ?? (async () => null),
     introspect: overrides?.introspect ?? (async () => ({ tables: {}, dependencies: [] })),
-    validateContractIR: (ir: unknown) => ir as ContractIR,
+    validateContractIR: (ir: unknown) => ir as Contract,
   } as unknown as ControlFamilyInstance<'sql'>;
 }
 
@@ -61,7 +61,7 @@ function createMockMigrations(overrides?: {
   } as unknown as TargetMigrationsCapability<'sql', 'postgres', ControlFamilyInstance<'sql'>>;
 }
 
-const dummyContractIR = { schemaVersion: '1', target: 'postgres' } as unknown as ContractIR;
+const dummyContractIR = { schemaVersion: '1', target: 'postgres' } as unknown as Contract;
 
 describe('executeDbUpdate', () => {
   it('succeeds on a fresh database without marker', async () => {

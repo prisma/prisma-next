@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/cli/config-types';
-import { enrichContractIR } from '@prisma-next/cli/control-api';
+import { enrichContract } from '@prisma-next/cli/control-api';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -121,8 +121,8 @@ describe('emit parity fixtures', () => {
             tsConfig.adapter,
             ...(tsConfig.extensionPacks ?? []),
           ];
-          const enrichedTs = enrichContractIR(tsProviderResultFirst.value, frameworkComponents);
-          const enrichedPsl = enrichContractIR(pslProviderResultFirst.value, frameworkComponents);
+          const enrichedTs = enrichContract(tsProviderResultFirst.value, frameworkComponents);
+          const enrichedPsl = enrichContract(pslProviderResultFirst.value, frameworkComponents);
 
           const normalizedTs = familyInstance.validateContractIR(enrichedTs);
           const normalizedPsl = familyInstance.validateContractIR(enrichedPsl);

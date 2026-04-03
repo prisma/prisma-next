@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -22,7 +22,7 @@ function createMockComponents() {
 
   const mockFamilyInstance = {
     introspect: async () => ({ tables: [] }),
-    validateContractIR: (ir: unknown) => ir as ContractIR,
+    validateContractIR: (ir: unknown) => ir as Contract,
     readMarker: async () => null,
     verify: async (): Promise<VerifyDatabaseResult> => ({
       ok: true,
@@ -394,7 +394,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          sourceProvider: async () => ok({ test: true } as unknown as ContractIR),
+          sourceProvider: async () => ok({ test: true } as unknown as Contract),
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -438,7 +438,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          sourceProvider: async () => ok({ test: true } as unknown as ContractIR),
+          sourceProvider: async () => ok({ test: true } as unknown as Contract),
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -554,7 +554,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          sourceProvider: async () => ok({ test: true } as unknown as ContractIR),
+          sourceProvider: async () => ok({ test: true } as unknown as Contract),
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -580,7 +580,7 @@ describe('ControlClient progress emission', () => {
       // Override family instance to return a marker (db update works with or without one)
       const mockFamilyInstance = {
         introspect: async () => ({ tables: {}, dependencies: [] }),
-        validateContractIR: (ir: unknown) => ir as ContractIR,
+        validateContractIR: (ir: unknown) => ir as Contract,
         readMarker: async () => ({ storageHash: 'sha256:origin' }),
       } as unknown as ControlFamilyInstance<string>;
 
@@ -686,7 +686,7 @@ describe('ControlClient progress emission', () => {
       // Override to return null marker — db update no longer requires a marker
       const noMarkerFamilyInstance = {
         introspect: async () => ({ tables: {}, dependencies: [] }),
-        validateContractIR: (ir: unknown) => ir as ContractIR,
+        validateContractIR: (ir: unknown) => ir as Contract,
         readMarker: async () => null,
       } as unknown as ControlFamilyInstance<string>;
 
@@ -810,7 +810,7 @@ describe('ControlClient progress emission', () => {
         },
       } as unknown as typeof mockTarget;
 
-      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as ContractIR;
+      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as Contract;
 
       const client = createControlClient({
         family: mockFamily,
@@ -890,7 +890,7 @@ describe('ControlClient progress emission', () => {
         },
       } as unknown as typeof mockTarget;
 
-      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as ContractIR;
+      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as Contract;
 
       const client = createControlClient({
         family: mockFamily,
@@ -949,7 +949,7 @@ describe('ControlClient progress emission', () => {
         },
       } as unknown as typeof mockTarget;
 
-      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as ContractIR;
+      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as Contract;
 
       const client = createControlClient({
         family: mockFamily,
@@ -1103,7 +1103,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          sourceProvider: async () => ok({ test: true } as unknown as ContractIR),
+          sourceProvider: async () => ok({ test: true } as unknown as Contract),
           output: '/tmp/contract.json',
         },
       });

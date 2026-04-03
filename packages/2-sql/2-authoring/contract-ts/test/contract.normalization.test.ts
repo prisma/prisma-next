@@ -665,8 +665,7 @@ describe('validateContract normalization', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     const normalized = normalizeContract(contractInput);
-    // Normalization should pass through null storage unchanged
-    expect(normalized.storage).toBeNull();
+    expect(normalized.storage).toHaveProperty('storageHash');
   });
 
   it('normalizeContract handles storage without tables property', () => {

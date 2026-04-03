@@ -9,7 +9,7 @@
  * with additional fields for execution (precheck SQL, execute SQL, etc.).
  */
 
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { Result } from '@prisma-next/utils/result';
 import type { ControlDriverInstance, ControlFamilyInstance } from './types';
@@ -267,7 +267,7 @@ export interface TargetMigrationsCapability<
    * @returns Family-specific schema IR (e.g., `SqlSchemaIR` for SQL targets).
    */
   contractToSchema(
-    contract: ContractIR | null,
+    contract: Contract | null,
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>,
   ): unknown;
 }

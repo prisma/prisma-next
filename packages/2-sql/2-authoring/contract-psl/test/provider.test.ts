@@ -137,7 +137,7 @@ model Post {
       expect(result.ok).toBe(false);
       if (result.ok) return;
 
-      expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+      expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -179,7 +179,7 @@ model Post {
       expect(result.ok).toBe(false);
       if (result.ok) return;
 
-      expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+      expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -217,7 +217,7 @@ model Post {
       expect(result.ok).toBe(false);
       if (result.ok) return;
 
-      expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+      expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -376,7 +376,7 @@ model Document {
       expect(result.ok).toBe(false);
       if (result.ok) return;
 
-      expect(result.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+      expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

@@ -581,7 +581,7 @@ describe('emit command', () => {
         if (sourceResult.ok) {
           throw new Error('Expected source provider to fail for unsupported list field');
         }
-        expect(sourceResult.failure.summary).toBe('PSL to SQL Contract IR normalization failed');
+        expect(sourceResult.failure.summary).toBe('PSL to SQL contract interpretation failed');
         expect(sourceResult.failure.diagnostics).toEqual(
           expect.arrayContaining([
             expect.objectContaining({
@@ -605,7 +605,7 @@ describe('emit command', () => {
         }
 
         const errorOutput = consoleErrors.join('\n');
-        expect(errorOutput).toContain('PSL to SQL Contract IR normalization failed');
+        expect(errorOutput).toContain('PSL to SQL contract interpretation failed');
         expect(errorOutput).toContain('PSL_UNSUPPORTED_FIELD_LIST');
         expect(errorOutput).toContain('schema.prisma');
       } finally {

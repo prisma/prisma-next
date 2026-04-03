@@ -21,7 +21,7 @@ export type CliDriver = ControlDriverInstance<string, string>;
 export interface ContractConfig {
   /**
    * Contract source provider. The provider is always async and must return
-   * a Result containing either ContractIR or structured diagnostics.
+   * a Result containing either a Contract or structured diagnostics.
    */
   readonly source: ContractSourceProvider;
   /**

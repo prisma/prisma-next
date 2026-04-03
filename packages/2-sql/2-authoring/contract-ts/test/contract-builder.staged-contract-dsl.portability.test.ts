@@ -112,9 +112,22 @@ describe('staged contract DSL portability coverage', () => {
       typeParams: { length: 36 },
     });
 
-    const { target: _postgresTarget, ...postgresPortableShape } = postgresContract;
-    const { target: _sqliteTarget, ...sqlitePortableShape } = sqliteContract;
+    const stripTargetProfileAndStorageHashes = <
+      C extends {
+        readonly target: string;
+        readonly profileHash: string;
+        readonly storage: { readonly storageHash: string } & Record<string, unknown>;
+      },
+    >(
+      c: C,
+    ) => {
+      const { target: _t, profileHash: _p, storage, ...rest } = c;
+      const { storageHash: _sh, ...storageRest } = storage;
+      return { ...rest, storage: storageRest };
+    };
 
-    expect(sqlitePortableShape).toEqual(postgresPortableShape);
+    expect(stripTargetProfileAndStorageHashes(sqliteContract)).toEqual(
+      stripTargetProfileAndStorageHashes(postgresContract),
+    );
   });
 });

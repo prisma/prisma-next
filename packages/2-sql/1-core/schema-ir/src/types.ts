@@ -6,7 +6,7 @@
  */
 
 /**
- * Primary key definition matching ContractIR format.
+ * Primary key definition matching Contract format.
  * Defined here to avoid circular dependency with sql-contract.
  */
 export type PrimaryKey = {
@@ -73,12 +73,12 @@ export type SqlIndexIR = {
 
 /**
  * SQL table IR representing a table in the schema.
- * Primary key format matches ContractIR for consistency.
+ * Primary key format matches Contract for consistency.
  */
 export type SqlTableIR = {
   readonly name: string;
   readonly columns: Record<string, SqlColumnIR>;
-  readonly primaryKey?: PrimaryKey; // Matches ContractIR format: { columns: string[]; name?: string }
+  readonly primaryKey?: PrimaryKey; // Matches Contract format: { columns: string[]; name?: string }
   readonly foreignKeys: readonly SqlForeignKeyIR[];
   readonly uniques: readonly SqlUniqueIR[];
   readonly indexes: readonly SqlIndexIR[];

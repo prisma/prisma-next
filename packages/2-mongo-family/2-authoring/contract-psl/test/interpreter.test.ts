@@ -2,8 +2,8 @@ import type { DomainField, DomainReferenceRelation } from '@prisma-next/contract
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
-  type InterpretPslDocumentToMongoContractIRInput,
-  interpretPslDocumentToMongoContractIR,
+  type InterpretPslDocumentToMongoContractInput,
+  interpretPslDocumentToMongoContract,
 } from '../src/interpreter';
 import { createMongoScalarTypeDescriptors } from '../src/scalar-type-descriptors';
 
@@ -19,10 +19,10 @@ function model(ir: { models: Record<string, unknown> }, name: string): MongoMode
 
 function interpret(
   schema: string,
-  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractIRInput, 'document'>>,
+  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document'>>,
 ) {
   const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
-  return interpretPslDocumentToMongoContractIR({
+  return interpretPslDocumentToMongoContract({
     document,
     scalarTypeDescriptors: createMongoScalarTypeDescriptors(),
     ...overrides,
@@ -31,7 +31,7 @@ function interpret(
 
 function interpretOk(
   schema: string,
-  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractIRInput, 'document'>>,
+  overrides?: Partial<Omit<InterpretPslDocumentToMongoContractInput, 'document'>>,
 ) {
   const result = interpret(schema, overrides);
   expect(result.ok).toBe(true);
@@ -39,7 +39,7 @@ function interpretOk(
   return result.value;
 }
 
-describe('interpretPslDocumentToMongoContractIR', () => {
+describe('interpretPslDocumentToMongoContract', () => {
   describe('scalar type mapping', () => {
     it('maps standard PSL types to Mongo codec IDs', () => {
       const ir = interpretOk(`
@@ -524,15 +524,16 @@ describe('interpretPslDocumentToMongoContractIR', () => {
         }
       `);
 
-      expect(ir.storage).toEqual({
+      expect(ir.storage).toMatchObject({
         collections: {
           user: {},
           post: {},
         },
+        storageHash: expect.stringMatching(/^sha256:/),
       });
     });
 
-    it('includes empty extensionPacks, capabilities, meta, and sources', () => {
+    it('includes empty extensionPacks, capabilities, and meta', () => {
       const ir = interpretOk(`
         model Item {
           id ObjectId @id @map("_id")
@@ -542,12 +543,11 @@ describe('interpretPslDocumentToMongoContractIR', () => {
       expect(ir.extensionPacks).toEqual({});
       expect(ir.capabilities).toEqual({});
       expect(ir.meta).toEqual({});
-      expect(ir.sources).toEqual({});
     });
   });
 
   describe('full blog schema', () => {
-    it('produces the expected IR matching the demo contract', () => {
+    it('produces the expected contract matching the demo contract', () => {
       const ir = interpretOk(`
         model User {
           id    ObjectId @id @map("_id")
@@ -570,7 +570,7 @@ describe('interpretPslDocumentToMongoContractIR', () => {
       `);
 
       expect(ir).toEqual({
-        schemaVersion: '1',
+        profileHash: expect.stringMatching(/^sha256:/),
         targetFamily: 'mongo',
         target: 'mongo',
         roots: {
@@ -617,11 +617,11 @@ describe('interpretPslDocumentToMongoContractIR', () => {
             users: {},
             posts: {},
           },
+          storageHash: expect.stringMatching(/^sha256:/),
         },
         extensionPacks: {},
         capabilities: {},
         meta: {},
-        sources: {},
       });
     });
   });

@@ -2,13 +2,13 @@ import type {
   ContractSourceDiagnostic,
   ContractSourceDiagnostics,
 } from '@prisma-next/config/config-types';
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { DomainField, DomainReferenceRelation } from '@prisma-next/contract/types';
+import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
+import type { Contract, DomainField, DomainReferenceRelation } from '@prisma-next/contract/types';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { getAttribute, getMapName, lowerFirst, parseRelationAttribute } from './psl-helpers';
 
-export interface InterpretPslDocumentToMongoContractIRInput {
+export interface InterpretPslDocumentToMongoContractInput {
   readonly document: ParsePslDocumentResult;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
 }
@@ -54,9 +54,9 @@ function resolveFieldCodecId(
   return scalarTypeDescriptors.get(field.typeName);
 }
 
-export function interpretPslDocumentToMongoContractIR(
-  input: InterpretPslDocumentToMongoContractIRInput,
-): Result<ContractIR, ContractSourceDiagnostics> {
+export function interpretPslDocumentToMongoContract(
+  input: InterpretPslDocumentToMongoContractInput,
+): Result<Contract, ContractSourceDiagnostics> {
   const { document, scalarTypeDescriptors } = input;
   const sourceId = document.ast.sourceId;
   const diagnostics: ContractSourceDiagnostic[] = [];
@@ -233,21 +233,26 @@ export function interpretPslDocumentToMongoContractIR(
 
   if (diagnostics.length > 0) {
     return notOk({
-      summary: 'PSL to Mongo Contract IR interpretation failed',
+      summary: 'PSL to Mongo contract interpretation failed',
       diagnostics,
     });
   }
 
+  const target = 'mongo';
+  const targetFamily = 'mongo';
+  const storageWithoutHash = { collections };
+  const storageHash = computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
+  const capabilities: Record<string, Record<string, boolean>> = {};
+
   return ok({
-    schemaVersion: '1',
-    targetFamily: 'mongo',
-    target: 'mongo',
+    targetFamily,
+    target,
     roots,
     models,
-    storage: { collections },
+    storage: { ...storageWithoutHash, storageHash },
     extensionPacks: {},
-    capabilities: {},
+    capabilities,
+    profileHash: computeProfileHash({ target, targetFamily, capabilities }),
     meta: {},
-    sources: {},
   });
 }

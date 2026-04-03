@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type { Result } from '@prisma-next/utils/result';
 
 export interface ContractSourceDiagnosticPosition {
@@ -31,4 +31,4 @@ export interface ContractSourceContext {
 
 export type ContractSourceProvider = (
   context: ContractSourceContext,
-) => Promise<Result<ContractIR, ContractSourceDiagnostics>>;
+) => Promise<Result<Contract, ContractSourceDiagnostics>>;

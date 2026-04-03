@@ -50,10 +50,11 @@ describe('validateContract structure validation', () => {
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/target/);
   });
 
-  it('throws on missing storageHash', () => {
+  it('computes storageHash when missing from top level', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    const invalid = { ...validContractInput, storageHash: undefined } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/storageHash/);
+    const input = { ...validContractInput, storageHash: undefined } as any;
+    const result = validateContract<SqlContract<SqlStorage>>(input);
+    expect(result.storageHash).toMatch(/^sha256:/);
   });
 
   it('throws on missing storage', () => {

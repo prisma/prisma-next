@@ -113,7 +113,7 @@ export type OnControlProgress = (event: ControlProgressEvent) => void;
  * Options for the verify operation.
  */
 export interface VerifyOptions {
-  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
   /**
    * Database connection. If provided, verify will connect before executing.
@@ -129,7 +129,7 @@ export interface VerifyOptions {
  * Options for the schemaVerify operation.
  */
 export interface SchemaVerifyOptions {
-  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
   /**
    * Whether to use strict mode for schema verification.
@@ -151,7 +151,7 @@ export interface SchemaVerifyOptions {
  * Options for the sign operation.
  */
 export interface SignOptions {
-  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
   /**
    * Path to the contract file (for metadata in the result).
@@ -175,7 +175,7 @@ export interface SignOptions {
  * Options for the dbInit operation.
  */
 export interface DbInitOptions {
-  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
   /**
    * Mode for the dbInit operation.
@@ -197,7 +197,7 @@ export interface DbInitOptions {
  * Options for the dbUpdate operation.
  */
 export interface DbUpdateOptions {
-  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
   /**
    * Mode for the dbUpdate operation.

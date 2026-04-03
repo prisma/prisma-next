@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
@@ -132,9 +132,9 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  let toContractJson: ContractIR;
+  let toContractJson: Contract;
   try {
-    toContractJson = JSON.parse(contractJsonContent) as ContractIR;
+    toContractJson = JSON.parse(contractJsonContent) as Contract;
   } catch (error) {
     return notOk(
       errorContractValidationFailed(
@@ -156,7 +156,7 @@ async function executeMigrationPlanCommand(
   }
 
   // Read existing migrations and determine "from" contract
-  let fromContract: ContractIR | null = null;
+  let fromContract: Contract | null = null;
   let fromHash: string = EMPTY_CONTRACT_HASH;
 
   try {

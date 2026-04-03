@@ -3,7 +3,7 @@ import type {
   ContractSourceDiagnosticSpan,
   ContractSourceDiagnostics,
 } from '@prisma-next/config/config-types';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringTypeConstructor } from '@prisma-next/framework-components/authoring';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
@@ -52,7 +52,7 @@ import {
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
 
-export interface InterpretPslDocumentToSqlContractIRInput {
+export interface InterpretPslDocumentToSqlContractInput {
   readonly document: ParsePslDocumentResult;
   readonly target: TargetPackRef<'sql', 'postgres'>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -116,13 +116,13 @@ function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceD
   }));
 }
 
-export function interpretPslDocumentToSqlContractIR(
-  input: InterpretPslDocumentToSqlContractIRInput,
-): Result<ContractIR, ContractSourceDiagnostics> {
+export function interpretPslDocumentToSqlContract(
+  input: InterpretPslDocumentToSqlContractInput,
+): Result<Contract, ContractSourceDiagnostics> {
   const sourceId = input.document.ast.sourceId;
   if (!input.target) {
     return notOk({
-      summary: 'PSL to SQL Contract IR normalization failed',
+      summary: 'PSL to SQL contract interpretation failed',
       diagnostics: [
         {
           code: 'PSL_TARGET_CONTEXT_REQUIRED',
@@ -134,7 +134,7 @@ export function interpretPslDocumentToSqlContractIR(
   }
   if (!input.scalarTypeDescriptors) {
     return notOk({
-      summary: 'PSL to SQL Contract IR normalization failed',
+      summary: 'PSL to SQL contract interpretation failed',
       diagnostics: [
         {
           code: 'PSL_SCALAR_TYPE_CONTEXT_REQUIRED',
@@ -675,7 +675,7 @@ export function interpretPslDocumentToSqlContractIR(
     );
 
     return notOk({
-      summary: 'PSL to SQL Contract IR normalization failed',
+      summary: 'PSL to SQL contract interpretation failed',
       diagnostics: dedupedDiagnostics,
     });
   }

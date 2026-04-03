@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
@@ -19,7 +19,7 @@ describe('executeDbInit progress emission', () => {
 
     const mockFamilyInstance = {
       introspect: async () => ({}),
-      validateContractIR: () => ({}) as ContractIR,
+      validateContractIR: () => ({}) as Contract,
       readMarker: async () => null,
     } as unknown as ControlFamilyInstance<string>;
 
@@ -43,7 +43,7 @@ describe('executeDbInit progress emission', () => {
     await executeDbInit({
       driver: mockDriver,
       familyInstance: mockFamilyInstance,
-      contractIR: {} as ContractIR,
+      contractIR: {} as Contract,
       mode: 'plan',
       migrations: mockMigrations,
       frameworkComponents: mockFrameworkComponents,
@@ -85,7 +85,7 @@ describe('executeDbInit progress emission', () => {
 
     const mockFamilyInstance = {
       introspect: async () => ({}),
-      validateContractIR: () => ({}) as ContractIR,
+      validateContractIR: () => ({}) as Contract,
       readMarker: async () => null,
     } as unknown as ControlFamilyInstance<string>;
 
@@ -131,7 +131,7 @@ describe('executeDbInit progress emission', () => {
     await executeDbInit({
       driver: mockDriver,
       familyInstance: mockFamilyInstance,
-      contractIR: {} as ContractIR,
+      contractIR: {} as Contract,
       mode: 'apply',
       migrations: mockMigrations,
       frameworkComponents: mockFrameworkComponents,
@@ -168,7 +168,7 @@ describe('executeDbInit progress emission', () => {
 
     const mockFamilyInstance = {
       introspect: async () => ({}),
-      validateContractIR: () => ({}) as ContractIR,
+      validateContractIR: () => ({}) as Contract,
       readMarker: async () => null,
     } as unknown as ControlFamilyInstance<string>;
 
@@ -193,7 +193,7 @@ describe('executeDbInit progress emission', () => {
     const result = await executeDbInit({
       driver: mockDriver,
       familyInstance: mockFamilyInstance,
-      contractIR: {} as ContractIR,
+      contractIR: {} as Contract,
       mode: 'plan',
       migrations: mockMigrations,
       frameworkComponents: mockFrameworkComponents,

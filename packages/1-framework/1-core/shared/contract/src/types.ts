@@ -1,7 +1,6 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { Contract } from './contract-types';
 import type { DomainModel } from './domain-types';
-import type { ContractIR } from './ir';
 
 /**
  * Unique symbol used as the key for branding types.

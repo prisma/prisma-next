@@ -1,19 +1,19 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
-import { enrichContractIR } from '../../src/control-api/contract-enrichment';
+import { enrichContract } from '../../src/control-api/contract-enrichment';
 
-function makeIR(overrides?: Partial<ContractIR>): ContractIR {
+function makeIR(overrides?: Partial<Contract>): Contract {
   return {
-    schemaVersion: '1',
     targetFamily: 'sql',
     target: 'postgres',
+    roots: {},
     models: {},
-    storage: {},
+    storage: { storageHash: coreHash('sha256:test') },
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    sources: {},
     ...overrides,
   };
 }
@@ -44,10 +44,10 @@ function makeExtension(
   } as TargetBoundComponentDescriptor<'sql', 'postgres'>;
 }
 
-describe('enrichContractIR', () => {
+describe('enrichContract', () => {
   it('returns IR unchanged when no components are provided', () => {
     const ir = makeIR();
-    const result = enrichContractIR(ir, []);
+    const result = enrichContract(ir, []);
     expect(result).toEqual(ir);
   });
 
@@ -59,7 +59,7 @@ describe('enrichContractIR', () => {
       },
     });
 
-    const result = enrichContractIR(ir, [adapter]);
+    const result = enrichContract(ir, [adapter]);
 
     expect(result.capabilities).toEqual({
       postgres: { lateral: true, returning: true },
@@ -79,7 +79,7 @@ describe('enrichContractIR', () => {
       },
     });
 
-    const result = enrichContractIR(ir, [adapter, extension]);
+    const result = enrichContract(ir, [adapter, extension]);
 
     expect(result.capabilities).toEqual({
       postgres: {
@@ -98,7 +98,7 @@ describe('enrichContractIR', () => {
       capabilities: { postgres: { returning: true } },
     });
 
-    const result = enrichContractIR(ir, [adapter]);
+    const result = enrichContract(ir, [adapter]);
 
     expect(result.capabilities).toEqual({
       sql: { select: true },
@@ -113,7 +113,7 @@ describe('enrichContractIR', () => {
       capabilities: { postgres: { 'pgvector/cosine': true } },
     });
 
-    const result = enrichContractIR(makeIR(), [extension]);
+    const result = enrichContract(makeIR(), [extension]);
 
     expect(result.extensionPacks).toEqual({
       pgvector: {
@@ -141,7 +141,7 @@ describe('enrichContractIR', () => {
       },
     });
 
-    const result = enrichContractIR(
+    const result = enrichContract(
       makeIR({
         extensionPacks: {
           pgvector: {
@@ -189,7 +189,7 @@ describe('enrichContractIR', () => {
       },
     });
 
-    const result = enrichContractIR(makeIR(), [extension]);
+    const result = enrichContract(makeIR(), [extension]);
     const packMeta = result.extensionPacks['pgvector'] as Record<string, unknown>;
     const types = packMeta['types'] as Record<string, unknown>;
     const codecTypes = types['codecTypes'] as Record<string, unknown>;
@@ -203,7 +203,7 @@ describe('enrichContractIR', () => {
       capabilities: { postgres: { returning: true } },
     });
 
-    const result = enrichContractIR(makeIR(), [adapter]);
+    const result = enrichContract(makeIR(), [adapter]);
 
     expect(result.extensionPacks).toEqual({});
   });
@@ -215,7 +215,7 @@ describe('enrichContractIR', () => {
       },
     });
 
-    const result = enrichContractIR(makeIR(), [adapter]);
+    const result = enrichContract(makeIR(), [adapter]);
 
     expect(result.capabilities).toEqual({
       postgres: { lateral: true },
@@ -230,7 +230,7 @@ describe('enrichContractIR', () => {
       capabilities: { mid: { m: true } },
     });
 
-    const result = enrichContractIR(ir, [adapter]);
+    const result = enrichContract(ir, [adapter]);
 
     const capKeys = Object.keys(result.capabilities);
     expect(capKeys).toEqual(['alpha', 'mid', 'zebra']);
