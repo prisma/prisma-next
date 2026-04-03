@@ -40,16 +40,15 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     await Promise.allSettled([runtime?.close(), client?.close(), replSet?.stop()]);
   }, timeouts.spinUpDbServer);
 
-  it('findMany returns seeded users', async () => {
+  it('all() returns seeded users', async () => {
     const db = client.db(dbName);
-    // Deterministic string IDs for assertions (cast needed because MongoDB driver expects ObjectId for _id)
     await db.collection('users').insertMany([
       { _id: 'u1' as never, name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
       { _id: 'u2' as never, name: 'Bob', email: 'bob@example.com', bio: null },
     ]);
 
     const orm = mongoOrm({ contract, executor: runtime });
-    const users = await orm.users.findMany();
+    const users = await orm.users.all();
     const sorted = [...users].sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
     expect(sorted).toHaveLength(2);
@@ -57,7 +56,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     expect(sorted[1]).toMatchObject({ name: 'Bob', email: 'bob@example.com', bio: null });
   });
 
-  it('findMany returns seeded posts', async () => {
+  it('all() returns seeded posts', async () => {
     const db = client.db(dbName);
     await db.collection('users').insertOne({
       _id: 'u1' as never,
@@ -83,7 +82,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     ]);
 
     const orm = mongoOrm({ contract, executor: runtime });
-    const posts = await orm.posts.findMany();
+    const posts = await orm.posts.all();
     const sorted = [...posts].sort((a, b) => String(a.title).localeCompare(String(b.title)));
 
     expect(sorted).toHaveLength(2);
@@ -91,7 +90,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     expect(sorted[1]).toMatchObject({ title: 'Second Post', content: 'More content' });
   });
 
-  it('findMany with include resolves Post -> User via $lookup', async () => {
+  it('include() resolves Post -> User via $lookup', async () => {
     const db = client.db(dbName);
     await db.collection('users').insertOne({
       _id: 'u1' as never,
@@ -108,7 +107,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     });
 
     const orm = mongoOrm({ contract, executor: runtime });
-    const posts = await orm.posts.findMany({ include: { author: true } });
+    const posts = await orm.posts.include('author').all();
 
     expect(posts).toHaveLength(1);
     expect(posts[0]).toMatchObject({
@@ -144,10 +143,10 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
 
     const orm = mongoOrm({ contract, executor: runtime });
 
-    const users = await orm.users.findMany();
+    const users = await orm.users.all();
     expect(users).toHaveLength(2);
 
-    const posts = await orm.posts.findMany({ include: { author: true } });
+    const posts = await orm.posts.include('author').all();
     expect(posts).toHaveLength(2);
 
     const alicePost = posts.find((p) => p.authorId === 'u1');

@@ -4,19 +4,8 @@ import type {
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
-  MongoQueryPlan,
   MongoTypeMaps,
 } from '@prisma-next/mongo-core';
-import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
-
-export interface MongoQueryExecutor {
-  execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row>;
-}
-
-export interface MongoOrmOptions<TContract extends MongoContract> {
-  readonly contract: TContract;
-  readonly executor: MongoQueryExecutor;
-}
 
 type Simplify<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
@@ -144,32 +133,3 @@ export type MongoIncludeSpec<
 > = {
   readonly [K in ReferenceRelationKeys<TContract, ModelName>]?: true;
 };
-
-export interface MongoFindManyOptions<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
-  TInclude extends MongoIncludeSpec<TContract, ModelName> = Record<string, never>,
-> {
-  readonly where?: MongoWhereFilter<TContract, ModelName>;
-  readonly include?: TInclude;
-}
-
-export type MongoOrmClient<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-> = {
-  readonly [K in keyof TContract['roots']]: TContract['roots'][K] extends string &
-    keyof TContract['models']
-    ? MongoCollection<TContract, TContract['roots'][K]>
-    : never;
-};
-
-export interface MongoCollection<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
-> {
-  findMany<TInclude extends MongoIncludeSpec<TContract, ModelName> = Record<string, never>>(
-    options?: MongoFindManyOptions<TContract, ModelName, TInclude>,
-  ): AsyncIterableResult<
-    InferRootRow<TContract, ModelName> & IncludeResultFields<TContract, ModelName, TInclude>
-  >;
-}

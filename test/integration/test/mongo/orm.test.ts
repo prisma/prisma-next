@@ -1,5 +1,6 @@
 import { validateMongoContract } from '@prisma-next/mongo-core';
 import { mongoOrm } from '@prisma-next/mongo-orm';
+import { MongoFieldFilter } from '@prisma-next/mongo-query-ast';
 import { expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/orm-contract';
 import ormContractJson from './fixtures/orm-contract.json';
@@ -8,7 +9,7 @@ import { describeWithMongoDB } from './setup';
 const { contract } = validateMongoContract<Contract>(ormContractJson);
 
 describeWithMongoDB('mongoOrm integration', (ctx) => {
-  it('findMany on a non-polymorphic root returns typed results', async () => {
+  it('all() on a non-polymorphic root returns typed results', async () => {
     const db = ctx.client.db(ctx.dbName);
     await db.collection('users').insertMany([
       { name: 'Alice', email: 'alice@example.com', addresses: [] },
@@ -16,14 +17,14 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     ]);
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
-    const results = await orm.users.findMany();
+    const results = await orm.users.all();
 
     expect(results).toHaveLength(2);
     expect(results[0]).toMatchObject({ name: 'Alice', email: 'alice@example.com' });
     expect(results[1]).toMatchObject({ name: 'Bob', email: 'bob@example.com' });
   });
 
-  it('findMany with equality filter narrows results', async () => {
+  it('where() with filter expression narrows results', async () => {
     const db = ctx.client.db(ctx.dbName);
     await db.collection('users').insertMany([
       { name: 'Alice', email: 'alice@example.com', addresses: [] },
@@ -31,15 +32,13 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     ]);
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
-    const results = await orm.users.findMany({
-      where: { email: 'alice@example.com' },
-    });
+    const results = await orm.users.where(MongoFieldFilter.eq('email', 'alice@example.com')).all();
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ name: 'Alice' });
   });
 
-  it('include on a reference relation returns related docs via $lookup', async () => {
+  it('include() on a reference relation returns related docs via $lookup', async () => {
     const db = ctx.client.db(ctx.dbName);
     await db.collection('users').insertOne({
       _id: 'u1' as never,
@@ -56,9 +55,7 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     });
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
-    const results = await orm.tasks.findMany({
-      include: { assignee: true },
-    });
+    const results = await orm.tasks.include('assignee').all();
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
@@ -79,7 +76,7 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     });
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
-    const users = await orm.users.findMany();
+    const users = await orm.users.all();
 
     expect(users).toHaveLength(1);
     expect(users[0]!.addresses).toHaveLength(2);
@@ -100,14 +97,14 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     });
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
-    const tasks = await orm.tasks.findMany();
+    const tasks = await orm.tasks.all();
 
     expect(tasks).toHaveLength(1);
     expect(tasks[0]!.comments).toHaveLength(1);
     expect(tasks[0]!.comments[0]).toMatchObject({ text: 'Found it!' });
   });
 
-  it('findMany on a polymorphic root returns all variants', async () => {
+  it('all() on a polymorphic root returns all variants', async () => {
     const db = ctx.client.db(ctx.dbName);
     await db.collection('tasks').insertMany([
       {
@@ -128,7 +125,7 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     ]);
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
-    const tasks = await orm.tasks.findMany();
+    const tasks = await orm.tasks.all();
 
     expect(tasks).toHaveLength(2);
     const bug = tasks.find((t) => t.type === 'bug');
@@ -152,7 +149,7 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     });
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
-    const results = await orm.tasks.findMany();
+    const results = await orm.tasks.all();
     const r0 = results[0]!;
 
     if (r0.type === 'bug') {
@@ -165,7 +162,7 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     }
   });
 
-  it('full flow: ORM -> command -> runtime -> driver -> typed results', async () => {
+  it('full flow: ORM -> typed AST -> runtime -> driver -> typed results', async () => {
     const db = ctx.client.db(ctx.dbName);
     await db.collection('users').insertOne({
       _id: 'u1' as never,
@@ -184,11 +181,11 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
 
-    const users = await orm.users.findMany({ where: { name: 'Alice' } });
+    const users = await orm.users.where(MongoFieldFilter.eq('name', 'Alice')).all();
     expect(users).toHaveLength(1);
     expect(users[0]!.addresses).toHaveLength(1);
 
-    const tasks = await orm.tasks.findMany({ include: { assignee: true } });
+    const tasks = await orm.tasks.include('assignee').all();
     expect(tasks).toHaveLength(1);
     expect(tasks[0]).toMatchObject({
       title: 'Ship it',
