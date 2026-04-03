@@ -241,6 +241,12 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/2-mongo-family/2-query/**",
+      "domain": "mongo",
+      "layer": "query",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/2-mongo-family/3-tooling/emitter/**",
       "domain": "mongo",
       "layer": "tooling",
@@ -340,6 +346,6 @@
   "layerOrder": {
     "framework": ["core", "authoring", "tooling", "runtime-executor"],
     "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"],
-    "mongo": ["core", "authoring", "tooling", "orm", "runtime", "family"]
+    "mongo": ["core", "authoring", "query", "tooling", "lanes", "orm", "runtime", "family"]
   }
 }
