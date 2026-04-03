@@ -4,7 +4,7 @@
 
 Build a `MongoCollection` class with the same fluent chaining API as the SQL `Collection`, compiling to typed aggregation pipeline stages at terminal methods. This is an isolated spike — no changes to the SQL ORM or framework layer. The options-bag API (`findMany`) is replaced by immutable method chaining (`.where().select().include().orderBy().take().skip().all().first()`).
 
-**Design constraint:** All read queries compile to typed pipeline stages exclusively — the `find()` API is not used ([ADR 183](../../../docs/architecture%20docs/adrs/ADR%20183%20-%20Pipeline-only%20query%20representation%20for%20MongoDB.md)). The typed stage representation is the foundation for the future pipeline query builder (WS4 stretch goal).
+**Design constraint:** All read queries compile to typed pipeline stages exclusively — the `find()` API is not used ([ADR 183](../../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md)). The typed stage representation is the foundation for the future pipeline query builder (WS4 stretch goal).
 
 **Spec:** [projects/orm-consolidation/spec.md](../spec.md)
 
@@ -25,7 +25,7 @@ Build a `MongoCollection` class with the same fluent chaining API as the SQL `Co
 - SQL `orm()` factory: `packages/3-extensions/sql-orm-client/src/orm.ts`
 - Current Mongo ORM: `packages/2-mongo-family/4-orm/src/mongo-orm.ts` (~145 lines)
 - Current Mongo types: `packages/2-mongo-family/4-orm/src/types.ts`
-- Mongo commands: `packages/2-mongo-family/1-core/src/commands.ts` (`AggregateCommand` — `FindCommand` is not used for reads per [ADR 183](../../../docs/architecture%20docs/adrs/ADR%20183%20-%20Pipeline-only%20query%20representation%20for%20MongoDB.md))
+- Mongo commands: `packages/2-mongo-family/1-core/src/commands.ts` (`AggregateCommand` — `FindCommand` is not used for reads per [ADR 183](../../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md))
 - Mongo demo: `examples/mongo-demo/`
 
 ## Milestones
@@ -51,7 +51,7 @@ The chaining machinery: `MongoCollection` class with `CollectionState`, `#clone`
 
 ### Milestone 2: Typed pipeline stages + terminal compilation
 
-Define typed pipeline stage nodes and compile accumulated `MongoCollectionState` into a `MongoReadStage[]` array wrapped in `AggregateCommand`. All read queries produce pipelines — `FindCommand` is not used ([ADR 183](../../../docs/architecture%20docs/adrs/ADR%20183%20-%20Pipeline-only%20query%20representation%20for%20MongoDB.md)).
+Define typed pipeline stage nodes and compile accumulated `MongoCollectionState` into a `MongoReadStage[]` array wrapped in `AggregateCommand`. All read queries produce pipelines — `FindCommand` is not used ([ADR 183](../../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md)).
 
 **Tasks:**
 
@@ -168,7 +168,7 @@ Replace the current `mongoOrm()` factory and update the demo to use the chaining
 
 ## Open Items
 
-1. ~~**Mongo filter expression representation.**~~ **Resolved.** `MongoModelAccessor` produces structured `MongoFilterExpr` AST nodes (mirroring SQL's `AnyExpression`), not raw Mongo filter documents. The adapter lowers the AST to plain documents. This enables composable AND/OR/NOT nesting, visitor-based interpretation, and aligns with [ADR 183](../../../docs/architecture%20docs/adrs/ADR%20183%20-%20Pipeline-only%20query%20representation%20for%20MongoDB.md)'s typed pipeline stage design.
+1. ~~**Mongo filter expression representation.**~~ **Resolved.** `MongoModelAccessor` produces structured `MongoFilterExpr` AST nodes (mirroring SQL's `AnyExpression`), not raw Mongo filter documents. The adapter lowers the AST to plain documents. This enables composable AND/OR/NOT nesting, visitor-based interpretation, and aligns with [ADR 183](../../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md)'s typed pipeline stage design.
 
 2. **Codec trait resolution.** The SQL `ModelAccessor` resolves traits via `context.codecs.traitsOf(codecId)`. The Mongo ORM needs equivalent access to codec trait metadata. Check whether `mongo-core` already provides this or if it needs to be added.
 

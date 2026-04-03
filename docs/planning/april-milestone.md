@@ -268,7 +268,7 @@ The remaining risks are **integration risks**, not architectural ones. The longe
 
 Proof: both ORM clients consume `ContractBase` for domain-level operations. The domain validation layer is shared.
 
-**2. ORM consolidation.** Flesh out the Mongo ORM with the SQL ORM's fluent chaining API (`.where().select().include().take().all()`), following [ADR 175](../architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md). Build as an isolated spike first, then coordinate with Alexey on the shared Collection interface. All read queries compile to typed aggregation pipeline stages exclusively — `find()` is not used ([ADR 183](../architecture%20docs/adrs/ADR%20183%20-%20Pipeline-only%20query%20representation%20for%20MongoDB.md)). The typed stage representation is shared with the stretch-goal pipeline query builder (task 6).
+**2. ORM consolidation.** Flesh out the Mongo ORM with the SQL ORM's fluent chaining API (`.where().select().include().take().all()`), following [ADR 175](../architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md). Build as an isolated spike first, then coordinate with Alexey on the shared Collection interface. All read queries compile to typed aggregation pipeline stages exclusively — `find()` is not used ([ADR 183](../architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md)). The typed stage representation is shared with the stretch-goal pipeline query builder (task 6).
 
 Proof: Mongo `Collection` class with the same method vocabulary as SQL, compiling to typed pipeline stages via `AggregateCommand` at terminal methods.
 
@@ -286,7 +286,7 @@ Proof: a data migration (e.g. split `name` → `firstName` + `lastName`) runs ag
 
 **P2 — Stretch:**
 
-**6. Basic Mongo query builder.** A type-safe aggregation pipeline builder for MongoDB, operating on the contract. This is the escape-hatch equivalent of the SQL query builder — a lower-level surface for queries the ORM can't express. It composes the same typed pipeline stage nodes that the ORM produces ([ADR 183](../architecture%20docs/adrs/ADR%20183%20-%20Pipeline-only%20query%20representation%20for%20MongoDB.md)), operating at a lower level with access to the full stage vocabulary (`$group`, `$addFields`, `$replaceRoot`, `$facet`, etc.).
+**6. Basic Mongo query builder.** A type-safe aggregation pipeline builder for MongoDB, operating on the contract. This is the escape-hatch equivalent of the SQL query builder — a lower-level surface for queries the ORM can't express. It composes the same typed pipeline stage nodes that the ORM produces ([ADR 183](../architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md)), operating at a lower level with access to the full stage vocabulary (`$group`, `$addFields`, `$replaceRoot`, `$facet`, etc.).
 
 **Cross-family validation (falls out of P1):**
 

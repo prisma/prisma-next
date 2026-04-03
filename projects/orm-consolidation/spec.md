@@ -16,7 +16,7 @@ Two ORM clients with divergent APIs for the same conceptual operations creates t
 
 **Parallelism:** This work has no dependency on M5 (unified contract type) or M6 (SQL emitter migration) from the [contract domain extraction project](../contract-domain-extraction/spec.md). The ORM query surface is independent of contract representation changes, and the domain-level access patterns are stable from M2 of that project.
 
-**Design constraint — pipeline-only:** All MongoDB read queries compile to typed aggregation pipeline stages exclusively. The older `find()` API is not used. See [ADR 183 — Pipeline-only query representation for MongoDB](../../docs/architecture%20docs/adrs/ADR%20183%20-%20Pipeline-only%20query%20representation%20for%20MongoDB.md). The typed stage representation is shared between the ORM and the future pipeline query builder.
+**Design constraint — pipeline-only:** All MongoDB read queries compile to typed aggregation pipeline stages exclusively. The older `find()` API is not used. See [ADR 183 — Pipeline-only query representation for MongoDB](../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md). The typed stage representation is shared between the ORM and the future pipeline query builder.
 
 # Before / After
 
@@ -69,7 +69,7 @@ const admin = await db.users.admins().first();
 
 1. **Implement `MongoCollection` with fluent chaining.** `.where().select().include().orderBy().take().skip()` with immutable-clone state accumulation (same pattern as SQL `Collection`). Compile to `MongoQueryPlan` at terminal methods (`.all()`, `.first()`).
 
-2. **Implement `CollectionState` → `MongoQueryPlan` compilation.** Translate accumulated filters, includes, orderBy, limit/offset, selectedFields into typed pipeline stages via `AggregateCommand` ([ADR 183](../../docs/architecture%20docs/adrs/ADR%20183%20-%20Pipeline-only%20query%20representation%20for%20MongoDB.md)). Pipeline stages are a discriminated union of typed nodes (`MongoMatchStage`, `MongoLookupStage`, `MongoProjectStage`, `MongoSortStage`, etc.), not untyped documents.
+2. **Implement `CollectionState` → `MongoQueryPlan` compilation.** Translate accumulated filters, includes, orderBy, limit/offset, selectedFields into typed pipeline stages via `AggregateCommand` ([ADR 183](../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md)). Pipeline stages are a discriminated union of typed nodes (`MongoMatchStage`, `MongoLookupStage`, `MongoProjectStage`, `MongoSortStage`, etc.), not untyped documents.
 
 3. **Implement typed `where` DSL for Mongo.** `MongoModelAccessor` with comparison methods (`.eq()`, `.neq()`, `.gt()`, `.lt()`, `.gte()`, `.lte()`, `.in()`, `.isNull()`), producing a structured Mongo filter expression AST (mirroring SQL's `AnyExpression` pattern with visitor/interpreter separation). Support both callback style `(model) => model.field.eq(value)` and shorthand object style `{ field: value }`. The filter AST is the content of `MongoMatchStage` in the pipeline.
 
@@ -115,7 +115,7 @@ const admin = await db.users.admins().first();
 - [ ] `.select()` compiles to `MongoProjectStage`
 - [ ] `.orderBy()` compiles to `MongoSortStage`
 - [ ] `.take()` and `.skip()` compile to `MongoLimitStage` and `MongoSkipStage`
-- [ ] All read queries compile to typed pipeline stages via `AggregateCommand` — `FindCommand` is not used ([ADR 183](../../docs/architecture%20docs/adrs/ADR%20183%20-%20Pipeline-only%20query%20representation%20for%20MongoDB.md))
+- [ ] All read queries compile to typed pipeline stages via `AggregateCommand` — `FindCommand` is not used ([ADR 183](../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md))
 - [ ] `.include()` compiles to `$lookup` pipeline stages with cardinality-aware `$unwind`
 - [ ] `.first()` returns `T | null` (single result or null)
 - [ ] `mongoOrm()` returns Collection instances instead of options-bag accessors
@@ -148,7 +148,7 @@ const admin = await db.users.admins().first();
 # References
 
 - [ADR 175 — Shared ORM Collection interface](../../docs/architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md)
-- [ADR 183 — Pipeline-only query representation for MongoDB](../../docs/architecture%20docs/adrs/ADR%20183%20-%20Pipeline-only%20query%20representation%20for%20MongoDB.md)
+- [ADR 183 — Pipeline-only query representation for MongoDB](../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md)
 - [ADR 172 — Contract domain-storage separation](../../docs/architecture%20docs/adrs/ADR%20172%20-%20Contract%20domain-storage%20separation.md)
 - [April milestone plan](../../docs/planning/april-milestone.md) § WS4, task 2
 - Linear: [TML-2189](https://linear.app/prisma-company/issue/TML-2189)
