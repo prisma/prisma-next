@@ -1,8 +1,6 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
-import { emit } from '@prisma-next/core-control-plane/emission';
 import type {
   ControlFamilyInstance,
-  EmitContractResult,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -10,45 +8,21 @@ import type {
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-core';
 import { validateMongoContract } from '@prisma-next/mongo-core';
-import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
 
 export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo'> {
   validateContract(contractJson: unknown): Contract;
-  emitContract(options: { readonly contract: Contract | unknown }): Promise<EmitContractResult>;
 }
 
 class MongoFamilyInstance implements MongoControlFamilyInstance {
   readonly familyId = 'mongo' as const;
 
-  private readonly controlStack: ControlStack;
-
-  constructor(controlStack: ControlStack) {
-    this.controlStack = controlStack;
-  }
+  constructor(_controlStack: ControlStack) {}
 
   validateContract(contractJson: unknown): Contract {
     const validated = validateMongoContract<MongoContract>(contractJson);
     // MongoContract and Contract share structure but are typed independently;
     // validateMongoContract guarantees the shape, so the double cast is safe.
     return validated.contract as unknown as Contract;
-  }
-
-  async emitContract({
-    contract,
-  }: {
-    readonly contract: Contract | unknown;
-  }): Promise<EmitContractResult> {
-    const validatedContract = contract as Contract;
-
-    const result = await emit(validatedContract, this.controlStack, mongoTargetFamilyHook);
-
-    return {
-      contractJson: result.contractJson,
-      contractDts: result.contractDts,
-      storageHash: result.storageHash,
-      ...(result.executionHash ? { executionHash: result.executionHash } : {}),
-      profileHash: result.profileHash,
-    };
   }
 
   async verify(): Promise<VerifyDatabaseResult> {

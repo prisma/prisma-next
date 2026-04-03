@@ -1,6 +1,5 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
-  EmitContractResult,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -50,8 +49,6 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
     readonly driver: ControlDriverInstance<TFamilyId, string>;
     readonly contract?: unknown;
   }): Promise<TSchemaIR>;
-
-  emitContract(options: { readonly contract: unknown }): Promise<EmitContractResult>;
 }
 
 export interface ControlTargetInstance<TFamilyId extends string, TTargetId extends string>
