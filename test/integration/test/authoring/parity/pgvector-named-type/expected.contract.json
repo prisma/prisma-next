@@ -3,8 +3,10 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:60395bf4e7b604833c3c947bb5724f50017a5f722aeda95ade05ee78e7abb049",
-  "profileHash": "sha256:4c68d253773262f590e742c85e147dd4eb29e082c65856d97671d98ef343de04",
-  "roots": {},
+  "profileHash": "sha256:ffc50246dae57a96ebc1abc212db40a10706095adca83ab257d4cb15f62cd192",
+  "roots": {
+    "document": "Document"
+  },
   "models": {
     "Document": {
       "fields": {

@@ -6,7 +6,7 @@ import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
-import { createContractIR } from '@prisma-next/emitter/test/utils';
+import { createTestContract } from '@prisma-next/emitter/test/utils';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
@@ -73,7 +73,7 @@ describe('contract.d.ts imports resolution', () => {
   it(
     'generates contract.d.ts with all imports resolving correctly',
     async () => {
-      const ir = createContractIR({
+      const ir = createTestContract({
         extensionPacks: {
           postgres: { version: '0.0.1' },
           pg: {},
@@ -241,7 +241,7 @@ type UserIdColumn = UserColumns['id'];
   it(
     'generated contract.d.ts can be imported and used in TypeScript',
     async () => {
-      const ir = createContractIR({
+      const ir = createTestContract({
         extensionPacks: {
           postgres: { version: '0.0.1' },
           pg: {},
