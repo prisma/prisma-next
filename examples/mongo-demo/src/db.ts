@@ -9,7 +9,7 @@ import contractJson from './contract.json' with { type: 'json' };
 
 const { contract } = validateMongoContract<Contract>(contractJson);
 
-export async function createDb(connectionUri: string, dbName: string) {
+export async function createClient(connectionUri: string, dbName: string) {
   const adapter = createMongoAdapter();
   const driver = await createMongoDriver(connectionUri, dbName);
   const loweringContext: MongoLoweringContext = { contract };
@@ -19,5 +19,5 @@ export async function createDb(connectionUri: string, dbName: string) {
   return { orm, runtime, contract };
 }
 
-export type Db = Awaited<ReturnType<typeof createDb>>;
+export type Db = Awaited<ReturnType<typeof createClient>>;
 export type { MongoRuntime };

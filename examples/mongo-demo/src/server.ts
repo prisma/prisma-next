@@ -1,11 +1,12 @@
 import { createServer } from 'node:http';
 import { MongoClient, ObjectId } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { createDb } from './db';
+import { createClient } from './db';
 
 const PORT = 3456;
 const DB_NAME = 'blog';
 
+// Seeds data via raw MongoClient because the ORM is currently read-only.
 async function seed(client: MongoClient) {
   const db = client.db(DB_NAME);
 
@@ -73,7 +74,7 @@ async function main() {
   await seed(client);
   console.log('Seed complete.');
 
-  const { orm } = await createDb(uri, DB_NAME);
+  const { orm } = await createClient(uri, DB_NAME);
 
   const server = createServer(async (req, res) => {
     try {
