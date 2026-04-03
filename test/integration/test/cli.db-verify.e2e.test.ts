@@ -971,7 +971,6 @@ withTempDir(({ createTempDir }) => {
             adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             // driver is missing - this is what we're testing
             extensionPacks: [],
-            // TML-2191 will align SqlContract.execution with ContractExecutionSection
             contract: typescriptContract(contract as unknown as Contract, 'output/contract.json'),
             db: {
               connection: connectionString,
