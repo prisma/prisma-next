@@ -760,6 +760,9 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../1-core/migration/control-plane
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../1-core/shared/framework-components
       arktype:
         specifier: ^2.0.0
         version: 2.1.29

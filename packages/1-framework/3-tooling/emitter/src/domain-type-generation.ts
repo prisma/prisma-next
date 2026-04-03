@@ -1,4 +1,4 @@
-import type { TypesImportSpec } from '@prisma-next/contract/types';
+import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 
 export function serializeValue(value: unknown): string {
   if (value === null) {
