@@ -1,6 +1,6 @@
-# Milestone 1: Pipeline AST — Design
+# Milestone 1: Mongo Query AST — Design
 
-Implementation design for the typed pipeline AST. This document describes the type hierarchies, interfaces, and patterns. For execution order and task breakdown, see [phase-1-mongo-collection-spike.md](./phase-1-mongo-collection-spike.md).
+Implementation design for the typed query AST in `@prisma-next/mongo-query-ast`. This document describes the type hierarchies, interfaces, and patterns. For execution order and task breakdown, see [phase-1-mongo-collection-spike.md](./phase-1-mongo-collection-spike.md).
 
 **Precedent:** The SQL AST in [`relational-core/src/ast/types.ts`](../../../packages/2-sql/4-lanes/relational-core/src/ast/types.ts) — class hierarchy, visitor/rewriter/folder interfaces, immutable frozen instances, hidden abstract bases with exported discriminated unions.
 
@@ -8,9 +8,9 @@ Implementation design for the typed pipeline AST. This document describes the ty
 
 1. **Mirror the SQL AST pattern.** Classes with `kind` discriminant, abstract bases hidden from export, concrete classes exposed via discriminated unions. `accept()` for visitors, `rewrite()` for transformations.
 2. **Contract-agnostic.** The AST deals in MongoDB concepts (fields, operators, pipeline stages), not contract concepts (models, codecIds, relations). The ORM bridges the gap.
-3. **Lowering in the adapter.** The AST is structurally close to the MongoDB driver's document format. The adapter performs the thin translation from typed nodes to plain documents. The AST package defines the types; the adapter interprets them.
+3. **Lowering in the adapter.** The AST is structurally close to the MongoDB driver's document format. The adapter performs the thin translation from typed nodes to plain documents. `mongo-query-ast` defines the types; the adapter interprets them.
 4. **Extensible operators via traits.** Filter operators are strings, not a closed enum. The ORM gates which operators appear on `MongoModelAccessor` fields using codec traits — the same pattern as SQL's `COMPARISON_METHODS_META` + `CodecTrait`.
-5. **Raw pipeline goes through the runtime.** Both typed AST pipelines and raw pipelines flow through `MongoRuntime.execute()` — the same middleware pipeline. The raw escape hatch bypasses the typed AST, not the runtime.
+5. **Raw escape hatch goes through the runtime.** Both typed AST and raw aggregation plans flow through `MongoRuntime.execute()` — the same runtime middleware. The raw escape hatch bypasses the typed AST, not the runtime.
 6. **Prove extensibility with a pass-through operator.** Milestone 1 includes adding one extension operator (e.g., a vector `$near` operator on a vector codec) to validate the trait-gated extensibility pattern end-to-end.
 
 ## Class hierarchy
@@ -263,7 +263,7 @@ export type MongoFilterExpr =
   | MongoExistsExpr;
 ```
 
-## Pipeline stage AST
+## Read stage AST
 
 ### Base class
 
@@ -531,7 +531,7 @@ SQL's `ExpressionFolder<T>` provides monoid-style aggregation with early exit. T
 
 ## Lowering
 
-Lowering translates typed AST nodes into plain `Record<string, unknown>` documents suitable for the MongoDB driver. Per our design decision, **lowering lives in the adapter** (`mongo-adapter`), not in `mongo-core`.
+Lowering translates typed AST nodes into plain `Record<string, unknown>` documents suitable for the MongoDB driver. Per our design decision, **lowering lives in the adapter** (`mongo-adapter`), not in `mongo-query-ast`.
 
 ### Why the adapter
 
@@ -695,20 +695,19 @@ This validates that:
 - Codec traits correctly gate which operators appear on which fields
 - Lowering is operator-agnostic — new operators pass through without adapter changes
 
-## Package location
+## Package
 
-The pipeline AST should **not** live in `mongo-core` (`packages/2-mongo-family/1-core/`). That package is already a grab-bag of commands, values, codecs, contract types, validation, wire commands, plan types, param refs, driver types, and codec registry.
+**Package:** `@prisma-next/mongo-query-ast`
+**Directory:** `packages/2-mongo-family/2-query-ast/`
+**Layer:** `query-ast` — a new layer between `core` (1) and `tooling` (3)
 
-The SQL precedent is clear: the query AST lives in `relational-core` (`@prisma-next/sql-relational-core`) at the **lanes** layer (`packages/2-sql/4-lanes/relational-core/`), not in `sql-core` (`packages/2-sql/1-core/`). The lanes layer sits between core and runtime — it's the query representation primitive consumed by both the ORM and query builder surfaces.
+The query AST lives in its own package, below all consumers. This prevents coupling the AST to ORM or builder concerns. The Mongo layer order becomes: `["core", "query-ast", "tooling", "orm", "runtime", "family"]`.
 
-Mongo's current layer order has no "lanes" layer: `["core", "tooling", "orm", "runtime", "family"]`. The pipeline AST is a query representation primitive that will be consumed by both `mongo-orm` and a future `mongo-pipeline-builder`, which is exactly the lanes-layer role.
+**Why not `mongo-core`?** That package is already a grab-bag of commands, values, codecs, contract types, validation, wire commands, plan types, param refs, driver types, and codec registry. The SQL precedent is clear: the query AST lives in `relational-core` (`@prisma-next/sql-relational-core`) at the lanes layer, not in `sql-core`.
 
-**Recommendation:** Create a new package for the pipeline AST. Concrete name and layer position TBD — candidates:
+**Why `query-ast` and not `pipeline`?** "Pipeline" is overloaded in this codebase — MongoDB aggregation pipeline, runtime middleware pipeline, emission pipeline. "Query AST" describes what the package contains without ambiguity.
 
-- `packages/2-mongo-family/4-lanes/pipeline-core/` — mirrors SQL's `4-lanes/relational-core/`, but Mongo currently uses `4-orm` at the same level
-- `packages/2-mongo-family/2-pipeline/` — positions it above core, below tooling, at the unused authoring layer slot
-
-The key constraint: the package must be importable by both `mongo-orm` (layer 4) and a future pipeline builder, and must be able to import from `mongo-core` (layer 1) for types like `MongoValue` and `MongoParamRef`.
+**Import direction:** `mongo-query-ast` imports from `mongo-core` (for `MongoValue`, `MongoParamRef`). Consumers (`mongo-orm`, future pipeline builder, `mongo-adapter`) import from `mongo-query-ast`.
 
 ## Module organization
 
@@ -732,9 +731,9 @@ The hidden abstract bases (`MongoFilterExpression`, `MongoStageNode`) live in th
 
 ## Comparison with SQL AST
 
-| Aspect | SQL (`relational-core`) | Mongo (new pipeline AST package) |
+| Aspect | SQL (`relational-core`) | Mongo (`mongo-query-ast`) |
 |---|---|---|
-| Package layer | Lanes (`4-lanes/relational-core`) | TBD — new package, not in `mongo-core` |
+| Package layer | Lanes (`4-lanes/relational-core`) | `query-ast` (`2-query-ast/`) — below consumers |
 | Root abstract base | `AstNode` | `MongoAstNode` |
 | Expression base | `Expression` (abstract) | `MongoFilterExpression` (abstract) |
 | Statement/stage base | `QueryAst` (abstract) | `MongoStageNode` (abstract) |
