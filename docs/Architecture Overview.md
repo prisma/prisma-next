@@ -23,6 +23,9 @@ We don’t execute intent directly; we compile it into immutable Plans. Every qu
 ### Thin core, fat targets
 Keep the core small and stable—contracts, plan model, runtime lifecycle, and policy surfaces—while adapters and extension packs carry dialect and capability logic. Capabilities are declared in the contract and verified against the database so behavior is explicit and swappable without touching core (ADR 005, ADR 112, ADR 117)
 
+### Domain-first surfaces
+User-facing APIs speak in application-domain terms — models, fields, relations, identity — not in storage terms. Database-specific details (table names, column types, index configurations, FK constraint names) are available but secondary: they appear in explicit overlay stages or target-specific packs rather than being interleaved with domain intent. This keeps contracts readable as domain documentation and portable across targets (ADR 178, ADR 172)
+
 ### Explicit over implicit
 No hidden multi round-trips, fallbacks, or adapter heuristics. Strategies are chosen explicitly via hints, annotations, and capability checks; raw SQL carries annotations so guardrails still apply. Multi-step behavior is expressed as explicit pipelines or transactions, not implicit client behavior (ADR 003, ADR 012, ADR 018, ADR 022)
 

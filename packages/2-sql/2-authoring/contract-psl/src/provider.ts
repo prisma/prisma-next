@@ -1,6 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type {
+  AuthoringContributions,
+  ExtensionPackRef,
+  TargetPackRef,
+} from '@prisma-next/contract/framework-components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -11,6 +15,7 @@ import { interpretPslDocumentToSqlContractIR } from './interpreter';
 export interface PrismaContractOptions {
   readonly output?: string;
   readonly target: TargetPackRef<'sql', 'postgres'>;
+  readonly authoringContributions?: AuthoringContributions;
   readonly scalarTypeDescriptors: ReadonlyMap<
     string,
     {
@@ -22,6 +27,7 @@ export interface PrismaContractOptions {
   >;
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly composedExtensionPacks?: readonly string[];
+  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', 'postgres'>[];
 }
 
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
@@ -58,10 +64,15 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
       const interpreted = interpretPslDocumentToSqlContractIR({
         document,
         target: options.target,
+        ...ifDefined('authoringContributions', options.authoringContributions),
         scalarTypeDescriptors: options.scalarTypeDescriptors,
         ...ifDefined(
           'composedExtensionPacks',
           composedExtensionPacks.length > 0 ? composedExtensionPacks : undefined,
+        ),
+        ...ifDefined(
+          'composedExtensionPackRefs',
+          options.composedExtensionPackRefs?.length ? options.composedExtensionPackRefs : undefined,
         ),
         ...ifDefined('controlMutationDefaults', options.controlMutationDefaults),
       });

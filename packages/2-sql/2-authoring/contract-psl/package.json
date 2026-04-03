@@ -18,11 +18,13 @@
     "@prisma-next/config": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/psl-parser": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "pathe": "^2.0.3"
   },
   "devDependencies": {
+    "@prisma-next/contract-authoring": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",

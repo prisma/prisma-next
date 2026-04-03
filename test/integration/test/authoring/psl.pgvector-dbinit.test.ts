@@ -3,7 +3,10 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient, enrichContractIR } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
-import sql, { assemblePslInterpretationContributions } from '@prisma-next/family-sql/control';
+import sql, {
+  assembleAuthoringContributions,
+  assemblePslInterpretationContributions,
+} from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
@@ -34,19 +37,22 @@ describe(
       writeFileSync(schemaPath, schemaText, 'utf-8');
 
       process.chdir(testDir);
+      const authoringContributions = assembleAuthoringContributions(frameworkComponents);
       const pslContributions = assemblePslInterpretationContributions(frameworkComponents);
       const contractConfig = prismaContract('./schema.prisma', {
         target: postgres,
+        authoringContributions,
         scalarTypeDescriptors: pslContributions.scalarTypeDescriptors,
         controlMutationDefaults: {
           defaultFunctionRegistry: pslContributions.defaultFunctionRegistry,
           generatorDescriptors: pslContributions.generatorDescriptors,
         },
         composedExtensionPacks: ['pgvector'],
+        composedExtensionPackRefs: [pgvector],
       });
 
       const pslResult = await contractConfig.source({
-        composedExtensionPacks: ['pgvector'],
+        composedExtensionPacks: [],
       });
       expect(pslResult.ok).toBe(true);
       if (!pslResult.ok) {

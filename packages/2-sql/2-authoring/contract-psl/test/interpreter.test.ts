@@ -6,6 +6,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  pgvectorExtensionPack,
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
@@ -197,7 +198,7 @@ model Post {
   id Int @id
   userId Int
   title String
-  author User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: SetNull)
+  author User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   @@index([userId])
   @@unique([title, userId])
 }
@@ -246,7 +247,7 @@ model Post {
                 columns: ['id'],
               },
               onDelete: 'cascade',
-              onUpdate: 'setNull',
+              onUpdate: 'cascade',
             },
           ],
         },
@@ -320,27 +321,47 @@ model Event {
           typeParams: { precision: 10, scale: 2 },
         },
       },
+    });
+    expect(result.value.storage).toMatchObject({
       tables: {
         event: {
           columns: {
-            id: { codecId: 'pg/text@1', nativeType: 'uuid' },
+            id: { codecId: 'pg/text@1', nativeType: 'uuid', nullable: false, typeRef: 'Id' },
             slug: {
               codecId: 'sql/varchar@1',
               nativeType: 'character varying',
-              typeParams: { length: 191 },
+              nullable: false,
+              typeRef: 'Slug',
             },
-            rating: { codecId: 'pg/int2@1', nativeType: 'int2' },
+            rating: {
+              codecId: 'pg/int2@1',
+              nativeType: 'int2',
+              nullable: false,
+              typeRef: 'Rating',
+            },
             happenedAt: {
               codecId: 'pg/time@1',
               nativeType: 'time',
-              typeParams: { precision: 3 },
+              nullable: false,
+              typeRef: 'HappenedAt',
             },
-            publishDay: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
-            payload: { codecId: 'pg/json@1', nativeType: 'json' },
+            publishDay: {
+              codecId: 'pg/timestamptz@1',
+              nativeType: 'date',
+              nullable: false,
+              typeRef: 'PublishDay',
+            },
+            payload: {
+              codecId: 'pg/json@1',
+              nativeType: 'json',
+              nullable: false,
+              typeRef: 'Payload',
+            },
             amount: {
               codecId: 'pg/numeric@1',
               nativeType: 'numeric',
-              typeParams: { precision: 10, scale: 2 },
+              nullable: false,
+              typeRef: 'Amount',
             },
           },
           primaryKey: { columns: ['id'] },
@@ -391,11 +412,24 @@ model User {
           typeParams: { values: ['OWNER'] },
         },
       },
+    });
+    expect(result.value.storage).toMatchObject({
       tables: {
         user: {
           columns: {
-            role: { codecId: 'pg/enum@1', nativeType: 'user_role' },
-            legacyRole: { codecId: 'pg/enum@1', nativeType: 'Role' },
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            role: {
+              codecId: 'pg/enum@1',
+              nativeType: 'user_role',
+              nullable: false,
+              typeRef: 'UserRole',
+            },
+            legacyRole: {
+              codecId: 'pg/enum@1',
+              nativeType: 'Role',
+              nullable: false,
+              typeRef: 'Role',
+            },
           },
         },
       },
@@ -458,32 +492,41 @@ model Event {
           typeParams: { precision: 2 },
         },
       },
+    });
+    expect(result.value.storage).toMatchObject({
       tables: {
         event: {
           columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             code: {
               codecId: 'sql/char@1',
               nativeType: 'character',
-              typeParams: { length: 12 },
+              nullable: false,
+              typeRef: 'Code',
             },
             score: {
               codecId: 'pg/float4@1',
               nativeType: 'float4',
+              nullable: false,
+              typeRef: 'Score',
             },
             createdAt: {
               codecId: 'pg/timestamp@1',
               nativeType: 'timestamp',
-              typeParams: { precision: 3 },
+              nullable: false,
+              typeRef: 'CreatedAt',
             },
             publishedAt: {
               codecId: 'pg/timestamptz@1',
               nativeType: 'timestamptz',
-              typeParams: { precision: 6 },
+              nullable: false,
+              typeRef: 'PublishedAt',
             },
             reminderAt: {
               codecId: 'pg/timetz@1',
               nativeType: 'timetz',
-              typeParams: { precision: 2 },
+              nullable: false,
+              typeRef: 'ReminderAt',
             },
           },
         },
@@ -877,6 +920,122 @@ model Document {
               codecId: 'pg/vector@1',
               nativeType: 'vector',
               typeParams: { length: 1536 },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('preserves composed extension pack versions when refs are provided', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
+}
+
+model Document {
+  id Int @id
+  embedding Embedding1536
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      composedExtensionPacks: ['pgvector'],
+      composedExtensionPackRefs: [pgvectorExtensionPack],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.extensionPacks).toMatchObject({
+      pgvector: {
+        version: pgvectorExtensionPack.version,
+      },
+    });
+  });
+
+  it('instantiates enum and pgvector descriptors from shared authoring contributions', () => {
+    const document = parsePslDocument({
+      schema: `enum Role {
+  USER
+  ADMIN
+}
+
+types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
+}
+
+model Document {
+  id Int @id
+  role Role
+  embedding Embedding1536
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractIR({
+      document,
+      composedExtensionPacks: ['pgvector'],
+      authoringContributions: {
+        type: {
+          enum: {
+            kind: 'typeConstructor',
+            args: [{ kind: 'string' }, { kind: 'stringArray' }],
+            output: {
+              codecId: 'custom/enum@1',
+              nativeType: { kind: 'arg', index: 0 },
+              typeParams: {
+                values: { kind: 'arg', index: 1 },
+              },
+            },
+          },
+          pgvector: {
+            vector: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'number', integer: true, minimum: 1, maximum: 2000 }],
+              output: {
+                codecId: 'custom/vector@1',
+                nativeType: 'vector',
+                typeParams: {
+                  length: { kind: 'arg', index: 0 },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.storage).toMatchObject({
+      types: {
+        Role: {
+          codecId: 'custom/enum@1',
+          nativeType: 'Role',
+          typeParams: { values: ['USER', 'ADMIN'] },
+        },
+        Embedding1536: {
+          codecId: 'custom/vector@1',
+          nativeType: 'vector',
+          typeParams: { length: 1536 },
+        },
+      },
+      tables: {
+        document: {
+          columns: {
+            role: {
+              codecId: 'custom/enum@1',
+              nativeType: 'Role',
+              typeRef: 'Role',
+            },
+            embedding: {
+              codecId: 'custom/vector@1',
+              nativeType: 'vector',
+              typeRef: 'Embedding1536',
             },
           },
         },

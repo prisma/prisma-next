@@ -176,6 +176,7 @@ function mockExpandParameterizedNativeType(input: ExpandNativeTypeInput): string
     'pg/varchar@1',
     'pg/bit@1',
     'pg/varbit@1',
+    'pg/vector@1',
   ]);
   if (lengthCodecs.has(codecId)) {
     const length = typeParams['length'];
@@ -231,6 +232,7 @@ export function createMockPostgresComponent(): TargetBoundComponentDescriptor<'s
     'pg/varchar@1',
     'pg/bit@1',
     'pg/varbit@1',
+    'pg/vector@1',
     'pg/numeric@1',
     'pg/timestamp@1',
     'pg/timestamptz@1',

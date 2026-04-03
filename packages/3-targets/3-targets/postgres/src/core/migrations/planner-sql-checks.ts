@@ -1,6 +1,7 @@
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
-import type { StorageColumn } from '@prisma-next/sql-contract/types';
+import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 export function qualifyTableName(schema: string, table: string): string {
   return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
@@ -229,23 +230,26 @@ function formatUserDefinedTypeName(identifier: string): string {
 export function buildExpectedFormatType(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
+  storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
-  if (column.typeParams && column.codecId) {
-    const hooks = codecHooks.get(column.codecId);
+  const resolved = resolveColumnTypeMetadata(column, storageTypes);
+
+  if (resolved.typeParams && resolved.codecId) {
+    const hooks = codecHooks.get(resolved.codecId);
     if (hooks?.expandNativeType) {
       return hooks.expandNativeType({
-        nativeType: column.nativeType,
-        codecId: column.codecId,
-        typeParams: column.typeParams,
+        nativeType: resolved.nativeType,
+        codecId: resolved.codecId,
+        typeParams: resolved.typeParams,
       });
     }
   }
 
   if (column.typeRef) {
-    return formatUserDefinedTypeName(column.nativeType);
+    return formatUserDefinedTypeName(resolved.nativeType);
   }
 
-  return FORMAT_TYPE_DISPLAY.get(column.nativeType) ?? column.nativeType;
+  return FORMAT_TYPE_DISPLAY.get(resolved.nativeType) ?? resolved.nativeType;
 }
 
 export function columnTypeCheck({

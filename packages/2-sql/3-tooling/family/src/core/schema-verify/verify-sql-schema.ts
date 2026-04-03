@@ -15,7 +15,12 @@ import type {
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
@@ -106,12 +111,14 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   const { contractStorageHash, contractProfileHash, contractTarget } =
     extractContractMetadata(contract);
+  const storageTypes = contract.storage.types ?? {};
   const { issues, rootChildren } = verifySchemaTables({
     contract,
     schema,
     strict,
     typeMetadataRegistry,
     codecHooks,
+    storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
   });
@@ -119,7 +126,6 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
 
   // Verify storage type instances via codec control hooks (pure, deterministic)
-  const storageTypes = contract.storage.types ?? {};
   const storageTypeEntries = Object.entries(storageTypes);
   if (storageTypeEntries.length > 0) {
     const typeNodes: SchemaVerificationNode[] = [];
@@ -235,6 +241,7 @@ function verifySchemaTables(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
+  storageTypes: Record<string, StorageTypeInstance>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
@@ -244,6 +251,7 @@ function verifySchemaTables(options: {
     strict,
     typeMetadataRegistry,
     codecHooks,
+    storageTypes,
     normalizeDefault,
     normalizeNativeType,
   } = options;
@@ -285,6 +293,7 @@ function verifySchemaTables(options: {
       strict,
       typeMetadataRegistry,
       codecHooks,
+      storageTypes,
       ...ifDefined('normalizeDefault', normalizeDefault),
       ...ifDefined('normalizeNativeType', normalizeNativeType),
     });
@@ -326,6 +335,7 @@ function verifyTableChildren(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
+  storageTypes: Record<string, StorageTypeInstance>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
@@ -338,6 +348,7 @@ function verifyTableChildren(options: {
     strict,
     typeMetadataRegistry,
     codecHooks,
+    storageTypes,
     normalizeDefault,
     normalizeNativeType,
   } = options;
@@ -351,6 +362,7 @@ function verifyTableChildren(options: {
     strict,
     typeMetadataRegistry,
     codecHooks,
+    storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
   });
@@ -481,6 +493,7 @@ function collectContractColumnNodes(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
+  storageTypes: Record<string, StorageTypeInstance>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
@@ -493,6 +506,7 @@ function collectContractColumnNodes(options: {
     strict,
     typeMetadataRegistry,
     codecHooks,
+    storageTypes,
     normalizeDefault,
     normalizeNativeType,
   } = options;
@@ -534,6 +548,7 @@ function collectContractColumnNodes(options: {
         strict,
         typeMetadataRegistry,
         codecHooks,
+        storageTypes,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
       }),
@@ -585,6 +600,7 @@ function verifyColumn(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
+  storageTypes: Record<string, StorageTypeInstance>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode {
@@ -597,13 +613,21 @@ function verifyColumn(options: {
     issues,
     strict,
     codecHooks,
+    storageTypes,
     normalizeDefault,
     normalizeNativeType,
   } = options;
   const columnChildren: SchemaVerificationNode[] = [];
   let columnStatus: VerificationStatus = 'pass';
 
-  const contractNativeType = renderExpectedNativeType(contractColumn, codecHooks);
+  const resolvedContractColumn = resolveContractColumnTypeMetadata(contractColumn, storageTypes, {
+    tableName,
+    columnName,
+  });
+  const contractNativeType = renderExpectedNativeType(contractColumn, storageTypes, codecHooks, {
+    tableName,
+    columnName,
+  });
   const schemaNativeType =
     normalizeNativeType?.(schemaColumn.nativeType) ?? schemaColumn.nativeType;
 
@@ -630,8 +654,8 @@ function verifyColumn(options: {
     columnStatus = 'fail';
   }
 
-  if (contractColumn.codecId) {
-    const typeMetadata = options.typeMetadataRegistry.get(contractColumn.codecId);
+  if (resolvedContractColumn.codecId) {
+    const typeMetadata = options.typeMetadataRegistry.get(resolvedContractColumn.codecId);
     if (!typeMetadata) {
       columnChildren.push({
         status: 'warn',
@@ -639,21 +663,24 @@ function verifyColumn(options: {
         name: 'type_metadata_missing',
         contractPath: `${columnPath}.codecId`,
         code: 'type_metadata_missing',
-        message: `codecId "${contractColumn.codecId}" not found in type metadata registry`,
-        expected: contractColumn.codecId,
+        message: `codecId "${resolvedContractColumn.codecId}" not found in type metadata registry`,
+        expected: resolvedContractColumn.codecId,
         actual: undefined,
         children: [],
       });
-    } else if (typeMetadata.nativeType && typeMetadata.nativeType !== contractColumn.nativeType) {
+    } else if (
+      typeMetadata.nativeType &&
+      typeMetadata.nativeType !== resolvedContractColumn.nativeType
+    ) {
       columnChildren.push({
         status: 'warn',
         kind: 'type',
         name: 'type_consistency',
         contractPath: `${columnPath}.codecId`,
         code: 'type_consistency_warning',
-        message: `codecId "${contractColumn.codecId}" maps to nativeType "${typeMetadata.nativeType}" in registry, but contract has "${contractColumn.nativeType}"`,
+        message: `codecId "${resolvedContractColumn.codecId}" maps to nativeType "${typeMetadata.nativeType}" in registry, but contract has "${resolvedContractColumn.nativeType}"`,
         expected: typeMetadata.nativeType,
-        actual: contractColumn.nativeType,
+        actual: resolvedContractColumn.nativeType,
         children: [],
       });
     }
@@ -761,8 +788,8 @@ function verifyColumn(options: {
   // Single-pass aggregation for better performance
   const aggregated = aggregateChildState(columnChildren, columnStatus);
   const nullableText = contractColumn.nullable ? 'nullable' : 'not nullable';
-  const columnTypeDisplay = contractColumn.codecId
-    ? `${contractNativeType} (${contractColumn.codecId})`
+  const columnTypeDisplay = resolvedContractColumn.codecId
+    ? `${contractNativeType} (${resolvedContractColumn.codecId})`
     : contractNativeType;
   const columnMessage = aggregated.failureMessages.join('; ');
 
@@ -916,9 +943,18 @@ function validateFrameworkComponentsForExtensions(
  */
 function renderExpectedNativeType(
   contractColumn: SqlContract<SqlStorage>['storage']['tables'][string]['columns'][string],
+  storageTypes: Record<string, StorageTypeInstance>,
   codecHooks: Map<string, CodecControlHooks>,
+  context?: {
+    readonly tableName: string;
+    readonly columnName: string;
+  },
 ): string {
-  const { codecId, nativeType, typeParams } = contractColumn;
+  const { codecId, nativeType, typeParams } = resolveContractColumnTypeMetadata(
+    contractColumn,
+    storageTypes,
+    context,
+  );
 
   // If no typeParams or codecId, return the base native type
   if (!typeParams || !codecId) {
@@ -933,6 +969,35 @@ function renderExpectedNativeType(
 
   // Fallback: return base native type if no hook is available
   return nativeType;
+}
+
+function resolveContractColumnTypeMetadata(
+  contractColumn: StorageColumn,
+  storageTypes: Record<string, StorageTypeInstance>,
+  context?: {
+    readonly tableName: string;
+    readonly columnName: string;
+  },
+): Pick<StorageColumn, 'codecId' | 'nativeType' | 'typeParams'> {
+  if (!contractColumn.typeRef) {
+    return contractColumn;
+  }
+
+  const referencedType = storageTypes[contractColumn.typeRef];
+  if (!referencedType) {
+    const columnLabel = context
+      ? `Column "${context.tableName}"."${context.columnName}"`
+      : 'Column';
+    throw new Error(
+      `${columnLabel} references storage type "${contractColumn.typeRef}" but it is not defined in storage.types.`,
+    );
+  }
+
+  return {
+    codecId: referencedType.codecId,
+    nativeType: referencedType.nativeType,
+    typeParams: referencedType.typeParams,
+  };
 }
 
 /**

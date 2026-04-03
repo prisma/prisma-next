@@ -6,7 +6,12 @@ import type {
   SqlMigrationPlanOperation,
   SqlPlannerConflict,
 } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type {
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import { invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
@@ -122,6 +127,7 @@ function buildReconciliationOperationFromIssue(options: {
   readonly codecHooks: Map<string, CodecControlHooks>;
 }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> | null {
   const { issue, contract, schemaName, mode, codecHooks } = options;
+  const storageTypes = contract.storage.types ?? {};
   switch (issue.kind) {
     case 'extra_table':
       if (!mode.allowDestructive || !issue.table) {
@@ -193,6 +199,7 @@ function buildReconciliationOperationFromIssue(options: {
         issue.column,
         contractColumn,
         codecHooks,
+        storageTypes,
       );
     }
 
@@ -527,9 +534,10 @@ function buildAlterColumnTypeOperation(
   columnName: string,
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
+  storageTypes: Record<string, StorageTypeInstance>,
 ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
   const qualified = qualifyTableName(schemaName, tableName);
-  const expectedType = buildColumnTypeSql(column, codecHooks);
+  const expectedType = buildColumnTypeSql(column, codecHooks, storageTypes, false);
   return {
     id: `alterType.${tableName}.${columnName}`,
     label: `Alter type for ${columnName} on ${tableName}`,
@@ -566,7 +574,7 @@ USING ${quoteIdentifier(columnName)}::${expectedType}`,
           schema: schemaName,
           table: tableName,
           column: columnName,
-          expectedType: buildExpectedFormatType(column, codecHooks),
+          expectedType: buildExpectedFormatType(column, codecHooks, storageTypes),
         }),
       },
     ],

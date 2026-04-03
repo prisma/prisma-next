@@ -13,6 +13,7 @@ export type {
 } from '@prisma-next/core-control-plane/types';
 export type { SqlControlDescriptorWithContributions } from '../core/assembly';
 export {
+  assembleAuthoringContributions,
   assembleControlMutationDefaultContributions,
   assemblePslInterpretationContributions,
   extractCodecControlHooks,

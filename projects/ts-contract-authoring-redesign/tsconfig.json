@@ -1,0 +1,11 @@
+{
+  "extends": ["@prisma-next/tsconfig/base"],
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["./contract.before.ts", "./contract.after.ts"],
+  "exclude": ["node_modules", "dist"]
+}

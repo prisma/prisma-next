@@ -7,22 +7,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function mergePlainObjects(
-  left: Record<string, unknown>,
-  right: Record<string, unknown>,
-): Record<string, unknown> {
-  const next: Record<string, unknown> = { ...left };
-  for (const [key, value] of Object.entries(right)) {
-    const existing = next[key];
-    if (isPlainObject(existing) && isPlainObject(value)) {
-      next[key] = mergePlainObjects(existing, value);
-      continue;
-    }
-    next[key] = value;
-  }
-  return next;
-}
-
 function sortDeep(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(sortDeep);
@@ -124,7 +108,7 @@ export function enrichContractIR(
 
   const extensionPacks =
     Object.keys(extensionPacksMeta).length > 0
-      ? mergePlainObjects(ir.extensionPacks, extensionPacksMeta)
+      ? { ...ir.extensionPacks, ...extensionPacksMeta }
       : ir.extensionPacks;
 
   return {

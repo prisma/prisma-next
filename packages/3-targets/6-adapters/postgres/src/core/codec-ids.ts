@@ -2,6 +2,8 @@ export {
   SQL_CHAR_CODEC_ID,
   SQL_FLOAT_CODEC_ID,
   SQL_INT_CODEC_ID,
+  SQL_TEXT_CODEC_ID,
+  SQL_TIMESTAMP_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
 } from '@prisma-next/sql-relational-core/ast';
 export const PG_TEXT_CODEC_ID = 'pg/text@1' as const;

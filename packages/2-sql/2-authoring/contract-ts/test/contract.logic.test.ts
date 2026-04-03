@@ -46,6 +46,30 @@ describe('validateContract logic validation', () => {
     expect(() => validateContract<SqlContract<SqlStorage>>(validContractInput)).not.toThrow();
   });
 
+  it('rejects invalid execution-default generator ids', () => {
+    const invalid = {
+      ...validContractInput,
+      execution: {
+        mutations: {
+          defaults: [
+            {
+              ref: {
+                table: 'User',
+                column: 'id',
+              },
+              onCreate: {
+                kind: 'generator',
+                id: 'invalid generator id',
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/a flat generator id/);
+  });
+
   it('throws when primaryKey references non-existent column', () => {
     const invalid = {
       ...validContractInput,

@@ -166,6 +166,21 @@ describe('contract builder constraint support', () => {
     });
   });
 
+  it('rejects duplicate named storage objects during build', () => {
+    expect(() =>
+      defineContract<CodecTypes>()
+        .target(postgresTargetPack)
+        .table('user', (t) =>
+          t
+            .column('id', { type: int4Column })
+            .primaryKey(['id'], 'user_pkey')
+            .index(['id'], 'user_pkey'),
+        )
+        .model('User', 'user', (m) => m.field('id', 'id'))
+        .build(),
+    ).toThrow(/Contract semantic validation failed:.*user_pkey/);
+  });
+
   it('supports multiple constraints on the same table', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)

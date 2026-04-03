@@ -15,12 +15,14 @@ This package contains the SQL-specific TypeScript contract authoring surface for
 ## Overview
 
 This package is part of the SQL family namespace (`packages/2-sql/2-authoring/contract-ts`) and provides:
-- SQL contract builder (`defineContract`) - TypeScript builder for creating SQL contracts programmatically
+- SQL contract builder (`defineContract`) in two forms:
+  - legacy chain builder
+  - staged contract DSL object-literal authoring with `model('User', { fields, relations }).attributes(...).sql(...)`
 - SQL contract JSON schema - JSON schema for validating contract structure
 
 ## Responsibilities
 
-- **SQL Contract Builder**: Provides the `defineContract()` builder API for creating SQL contracts programmatically with type safety, including pack-ref based `.target()` and `.extensionPacks()` helpers
+- **SQL Contract Builder**: Provides both the existing chain builder and the staged contract DSL authoring surface for creating SQL contracts programmatically with type safety
 - **Storage Type Authoring**: Supports `storage.types` declarations and `typeRef` columns via the SQL builder
 - **SQL Contract JSON Schema**: Provides JSON schema for validating contract structure in IDEs and tooling
 - **Composition Layer**: Composes the target-agnostic builder core from `@prisma-next/contract-authoring` with SQL-specific types and validation logic
@@ -50,13 +52,147 @@ This package is part of the package layering architecture:
 
 ## Exports
 
-- `./contract-builder` - Contract builder API (`defineContract`, `ColumnBuilder`)
+- `./contract-builder` - Contract builder API (`defineContract`, `field`, `model`, `rel`, `ColumnBuilder`)
 - `./config-types` - TypeScript contract config helper (`typescriptContract`)
 - `./schema-sql` - SQL contract JSON schema (`data-contract-sql-v1.json`)
 
 ## Usage
 
 ### Building Contracts
+
+#### Staged Contract DSL
+
+The refined surface keeps domain meaning close to the model:
+- field-level `id()` and `unique()` for the common single-field case
+- portable helper presets such as `field.id.uuidv4()`, `field.id.uuidv7()`, `field.id.nanoid({ size: 16 })`, `field.uuid()`, `field.nanoid({ size: 16 })`, `field.text()`, and `field.createdAt()`
+- field-local `.sql({ column | id | unique })` and belongsTo-local `.sql({ fk })` overlays for one-off storage detail
+- an optional integrated callback form where `defineContract(config, ({ type, field, model, rel }) => ...)` exposes composition-shaped `type.*` and pack-owned `field.*` helper namespaces
+- `.attributes(...)` for compound `id` and compound `unique`
+- optional staged `.relations(...)` for mutually recursive model graphs
+- model-level `.sql(...)` for table naming, indexes, and advanced fallback storage detail
+
+```typescript
+import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
+
+const User = model('User', {
+  fields: {
+    id: field.id.uuidv7().sql({ id: { name: 'app_user_pkey' } }),
+    email: field.text().unique().sql({ unique: { name: 'app_user_email_key' } }),
+    createdAt: field.createdAt(),
+  },
+});
+
+const Post = model('Post', {
+  fields: {
+    id: field.id.uuidv7(),
+    userId: field.uuid(),
+    title: field.text(),
+  },
+});
+
+export const contract = defineContract({
+  target: postgresPack,
+  naming: { tables: 'snake_case', columns: 'snake_case' },
+  models: {
+    User: User.relations({
+      posts: rel.hasMany(Post, { by: 'userId' }),
+    }).sql({
+      table: 'app_user',
+    }),
+    Post: Post.relations({
+      user: rel
+        .belongsTo(User, { from: 'userId', to: 'id' })
+        .sql({ fk: { name: 'blog_post_user_id_fkey', onDelete: 'cascade' } }),
+    }).sql({
+      table: 'blog_post',
+    }),
+  },
+});
+```
+
+If you want the helper vocabulary to be wired directly into the contract shell, use the callback overload:
+
+```typescript
+import pgvector from '@prisma-next/extension-pgvector/pack';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
+
+export const contract = defineContract(
+  {
+    target: postgresPack,
+    extensionPacks: { pgvector },
+  },
+  ({ type, field, model, rel }) => {
+    const types = {
+      Role: type.enum('role', ['USER', 'ADMIN'] as const),
+      Embedding1536: type.pgvector.vector(1536),
+    } as const;
+
+    const User = model('User', {
+      fields: {
+        id: field.id.uuidv7().sql({ id: { name: 'user_pkey' } }),
+        role: field.namedType(types.Role),
+        embedding: field.namedType(types.Embedding1536).optional(),
+      },
+    }).sql({
+      table: 'user',
+    });
+
+    return {
+      types,
+      models: {
+        User: User.relations({
+          posts: rel.hasMany(() => Post, { by: 'authorId' }),
+        }),
+      },
+    };
+  },
+);
+```
+
+Compound model-level constraints live in `.attributes(...)`:
+
+```typescript
+const Membership = model('Membership', {
+  fields: {
+    orgId: field.column(textColumn).column('org_id'),
+    userId: field.column(textColumn).column('user_id'),
+    role: field.column(textColumn),
+  },
+})
+  .attributes(({ fields, constraints }) => ({
+    id: constraints.id([fields.orgId, fields.userId], { name: 'membership_pkey' }),
+    uniques: [
+      constraints.unique([fields.orgId, fields.role], {
+        name: 'membership_org_role_key',
+      }),
+    ],
+  }))
+  .sql({ table: 'membership' });
+```
+
+This first slice now includes a small portable helper vocabulary:
+
+- use `field.id.uuidv4()` or `field.id.uuidv7()` for single-field UUID primary keys with explicit generator choice
+- use `field.id.nanoid({ size })`, `field.id.ulid()`, `field.id.cuid2()`, and `field.id.ksuid()` for other generated primary-key strategies
+- use `field.uuid()` for portable UUID-shaped foreign keys and other scalar fields
+- use `field.nanoid({ size })`, `field.ulid()`, `field.cuid2()`, and `field.ksuid()` when you want those scalar storage shapes without generation
+- use `field.text()`, `field.timestamp()`, and `field.createdAt()` for portable common SQL scalars
+- use `field.sql({ column | id | unique })` and belongsTo-local `.sql({ fk })` when the storage override belongs next to one field or one FK
+- use pack-provided column descriptors with `field.column(...)` when you need target-specific types
+- use generated-column specs with `field.generated(...)` when you want explicit generator control
+- use root `types` directly with `field.namedType(types.Role)` for `storage.types` references
+- `field.namedType('Role')` still works as a fallback, but when `types.Role` exists in the same contract the builder emits `PN_CONTRACT_TYPED_FALLBACK_AVAILABLE`; prefer `field.namedType(types.Role)` for autocomplete and typed local refs
+- use the callback overload when you want target- and extension-composed `type.*` and pack-owned `field.*` helper autocomplete inside `contract.ts`
+- use named model tokens plus `User.refs.id` or `User.ref('id')` for cross-model foreign-key targets
+- `constraints.ref('Model', 'field')` still works as a fallback, but when the named model token exists in the same contract the builder emits `PN_CONTRACT_TYPED_FALLBACK_AVAILABLE`; prefer `User.refs.id`-style refs for autocomplete and typed model refs
+- string relation targets such as `rel.belongsTo('User', ...)`, `rel.hasMany('Post', ...)`, and `rel.manyToMany('Tag', { through: 'PostTag', ... })` still work, but when named model tokens exist in the same contract the builder emits `PN_CONTRACT_TYPED_FALLBACK_AVAILABLE`; prefer model tokens so cross-model authoring stays typed end-to-end
+- use inline `.id()` for single-field identity and `.attributes(({ fields, constraints }) => ({ id: constraints.id([...]) }))` for compound identity
+- use inline `.unique()` for single-field uniqueness and `.attributes(({ fields, constraints }) => ({ uniques: [constraints.unique([...])] }))` for compound uniqueness
+- duplicate named primary keys, uniques, indexes, and foreign keys are rejected during build/validation instead of silently overriding each other
+
+#### Legacy Chain Builder
 
 ```typescript
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -162,6 +298,8 @@ Integration tests that depend on both `sql-contract-ts` and `sql-query` are loca
 
 ## Migration Notes
 
+- **Staged contract DSL is the long-term direction**: `defineContract({ ... })` plus `model('User', { fields, relations }).sql(...)`
+- **The first slice keeps the helper vocabulary intentionally small**: prefer pack-provided descriptors over a large built-in preset surface for now
 - **Backward Compatibility**: `@prisma-next/sql-query` re-exports contract authoring functions for backward compatibility (will be removed in Slice 7)
 - **Import Path**: New code should import directly from `@prisma-next/sql-contract-ts`
 - **Phase 2 Complete**: The target-agnostic core has been extracted to `@prisma-next/contract-authoring`. This package composes the generic core with SQL-specific types.
@@ -171,4 +309,3 @@ Integration tests that depend on both `sql-contract-ts` and `sql-query` are loca
 - `@prisma-next/contract-authoring` - Target-agnostic builder core that this package composes
 - `@prisma-next/sql-contract-psl` - PSL parser-output to SQL `ContractIR` interpreter for provider-based flows
 - `@prisma-next/sql-contract-psl/provider` - SQL PSL-first `prismaContract()` helper (read -> parse -> interpret)
-

@@ -260,6 +260,36 @@ describe('NOT NULL column without default uses temporary default', () => {
     ]);
   });
 
+  it('uses codec hook temporary defaults for parameterized pgvector storage type refs', () => {
+    const addCol = planAddColumn(
+      'embedding',
+      {
+        nativeType: 'vector',
+        codecId: 'pg/vector@1',
+        nullable: false,
+        typeRef: 'Embedding3',
+      },
+      {
+        frameworkComponents: [pgvectorDescriptor],
+        extraStorageTypes: {
+          Embedding3: {
+            codecId: 'pg/vector@1',
+            nativeType: 'vector',
+            typeParams: { length: 3 },
+          },
+        },
+      },
+    );
+
+    expect(addCol.precheck.map((p) => p.sql)).not.toContain(
+      `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedUserTable} LIMIT 1)`,
+    );
+    expect(addCol.execute.map((step) => step.sql)).toEqual([
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "embedding" vector(3) DEFAULT '[0,0,0]'::vector NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ALTER COLUMN "embedding" DROP DEFAULT`,
+    ]);
+  });
+
   it('uses the empty-table fallback when a codec hook declines a temporary default', () => {
     const addCol = planAddColumn(
       'name',
@@ -550,10 +580,12 @@ function planAddColumn(
     codecId: string;
     nullable: boolean;
     typeParams?: Record<string, unknown>;
+    typeRef?: string;
     default?: { kind: 'literal'; value: ColumnDefaultLiteralInputValue };
   },
   options?: {
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
+    extraStorageTypes?: SqlContract<SqlStorage>['storage']['types'];
   },
 ) {
   const operations = planUserTableOperations(
@@ -600,6 +632,7 @@ function planUserTableOperations(
   schemaUserTable: SqlSchemaIR['tables'][string],
   options?: {
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
+    extraStorageTypes?: SqlContract<SqlStorage>['storage']['types'];
     extraContractTables?: SqlContract<SqlStorage>['storage']['tables'];
     extraSchemaTables?: SqlSchemaIR['tables'];
   },
@@ -611,6 +644,7 @@ function planUserTableOperations(
         ...(options?.extraContractTables ?? {}),
         user: userTable,
       },
+      ...(options?.extraStorageTypes ? { types: options.extraStorageTypes } : {}),
     },
   });
   const schema: SqlSchemaIR = {

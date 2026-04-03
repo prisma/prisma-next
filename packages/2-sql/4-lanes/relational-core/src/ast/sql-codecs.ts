@@ -5,9 +5,15 @@ export const SQL_CHAR_CODEC_ID = 'sql/char@1' as const;
 export const SQL_VARCHAR_CODEC_ID = 'sql/varchar@1' as const;
 export const SQL_INT_CODEC_ID = 'sql/int@1' as const;
 export const SQL_FLOAT_CODEC_ID = 'sql/float@1' as const;
+export const SQL_TEXT_CODEC_ID = 'sql/text@1' as const;
+export const SQL_TIMESTAMP_CODEC_ID = 'sql/timestamp@1' as const;
 
 const lengthParamsSchema = arktype({
   length: 'number.integer > 0',
+});
+
+const precisionParamsSchema = arktype({
+  'precision?': 'number.integer >= 0 & number.integer <= 6',
 });
 
 type LengthTypeHelper = {
@@ -70,11 +76,30 @@ const sqlFloatCodec = codec({
   decode: (wire: number): number => wire,
 });
 
+const sqlTextCodec = codec({
+  typeId: SQL_TEXT_CODEC_ID,
+  targetTypes: ['text'],
+  traits: ['equality', 'order', 'textual'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+});
+
+const sqlTimestampCodec = codec({
+  typeId: SQL_TIMESTAMP_CODEC_ID,
+  targetTypes: ['timestamp'],
+  traits: ['equality', 'order'],
+  encode: (value: string | Date): string => (value instanceof Date ? value.toISOString() : value),
+  decode: (wire: string | Date): string => (wire instanceof Date ? wire.toISOString() : wire),
+  paramsSchema: precisionParamsSchema,
+});
+
 const codecs = defineCodecs()
   .add('char', sqlCharCodec)
   .add('varchar', sqlVarcharCodec)
   .add('int', sqlIntCodec)
-  .add('float', sqlFloatCodec);
+  .add('float', sqlFloatCodec)
+  .add('text', sqlTextCodec)
+  .add('timestamp', sqlTimestampCodec);
 
 export const sqlCodecDefinitions = codecs.codecDefinitions;
 export const sqlDataTypes = codecs.dataTypes;

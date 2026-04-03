@@ -3,11 +3,19 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
-import sql, { assemblePslInterpretationContributions } from '@prisma-next/family-sql/control';
+import sql, {
+  assembleAuthoringContributions,
+  assemblePslInterpretationContributions,
+} from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 
 const extensionPacks = [pgvector];
+const authoringContributions = assembleAuthoringContributions([
+  postgres,
+  postgresAdapter,
+  ...extensionPacks,
+]);
 const pslContributions = assemblePslInterpretationContributions([
   postgres,
   postgresAdapter,
@@ -23,6 +31,7 @@ export default defineConfig({
   contract: prismaContract('./prisma/schema.prisma', {
     output: 'src/prisma/contract.json',
     target: postgres,
+    authoringContributions,
     scalarTypeDescriptors: pslContributions.scalarTypeDescriptors,
     controlMutationDefaults: {
       defaultFunctionRegistry: pslContributions.defaultFunctionRegistry,

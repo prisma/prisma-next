@@ -1,4 +1,9 @@
 import type {
+  AuthoringContributions,
+  AuthoringFieldNamespace,
+  AuthoringFieldPresetDescriptor,
+  AuthoringTypeConstructorDescriptor,
+  AuthoringTypeNamespace,
   NormalizedTypeRenderer,
   TargetBoundComponentDescriptor,
   TypeRenderer,
@@ -41,6 +46,7 @@ function assertUniqueCodecOwner(options: {
 
 export interface SqlControlDescriptorWithContributions extends SqlControlStaticContributions {
   readonly id: string;
+  readonly authoring?: AuthoringContributions;
   readonly types?: {
     readonly codecTypes?: {
       readonly import?: TypesImportSpec;
@@ -59,6 +65,11 @@ export interface AssembledControlMutationDefaultContributions {
 export interface AssembledPslInterpretationContributions
   extends AssembledControlMutationDefaultContributions {
   readonly scalarTypeDescriptors: ReadonlyMap<string, PslScalarTypeDescriptor>;
+}
+
+export interface AssembledAuthoringContributions {
+  readonly field: AuthoringFieldNamespace;
+  readonly type: AuthoringTypeNamespace;
 }
 
 export function assembleOperationRegistry(
@@ -319,5 +330,103 @@ export function assemblePslInterpretationContributions(
   return {
     ...mutationDefaults,
     scalarTypeDescriptors,
+  };
+}
+
+function isTypeConstructorDescriptor(value: unknown): value is AuthoringTypeConstructorDescriptor {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { kind?: unknown }).kind === 'typeConstructor'
+  );
+}
+
+function isFieldPresetDescriptor(value: unknown): value is AuthoringFieldPresetDescriptor {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { kind?: unknown }).kind === 'fieldPreset'
+  );
+}
+
+function mergeAuthoringNamespaces(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+  path: readonly string[],
+  leafGuard: (value: unknown) => boolean,
+  label: string,
+): void {
+  const assertSafePath = (currentPath: readonly string[]) => {
+    const blockedSegment = currentPath.find(
+      (segment) => segment === '__proto__' || segment === 'constructor' || segment === 'prototype',
+    );
+    if (blockedSegment) {
+      throw new Error(
+        `Invalid authoring ${label} helper "${currentPath.join('.')}". Helper path segments must not use "${blockedSegment}".`,
+      );
+    }
+  };
+
+  for (const [key, sourceValue] of Object.entries(source)) {
+    const currentPath = [...path, key];
+    assertSafePath(currentPath);
+    const hasExistingValue = Object.hasOwn(target, key);
+    const existingValue = hasExistingValue ? target[key] : undefined;
+
+    if (!hasExistingValue) {
+      target[key] = sourceValue;
+      continue;
+    }
+
+    const existingIsLeaf = leafGuard(existingValue);
+    const sourceIsLeaf = leafGuard(sourceValue);
+
+    if (existingIsLeaf || sourceIsLeaf) {
+      throw new Error(
+        `Duplicate authoring ${label} helper "${currentPath.join('.')}". Descriptor contributions must be unique across composed components.`,
+      );
+    }
+
+    mergeAuthoringNamespaces(
+      existingValue as Record<string, unknown>,
+      sourceValue as Record<string, unknown>,
+      currentPath,
+      leafGuard,
+      label,
+    );
+  }
+}
+
+export function assembleAuthoringContributions(
+  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
+): AssembledAuthoringContributions {
+  const field = {} as Record<string, unknown>;
+  const type = {} as Record<string, unknown>;
+
+  for (const descriptor of descriptors) {
+    if (descriptor.authoring?.field) {
+      mergeAuthoringNamespaces(
+        field,
+        descriptor.authoring.field,
+        [],
+        isFieldPresetDescriptor,
+        'field',
+      );
+    }
+    if (!descriptor.authoring?.type) {
+      continue;
+    }
+    mergeAuthoringNamespaces(
+      type,
+      descriptor.authoring.type,
+      [],
+      isTypeConstructorDescriptor,
+      'type',
+    );
+  }
+
+  return {
+    field: field as AuthoringFieldNamespace,
+    type: type as AuthoringTypeNamespace,
   };
 }

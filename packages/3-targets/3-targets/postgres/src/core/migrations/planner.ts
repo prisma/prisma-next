@@ -21,7 +21,11 @@ import {
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import type { StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import type {
+  StorageColumn,
+  StorageTable,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -110,6 +114,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
 
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    const storageTypes = options.contract.storage.types ?? {};
 
     const reconciliationPlan = buildReconciliationPlan({
       contract: options.contract,
@@ -139,13 +144,20 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       ...this.buildDatabaseDependencyOperations(options),
       ...storageTypePlan.operations,
       ...reconciliationPlan.operations,
-      ...this.buildTableOperations(sortedTables, options.schema, schemaName, codecHooks),
+      ...this.buildTableOperations(
+        sortedTables,
+        options.schema,
+        schemaName,
+        codecHooks,
+        storageTypes,
+      ),
       ...this.buildColumnOperations(
         sortedTables,
         options.schema,
         schemaLookups,
         schemaName,
         codecHooks,
+        storageTypes,
       ),
       ...this.buildPrimaryKeyOperations(sortedTables, options.schema, schemaName),
       ...this.buildUniqueOperations(sortedTables, schemaLookups, schemaName),
@@ -276,6 +288,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     schema: SqlSchemaIR,
     schemaName: string,
     codecHooks: Map<string, CodecControlHooks>,
+    storageTypes: Record<string, StorageTypeInstance>,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
@@ -301,7 +314,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         execute: [
           {
             description: `create table "${tableName}"`,
-            sql: buildCreateTableSql(qualified, table, codecHooks),
+            sql: buildCreateTableSql(qualified, table, codecHooks, storageTypes),
           },
         ],
         postcheck: [
@@ -321,6 +334,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
     codecHooks: Map<string, CodecControlHooks>,
+    storageTypes: Record<string, StorageTypeInstance>,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
@@ -343,6 +357,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
             columnName,
             column,
             codecHooks,
+            storageTypes,
           }),
         );
       }
@@ -359,16 +374,26 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     readonly columnName: string;
     readonly column: StorageColumn;
     readonly codecHooks: Map<string, CodecControlHooks>;
+    readonly storageTypes: Record<string, StorageTypeInstance>;
   }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-    const { schema, tableName, table, schemaTable, schemaLookup, columnName, column, codecHooks } =
-      options;
+    const {
+      schema,
+      tableName,
+      table,
+      schemaTable,
+      schemaLookup,
+      columnName,
+      column,
+      codecHooks,
+      storageTypes,
+    } = options;
     const notNull = column.nullable === false;
     const hasDefault = column.default !== undefined;
     // Planner logic decides whether this column needs the coordinated multi-step
     // strategy. The strategy recipe itself is built by a dedicated helper.
     const needsTemporaryDefault = notNull && !hasDefault;
     const temporaryDefault = needsTemporaryDefault
-      ? resolveIdentityValue(column, codecHooks)
+      ? resolveIdentityValue(column, codecHooks, storageTypes)
       : null;
     const canUseSharedTemporaryDefault =
       needsTemporaryDefault &&
@@ -387,6 +412,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         columnName,
         column,
         codecHooks,
+        storageTypes,
         temporaryDefault,
       });
     }
@@ -413,7 +439,14 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       execute: [
         {
           description: `add column "${columnName}"`,
-          sql: buildAddColumnSql(qualified, columnName, column, codecHooks),
+          sql: buildAddColumnSql(
+            qualified,
+            columnName,
+            column,
+            codecHooks,
+            undefined,
+            storageTypes,
+          ),
         },
       ],
       postcheck: [

@@ -1,5 +1,6 @@
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { QueryOperationDescriptor } from '@prisma-next/sql-relational-core/query-operations';
+import { pgvectorAuthoringTypes } from './authoring';
 
 const pgvectorTypeId = 'pg/vector@1' as const;
 
@@ -73,6 +74,9 @@ export const pgvectorPackMeta = {
     postgres: {
       'pgvector/cosine': true,
     },
+  },
+  authoring: {
+    type: pgvectorAuthoringTypes,
   },
   types: {
     codecTypes: {

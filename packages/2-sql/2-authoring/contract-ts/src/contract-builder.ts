@@ -1,12 +1,9 @@
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import type {
-  ColumnDefault,
-  ColumnDefaultLiteralInputValue,
-  ColumnDefaultLiteralValue,
-  ExecutionMutationDefault,
-  ExecutionMutationDefaultValue,
-  TaggedRaw,
-} from '@prisma-next/contract/types';
+  ExtensionPackRef,
+  FamilyPackRef,
+  TargetPackRef,
+} from '@prisma-next/contract/framework-components';
+import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
@@ -24,19 +21,48 @@ import {
   type ExtractColumns,
   type ExtractPrimaryKey,
   ModelBuilder,
-  type Mutable,
   TableBuilder,
 } from '@prisma-next/contract-authoring';
-import {
-  applyFkDefaults,
-  type ContractWithTypeMaps,
-  type Index,
-  type ReferentialAction,
-  type SqlContract,
-  type StorageTypeInstance,
-  type TypeMaps,
+import type {
+  ContractWithTypeMaps,
+  Index,
+  ReferentialAction,
+  SqlContract,
+  StorageTypeInstance,
+  TypeMaps,
 } from '@prisma-next/sql-contract/types';
-import { ifDefined } from '@prisma-next/utils/defined';
+import {
+  type ComposedAuthoringHelpers,
+  createComposedAuthoringHelpers,
+} from './composed-authoring-helpers';
+import {
+  buildContractIR,
+  buildSqlContractFromSemanticDefinition,
+  type RuntimeBuilderState,
+} from './contract-ir-builder';
+
+export { buildSqlContractFromSemanticDefinition } from './contract-ir-builder';
+
+import {
+  field,
+  isStagedContractInput,
+  type ModelAttributesSpec,
+  model,
+  type RelationBuilder,
+  rel,
+  type ScalarFieldBuilder,
+  type SqlStageSpec,
+  type StagedContractInput,
+  type StagedModelBuilder,
+  type RelationState as StagedRelationState,
+} from './staged-contract-dsl';
+import { buildStagedSemanticContractDefinition } from './staged-contract-lowering';
+import type {
+  ExtractCodecTypesFromPack,
+  MergeExtensionCodecTypes,
+  MergeExtensionPackRefs,
+  SqlContractResult,
+} from './staged-contract-types';
 
 type ColumnDefaultForCodec<
   CodecTypes extends Record<string, { output: unknown }>,
@@ -126,24 +152,6 @@ export interface SqlTableBuilder<
   >;
 }
 
-type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
-  ? C extends Record<string, { output: unknown }>
-    ? C
-    : Record<string, never>
-  : Record<string, never>;
-
-type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (
-  k: infer I,
-) => void
-  ? I
-  : never;
-
-type MergeExtensionCodecTypes<Packs extends Record<string, unknown>> = UnionToIntersection<
-  {
-    [K in keyof Packs]: ExtractCodecTypesFromPack<Packs[K]>;
-  }[keyof Packs]
->;
-
 type BuildStorageTable<
   _TableName extends string,
   Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
@@ -194,73 +202,30 @@ type BuildStorage<
   readonly types: Types;
 };
 
-type BuildStorageTables<
-  Tables extends Record<
-    string,
-    TableBuilderState<
-      string,
-      Record<string, ColumnBuilderState<string, boolean, string>>,
-      readonly string[] | undefined
-    >
-  >,
-> = {
-  readonly [K in keyof Tables]: BuildStorageTable<
-    K & string,
-    ExtractColumns<Tables[K]>,
-    ExtractPrimaryKey<Tables[K]>
-  >;
-};
-
 export interface ColumnBuilder<Name extends string, Nullable extends boolean, Type extends string> {
   nullable<Value extends boolean>(value?: Value): ColumnBuilder<Name, Value, Type>;
   type<Id extends string>(id: Id): ColumnBuilder<Name, Nullable, Id>;
   build(): ColumnBuilderState<Name, Nullable, Type>;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
+type StagedModelLike = {
+  readonly stageOne: {
+    readonly modelName?: string;
+    readonly fields: Record<string, ScalarFieldBuilder>;
+    readonly relations: Record<string, RelationBuilder<StagedRelationState>>;
+  };
+  readonly __attributes: ModelAttributesSpec | undefined;
+  readonly __sql: SqlStageSpec | undefined;
+  buildAttributesSpec(): ModelAttributesSpec | undefined;
+  buildSqlSpec(): SqlStageSpec | undefined;
+};
 
-function isJsonValue(value: unknown): value is ColumnDefaultLiteralValue {
-  if (value === null) return true;
-  const valueType = typeof value;
-  if (valueType === 'string' || valueType === 'number' || valueType === 'boolean') return true;
-  if (Array.isArray(value)) {
-    return value.every((item) => isJsonValue(item));
-  }
-  if (isPlainObject(value)) {
-    return Object.values(value).every((item) => isJsonValue(item));
-  }
-  return false;
-}
-
-function encodeDefaultLiteralValue(
-  value: ColumnDefaultLiteralInputValue,
-): ColumnDefaultLiteralValue {
-  if (typeof value === 'bigint') {
-    return { $type: 'bigint', value: value.toString() };
-  }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (isJsonValue(value)) {
-    if (isPlainObject(value) && '$type' in value) {
-      return { $type: 'raw', value } satisfies TaggedRaw;
-    }
-    return value;
-  }
-  throw new Error(
-    'Unsupported column default literal value: expected JSON-safe value, bigint, or Date.',
-  );
-}
-
-function encodeColumnDefault(defaultInput: ColumnDefault): ColumnDefault {
-  if (defaultInput.kind === 'function') {
-    return { kind: 'function', expression: defaultInput.expression };
-  }
-  return { kind: 'literal', value: encodeDefaultLiteralValue(defaultInput.value) };
+function buildStagedContract<Definition extends StagedContractInput>(
+  definition: Definition,
+): SqlContractResult<Definition> {
+  return buildSqlContractFromSemanticDefinition(
+    buildStagedSemanticContractDefinition(definition),
+  ) as SqlContractResult<Definition>;
 }
 
 class SqlContractBuilder<
@@ -327,241 +292,7 @@ class SqlContractBuilder<
         TypeMaps<CodecTypes, Record<string, never>>
       >
     : never {
-    type BuiltContract = Target extends string
-      ? ContractWithTypeMaps<
-          SqlContract<BuildStorage<Tables, Types>, BuildModels<Models>> & {
-            readonly schemaVersion: '1';
-            readonly target: Target;
-            readonly targetFamily: 'sql';
-            readonly storageHash: StorageHash extends string ? StorageHash : string;
-          } & (ExtensionPacks extends Record<string, unknown>
-              ? { readonly extensionPacks: ExtensionPacks }
-              : Record<string, never>) &
-            (Capabilities extends Record<string, Record<string, boolean>>
-              ? { readonly capabilities: Capabilities }
-              : Record<string, never>),
-          TypeMaps<CodecTypes, Record<string, never>>
-        >
-      : never;
-    if (!this.state.target) {
-      throw new Error('target is required. Call .target() before .build()');
-    }
-
-    const target = this.state.target as Target & string;
-
-    const storageTables = {} as Partial<Mutable<BuildStorageTables<Tables>>>;
-    const executionDefaults: ExecutionMutationDefault[] = [];
-
-    for (const tableName of Object.keys(this.state.tables) as Array<keyof Tables & string>) {
-      const tableState = this.state.tables[tableName];
-      if (!tableState) continue;
-
-      type TableKey = typeof tableName;
-      type ColumnDefs = ExtractColumns<Tables[TableKey]>;
-      type PrimaryKey = ExtractPrimaryKey<Tables[TableKey]>;
-
-      const columns = {} as Partial<{
-        [K in keyof ColumnDefs]: BuildStorageColumn<
-          ColumnDefs[K]['nullable'] & boolean,
-          ColumnDefs[K]['type']
-        >;
-      }>;
-
-      for (const columnName in tableState.columns) {
-        const columnState = tableState.columns[columnName];
-        if (!columnState) continue;
-        const codecId = columnState.type;
-        const nativeType = columnState.nativeType;
-        const typeRef = columnState.typeRef;
-
-        const encodedDefault =
-          columnState.default !== undefined
-            ? encodeColumnDefault(columnState.default as ColumnDefault)
-            : undefined;
-
-        columns[columnName as keyof ColumnDefs] = {
-          nativeType,
-          codecId,
-          nullable: (columnState.nullable ?? false) as ColumnDefs[keyof ColumnDefs]['nullable'] &
-            boolean,
-          ...ifDefined('typeParams', columnState.typeParams),
-          ...ifDefined('default', encodedDefault),
-          ...ifDefined('typeRef', typeRef),
-        } as BuildStorageColumn<
-          ColumnDefs[keyof ColumnDefs]['nullable'] & boolean,
-          ColumnDefs[keyof ColumnDefs]['type']
-        >;
-
-        if ('executionDefault' in columnState && columnState.executionDefault) {
-          executionDefaults.push({
-            ref: { table: tableName, column: columnName },
-            onCreate: columnState.executionDefault,
-          });
-        }
-      }
-
-      // Build uniques from table state
-      const uniques = (tableState.uniques ?? []).map((u) => ({
-        columns: u.columns,
-        ...(u.name ? { name: u.name } : {}),
-      }));
-
-      // Build indexes from table state
-      const indexes = (tableState.indexes ?? []).map((i) => ({
-        columns: i.columns,
-        ...(i.name ? { name: i.name } : {}),
-        ...(i.using ? { using: i.using } : {}),
-        ...(i.config ? { config: i.config } : {}),
-      }));
-
-      // Build foreign keys from table state, materializing defaults
-      const foreignKeys = (tableState.foreignKeys ?? []).map((fk) => ({
-        columns: fk.columns,
-        references: fk.references,
-        ...applyFkDefaults(fk, this.state.foreignKeyDefaults),
-        ...(fk.name ? { name: fk.name } : {}),
-        ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
-        ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
-      }));
-
-      const table = {
-        columns: columns as {
-          [K in keyof ColumnDefs]: BuildStorageColumn<
-            ColumnDefs[K]['nullable'] & boolean,
-            ColumnDefs[K]['type']
-          >;
-        },
-        uniques,
-        indexes,
-        foreignKeys,
-        ...(tableState.primaryKey
-          ? {
-              primaryKey: {
-                columns: tableState.primaryKey,
-                ...(tableState.primaryKeyName ? { name: tableState.primaryKeyName } : {}),
-              },
-            }
-          : {}),
-      } as unknown as BuildStorageTable<TableKey & string, ColumnDefs, PrimaryKey>;
-
-      (storageTables as Mutable<BuildStorageTables<Tables>>)[tableName] = table;
-    }
-
-    const storageTypes = (this.state.storageTypes ?? {}) as Types;
-    const storage: BuildStorage<Tables, Types> = {
-      tables: storageTables as BuildStorageTables<Tables>,
-      types: storageTypes,
-    };
-
-    const execution =
-      executionDefaults.length > 0
-        ? {
-            mutations: {
-              defaults: executionDefaults.sort((a, b) => {
-                const tableCompare = a.ref.table.localeCompare(b.ref.table);
-                if (tableCompare !== 0) {
-                  return tableCompare;
-                }
-                return a.ref.column.localeCompare(b.ref.column);
-              }),
-            },
-          }
-        : undefined;
-
-    // Build models - construct as partial first, then assert full type
-    const modelsPartial: Partial<BuildModels<Models>> = {};
-
-    for (const modelName in this.state.models) {
-      const modelState = this.state.models[modelName];
-      if (!modelState) continue;
-
-      const modelStateTyped = modelState as unknown as {
-        name: string;
-        table: string;
-        fields: Record<string, string>;
-        relations: Record<string, RelationDefinition>;
-      };
-
-      const tableName = modelStateTyped.table;
-      const tableState = this.state.tables[tableName as keyof Tables];
-      const tableColumns = tableState
-        ? (
-            tableState as unknown as {
-              columns: Record<string, { type: string; nullable?: boolean }>;
-            }
-          ).columns
-        : {};
-
-      const storageFields: Record<string, { readonly column: string }> = {};
-      const domainFields: Record<string, Record<string, unknown>> = {};
-
-      for (const fieldName in modelStateTyped.fields) {
-        const columnName = modelStateTyped.fields[fieldName];
-        if (!columnName) continue;
-
-        storageFields[fieldName] = { column: columnName };
-
-        const column = tableColumns[columnName];
-        if (column) {
-          domainFields[fieldName] = {
-            codecId: column.type,
-            nullable: column.nullable ?? false,
-          };
-        }
-      }
-
-      const modelRelations: Record<string, Record<string, unknown>> = {};
-      if (modelStateTyped.relations) {
-        for (const relName in modelStateTyped.relations) {
-          const rel = modelStateTyped.relations[relName];
-          if (!rel) continue;
-          modelRelations[relName] = {
-            to: rel.to,
-            cardinality: rel.cardinality,
-            on: {
-              localFields: rel.on.parentCols,
-              targetFields: rel.on.childCols,
-            },
-          };
-        }
-      }
-
-      (modelsPartial as unknown as Record<string, Record<string, unknown>>)[modelName] = {
-        storage: {
-          table: tableName,
-          fields: storageFields,
-        },
-        fields: domainFields,
-        relations: modelRelations,
-      };
-    }
-
-    const models = modelsPartial as unknown as BuildModels<Models>;
-
-    const extensionNamespaces = this.state.extensionNamespaces ?? [];
-    const extensionPacks: Record<string, unknown> = { ...(this.state.extensionPacks || {}) };
-    for (const namespace of extensionNamespaces) {
-      if (!Object.hasOwn(extensionPacks, namespace)) {
-        extensionPacks[namespace] = {};
-      }
-    }
-
-    const contract = {
-      schemaVersion: '1' as const,
-      target,
-      targetFamily: 'sql' as const,
-      storageHash: this.state.storageHash || 'sha256:ts-builder-placeholder',
-      models,
-      roots: {},
-      storage,
-      ...(execution ? { execution } : {}),
-      extensionPacks,
-      capabilities: this.state.capabilities || {},
-      meta: {},
-      sources: {},
-    } as unknown as BuiltContract;
-
-    return contract as unknown as ReturnType<
+    return buildContractIR(this.state as unknown as RuntimeBuilderState) as unknown as ReturnType<
       SqlContractBuilder<
         CodecTypes,
         Target,
@@ -629,7 +360,7 @@ class SqlContractBuilder<
     Models,
     Types,
     StorageHash,
-    ExtensionPacks,
+    MergeExtensionPackRefs<ExtensionPacks, Packs>,
     Capabilities
   > {
     if (!this.state.target) {
@@ -637,8 +368,13 @@ class SqlContractBuilder<
     }
 
     const namespaces = new Set(this.state.extensionNamespaces ?? []);
+    const nextExtensionPacks = {
+      ...(this.state.extensionPacks ?? {}),
+    } as Record<string, unknown>;
 
-    for (const packRef of Object.values(packs) as ExtensionPackRef<'sql', string>[]) {
+    for (const [name, packRef] of Object.entries(packs) as Array<
+      [keyof Packs & string, ExtensionPackRef<'sql', string>]
+    >) {
       if (!packRef) continue;
 
       if (packRef.kind !== 'extension') {
@@ -660,6 +396,7 @@ class SqlContractBuilder<
       }
 
       namespaces.add(packRef.id);
+      nextExtensionPacks[name] = packRef;
     }
 
     return new SqlContractBuilder<
@@ -669,10 +406,11 @@ class SqlContractBuilder<
       Models,
       Types,
       StorageHash,
-      ExtensionPacks,
+      MergeExtensionPackRefs<ExtensionPacks, Packs>,
       Capabilities
     >({
       ...this.state,
+      extensionPacks: nextExtensionPacks as MergeExtensionPackRefs<ExtensionPacks, Packs>,
       extensionNamespaces: [...namespaces],
     });
   }
@@ -743,6 +481,9 @@ class SqlContractBuilder<
     Capabilities
   > {
     const tableBuilder = createTable(name);
+    // Double cast: createTable returns an unparameterized builder; we first narrow
+    // to SqlTableBuilder with the caller's generic params, then to the public
+    // TableBuilder facade that the callback expects.
     const result = callback(
       tableBuilder as unknown as SqlTableBuilder<
         TableName,
@@ -873,8 +614,168 @@ class SqlContractBuilder<
   }
 }
 
+type StagedContractDefinition<
+  Family extends FamilyPackRef<string>,
+  Target extends TargetPackRef<'sql', string>,
+  Types extends Record<string, StorageTypeInstance>,
+  Models extends Record<string, StagedModelLike>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Capabilities extends Record<string, Record<string, boolean>> | undefined,
+  Naming extends StagedContractInput['naming'] | undefined,
+  StorageHash extends string | undefined,
+  ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
+> = {
+  readonly family: Family;
+  readonly target: Target;
+  readonly extensionPacks?: ExtensionPacks;
+  readonly naming?: Naming;
+  readonly storageHash?: StorageHash;
+  readonly foreignKeyDefaults?: ForeignKeyDefaults;
+  readonly capabilities?: Capabilities;
+  readonly types?: Types;
+  readonly models?: Models;
+};
+
+type StagedContractScaffold<
+  Family extends FamilyPackRef<string>,
+  Target extends TargetPackRef<'sql', string>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Capabilities extends Record<string, Record<string, boolean>> | undefined,
+  Naming extends StagedContractInput['naming'] | undefined,
+  StorageHash extends string | undefined,
+  ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
+> = {
+  readonly family: Family;
+  readonly target: Target;
+  readonly extensionPacks?: ExtensionPacks;
+  readonly naming?: Naming;
+  readonly storageHash?: StorageHash;
+  readonly foreignKeyDefaults?: ForeignKeyDefaults;
+  readonly capabilities?: Capabilities;
+};
+
+type StagedContractFactory<
+  Family extends FamilyPackRef<string>,
+  Target extends TargetPackRef<'sql', string>,
+  Types extends Record<string, StorageTypeInstance>,
+  Models extends Record<string, StagedModelLike>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+> = (helpers: ComposedAuthoringHelpers<Family, Target, ExtensionPacks>) => {
+  readonly types?: Types;
+  readonly models?: Models;
+};
+
 export function defineContract<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
->(): SqlContractBuilder<CodecTypes> {
+>(): SqlContractBuilder<CodecTypes>;
+export function defineContract<
+  const Family extends FamilyPackRef<string>,
+  const Target extends TargetPackRef<'sql', string>,
+  const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
+  const Models extends Record<string, StagedModelLike> = Record<never, never>,
+  const ExtensionPacks extends
+    | Record<string, ExtensionPackRef<'sql', string>>
+    | undefined = undefined,
+  const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
+  const Naming extends StagedContractInput['naming'] | undefined = undefined,
+  const StorageHash extends string | undefined = undefined,
+  const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
+>(
+  definition: StagedContractDefinition<
+    Family,
+    Target,
+    Types,
+    Models,
+    ExtensionPacks,
+    Capabilities,
+    Naming,
+    StorageHash,
+    ForeignKeyDefaults
+  >,
+): SqlContractResult<
+  StagedContractDefinition<
+    Family,
+    Target,
+    Types,
+    Models,
+    ExtensionPacks,
+    Capabilities,
+    Naming,
+    StorageHash,
+    ForeignKeyDefaults
+  >
+>;
+export function defineContract<
+  const Family extends FamilyPackRef<string>,
+  const Target extends TargetPackRef<'sql', string>,
+  const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
+  const Models extends Record<string, StagedModelLike> = Record<never, never>,
+  const ExtensionPacks extends
+    | Record<string, ExtensionPackRef<'sql', string>>
+    | undefined = undefined,
+  const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
+  const Naming extends StagedContractInput['naming'] | undefined = undefined,
+  const StorageHash extends string | undefined = undefined,
+  const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
+>(
+  definition: StagedContractScaffold<
+    Family,
+    Target,
+    ExtensionPacks,
+    Capabilities,
+    Naming,
+    StorageHash,
+    ForeignKeyDefaults
+  >,
+  factory: StagedContractFactory<Family, Target, Types, Models, ExtensionPacks>,
+): SqlContractResult<
+  StagedContractDefinition<
+    Family,
+    Target,
+    Types,
+    Models,
+    ExtensionPacks,
+    Capabilities,
+    Naming,
+    StorageHash,
+    ForeignKeyDefaults
+  >
+>;
+export function defineContract<
+  CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+>(
+  definition?: StagedContractInput,
+  factory?: StagedContractFactory<
+    FamilyPackRef<string>,
+    TargetPackRef<'sql', string>,
+    Record<string, StorageTypeInstance>,
+    Record<string, StagedModelLike>,
+    Record<string, ExtensionPackRef<'sql', string>> | undefined
+  >,
+): SqlContractBuilder<CodecTypes> | SqlContractResult<StagedContractInput> {
+  if (definition && isStagedContractInput(definition)) {
+    if (factory) {
+      const builtDefinition = {
+        ...definition,
+        ...factory(
+          createComposedAuthoringHelpers({
+            family: definition.family,
+            target: definition.target,
+            extensionPacks: definition.extensionPacks,
+          }),
+        ),
+      };
+      return buildStagedContract(builtDefinition);
+    }
+    return buildStagedContract(definition);
+  }
   return new SqlContractBuilder<CodecTypes>();
 }
+
+export { field, model, rel };
+export type {
+  ComposedAuthoringHelpers,
+  StagedContractInput,
+  StagedModelBuilder,
+  ScalarFieldBuilder,
+};

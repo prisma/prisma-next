@@ -381,7 +381,9 @@ export const sqlTargetFamilyHook = {
 
   generateStorageType(storage: SqlStorage): string {
     const tables: string[] = [];
-    for (const [tableName, table] of Object.entries(storage.tables)) {
+    for (const [tableName, table] of Object.entries(storage.tables).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
       const columns: string[] = [];
       for (const [colName, col] of Object.entries(table.columns)) {
         const nullable = col.nullable ? 'true' : 'false';
@@ -542,7 +544,9 @@ export const sqlTargetFamilyHook = {
     }
 
     const modelTypes: string[] = [];
-    for (const [modelName, model] of Object.entries(models)) {
+    for (const [modelName, model] of Object.entries(models).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
       const fields: string[] = [];
       const storageFieldParts: string[] = [];
       const tableName = model.storage.table;

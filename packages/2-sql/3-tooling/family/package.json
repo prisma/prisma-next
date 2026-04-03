@@ -45,6 +45,7 @@
   "exports": {
     "./control": "./dist/control.mjs",
     "./control-adapter": "./dist/control-adapter.mjs",
+    "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./schema-verify": "./dist/schema-verify.mjs",
     "./test-utils": "./dist/test-utils.mjs",

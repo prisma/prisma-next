@@ -4,6 +4,7 @@ import type { CodecTypes } from '../types/codec-types';
 
 const pgvectorPack = pgvectorPackMeta;
 
-export default pgvectorPack as ExtensionPackRef<'sql', 'postgres'> & {
-  readonly __codecTypes?: CodecTypes;
-};
+export default pgvectorPack as typeof pgvectorPackMeta &
+  ExtensionPackRef<'sql', 'postgres'> & {
+    readonly __codecTypes?: CodecTypes;
+  };

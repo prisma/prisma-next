@@ -10,6 +10,7 @@ import {
   ColumnDefaultSchema,
   ForeignKeySchema,
   IndexSchema,
+  validateStorageSemantics,
 } from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
@@ -464,6 +465,11 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
   const contractForValidation = structurallyValid as SqlContract<SqlStorage>;
 
   validateContractLogic(contractForValidation);
+
+  const semanticErrors = validateStorageSemantics(contractForValidation.storage);
+  if (semanticErrors.length > 0) {
+    throw new Error(`Contract semantic validation failed: ${semanticErrors.join('; ')}`);
+  }
 
   return decodeContractDefaults(contractForValidation) as TContract;
 }

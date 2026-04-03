@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';
 import {
+  assembleAuthoringContributions,
   assembleControlMutationDefaultContributions,
   assemblePslInterpretationContributions,
 } from '../src/core/assembly';
@@ -216,5 +217,169 @@ describe('assembleControlMutationDefaultContributions', () => {
     expect(() => assemblePslInterpretationContributions([first, second])).toThrow(
       /Duplicate PSL scalar type descriptor "String"/,
     );
+  });
+
+  it('collects authoring type helper contributions', () => {
+    const first = createDescriptor('first', {
+      authoring: {
+        field: {
+          text: {
+            kind: 'fieldPreset',
+            output: {
+              codecId: 'sql/text@1',
+              nativeType: 'text',
+            },
+          },
+        },
+        type: {
+          enum: {
+            kind: 'typeConstructor',
+            args: [{ kind: 'string' }, { kind: 'stringArray' }],
+            output: {
+              codecId: 'pg/enum@1',
+              nativeType: { kind: 'arg', index: 0 },
+              typeParams: {
+                values: { kind: 'arg', index: 1 },
+              },
+            },
+          },
+        },
+      },
+    });
+    const second = createDescriptor('second', {
+      authoring: {
+        type: {
+          pgvector: {
+            vector: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'number', integer: true, minimum: 1, maximum: 2000 }],
+              output: {
+                codecId: 'pg/vector@1',
+                nativeType: 'vector',
+                typeParams: {
+                  length: { kind: 'arg', index: 0 },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const contributions = assembleAuthoringContributions([first, second]);
+
+    expect(contributions.type).toMatchObject({
+      enum: {
+        kind: 'typeConstructor',
+      },
+      pgvector: {
+        vector: {
+          kind: 'typeConstructor',
+        },
+      },
+    });
+    expect(contributions.field).toMatchObject({
+      text: {
+        kind: 'fieldPreset',
+      },
+    });
+  });
+
+  it('throws for duplicate authoring helper names', () => {
+    const first = createDescriptor('first', {
+      authoring: {
+        type: {
+          enum: {
+            kind: 'typeConstructor',
+            args: [{ kind: 'string' }, { kind: 'stringArray' }],
+            output: {
+              codecId: 'pg/enum@1',
+              nativeType: { kind: 'arg', index: 0 },
+            },
+          },
+        },
+      },
+    });
+    const second = createDescriptor('second', {
+      authoring: {
+        type: {
+          enum: {
+            kind: 'typeConstructor',
+            args: [{ kind: 'string' }, { kind: 'stringArray' }],
+            output: {
+              codecId: 'conflict/enum@1',
+              nativeType: { kind: 'arg', index: 0 },
+            },
+          },
+        },
+      },
+    });
+
+    expect(() => assembleAuthoringContributions([first, second])).toThrow(
+      /Duplicate authoring type helper "enum"/,
+    );
+  });
+
+  it('throws for duplicate authoring field helper names', () => {
+    const first = createDescriptor('first', {
+      authoring: {
+        field: {
+          text: {
+            kind: 'fieldPreset',
+            output: {
+              codecId: 'sql/text@1',
+              nativeType: 'text',
+            },
+          },
+        },
+      },
+    });
+    const second = createDescriptor('second', {
+      authoring: {
+        field: {
+          text: {
+            kind: 'fieldPreset',
+            output: {
+              codecId: 'conflict/text@1',
+              nativeType: 'text',
+            },
+          },
+        },
+      },
+    });
+
+    expect(() => assembleAuthoringContributions([first, second])).toThrow(
+      /Duplicate authoring field helper "text"/,
+    );
+  });
+
+  it('rejects dangerous authoring helper path segments', () => {
+    const maliciousFieldNamespace = JSON.parse(`
+      {
+        "__proto__": {
+          "polluted": {
+            "kind": "fieldPreset",
+            "output": {
+              "codecId": "conflict/text@1",
+              "nativeType": "text"
+            }
+          }
+        }
+      }
+    `);
+
+    const descriptor = createDescriptor('malicious', {
+      authoring: {
+        field: maliciousFieldNamespace,
+      },
+    });
+
+    try {
+      expect(() => assembleAuthoringContributions([descriptor])).toThrow(
+        /Invalid authoring field helper "__proto__"/,
+      );
+    } finally {
+      delete (Object.prototype as Record<string, unknown>)['polluted'];
+    }
   });
 });

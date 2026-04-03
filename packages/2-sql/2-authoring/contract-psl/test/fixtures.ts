@@ -1,4 +1,4 @@
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import type {
   ControlMutationDefaults,
   DefaultFunctionLoweringContext,
@@ -74,6 +74,14 @@ export const postgresTarget: TargetPackRef<'sql', 'postgres'> = {
   id: 'postgres',
   version: '0.0.1',
   capabilities: {},
+};
+
+export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
+  kind: 'extension',
+  familyId: 'sql',
+  targetId: 'postgres',
+  id: 'pgvector',
+  version: '1.2.3-test',
 };
 
 export const postgresScalarTypeDescriptors = new Map([

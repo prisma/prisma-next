@@ -302,7 +302,7 @@ describe('extensionPacks', () => {
       .build();
 
     expect(contract.extensionPacks).toBeDefined();
-    expect(contract.extensionPacks?.['pgvector']).toEqual({});
+    expect(contract.extensionPacks?.['pgvector']).toEqual(pgvectorPack);
   });
 
   it('rejects non-extension pack refs', () => {
@@ -344,7 +344,8 @@ describe('extensionPacks', () => {
       })
       .build();
 
-    expect(contract.extensionPacks?.['pgvector']).toEqual({});
+    expect(contract.extensionPacks?.['pgvector']).toEqual(pgvectorPack);
+    expect(contract.extensionPacks).not.toHaveProperty('missing');
   });
 
   it('preserves pre-populated extension namespace entries', () => {

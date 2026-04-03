@@ -3,6 +3,8 @@ import {
   SQL_CHAR_CODEC_ID,
   SQL_FLOAT_CODEC_ID,
   SQL_INT_CODEC_ID,
+  SQL_TEXT_CODEC_ID,
+  SQL_TIMESTAMP_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
   sqlCodecDefinitions,
   sqlDataTypes,
@@ -15,11 +17,15 @@ describe('sql-codecs', () => {
       varchar: SQL_VARCHAR_CODEC_ID,
       int: SQL_INT_CODEC_ID,
       float: SQL_FLOAT_CODEC_ID,
+      text: SQL_TEXT_CODEC_ID,
+      timestamp: SQL_TIMESTAMP_CODEC_ID,
     }).toEqual({
       char: 'sql/char@1',
       varchar: 'sql/varchar@1',
       int: 'sql/int@1',
       float: 'sql/float@1',
+      text: 'sql/text@1',
+      timestamp: 'sql/timestamp@1',
     });
   });
 
@@ -58,6 +64,20 @@ describe('sql-codecs', () => {
       hasParamsSchema: false,
       hasInit: false,
     },
+    {
+      scalar: 'text',
+      id: SQL_TEXT_CODEC_ID,
+      targetTypes: ['text'],
+      hasParamsSchema: false,
+      hasInit: false,
+    },
+    {
+      scalar: 'timestamp',
+      id: SQL_TIMESTAMP_CODEC_ID,
+      targetTypes: ['timestamp'],
+      hasParamsSchema: true,
+      hasInit: false,
+    },
   ];
 
   it.each(codecDefinitionCases)('defines codec for $scalar', ({
@@ -81,6 +101,8 @@ describe('sql-codecs', () => {
       varchar: SQL_VARCHAR_CODEC_ID,
       int: SQL_INT_CODEC_ID,
       float: SQL_FLOAT_CODEC_ID,
+      text: SQL_TEXT_CODEC_ID,
+      timestamp: SQL_TIMESTAMP_CODEC_ID,
     });
   });
 
@@ -113,6 +135,18 @@ describe('sql-codecs', () => {
       input: 3.14,
       expectedEncoded: 3.14,
       expectedDecoded: 3.14,
+    },
+    {
+      scalar: 'text',
+      input: 'portable text',
+      expectedEncoded: 'portable text',
+      expectedDecoded: 'portable text',
+    },
+    {
+      scalar: 'timestamp',
+      input: '2024-01-15T10:30:00.000Z',
+      expectedEncoded: '2024-01-15T10:30:00.000Z',
+      expectedDecoded: '2024-01-15T10:30:00.000Z',
     },
   ];
 
@@ -152,5 +186,17 @@ describe('sql-codecs', () => {
       kind: 'variable',
       maxLength: 255,
     });
+  });
+
+  it('normalizes Date values for timestamp codecs', () => {
+    const timestampCodec = sqlCodecDefinitions.timestamp.codec as {
+      encode: (value: string | Date) => string;
+      decode: (wire: string | Date) => string;
+    };
+
+    const instant = new Date('2024-01-15T10:30:00Z');
+
+    expect(timestampCodec.encode(instant)).toBe('2024-01-15T10:30:00.000Z');
+    expect(timestampCodec.decode(instant)).toBe('2024-01-15T10:30:00.000Z');
   });
 });
