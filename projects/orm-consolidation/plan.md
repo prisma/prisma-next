@@ -25,10 +25,9 @@ Build `MongoCollection` with the same fluent chaining API as SQL, compiling to `
 
 **Milestones:**
 
-1. Collection state + immutable chaining skeleton
-2. Terminal compilation (CollectionState → MongoQueryPlan)
-3. Typed where DSL (MongoModelAccessor)
-4. Wire `mongoOrm()` + update demo + integration tests
+1. Query AST (`@prisma-next/mongo-query-ast`) — filter expressions, read stages, visitors, lowering, extension operator proof
+2. ORM Collection with chaining + compilation (CollectionState → MongoQueryPlan)
+3. Wire `mongoOrm()` + update demo + integration tests
 
 **Proof:** Mongo demo uses `.where().select().include().orderBy().take().all()` chaining, executing against `mongodb-memory-server`.
 
@@ -54,6 +53,14 @@ Extract `Collection<C, M>` base class, `CollectionState`, `InferModelRow`, and i
 - **Phase 2 depends on Phase 1** — can't extract a shared interface without two concrete implementations.
 - **Phase 2 requires coordination with Alexey** — extraction changes the SQL Collection's inheritance hierarchy.
 - **WS4-3 (polymorphic models) depends on Phase 2** — polymorphic models extend the shared Collection interface.
+
+## Follow-ups
+
+### Restructure Mongo family directories to match layering design
+
+The current `packages/2-mongo-family/` has most numbered directories acting as the package itself rather than as layer directories containing packages. Restructure to match the target layering: each numbered directory is a layer containing one or more packages (e.g., `1-core/mongo-core/`, `4-orm/mongo-orm/`). Only `2-query/` follows the correct convention from the start.
+
+**Design:** [plans/mongo-family-layering.md](plans/mongo-family-layering.md)
 
 ## Close-out (required)
 
