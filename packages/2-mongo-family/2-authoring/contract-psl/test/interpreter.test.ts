@@ -1,3 +1,4 @@
+import type { DomainField, DomainReferenceRelation } from '@prisma-next/contract/types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
@@ -7,8 +8,8 @@ import {
 import { createMongoScalarTypeDescriptors } from '../src/scalar-type-descriptors';
 
 interface MongoModel {
-  readonly fields: Record<string, { readonly codecId: string; readonly nullable: boolean }>;
-  readonly relations: Record<string, unknown>;
+  readonly fields: Record<string, DomainField>;
+  readonly relations: Record<string, DomainReferenceRelation>;
   readonly storage: Record<string, unknown>;
 }
 
@@ -284,6 +285,88 @@ describe('interpretPslDocumentToMongoContractIR', () => {
       const ir = interpretOk(blogSchema);
 
       expect(model(ir, 'User').fields).not.toHaveProperty('posts');
+    });
+
+    it('disambiguates multiple FK relations to the same target using relation name', () => {
+      const ir = interpretOk(`
+        model User {
+          id             ObjectId @id @map("_id")
+          createdTasks   Task[] @relation("created")
+          assignedTasks  Task[] @relation("assigned")
+        }
+
+        model Task {
+          id           ObjectId @id @map("_id")
+          title        String
+          creatorId    ObjectId
+          assigneeId   ObjectId
+          creator      User @relation("created", fields: [creatorId], references: [id])
+          assignee     User @relation("assigned", fields: [assigneeId], references: [id])
+        }
+      `);
+
+      expect(model(ir, 'User').relations).toMatchObject({
+        createdTasks: {
+          to: 'Task',
+          cardinality: '1:N',
+          on: { localFields: ['_id'], targetFields: ['creatorId'] },
+        },
+        assignedTasks: {
+          to: 'Task',
+          cardinality: '1:N',
+          on: { localFields: ['_id'], targetFields: ['assigneeId'] },
+        },
+      });
+    });
+
+    it('emits diagnostic for ambiguous backrelation with multiple FKs and no relation name', () => {
+      const result = interpret(`
+        model User {
+          id    ObjectId @id @map("_id")
+          tasks Task[]
+        }
+
+        model Task {
+          id          ObjectId @id @map("_id")
+          creatorId   ObjectId
+          assigneeId  ObjectId
+          creator     User @relation("created", fields: [creatorId], references: [id])
+          assignee    User @relation("assigned", fields: [assigneeId], references: [id])
+        }
+      `);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_AMBIGUOUS_BACKRELATION',
+          }),
+        ]),
+      );
+    });
+
+    it('emits diagnostic for orphaned backrelation with no matching FK', () => {
+      const result = interpret(`
+        model User {
+          id       ObjectId @id @map("_id")
+          comments Comment[]
+        }
+
+        model Comment {
+          id ObjectId @id @map("_id")
+        }
+      `);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_ORPHANED_BACKRELATION',
+          }),
+        ]),
+      );
     });
   });
 

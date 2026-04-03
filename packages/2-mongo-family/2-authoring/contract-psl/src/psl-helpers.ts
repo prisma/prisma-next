@@ -20,28 +20,41 @@ export function getMapName(attributes: readonly PslAttribute[]): string | undefi
   return stripQuotes(arg.value);
 }
 
-export function parseRelationAttribute(attributes: readonly PslAttribute[]):
-  | {
-      fields: readonly string[];
-      references: readonly string[];
-    }
-  | undefined {
+export interface ParsedRelationAttribute {
+  readonly relationName?: string;
+  readonly fields?: readonly string[];
+  readonly references?: readonly string[];
+}
+
+export function parseRelationAttribute(
+  attributes: readonly PslAttribute[],
+): ParsedRelationAttribute | undefined {
   const relationAttr = getAttribute(attributes, 'relation');
   if (!relationAttr) return undefined;
 
+  let relationName: string | undefined;
   let fieldsArg: PslAttributeArgument | undefined;
   let referencesArg: PslAttributeArgument | undefined;
 
   for (const arg of relationAttr.args) {
-    if (arg.kind === 'named' && arg.name === 'fields') fieldsArg = arg;
-    if (arg.kind === 'named' && arg.name === 'references') referencesArg = arg;
+    if (arg.kind === 'positional') {
+      relationName = stripQuotes(arg.value);
+    } else if (arg.name === 'name') {
+      relationName = stripQuotes(arg.value);
+    } else if (arg.name === 'fields') {
+      fieldsArg = arg;
+    } else if (arg.name === 'references') {
+      referencesArg = arg;
+    }
   }
 
-  if (!fieldsArg || !referencesArg) return undefined;
+  const fields = fieldsArg ? parseFieldList(fieldsArg.value) : undefined;
+  const references = referencesArg ? parseFieldList(referencesArg.value) : undefined;
 
   return {
-    fields: parseFieldList(fieldsArg.value),
-    references: parseFieldList(referencesArg.value),
+    ...(relationName !== undefined ? { relationName } : {}),
+    ...(fields !== undefined ? { fields } : {}),
+    ...(references !== undefined ? { references } : {}),
   };
 }
 
