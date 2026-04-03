@@ -135,7 +135,6 @@ describe('unified contract types', () => {
         storage: {},
         discriminator: { field: 'type' },
         variants: { Special: { value: 'special' } },
-        base: undefined,
         owner: 'Parent',
       };
       expect(model.discriminator?.field).toBe('type');

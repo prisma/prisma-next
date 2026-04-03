@@ -159,7 +159,7 @@ export type ExecutionMutationDefault = {
 };
 
 export type ExecutionSection<THash extends string = string> = {
-  readonly executionHash?: ExecutionHashBase<THash>;
+  readonly executionHash: ExecutionHashBase<THash>;
   readonly mutations: {
     readonly defaults: ReadonlyArray<ExecutionMutationDefault>;
   };
