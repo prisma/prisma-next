@@ -48,58 +48,54 @@ The pipeline AST in `mongo-core` is contract-agnostic — it deals in MongoDB co
 
 ### Milestone 1: Pipeline AST in `mongo-core`
 
-The typed primitive layer. Defines pipeline stage nodes, filter expression AST, visitor interface, and lowering to plain documents for the driver. No ORM, no Collection, no contract awareness. This is the Mongo equivalent of `relational-core`'s SQL AST.
+The typed primitive layer. Defines pipeline stage nodes, filter expression AST, visitor/rewriter interfaces. No ORM, no Collection, no contract awareness. This is the Mongo equivalent of `relational-core`'s SQL AST.
+
+**Design:** [milestone-1-pipeline-ast-design.md](./milestone-1-pipeline-ast-design.md) — class hierarchies, visitor/rewriter interfaces, lowering strategy, operations extensibility, raw pipeline escape hatch.
 
 **Tasks:**
 
-#### 1.1 Filter expression AST
+#### 1.1 Filter expression AST + visitor/rewriter
 
-Define structured filter expression types in `packages/2-mongo-family/1-core/src/`:
+Implement the `MongoFilterExpression` class hierarchy in `packages/2-mongo-family/1-core/src/pipeline/types.ts`:
 
-- `MongoFieldFilter` — `{ kind: 'field', field: string, op: '$eq' | '$ne' | '$gt' | '$lt' | '$gte' | '$lte' | '$in', value: MongoValue }`
-- `MongoAndExpr` — `{ kind: 'and', exprs: MongoFilterExpr[] }`
-- `MongoOrExpr` — `{ kind: 'or', exprs: MongoFilterExpr[] }`
-- `MongoNotExpr` — `{ kind: 'not', expr: MongoFilterExpr }`
-- `MongoExistsExpr` — `{ kind: 'exists', field: string, exists: boolean }`
-- `MongoFilterExpr` — discriminated union of the above
-- `MongoFilterVisitor<R>` — visitor interface for interpretation dispatch
+- Classes: `MongoFieldFilter`, `MongoAndExpr`, `MongoOrExpr`, `MongoNotExpr`, `MongoExistsExpr` (extending hidden `MongoFilterExpression` base)
+- Exported union: `MongoFilterExpr`
+- Interfaces: `MongoFilterVisitor<R>` (exhaustive), `MongoFilterRewriter` (optional hooks)
+- `MongoFieldFilter.op` is a `string` (open, not a closed enum) — extensible via codec traits
 
-#### 1.2 Pipeline stage types
+See design doc §Filter expression AST for class definitions and §Operations extensibility for the trait-gated operator pattern.
 
-Define typed pipeline stage nodes in `packages/2-mongo-family/1-core/src/`:
+#### 1.2 Pipeline stage AST + visitor
 
-- `MongoMatchStage` — `{ kind: 'match', filter: MongoFilterExpr }`
-- `MongoLookupStage` — `{ kind: 'lookup', from: string, localField: string, foreignField: string, as: string, pipeline?: MongoReadStage[] }`
-- `MongoProjectStage` — `{ kind: 'project', projection: Record<string, 0 | 1> }`
-- `MongoSortStage` — `{ kind: 'sort', sort: Record<string, 1 | -1> }`
-- `MongoUnwindStage` — `{ kind: 'unwind', path: string, preserveNullAndEmptyArrays: boolean }`
-- `MongoLimitStage` — `{ kind: 'limit', limit: number }`
-- `MongoSkipStage` — `{ kind: 'skip', skip: number }`
-- `MongoReadStage` — discriminated union of the above
+Implement the `MongoStageNode` class hierarchy in `packages/2-mongo-family/1-core/src/pipeline/types.ts`:
 
-#### 1.3 Lowering
+- Classes: `MongoMatchStage`, `MongoProjectStage`, `MongoSortStage`, `MongoLimitStage`, `MongoSkipStage`, `MongoLookupStage`, `MongoUnwindStage` (extending hidden `MongoStageNode` base)
+- Exported union: `MongoReadStage`
+- Interface: `MongoStageVisitor<R>` (exhaustive)
+- `MongoStageNode.rewrite(rewriter: MongoFilterRewriter)` recurses into embedded filters and nested pipelines
 
-Implement lowering from typed AST to plain documents for the driver:
+See design doc §Pipeline stage AST for class definitions.
 
-- `lowerFilterExpr(expr: MongoFilterExpr)` → `Document` — recursive lowering of filter expressions (e.g., `MongoFieldFilter({ field: 'email', op: '$eq', value: 'alice' })` → `{ email: { $eq: 'alice' } }`, `MongoAndExpr` → `{ $and: [...] }`)
-- `lowerStage(stage: MongoReadStage)` → `Record<string, unknown>` — per-stage lowering (e.g., `MongoMatchStage` → `{ $match: lowerFilterExpr(stage.filter) }`)
-- `lowerPipeline(stages: MongoReadStage[])` → `Record<string, unknown>[]`
+#### 1.3 Update `AggregateCommand`
 
-#### 1.4 Update `AggregateCommand`
+Update `AggregateCommand` to carry typed `MongoReadStage[]` instead of `RawPipeline`. Raw pipelines bypass the typed AST at the plan level (see design doc §Raw pipeline escape hatch).
 
-Update `AggregateCommand` to accept `MongoReadStage[]` instead of (or alongside) `RawPipeline`.
+#### 1.4 Update adapter lowering
 
-#### 1.5 Update adapter lowering
+Update the adapter's `#lowerCommand` for `aggregate` to lower typed stages to plain documents. The lowering is a thin translation using `MongoStageVisitor<Record<string, unknown>>` or switch-based dispatch (see design doc §Lowering).
 
-Update the adapter's `#lowerCommand` for `aggregate` to use `lowerPipeline()` when the command carries typed stages.
+#### 1.5 Tests
 
-#### 1.6 Tests
-
-- Filter expression construction and lowering: each node kind produces correct driver documents
+- Filter expression construction: each concrete class with static factories
+- Filter visitor dispatch: exhaustive visitor visits each kind
+- Filter rewriter: selective rewriting of nodes
+- Stage construction: each concrete class
+- Stage visitor dispatch: exhaustive visitor visits each kind
+- Stage rewriter: `MongoMatchStage` rewrites its filter; `MongoLookupStage` rewrites nested pipeline
+- All instances are frozen/immutable
+- Adapter lowering: each stage and filter kind produces correct driver documents
 - Composite filters: `$and`, `$or`, `$not` nesting
-- Stage construction and lowering: each stage kind produces correct driver documents
-- Pipeline lowering: stage ordering preserved, output matches MongoDB driver expectations
-- Round-trip: construct typed stages → lower → verify against known MongoDB pipeline documents
+- Round-trip: construct typed stages → adapter lower → verify against known MongoDB pipeline documents
 
 ### Milestone 2: ORM Collection with chaining + compilation
 
@@ -181,11 +177,14 @@ Replace the current `mongoOrm()` factory and update the demo to use the chaining
 
 | Acceptance Criterion | Test Type | Milestone | Notes |
 | --- | --- | --- | --- |
-| Filter expression AST: each node kind lowers correctly | Unit | 1.6 | Construction + lowering |
-| Pipeline stage types: each stage kind lowers correctly | Unit | 1.6 | Construction + lowering |
-| Composite filters ($and/$or/$not) nest and lower | Unit | 1.6 | Nesting tests |
-| Round-trip: typed stages → lower → correct MongoDB docs | Unit | 1.6 | Known-good pipeline documents |
-| All reads produce `AggregateCommand` (no `FindCommand`) | Unit | 1.6 | Pipeline-only per ADR 183 |
+| Filter expression AST: each node kind constructs and lowers correctly | Unit | 1.5 | Construction + adapter lowering |
+| Filter visitor/rewriter dispatch | Unit | 1.5 | Exhaustive visitor + selective rewriter |
+| Pipeline stage types: each stage kind constructs and lowers correctly | Unit | 1.5 | Construction + adapter lowering |
+| Stage visitor/rewriter dispatch | Unit | 1.5 | Exhaustive visitor + filter rewriting into stages |
+| Composite filters ($and/$or/$not) nest and lower | Unit | 1.5 | Nesting tests |
+| Round-trip: typed stages → adapter lower → correct MongoDB docs | Unit | 1.5 | Known-good pipeline documents |
+| All reads produce `AggregateCommand` (no `FindCommand`) | Unit | 1.5 | Pipeline-only per ADR 183 |
+| All AST instances are frozen/immutable | Unit | 1.5 | Freeze verification |
 | Fluent chaining methods return new instances | Unit | 2.5 | Immutability tests |
 | Custom subclass preservation via `#createSelf` | Unit | 2.5 | Subclass identity checks |
 | Compilation: state → correct pipeline stages | Unit | 2.5 | Per-field compilation tests |
@@ -199,12 +198,16 @@ Replace the current `mongoOrm()` factory and update the demo to use the chaining
 
 ## Open Items
 
-1. ~~**Mongo filter expression representation.**~~ **Resolved.** Structured `MongoFilterExpr` AST with visitor pattern, not raw documents. Lowering to driver documents is a separate step.
+1. ~~**Mongo filter expression representation.**~~ **Resolved.** Class-based `MongoFilterExpr` AST with visitor/rewriter pattern, mirroring the SQL `Expression` hierarchy. See [milestone-1-pipeline-ast-design.md](./milestone-1-pipeline-ast-design.md).
 
-2. **Codec trait resolution.** The SQL `ModelAccessor` resolves traits via `context.codecs.traitsOf(codecId)`. The Mongo ORM needs equivalent access to codec trait metadata — this must be added to `mongo-core`.
+2. ~~**`RawPipeline` escape hatch.**~~ **Resolved.** Raw pipelines bypass the typed AST at the plan level, not inside `AggregateCommand`. `AggregateCommand` carries typed `MongoReadStage[]`; raw pipelines construct `MongoExecutionPlan` directly with `AggregateWireCommand`. Same pattern as SQL's `SqlQueryPlan` vs `ExecutionPlan`. See design doc §Raw pipeline escape hatch.
 
-3. **`orderBy` callback shape.** Same `.asc()` / `.desc()` pattern as SQL. The Mongo sort spec `Record<string, 1 | -1>` is the lowered form.
+3. ~~**Lowering location.**~~ **Resolved.** Lowering lives in the adapter (`mongo-adapter`), not in `mongo-core`. The AST is structurally close to the driver's document format, making the translation thin. See design doc §Lowering.
 
-4. **Include refinement.** The SQL ORM supports refinement callbacks (`include('user', (u) => u.select('id', 'email'))`). The pipeline AST supports this via `MongoLookupStage.pipeline` (the pipeline variant of `$lookup`). Whether to include refinement in the spike or add it later is a scope question.
+4. ~~**Operations extensibility.**~~ **Resolved.** `MongoFieldFilter.op` is a `string` (open, not a closed enum). The ORM gates which operators appear via codec traits, mirroring SQL's `COMPARISON_METHODS_META` + `CodecTrait` pattern. See design doc §Operations extensibility.
 
-5. **`RawPipeline` escape hatch.** Decide whether `AggregateCommand` accepts `MongoReadStage[] | RawPipeline` (union) or uses a separate variant.
+5. **Codec trait resolution.** The SQL `ModelAccessor` resolves traits via `context.codecs.traitsOf(codecId)`. The Mongo ORM needs equivalent access to codec trait metadata — this must be added to `mongo-core`.
+
+6. **`orderBy` callback shape.** Same `.asc()` / `.desc()` pattern as SQL. The Mongo sort spec `Record<string, 1 | -1>` is the lowered form.
+
+7. **Include refinement.** The SQL ORM supports refinement callbacks (`include('user', (u) => u.select('id', 'email'))`). The pipeline AST supports this via `MongoLookupStage.pipeline` (the pipeline variant of `$lookup`). Whether to include refinement in the spike or add it later is a scope question.
