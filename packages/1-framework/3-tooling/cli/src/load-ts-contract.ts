@@ -10,13 +10,18 @@ export interface LoadTsContractOptions {
   readonly allowlist?: ReadonlyArray<string>;
 }
 
-const DEFAULT_ALLOWLIST = ['@prisma-next/*'];
+const DEFAULT_ALLOWLIST = ['@prisma-next/*', 'node:*'];
 
 function isAllowedImport(importPath: string, allowlist: ReadonlyArray<string>): boolean {
   for (const pattern of allowlist) {
     if (pattern.endsWith('/*')) {
       const prefix = pattern.slice(0, -2);
       if (importPath === prefix || importPath.startsWith(`${prefix}/`)) {
+        return true;
+      }
+    } else if (pattern.endsWith('*')) {
+      const prefix = pattern.slice(0, -1);
+      if (importPath.startsWith(prefix)) {
         return true;
       }
     } else if (importPath === pattern) {

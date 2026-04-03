@@ -22,7 +22,7 @@ function createMockComponents() {
 
   const mockFamilyInstance = {
     introspect: async () => ({ tables: [] }),
-    validateContractIR: (ir: unknown) => ir as Contract,
+    validateContract: (ir: unknown) => ir as Contract,
     readMarker: async () => null,
     verify: async (): Promise<VerifyDatabaseResult> => ({
       ok: true,
@@ -120,7 +120,7 @@ describe('ControlClient progress emission', () => {
       });
 
       await client.verify({
-        contractIR: {},
+        contract: {},
         connection: 'postgres://test',
         onProgress: (event) => events.push(event),
       });
@@ -160,7 +160,7 @@ describe('ControlClient progress emission', () => {
       await client.connect('postgres://test');
 
       await client.verify({
-        contractIR: {},
+        contract: {},
         onProgress: (event) => events.push(event),
       });
 
@@ -189,7 +189,7 @@ describe('ControlClient progress emission', () => {
       });
 
       await client.schemaVerify({
-        contractIR: {},
+        contract: {},
         connection: 'postgres://test',
         onProgress: (event) => events.push(event),
       });
@@ -255,7 +255,7 @@ describe('ControlClient progress emission', () => {
       });
 
       await client.schemaVerify({
-        contractIR: {},
+        contract: {},
         connection: 'postgres://test',
         onProgress: (event) => events.push(event),
       });
@@ -283,7 +283,7 @@ describe('ControlClient progress emission', () => {
       });
 
       await client.sign({
-        contractIR: {},
+        contract: {},
         connection: 'postgres://test',
         onProgress: (event) => events.push(event),
       });
@@ -580,7 +580,7 @@ describe('ControlClient progress emission', () => {
       // Override family instance to return a marker (db update works with or without one)
       const mockFamilyInstance = {
         introspect: async () => ({ tables: {}, dependencies: [] }),
-        validateContractIR: (ir: unknown) => ir as Contract,
+        validateContract: (ir: unknown) => ir as Contract,
         readMarker: async () => ({ storageHash: 'sha256:origin' }),
       } as unknown as ControlFamilyInstance<string>;
 
@@ -648,7 +648,7 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.dbUpdate({
-        contractIR: {},
+        contract: {},
         mode: 'apply',
         connection: 'postgres://test',
         onProgress: (event) => events.push(event),
@@ -686,7 +686,7 @@ describe('ControlClient progress emission', () => {
       // Override to return null marker — db update no longer requires a marker
       const noMarkerFamilyInstance = {
         introspect: async () => ({ tables: {}, dependencies: [] }),
-        validateContractIR: (ir: unknown) => ir as Contract,
+        validateContract: (ir: unknown) => ir as Contract,
         readMarker: async () => null,
       } as unknown as ControlFamilyInstance<string>;
 
@@ -704,7 +704,7 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.dbUpdate({
-        contractIR: {},
+        contract: {},
         mode: 'plan',
         connection: 'postgres://test',
       });
@@ -726,7 +726,7 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.dbUpdate({
-        contractIR: {},
+        contract: {},
         mode: 'plan',
         connection: 'postgres://test',
       });
@@ -810,7 +810,7 @@ describe('ControlClient progress emission', () => {
         },
       } as unknown as typeof mockTarget;
 
-      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as Contract;
+      mockFamilyInstance.validateContract = (ir: unknown) => ir as Contract;
 
       const client = createControlClient({
         family: mockFamily,
@@ -890,7 +890,7 @@ describe('ControlClient progress emission', () => {
         },
       } as unknown as typeof mockTarget;
 
-      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as Contract;
+      mockFamilyInstance.validateContract = (ir: unknown) => ir as Contract;
 
       const client = createControlClient({
         family: mockFamily,
@@ -949,7 +949,7 @@ describe('ControlClient progress emission', () => {
         },
       } as unknown as typeof mockTarget;
 
-      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as Contract;
+      mockFamilyInstance.validateContract = (ir: unknown) => ir as Contract;
 
       const client = createControlClient({
         family: mockFamily,
@@ -1024,7 +1024,7 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.verify({
-        contractIR: {},
+        contract: {},
         connection: 'postgres://test',
       });
 
@@ -1044,7 +1044,7 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.schemaVerify({
-        contractIR: {},
+        contract: {},
         connection: 'postgres://test',
       });
 
@@ -1064,7 +1064,7 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.sign({
-        contractIR: {},
+        contract: {},
         connection: 'postgres://test',
       });
 

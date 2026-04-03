@@ -50,13 +50,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * Uses batched queries to minimize database round trips (7 queries instead of 5T+3).
    *
    * @param driver - ControlDriverInstance<'sql', 'postgres'> instance for executing queries
-   * @param contractIR - Optional contract IR for contract-guided introspection (filtering, optimization)
+   * @param contract - Optional contract for contract-guided introspection (filtering, optimization)
    * @param schema - Schema name to introspect (defaults to 'public')
    * @returns Promise resolving to SqlSchemaIR representing the live database schema
    */
   async introspect(
     driver: ControlDriverInstance<'sql', 'postgres'>,
-    _contractIR?: unknown,
+    _contract?: unknown,
     schema = 'public',
   ): Promise<SqlSchemaIR> {
     // Execute all queries in parallel for efficiency (7 queries instead of 5T+3)

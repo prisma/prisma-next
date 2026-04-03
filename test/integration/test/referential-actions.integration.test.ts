@@ -252,7 +252,7 @@ describe('referential actions integration', () => {
             const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
               driver,
-              contractIR: validatedContract,
+              contract: validatedContract,
               strict: false,
               context: { contractPath: './contract.json' },
               frameworkComponents,
@@ -341,7 +341,7 @@ describe('referential actions integration', () => {
             const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
               driver,
-              contractIR: validatedContract,
+              contract: validatedContract,
               strict: false,
               context: { contractPath: './contract.json' },
               frameworkComponents,
@@ -408,7 +408,7 @@ describe('referential actions integration', () => {
             const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
               driver,
-              contractIR: validatedContract,
+              contract: validatedContract,
               strict: false,
               context: { contractPath: './contract.json' },
               frameworkComponents,
@@ -495,7 +495,7 @@ describe('referential actions integration', () => {
             const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
               driver,
-              contractIR: validatedContract,
+              contract: validatedContract,
               strict: false,
               context: { contractPath: './contract.json' },
               frameworkComponents,

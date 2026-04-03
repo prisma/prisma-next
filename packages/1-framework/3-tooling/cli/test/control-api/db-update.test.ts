@@ -25,7 +25,7 @@ function createMockFamilyInstance(overrides?: {
     familyId: 'sql',
     readMarker: overrides?.readMarker ?? (async () => null),
     introspect: overrides?.introspect ?? (async () => ({ tables: {}, dependencies: [] })),
-    validateContractIR: (ir: unknown) => ir as Contract,
+    validateContract: (ir: unknown) => ir as Contract,
   } as unknown as ControlFamilyInstance<'sql'>;
 }
 
@@ -61,14 +61,14 @@ function createMockMigrations(overrides?: {
   } as unknown as TargetMigrationsCapability<'sql', 'postgres', ControlFamilyInstance<'sql'>>;
 }
 
-const dummyContractIR = { schemaVersion: '1', target: 'postgres' } as unknown as Contract;
+const dummyContract = { schemaVersion: '1', target: 'postgres' } as unknown as Contract;
 
 describe('executeDbUpdate', () => {
   it('succeeds on a fresh database without marker', async () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
       familyInstance: createMockFamilyInstance(),
-      contractIR: dummyContractIR,
+      contract: dummyContract,
       mode: 'plan',
       migrations: createMockMigrations(),
       frameworkComponents: [],
@@ -87,7 +87,7 @@ describe('executeDbUpdate', () => {
       familyInstance: createMockFamilyInstance({
         readMarker: async () => ({ storageHash: 'sha256:origin' }),
       }),
-      contractIR: dummyContractIR,
+      contract: dummyContract,
       mode: 'plan',
       migrations: createMockMigrations({
         planResult: {
@@ -143,7 +143,7 @@ describe('executeDbUpdate', () => {
           profileHash: 'sha256:origin-profile',
         }),
       }),
-      contractIR: dummyContractIR,
+      contract: dummyContract,
       mode: 'plan',
       migrations,
       frameworkComponents: [],
@@ -167,7 +167,7 @@ describe('executeDbUpdate', () => {
       familyInstance: createMockFamilyInstance({
         readMarker: async () => ({ storageHash: 'sha256:origin' }),
       }),
-      contractIR: dummyContractIR,
+      contract: dummyContract,
       mode: 'apply',
       migrations: createMockMigrations({
         runnerResult: notOk({
@@ -198,7 +198,7 @@ describe('executeDbUpdate', () => {
           profileHash: 'sha256:origin-profile',
         }),
       }),
-      contractIR: dummyContractIR,
+      contract: dummyContract,
       mode: 'apply',
       migrations: createMockMigrations({
         runnerResult: ok({ operationsPlanned: 2, operationsExecuted: 2 }),
@@ -228,7 +228,7 @@ describe('executeDbUpdate', () => {
           profileHash: 'sha256:current-profile',
         }),
       }),
-      contractIR: dummyContractIR,
+      contract: dummyContract,
       mode: 'apply',
       migrations: createMockMigrations({
         planResult: {
@@ -283,7 +283,7 @@ describe('executeDbUpdate', () => {
           profileHash: 'sha256:same-profile',
         }),
       }),
-      contractIR: dummyContractIR,
+      contract: dummyContract,
       mode: 'plan',
       migrations,
       frameworkComponents: [],
@@ -318,7 +318,7 @@ describe('executeDbUpdate', () => {
       familyInstance: createMockFamilyInstance({
         readMarker: async () => ({ storageHash: 'sha256:origin' }),
       }),
-      contractIR: dummyContractIR,
+      contract: dummyContract,
       mode: 'plan',
       migrations,
       frameworkComponents: [],
@@ -362,7 +362,7 @@ describe('executeDbUpdate', () => {
         familyInstance: createMockFamilyInstance({
           readMarker: async () => ({ storageHash: 'sha256:origin' }),
         }),
-        contractIR: dummyContractIR,
+        contract: dummyContract,
         mode: 'apply',
         migrations: createDestructiveMigrations(),
         frameworkComponents: [],
@@ -386,7 +386,7 @@ describe('executeDbUpdate', () => {
         familyInstance: createMockFamilyInstance({
           readMarker: async () => ({ storageHash: 'sha256:origin' }),
         }),
-        contractIR: dummyContractIR,
+        contract: dummyContract,
         mode: 'apply',
         acceptDataLoss: true,
         migrations: createDestructiveMigrations(),
@@ -406,7 +406,7 @@ describe('executeDbUpdate', () => {
         familyInstance: createMockFamilyInstance({
           readMarker: async () => ({ storageHash: 'sha256:origin' }),
         }),
-        contractIR: dummyContractIR,
+        contract: dummyContract,
         mode: 'plan',
         migrations: createDestructiveMigrations(),
         frameworkComponents: [],
@@ -449,7 +449,7 @@ describe('executeDbUpdate', () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
       familyInstance: createMockFamilyInstance(),
-      contractIR: dummyContractIR,
+      contract: dummyContract,
       mode: 'apply',
       migrations,
       frameworkComponents: [],
@@ -474,7 +474,7 @@ describe('executeDbUpdate', () => {
       await executeDbUpdate({
         driver: createMockDriver(),
         familyInstance: createMockFamilyInstance(),
-        contractIR: dummyContractIR,
+        contract: dummyContract,
         mode: 'plan',
         migrations: createMockMigrations(),
         frameworkComponents: [],
@@ -498,7 +498,7 @@ describe('executeDbUpdate', () => {
       await executeDbUpdate({
         driver: createMockDriver(),
         familyInstance: createMockFamilyInstance(),
-        contractIR: dummyContractIR,
+        contract: dummyContract,
         mode: 'apply',
         migrations: createMockMigrations(),
         frameworkComponents: [],
@@ -521,7 +521,7 @@ describe('executeDbUpdate', () => {
       await executeDbUpdate({
         driver: createMockDriver(),
         familyInstance: createMockFamilyInstance(),
-        contractIR: dummyContractIR,
+        contract: dummyContract,
         mode: 'plan',
         migrations: createMockMigrations({
           planResult: { kind: 'failure', conflicts: [] },
@@ -540,7 +540,7 @@ describe('executeDbUpdate', () => {
       await executeDbUpdate({
         driver: createMockDriver(),
         familyInstance: createMockFamilyInstance(),
-        contractIR: dummyContractIR,
+        contract: dummyContract,
         mode: 'apply',
         migrations: createMockMigrations({
           runnerResult: notOk({ code: 'RUNNER_ERROR', summary: 'Failed', why: 'Error' }),
@@ -557,7 +557,7 @@ describe('executeDbUpdate', () => {
       const result = await executeDbUpdate({
         driver: createMockDriver(),
         familyInstance: createMockFamilyInstance(),
-        contractIR: dummyContractIR,
+        contract: dummyContract,
         mode: 'plan',
         migrations: createMockMigrations(),
         frameworkComponents: [],

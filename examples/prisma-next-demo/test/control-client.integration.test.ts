@@ -21,7 +21,7 @@ describe('control client integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         // Use control client to initialize the database
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
 
         // Verify tables were created by querying the database
         const pool = new Pool({ connectionString });
@@ -49,12 +49,12 @@ describe('control client integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         // Initialize and sign database
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
 
         // Create a new client to verify
         const client = createPrismaNextControlClient({ connection: connectionString });
         try {
-          const verifyResult = await client.verify({ contractIR: contract });
+          const verifyResult = await client.verify({ contract: contract });
 
           expect(verifyResult).toMatchObject({
             ok: true,
@@ -72,11 +72,11 @@ describe('control client integration', () => {
     'schema verify passes after dbInit',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
 
         const client = createPrismaNextControlClient({ connection: connectionString });
         try {
-          const schemaResult = await client.schemaVerify({ contractIR: contract });
+          const schemaResult = await client.schemaVerify({ contract: contract });
 
           expect(schemaResult.ok).toBe(true);
         } finally {
@@ -91,7 +91,7 @@ describe('control client integration', () => {
     'introspects database schema',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
 
         const client = createPrismaNextControlClient({ connection: connectionString });
         try {

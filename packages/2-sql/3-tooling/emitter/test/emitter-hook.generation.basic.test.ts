@@ -1,5 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TypeRenderEntry } from '@prisma-next/contract/types';
+import type { Contract, TypeRenderEntry } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
@@ -17,7 +16,7 @@ type TestDescriptor =
   | ControlAdapterDescriptor<'sql', string>
   | ControlExtensionDescriptor<'sql', string>;
 
-function createContractIR(overrides: Partial<ContractIR>): ContractIR {
+function createContract(overrides: Partial<Contract>): Contract {
   return {
     schemaVersion: '1',
     targetFamily: 'sql',
@@ -37,7 +36,7 @@ const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-h
 
 describe('sql-target-family-hook', () => {
   it('generates contract types', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -72,7 +71,7 @@ describe('sql-target-family-hook', () => {
 
   describe('Contract and TypeMaps shape', () => {
     it('emits TypeMaps as separate export', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           User: {
             storage: { table: 'user', fields: { id: { column: 'id' } } },
@@ -100,7 +99,7 @@ describe('sql-target-family-hook', () => {
     });
 
     it('TypeMaps delegates to TypeMapsType with CodecTypes and OperationTypes', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {},
         storage: { tables: {} },
       });
@@ -109,7 +108,7 @@ describe('sql-target-family-hook', () => {
     });
 
     it('Contract does not include phantom codecTypes or operationTypes keys', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           User: {
             storage: { table: 'user', fields: { id: { column: 'id' } } },
@@ -138,7 +137,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with correct import path', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -212,7 +211,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with multiple extensions', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -296,7 +295,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with uniques in storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -321,7 +320,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with uniques with names in storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -346,7 +345,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with composite uniques in storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -372,7 +371,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with indexes in storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -397,7 +396,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with indexes with names in storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -422,7 +421,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with foreignKeys in storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -463,7 +462,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with foreignKeys with names in storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -503,7 +502,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with primaryKey with name in storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -526,7 +525,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with nullable columns', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -563,7 +562,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with model field missing column reference', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -597,7 +596,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with model referencing missing table', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -629,7 +628,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with undefined models', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: undefined,
       storage: {
         tables: {
@@ -652,7 +651,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with column nullable undefined defaults to false', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -689,7 +688,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('renders parameterized type when column has typeParams and renderer exists', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         Embedding: {
           storage: {
@@ -740,7 +739,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('falls back to CodecTypes when column has typeParams but no renderer', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         Embedding: {
           storage: {
@@ -778,7 +777,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with no operation type imports', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -800,7 +799,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('filters operation type imports to only OperationTypes', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -835,7 +834,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with query operation type imports', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -864,7 +863,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with extension-owned index config in storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -909,7 +908,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with expression entries in extension config', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -949,7 +948,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('quotes non-identifier keys in extension index config', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       targetFamily: 'sql',
       target: 'test-db',
       storage: {
@@ -984,7 +983,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('includes execution section in ContractBase when IR has execution defaults', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         Tag: {
           storage: { table: 'tags', fields: { id: { column: 'id' }, name: { column: 'name' } } },
@@ -1029,7 +1028,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('emits execution as undefined when IR has no execution', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: { tables: {} },
     });
 

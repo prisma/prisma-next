@@ -13,8 +13,8 @@ import { validateMongoContract } from '@prisma-next/mongo-core';
 import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
 
 export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo'> {
-  validateContractIR(contractJson: unknown): Contract;
-  emitContract(options: { readonly contractIR: Contract | unknown }): Promise<EmitContractResult>;
+  validateContract(contractJson: unknown): Contract;
+  emitContract(options: { readonly contract: Contract | unknown }): Promise<EmitContractResult>;
 }
 
 class MongoFamilyInstance implements MongoControlFamilyInstance {
@@ -26,7 +26,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     this.controlStack = controlStack;
   }
 
-  validateContractIR(contractJson: unknown): Contract {
+  validateContract(contractJson: unknown): Contract {
     const validated = validateMongoContract<MongoContract>(contractJson);
     // MongoContract and Contract share structure but are typed independently;
     // validateMongoContract guarantees the shape, so the double cast is safe.
@@ -34,13 +34,11 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
   }
 
   async emitContract({
-    contractIR,
+    contract,
   }: {
-    readonly contractIR: Contract | unknown;
+    readonly contract: Contract | unknown;
   }): Promise<EmitContractResult> {
-    // The caller validates via validateContractIR before calling emitContract,
-    // so contractIR is guaranteed to be Contract at this point.
-    const ir = contractIR as Contract;
+    const ir = contract as Contract;
     const {
       codecTypeImports,
       operationTypeImports,

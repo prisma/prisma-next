@@ -33,7 +33,7 @@ describe(
       }
     });
 
-    async function emitPgvectorContractIR(schemaText: string): Promise<Record<string, unknown>> {
+    async function emitPgvectorContract(schemaText: string): Promise<Record<string, unknown>> {
       const schemaPath = join(testDir, 'schema.prisma');
       writeFileSync(schemaPath, schemaText, 'utf-8');
 
@@ -71,7 +71,7 @@ describe(
         }),
       );
 
-      const emitted = await familyInstance.emitContract({ contractIR: enrichedIR });
+      const emitted = await familyInstance.emitContract({ contract: enrichedIR });
       return JSON.parse(emitted.contractJson) as Record<string, unknown>;
     }
 
@@ -98,7 +98,7 @@ describe(
     it(
       'dbInit succeeds for a PSL-emitted pgvector named type schema',
       async () => {
-        const emittedContractIR = await emitPgvectorContractIR(`types {
+        const emittedContract = await emitPgvectorContract(`types {
   Embedding1536 = Bytes @pgvector.column(length: 1536)
 }
 
@@ -110,7 +110,7 @@ model Document {
 
         await withDevDatabase(async ({ connectionString }) => {
           await withPgvectorControlClient(connectionString, async (client) => {
-            const plan = await client.dbInit({ contractIR: emittedContractIR, mode: 'plan' });
+            const plan = await client.dbInit({ contract: emittedContract, mode: 'plan' });
             expect(plan.ok).toBe(true);
             if (!plan.ok) {
               throw new Error(`dbInit plan failed: ${plan.failure.summary}`);
@@ -120,7 +120,7 @@ model Document {
             expect(ddl).toContain('vector(1536)');
             expect(ddl).not.toContain('"vector(1536)"');
 
-            const apply = await client.dbInit({ contractIR: emittedContractIR, mode: 'apply' });
+            const apply = await client.dbInit({ contract: emittedContract, mode: 'apply' });
             if (!apply.ok) {
               throw new Error(
                 `dbInit apply failed: ${apply.failure.summary}\n\n${JSON.stringify(apply.failure, null, 2)}`,
@@ -135,7 +135,7 @@ model Document {
     it(
       'dbUpdate recovers a dropped pgvector NOT NULL column on a non-empty table',
       async () => {
-        const emittedContractIR = await emitPgvectorContractIR(`types {
+        const emittedContract = await emitPgvectorContract(`types {
   Embedding3 = Bytes @pgvector.column(length: 3)
 }
 
@@ -147,7 +147,7 @@ model Document {
 
         await withDevDatabase(async ({ connectionString }) => {
           await withPgvectorControlClient(connectionString, async (client) => {
-            const init = await client.dbInit({ contractIR: emittedContractIR, mode: 'apply' });
+            const init = await client.dbInit({ contract: emittedContract, mode: 'apply' });
             if (!init.ok) {
               throw new Error(
                 `dbInit apply failed: ${init.failure.summary}\n\n${JSON.stringify(init.failure, null, 2)}`,
@@ -167,7 +167,7 @@ model Document {
           });
 
           await withPgvectorControlClient(connectionString, async (client) => {
-            const update = await client.dbUpdate({ contractIR: emittedContractIR, mode: 'apply' });
+            const update = await client.dbUpdate({ contract: emittedContract, mode: 'apply' });
             if (!update.ok) {
               throw new Error(
                 `dbUpdate apply failed: ${update.failure.summary}\n\n${JSON.stringify(update.failure, null, 2)}`,

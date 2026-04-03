@@ -127,11 +127,11 @@ export function assertFrameworkComponentsCompatible<
  * import { assertContractRequirementsSatisfied } from './framework-components';
  *
  * const config = await loadConfig();
- * const contractIR = await loadContractJson(config.contract.output);
+ * const contract = await loadContractJson(config.contract.output);
  * const stack = createControlStack({ family: config.family, target: config.target, adapter: config.adapter, ... });
  *
  * // Throws if contract is incompatible with config
- * assertContractRequirementsSatisfied({ contract: contractIR, stack });
+ * assertContractRequirementsSatisfied({ contract, stack });
  * ```
  */
 export function assertContractRequirementsSatisfied<

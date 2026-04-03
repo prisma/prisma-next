@@ -230,7 +230,7 @@ describe('family instance schemaVerify - types', () => {
             validateContract<SqlContract<SqlStorage>>(contractWithUnknownType);
           const result = await familyInstance.schemaVerify({
             driver,
-            contractIR: validatedContract,
+            contract: validatedContract,
             strict: false,
             context: { contractPath: './contract.json' },
             frameworkComponents: [postgres, postgresAdapter],

@@ -3,7 +3,6 @@ import { defineConfig } from '@prisma-next/tsdown';
 export default defineConfig({
   entry: [
     'src/exports/types.ts',
-    'src/exports/ir.ts',
     'src/exports/validate-domain.ts',
     'src/exports/validate-contract.ts',
     'src/exports/hashing.ts',

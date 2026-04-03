@@ -31,7 +31,7 @@ describe('prismaContract provider helper', () => {
   });
 
   describe('given a valid schema', () => {
-    it('returns contract config and emits SQL ContractIR from schema path', async () => {
+    it('returns contract config and emits SQL Contract from schema path', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
       const schemaPath = join(tempDir, 'schema.prisma');

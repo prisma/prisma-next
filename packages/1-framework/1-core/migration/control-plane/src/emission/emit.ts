@@ -114,7 +114,9 @@ export async function emit(
   assertCanonicalArtifactShape(canonicalContract);
 
   const storageHash = contract.storage.storageHash as string;
-  const executionHash = contract.execution?.executionHash as string | undefined;
+  const executionHash = (contract as Record<string, unknown>)['executionHash'] as
+    | string
+    | undefined;
   const profileHash = (contract.profileHash ?? '') as string;
 
   const contractWithHashes = {

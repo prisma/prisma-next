@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/core-control-plane/errors';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type {
@@ -141,7 +141,7 @@ describe('assertFrameworkComponentsCompatible', () => {
 });
 
 describe('assertContractRequirementsSatisfied', () => {
-  const contract: Pick<ContractIR, 'targetFamily' | 'target' | 'extensionPacks'> = {
+  const contract: Pick<Contract, 'targetFamily' | 'target' | 'extensionPacks'> = {
     targetFamily: 'sql',
     target: 'postgres',
     extensionPacks: {
@@ -223,7 +223,7 @@ describe('assertContractRequirementsSatisfied', () => {
   });
 
   it('includes all missing extension packs in error meta', () => {
-    const contractWithTwoPacks: Pick<ContractIR, 'targetFamily' | 'target' | 'extensionPacks'> = {
+    const contractWithTwoPacks: Pick<Contract, 'targetFamily' | 'target' | 'extensionPacks'> = {
       targetFamily: 'sql',
       target: 'postgres',
       extensionPacks: {

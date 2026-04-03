@@ -18,7 +18,7 @@ describe('mongoFamilyDescriptor', () => {
     const instance = mongoFamilyDescriptor.create(stack);
 
     expect(instance.familyId).toBe('mongo');
-    expect(typeof instance.validateContractIR).toBe('function');
+    expect(typeof instance.validateContract).toBe('function');
     expect(typeof instance.emitContract).toBe('function');
   });
 

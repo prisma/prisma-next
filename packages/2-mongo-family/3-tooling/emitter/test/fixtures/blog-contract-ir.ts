@@ -1,9 +1,9 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 
-export const blogContractIR: ContractIR = {
-  schemaVersion: '1',
+export const blogContractIR: Contract = {
   targetFamily: 'mongo',
   target: 'mongo',
+  profileHash: 'sha256:test',
   roots: {
     users: 'User',
     posts: 'Post',
@@ -60,6 +60,7 @@ export const blogContractIR: ContractIR = {
     },
   },
   storage: {
+    storageHash: 'sha256:test',
     collections: {
       users: {},
       posts: {},
@@ -68,5 +69,4 @@ export const blogContractIR: ContractIR = {
   extensionPacks: {},
   capabilities: {},
   meta: {},
-  sources: {},
 };

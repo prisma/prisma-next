@@ -130,7 +130,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       operations,
     };
 
-    const destinationContract = familyInstance.validateContractIR(migration.toContract as Contract);
+    const destinationContract = familyInstance.validateContract(migration.toContract as Contract);
 
     const runnerResult: MigrationRunnerResult = await runner.execute({
       plan,

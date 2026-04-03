@@ -104,7 +104,7 @@ export async function runSchemaVerify(
     ];
     return familyInstance.schemaVerify({
       driver,
-      contractIR: validatedContract,
+      contract: validatedContract,
       strict: options.strict ?? false,
       context: { contractPath: './contract.json' },
       frameworkComponents,

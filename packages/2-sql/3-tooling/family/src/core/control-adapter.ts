@@ -28,13 +28,13 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
    * @param driver - ControlDriverInstance instance for executing queries (target-specific)
-   * @param contractIR - Optional contract IR for contract-guided introspection (filtering, optimization)
+   * @param contract - Optional contract for contract-guided introspection (filtering, optimization)
    * @param schema - Schema name to introspect (defaults to 'public')
    * @returns Promise resolving to SqlSchemaIR representing the live database schema
    */
   introspect(
     driver: ControlDriverInstance<'sql', TTarget>,
-    contractIR?: unknown,
+    contract?: unknown,
     schema?: string,
   ): Promise<SqlSchemaIR>;
 

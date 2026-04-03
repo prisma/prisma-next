@@ -1,9 +1,8 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ValidationContext } from '@prisma-next/contract/types';
+import type { Contract, ValidationContext } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 
-function createContractIR(overrides: Partial<ContractIR>): ContractIR {
+function createContract(overrides: Partial<Contract>): Contract {
   return {
     schemaVersion: '1',
     targetFamily: 'sql',
@@ -20,7 +19,7 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
 
 describe('sql-target-family-hook', () => {
   it('validates types from referenced extensions', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       extensions: {
         postgres: {
           version: '0.0.1',
@@ -50,7 +49,7 @@ describe('sql-target-family-hook', () => {
   it('validates type ID format regardless of namespace', () => {
     // Namespace validation removed - codecs can use any namespace
     // Only format validation remains (ns/name@version)
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -73,7 +72,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('throws error for invalid type ID format', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -93,7 +92,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types from loaded packs even if not in extensions', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -115,7 +114,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with missing column type', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -135,7 +134,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with type ID that fails regex match', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -155,7 +154,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with empty storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {},
       },
@@ -169,7 +168,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with missing storage', () => {
-    const ir = createContractIR({});
+    const ir = createContract({});
 
     const ctx: ValidationContext = {};
 
@@ -179,7 +178,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with storage but no tables', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         // No tables property - should hit early return at line 16
       },
@@ -193,7 +192,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types regardless of extensionIds', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -220,7 +219,7 @@ describe('sql-target-family-hook', () => {
       targetFamily: 'sql',
       storage: { tables: {} },
       extensions: undefined,
-    } as unknown as ContractIR;
+    } as unknown as Contract;
 
     expect(() => sqlTargetFamilyHook.validateTypes(ir, {})).not.toThrow();
   });

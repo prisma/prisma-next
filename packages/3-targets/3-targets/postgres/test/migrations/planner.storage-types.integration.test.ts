@@ -151,7 +151,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
         const planner = postgresTargetDescriptor.createPlanner(familyInstance);
         const schema = await familyInstance.introspect({
           driver: driver!,
-          contractIR: contractWithEnum,
+          contract: contractWithEnum,
         });
 
         const planResult = planner.plan({
@@ -180,7 +180,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
         const planner = postgresTargetDescriptor.createPlanner(familyInstance);
         const schema = await familyInstance.introspect({
           driver: driver!,
-          contractIR: contractWithEnum,
+          contract: contractWithEnum,
         });
 
         const planResult = planner.plan({

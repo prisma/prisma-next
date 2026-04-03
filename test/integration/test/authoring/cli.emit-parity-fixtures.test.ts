@@ -124,14 +124,14 @@ describe('emit parity fixtures', () => {
           const enrichedTs = enrichContract(tsProviderResultFirst.value, frameworkComponents);
           const enrichedPsl = enrichContract(pslProviderResultFirst.value, frameworkComponents);
 
-          const normalizedTs = familyInstance.validateContractIR(enrichedTs);
-          const normalizedPsl = familyInstance.validateContractIR(enrichedPsl);
+          const normalizedTs = familyInstance.validateContract(enrichedTs);
+          const normalizedPsl = familyInstance.validateContract(enrichedPsl);
           expect(normalizedTs).toEqual(normalizedPsl);
 
-          const tsEmitFirst = await familyInstance.emitContract({ contractIR: normalizedTs });
-          const tsEmitSecond = await familyInstance.emitContract({ contractIR: normalizedTs });
-          const pslEmitFirst = await familyInstance.emitContract({ contractIR: normalizedPsl });
-          const pslEmitSecond = await familyInstance.emitContract({ contractIR: normalizedPsl });
+          const tsEmitFirst = await familyInstance.emitContract({ contract: normalizedTs });
+          const tsEmitSecond = await familyInstance.emitContract({ contract: normalizedTs });
+          const pslEmitFirst = await familyInstance.emitContract({ contract: normalizedPsl });
+          const pslEmitSecond = await familyInstance.emitContract({ contract: normalizedPsl });
 
           expect(tsEmitFirst).toMatchObject({
             contractJson: tsEmitSecond.contractJson,

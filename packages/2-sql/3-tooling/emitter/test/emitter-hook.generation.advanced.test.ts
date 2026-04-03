@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
@@ -17,7 +17,7 @@ type TestDescriptor =
   | ControlAdapterDescriptor<'sql', string>
   | ControlExtensionDescriptor<'sql', string>;
 
-function createContractIR(overrides: Partial<ContractIR>): ContractIR {
+function createContract(overrides: Partial<Contract>): Contract {
   return {
     schemaVersion: '1',
     targetFamily: 'sql',
@@ -37,7 +37,7 @@ const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-h
 
 describe('sql-target-family-hook', () => {
   it('generates contract types with model relations', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -101,7 +101,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types when models is an empty object', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {},
       storage: {
         tables: {
@@ -145,7 +145,7 @@ describe('sql-target-family-hook', () => {
       },
     ];
 
-    const ir = createContractIR({
+    const ir = createContract({
       models: {},
       storage: {
         tables: {
@@ -176,7 +176,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with default models and codecTypes from descriptors', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -225,7 +225,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('emits model relations on each model in Contract', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -300,7 +300,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates models with empty relations object when no relations', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -332,7 +332,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates models type from models and storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -375,7 +375,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates models type with multiple models', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -431,7 +431,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('uses Record<string, never> for models when IR has no models', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: undefined,
       targetFamily: 'sql',
       target: 'test-db',
@@ -456,7 +456,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates models type with relations missing on/cols properties', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -487,7 +487,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates models with empty fields object when model has no fields', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -619,7 +619,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('renders column type using inline typeParams with parameterized renderer', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         Embedding: {
           storage: {
@@ -670,7 +670,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('renders column type using typeRef with parameterized renderer', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         Embedding: {
           storage: {

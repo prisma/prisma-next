@@ -331,7 +331,7 @@ async function executeDbVerifyCommand(
 
   try {
     const verifyResult = await client.verify({
-      contractIR: contractJson,
+      contract: contractJson,
       connection: dbConnection,
       onProgress,
     });
@@ -361,7 +361,7 @@ async function executeDbVerifyCommand(
     }
 
     const schemaVerifyResult = await client.schemaVerify({
-      contractIR: contractJson,
+      contract: contractJson,
       strict: options.strict ?? false,
       onProgress,
     });
@@ -414,7 +414,7 @@ async function executeDbSchemaOnlyVerifyCommand(
 
   try {
     const schemaVerifyResult = await client.schemaVerify({
-      contractIR: contractJson,
+      contract: contractJson,
       strict: options.strict ?? false,
       connection: dbConnection,
       onProgress,

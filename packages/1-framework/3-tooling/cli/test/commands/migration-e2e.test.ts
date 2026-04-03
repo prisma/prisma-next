@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { attestMigration, verifyMigration } from '@prisma-next/migration-tools/attestation';
@@ -15,30 +15,6 @@ import {
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { isAttested } from '@prisma-next/migration-tools/types';
 import { describe, expect, it } from 'vitest';
-
-function createContract(
-  tables: Record<
-    string,
-    Record<string, { nativeType: string; codecId: string; nullable: boolean }>
-  >,
-): ContractIR {
-  const storage: Record<string, unknown> = { tables: {} };
-  const storageTables = storage['tables'] as Record<string, unknown>;
-  for (const [tableName, columns] of Object.entries(tables)) {
-    storageTables[tableName] = { columns };
-  }
-  return {
-    schemaVersion: '1',
-    targetFamily: 'sql',
-    target: 'postgres',
-    models: {},
-    storage,
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-  };
-}
 
 function createTableOp(table: string): MigrationPlanOperation {
   return {
@@ -63,10 +39,16 @@ describe('migration plan → verify end-to-end', () => {
     const migrationsDir = join(root, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const toContract = createContract({
-      user: {
-        id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-        email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+    const toContract = createSqlContract({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+          },
+        },
       },
     });
 
@@ -114,12 +96,20 @@ describe('migration plan → verify end-to-end', () => {
     const migrationsDir = join(root, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createContract({
-      user: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+    const contractA = createSqlContract({
+      storage: {
+        tables: {
+          user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+        },
+      },
     });
-    const contractB = createContract({
-      user: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-      post: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+    const contractB = createSqlContract({
+      storage: {
+        tables: {
+          user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+          post: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+        },
+      },
     });
 
     // Plan 1: empty → A
@@ -195,8 +185,12 @@ describe('migration plan → verify end-to-end', () => {
     const migrationsDir = join(root, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createContract({
-      user: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+    const contract = createSqlContract({
+      storage: {
+        tables: {
+          user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+        },
+      },
     });
 
     // First migration
@@ -251,7 +245,7 @@ describe('migration plan → verify end-to-end', () => {
         migrationId: null,
         kind: 'regular',
         fromContract: null,
-        toContract: createContract({}),
+        toContract: createContract(),
         hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'manual' },
         labels: [],
         createdAt: new Date().toISOString(),

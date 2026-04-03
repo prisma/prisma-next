@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 import { defineConfig, type PrismaNextConfig } from '../src/config-types';
@@ -312,7 +312,7 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ contract: 'invalid' }), 'contract');
     expectFieldError(createValidRawConfig({ contract: {} }), 'contract.source');
     const inheritedSourceContract = Object.create({
-      source: async () => ok({ targetFamily: 'sql' } as ContractIR),
+      source: async () => ok({ targetFamily: 'sql' } as Contract),
     }) as Record<string, unknown>;
     expectFieldError(
       createValidRawConfig({ contract: inheritedSourceContract }),
@@ -327,7 +327,7 @@ describe('validateConfig', () => {
     expectFieldError(
       createValidRawConfig({
         contract: {
-          source: async () => ok({ targetFamily: 'sql' } as ContractIR),
+          source: async () => ok({ targetFamily: 'sql' } as Contract),
           output: 123,
         },
       }),
@@ -349,7 +349,7 @@ describe('validateConfig', () => {
         },
       ],
       contract: {
-        source: async () => ok({ targetFamily: 'sql' } as ContractIR),
+        source: async () => ok({ targetFamily: 'sql' } as Contract),
         output: 'src/prisma/contract.json',
       },
     });
@@ -403,7 +403,7 @@ describe('defineConfig', () => {
   });
 
   it('applies default output path when contract output is missing', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as ContractIR);
+    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config = createValidConfig({
       contract: {
         source: sourceProvider,
@@ -415,7 +415,7 @@ describe('defineConfig', () => {
   });
 
   it('preserves custom output path', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as ContractIR);
+    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config = createValidConfig({
       contract: {
         source: sourceProvider,

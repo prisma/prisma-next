@@ -154,7 +154,7 @@ export async function executeContractEmit(
   const enrichedIR = enrichContract(providerResult.value as Contract, frameworkComponents);
 
   // Emit contract via family instance
-  const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: enrichedIR }));
+  const emitResult = await unlessAborted(familyInstance.emitContract({ contract: enrichedIR }));
 
   // Create directory if needed and write files (both colocated)
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));

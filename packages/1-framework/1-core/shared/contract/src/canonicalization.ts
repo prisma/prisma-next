@@ -237,24 +237,24 @@ function orderTopLevel(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 export type CanonicalContractInput = {
-  schemaVersion: string;
+  schemaVersion?: string | undefined;
   targetFamily: string;
   target: string;
-  roots?: Record<string, string>;
+  roots?: Record<string, string> | undefined;
   models: Record<string, unknown>;
   storage: Record<string, unknown>;
-  execution?: Record<string, unknown>;
+  execution?: Record<string, unknown> | undefined;
   extensionPacks: Record<string, unknown>;
   capabilities: Record<string, Record<string, boolean>>;
   meta: Record<string, unknown>;
-  storageHash?: string;
-  executionHash?: string;
-  profileHash?: string;
+  storageHash?: string | undefined;
+  executionHash?: string | undefined;
+  profileHash?: string | undefined;
 };
 
 export function canonicalizeContract(input: CanonicalContractInput): string {
   const normalized: Record<string, unknown> = {
-    schemaVersion: input.schemaVersion,
+    ...(input.schemaVersion !== undefined ? { schemaVersion: input.schemaVersion } : {}),
     targetFamily: input.targetFamily,
     target: input.target,
     ...(input.roots !== undefined ? { roots: input.roots } : {}),
