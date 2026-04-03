@@ -51,9 +51,9 @@ describe('lowerFilter', () => {
     });
   });
 
-  it('lowers MongoNotExpr', () => {
+  it('lowers MongoNotExpr to $nor', () => {
     const not = new MongoNotExpr(MongoFieldFilter.eq('x', 1));
-    expect(lowerFilter(not)).toEqual({ $not: { x: { $eq: 1 } } });
+    expect(lowerFilter(not)).toEqual({ $nor: [{ x: { $eq: 1 } }] });
   });
 
   it('lowers MongoExistsExpr (true)', () => {
@@ -70,7 +70,7 @@ describe('lowerFilter', () => {
       new MongoNotExpr(MongoFieldFilter.gt('y', 10)),
     ]);
     expect(lowerFilter(filter)).toEqual({
-      $and: [{ $or: [{ x: { $eq: 1 } }, { x: { $eq: 2 } }] }, { $not: { y: { $gt: 10 } } }],
+      $and: [{ $or: [{ x: { $eq: 1 } }, { x: { $eq: 2 } }] }, { $nor: [{ y: { $gt: 10 } }] }],
     });
   });
 
@@ -78,6 +78,14 @@ describe('lowerFilter', () => {
     const param = MongoParamRef.of('alice@example.com', { name: 'email' });
     const filter = MongoFieldFilter.eq('email', param);
     expect(lowerFilter(filter)).toEqual({ email: { $eq: 'alice@example.com' } });
+  });
+
+  it('lowers MongoFieldFilter.isNull', () => {
+    expect(lowerFilter(MongoFieldFilter.isNull('bio'))).toEqual({ bio: { $eq: null } });
+  });
+
+  it('lowers MongoFieldFilter.isNotNull', () => {
+    expect(lowerFilter(MongoFieldFilter.isNotNull('bio'))).toEqual({ bio: { $ne: null } });
   });
 
   it('resolves nested MongoParamRef in document values', () => {
