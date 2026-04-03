@@ -125,6 +125,9 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
     devDependencies:
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/3-tooling/cli
       '@prisma-next/family-mongo':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/9-family

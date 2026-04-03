@@ -48,7 +48,7 @@
     "node": ">=20"
   },
   "exports": {
-    ".": "./dist/runtime.mjs",
+    "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/runtime.mjs",
