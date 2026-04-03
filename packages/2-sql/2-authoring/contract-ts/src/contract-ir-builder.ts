@@ -300,6 +300,7 @@ export function buildContract(state: RuntimeBuilderState): Contract {
   const contract = {
     target,
     targetFamily,
+    storageHash,
     models,
     roots,
     storage,
