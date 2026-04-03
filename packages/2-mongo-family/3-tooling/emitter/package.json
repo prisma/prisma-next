@@ -17,6 +17,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/mongo-core": "workspace:*"
   },
   "devDependencies": {

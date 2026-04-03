@@ -1,4 +1,4 @@
-import type { TypesImportSpec } from '@prisma-next/contract/types';
+import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
 import { mongoTargetFamilyHook } from '../src/index';
 import { blogContract } from './fixtures/blog-contract';

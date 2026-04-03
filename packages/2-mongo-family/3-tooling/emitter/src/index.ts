@@ -1,9 +1,4 @@
-import type {
-  Contract,
-  GenerateContractTypesOptions,
-  TypesImportSpec,
-  ValidationContext,
-} from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import {
   deduplicateImports,
   generateCodecTypeIntersection,
@@ -14,6 +9,12 @@ import {
   serializeObjectKey,
   serializeValue,
 } from '@prisma-next/emitter/domain-type-generation';
+import type {
+  GenerateContractTypesOptions,
+  TargetFamilyHook,
+  TypesImportSpec,
+  ValidationContext,
+} from '@prisma-next/framework-components/emission';
 import type { MongoStorage } from '@prisma-next/mongo-core';
 
 interface MongoModelIR {
