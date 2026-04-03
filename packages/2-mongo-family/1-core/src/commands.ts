@@ -13,32 +13,6 @@ abstract class MongoCommand {
   }
 }
 
-export interface FindOptions {
-  readonly projection?: Record<string, 1 | 0>;
-  readonly sort?: Record<string, 1 | -1>;
-  readonly limit?: number;
-  readonly skip?: number;
-}
-
-export class FindCommand extends MongoCommand {
-  readonly kind = 'find' as const;
-  readonly filter: MongoExpr | undefined;
-  readonly projection: Record<string, 1 | 0> | undefined;
-  readonly sort: Record<string, 1 | -1> | undefined;
-  readonly limit: number | undefined;
-  readonly skip: number | undefined;
-
-  constructor(collection: string, filter?: MongoExpr, options?: FindOptions) {
-    super(collection);
-    this.filter = filter;
-    this.projection = options?.projection;
-    this.sort = options?.sort;
-    this.limit = options?.limit;
-    this.skip = options?.skip;
-    this.freeze();
-  }
-}
-
 export class InsertOneCommand extends MongoCommand {
   readonly kind = 'insertOne' as const;
   readonly document: Record<string, MongoValue>;
@@ -86,7 +60,6 @@ export class AggregateCommand extends MongoCommand {
 }
 
 export type AnyMongoCommand =
-  | FindCommand
   | InsertOneCommand
   | UpdateOneCommand
   | DeleteOneCommand

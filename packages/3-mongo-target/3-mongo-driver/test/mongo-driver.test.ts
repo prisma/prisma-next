@@ -1,7 +1,6 @@
 import {
   AggregateWireCommand,
   DeleteOneWireCommand,
-  FindWireCommand,
   InsertOneWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
@@ -38,54 +37,6 @@ async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
 }
 
 describe('MongoDriver', () => {
-  describe('find', () => {
-    const col = 'driver_find';
-
-    beforeAll(async () => {
-      const db = seedClient.db(dbName);
-      await db.collection(col).deleteMany({});
-      await db.collection(col).insertMany([
-        { name: 'Alice', age: 30 },
-        { name: 'Bob', age: 25 },
-        { name: 'Charlie', age: 35 },
-      ]);
-    });
-
-    it('returns matching documents', async () => {
-      const driver = await createMongoDriver(connectionUri, dbName);
-      try {
-        const cmd = new FindWireCommand(col, { name: 'Alice' });
-        const rows = await collect(driver.execute(cmd));
-        expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ name: 'Alice', age: 30 });
-      } finally {
-        await driver.close();
-      }
-    });
-
-    it('applies projection, sort, limit, skip', async () => {
-      const driver = await createMongoDriver(connectionUri, dbName);
-      try {
-        const cmd = new FindWireCommand(
-          col,
-          {},
-          {
-            projection: { name: 1, _id: 0 },
-            sort: { name: 1 },
-            limit: 2,
-            skip: 1,
-          },
-        );
-        const rows = await collect(driver.execute(cmd));
-        expect(rows).toHaveLength(2);
-        expect(rows[0]).toEqual({ name: 'Bob' });
-        expect(rows[1]).toEqual({ name: 'Charlie' });
-      } finally {
-        await driver.close();
-      }
-    });
-  });
-
   describe('insertOne', () => {
     const col = 'driver_insert';
 

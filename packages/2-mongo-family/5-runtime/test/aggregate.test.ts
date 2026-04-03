@@ -14,13 +14,11 @@ describe('aggregate integration', () => {
         { department: 'sales', amount: 150 },
       ]);
 
-      const plan = ctx.makePlan(
-        new AggregateCommand(collectionName, [
-          { $group: { _id: '$department', total: { $sum: '$amount' } } },
-          { $sort: { _id: 1 } },
-        ]),
-      );
-      const rows = await ctx.runtime.execute(plan);
+      const command = new AggregateCommand(collectionName, [
+        { $group: { _id: '$department', total: { $sum: '$amount' } } },
+        { $sort: { _id: 1 } },
+      ]);
+      const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
       expect(rows).toHaveLength(2);
 
       const typed = rows as Array<{ _id: string; total: number }>;

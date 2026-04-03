@@ -13,14 +13,12 @@ describe('updateOne integration', () => {
         { name: 'Bob', age: 25 },
       ]);
 
-      const plan = ctx.makePlan(
-        new UpdateOneCommand(
-          collectionName,
-          { name: new MongoParamRef('Alice') },
-          { $set: { age: new MongoParamRef(31) } },
-        ),
+      const command = new UpdateOneCommand(
+        collectionName,
+        { name: new MongoParamRef('Alice') },
+        { $set: { age: new MongoParamRef(31) } },
       );
-      const rows = await ctx.runtime.execute(plan);
+      const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ matchedCount: 1, modifiedCount: 1 });
 
