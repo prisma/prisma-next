@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
 import { findLatestMigration } from '@prisma-next/migration-tools/dag';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
@@ -220,7 +220,8 @@ async function executeMigrationPlanCommand(
       }),
     );
   }
-  const stack = createControlPlaneStack({
+  const stack = createControlStack({
+    family: config.family,
     target: config.target,
     adapter: config.adapter,
     extensionPacks: config.extensionPacks ?? [],

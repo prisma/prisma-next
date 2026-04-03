@@ -4,6 +4,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -70,12 +71,15 @@ describe('referential actions integration', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
 
           const schemaIR = await familyInstance.introspect({ driver });
 
@@ -102,12 +106,15 @@ describe('referential actions integration', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
 
           const schemaIR = await familyInstance.introspect({ driver });
 
@@ -148,12 +155,15 @@ describe('referential actions integration', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
 
           const schemaIR = await familyInstance.introspect({ driver });
           const fk = schemaIR.tables['post']?.foreignKeys[0];
@@ -229,12 +239,15 @@ describe('referential actions integration', () => {
 
           const driver = await postgresDriver.create(connectionString);
           try {
-            const familyInstance = sql.create({
-              target: postgres,
-              adapter: postgresAdapter,
-              driver: postgresDriver,
-              extensionPacks: [],
-            });
+            const familyInstance = sql.create(
+              createControlStack({
+                family: sql,
+                target: postgres,
+                adapter: postgresAdapter,
+                driver: postgresDriver,
+                extensionPacks: [],
+              }),
+            );
 
             const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
@@ -315,12 +328,15 @@ describe('referential actions integration', () => {
 
           const driver = await postgresDriver.create(connectionString);
           try {
-            const familyInstance = sql.create({
-              target: postgres,
-              adapter: postgresAdapter,
-              driver: postgresDriver,
-              extensionPacks: [],
-            });
+            const familyInstance = sql.create(
+              createControlStack({
+                family: sql,
+                target: postgres,
+                adapter: postgresAdapter,
+                driver: postgresDriver,
+                extensionPacks: [],
+              }),
+            );
 
             const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
@@ -379,12 +395,15 @@ describe('referential actions integration', () => {
 
           const driver = await postgresDriver.create(connectionString);
           try {
-            const familyInstance = sql.create({
-              target: postgres,
-              adapter: postgresAdapter,
-              driver: postgresDriver,
-              extensionPacks: [],
-            });
+            const familyInstance = sql.create(
+              createControlStack({
+                family: sql,
+                target: postgres,
+                adapter: postgresAdapter,
+                driver: postgresDriver,
+                extensionPacks: [],
+              }),
+            );
 
             const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
@@ -463,12 +482,15 @@ describe('referential actions integration', () => {
 
           const driver = await postgresDriver.create(connectionString);
           try {
-            const familyInstance = sql.create({
-              target: postgres,
-              adapter: postgresAdapter,
-              driver: postgresDriver,
-              extensionPacks: [],
-            });
+            const familyInstance = sql.create(
+              createControlStack({
+                family: sql,
+                target: postgres,
+                adapter: postgresAdapter,
+                driver: postgresDriver,
+                extensionPacks: [],
+              }),
+            );
 
             const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
@@ -533,12 +555,15 @@ describe('referential actions integration', () => {
           .build();
 
         const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensionPacks: [],
-        });
+        const familyInstance = sql.create(
+          createControlStack({
+            family: sql,
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensionPacks: [],
+          }),
+        );
 
         // Introspect the empty database to get a baseline schema IR
         const driver = await postgresDriver.create(connectionString);

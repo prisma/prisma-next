@@ -1,17 +1,17 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
-import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
-  ControlPlaneStack,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import { hasMigrations, hasSchemaView } from '@prisma-next/core-control-plane/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import type { ControlStack } from '@prisma-next/framework-components/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
@@ -59,7 +59,7 @@ export function createControlClient(options: ControlClientOptions): ControlClien
  */
 class ControlClientImpl implements ControlClient {
   private readonly options: ControlClientOptions;
-  private stack: ControlPlaneStack<string, string> | null = null;
+  private stack: ControlStack | null = null;
   private driver: ControlDriverInstance<string, string> | null = null;
   private familyInstance: ControlFamilyInstance<string> | null = null;
   private frameworkComponents: ReadonlyArray<
@@ -78,15 +78,14 @@ class ControlClientImpl implements ControlClient {
       return; // Idempotent
     }
 
-    // Create the control plane stack
-    this.stack = createControlPlaneStack({
+    this.stack = createControlStack({
+      family: this.options.family,
       target: this.options.target,
       adapter: this.options.adapter,
       driver: this.options.driver,
       extensionPacks: this.options.extensionPacks,
     });
 
-    // Create family instance using the stack
     this.familyInstance = this.options.family.create(this.stack);
 
     // Validate and type-narrow framework components
@@ -127,12 +126,8 @@ class ControlClientImpl implements ControlClient {
       );
     }
 
-    // Create driver instance
-    // Cast through any since connection type is driver-specific at runtime.
-    // The driver descriptor is typed with any for TConnection in ControlClientOptions,
-    // but createControlPlaneStack defaults it to string. We bridge this at runtime.
     // biome-ignore lint/suspicious/noExplicitAny: required for runtime connection type flexibility
-    this.driver = await this.stack?.driver.create(resolvedConnection as any);
+    this.driver = await this.stack.driver.create(resolvedConnection as any);
   }
 
   async close(): Promise<void> {

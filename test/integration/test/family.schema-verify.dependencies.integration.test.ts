@@ -5,6 +5,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -62,12 +63,15 @@ describe('family instance schemaVerify', () => {
         const driver = await postgresDriver.create(connectionString);
         try {
           // Create family instance with the pgvector extension
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [pgvector],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [pgvector],
+            }),
+          );
 
           const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
           // Include pgvector in frameworkComponents so its verifyDatabaseDependencies hook is called
@@ -129,12 +133,15 @@ describe('family instance schemaVerify', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
 
           const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
           const frameworkComponents: ReadonlyArray<
@@ -181,12 +188,15 @@ describe('family instance schemaVerify', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
 
           const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
           const frameworkComponents: ReadonlyArray<
@@ -213,12 +223,15 @@ describe('family instance schemaVerify', () => {
 
   describe('type metadata registry', () => {
     it('registry contains known type IDs with expected native types', () => {
-      const familyInstance = sql.create({
-        target: postgres,
-        adapter: postgresAdapter,
-        driver: postgresDriver,
-        extensionPacks: [],
-      });
+      const familyInstance = sql.create(
+        createControlStack({
+          family: sql,
+          target: postgres,
+          adapter: postgresAdapter,
+          driver: postgresDriver,
+          extensionPacks: [],
+        }),
+      );
 
       const registry = familyInstance.typeMetadataRegistry;
 
@@ -243,12 +256,15 @@ describe('family instance schemaVerify', () => {
     });
 
     it('registry includes extension pack types', () => {
-      const familyInstance = sql.create({
-        target: postgres,
-        adapter: postgresAdapter,
-        driver: postgresDriver,
-        extensionPacks: [pgvector],
-      });
+      const familyInstance = sql.create(
+        createControlStack({
+          family: sql,
+          target: postgres,
+          adapter: postgresAdapter,
+          driver: postgresDriver,
+          extensionPacks: [pgvector],
+        }),
+      );
 
       const registry = familyInstance.typeMetadataRegistry;
 
@@ -290,12 +306,15 @@ describe('family instance schemaVerify', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
 
           const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
           const frameworkComponents: ReadonlyArray<
@@ -376,12 +395,15 @@ describe('family instance schemaVerify', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          });
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
 
           const validatedContract =
             validateContract<SqlContract<SqlStorage>>(contractWithUnknownType);

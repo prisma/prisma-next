@@ -7,6 +7,7 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -57,12 +58,15 @@ async function emitContract(
   testDir: string,
 ): Promise<SqlContract<SqlStorage>> {
   // Create family instance
-  const familyInstance = sql.create({
-    target: postgres,
-    adapter: postgresAdapter,
-    driver: postgresDriver,
-    extensionPacks: [],
-  });
+  const familyInstance = sql.create(
+    createControlStack({
+      family: sql,
+      target: postgres,
+      adapter: postgresAdapter,
+      driver: postgresDriver,
+      extensionPacks: [],
+    }),
+  );
 
   // emitContract handles stripping mappings and validation internally
   const emitResult = await familyInstance.emitContract({ contractIR: contract });
@@ -88,12 +92,15 @@ function loadContract(testDir: string): { contractIR: ContractIR; contractPath: 
   const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
   // Create family instance to validate contract
-  const familyInstance = sql.create({
-    target: postgres,
-    adapter: postgresAdapter,
-    driver: postgresDriver,
-    extensionPacks: [],
-  });
+  const familyInstance = sql.create(
+    createControlStack({
+      family: sql,
+      target: postgres,
+      adapter: postgresAdapter,
+      driver: postgresDriver,
+      extensionPacks: [],
+    }),
+  );
   const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
   return { contractIR, contractPath };
 }
@@ -112,12 +119,15 @@ async function verifyDatabase(options: {
 
   const driver = await postgresDriver.create(dbUrl);
   try {
-    const familyInstance = sql.create({
-      target: postgres,
-      adapter: postgresAdapter,
-      driver: postgresDriver,
-      extensionPacks: [],
-    });
+    const familyInstance = sql.create(
+      createControlStack({
+        family: sql,
+        target: postgres,
+        adapter: postgresAdapter,
+        driver: postgresDriver,
+        extensionPacks: [],
+      }),
+    );
 
     return await familyInstance.verify({
       driver,

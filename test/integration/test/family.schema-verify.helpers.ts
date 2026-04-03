@@ -6,6 +6,7 @@ import type { ControlExtensionDescriptor } from '@prisma-next/core-control-plane
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { type SqlControlFamilyInstance } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import postgres from '@prisma-next/target-postgres/control';
@@ -56,12 +57,15 @@ export function useDevDatabase(): { getConnectionString: () => string } {
 export function createFamilyInstance(
   extensions: readonly ControlExtensionDescriptor<'sql', 'postgres'>[] = [],
 ): SqlControlFamilyInstance {
-  return sql.create({
-    target: postgres,
-    adapter: postgresAdapter,
-    driver: postgresDriver,
-    extensionPacks: extensions,
-  });
+  return sql.create(
+    createControlStack({
+      family: sql,
+      target: postgres,
+      adapter: postgresAdapter,
+      driver: postgresDriver,
+      extensionPacks: extensions,
+    }),
+  );
 }
 
 /**

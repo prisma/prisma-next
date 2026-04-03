@@ -5,6 +5,7 @@ import sqlFamilyDescriptor, {
   createMigrationPlan,
   type SqlMigrationRunnerFailure,
 } from '@prisma-next/family-sql/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
@@ -45,12 +46,15 @@ export const emptySchema: SqlSchemaIR = {
   dependencies: [],
 };
 
-export const familyInstance = sqlFamilyDescriptor.create({
-  target: postgresTargetDescriptor,
-  adapter: postgresAdapterDescriptor,
-  driver: postgresDriverDescriptor,
-  extensionPacks: [],
-});
+export const familyInstance = sqlFamilyDescriptor.create(
+  createControlStack({
+    family: sqlFamilyDescriptor,
+    target: postgresTargetDescriptor,
+    adapter: postgresAdapterDescriptor,
+    driver: postgresDriverDescriptor,
+    extensionPacks: [],
+  }),
+);
 
 export const frameworkComponents = [
   postgresTargetDescriptor,

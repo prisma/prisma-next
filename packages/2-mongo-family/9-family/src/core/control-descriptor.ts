@@ -1,7 +1,4 @@
-import type {
-  ControlFamilyDescriptor,
-  ControlPlaneStack,
-} from '@prisma-next/core-control-plane/types';
+import type { ControlFamilyDescriptor } from '@prisma-next/core-control-plane/types';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
 import { createMongoFamilyInstance, type MongoControlFamilyInstance } from './control-instance';
@@ -16,16 +13,9 @@ class MongoFamilyDescriptor
   readonly hook = mongoTargetFamilyHook;
 
   create<TTargetId extends string>(
-    _stack: ControlPlaneStack<'mongo', TTargetId>,
-    controlStack?: ControlStack,
+    stack: ControlStack<'mongo', TTargetId>,
   ): MongoControlFamilyInstance {
-    if (!controlStack) {
-      throw new Error(
-        'MongoFamilyDescriptor.create() requires controlStack. ' +
-          'Call createControlStack() first and pass the result.',
-      );
-    }
-    return createMongoFamilyInstance(controlStack);
+    return createMongoFamilyInstance(stack);
   }
 }
 

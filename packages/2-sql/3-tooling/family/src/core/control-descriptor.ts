@@ -1,8 +1,6 @@
-import type {
-  ControlFamilyDescriptor,
-  ControlPlaneStack,
-} from '@prisma-next/core-control-plane/types';
+import type { ControlFamilyDescriptor } from '@prisma-next/core-control-plane/types';
 import type { TargetDescriptor } from '@prisma-next/framework-components/components';
+import type { ControlStack } from '@prisma-next/framework-components/control';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import type { SqlControlDescriptorWithContributions } from './assembly';
 import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './control-instance';
@@ -21,7 +19,7 @@ export class SqlFamilyDescriptor
   readonly hook = sqlTargetFamilyHook;
 
   create<TTargetId extends string>(
-    stack: ControlPlaneStack<'sql', TTargetId>,
+    stack: ControlStack<'sql', TTargetId>,
   ): SqlControlFamilyInstance {
     const target = stack.target as unknown as TargetDescriptor<'sql', TTargetId> &
       SqlControlDescriptorWithContributions;

@@ -6,6 +6,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
@@ -43,12 +44,15 @@ async function emitContract(
   testDir: string,
 ): Promise<Record<string, unknown>> {
   // Create family instance for emission
-  const familyInstance = sql.create({
-    target: postgres,
-    adapter: postgresAdapter,
-    driver: undefined,
-    extensionPacks: [],
-  });
+  const familyInstance = sql.create(
+    createControlStack({
+      family: sql,
+      target: postgres,
+      adapter: postgresAdapter,
+      driver: undefined,
+      extensionPacks: [],
+    }),
+  );
 
   // emitContract handles stripping mappings and validation internally
   const emitResult = await familyInstance.emitContract({ contractIR: contract });

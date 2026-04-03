@@ -15,22 +15,21 @@ import type {
   TargetDescriptor,
 } from './framework-components';
 
-export interface ControlPlaneStack<TFamilyId extends string, TTargetId extends string> {
-  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
-  readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
-  readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
-  readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
-}
+/**
+ * @deprecated Use ControlStack from './control-stack' instead.
+ * Retained as a backward-compat alias — structurally a subset of ControlStack.
+ */
+export type ControlPlaneStack<TFamilyId extends string, TTargetId extends string> = Pick<
+  ControlStack<TFamilyId, TTargetId>,
+  'target' | 'adapter' | 'driver' | 'extensionPacks'
+>;
 
 export interface ControlFamilyDescriptor<
   TFamilyId extends string,
   TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
 > extends FamilyDescriptor<TFamilyId> {
   readonly hook: TargetFamilyHook;
-  create<TTargetId extends string>(
-    stack: ControlPlaneStack<TFamilyId, TTargetId>,
-    controlStack?: ControlStack,
-  ): TFamilyInstance;
+  create<TTargetId extends string>(stack: ControlStack<TFamilyId, TTargetId>): TFamilyInstance;
 }
 
 export interface ControlTargetDescriptor<

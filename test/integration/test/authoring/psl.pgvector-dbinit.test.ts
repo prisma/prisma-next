@@ -7,6 +7,7 @@ import sql, {
   assembleAuthoringContributions,
   assemblePslInterpretationContributions,
 } from '@prisma-next/family-sql/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
@@ -60,12 +61,15 @@ describe(
       }
 
       const enrichedIR = enrichContractIR(pslResult.value, frameworkComponents);
-      const familyInstance = sql.create({
-        target: postgres,
-        adapter: postgresAdapter,
-        driver: undefined,
-        extensionPacks: [pgvector],
-      });
+      const familyInstance = sql.create(
+        createControlStack({
+          family: sql,
+          target: postgres,
+          adapter: postgresAdapter,
+          driver: undefined,
+          extensionPacks: [pgvector],
+        }),
+      );
 
       const emitted = await familyInstance.emitContract({ contractIR: enrichedIR });
       return JSON.parse(emitted.contractJson) as Record<string, unknown>;

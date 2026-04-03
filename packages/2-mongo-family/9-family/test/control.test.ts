@@ -1,4 +1,5 @@
 import type { ControlStack } from '@prisma-next/framework-components/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
@@ -6,6 +7,9 @@ import { mongoTargetDescriptor } from '../src/core/mongo-target-descriptor';
 
 function createMinimalControlStack(): ControlStack {
   return {
+    family: mongoFamilyDescriptor,
+    target: mongoTargetDescriptor,
+    extensionPacks: [],
     codecTypeImports: [],
     operationTypeImports: [],
     queryOperationTypeImports: [],
@@ -17,19 +21,13 @@ function createMinimalControlStack(): ControlStack {
 }
 
 describe('mongoFamilyDescriptor', () => {
-  it('throws when controlStack is missing', () => {
-    const stack = { target: mongoTargetDescriptor, extensions: [] };
+  it('returns a valid instance from ControlStack', () => {
+    const stack = createControlStack({
+      family: mongoFamilyDescriptor,
+      target: mongoTargetDescriptor,
+    });
 
-    expect(() => mongoFamilyDescriptor.create(stack as never)).toThrow(
-      'MongoFamilyDescriptor.create() requires controlStack',
-    );
-  });
-
-  it('returns a valid instance when controlStack is provided', () => {
-    const stack = { target: mongoTargetDescriptor, extensions: [] };
-    const state = createMinimalControlStack();
-
-    const instance = mongoFamilyDescriptor.create(stack as never, state);
+    const instance = mongoFamilyDescriptor.create(stack);
 
     expect(instance.familyId).toBe('mongo');
     expect(typeof instance.validateContractIR).toBe('function');

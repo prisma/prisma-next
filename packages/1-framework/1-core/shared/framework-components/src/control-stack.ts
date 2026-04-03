@@ -1,11 +1,18 @@
 import type {
+  ControlAdapterDescriptor,
+  ControlDriverDescriptor,
+  ControlExtensionDescriptor,
+  ControlFamilyDescriptor,
+  ControlTargetDescriptor,
+} from './control-descriptors';
+import type {
   AuthoringContributions,
   AuthoringFieldNamespace,
   AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
 } from './framework-authoring';
-import type { ComponentDescriptor, ComponentMetadata } from './framework-components';
+import type { ComponentMetadata } from './framework-components';
 import type { NormalizedTypeRenderer, TypeRenderer } from './type-renderers';
 import { normalizeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types';
@@ -15,7 +22,16 @@ export interface AssembledAuthoringContributions {
   readonly type: AuthoringTypeNamespace;
 }
 
-export interface ControlStack {
+export interface ControlStack<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  readonly family: ControlFamilyDescriptor<TFamilyId>;
+  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
+  readonly adapter?: ControlAdapterDescriptor<TFamilyId, TTargetId> | undefined;
+  readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
+  readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly queryOperationTypeImports: ReadonlyArray<TypesImportSpec>;
@@ -25,11 +41,17 @@ export interface ControlStack {
   readonly authoringContributions: AssembledAuthoringContributions;
 }
 
-export interface CreateControlStackInput {
-  readonly family: ComponentDescriptor<'family'>;
-  readonly target: ComponentDescriptor<'target'>;
-  readonly adapter?: ComponentDescriptor<'adapter'>;
-  readonly extensionPacks?: ReadonlyArray<ComponentDescriptor<'extension'>>;
+export interface CreateControlStackInput<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  readonly family: ControlFamilyDescriptor<TFamilyId>;
+  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
+  readonly adapter?: ControlAdapterDescriptor<TFamilyId, TTargetId> | undefined;
+  readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
+  readonly extensionPacks?:
+    | ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>
+    | undefined;
 }
 
 function addUniqueId(ids: string[], seen: Set<string>, id: string): void {
@@ -266,14 +288,20 @@ export function assembleAuthoringContributions(
   };
 }
 
-export function createControlStack(input: CreateControlStackInput): ControlStack {
-  const { family, target, adapter, extensionPacks = [] } = input;
+export function createControlStack<TFamilyId extends string, TTargetId extends string>(
+  input: CreateControlStackInput<TFamilyId, TTargetId>,
+): ControlStack<TFamilyId, TTargetId> {
+  const { family, target, adapter, driver, extensionPacks = [] } = input;
 
-  const allDescriptors: ComponentDescriptor<string>[] = [family, target];
-  if (adapter) allDescriptors.push(adapter);
-  allDescriptors.push(...extensionPacks);
+  const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...extensionPacks];
 
   return {
+    family,
+    target,
+    adapter,
+    driver,
+    extensionPacks: extensionPacks as readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[],
+
     codecTypeImports: extractCodecTypeImports(allDescriptors),
     operationTypeImports: extractOperationTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
