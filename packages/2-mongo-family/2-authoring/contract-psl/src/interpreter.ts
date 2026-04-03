@@ -97,7 +97,9 @@ export function interpretPslDocumentToMongoContractIR(
             modelName: pslModel.name,
             fieldName: field.name,
             targetModelName: field.typeName,
-            relationName: listRelation?.relationName,
+            ...(listRelation?.relationName !== undefined
+              ? { relationName: listRelation.relationName }
+              : {}),
             field,
           });
           continue;
@@ -126,7 +128,7 @@ export function interpretPslDocumentToMongoContractIR(
             declaringModel: pslModel.name,
             fieldName: field.name,
             targetModel: field.typeName,
-            relationName: relation.relationName,
+            ...(relation.relationName !== undefined ? { relationName: relation.relationName } : {}),
             localFields: localMapped,
             targetFields: targetMapped,
           });
@@ -194,7 +196,8 @@ export function interpretPslDocumentToMongoContractIR(
       continue;
     }
 
-    const fk = matches[0]!;
+    const fk = matches[0];
+    if (!fk) continue;
     const modelEntry = models[candidate.modelName];
     if (!modelEntry) continue;
     modelEntry.relations[candidate.fieldName] = {
