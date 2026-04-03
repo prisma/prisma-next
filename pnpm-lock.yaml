@@ -407,9 +407,6 @@ importers:
 
   packages/1-framework/1-core/shared/contract:
     dependencies:
-      '@prisma-next/operations':
-        specifier: workspace:*
-        version: link:../operations
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../utils
