@@ -1,5 +1,5 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
+  Contract,
   GenerateContractTypesOptions,
   TargetFamilyHook,
   TypesImportSpec,
@@ -119,8 +119,8 @@ function generateStorageType(storage: MongoStorageIR): string {
 export const mongoTargetFamilyHook = {
   id: 'mongo',
 
-  validateTypes(ir: ContractIR, _ctx: ValidationContext): void {
-    const models = ir.models as Record<string, MongoModelIR> | undefined;
+  validateTypes(contract: Contract, _ctx: ValidationContext): void {
+    const models = contract.models as Record<string, MongoModelIR> | undefined;
     if (!models) return;
 
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
@@ -141,18 +141,17 @@ export const mongoTargetFamilyHook = {
     }
   },
 
-  validateStructure(ir: ContractIR): void {
-    if (ir.targetFamily !== 'mongo') {
-      throw new Error(`Expected targetFamily "mongo", got "${ir.targetFamily}"`);
+  validateStructure(contract: Contract): void {
+    if (contract.targetFamily !== 'mongo') {
+      throw new Error(`Expected targetFamily "mongo", got "${contract.targetFamily}"`);
     }
 
-    // ContractIR.storage is typed as generic Record; narrow to Mongo shape (validated below)
-    const storage = ir.storage as unknown as MongoStorageIR | undefined;
+    const storage = contract.storage as unknown as MongoStorageIR | undefined;
     if (!storage || !storage.collections || typeof storage.collections !== 'object') {
       throw new Error('Mongo contract must have storage.collections');
     }
 
-    const models = ir.models as Record<string, MongoModelIR> | undefined;
+    const models = contract.models as Record<string, MongoModelIR> | undefined;
     if (!models) return;
 
     const collectionNames = new Set(Object.keys(storage.collections));
@@ -237,7 +236,7 @@ export const mongoTargetFamilyHook = {
   },
 
   generateContractTypes(
-    ir: ContractIR,
+    contract: Contract,
     codecTypeImports: ReadonlyArray<TypesImportSpec>,
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
     hashes: {
@@ -248,9 +247,8 @@ export const mongoTargetFamilyHook = {
     options?: GenerateContractTypesOptions,
   ): string {
     const parameterizedTypeImports = options?.parameterizedTypeImports;
-    const models = ir.models as Record<string, MongoModelIR>;
-    // ContractIR.storage is typed as generic Record; narrow to Mongo shape (validated by validateStructure)
-    const storage = ir.storage as unknown as MongoStorageIR;
+    const models = contract.models as Record<string, MongoModelIR>;
+    const storage = contract.storage as unknown as MongoStorageIR;
 
     const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
     if (parameterizedTypeImports) {
@@ -264,7 +262,7 @@ export const mongoTargetFamilyHook = {
     const operationTypes = generateCodecTypeIntersection(operationTypeImports, 'OperationTypes');
 
     const hashAliases = generateHashTypeAliases(hashes);
-    const rootsType = generateRootsType(ir.roots);
+    const rootsType = generateRootsType(contract.roots);
     const modelsType = generateModelsType(models);
     const storageTypeDef = generateStorageType(storage);
 
@@ -290,16 +288,15 @@ export type OperationTypes = ${operationTypes};
 export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>;
 
 type ContractBase = {
-  readonly schemaVersion: ${serializeValue(ir.schemaVersion)};
-  readonly target: ${serializeValue(ir.target)};
-  readonly targetFamily: ${serializeValue(ir.targetFamily)};
+  readonly schemaVersion: ${serializeValue('1')};
+  readonly target: ${serializeValue(contract.target)};
+  readonly targetFamily: ${serializeValue(contract.targetFamily)};
   readonly storageHash: StorageHash;
   readonly executionHash?: ExecutionHash;
   readonly profileHash: ProfileHash;
-  readonly capabilities: ${serializeValue(ir.capabilities)};
-  readonly extensionPacks: ${serializeValue(ir.extensionPacks)};
-  readonly meta: ${serializeValue(ir.meta)};
-  readonly sources: ${serializeValue(ir.sources)};
+  readonly capabilities: ${serializeValue(contract.capabilities)};
+  readonly extensionPacks: ${serializeValue(contract.extensionPacks)};
+  readonly meta: ${serializeValue(contract.meta)};
   readonly roots: ${rootsType};
   readonly models: ${modelsType};
   readonly storage: ${storageTypeDef};

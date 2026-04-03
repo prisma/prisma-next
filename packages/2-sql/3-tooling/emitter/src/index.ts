@@ -1,5 +1,5 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
+  Contract,
   GenerateContractTypesOptions,
   TypeRenderContext,
   TypeRenderEntry,
@@ -52,8 +52,8 @@ function resolveColumnTypeParams(
 export const sqlTargetFamilyHook = {
   id: 'sql',
 
-  validateTypes(ir: ContractIR, _ctx: ValidationContext): void {
-    const storage = ir.storage as SqlStorage | undefined;
+  validateTypes(contract: Contract, _ctx: ValidationContext): void {
+    const storage = contract.storage as unknown as SqlStorage | undefined;
     if (!storage || !storage.tables) {
       return;
     }
@@ -81,17 +81,17 @@ export const sqlTargetFamilyHook = {
     }
   },
 
-  validateStructure(ir: ContractIR): void {
-    if (ir.targetFamily !== 'sql') {
-      throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
+  validateStructure(contract: Contract): void {
+    if (contract.targetFamily !== 'sql') {
+      throw new Error(`Expected targetFamily "sql", got "${contract.targetFamily}"`);
     }
 
-    const storage = ir.storage as SqlStorage | undefined;
+    const storage = contract.storage as unknown as SqlStorage | undefined;
     if (!storage || !storage.tables) {
       throw new Error('SQL contract must have storage.tables');
     }
 
-    const models = ir.models as Record<string, IRModelDefinition> | undefined;
+    const models = contract.models as Record<string, IRModelDefinition> | undefined;
     const tableNames = new Set(Object.keys(storage.tables));
 
     if (models) {
@@ -234,7 +234,7 @@ export const sqlTargetFamilyHook = {
   },
 
   generateContractTypes(
-    ir: ContractIR,
+    contract: Contract,
     codecTypeImports: ReadonlyArray<TypesImportSpec>,
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
     hashes: {
@@ -246,8 +246,8 @@ export const sqlTargetFamilyHook = {
   ): string {
     const parameterizedRenderers = options?.parameterizedRenderers;
     const parameterizedTypeImports = options?.parameterizedTypeImports;
-    const storage = ir.storage as SqlStorage;
-    const models = ir.models as Record<string, IRModelDefinition>;
+    const storage = contract.storage as unknown as SqlStorage;
+    const models = contract.models as Record<string, IRModelDefinition>;
 
     // Collect all type imports from three sources:
     // 1. Codec type imports (from adapters, targets, and extensions)
@@ -307,7 +307,7 @@ export const sqlTargetFamilyHook = {
     const renderCtx: TypeRenderContext = { codecTypesName: 'CodecTypes' };
     const storageType = this.generateStorageType(storage);
     const modelsType = this.generateModelsType(models, storage, parameterizedRenderers, renderCtx);
-    const rootsType = this.generateRootsType(ir.roots);
+    const rootsType = this.generateRootsType(contract.roots);
 
     const executionHashType = hashes.executionHash
       ? `ExecutionHashBase<'${hashes.executionHash}'>`
@@ -353,11 +353,11 @@ export const sqlTargetFamilyHook = {
   ExecutionHash,
   ProfileHash
   > & {
-    readonly target: ${this.serializeValue(ir.target)};
+    readonly target: ${this.serializeValue(contract.target)};
     readonly roots: ${rootsType};
-    readonly capabilities: ${this.serializeValue(ir.capabilities)};
-    readonly extensionPacks: ${this.serializeValue(ir.extensionPacks)};
-    readonly execution: ${this.serializeValue(ir.execution)};
+    readonly capabilities: ${this.serializeValue(contract.capabilities)};
+    readonly extensionPacks: ${this.serializeValue(contract.extensionPacks)};
+    readonly execution: ${this.serializeValue(contract.execution)};
   };
 
   export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;

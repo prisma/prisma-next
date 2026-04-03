@@ -1,4 +1,5 @@
 import type { OperationRegistry } from '@prisma-next/operations';
+import type { Contract } from './contract-types';
 import type { DomainModel } from './domain-types';
 import type { ContractIR } from './ir';
 
@@ -383,20 +384,20 @@ export interface TargetFamilyHook {
 
   /**
    * Validates that all type IDs in the contract come from referenced extension packs.
-   * @param ir - Contract IR to validate
+   * @param contract - Contract to validate
    * @param ctx - Validation context with operation registry and extension IDs
    */
-  validateTypes(ir: ContractIR, ctx: ValidationContext): void;
+  validateTypes(contract: Contract, ctx: ValidationContext): void;
 
   /**
    * Validates family-specific contract structure.
-   * @param ir - Contract IR to validate
+   * @param contract - Contract to validate
    */
-  validateStructure(ir: ContractIR): void;
+  validateStructure(contract: Contract): void;
 
   /**
    * Generates contract.d.ts file content.
-   * @param ir - Contract IR
+   * @param contract - Contract
    * @param codecTypeImports - Array of codec type import specs
    * @param operationTypeImports - Array of operation type import specs
    * @param hashes - Contract hash values (storageHash, executionHash, profileHash)
@@ -404,7 +405,7 @@ export interface TargetFamilyHook {
    * @returns Generated TypeScript type definitions as string
    */
   generateContractTypes(
-    ir: ContractIR,
+    contract: Contract,
     codecTypeImports: ReadonlyArray<TypesImportSpec>,
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
     hashes: {

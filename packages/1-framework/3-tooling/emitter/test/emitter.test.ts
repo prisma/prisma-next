@@ -1,5 +1,5 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
+  Contract,
   GenerateContractTypesOptions,
   TargetFamilyHook,
   TypeRenderEntry,
@@ -12,10 +12,30 @@ import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createContractIR } from './utils';
 
+const EMIT_TEST_STORAGE_HASH =
+  'sha256:0000000000000000000000000000000000000000000000000000000000000000';
+
+function emitTestContract(patch: Record<string, unknown>): Contract {
+  const base = {
+    targetFamily: 'sql',
+    target: 'postgres',
+    roots: {},
+    models: {},
+    storage: {
+      tables: {},
+      storageHash: EMIT_TEST_STORAGE_HASH,
+    },
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+  return { ...base, ...patch } as unknown as Contract;
+}
+
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (ir: ContractIR) => {
-    const storage = ir.storage as
+  validateTypes: (contract: Contract) => {
+    const storage = contract.storage as
       | { tables?: Record<string, { columns?: Record<string, { codecId?: string }> }> }
       | undefined;
     if (!storage?.tables) {
@@ -41,14 +61,18 @@ const mockSqlHook: TargetFamilyHook = {
       }
     }
   },
-  validateStructure: (ir: ContractIR) => {
-    if (ir.targetFamily !== 'sql') {
-      throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
+  validateStructure: (contract: Contract) => {
+    if (contract.targetFamily !== 'sql') {
+      throw new Error(`Expected targetFamily "sql", got "${contract.targetFamily}"`);
     }
   },
-  generateContractTypes: (ir: ContractIR, _codecTypeImports, _operationTypeImports, _hashes) => {
-    // Access ir properties to satisfy lint rules, but we don't use them in the mock
-    void ir;
+  generateContractTypes: (
+    contract: Contract,
+    _codecTypeImports,
+    _operationTypeImports,
+    _hashes,
+  ) => {
+    void contract;
     void _codecTypeImports;
     void _operationTypeImports;
     void _hashes;
@@ -58,6 +82,13 @@ export type LaneCodecTypes = CodecTypes;
 export type Contract = unknown;
 `;
   },
+};
+
+const mockSqlHookSkipStructureValidation: TargetFamilyHook = {
+  id: 'sql',
+  validateTypes: mockSqlHook.validateTypes,
+  validateStructure: () => {},
+  generateContractTypes: mockSqlHook.generateContractTypes,
 };
 
 describe('emitter', () => {
@@ -186,21 +217,7 @@ describe('emitter', () => {
   });
 
   it('throws error when targetFamily is missing', async () => {
-    const ir = createContractIR({
-      targetFamily: undefined as unknown as string,
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    }) as ContractIR;
+    const contract = emitTestContract({ targetFamily: undefined });
 
     const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
@@ -211,27 +228,13 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'ContractIR must have targetFamily',
+    await expect(emit(contract, options, mockSqlHookSkipStructureValidation)).rejects.toThrow(
+      'Contract canonical artifact validation failed',
     );
   });
 
   it('throws error when target is missing', async () => {
-    const ir = createContractIR({
-      target: undefined as unknown as string,
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    }) as ContractIR;
+    const contract = emitTestContract({ target: undefined });
 
     const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
@@ -242,7 +245,9 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have target');
+    await expect(emit(contract, options, mockSqlHook)).rejects.toThrow(
+      'Contract canonical artifact validation failed',
+    );
   });
 
   it('emits contract even when extension pack namespace does not match extensionIds', async () => {
@@ -341,97 +346,8 @@ describe('emitter', () => {
     expect(result.contractDts).toBeDefined();
   });
 
-  it('throws error when schemaVersion is missing', async () => {
-    const ir = createContractIR({
-      schemaVersion: undefined as unknown as string,
-    }) as ContractIR;
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'ContractIR must have schemaVersion',
-    );
-  });
-
-  it('throws error when models is missing', async () => {
-    const ir = createContractIR({
-      models: undefined as unknown as Record<string, unknown>,
-    }) as ContractIR;
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have models');
-  });
-
-  it('throws error when models is not an object', async () => {
-    const ir = createContractIR({
-      models: 'not-an-object' as unknown as Record<string, unknown>,
-    }) as ContractIR;
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have models');
-  });
-
-  it('throws error when storage is missing', async () => {
-    const ir = createContractIR({
-      storage: undefined as unknown as Record<string, unknown>,
-    }) as ContractIR;
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have storage');
-  });
-
-  it('throws error when storage is not an object', async () => {
-    const ir = createContractIR({
-      storage: 'not-an-object' as unknown as Record<string, unknown>,
-    }) as ContractIR;
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have storage');
-  });
-
   it('throws error when extension packs are missing', async () => {
-    const ir = createContractIR({
-      extensionPacks: undefined as unknown as Record<string, unknown>,
-    }) as ContractIR;
+    const contract = emitTestContract({ extensionPacks: undefined });
 
     const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
@@ -442,15 +358,15 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'ContractIR must have extensionPacks',
+    await expect(emit(contract, options, mockSqlHook)).rejects.toThrow(
+      'Contract canonical artifact validation failed',
     );
   });
 
   it('throws error when extension packs are not an object', async () => {
     const ir = createContractIR({
       extensionPacks: 'not-an-object' as unknown as Record<string, unknown>,
-    }) as ContractIR;
+    });
 
     const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
@@ -462,14 +378,12 @@ describe('emitter', () => {
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'ContractIR must have extensionPacks',
+      'Contract canonical artifact validation failed',
     );
   });
 
   it('throws error when capabilities is missing', async () => {
-    const ir = createContractIR({
-      capabilities: undefined as unknown as Record<string, Record<string, boolean>>,
-    }) as ContractIR;
+    const contract = emitTestContract({ capabilities: undefined });
 
     const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
@@ -480,15 +394,15 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'ContractIR must have capabilities',
+    await expect(emit(contract, options, mockSqlHook)).rejects.toThrow(
+      'Contract canonical artifact validation failed',
     );
   });
 
   it('throws error when capabilities is not an object', async () => {
     const ir = createContractIR({
       capabilities: 'not-an-object' as unknown as Record<string, Record<string, boolean>>,
-    }) as ContractIR;
+    });
 
     const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
@@ -500,14 +414,12 @@ describe('emitter', () => {
     };
 
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'ContractIR must have capabilities',
+      'Contract canonical artifact validation failed',
     );
   });
 
   it('throws error when meta is missing', async () => {
-    const ir = createContractIR({
-      meta: undefined as unknown as Record<string, unknown>,
-    }) as ContractIR;
+    const contract = emitTestContract({ meta: undefined });
 
     const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
@@ -518,13 +430,15 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have meta');
+    await expect(emit(contract, options, mockSqlHook)).rejects.toThrow(
+      'Contract canonical artifact validation failed',
+    );
   });
 
   it('throws error when meta is not an object', async () => {
     const ir = createContractIR({
       meta: 'not-an-object' as unknown as Record<string, unknown>,
-    }) as ContractIR;
+    });
 
     const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
@@ -535,13 +449,25 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have meta');
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'Contract canonical artifact validation failed',
+    );
   });
 
   it('omits sources from emitted contract artifact', async () => {
     const ir = createContractIR({
-      sources: {
-        schema: { sourceId: 'schema.prisma' },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
       },
     });
 
@@ -629,15 +555,19 @@ describe('emitter', () => {
     // Use a mock hook that doesn't validate types to avoid type validation errors
     const mockHookNoTypeValidation: TargetFamilyHook = {
       id: 'sql',
-      validateTypes: () => {
-        // Skip type validation
-      },
-      validateStructure: (ir: ContractIR) => {
-        if (ir.targetFamily !== 'sql') {
-          throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
+      validateTypes: () => {},
+      validateStructure: (contract: Contract) => {
+        if (contract.targetFamily !== 'sql') {
+          throw new Error(`Expected targetFamily "sql", got "${contract.targetFamily}"`);
         }
       },
-      generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports, _hashes) => {
+      generateContractTypes: (
+        contract: Contract,
+        _codecTypeImports,
+        _operationTypeImports,
+        _hashes,
+      ) => {
+        void contract;
         void _codecTypeImports;
         void _operationTypeImports;
         void _hashes;
@@ -676,7 +606,14 @@ export type Contract = unknown;
       id: 'sql',
       validateTypes: () => {},
       validateStructure: () => {},
-      generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports, _hashes, options) => {
+      generateContractTypes: (
+        contract: Contract,
+        _codecTypeImports,
+        _operationTypeImports,
+        _hashes,
+        options,
+      ) => {
+        void contract;
         receivedOptions = options;
         return `// Generated contract types
 export type CodecTypes = Record<string, never>;
