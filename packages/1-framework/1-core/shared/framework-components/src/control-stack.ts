@@ -5,8 +5,8 @@ import type {
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
 } from './framework-authoring';
-import type { NormalizedTypeRenderer, TypeRenderer } from './framework-components';
-import { normalizeRenderer } from './framework-components';
+import type { NormalizedTypeRenderer, TypeRenderer } from './type-renderers';
+import { normalizeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types';
 
 export interface AssemblyInput {

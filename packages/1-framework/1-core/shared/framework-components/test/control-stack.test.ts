@@ -172,7 +172,7 @@ describe('extractParameterizedRenderers', () => {
         types: {
           codecTypes: {
             parameterized: {
-              'test/custom@1': (params, ctx) =>
+              'test/custom@1': (params: Record<string, unknown>, ctx: { codecTypesName: string }) =>
                 `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
             },
           },
@@ -194,7 +194,8 @@ describe('extractParameterizedRenderers', () => {
             parameterized: {
               'test/custom@1': {
                 kind: 'function',
-                render: (params, ctx) => `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
+                render: (params: Record<string, unknown>, ctx: { codecTypesName: string }) =>
+                  `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
               },
             },
           },
