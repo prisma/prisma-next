@@ -51,6 +51,7 @@ export interface ComponentMetadata {
       readonly controlPlaneHooks?: Record<string, unknown>;
     };
     readonly operationTypes?: { readonly import: TypesImportSpec };
+    readonly queryOperationTypes?: { readonly import: TypesImportSpec };
     readonly storage?: ReadonlyArray<{
       readonly typeId: string;
       readonly familyId: string;

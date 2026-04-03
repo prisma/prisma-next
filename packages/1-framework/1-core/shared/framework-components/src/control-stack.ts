@@ -5,23 +5,10 @@ import type {
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
 } from './framework-authoring';
+import type { ComponentDescriptor } from './framework-components';
 import type { NormalizedTypeRenderer, TypeRenderer } from './type-renderers';
 import { normalizeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types';
-
-export interface AssemblyInput {
-  readonly id: string;
-  readonly authoring?: AuthoringContributions;
-  readonly types?: {
-    readonly codecTypes?: {
-      readonly import?: TypesImportSpec;
-      readonly parameterized?: Record<string, TypeRenderer>;
-      readonly typeImports?: ReadonlyArray<TypesImportSpec>;
-    };
-    readonly operationTypes?: { readonly import: TypesImportSpec };
-    readonly queryOperationTypes?: { readonly import: TypesImportSpec };
-  };
-}
 
 export interface AssembledAuthoringContributions {
   readonly field: AuthoringFieldNamespace;
@@ -39,10 +26,10 @@ export interface ControlStack {
 }
 
 export interface CreateControlStackInput {
-  readonly family: AssemblyInput;
-  readonly target: AssemblyInput;
-  readonly adapter?: AssemblyInput;
-  readonly extensionPacks?: ReadonlyArray<AssemblyInput>;
+  readonly family: ComponentDescriptor<'family'>;
+  readonly target: ComponentDescriptor<'target'>;
+  readonly adapter?: ComponentDescriptor<'adapter'>;
+  readonly extensionPacks?: ReadonlyArray<ComponentDescriptor<'extension'>>;
 }
 
 function addUniqueId(ids: string[], seen: Set<string>, id: string): void {
@@ -70,7 +57,7 @@ export function assertUniqueCodecOwner(options: {
 }
 
 export function extractCodecTypeImports(
-  descriptors: ReadonlyArray<AssemblyInput>,
+  descriptors: ReadonlyArray<ComponentDescriptor<string>>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -88,7 +75,7 @@ export function extractCodecTypeImports(
 }
 
 export function extractOperationTypeImports(
-  descriptors: ReadonlyArray<AssemblyInput>,
+  descriptors: ReadonlyArray<ComponentDescriptor<string>>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -103,7 +90,7 @@ export function extractOperationTypeImports(
 }
 
 export function extractQueryOperationTypeImports(
-  descriptors: ReadonlyArray<AssemblyInput>,
+  descriptors: ReadonlyArray<ComponentDescriptor<string>>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -140,7 +127,7 @@ export function extractComponentIds(
 }
 
 export function extractParameterizedRenderers(
-  descriptors: ReadonlyArray<AssemblyInput>,
+  descriptors: ReadonlyArray<ComponentDescriptor<string>>,
 ): Map<string, NormalizedTypeRenderer> {
   const renderers = new Map<string, NormalizedTypeRenderer>();
   const owners = new Map<string, string>();
@@ -167,7 +154,7 @@ export function extractParameterizedRenderers(
 }
 
 export function extractParameterizedTypeImports(
-  descriptors: ReadonlyArray<AssemblyInput>,
+  descriptors: ReadonlyArray<ComponentDescriptor<string>>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -282,7 +269,7 @@ export function assembleAuthoringContributions(
 export function createControlStack(input: CreateControlStackInput): ControlStack {
   const { family, target, adapter, extensionPacks = [] } = input;
 
-  const allDescriptors: AssemblyInput[] = [family, target];
+  const allDescriptors: ComponentDescriptor<string>[] = [family, target];
   if (adapter) allDescriptors.push(adapter);
   allDescriptors.push(...extensionPacks);
 
