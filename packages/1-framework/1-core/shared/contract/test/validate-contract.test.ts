@@ -76,6 +76,19 @@ describe('validateContract', () => {
     );
   });
 
+  it('rejects objects missing required fields', () => {
+    expect(() => validateContract<Contract>({ target: 'postgres' }, noopValidator)).toThrow(
+      'Invalid contract structure',
+    );
+  });
+
+  it('rejects objects with wrong field types', () => {
+    const raw = { ...minimalContract(), target: 42 };
+    expect(() => validateContract<Contract>(raw, noopValidator)).toThrow(
+      'Invalid contract structure',
+    );
+  });
+
   it('runs domain validation (catches bad root references)', () => {
     const raw = minimalContract({ roots: { users: 'NonExistent' } });
     expect(() => validateContract<Contract>(raw, noopValidator)).toThrow(

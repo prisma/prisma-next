@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@prisma-next/operations": "workspace:*",
-    "@prisma-next/utils": "workspace:*"
+    "@prisma-next/utils": "workspace:*",
+    "arktype": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",

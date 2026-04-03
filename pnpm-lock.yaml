@@ -413,6 +413,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../utils
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
