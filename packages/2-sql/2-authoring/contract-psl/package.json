@@ -17,6 +17,7 @@
   "dependencies": {
     "@prisma-next/config": "workspace:*",
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/psl-parser": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",

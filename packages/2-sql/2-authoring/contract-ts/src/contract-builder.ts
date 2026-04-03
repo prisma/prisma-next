@@ -1,8 +1,3 @@
-import type {
-  ExtensionPackRef,
-  FamilyPackRef,
-  TargetPackRef,
-} from '@prisma-next/contract/framework-components';
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
@@ -23,6 +18,11 @@ import {
   ModelBuilder,
   TableBuilder,
 } from '@prisma-next/contract-authoring';
+import type {
+  ExtensionPackRef,
+  FamilyPackRef,
+  TargetPackRef,
+} from '@prisma-next/framework-components/components';
 import type {
   ContractWithTypeMaps,
   Index,

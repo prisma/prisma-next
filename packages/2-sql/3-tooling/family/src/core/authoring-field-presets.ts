@@ -1,4 +1,4 @@
-import type { AuthoringFieldNamespace } from '@prisma-next/contract/framework-components';
+import type { AuthoringFieldNamespace } from '@prisma-next/framework-components/authoring';
 
 const CHARACTER_CODEC_ID = 'sql/char@1';
 const CHARACTER_NATIVE_TYPE = 'character';

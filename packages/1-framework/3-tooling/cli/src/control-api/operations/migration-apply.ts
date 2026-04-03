@@ -1,4 +1,3 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type {
@@ -7,6 +6,7 @@ import type {
   MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type {
   MigrationApplyAppliedEntry,

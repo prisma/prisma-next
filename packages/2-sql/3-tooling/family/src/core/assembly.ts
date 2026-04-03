@@ -1,9 +1,9 @@
+import type { TypesImportSpec } from '@prisma-next/contract/types';
+import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type {
-  AuthoringContributions,
   TargetBoundComponentDescriptor,
   TypeRenderer,
-} from '@prisma-next/contract/framework-components';
-import type { TypesImportSpec } from '@prisma-next/contract/types';
+} from '@prisma-next/framework-components/components';
 import { assertUniqueCodecOwner } from '@prisma-next/framework-components/control';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';

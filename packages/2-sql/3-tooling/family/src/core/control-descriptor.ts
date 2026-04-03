@@ -1,8 +1,8 @@
-import type { TargetDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   ControlFamilyDescriptor,
   ControlPlaneStack,
 } from '@prisma-next/core-control-plane/types';
+import type { TargetDescriptor } from '@prisma-next/framework-components/components';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import type { SqlControlDescriptorWithContributions } from './assembly';
 import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './control-instance';

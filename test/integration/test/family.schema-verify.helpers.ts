@@ -2,10 +2,10 @@
  * Shared helpers for family.schema-verify tests.
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ControlExtensionDescriptor } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { type SqlControlFamilyInstance } from '@prisma-next/family-sql/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import postgres from '@prisma-next/target-postgres/control';

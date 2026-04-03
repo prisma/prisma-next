@@ -1,7 +1,3 @@
-import type {
-  TargetBoundComponentDescriptor,
-  TargetDescriptor,
-} from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
@@ -15,6 +11,10 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import type {
+  TargetBoundComponentDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/framework-components/components';
 import {
   extractCodecTypeImports,
   extractComponentIds,

@@ -1,4 +1,4 @@
-import type { ExtensionPackRef } from '@prisma-next/contract/framework-components';
+import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
 import { pgvectorPackMeta } from '../core/descriptor-meta';
 import type { CodecTypes } from '../types/codec-types';
 

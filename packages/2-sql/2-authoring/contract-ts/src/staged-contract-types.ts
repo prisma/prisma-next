@@ -1,5 +1,5 @@
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ContractWithTypeMaps,
   Index,

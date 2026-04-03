@@ -2,13 +2,13 @@ import type {
   AuthoringFieldNamespace,
   AuthoringFieldPresetDescriptor,
   AuthoringTypeNamespace,
-} from '@prisma-next/contract/framework-components';
+} from '@prisma-next/framework-components/authoring';
 import {
   instantiateAuthoringTypeConstructor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
   validateAuthoringHelperArguments,
-} from '@prisma-next/contract/framework-components';
+} from '@prisma-next/framework-components/authoring';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 
 export type RuntimeNamedConstraintSpec = {

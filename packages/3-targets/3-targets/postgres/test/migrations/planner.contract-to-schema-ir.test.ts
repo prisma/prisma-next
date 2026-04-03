@@ -1,5 +1,4 @@
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
@@ -13,6 +12,7 @@ import {
   detectDestructiveChanges,
   extractCodecControlHooks,
 } from '@prisma-next/family-sql/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   SqlContract,
   SqlStorage,

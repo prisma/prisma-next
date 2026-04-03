@@ -1,8 +1,9 @@
 /**
  * Shared test helpers for schema verification tests.
  */
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+
 import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import {
   applyFkDefaults,
   type ReferentialAction,

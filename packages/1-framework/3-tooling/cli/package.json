@@ -28,6 +28,7 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/psl-printer": "workspace:*",
     "@prisma-next/utils": "workspace:*",

@@ -1,5 +1,5 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
+import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 
 const postgresPack = postgresTargetDescriptorMeta;

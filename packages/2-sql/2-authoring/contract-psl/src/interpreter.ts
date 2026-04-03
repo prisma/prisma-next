@@ -3,13 +3,10 @@ import type {
   ContractSourceDiagnosticSpan,
   ContractSourceDiagnostics,
 } from '@prisma-next/config/config-types';
-import type {
-  AuthoringContributions,
-  ExtensionPackRef,
-  TargetPackRef,
-} from '@prisma-next/contract/framework-components';
-import { instantiateAuthoringTypeConstructor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import { instantiateAuthoringTypeConstructor } from '@prisma-next/framework-components/authoring';
+import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ParsePslDocumentResult,
   PslAttribute,

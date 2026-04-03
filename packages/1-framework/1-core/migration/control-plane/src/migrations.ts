@@ -9,8 +9,8 @@
  * with additional fields for execution (precheck SQL, execute SQL, etc.).
  */
 
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { Result } from '@prisma-next/utils/result';
 import type { ControlDriverInstance, ControlFamilyInstance } from './types';
 
