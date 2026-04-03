@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
@@ -69,7 +69,7 @@ async function emitContract(
   );
 
   // emitContract handles stripping mappings and validation internally
-  const emitResult = await familyInstance.emitContract({ contractIR: contract });
+  const emitResult = await familyInstance.emitContract({ contract: contract });
 
   // Write contract files
   const contractJsonPath = resolve(testDir, 'output/contract.json');
@@ -86,7 +86,7 @@ async function emitContract(
 /**
  * Loads contract from disk and validates it.
  */
-function loadContract(testDir: string): { contractIR: ContractIR; contractPath: string } {
+function loadContract(testDir: string): { contract: Contract; contractPath: string } {
   const contractPath = join(testDir, 'output/contract.json');
   const contractJsonContent = readFileSync(contractPath, 'utf-8');
   const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
@@ -101,8 +101,8 @@ function loadContract(testDir: string): { contractIR: ContractIR; contractPath: 
       extensionPacks: [],
     }),
   );
-  const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
-  return { contractIR, contractPath };
+  const contract = familyInstance.validateContract(contractJson) as Contract;
+  return { contract, contractPath };
 }
 
 /**
@@ -110,12 +110,12 @@ function loadContract(testDir: string): { contractIR: ContractIR; contractPath: 
  * Creates a driver, family instance, and calls verify() with proper cleanup.
  */
 async function verifyDatabase(options: {
-  contractIR: ContractIR;
+  contract: Contract;
   dbUrl: string;
   contractPath: string;
   configPath?: string;
 }): Promise<VerifyDatabaseResult> {
-  const { contractIR, dbUrl, contractPath, configPath } = options;
+  const { contract, dbUrl, contractPath, configPath } = options;
 
   const driver = await postgresDriver.create(dbUrl);
   try {
@@ -131,7 +131,7 @@ async function verifyDatabase(options: {
 
     return await familyInstance.verify({
       driver,
-      contractIR,
+      contract,
       expectedTargetId: postgres.id,
       contractPath,
       ...(configPath ? { configPath } : {}),
@@ -150,8 +150,8 @@ describe('family instance verify - errors', () => {
 
         try {
           // Create and emit contract
-          const contract = createTestContract();
-          const contractWithDb = await emitContract(contract, testDirWithDb);
+          const testContract = createTestContract();
+          const contractWithDb = await emitContract(testContract, testDirWithDb);
 
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table but don't write marker
@@ -160,9 +160,9 @@ describe('family instance verify - errors', () => {
           });
 
           // Load contract and verify
-          const { contractIR, contractPath } = loadContract(testDirWithDb);
+          const { contract, contractPath } = loadContract(testDirWithDb);
           const result = await verifyDatabase({
-            contractIR,
+            contract,
             dbUrl: connectionString,
             contractPath,
           });
@@ -199,8 +199,8 @@ describe('family instance verify - errors', () => {
 
         try {
           // Create and emit contract
-          const contract = createTestContract();
-          const contractWithDb = await emitContract(contract, testDirWithDb);
+          const testContract = createTestContract();
+          const contractWithDb = await emitContract(testContract, testDirWithDb);
 
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table
@@ -218,9 +218,9 @@ describe('family instance verify - errors', () => {
           });
 
           // Load contract and verify
-          const { contractIR, contractPath } = loadContract(testDirWithDb);
+          const { contract, contractPath } = loadContract(testDirWithDb);
           const result = await verifyDatabase({
-            contractIR,
+            contract,
             dbUrl: connectionString,
             contractPath,
           });
@@ -257,8 +257,8 @@ describe('family instance verify - errors', () => {
 
         try {
           // Create and emit contract
-          const contract = createTestContract();
-          const contractWithDb = await emitContract(contract, testDirWithDb);
+          const testContract = createTestContract();
+          const contractWithDb = await emitContract(testContract, testDirWithDb);
 
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table
@@ -276,9 +276,9 @@ describe('family instance verify - errors', () => {
           });
 
           // Load contract and verify
-          const { contractIR, contractPath } = loadContract(testDirWithDb);
+          const { contract, contractPath } = loadContract(testDirWithDb);
           const result = await verifyDatabase({
-            contractIR,
+            contract,
             dbUrl: connectionString,
             contractPath,
           });
@@ -315,11 +315,11 @@ describe('family instance verify - errors', () => {
 
         try {
           // Create and emit a valid contract first
-          const contract = createTestContract();
-          await emitContract(contract, testDirWithDb);
+          const testContract = createTestContract();
+          await emitContract(testContract, testDirWithDb);
 
           // Create an invalid contract IR (missing storageHash/target)
-          const invalidContractIR = {
+          const invalidContract = {
             schemaVersion: '1',
             targetFamily: 'sql',
             storage: {
@@ -327,12 +327,12 @@ describe('family instance verify - errors', () => {
             },
             models: {},
             relations: {},
-          } as unknown as ContractIR;
+          } as unknown as Contract;
 
           // Try to verify with invalid contract
           await expect(
             verifyDatabase({
-              contractIR: invalidContractIR,
+              contract: invalidContract,
               dbUrl: connectionString,
               contractPath: join(testDirWithDb, 'output/contract.json'),
             }),
@@ -355,8 +355,8 @@ describe('family instance verify - errors', () => {
 
         try {
           // Create and emit contract
-          const contract = createTestContract();
-          const contractWithDb = await emitContract(contract, testDirWithDb);
+          const testContract = createTestContract();
+          const contractWithDb = await emitContract(testContract, testDirWithDb);
 
           await withClient(connectionString, async (client) => {
             await executeStatement(client, ensureSchemaStatement);
@@ -372,9 +372,9 @@ describe('family instance verify - errors', () => {
           });
 
           // Load contract and verify
-          const { contractIR, contractPath } = loadContract(testDirWithDb);
+          const { contract, contractPath } = loadContract(testDirWithDb);
           const result = await verifyDatabase({
-            contractIR,
+            contract,
             dbUrl: connectionString,
             contractPath,
           });

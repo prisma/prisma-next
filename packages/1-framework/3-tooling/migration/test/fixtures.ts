@@ -1,4 +1,5 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import { createContract } from '@prisma-next/contract/testing';
+import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import type {
   AttestedMigrationBundle,
@@ -6,19 +7,8 @@ import type {
   MigrationManifest,
 } from '../src/types';
 
-export function createTestContract(overrides: Partial<ContractIR> = {}): ContractIR {
-  return {
-    schemaVersion: '1',
-    targetFamily: 'sql',
-    target: 'postgres',
-    models: {},
-    storage: { tables: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
-  };
+export function createTestContract(overrides: Partial<Contract> = {}): Contract {
+  return createContract(overrides);
 }
 
 export function createTestManifest(overrides: Partial<MigrationManifest> = {}): MigrationManifest {

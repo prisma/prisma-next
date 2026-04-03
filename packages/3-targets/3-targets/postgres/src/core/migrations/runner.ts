@@ -136,7 +136,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       // Step 1: Introspect live schema (DB I/O, family-owned)
       const schemaIR = await this.family.introspect({
         driver,
-        contractIR: options.destinationContract,
+        contract: options.destinationContract,
       });
 
       // Step 2: Pure verification (no DB I/O)

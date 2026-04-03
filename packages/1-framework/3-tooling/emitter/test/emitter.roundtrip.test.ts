@@ -1,5 +1,5 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
+  Contract,
   TargetFamilyHook,
   TypesImportSpec,
   ValidationContext,
@@ -9,11 +9,11 @@ import { emit } from '@prisma-next/core-control-plane/emission';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createContractIR } from './utils';
+import { createTestContract } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (ir: ContractIR, _ctx: ValidationContext) => {
+  validateTypes: (ir: Contract, _ctx: ValidationContext) => {
     const storage = ir.storage as
       | { tables?: Record<string, { columns?: Record<string, { codecId?: string }> }> }
       | undefined;
@@ -60,7 +60,7 @@ const mockSqlHook: TargetFamilyHook = {
       }
     }
   },
-  validateStructure: (ir: ContractIR) => {
+  validateStructure: (ir: Contract) => {
     if (ir.targetFamily !== 'sql') {
       throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
     }
@@ -80,7 +80,7 @@ describe('emitter round-trip', () => {
   it(
     'round-trip with minimal IR',
     async () => {
-      const ir = createContractIR({
+      const ir = createTestContract({
         storage: {
           tables: {
             user: {
@@ -116,7 +116,7 @@ describe('emitter round-trip', () => {
       const result1 = await emit(ir, options, mockSqlHook);
       const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-      const ir2 = createContractIR({
+      const ir2 = createTestContract({
         schemaVersion: contractJson1['schemaVersion'] as string,
         targetFamily: contractJson1['targetFamily'] as string,
         target: contractJson1['target'] as string,
@@ -138,7 +138,7 @@ describe('emitter round-trip', () => {
   );
 
   it('round-trip with complex IR', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       models: {
         User: {
           storage: { table: 'user' },
@@ -212,7 +212,7 @@ describe('emitter round-trip', () => {
     const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    const ir2 = createContractIR({
+    const ir2 = createTestContract({
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
@@ -232,7 +232,7 @@ describe('emitter round-trip', () => {
   });
 
   it('round-trip with nullable fields', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -270,7 +270,7 @@ describe('emitter round-trip', () => {
     const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    const ir2 = createContractIR({
+    const ir2 = createTestContract({
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,
@@ -302,7 +302,7 @@ describe('emitter round-trip', () => {
   });
 
   it('round-trip with capabilities', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -344,7 +344,7 @@ describe('emitter round-trip', () => {
     const result1 = await emit(ir, options, mockSqlHook);
     const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    const ir2 = createContractIR({
+    const ir2 = createTestContract({
       schemaVersion: contractJson1['schemaVersion'] as string,
       targetFamily: contractJson1['targetFamily'] as string,
       target: contractJson1['target'] as string,

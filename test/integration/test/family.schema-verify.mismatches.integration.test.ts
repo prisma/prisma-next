@@ -75,7 +75,7 @@ describe('family instance schemaVerify', () => {
           > = [postgres, postgresAdapter];
           const result = await familyInstance.schemaVerify({
             driver,
-            contractIR: validatedContract,
+            contract: validatedContract,
             strict: false,
             context: { contractPath: './contract.json' },
             frameworkComponents,
@@ -146,7 +146,7 @@ describe('family instance schemaVerify', () => {
           > = [postgres, postgresAdapter];
           const result = await familyInstance.schemaVerify({
             driver,
-            contractIR: validatedContract,
+            contract: validatedContract,
             strict: false,
             context: { contractPath: './contract.json' },
             frameworkComponents,
@@ -220,7 +220,7 @@ describe('family instance schemaVerify', () => {
           > = [postgres, postgresAdapter];
           const result = await familyInstance.schemaVerify({
             driver,
-            contractIR: validatedContract,
+            contract: validatedContract,
             strict: false,
             context: { contractPath: './contract.json' },
             frameworkComponents,
@@ -309,7 +309,7 @@ describe('family instance schemaVerify', () => {
           > = [postgres, postgresAdapter];
           const result = await familyInstance.schemaVerify({
             driver,
-            contractIR: validatedContract,
+            contract: validatedContract,
             strict: false,
             context: { contractPath: './contract.json' },
             frameworkComponents,

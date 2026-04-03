@@ -1,9 +1,8 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TypeRenderEntry } from '@prisma-next/contract/types';
+import type { Contract, TypeRenderEntry } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 
-function createContractIR(overrides: Partial<ContractIR>): ContractIR {
+function createContract(overrides: Partial<Contract>): Contract {
   return {
     schemaVersion: '1',
     targetFamily: 'sql',
@@ -23,7 +22,7 @@ const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-h
 describe('sql-target-family-hook parameterized type emission', () => {
   describe('columns with typeParams', () => {
     it('emits parameterized TS type via normalized renderer', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           Document: {
             storage: {
@@ -73,7 +72,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('falls back to CodecTypes[codecId].output for columns without typeParams', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           User: {
             storage: {
@@ -116,7 +115,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('emits nullable parameterized type with | null suffix', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           Document: {
             storage: {
@@ -164,7 +163,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('uses custom renderer logic for complex type generation', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           Data: {
             storage: {
@@ -218,7 +217,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
 
   describe('enum unions', () => {
     it('emits literal unions in value order', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           User: {
             storage: {
@@ -275,7 +274,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
 
   describe('columns with typeRef', () => {
     it('resolves typeRef to storage.types and emits parameterized type', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           Document: {
             storage: {
@@ -332,7 +331,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
 
   describe('deterministic output ordering', () => {
     it('emits multiple parameterized types in deterministic column order', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           Document: {
             storage: {
@@ -405,7 +404,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
 
   describe('edge cases', () => {
     it('handles columns with typeParams but no matching renderer', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           Data: {
             storage: {
@@ -448,7 +447,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('handles typeRef pointing to non-existent storage.types entry gracefully', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           Data: {
             storage: {
@@ -497,7 +496,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('handles empty typeParams object by falling back to standard lookup', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           Data: {
             storage: {
@@ -545,7 +544,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('works without options parameter (backwards compatibility)', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         models: {
           User: {
             storage: {
@@ -581,7 +580,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
 
   describe('storage.types emission', () => {
     it('emits storage.types with literal types', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         storage: {
           tables: {
             document: {
@@ -622,7 +621,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('handles empty storage.types', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         storage: {
           tables: {
             user: {
@@ -646,7 +645,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('handles undefined storage.types (no types key)', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         storage: {
           tables: {
             user: {
@@ -670,7 +669,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('emits typeParams with nested objects', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         storage: {
           tables: {
             data: {
@@ -702,7 +701,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('emits typeParams with arrays', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         storage: {
           tables: {
             data: {
@@ -732,7 +731,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('emits typeParams with nested objects inside objects', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         storage: {
           tables: {
             data: {
@@ -764,7 +763,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('emits typeParams with null values', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         storage: {
           tables: {
             data: {
@@ -794,7 +793,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('emits typeParams with undefined values', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         storage: {
           tables: {
             data: {
@@ -826,7 +825,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
 
   describe('parameterizedTypeImports option', () => {
     it('includes parameterizedTypeImports in generated imports', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         storage: {
           tables: {
             data: {
@@ -854,7 +853,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
 
     it('deduplicates imports when parameterizedTypeImports overlaps with codecTypeImports', () => {
-      const ir = createContractIR({
+      const ir = createContract({
         storage: {
           tables: {
             data: {

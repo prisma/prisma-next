@@ -1,8 +1,8 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 
-function createContractIR(overrides: Partial<ContractIR>): ContractIR {
+function createContract(overrides: Partial<Contract>): Contract {
   return {
     schemaVersion: '1',
     targetFamily: 'sql',
@@ -19,7 +19,7 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
 
 describe('sql-target-family-hook', () => {
   it('validates SQL structure', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -52,7 +52,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('throws error for invalid structure', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: { table: 'nonexistent', fields: {} },
@@ -77,7 +77,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model field missing column property', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -111,9 +111,9 @@ describe('sql-target-family-hook', () => {
 
   it('validates structure with missing targetFamily', () => {
     const ir = {
-      ...createContractIR({}),
+      ...createContract({}),
       targetFamily: undefined as unknown as string,
-    } as ContractIR;
+    } as Contract;
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -121,9 +121,9 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with missing storage', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: undefined as unknown as Record<string, unknown>,
-    }) as ContractIR;
+    }) as Contract;
 
     expect(() => {
       sqlTargetFamilyHook.validateStructure(ir);
@@ -131,7 +131,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with missing storage.tables', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {},
     });
 
@@ -141,7 +141,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model missing storage.table', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           fields: {},
@@ -166,7 +166,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model referencing non-existent table', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: { table: 'nonexistent', fields: {} },
@@ -191,7 +191,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model table missing primary key', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: { table: 'user', fields: {} },
@@ -216,7 +216,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model field referencing non-existent column', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -247,7 +247,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with missing model storage.fields', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: { table: 'user' },
@@ -275,7 +275,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with primaryKey referencing non-existent column', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -297,7 +297,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with unique constraint referencing non-existent column', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -320,7 +320,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with index referencing non-existent column', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -343,7 +343,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with foreignKey referencing non-existent column', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -380,7 +380,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with foreignKey referencing non-existent table', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -417,7 +417,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with foreignKey referencing non-existent referenced column', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -454,7 +454,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with foreignKey column count mismatch', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -491,7 +491,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model missing relations', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -524,7 +524,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with model relations not an object', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -557,7 +557,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with uniques not an array', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -579,7 +579,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with indexes not an array', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -601,7 +601,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with foreignKeys not an array', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -623,7 +623,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with table missing from storage.tables after check', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {
@@ -690,7 +690,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with referenced table missing from storage.tables after check', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           user: {
@@ -761,7 +761,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure without models', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {},
       storage: {
         tables: {
@@ -784,7 +784,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with table without primary key when no models', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {},
       storage: {
         tables: {
@@ -806,7 +806,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('accepts extension-owned index config payloads without core-specific validation', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           items: {
@@ -838,7 +838,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('still validates index column references independent of extension config', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       storage: {
         tables: {
           items: {
@@ -870,7 +870,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates structure with complex valid contract', () => {
-    const ir = createContractIR({
+    const ir = createContract({
       models: {
         User: {
           storage: {

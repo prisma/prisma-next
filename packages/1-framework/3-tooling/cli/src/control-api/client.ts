@@ -186,9 +186,9 @@ class ControlClientImpl implements ControlClient {
     const { driver, familyInstance } = await this.ensureConnected();
 
     // Validate contract using family instance
-    let contractIR: Contract;
+    let contract: Contract;
     try {
-      contractIR = familyInstance.validateContractIR(options.contractIR);
+      contract = familyInstance.validateContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -209,7 +209,7 @@ class ControlClientImpl implements ControlClient {
       // metadata for error reporting.
       const result = await familyInstance.verify({
         driver,
-        contractIR,
+        contract,
         expectedTargetId: this.options.target.targetId,
         contractPath: '',
       });
@@ -239,9 +239,9 @@ class ControlClientImpl implements ControlClient {
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
     // Validate contract using family instance
-    let contractIR: Contract;
+    let contract: Contract;
     try {
-      contractIR = familyInstance.validateContractIR(options.contractIR);
+      contract = familyInstance.validateContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -259,7 +259,7 @@ class ControlClientImpl implements ControlClient {
       // Delegate to family instance schemaVerify method
       const result = await familyInstance.schemaVerify({
         driver,
-        contractIR,
+        contract,
         strict: options.strict ?? false,
         contractPath: '',
         frameworkComponents,
@@ -290,9 +290,9 @@ class ControlClientImpl implements ControlClient {
     const { driver, familyInstance } = await this.ensureConnected();
 
     // Validate contract using family instance
-    let contractIR: Contract;
+    let contract: Contract;
     try {
-      contractIR = familyInstance.validateContractIR(options.contractIR);
+      contract = familyInstance.validateContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -310,7 +310,7 @@ class ControlClientImpl implements ControlClient {
       // Delegate to family instance sign method
       const result = await familyInstance.sign({
         driver,
-        contractIR,
+        contract,
         contractPath: options.contractPath ?? '',
         ...ifDefined('configPath', options.configPath),
       });
@@ -343,9 +343,9 @@ class ControlClientImpl implements ControlClient {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
-    let contractIR: Contract;
+    let contract: Contract;
     try {
-      contractIR = familyInstance.validateContractIR(options.contractIR);
+      contract = familyInstance.validateContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -354,7 +354,7 @@ class ControlClientImpl implements ControlClient {
     return executeDbInit({
       driver,
       familyInstance,
-      contractIR,
+      contract,
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
@@ -371,9 +371,9 @@ class ControlClientImpl implements ControlClient {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
-    let contractIR: Contract;
+    let contract: Contract;
     try {
-      contractIR = familyInstance.validateContractIR(options.contractIR);
+      contract = familyInstance.validateContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -382,7 +382,7 @@ class ControlClientImpl implements ControlClient {
     return executeDbUpdate({
       driver,
       familyInstance,
-      contractIR,
+      contract,
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
@@ -551,7 +551,7 @@ class ControlClientImpl implements ControlClient {
       const enrichedIR = enrichContract(contractRaw as Contract, this.frameworkComponents ?? []);
 
       try {
-        this.familyInstance.validateContractIR(enrichedIR);
+        this.familyInstance.validateContract(enrichedIR);
       } catch (error) {
         onProgress?.({
           action: 'emit',
@@ -568,7 +568,7 @@ class ControlClientImpl implements ControlClient {
         });
       }
 
-      const emitResult = await this.familyInstance.emitContract({ contractIR: enrichedIR });
+      const emitResult = await this.familyInstance.emitContract({ contract: enrichedIR });
 
       onProgress?.({
         action: 'emit',

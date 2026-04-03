@@ -1,5 +1,5 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
+  Contract,
   TargetFamilyHook,
   TypesImportSpec,
   ValidationContext,
@@ -9,11 +9,11 @@ import { emit } from '@prisma-next/core-control-plane/emission';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createContractIR } from './utils';
+import { createTestContract } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (ir: ContractIR, _ctx: ValidationContext) => {
+  validateTypes: (ir: Contract, _ctx: ValidationContext) => {
     const storage = ir.storage as
       | { tables?: Record<string, { columns?: Record<string, { type?: string }> }> }
       | undefined;
@@ -60,7 +60,7 @@ const mockSqlHook: TargetFamilyHook = {
       }
     }
   },
-  validateStructure: (ir: ContractIR) => {
+  validateStructure: (ir: Contract) => {
     if (ir.targetFamily !== 'sql') {
       throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
     }
@@ -80,7 +80,7 @@ describe('emitter integration', () => {
   it(
     'emits complete contract from IR to artifacts',
     async () => {
-      const ir = createContractIR({
+      const ir = createTestContract({
         models: {
           User: {
             storage: { table: 'user' },
@@ -150,7 +150,7 @@ describe('emitter integration', () => {
   );
 
   it('produces stable hashes for identical input', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       models: {
         User: {
           storage: { table: 'user' },
@@ -205,7 +205,7 @@ describe('emitter integration', () => {
   it(
     'round-trip: IR → JSON → parse JSON → compare',
     async () => {
-      const ir = createContractIR({
+      const ir = createTestContract({
         models: {
           User: {
             storage: { table: 'user' },
@@ -254,7 +254,7 @@ describe('emitter integration', () => {
       const result1 = await emit(ir, options, mockSqlHook);
       const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-      const ir2 = createContractIR({
+      const ir2 = createTestContract({
         schemaVersion: contractJson1['schemaVersion'] as string,
         targetFamily: contractJson1['targetFamily'] as string,
         target: contractJson1['target'] as string,

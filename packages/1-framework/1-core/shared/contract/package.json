@@ -37,7 +37,6 @@
   },
   "exports": {
     "./hashing": "./dist/hashing.mjs",
-    "./ir": "./dist/ir.mjs",
     "./testing": "./dist/testing.mjs",
     "./types": "./dist/types.mjs",
     "./validate-contract": "./dist/validate-contract.mjs",

@@ -1,7 +1,7 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
@@ -16,23 +16,6 @@ import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { isAttested } from '@prisma-next/migration-tools/types';
 import { describe, expect, it } from 'vitest';
 import { resolveBundleByPrefix } from '../../src/commands/migration-plan';
-
-function createTestContract(overrides?: Partial<ContractIR>): ContractIR {
-  return {
-    schemaVersion: '1',
-    targetFamily: 'sql',
-    target: 'postgres',
-    models: {},
-    storage: {
-      tables: {},
-    },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
-  };
-}
 
 function createTableOp(table: string): MigrationPlanOperation {
   return {
@@ -57,7 +40,7 @@ describe('migration plan — core flow', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const toContract = createTestContract({
+    const toContract = createSqlContract({
       storage: {
         tables: {
           user: {
@@ -110,7 +93,7 @@ describe('migration plan — core flow', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createTestContract();
+    const contract = createContract();
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:same-hash',
@@ -150,14 +133,14 @@ describe('migration plan — core flow', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createTestContract({
+    const contractA = createSqlContract({
       storage: {
         tables: {
           user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
         },
       },
     });
-    const contractB = createTestContract({
+    const contractB = createSqlContract({
       storage: {
         tables: {
           user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
@@ -257,7 +240,7 @@ describe('--from hash lookup', () => {
       migrationId: null,
       kind: 'regular',
       fromContract: null,
-      toContract: createTestContract(),
+      toContract: createContract(),
       hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
       labels: [],
       createdAt: new Date().toISOString(),
@@ -277,7 +260,7 @@ describe('--from hash lookup', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createTestContract();
+    const contract = createContract();
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:abcdef1234567890',
@@ -307,7 +290,7 @@ describe('--from hash lookup', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createTestContract();
+    const contract = createContract();
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,
       to: 'sha256:abcdef1234567890',
@@ -337,8 +320,8 @@ describe('--from hash lookup', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createTestContract();
-    const contractB = createTestContract();
+    const contractA = createContract();
+    const contractB = createContract();
 
     // Two migrations whose `to` hashes share a prefix
     const dir1 = formatMigrationDirName(new Date(2026, 0, 1), 'first');

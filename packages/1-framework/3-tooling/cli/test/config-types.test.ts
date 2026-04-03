@@ -1,6 +1,6 @@
 import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { defineConfig } from '@prisma-next/config/config-types';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
@@ -22,7 +22,7 @@ describe('defineConfig', () => {
       hook: mockHook,
       create: () => ({
         familyId: 'sql',
-        validateContractIR: (contract: unknown) => contract as ContractIR,
+        validateContract: (contract: unknown) => contract as Contract,
         verify: async () => ({
           ok: true,
           summary: 'test',
@@ -111,7 +111,7 @@ describe('defineConfig', () => {
   });
 
   it('normalizes contract config with default output', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as ContractIR);
+    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
@@ -124,7 +124,7 @@ describe('defineConfig', () => {
   });
 
   it('normalizes contract config with custom output', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as ContractIR);
+    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
@@ -138,7 +138,7 @@ describe('defineConfig', () => {
   });
 
   it('validates contract source accepts provider function', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as ContractIR);
+    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
@@ -185,7 +185,7 @@ describe('defineConfig', () => {
   });
 
   it('builds TypeScript contract config via helper utility', async () => {
-    const contract = { targetFamily: 'sql' } as ContractIR;
+    const contract = { targetFamily: 'sql' } as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
     const result = await config.source({ composedExtensionPacks: [] });
 

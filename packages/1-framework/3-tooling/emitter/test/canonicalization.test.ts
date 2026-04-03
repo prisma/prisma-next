@@ -1,10 +1,10 @@
 import { canonicalizeContract } from '@prisma-next/core-control-plane/emission';
 import { describe, expect, it } from 'vitest';
-import { createContractIR } from './utils';
+import { createTestContract } from './utils';
 
 describe('canonicalization', () => {
   it('orders top-level sections correctly', () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       capabilities: { postgres: { jsonAgg: true } },
       meta: { emitterVersion: 'test' },
     });
@@ -30,7 +30,7 @@ describe('canonicalization', () => {
   });
 
   it('omits nullable false from columns', () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -59,7 +59,7 @@ describe('canonicalization', () => {
     { nullable: false },
     { nullable: undefined },
   ])('omits nullable:false for columns with defaults (nullable=$nullable)', ({ nullable }) => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -94,7 +94,7 @@ describe('canonicalization', () => {
   });
 
   it('preserves nullable:true for columns with defaults', () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -123,7 +123,7 @@ describe('canonicalization', () => {
   });
 
   it('omits empty arrays and objects except required ones', () => {
-    const ir = createContractIR();
+    const ir = createTestContract();
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result);
@@ -143,7 +143,7 @@ describe('canonicalization', () => {
   });
 
   it('preserves semantic array order for column lists', () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -161,7 +161,7 @@ describe('canonicalization', () => {
 
     const result1 = canonicalizeContract(ir);
 
-    const ir2 = createContractIR({
+    const ir2 = createTestContract({
       storage: {
         tables: {
           user: {
@@ -183,7 +183,7 @@ describe('canonicalization', () => {
   });
 
   it('sorts indexes by canonical name', () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -210,7 +210,7 @@ describe('canonicalization', () => {
   });
 
   it('sorts uniques by canonical name', () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -239,7 +239,7 @@ describe('canonicalization', () => {
   });
 
   it('preserves column order in composite unique constraints', () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -264,7 +264,7 @@ describe('canonicalization', () => {
   });
 
   it('sorts nested object keys lexicographically', () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -290,7 +290,7 @@ describe('canonicalization', () => {
 
   describe('Mongo storage.collections preservation', () => {
     it('preserves empty storage.collections container', () => {
-      const ir = createContractIR({
+      const ir = createTestContract({
         targetFamily: 'mongo',
         target: 'mongo',
         storage: { collections: {} },
@@ -303,7 +303,7 @@ describe('canonicalization', () => {
     });
 
     it('preserves collection entries with empty payloads', () => {
-      const ir = createContractIR({
+      const ir = createTestContract({
         targetFamily: 'mongo',
         target: 'mongo',
         storage: { collections: { users: {}, posts: {} } },
@@ -318,7 +318,7 @@ describe('canonicalization', () => {
     });
 
     it('sorts collection names lexicographically', () => {
-      const ir = createContractIR({
+      const ir = createTestContract({
         targetFamily: 'mongo',
         target: 'mongo',
         storage: { collections: { zebras: {}, apples: {}, mangoes: {} } },
@@ -332,12 +332,12 @@ describe('canonicalization', () => {
     });
 
     it('produces different hashes when collections differ', () => {
-      const ir1 = createContractIR({
+      const ir1 = createTestContract({
         targetFamily: 'mongo',
         target: 'mongo',
         storage: { collections: { users: {} } },
       });
-      const ir2 = createContractIR({
+      const ir2 = createTestContract({
         targetFamily: 'mongo',
         target: 'mongo',
         storage: { collections: { users: {}, posts: {} } },
@@ -350,7 +350,7 @@ describe('canonicalization', () => {
   });
 
   it('sorts extension namespaces lexicographically', () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       extensionPacks: {
         pgvector: { version: '0.0.1' },
         postgres: { version: '0.0.1' },
@@ -366,7 +366,7 @@ describe('canonicalization', () => {
   });
 
   it('omits generated false', () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {

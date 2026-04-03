@@ -175,6 +175,6 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
 async function introspectSchema(driver: PostgresControlDriver): Promise<SqlSchemaIR> {
   return familyInstance.introspect({
     driver,
-    contractIR: contract,
+    contract: contract,
   });
 }

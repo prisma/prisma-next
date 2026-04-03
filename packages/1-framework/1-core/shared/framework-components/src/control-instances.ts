@@ -16,11 +16,11 @@ import type {
 
 export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unknown>
   extends FamilyInstance<TFamilyId> {
-  validateContractIR(contractJson: unknown): Contract;
+  validateContract(contractJson: unknown): Contract;
 
   verify(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
-    readonly contractIR: unknown;
+    readonly contract: unknown;
     readonly expectedTargetId: string;
     readonly contractPath: string;
     readonly configPath?: string;
@@ -28,7 +28,7 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
 
   schemaVerify(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
-    readonly contractIR: unknown;
+    readonly contract: unknown;
     readonly strict: boolean;
     readonly contractPath: string;
     readonly configPath?: string;
@@ -37,7 +37,7 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
 
   sign(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
-    readonly contractIR: unknown;
+    readonly contract: unknown;
     readonly contractPath: string;
     readonly configPath?: string;
   }): Promise<SignDatabaseResult>;
@@ -48,10 +48,10 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
 
   introspect(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
-    readonly contractIR?: unknown;
+    readonly contract?: unknown;
   }): Promise<TSchemaIR>;
 
-  emitContract(options: { readonly contractIR: unknown }): Promise<EmitContractResult>;
+  emitContract(options: { readonly contract: unknown }): Promise<EmitContractResult>;
 }
 
 export interface ControlTargetInstance<TFamilyId extends string, TTargetId extends string>

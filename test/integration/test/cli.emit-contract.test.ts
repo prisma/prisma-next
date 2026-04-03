@@ -9,7 +9,7 @@ import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-help
 // Fixture subdirectory for emit-contract tests
 const fixtureSubdir = 'emit-contract';
 
-const resolveContractIR = async (
+const resolveContract = async (
   source: NonNullable<Awaited<ReturnType<typeof loadConfig>>['contract']>['source'],
 ) => {
   const sourceResult = await source({ composedExtensionPacks: [] });
@@ -46,7 +46,7 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      const contractRaw = await resolveContractIR(contractConfig.source);
+      const contractRaw = await resolveContract(contractConfig.source);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -67,7 +67,7 @@ describe('emitContract API', () => {
       );
 
       // emitContract handles stripping mappings and validation internally
-      const result = await familyInstance.emitContract({ contractIR: contractRaw });
+      const result = await familyInstance.emitContract({ contract: contractRaw });
 
       expect(result).toBeDefined();
       expect(result.storageHash).toBeDefined();
@@ -108,7 +108,7 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      const contractRaw = await resolveContractIR(contractConfig.source);
+      const contractRaw = await resolveContract(contractConfig.source);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -129,7 +129,7 @@ describe('emitContract API', () => {
       );
 
       // emitContract handles stripping mappings and validation internally
-      const result = await familyInstance.emitContract({ contractIR: contractRaw });
+      const result = await familyInstance.emitContract({ contract: contractRaw });
 
       // Write files and verify paths (dts is colocated with json)
       const contractJsonPath = resolve(testDir, contractConfig.output);
@@ -165,7 +165,7 @@ describe('emitContract API', () => {
         }
 
         const contractConfig = config.contract;
-        const contractRaw = await resolveContractIR(contractConfig.source);
+        const contractRaw = await resolveContract(contractConfig.source);
 
         if (!contractConfig.output) {
           throw new Error('Contract config must have output path');
@@ -186,7 +186,7 @@ describe('emitContract API', () => {
         );
 
         // emitContract handles stripping mappings and validation internally
-        const result = await familyInstance.emitContract({ contractIR: contractRaw });
+        const result = await familyInstance.emitContract({ contract: contractRaw });
 
         // Write files (dts is colocated with json)
         const contractJsonPath = resolve(customTestDir, contractConfig.output);
@@ -214,7 +214,7 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      const contractRaw = await resolveContractIR(contractConfig.source);
+      const contractRaw = await resolveContract(contractConfig.source);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -235,7 +235,7 @@ describe('emitContract API', () => {
       );
 
       // emitContract handles stripping mappings and validation internally
-      const result = await familyInstance.emitContract({ contractIR: contractRaw });
+      const result = await familyInstance.emitContract({ contract: contractRaw });
 
       // profileHash is always present
       expect(typeof result.profileHash).toBe('string');
@@ -254,7 +254,7 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      const contractRaw = await resolveContractIR(contractConfig.source);
+      const contractRaw = await resolveContract(contractConfig.source);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -275,7 +275,7 @@ describe('emitContract API', () => {
       );
 
       // emitContract handles stripping mappings and validation internally
-      const result = await familyInstance.emitContract({ contractIR: contractRaw });
+      const result = await familyInstance.emitContract({ contract: contractRaw });
 
       // Timings are no longer returned in the result
       expect(result).toBeDefined();
@@ -294,7 +294,7 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      const contractRaw = await resolveContractIR(contractConfig.source);
+      const contractRaw = await resolveContract(contractConfig.source);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -315,7 +315,7 @@ describe('emitContract API', () => {
       );
 
       // emitContract handles stripping mappings and validation internally
-      const result = await familyInstance.emitContract({ contractIR: contractRaw });
+      const result = await familyInstance.emitContract({ contract: contractRaw });
 
       expect(result).toBeDefined();
     },

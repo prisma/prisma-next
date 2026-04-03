@@ -85,7 +85,7 @@ async function executeDbUpdateCommand(
   try {
     // Call dbUpdate with connection and progress callback
     const result = await client.dbUpdate({
-      contractIR: contractJson,
+      contract: contractJson,
       mode: options.dryRun ? 'plan' : 'apply',
       connection: dbConnection,
       ...(flags.yes ? { acceptDataLoss: true } : {}),

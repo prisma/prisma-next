@@ -48,11 +48,11 @@ function createControlClientForTests(connectionString: string): ControlClient {
 export async function loadContractFromDisk<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 >(contractJsonPath: string): Promise<TContract> {
-  const contractJson = await loadContractIRFromDisk(contractJsonPath);
+  const contractJson = await loadRawContractFromDisk(contractJsonPath);
   return validateContract<TContract>(contractJson);
 }
 
-async function loadContractIRFromDisk(contractJsonPath: string): Promise<Record<string, unknown>> {
+async function loadRawContractFromDisk(contractJsonPath: string): Promise<Record<string, unknown>> {
   const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
   return JSON.parse(contractJsonContent) as Record<string, unknown>;
 }
@@ -101,11 +101,11 @@ export async function runDbInit(options: {
   readonly contractJsonPath: string;
 }): Promise<void> {
   const { connectionString, contractJsonPath } = options;
-  const contractIR = await loadContractIRFromDisk(contractJsonPath);
+  const contract = await loadRawContractFromDisk(contractJsonPath);
   const controlClient = createControlClientForTests(connectionString);
 
   try {
-    const result = await controlClient.dbInit({ contractIR, mode: 'apply' });
+    const result = await controlClient.dbInit({ contract, mode: 'apply' });
     if (!result.ok) {
       throw new Error(
         `dbInit failed: ${result.failure.summary}\n${JSON.stringify(result.failure, null, 2)}`,
@@ -118,14 +118,14 @@ export async function runDbInit(options: {
 
 async function getPlannedDdlSql(options: {
   readonly connectionString: string;
-  readonly contractIR: Record<string, unknown>;
+  readonly contract: Record<string, unknown>;
 }): Promise<string> {
-  const { connectionString, contractIR } = options;
+  const { connectionString, contract } = options;
   const controlClient = createControlClientForTests(connectionString);
 
   try {
     const result = await controlClient.dbInit({
-      contractIR,
+      contract,
       mode: 'plan',
       connection: connectionString,
     });
@@ -186,11 +186,11 @@ export async function withTestRuntime<TContract extends SqlContract<SqlStorage>>
   contractJsonPath: string,
   callback: (ctx: TestRuntimeContext<TContract>) => Promise<void>,
 ): Promise<void> {
-  const contractIR = await loadContractIRFromDisk(contractJsonPath);
-  const contract = validateContract<TContract>(contractIR);
+  const rawContract = await loadRawContractFromDisk(contractJsonPath);
+  const contract = validateContract<TContract>(rawContract);
 
   await withDevDatabase(async ({ connectionString }) => {
-    const sql = await getPlannedDdlSql({ connectionString, contractIR });
+    const sql = await getPlannedDdlSql({ connectionString, contract });
     await runDbInit({ connectionString, contractJsonPath });
 
     await withClient(connectionString, async (client: Client) => {

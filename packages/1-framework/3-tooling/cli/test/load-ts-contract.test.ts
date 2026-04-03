@@ -146,7 +146,7 @@ describe('loadContractFromTs', () => {
       const contractPath = join(fixturesDir, 'custom-allowlist.ts');
 
       const contract = await loadContractFromTs(contractPath, {
-        allowlist: ['@custom/package/*', '@prisma-next/*'],
+        allowlist: ['@custom/package/*', '@prisma-next/*', 'node:*'],
       });
 
       expect(contract).toBeDefined();
@@ -174,7 +174,7 @@ describe('loadContractFromTs', () => {
       const contractPath = join(fixturesDir, 'exact-prefix-import.ts');
 
       const contract = await loadContractFromTs(contractPath, {
-        allowlist: ['@prisma-next/*'],
+        allowlist: ['@prisma-next/*', 'node:*'],
       });
 
       expect(contract).toBeDefined();

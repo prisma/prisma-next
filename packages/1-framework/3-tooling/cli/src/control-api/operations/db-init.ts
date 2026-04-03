@@ -20,7 +20,7 @@ import { createOperationCallbacks, stripOperations } from './migration-helpers';
 export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId>;
-  readonly contractIR: Contract;
+  readonly contract: Contract;
   readonly mode: 'plan' | 'apply';
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
@@ -45,7 +45,7 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
 export async function executeDbInit<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbInitOptions<TFamilyId, TTargetId>,
 ): Promise<DbInitResult> {
-  const { driver, familyInstance, contractIR, mode, migrations, frameworkComponents, onProgress } =
+  const { driver, familyInstance, contract, mode, migrations, frameworkComponents, onProgress } =
     options;
 
   // Create planner and runner from target migrations capability
@@ -80,7 +80,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     label: 'Planning migration',
   });
   const plannerResult: MigrationPlannerResult = await planner.plan({
-    contract: contractIR,
+    contract,
     schema: schemaIR,
     policy,
     frameworkComponents,
@@ -222,7 +222,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
   const runnerResult: MigrationRunnerResult = await runner.execute({
     plan: migrationPlan,
     driver,
-    destinationContract: contractIR,
+    destinationContract: contract,
     policy,
     ...ifDefined('callbacks', callbacks),
     // db init plans and applies back-to-back from a fresh introspection, so per-operation

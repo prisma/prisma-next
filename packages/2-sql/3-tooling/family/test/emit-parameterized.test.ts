@@ -1,5 +1,10 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TypeRenderEntry, TypeRenderer, TypesImportSpec } from '@prisma-next/contract/types';
+import { createSqlContract } from '@prisma-next/contract/testing';
+import type {
+  Contract,
+  TypeRenderEntry,
+  TypeRenderer,
+  TypesImportSpec,
+} from '@prisma-next/contract/types';
 import type { TargetDescriptor } from '@prisma-next/framework-components/components';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
@@ -120,21 +125,12 @@ function createMockExtensionWithParameterizedRenderer(
   };
 }
 
-function createTestContractIR(
-  overrides: Partial<ContractIR> & { storageHash?: string } = {},
-): ContractIR & { storageHash?: string } {
+function createTestContract(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const base = createSqlContract(overrides);
   return {
     schemaVersion: '1',
-    targetFamily: 'sql',
-    target: 'postgres',
-    storageHash: 'sha256:placeholder',
-    models: {},
-    storage: { tables: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
+    ...base,
+    storageHash: (base.storage as Record<string, unknown>)['storageHash'] ?? 'sha256:test',
   };
 }
 
@@ -156,7 +152,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Create a contract IR with a column using the parameterized codec
-    const contractIR = createTestContractIR({
+    const contract = createTestContract({
       models: {
         Embedding: {
           storage: {
@@ -192,7 +188,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Emit the contract
-    const result = await familyInstance.emitContract({ contractIR });
+    const result = await familyInstance.emitContract({ contract });
 
     // Verify the parameterized renderer produces the correct type
     expect(result.contractDts).toContain('readonly vector: Vector<1536>');
@@ -232,7 +228,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Create a contract IR with a column using the parameterized codec
-    const contractIR = createTestContractIR({
+    const contract = createTestContract({
       models: {
         Embedding: {
           storage: {
@@ -268,7 +264,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Emit the contract
-    const result = await familyInstance.emitContract({ contractIR });
+    const result = await familyInstance.emitContract({ contract });
 
     // Verify the parameterized codec's typesImport appears in contract.d.ts
     expect(result.contractDts).toContain(
@@ -292,7 +288,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Contract with columns WITHOUT typeParams
-    const contractIR = createTestContractIR({
+    const contract = createTestContract({
       models: {
         User: {
           storage: {
@@ -321,7 +317,7 @@ describe('emit parameterized codecs integration', () => {
       },
     });
 
-    const result = await familyInstance.emitContract({ contractIR });
+    const result = await familyInstance.emitContract({ contract });
 
     // Standard columns should use CodecTypes lookup
     expect(result.contractDts).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
@@ -345,7 +341,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Contract with column using a different codecId (no renderer exists)
-    const contractIR = createTestContractIR({
+    const contract = createTestContract({
       models: {
         Data: {
           storage: {
@@ -377,7 +373,7 @@ describe('emit parameterized codecs integration', () => {
       },
     });
 
-    const result = await familyInstance.emitContract({ contractIR });
+    const result = await familyInstance.emitContract({ contract });
 
     // Should fall back to standard CodecTypes lookup
     expect(result.contractDts).toContain("readonly value: CodecTypes['custom/type@1']['output']");
@@ -428,7 +424,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Create a contract IR with columns using both parameterized codecs
-    const contractIR = createTestContractIR({
+    const contract = createTestContract({
       models: {
         Data: {
           storage: {
@@ -470,7 +466,7 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: { pgvector: { version: '0.0.1' } },
     });
 
-    const result = await familyInstance.emitContract({ contractIR });
+    const result = await familyInstance.emitContract({ contract });
 
     // Verify both typesImports appear in contract.d.ts
     expect(result.contractDts).toContain(
@@ -522,7 +518,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Contract with columns using BOTH parameterized codecs from the same package
-    const contractIR = createTestContractIR({
+    const contract = createTestContract({
       models: {
         VectorData: {
           storage: {
@@ -564,7 +560,7 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: { pgvector: { version: '0.0.1' } },
     });
 
-    const result = await familyInstance.emitContract({ contractIR });
+    const result = await familyInstance.emitContract({ contract });
 
     // Both imports should appear (different named exports from the same package)
     // When alias === named, the emitter omits the redundant "as Alias" part
@@ -613,7 +609,7 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [],
     });
 
-    const contractIR = createTestContractIR({
+    const contract = createTestContract({
       models: {
         Event: {
           storage: {
@@ -651,7 +647,7 @@ describe('emit parameterized codecs integration', () => {
       },
     });
 
-    const result = await familyInstance.emitContract({ contractIR });
+    const result = await familyInstance.emitContract({ contract });
 
     expect(result.contractDts).toContain('readonly payload: AuditPayload');
     expect(result.contractDts).toContain("readonly metadata: CodecTypes['pg/jsonb@1']['output']");

@@ -110,7 +110,7 @@ describe('family instance sign', () => {
 
           const result = (await familyInstance.sign({
             driver,
-            contractIR: validatedContract,
+            contract: validatedContract,
             contractPath: './contract.json',
           })) as SignDatabaseResult;
 
@@ -195,7 +195,7 @@ describe('family instance sign', () => {
 
           const result = (await familyInstance.sign({
             driver,
-            contractIR: validatedContract,
+            contract: validatedContract,
             contractPath: './contract.json',
           })) as SignDatabaseResult;
 
@@ -278,7 +278,7 @@ describe('family instance sign', () => {
           // First sign - creates marker
           const firstResult = (await familyInstance.sign({
             driver,
-            contractIR: validatedContract,
+            contract: validatedContract,
             contractPath: './contract.json',
           })) as SignDatabaseResult;
 
@@ -292,7 +292,7 @@ describe('family instance sign', () => {
           // Second sign - should be idempotent
           const secondResult = (await familyInstance.sign({
             driver,
-            contractIR: validatedContract,
+            contract: validatedContract,
             contractPath: './contract.json',
           })) as SignDatabaseResult;
 

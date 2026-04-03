@@ -6,7 +6,7 @@
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
@@ -42,19 +42,19 @@ export function createPrismaNextControlClient(options: TestControlClientOptions)
  * @example
  * ```typescript
  * await withDevDatabase(async ({ connectionString }) => {
- *   await initTestDatabase({ connection: connectionString, contractIR });
+ *   await initTestDatabase({ connection: connectionString, contract });
  *   // Database is now ready with schema and marker
  * });
  * ```
  */
 export async function initTestDatabase(options: {
   readonly connection: string;
-  readonly contractIR: ContractIR;
+  readonly contract: Contract;
 }): Promise<void> {
   const client = createPrismaNextControlClient({ connection: options.connection });
 
   try {
-    const initResult = await client.dbInit({ contractIR: options.contractIR, mode: 'apply' });
+    const initResult = await client.dbInit({ contract: options.contract, mode: 'apply' });
     if (!initResult.ok) {
       throw new Error(
         `dbInit failed: ${initResult.failure.summary}\n\n${JSON.stringify(initResult.failure, null, 2)}`,

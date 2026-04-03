@@ -173,7 +173,7 @@ interface SqlFamilyInstanceState {
 
 export interface SchemaVerifyOptions {
   readonly driver: ControlDriverInstance<'sql', string>;
-  readonly contractIR: unknown;
+  readonly contract: unknown;
   readonly strict: boolean;
   readonly context?: OperationContext;
   /**
@@ -186,11 +186,11 @@ export interface SchemaVerifyOptions {
 export interface SqlControlFamilyInstance
   extends ControlFamilyInstance<'sql'>,
     SqlFamilyInstanceState {
-  validateContractIR(contractJson: unknown): Contract;
+  validateContract(contractJson: unknown): Contract;
 
   verify(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
-    readonly contractIR: unknown;
+    readonly contract: unknown;
     readonly expectedTargetId: string;
     readonly contractPath: string;
     readonly configPath?: string;
@@ -200,19 +200,19 @@ export interface SqlControlFamilyInstance
 
   sign(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
-    readonly contractIR: unknown;
+    readonly contract: unknown;
     readonly contractPath: string;
     readonly configPath?: string;
   }): Promise<SignDatabaseResult>;
 
   introspect(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
-    readonly contractIR?: unknown;
+    readonly contract?: unknown;
   }): Promise<SqlSchemaIR>;
 
   toSchemaView(schema: SqlSchemaIR): CoreSchemaView;
 
-  emitContract(options: { readonly contractIR: Contract | unknown }): Promise<EmitContractResult>;
+  emitContract(options: { readonly contract: Contract | unknown }): Promise<EmitContractResult>;
 }
 
 export type SqlFamilyInstance = SqlControlFamilyInstance;
@@ -307,7 +307,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionPacks: extensions,
   });
 
-  function normalizeProviderContractIR(contract: unknown): Contract {
+  function normalizeProviderContract(contract: unknown): Contract {
     const validated = validateContract<SqlContract<SqlStorage>>(contract);
     return validated as unknown as Contract;
   }
@@ -320,37 +320,37 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionIds,
     typeMetadataRegistry,
 
-    validateContractIR(contractJson: unknown): Contract {
-      return normalizeProviderContractIR(contractJson);
+    validateContract(contractJson: unknown): Contract {
+      return normalizeProviderContract(contractJson);
     },
 
     async verify(verifyOptions: {
       readonly driver: ControlDriverInstance<'sql', string>;
-      readonly contractIR: unknown;
+      readonly contract: unknown;
       readonly expectedTargetId: string;
       readonly contractPath: string;
       readonly configPath?: string;
     }): Promise<VerifyDatabaseResult> {
-      const { driver, contractIR, expectedTargetId, contractPath, configPath } = verifyOptions;
+      const { driver, contract, expectedTargetId, contractPath, configPath } = verifyOptions;
       const startTime = Date.now();
 
       if (
-        typeof contractIR !== 'object' ||
-        contractIR === null ||
-        !('storageHash' in contractIR) ||
-        !('target' in contractIR) ||
-        typeof contractIR.storageHash !== 'string' ||
-        typeof contractIR.target !== 'string'
+        typeof contract !== 'object' ||
+        contract === null ||
+        !('storageHash' in contract) ||
+        !('target' in contract) ||
+        typeof contract.storageHash !== 'string' ||
+        typeof contract.target !== 'string'
       ) {
         throw new Error('Contract is missing required fields: storageHash or target');
       }
 
-      const contractStorageHash = contractIR.storageHash;
+      const contractStorageHash = contract.storageHash;
       const contractProfileHash =
-        'profileHash' in contractIR && typeof contractIR.profileHash === 'string'
-          ? contractIR.profileHash
+        'profileHash' in contract && typeof contract.profileHash === 'string'
+          ? contract.profileHash
           : undefined;
-      const contractTarget = contractIR.target;
+      const contractTarget = contract.target;
 
       const marker = await readMarker(driver);
 
@@ -361,7 +361,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         codecCoverageSkipped = true;
       } else {
         const supportedSet = new Set(supportedTypeIds);
-        const usedTypeIds = extractCodecTypeIdsFromContract(contractIR);
+        const usedTypeIds = extractCodecTypeIdsFromContract(contract);
         const missing = usedTypeIds.filter((id) => !supportedSet.has(id));
         if (missing.length > 0) {
           missingCodecs = missing;
@@ -457,15 +457,15 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
 
     async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
-      const { driver, contractIR, strict, context, frameworkComponents } = options;
+      const { driver, contract: contractInput, strict, context, frameworkComponents } = options;
 
-      const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
+      const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
 
       const controlAdapter = adapter.create();
       if (!isSqlControlAdapter(controlAdapter)) {
         throw new Error('Adapter does not implement SqlControlAdapter.introspect()');
       }
-      const schemaIR = await controlAdapter.introspect(driver, contractIR);
+      const schemaIR = await controlAdapter.introspect(driver, contractInput);
 
       return verifySqlSchema({
         contract,
@@ -481,14 +481,14 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
     async sign(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
-      readonly contractIR: unknown;
+      readonly contract: unknown;
       readonly contractPath: string;
       readonly configPath?: string;
     }): Promise<SignDatabaseResult> {
-      const { driver, contractIR, contractPath, configPath } = options;
+      const { driver, contract: contractInput, contractPath, configPath } = options;
       const startTime = Date.now();
 
-      const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
+      const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
 
       const contractStorageHash = contract.storageHash;
       const contractProfileHash =
@@ -510,7 +510,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const write = writeContractMarker({
           storageHash: contractStorageHash,
           profileHash: contractProfileHash,
-          contractJson: contractIR,
+          contractJson: contractInput,
           canonicalVersion: 1,
         });
         await driver.query(write.insert.sql, write.insert.params);
@@ -530,7 +530,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           const write = writeContractMarker({
             storageHash: contractStorageHash,
             profileHash: contractProfileHash,
-            contractJson: contractIR,
+            contractJson: contractInput,
             canonicalVersion: existingMarker.canonicalVersion ?? 1,
           });
           await driver.query(write.update.sql, write.update.params);
@@ -581,15 +581,15 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
     async introspect(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
-      readonly contractIR?: unknown;
+      readonly contract?: unknown;
     }): Promise<SqlSchemaIR> {
-      const { driver, contractIR } = options;
+      const { driver, contract } = options;
 
       const controlAdapter = adapter.create();
       if (!isSqlControlAdapter(controlAdapter)) {
         throw new Error('Adapter does not implement SqlControlAdapter.introspect()');
       }
-      return controlAdapter.introspect(driver, contractIR);
+      return controlAdapter.introspect(driver, contract);
     },
 
     toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
@@ -716,8 +716,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       };
     },
 
-    async emitContract({ contractIR }): Promise<EmitContractResult> {
-      const normalizedIR = normalizeProviderContractIR(contractIR);
+    async emitContract({ contract }): Promise<EmitContractResult> {
+      const normalizedIR = normalizeProviderContract(contract);
 
       const result = await emit(
         normalizedIR,

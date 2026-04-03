@@ -10,7 +10,7 @@ import { emit } from '@prisma-next/core-control-plane/emission';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createContractIR } from './utils';
+import { createTestContract } from './utils';
 
 const EMIT_TEST_STORAGE_HASH =
   'sha256:0000000000000000000000000000000000000000000000000000000000000000';
@@ -95,7 +95,7 @@ describe('emitter', () => {
   it(
     'emits contract.json and contract.d.ts',
     async () => {
-      const ir = createContractIR({
+      const ir = createTestContract({
         models: {
           User: {
             storage: { table: 'user' },
@@ -156,7 +156,7 @@ describe('emitter', () => {
 
   it('does not validate codec namespaces against extensions', async () => {
     // Namespace validation removed - codecs can use any namespace
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -188,7 +188,7 @@ describe('emitter', () => {
   });
 
   it('validates type ID format', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -252,7 +252,7 @@ describe('emitter', () => {
 
   it('emits contract even when extension pack namespace does not match extensionIds', async () => {
     // Adapter-provided codecs (pg/int4@1) don't need to be in contract.extensionPacks
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -284,7 +284,7 @@ describe('emitter', () => {
 
   it('handles missing extensionPacks field', async () => {
     // Namespace validation removed - codecs can use any namespace
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -316,7 +316,7 @@ describe('emitter', () => {
 
   it('handles empty packs array', async () => {
     // Namespace validation removed - codecs can use any namespace
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -364,7 +364,7 @@ describe('emitter', () => {
   });
 
   it('throws error when extension packs are not an object', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       extensionPacks: 'not-an-object' as unknown as Record<string, unknown>,
     });
 
@@ -400,7 +400,7 @@ describe('emitter', () => {
   });
 
   it('throws error when capabilities is not an object', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       capabilities: 'not-an-object' as unknown as Record<string, Record<string, boolean>>,
     });
 
@@ -436,7 +436,7 @@ describe('emitter', () => {
   });
 
   it('throws error when meta is not an object', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       meta: 'not-an-object' as unknown as Record<string, unknown>,
     });
 
@@ -455,7 +455,7 @@ describe('emitter', () => {
   });
 
   it('omits sources from emitted contract artifact', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -486,7 +486,7 @@ describe('emitter', () => {
   });
 
   it('accepts meta keys when family validation allows them', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       meta: {
         sourceId: 'schema.prisma',
         schemaPath: '/tmp/schema.prisma',
@@ -509,7 +509,7 @@ describe('emitter', () => {
   });
 
   it('accepts canonical section keys when family validation allows them', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {
           user: {
@@ -546,7 +546,7 @@ describe('emitter', () => {
 
   it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {
     // extensionIds includes adapters/targets which are not in contract.extensionPacks
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {},
       },
@@ -594,7 +594,7 @@ export type Contract = unknown;
   });
 
   it('passes parameterizedRenderers to generateContractTypes options', async () => {
-    const ir = createContractIR({
+    const ir = createTestContract({
       storage: {
         tables: {},
       },

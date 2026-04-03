@@ -96,7 +96,7 @@ describe.sequential('Schema verification after runner - integration', () => {
 
       const result = await familyInstance.schemaVerify({
         driver: driver!,
-        contractIR: contract,
+        contract: contract,
         strict: false,
         frameworkComponents,
       });
@@ -149,7 +149,7 @@ describe.sequential('Schema verification after runner - integration', () => {
 
       const result = await familyInstance.schemaVerify({
         driver: driver!,
-        contractIR: contractWithDefaults,
+        contract: contractWithDefaults,
         strict: false,
         frameworkComponents,
       });
@@ -213,7 +213,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         // Also verify via familyInstance.schemaVerify for completeness
         const result = await familyInstance.schemaVerify({
           driver: driver!,
-          contractIR: enumContract,
+          contract: enumContract,
           strict: false,
           frameworkComponents,
         });
@@ -233,7 +233,7 @@ describe.sequential('Schema verification after runner - integration', () => {
 
       const result = await familyInstance.schemaVerify({
         driver: driver!,
-        contractIR: contract,
+        contract: contract,
         strict: false,
         frameworkComponents,
       });
@@ -256,7 +256,7 @@ describe.sequential('Schema verification after runner - integration', () => {
 
       const result = await familyInstance.schemaVerify({
         driver: driver!,
-        contractIR: contract,
+        contract: contract,
         strict: false,
         frameworkComponents,
       });
@@ -280,7 +280,7 @@ describe.sequential('Schema verification after runner - integration', () => {
 
       const result = await familyInstance.schemaVerify({
         driver: driver!,
-        contractIR: contract,
+        contract: contract,
         strict: false,
         frameworkComponents,
       });

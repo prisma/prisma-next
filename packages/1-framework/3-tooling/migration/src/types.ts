@@ -1,4 +1,4 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 
 export interface MigrationHints {
@@ -15,8 +15,8 @@ interface MigrationManifestBase {
   readonly from: string;
   readonly to: string;
   readonly kind: 'regular' | 'baseline';
-  readonly fromContract: ContractIR | null;
-  readonly toContract: ContractIR;
+  readonly fromContract: Contract | null;
+  readonly toContract: Contract;
   readonly hints: MigrationHints;
   readonly labels: readonly string[];
   readonly authorship?: { readonly author?: string; readonly email?: string };

@@ -25,7 +25,7 @@ const DB_UPDATE_POLICY = {
 export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId>;
-  readonly contractIR: Contract;
+  readonly contract: Contract;
   readonly mode: 'plan' | 'apply';
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
@@ -49,7 +49,7 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
 export async function executeDbUpdate<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbUpdateOptions<TFamilyId, TTargetId>,
 ): Promise<DbUpdateResult> {
-  const { driver, familyInstance, contractIR, mode, migrations, frameworkComponents, onProgress } =
+  const { driver, familyInstance, contract, mode, migrations, frameworkComponents, onProgress } =
     options;
 
   const planner = migrations.createPlanner(familyInstance);
@@ -80,7 +80,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     label: 'Planning migration',
   });
   const plannerResult: MigrationPlannerResult = await planner.plan({
-    contract: contractIR,
+    contract,
     schema: schemaIR,
     policy,
     frameworkComponents,
@@ -156,7 +156,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
   const runnerResult: MigrationRunnerResult = await runner.execute({
     plan: migrationPlan,
     driver,
-    destinationContract: contractIR,
+    destinationContract: contract,
     policy,
     ...(callbacks ? { callbacks } : {}),
     // db update plans and applies from a single introspection pass, so per-operation pre/postchecks

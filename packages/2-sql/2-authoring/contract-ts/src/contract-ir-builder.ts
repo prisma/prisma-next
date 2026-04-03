@@ -219,15 +219,12 @@ export function buildContract(state: RuntimeBuilderState): Contract {
         }
       : undefined;
 
-  const execution = executionSection
-    ? {
-        ...executionSection,
-        executionHash: computeExecutionHash({
-          target,
-          targetFamily,
-          execution: executionSection,
-        }),
-      }
+  const executionHash = executionSection
+    ? computeExecutionHash({
+        target,
+        targetFamily,
+        execution: executionSection,
+      })
     : undefined;
 
   const models: Record<string, Record<string, unknown>> = {};
@@ -306,7 +303,8 @@ export function buildContract(state: RuntimeBuilderState): Contract {
     models,
     roots,
     storage,
-    ...(execution ? { execution } : {}),
+    ...(executionSection ? { execution: executionSection } : {}),
+    ...(executionHash !== undefined ? { executionHash } : {}),
     extensionPacks,
     capabilities,
     profileHash,

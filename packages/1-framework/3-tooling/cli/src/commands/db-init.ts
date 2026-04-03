@@ -116,7 +116,7 @@ async function executeDbInitCommand(
   try {
     // Call dbInit with connection and progress callback
     const result = await client.dbInit({
-      contractIR: contractJson,
+      contract: contractJson,
       mode: options.dryRun ? 'plan' : 'apply',
       connection: dbConnection,
       onProgress,

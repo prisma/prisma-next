@@ -113,8 +113,8 @@ export type OnControlProgress = (event: ControlProgressEvent) => void;
  * Options for the verify operation.
  */
 export interface VerifyOptions {
-  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
-  readonly contractIR: unknown;
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContract() */
+  readonly contract: unknown;
   /**
    * Database connection. If provided, verify will connect before executing.
    * If omitted, the client must already be connected.
@@ -129,8 +129,8 @@ export interface VerifyOptions {
  * Options for the schemaVerify operation.
  */
 export interface SchemaVerifyOptions {
-  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
-  readonly contractIR: unknown;
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContract() */
+  readonly contract: unknown;
   /**
    * Whether to use strict mode for schema verification.
    * In strict mode, extra tables/columns are reported as issues.
@@ -151,8 +151,8 @@ export interface SchemaVerifyOptions {
  * Options for the sign operation.
  */
 export interface SignOptions {
-  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
-  readonly contractIR: unknown;
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContract() */
+  readonly contract: unknown;
   /**
    * Path to the contract file (for metadata in the result).
    */
@@ -175,8 +175,8 @@ export interface SignOptions {
  * Options for the dbInit operation.
  */
 export interface DbInitOptions {
-  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
-  readonly contractIR: unknown;
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContract() */
+  readonly contract: unknown;
   /**
    * Mode for the dbInit operation.
    * - 'plan': Returns planned operations without applying
@@ -197,8 +197,8 @@ export interface DbInitOptions {
  * Options for the dbUpdate operation.
  */
 export interface DbUpdateOptions {
-  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
-  readonly contractIR: unknown;
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContract() */
+  readonly contract: unknown;
   /**
    * Mode for the dbUpdate operation.
    * - 'plan': Returns planned operations without applying

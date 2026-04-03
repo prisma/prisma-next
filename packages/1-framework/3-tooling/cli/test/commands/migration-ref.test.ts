@@ -1,7 +1,8 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import { createSqlContract } from '@prisma-next/contract/testing';
+import type { Contract } from '@prisma-next/contract/types';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
@@ -20,21 +21,6 @@ import { describe, expect, it } from 'vitest';
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const HASH_C = `sha256:${'c'.repeat(64)}`;
-
-function createTestContract(overrides?: Partial<ContractIR>): ContractIR {
-  return {
-    schemaVersion: '1',
-    targetFamily: 'sql',
-    target: 'postgres',
-    models: {},
-    storage: { tables: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
-  };
-}
 
 function createTableOp(table: string): MigrationPlanOperation {
   return {
@@ -58,8 +44,8 @@ async function writeAttestedMigration(
   opts: {
     from: string;
     to: string;
-    fromContract: ContractIR | null;
-    toContract: ContractIR;
+    fromContract: Contract | null;
+    toContract: Contract;
     ops: MigrationPlanOperation[];
     timestamp: Date;
     slug: string;
@@ -94,7 +80,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createTestContract({
+    const contractA = createSqlContract({
       storage: {
         tables: {
           user: {
@@ -103,7 +89,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
         },
       },
     });
-    const contractB = createTestContract({
+    const contractB = createSqlContract({
       storage: {
         tables: {
           user: {
@@ -115,7 +101,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
         },
       },
     });
-    const contractC = createTestContract({
+    const contractC = createSqlContract({
       storage: {
         tables: {
           user: {
@@ -221,7 +207,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createTestContract({
+    const contractA = createSqlContract({
       storage: {
         tables: {
           user: {
@@ -230,7 +216,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
         },
       },
     });
-    const contractB = createTestContract({
+    const contractB = createSqlContract({
       storage: {
         tables: {
           user: {
@@ -316,7 +302,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createTestContract({
+    const contractA = createSqlContract({
       storage: {
         tables: {
           user: {
@@ -325,7 +311,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
         },
       },
     });
-    const contractB = createTestContract({
+    const contractB = createSqlContract({
       storage: {
         tables: {
           user: {
@@ -388,7 +374,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createTestContract({
+    const contractA = createSqlContract({
       storage: {
         tables: {
           user: {
@@ -397,7 +383,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
         },
       },
     });
-    const contractB = createTestContract({
+    const contractB = createSqlContract({
       storage: {
         tables: {
           user: {

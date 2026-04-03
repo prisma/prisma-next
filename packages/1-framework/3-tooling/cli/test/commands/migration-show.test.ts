@@ -1,7 +1,8 @@
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import { createContract, createSqlContract } from '@prisma-next/contract/testing';
+import type { Contract } from '@prisma-next/contract/types';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
@@ -16,21 +17,6 @@ import { describe, expect, it } from 'vitest';
 import { resolveByHashPrefix } from '../../src/commands/migration-show';
 import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
-
-function createTestContract(overrides?: Partial<ContractIR>): ContractIR {
-  return {
-    schemaVersion: '1',
-    targetFamily: 'sql',
-    target: 'postgres',
-    models: {},
-    storage: { tables: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
-  };
-}
 
 async function createTempDir(prefix: string): Promise<string> {
   const dir = join(
@@ -57,8 +43,8 @@ function createOp(
 function createManifest(
   from: string,
   to: string,
-  toContract: ContractIR,
-  fromContract: ContractIR | null = null,
+  toContract: Contract,
+  fromContract: Contract | null = null,
 ): MigrationManifest {
   return {
     from,
@@ -94,7 +80,7 @@ describe('resolveByHashPrefix', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createTestContract({
+    const contract = createSqlContract({
       storage: {
         tables: {
           user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
@@ -125,7 +111,7 @@ describe('resolveByHashPrefix', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createTestContract({
+    const contract = createSqlContract({
       storage: {
         tables: {
           user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
@@ -162,7 +148,7 @@ describe('resolveByHashPrefix', () => {
           migrationId: 'sha256:abc123',
           kind: 'regular',
           fromContract: null,
-          toContract: createTestContract(),
+          toContract: createContract(),
           hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'diff' },
           labels: [],
           createdAt: new Date().toISOString(),
@@ -179,7 +165,7 @@ describe('resolveByHashPrefix', () => {
   });
 
   it('returns error for ambiguous prefix', () => {
-    const contract = createTestContract();
+    const contract = createContract();
     const packages: MigrationPackage[] = [
       {
         dirName: '20260101_100000_first',
@@ -233,7 +219,7 @@ describe('resolveByHashPrefix', () => {
           migrationId: 'sha256:abc123def456',
           kind: 'regular',
           fromContract: null,
-          toContract: createTestContract(),
+          toContract: createContract(),
           hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'diff' },
           labels: [],
           createdAt: new Date().toISOString(),
@@ -260,7 +246,7 @@ describe('resolveByHashPrefix', () => {
           migrationId: null,
           kind: 'regular',
           fromContract: null,
-          toContract: createTestContract(),
+          toContract: createContract(),
           hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'diff' },
           labels: [],
           createdAt: new Date().toISOString(),

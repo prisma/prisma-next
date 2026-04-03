@@ -19,7 +19,7 @@ describe('executeDbInit progress emission', () => {
 
     const mockFamilyInstance = {
       introspect: async () => ({}),
-      validateContractIR: () => ({}) as Contract,
+      validateContract: () => ({}) as Contract,
       readMarker: async () => null,
     } as unknown as ControlFamilyInstance<string>;
 
@@ -43,7 +43,7 @@ describe('executeDbInit progress emission', () => {
     await executeDbInit({
       driver: mockDriver,
       familyInstance: mockFamilyInstance,
-      contractIR: {} as Contract,
+      contract: {} as Contract,
       mode: 'plan',
       migrations: mockMigrations,
       frameworkComponents: mockFrameworkComponents,
@@ -85,7 +85,7 @@ describe('executeDbInit progress emission', () => {
 
     const mockFamilyInstance = {
       introspect: async () => ({}),
-      validateContractIR: () => ({}) as Contract,
+      validateContract: () => ({}) as Contract,
       readMarker: async () => null,
     } as unknown as ControlFamilyInstance<string>;
 
@@ -131,7 +131,7 @@ describe('executeDbInit progress emission', () => {
     await executeDbInit({
       driver: mockDriver,
       familyInstance: mockFamilyInstance,
-      contractIR: {} as Contract,
+      contract: {} as Contract,
       mode: 'apply',
       migrations: mockMigrations,
       frameworkComponents: mockFrameworkComponents,
@@ -168,7 +168,7 @@ describe('executeDbInit progress emission', () => {
 
     const mockFamilyInstance = {
       introspect: async () => ({}),
-      validateContractIR: () => ({}) as Contract,
+      validateContract: () => ({}) as Contract,
       readMarker: async () => null,
     } as unknown as ControlFamilyInstance<string>;
 
@@ -193,7 +193,7 @@ describe('executeDbInit progress emission', () => {
     const result = await executeDbInit({
       driver: mockDriver,
       familyInstance: mockFamilyInstance,
-      contractIR: {} as Contract,
+      contract: {} as Contract,
       mode: 'plan',
       migrations: mockMigrations,
       frameworkComponents: mockFrameworkComponents,
