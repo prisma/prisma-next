@@ -2,7 +2,7 @@
 
 ## Summary
 
-Build a typed pipeline AST as the shared primitive for all MongoDB read queries, then build a `MongoCollection` class on top of it with the same fluent chaining API as the SQL `Collection`. This mirrors the SQL architecture where `relational-core` owns the SQL AST and both the ORM and query builder are consumers of it. The pipeline AST lives in its own package (not `mongo-core`) — see [design doc §Package location](./milestone-1-pipeline-ast-design.md#package-location).
+Build a typed query AST (`@prisma-next/mongo-query-ast`) as the shared primitive for all MongoDB read queries, then build a `MongoCollection` class on top of it with the same fluent chaining API as the SQL `Collection`. This mirrors the SQL architecture where `relational-core` owns the SQL AST and both the ORM and query builder are consumers of it. The query AST lives in its own package at `packages/2-mongo-family/2-query-ast/`, below all consumers — see [design doc §Package](./milestone-1-pipeline-ast-design.md#package).
 
 **Design constraint:** All read queries compile to typed pipeline stages exclusively — the `find()` API is not used ([ADR 183](../../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md)). The typed stage representation is the foundation for both the ORM and the future pipeline query builder (WS4 stretch goal).
 
@@ -27,6 +27,7 @@ Build a typed pipeline AST as the shared primitive for all MongoDB read queries,
 - Current Mongo ORM: `packages/2-mongo-family/4-orm/src/mongo-orm.ts` (~145 lines)
 - Current Mongo types: `packages/2-mongo-family/4-orm/src/types.ts`
 - Mongo commands: `packages/2-mongo-family/1-core/src/commands.ts` (`AggregateCommand` — `FindCommand` is not used for reads per [ADR 183](../../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md))
+- Mongo query AST (new): `packages/2-mongo-family/2-query-ast/` — filter expressions, read stages, visitors
 - Mongo demo: `examples/mongo-demo/`
 
 ## Architecture
@@ -34,7 +35,7 @@ Build a typed pipeline AST as the shared primitive for all MongoDB read queries,
 ```
 mongo-core (layer 1)
     ↑
-pipeline AST package (new)             ← stages, filter expressions, visitors
+mongo-query-ast (layer 2)              ← stages, filter expressions, visitors
     ↑                    ↑
     │                    │
 mongo-pipeline-builder   mongo-orm (layer 4-orm)
@@ -44,21 +45,21 @@ mongo-pipeline-builder   mongo-orm (layer 4-orm)
         pipeline builder
 ```
 
-The pipeline AST is contract-agnostic — it deals in MongoDB concepts (fields, operators, pipeline stages), not contract concepts (models, codecIds, relations). The ORM bridges the gap, just as the SQL ORM bridges models to `SelectAst`. It lives in its own package, mirroring how the SQL AST lives in `relational-core` (lanes layer), not in `sql-core`.
+The query AST is contract-agnostic — it deals in MongoDB concepts (fields, operators, aggregation stages), not contract concepts (models, codecIds, relations). The ORM bridges the gap, just as the SQL ORM bridges models to `SelectAst`. It lives in its own package below all consumers, mirroring how the SQL AST lives in `relational-core`, not in `sql-core`.
 
 ## Milestones
 
-### Milestone 1: Pipeline AST (new package)
+### Milestone 1: Query AST (`@prisma-next/mongo-query-ast`)
 
-The typed primitive layer. Defines pipeline stage nodes, filter expression AST, visitor/rewriter interfaces. No ORM, no Collection, no contract awareness. This is the Mongo equivalent of `relational-core`'s SQL AST, in its own package (not `mongo-core`).
+The typed primitive layer in `packages/2-mongo-family/2-query-ast/`. Defines read stage nodes, filter expression AST, visitor/rewriter interfaces. No ORM, no Collection, no contract awareness. This is the Mongo equivalent of `relational-core`'s SQL AST.
 
-**Design:** [milestone-1-pipeline-ast-design.md](./milestone-1-pipeline-ast-design.md) — class hierarchies, visitor/rewriter interfaces, lowering strategy, operations extensibility, raw pipeline escape hatch, package location.
+**Design:** [milestone-1-pipeline-ast-design.md](./milestone-1-pipeline-ast-design.md) — class hierarchies, visitor/rewriter interfaces, lowering strategy, operations extensibility, raw escape hatch, package location.
 
 **Tasks:**
 
-#### 1.0 Create pipeline AST package
+#### 1.0 Create `mongo-query-ast` package
 
-Create a new package for the pipeline AST. Package name and layer position TBD — see design doc §Package location.
+Create `packages/2-mongo-family/2-query-ast/` (`@prisma-next/mongo-query-ast`). Add the `query-ast` layer to the Mongo layer order in `architecture.config.json`. See design doc §Package.
 
 #### 1.1 Filter expression AST + visitor/rewriter
 
@@ -117,7 +118,7 @@ Add one pass-through extension operator to validate the trait-gated extensibilit
 
 ### Milestone 2: ORM Collection with chaining + compilation
 
-Build `MongoCollection` with the fluent chaining API, compiling `CollectionState` to the pipeline AST from Milestone 1. The Collection is contract-aware — it bridges models, fields, and relations to pipeline stages.
+Build `MongoCollection` with the fluent chaining API, compiling `CollectionState` to the query AST from Milestone 1. The Collection is contract-aware — it bridges models, fields, and relations to pipeline stages.
 
 **Tasks:**
 
