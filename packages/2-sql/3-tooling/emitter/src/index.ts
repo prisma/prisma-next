@@ -347,7 +347,7 @@ export const sqlTargetFamilyHook = {
   export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
   type ContractBase = SqlContract<
-  ${storageType},
+  ${storageType} & { readonly storageHash: StorageHash },
   ${modelsType},
   StorageHash,
   ExecutionHash,

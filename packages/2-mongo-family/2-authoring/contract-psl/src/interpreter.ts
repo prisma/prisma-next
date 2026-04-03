@@ -247,9 +247,10 @@ export function interpretPslDocumentToMongoContract(
   return ok({
     targetFamily,
     target,
+    storageHash,
     roots,
     models,
-    storage: { ...storageWithoutHash, storageHash },
+    storage: storageWithoutHash,
     extensionPacks: {},
     capabilities,
     profileHash: computeProfileHash({ target, targetFamily, capabilities }),
