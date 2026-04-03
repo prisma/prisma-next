@@ -41,6 +41,7 @@
     "./types": "./dist/types.mjs",
     "./validate-contract": "./dist/validate-contract.mjs",
     "./validate-domain": "./dist/validate-domain.mjs",
+    "./testing": "./dist/testing.mjs",
     "./package.json": "./package.json"
   },
   "repository": {

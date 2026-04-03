@@ -7,5 +7,6 @@ export default defineConfig({
     'src/exports/validate-domain.ts',
     'src/exports/validate-contract.ts',
     'src/exports/hashing.ts',
+    'src/exports/testing.ts',
   ],
 });
