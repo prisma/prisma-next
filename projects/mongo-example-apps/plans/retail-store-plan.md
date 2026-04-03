@@ -1,8 +1,10 @@
-# Retail Store Port
+# Retail Store Example App
 
 ## Summary
 
-Port the [retail-store-v2](https://github.com/mongodb-industry-solutions/retail-store-v2) e-commerce platform from raw MongoDB driver calls to Prisma Next's MongoDB support. The app exercises embedded documents, referenced relations, multiple index types, update operators, vector search, change streams, and aggregation pipelines across a realistic e-commerce domain (products, orders, customers, carts, inventory, recommendations, CEP events). Success means every data access path uses the PN ORM with full type safety, and at least one schema migration and one data migration run through the PN migration graph.
+Build a contract-first e-commerce data access layer using Prisma Next's MongoDB support, inspired by the [retail-store-v2](https://github.com/mongodb-industry-solutions/retail-store-v2) domain model. This is **not a literal port** — it's an equivalent application designed from the contract outward, the way a PN user would build it. The domain model (products, carts, orders, users, locations) stays the same; the data access layer is idiomatic PN.
+
+The goal is to validate that PN's Mongo implementation handles a realistic e-commerce domain: embedded documents, referenced relations, update operators, vector search, change streams, aggregation, and schema migrations — all with full type safety.
 
 **Spec:** `projects/mongo-example-apps/spec.md`
 
@@ -13,6 +15,28 @@ Port the [retail-store-v2](https://github.com/mongodb-industry-solutions/retail-
 | Maker | Agent / Engineer | Drives execution |
 | Reviewer | Will | Architectural review, framework gap triage |
 | Collaborator | WS4 (Mongo) team | Framework features this plan depends on |
+
+---
+
+## What we're building
+
+A typed data access layer for an e-commerce store, living at `examples/retail-store/`. It consists of:
+
+1. **A PN contract** defining the domain model (TypeScript DSL → `contract.json` + `contract.d.ts`)
+2. **A data access module** — typed functions for every data operation (queries, mutations, aggregations) built on the PN ORM and runtime
+3. **Integration tests** proving each capability against `mongodb-memory-server`
+4. **Seed data** for demonstrations and tests
+
+No UI, no API routes, no SSE bridge. The example validates the PN framework, not application infrastructure.
+
+### What we're NOT building
+
+- **The Next.js app** — no frontend, no API routes, no Redux
+- **The chatbot integration** — validates Dataworkz, not PN
+- **The SSE bridge** — app-level HTTP code that stays as-is in the original
+- **Generic CRUD helpers** — the original's `findDocuments`/`insertDocument`/`updateDocument` are the anti-pattern PN replaces
+
+---
 
 ## Source Repo Analysis
 
@@ -25,172 +49,489 @@ The retail-store-v2 is a **Next.js App Router** JavaScript app using the **nativ
 - **Update operators**: `$push` (order status, cart items), `$pull` (cart item removal), `$set` (clear cart, embeddings, NBA redeemed), `$setOnInsert` (cart upsert)
 - **Change streams**: DB-level `watch()` with `$match` filter, SSE bridge to client
 - **Aggregation**: `$search` (text), `$sample`, generic aggregate endpoint, analytics pipelines with `$group`/`$unwind`/`$sort`
-- **No `$lookup`**: original app uses denormalization everywhere — the port will add `$lookup` via PN `include()` where appropriate
+- **No `$lookup`**: original app uses denormalization everywhere — our app will add `$lookup` via PN `include()` where appropriate
+
+---
+
+## Domain Model
+
+### Overview
+
+The original retail-store-v2 has 10 collections. We use the same core e-commerce domain but design the contract to showcase PN's strengths. We keep 7 collections that exercise distinct MongoDB patterns:
+
+| Collection | Purpose | Key PN patterns |
+|---|---|---|
+| `products` | Product catalog | Embedded value objects (price, image), vector embedding field, text search index |
+| `users` | Customer accounts | Embedded value objects (address), referenced by carts and orders |
+| `carts` | Shopping carts | Embedded cart items (value objects), reference to user (1:1), update operators (`$push`, `$pull`, `$set`), upsert |
+| `orders` | Customer orders | Embedded line items and status history (value objects), reference to user (N:1), update operators (`$push`) |
+| `locations` | Store locations | Simple read-only collection |
+| `invoices` | Digital receipts | Embedded line items, linked to order |
+| `events` | Behavioral event stream | High-volume inserts, aggregation pipelines, change streams |
+
+**Dropped from original:** `sessions` (trivial insert, no PN value), `session_signals` and `next_best_actions` (CEP microservice concern — their aggregation patterns are better demonstrated through `events`).
+
+### Document Shapes
+
+#### Product
+
+```
+products {
+  _id: ObjectId
+  name: string
+  brand: string
+  code: string
+  description: string
+  masterCategory: string
+  subCategory: string
+  articleType: string
+  price: Price              // embedded value object
+  image: Image              // embedded value object
+  embedding: number[]       // vector embedding for similarity search
+}
+
+Price {                      // value object (no identity)
+  amount: number
+  currency: string
+}
+
+Image {                      // value object
+  url: string
+}
+```
+
+**Mapping to original:** Same fields. Renamed `vai_text_embedding` → `embedding` (clearer). `price` and `image` are embedded subdocuments in both — we model them as value objects (once ADR 178 ships) or embedded models (owner pattern as stopgap).
+
+**Indexes:**
+- Text search index on `name`, `articleType`, `subCategory`, `brand`
+- Vector search index on `embedding`
+
+#### User
+
+```
+users {
+  _id: ObjectId
+  name: string
+  email: string
+  address: Address          // embedded value object
+}
+
+Address {                    // value object
+  streetAndNumber: string
+  city: string
+  postalCode: string
+  country: string
+}
+```
+
+**Mapping to original:** The original `users` collection has minimal visible fields (the routes just `find({})` and `find({_id})`). We add an embedded `address` (inspired by the shipping address logic in `createOrder`) to exercise embedded value objects on users. The original's `lastRecommendations` array is dropped — recommendation state belongs in the vector search results, not denormalized on the user.
+
+#### Cart
+
+```
+carts {
+  _id: ObjectId
+  userId: ObjectId           // reference to users (1:1)
+  items: CartItem[]          // embedded array of value objects
+}
+
+CartItem {                   // value object
+  productId: ObjectId
+  name: string
+  brand: string
+  amount: number
+  price: Price               // nested value object
+  image: Image               // nested value object
+}
+```
+
+**Mapping to original:** Same structure. The original's `user` field is renamed `userId` for clarity. Cart items are denormalized product snapshots (same pattern — this is intentional denormalization for cart display). The `code` and `description` fields from the original cart items are dropped (not needed for cart display).
+
+**Indexes:**
+- Unique index on `userId` (1:1 relationship enforcement)
+
+**Data access patterns:**
+- **Upsert cart** — `findOneAndUpdate` with `$setOnInsert` + `$push` (create if not exists, add items)
+- **Add item** — `$push` to `items` array
+- **Remove item** — `$pull` from `items` array by `productId`
+- **Clear cart** — `$set` `items` to `[]`
+- **Get cart** — `findFirst` by `userId`
+- **Get cart with user** — `findFirst` with `include({ user: true })` (demonstrates `$lookup`)
+
+#### Order
+
+```
+orders {
+  _id: ObjectId
+  userId: ObjectId            // reference to users (N:1)
+  items: OrderLineItem[]      // embedded array of value objects (snapshot at order time)
+  shippingAddress: string
+  type: string                // "home" | "bopis"
+  statusHistory: StatusEntry[] // embedded array of value objects
+}
+
+OrderLineItem {               // value object (identical to CartItem shape)
+  productId: ObjectId
+  name: string
+  brand: string
+  amount: number
+  price: Price
+  image: Image
+}
+
+StatusEntry {                 // value object
+  status: string
+  timestamp: Date
+}
+```
+
+**Mapping to original:** Same structure. `products` → `items` and `status_history` → `statusHistory` for TS naming conventions. The `user` ObjectId field → `userId`.
+
+**Data access patterns:**
+- **Create order** — insert with initial status entry
+- **List user orders** — `findMany` by `userId`, sorted by `_id` descending
+- **Get order details** — `findFirst` by `_id`
+- **Get order with user** — `findFirst` with `include({ user: true })` (demonstrates `$lookup`)
+- **Update order status** — `$push` to `statusHistory` array
+- **Delete order** — `deleteOne` by `_id`
+
+#### Location
+
+```
+locations {
+  _id: ObjectId
+  name: string
+  streetAndNumber: string
+  city: string
+  postalCode: string
+  country: string
+}
+```
+
+**Mapping to original:** Same purpose, field names aligned with our `Address` value object. Simple read-only collection.
+
+#### Invoice
+
+```
+invoices {
+  _id: ObjectId
+  orderId: ObjectId           // reference to orders
+  items: InvoiceLineItem[]    // embedded array
+  subtotal: number
+  tax: number
+  total: number
+  issuedAt: Date
+}
+
+InvoiceLineItem {             // value object
+  name: string
+  amount: number
+  unitPrice: number
+  lineTotal: number
+}
+```
+
+**Mapping to original:** The original's invoice structure isn't visible from routes (only `findFirst` by `_id`). We define a reasonable invoice shape that demonstrates embedded line items and a reference to orders.
+
+#### Event
+
+```
+events {
+  _id: ObjectId
+  userId: string
+  sessionId: string
+  type: string                // "heartbeat" | "view-product" | "add-to-cart" | "search" | "exit-risk"
+  timestamp: Date
+  metadata: EventMetadata     // embedded value object (polymorphic by type)
+}
+
+EventMetadata {               // value object
+  productId?: string
+  subCategory?: string
+  brand?: string
+  query?: string
+  exitMethod?: string
+}
+```
+
+**Mapping to original:** Consolidates the original's `events_ingest`, `session_signals`, and `next_best_actions` into a single `events` collection. The aggregation patterns (group by type, compute percentages, sort) are preserved as queries against this collection. This simplification still exercises the same MongoDB features (high-volume inserts, aggregation pipelines, change streams) without the microservice complexity.
+
+**Data access patterns:**
+- **Insert event** — high-volume `insertOne`
+- **Aggregate by type** — `$match` → `$group` → `$group` → `$unwind` → `$project` → `$sort` (same pipeline shape as the original)
+- **Watch events** — change stream subscription for real-time processing
+
+---
+
+## Feature Coverage
+
+Each feature we exercise maps to a PN capability we're validating:
+
+### Tier 1: Core (can start now or soon)
+
+| Feature | MongoDB idiom | PN capability | Original app equivalent |
+|---|---|---|---|
+| Contract definition | — | Contract IR + emitter | (new — original has no schema) |
+| Product catalog queries | `find` with projection and filter | ORM `findMany` | `getProducts`, `findDocuments` |
+| User lookup | `find` by `_id` | ORM `findFirst` | `getUsers` |
+| Cart → User relation | `$lookup` | ORM `include()` | (new — original denormalizes) |
+| Order → User relation | `$lookup` | ORM `include()` | (new — original denormalizes) |
+| Embedded documents | Subdocuments in results | Value objects / owner pattern | `price`, `image` on products |
+| Location listing | `find({})` | ORM `findMany` | `getStoreLocations` |
+
+### Tier 2: Mutations (requires ORM write surface + update operators)
+
+| Feature | MongoDB idiom | PN capability | Original app equivalent |
+|---|---|---|---|
+| Create order | `insertOne` | ORM `create` | `createOrder` |
+| Cart upsert | `findOneAndUpdate` + `$setOnInsert` + `$push` | ORM `upsert` | `fillCart` |
+| Add to cart | `$push` | Typed `$push` operator | `updateCartProducts` (add) |
+| Remove from cart | `$pull` | Typed `$pull` operator | `updateCartProducts` (remove) |
+| Clear cart | `$set` to `[]` | Typed `$set` operator | `clearCart` |
+| Update order status | `$push` to array | Typed `$push` operator | `updateOrderStatus` |
+| Delete order | `deleteOne` | ORM `delete` | `deleteOrder` |
+| Insert event | `insertOne` | ORM `create` | `events/route.js` |
+
+### Tier 3: Advanced (requires framework features not yet built)
+
+| Feature | MongoDB idiom | PN capability | Blocks on |
+|---|---|---|---|
+| Schema migrations | `createIndex`, `createCollection` | Migration runner | Mongo migration planner |
+| Product text search | `$search` stage | Atlas Search extension pack | Extension pack |
+| Product similarity | `$vectorSearch` | Vector search extension pack | Extension pack |
+| Event aggregation | `$group`/`$unwind`/`$sort` pipeline | Aggregation pipeline builder | Pipeline builder |
+| Event change stream | `db.watch()` | Runtime streaming interface | Change stream support |
+| Data migration | `updateMany` with field transform | Migration graph | Data migration runner |
+| Random products | `$sample` | Aggregation pipeline builder | Pipeline builder |
+
+---
+
+## Architecture
+
+```
+examples/retail-store/
+├── package.json
+├── tsconfig.json
+├── biome.jsonc
+├── vitest.config.ts
+├── scripts/
+│   └── generate-contract.ts     # ContractIR → emit → contract.json + contract.d.ts
+├── src/
+│   ├── contract.json            # generated
+│   ├── contract.d.ts            # generated
+│   ├── db.ts                    # database factory (createDb: uri, dbName → orm instance)
+│   ├── data/                    # data access functions organized by entity
+│   │   ├── products.ts          # findProducts, findProductById, searchProducts, ...
+│   │   ├── users.ts             # findUsers, findUserById
+│   │   ├── carts.ts             # getCart, addToCart, removeFromCart, clearCart, ...
+│   │   ├── orders.ts            # createOrder, getUserOrders, updateOrderStatus, ...
+│   │   ├── locations.ts         # findLocations
+│   │   ├── invoices.ts          # findInvoice
+│   │   └── events.ts            # insertEvent, aggregateEventsByType, ...
+│   └── seed.ts                  # seed data for tests and demos
+└── test/
+    ├── products.test.ts
+    ├── users.test.ts
+    ├── carts.test.ts
+    ├── orders.test.ts
+    ├── locations.test.ts
+    ├── invoices.test.ts
+    ├── events.test.ts
+    ├── relations.test.ts        # cross-collection $lookup tests
+    └── setup.ts                 # shared MongoMemoryReplSet setup
+```
+
+This follows the `mongo-demo` pattern: `scripts/generate-contract.ts` defines the `ContractIR` and emits artifacts to `src/`. The `db.ts` factory creates the PN runtime + ORM from a connection URI. Each entity module exports typed data access functions. Tests use `mongodb-memory-server`.
+
+---
 
 ## Milestones
 
-### Milestone 1: Project scaffold and contract authoring
+### Milestone 1: Scaffold + Contract
 
-Set up the example app as a workspace package, analyze the source data model in detail, and author the contract in both PSL and TypeScript DSL. The contract is the foundation — everything else depends on it.
+Set up the workspace package and author the contract.
 
-**Validates:** dual authoring surface parity, Mongo contract support for embedded documents, referenced relations, value objects, polymorphism.
-
-**Tasks:**
-
-- [ ] Create `examples/retail-store/` with `package.json` (workspace deps on PN packages), `tsconfig.json`, `biome.jsonc`, `vitest.config.ts` — following the `mongo-demo` example structure
-- [ ] Clone/download the retail-store-v2 source and analyze the full data model: document every collection's fields, embedded documents, cross-collection references, and index requirements
-- [ ] Author the PSL contract (`schema.psl`) covering all collections: `products`, `carts`, `orders`, `users`, `locations`, `invoices`, `sessions`, `events_ingest`, `session_signals`, `next_best_actions`
-  - Model embedded documents: order line items (value objects with `price`, `image`), `status_history` entries, cart items, event `tags`/`metadata`, user `lastRecommendations`
-  - Model referenced relations: `carts` → `users` (1:1 via `user` field), `orders` → `users` (N:1)
-  - Model vector embedding field on `products` (`vai_text_embedding`)
-- [ ] Author the TypeScript DSL contract producing equivalent `contract.json`
-- [ ] Write a parity test: emit `contract.json` from both PSL and TS DSL, assert structural equivalence
-- [ ] Generate `contract.json` and `contract.d.ts` via the emitter; commit artifacts
-
-### Milestone 2: Schema migrations
-
-The contract produces schema migrations that create MongoDB collections with the correct indexes and validators. The migration runner applies them against `mongodb-memory-server`.
-
-**Validates:** Mongo schema migration generation, index creation (unique, compound, text, vector), JSON Schema validators, migration runner against real MongoDB.
+**Framework dependencies:** None — ContractIR + emitter already work.
 
 **Tasks:**
+- [ ] Create `examples/retail-store/` with `package.json`, `tsconfig.json`, `biome.jsonc`, `vitest.config.ts`
+- [ ] Write `scripts/generate-contract.ts` defining the full ContractIR (all 7 collections, all embedded documents, all relations)
+- [ ] Run the emitter, commit `contract.json` + `contract.d.ts`
+- [ ] Write `src/db.ts` database factory
+- [ ] Write `src/seed.ts` with realistic seed data for all collections
 
-- [ ] Generate schema migrations from the contract for all collections
-- [ ] Verify migration creates the `user_1` unique index on `carts`
-- [ ] Verify migration creates a text search index on `products` (fields: `name`, `articleType`, `subCategory`, `brand`)
-- [ ] Verify migration creates a vector search index on `products` for `vai_text_embedding`
-- [ ] Verify migration creates collection options where needed (e.g. `changeStreamPreAndPostImages: { enabled: true }` on `users`, `orders`)
-- [ ] Write integration test: apply migrations against `mongodb-memory-server`, assert collections and indexes exist with correct configuration
-- [ ] Write integration test: apply migrations idempotently (run twice, assert no errors)
+**Open question:** Value objects (ADR 178) vs. owner pattern for embedded documents. If value objects aren't shipped yet, use the owner pattern as the existing demo does. Update the contract when value objects ship.
 
-### Milestone 3: Core ORM — CRUD operations
+### Milestone 2: Read operations + relations
 
-Replace the raw MongoDB driver calls for basic CRUD operations with PN ORM queries. This covers the data access layer for products, users, locations, invoices, and sessions — the simpler collections without update operator complexity.
+Build the read-side data access layer — the part that works today.
 
-**Validates:** `findMany`, `findFirst`, `create`, `update`, `delete` via ORM; embedded document inlining; type safety.
-
-**Tasks:**
-
-- [ ] Create the PN database client (`db.ts`) following the `mongo-demo` pattern: `mongodb-memory-server` for tests, real connection for optional integration
-- [ ] Port `products` queries: `findMany` with projection, `findFirst` by ID, `$sample` aggregation for random products
-- [ ] Port `users` queries: `findMany` (login list), `findFirst` by ID
-- [ ] Port `locations` queries: `findMany` (store list), `findFirst` by ID
-- [ ] Port `invoices` queries: `findFirst` by `_id`
-- [ ] Port `sessions` queries: `create` (insert session doc)
-- [ ] Write integration tests for each collection's CRUD operations against `mongodb-memory-server`
-- [ ] Verify embedded documents (`products.price`, `products.image`) appear inline in query results without separate `include`
-- [ ] Verify all query results are fully typed — add negative type tests (e.g. accessing non-existent field causes compile error)
-
-### Milestone 4: Relations and `$lookup`
-
-Add relation loading via the PN ORM's `include()` method for the referenced relations the original app handles via denormalization.
-
-**Validates:** `$lookup` aggregation pipeline generation, `include()` API, relation type inference.
+**Framework dependencies:** ORM `findMany` + `include()` (implemented).
 
 **Tasks:**
+- [ ] Implement product queries: `findProducts` (with filters), `findProductById`
+- [ ] Implement user queries: `findUsers`, `findUserById`
+- [ ] Implement location queries: `findLocations`
+- [ ] Implement invoice queries: `findInvoiceById`
+- [ ] Implement cart query: `getCartByUserId`
+- [ ] Implement order queries: `getUserOrders` (sorted), `getOrderById`
+- [ ] Implement relation loading: cart with user (`include`), order with user (`include`)
+- [ ] Write integration tests for all read operations
+- [ ] Write type safety tests (compile-time: accessing non-existent fields causes errors)
+- [ ] Verify embedded documents (price, image, address, cart items, status history) appear inline without `include`
 
-- [ ] Port `carts` → `users` relation: load cart with `include({ user: true })`, verify the user document is joined via `$lookup`
-- [ ] Port `orders` → `users` relation: load orders with `include({ user: true })`
-- [ ] Write integration tests: create user + cart + orders, query with `include`, assert joined documents are present and correctly typed
-- [ ] Verify the ORM infers the correct return type when `include` is used vs. omitted
+### Milestone 3: Write operations
 
-### Milestone 5: Update operators
+Add mutations to the data access layer.
 
-Port the cart and order mutation logic that uses Mongo-native update operators through the PN mutation surface.
+**Framework dependencies:** ORM `create` / `update` / `delete` methods (not yet implemented — currently only runtime-level commands exist).
 
-**Validates:** `$push`, `$pull`, `$set`, `$setOnInsert` through the PN mutation API; upsert support.
+**Decision point:** If ORM-level writes don't ship soon, we can implement this milestone using runtime-level commands (`insertOne`, `updateOne`, `deleteOne`) and upgrade to ORM methods later. The spec says "use PN ORM" but runtime commands are still PN framework code.
 
 **Tasks:**
+- [ ] Implement `createOrder` — insert order document with initial status entry
+- [ ] Implement `deleteOrder` — delete by `_id`
+- [ ] Implement `insertEvent` — insert event document
+- [ ] Write integration tests for create/delete operations
 
-- [ ] Port cart `fillCart` operation: upsert with `$setOnInsert` (new cart) and `$push` (add product to `products` array)
-- [ ] Port cart `updateCartProducts`: `$push` to add item, `$pull` to remove item by `products._id`
-- [ ] Port cart `clearCart`: `$set` to reset `products` to empty array
-- [ ] Port order `updateOrderStatus`: `$push` to append to `status_history` array
-- [ ] Port product embedding update: `$set` on `vai_text_embedding` field
-- [ ] Port NBA redemption: `$set` on `redeemed` field
-- [ ] Write integration tests for each update operator pattern against `mongodb-memory-server`
+### Milestone 4: Update operators
+
+Implement the cart and order mutations that use Mongo-native update operators.
+
+**Framework dependencies:** Typed `$push`, `$pull`, `$set` through the PN mutation surface (ADR 180 — designed, not built). Upsert support.
+
+**Tasks:**
+- [ ] Implement `upsertCart` — `findOneAndUpdate` with `$setOnInsert` + `$push`
+- [ ] Implement `addToCart` — `$push` to `items` array
+- [ ] Implement `removeFromCart` — `$pull` from `items` by `productId`
+- [ ] Implement `clearCart` — `$set` `items` to `[]`
+- [ ] Implement `updateOrderStatus` — `$push` to `statusHistory`
+- [ ] Write integration tests for each update operator pattern
+
+### Milestone 5: Schema migrations
+
+Generate and apply schema migrations from the contract.
+
+**Framework dependencies:** Mongo migration planner (designed, not built).
+
+**Tasks:**
+- [ ] Generate schema migrations from the contract
+- [ ] Verify unique index on `carts.userId`
+- [ ] Verify text search index on `products`
+- [ ] Verify vector search index on `products.embedding`
+- [ ] Write integration test: apply migrations against `mongodb-memory-server`, assert indexes exist
+- [ ] Write integration test: idempotent migration (apply twice, no errors)
 
 ### Milestone 6: Vector search
 
-Port product recommendation queries to use the PN vector search extension pack.
+Add product recommendation queries using vector similarity.
 
-**Validates:** PN vector search extension pack against a real use case; vector index integration; embedding field querying.
+**Framework dependencies:** Vector search extension pack (planned for April — not built).
 
-**Blocks on:** PN Mongo vector search extension pack implementation.
-
-**Tasks:**
-
-- [ ] Add the PN vector search extension pack dependency
-- [ ] Port product similarity search: query `products` by `vai_text_embedding` vector similarity
-- [ ] Port personalized recommendations: vector search producing results with `vectorSearchScore`
-- [ ] Write integration test: seed products with embedding vectors, run vector similarity query, assert results ordered by relevance (requires Atlas or a test double for vector search)
-
-### Milestone 7: Change streams
-
-Port the SSE/change stream infrastructure to use the PN runtime's streaming interface.
-
-**Validates:** PN change stream subscription API; `AsyncIterable<Row>` interface; filter-based watching.
-
-**Blocks on:** PN change stream implementation.
+**Test infrastructure:** Requires a real Atlas cluster (vector search is Atlas-only). An Atlas cluster is available for optional integration tests.
 
 **Tasks:**
+- [ ] Add vector search extension pack dependency
+- [ ] Implement `findSimilarProducts` — vector similarity query on `embedding`
+- [ ] Write integration test: seed products with embeddings, query by vector, assert results ordered by relevance
 
-- [ ] Port the `getChangeStream` utility: subscribe to collection changes via PN runtime, filtered by collection and document key
-- [ ] Port user recommendation updates: watch `users` collection for changes to `lastRecommendations`
-- [ ] Port order status updates: watch `orders` collection for status changes
-- [ ] Write integration test: insert/update documents, assert change events are received through the PN streaming interface (requires replica set — `mongodb-memory-server` with `--replSet`)
+### Milestone 7: Aggregation + change streams
 
-### Milestone 8: Data migration and CEP events
+Add event analytics and real-time event watching.
 
-Port the CEP event ingestion and demonstrate a data migration through the PN migration graph.
-
-**Validates:** PN data migration system for Mongo; high-volume insert patterns; event/time-series document handling.
+**Framework dependencies:** Aggregation pipeline builder (not built — raw pipeline passthrough exists). Change stream support (not built).
 
 **Tasks:**
+- [ ] Implement `aggregateEventsByType` — `$match`/`$group`/`$unwind`/`$project`/`$sort` pipeline
+- [ ] Implement event change stream subscription
+- [ ] Write integration tests for aggregation results
+- [ ] Write integration test for change stream (insert event, assert change received)
 
-- [ ] Port `events_ingest` writes: create events with `tags` and `metadata` through the ORM
-- [ ] Port `session_signals` and `next_best_actions` CRUD operations
-- [ ] Port analytics aggregation pipelines (`$match`, `$group`, `$unwind`, `$sort`) through the PN query surface
-- [ ] Design and implement one data migration: e.g. rename `session_signals` field, restructure `events_ingest.tags` shape, or consolidate `next_best_actions` schema — run through the PN migration graph
-- [ ] Write integration test: apply the data migration, verify documents are transformed correctly
+**Fallback:** If the pipeline builder doesn't ship, use the raw aggregate passthrough (it works today). The change stream has no fallback — it blocks on framework support.
 
-### Milestone 9: Close-out
+### Milestone 8: Data migration + close-out
 
-Verify all acceptance criteria, document gaps found, and clean up.
+Demonstrate a data migration and verify all acceptance criteria.
+
+**Framework dependencies:** Data migration runner (ADR 176 — designed, not built).
 
 **Tasks:**
-
-- [ ] Run full test suite against `mongodb-memory-server` — all tests pass
+- [ ] Design and implement one data migration (e.g., rename a field, restructure event metadata shape)
+- [ ] Write integration test: apply migration, verify documents transformed
+- [ ] Run full test suite — all tests pass
 - [ ] Run typecheck — no errors
-- [ ] Verify all acceptance criteria from the spec are met (checklist below)
-- [ ] Document any framework gaps discovered during the port (file as issues or note in project artifacts)
-- [ ] Write a brief README for `examples/retail-store/` explaining how to run the example
+- [ ] Verify all acceptance criteria from the spec
+- [ ] Document any framework gaps discovered
+- [ ] Write README for `examples/retail-store/`
+
+---
+
+## Mapping to Original App
+
+This section documents how each original retail-store-v2 API route maps to our design:
+
+| Original route | Original operation | Our equivalent | Notes |
+|---|---|---|---|
+| `getProducts` | `find` with brand/category filters, projection | `findProducts(filters)` | Same query, typed filters |
+| `search` | `$search` aggregation pipeline | `searchProducts(query)` | Blocks on Atlas Search extension |
+| `getProductId` | `find({_id})` | `findProductById(id)` | Direct mapping |
+| `getUsers` | `find({})` | `findUsers()` | Direct mapping |
+| `getCart` | `find({user: ObjectId})` | `getCartByUserId(userId)` | Direct mapping |
+| `fillCart` | `$sample` + `findOneAndUpdate` with upsert, `$setOnInsert`, `$push` | `upsertCart(userId, items)` | Split: random product selection is separate from cart upsert |
+| `updateCartProducts` | `$push` (add) or `$pull` (remove) via `findOneAndUpdate` | `addToCart(userId, item)` / `removeFromCart(userId, productId)` | Split into explicit add/remove |
+| `clearCart` | `updateOne` with `$set: {products: []}` | `clearCart(userId)` | Direct mapping |
+| `createOrder` | `insertOne` with constructed document | `createOrder(order)` | Direct mapping |
+| `getOrders` | `find({user}).sort({_id: -1})` | `getUserOrders(userId)` | Direct mapping |
+| `getOrderDetails` | `find({_id})` | `getOrderById(orderId)` | Direct mapping |
+| `updateOrderStatus` | `updateOne` with `$push: {status_history}` | `updateOrderStatus(orderId, entry)` | Direct mapping |
+| `deleteOrder` | `deleteOne({_id})` | `deleteOrder(orderId)` | Direct mapping |
+| `getStoreLocations` | `find({})` | `findLocations()` | Direct mapping |
+| `findDocuments` (invoices) | Generic `find` | `findInvoiceById(id)` | Typed, not generic |
+| `insertDocument` (sessions) | Generic `insertOne` | Dropped | No PN value in a trivial insert |
+| `events` | `insertOne` to `events_ingest` | `insertEvent(event)` | Direct mapping |
+| `aggregate` | Generic aggregate endpoint | `aggregateEventsByType(userId)` | Typed, specific pipelines |
+| `sse` | `db.watch()` + SSE bridge | Change stream subscription (no SSE) | PN side only; SSE is app-level |
+| `updateDocument` (NBA redeem) | Generic `updateOne` with `$set` | Dropped (consolidated into events) | |
+| `findDocuments` (signals, NBAs) | Generic `find` | Dropped (consolidated into events) | |
+| `getAssistantResponse` | Chatbot integration | Dropped | Out of scope (validates Dataworkz) |
+| `getInvoiceUrl` | URL generation | Dropped | App-level concern |
+
+---
+
+## Framework Gaps (Known Blockers)
+
+These are framework features this example needs that aren't built yet. Each gap should be filed as a blocking issue for the WS4 team as we encounter it.
+
+| Gap | Blocks milestone | ADR/Design doc | Priority |
+|---|---|---|---|
+| ORM `create`/`update`/`delete` | M3 | — | High |
+| Typed `$push`/`$pull`/`$set` operators | M4 | ADR 180 | High |
+| Upsert support | M4 | — | High |
+| Value objects in contract | M1 (contract accuracy) | ADR 178 | Medium (owner pattern is stopgap) |
+| Mongo migration planner | M5 | Design doc exists | Medium |
+| Vector search extension pack | M6 | — | Medium |
+| Aggregation pipeline builder | M7 | — | Medium (raw passthrough is fallback) |
+| Change stream support | M7 | ADR 124 | Medium |
+| Data migration runner | M8 | ADR 176 | Low (last milestone) |
+| PSL for Mongo contracts | — | — | Deferred (not needed for this example) |
+
+---
 
 ## Test Coverage
 
-| Acceptance Criterion | Test Type | Milestone | Notes |
-|---|---|---|---|
-| Contract authored in both PSL and TS DSL | Integration (parity) | M1 | Assert equivalent `contract.json` output |
-| Both surfaces produce equivalent `contract.json` | Integration (parity) | M1 | Structural comparison test |
-| Contract emits valid `contract.json` and `contract.d.ts` | Integration | M1 | Emitter success + typecheck |
-| Schema migrations create correct collections, indexes, validators | Integration | M2 | Apply against mongodb-memory-server, assert indexes |
-| Migration runner applies against real MongoDB | Integration | M2 | mongodb-memory-server test |
-| All CRUD operations use PN ORM | Integration | M3 | Per-collection CRUD tests |
-| Embedded documents inline in results | Integration | M3 | Assert nested fields present without `include` |
-| Referenced relations load via `$lookup` / `include` | Integration | M4 | Create related docs, query with include |
-| Query results fully typed | Compile-time | M3, M4 | Negative type tests + typecheck |
-| Mongo-native update operators via PN mutation | Integration | M5 | `$push`, `$pull`, `$set` tests |
-| Vector search via PN extension pack | Integration | M6 | Requires Atlas or test double |
-| Data migration via PN migration graph | Integration | M8 | Apply migration, verify transformation |
-| Change stream via PN runtime | Integration | M7 | Requires replica set configuration |
-| Runs against mongodb-memory-server in CI | CI | M9 | Full suite green |
-| Demonstrates 3+ distinct MongoDB idioms | Manual | M9 | Checklist: embedded docs, relations, update ops, vector search, change streams, aggregation |
-
-## Open Items
-
-- **Aggregation pipeline builder**: The analytics queries in `constants.js` use complex pipelines (`$group`, `$unwind`, `$sort`). If the PN aggregation pipeline builder isn't ready, these block on the framework. Do not use raw pipelines.
-- **Upsert support**: Cart operations use `findOneAndUpdate` with `upsert: true` and `$setOnInsert`. The PN mutation surface needs to support this pattern.
-- **Atlas Search vs. vector search**: The original app uses `$search` (Atlas Full-Text Search) for product text search, separate from vector search. The port needs either the PN text search extension or to model this as a different query type.
-- **SSE/streaming bridge**: The original app bridges MongoDB change streams to HTTP SSE. The port replaces the MongoDB side; the SSE bridge is app-level code that stays as-is.
-- **`$sample` aggregation**: Random product selection uses `$sample`. This may require the aggregation pipeline builder.
-- **Generic data APIs**: The original app has generic `findDocuments`/`insertDocument`/`updateDocument` helpers. The port replaces these with typed, collection-specific ORM calls — a deliberate narrowing.
+| Acceptance Criterion | Test Type | Milestone |
+|---|---|---|
+| Contract emits valid `contract.json` and `contract.d.ts` | Build | M1 |
+| All read operations return typed results | Integration + compile-time | M2 |
+| Embedded documents inline in results | Integration | M2 |
+| `$lookup` relations load via `include()` | Integration | M2 |
+| Type errors on non-existent fields | Compile-time (negative) | M2 |
+| Create/delete operations work | Integration | M3 |
+| `$push`/`$pull`/`$set` update operators work | Integration | M4 |
+| Cart upsert works | Integration | M4 |
+| Schema migrations create correct indexes | Integration | M5 |
+| Vector search returns similarity-ordered results | Integration | M6 |
+| Aggregation pipeline produces correct analytics | Integration | M7 |
+| Change stream receives insert events | Integration | M7 |
+| Data migration transforms documents correctly | Integration | M8 |
+| Full suite passes against `mongodb-memory-server` | CI | M8 |
