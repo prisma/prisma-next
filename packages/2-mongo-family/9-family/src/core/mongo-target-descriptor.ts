@@ -1,11 +1,8 @@
 import type { TargetDescriptor } from '@prisma-next/framework-components/components';
+import mongoTargetDescriptorMeta from '@prisma-next/target-mongo';
 
 export const mongoTargetDescriptor = {
-  kind: 'target',
-  id: 'mongo',
-  familyId: 'mongo',
-  targetId: 'mongo',
-  version: '0.0.1',
+  ...mongoTargetDescriptorMeta,
   types: {
     codecTypes: {
       import: {

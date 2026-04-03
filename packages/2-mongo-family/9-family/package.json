@@ -16,6 +16,7 @@
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/mongo-core": "workspace:*",
+    "@prisma-next/target-mongo": "workspace:*",
     "@prisma-next/mongo-emitter": "workspace:*"
   },
   "devDependencies": {

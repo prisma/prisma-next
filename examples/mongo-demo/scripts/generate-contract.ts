@@ -66,7 +66,7 @@ async function main() {
   });
 
   const instance = mongoFamilyDescriptor.create(
-    // TODO(5.8): remove cast when create() accepts ControlStack directly
+    // TODO: remove cast when create() accepts ControlStack directly (F13 stack consolidation)
     { target: mongoTargetDescriptor } as never,
     controlStack,
   );
