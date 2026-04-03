@@ -1,11 +1,33 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TargetFamilyHook, ValidationContext } from '@prisma-next/contract/types';
+import type { Contract, TargetFamilyHook, ValidationContext } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { format } from 'prettier';
 import { canonicalizeContract } from './canonicalization';
-import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
 import type { EmitOptions, EmitResult } from './types';
+
+const SCHEMA_VERSION = '1';
+
+const CanonicalMetaSchema = type({
+  '[string]': 'unknown',
+});
+
+const CanonicalContractSchema = type({
+  '+': 'reject',
+  schemaVersion: 'string',
+  targetFamily: 'string',
+  target: 'string',
+  models: type({ '[string]': 'unknown' }),
+  roots: 'Record<string, string>',
+  storage: type({ '[string]': 'unknown' }),
+  'execution?': type({ '[string]': 'unknown' }),
+  extensionPacks: type({ '[string]': 'unknown' }),
+  capabilities: type({
+    '[string]': type({
+      '[string]': 'boolean',
+    }),
+  }),
+  meta: CanonicalMetaSchema,
+});
 
 function stripStrategyFromRelations(
   relations: Record<string, Record<string, unknown>> | undefined,
@@ -34,28 +56,6 @@ function stripRelationStrategies(models: Record<string, unknown>): Record<string
   return result;
 }
 
-const CanonicalMetaSchema = type({
-  '[string]': 'unknown',
-});
-
-const CanonicalContractSchema = type({
-  '+': 'reject',
-  schemaVersion: 'string',
-  targetFamily: 'string',
-  target: 'string',
-  models: type({ '[string]': 'unknown' }),
-  'roots?': 'Record<string, string>',
-  storage: type({ '[string]': 'unknown' }),
-  'execution?': type({ '[string]': 'unknown' }),
-  extensionPacks: type({ '[string]': 'unknown' }),
-  capabilities: type({
-    '[string]': type({
-      '[string]': 'boolean',
-    }),
-  }),
-  meta: CanonicalMetaSchema,
-});
-
 function assertCanonicalArtifactShape(value: unknown): void {
   const result = CanonicalContractSchema(value);
   if (result instanceof type.errors) {
@@ -65,39 +65,12 @@ function assertCanonicalArtifactShape(value: unknown): void {
         return `${path}: ${error.message}`;
       })
       .join('; ');
-    throw new Error(`ContractIR canonical artifact validation failed: ${issues}`);
-  }
-}
-
-function validateCoreStructure(ir: ContractIR): void {
-  if (!ir.targetFamily) {
-    throw new Error('ContractIR must have targetFamily');
-  }
-  if (!ir.target) {
-    throw new Error('ContractIR must have target');
-  }
-  if (!ir.schemaVersion) {
-    throw new Error('ContractIR must have schemaVersion');
-  }
-  if (!ir.models || typeof ir.models !== 'object') {
-    throw new Error('ContractIR must have models');
-  }
-  if (!ir.storage || typeof ir.storage !== 'object') {
-    throw new Error('ContractIR must have storage');
-  }
-  if (!ir.extensionPacks || typeof ir.extensionPacks !== 'object') {
-    throw new Error('ContractIR must have extensionPacks');
-  }
-  if (!ir.capabilities || typeof ir.capabilities !== 'object') {
-    throw new Error('ContractIR must have capabilities');
-  }
-  if (!ir.meta || typeof ir.meta !== 'object') {
-    throw new Error('ContractIR must have meta');
+    throw new Error(`Contract canonical artifact validation failed: ${issues}`);
   }
 }
 
 export async function emit(
-  ir: ContractIR,
+  contract: Contract,
   options: EmitOptions,
   targetFamily: TargetFamilyHook,
 ): Promise<EmitResult> {
@@ -111,37 +84,38 @@ export async function emit(
     queryOperationTypeImports,
   } = options;
 
-  validateCoreStructure(ir);
-
   const ctx: ValidationContext = {
     ...ifDefined('operationRegistry', operationRegistry),
     ...ifDefined('codecTypeImports', codecTypeImports),
     ...ifDefined('operationTypeImports', operationTypeImports),
     ...ifDefined('extensionIds', extensionIds),
   };
-  targetFamily.validateTypes(ir, ctx);
+  targetFamily.validateTypes(contract, ctx);
 
-  targetFamily.validateStructure(ir);
+  targetFamily.validateStructure(contract);
+
+  const { storageHash: _sh, ...storageWithoutHash } = contract.storage as Record<
+    string,
+    unknown
+  > & { storageHash: unknown };
 
   const canonicalContract = {
-    schemaVersion: ir.schemaVersion,
-    targetFamily: ir.targetFamily,
-    target: ir.target,
-    ...ifDefined('roots', ir.roots),
-    models: stripRelationStrategies(ir.models as Record<string, unknown>),
-    storage: ir.storage,
-    ...ifDefined('execution', ir.execution),
-    extensionPacks: ir.extensionPacks,
-    capabilities: ir.capabilities,
-    meta: ir.meta,
+    schemaVersion: SCHEMA_VERSION,
+    targetFamily: contract.targetFamily,
+    target: contract.target,
+    roots: contract.roots,
+    models: stripRelationStrategies(contract.models as Record<string, unknown>),
+    storage: storageWithoutHash,
+    ...ifDefined('execution', contract.execution),
+    extensionPacks: contract.extensionPacks,
+    capabilities: contract.capabilities,
+    meta: contract.meta,
   };
   assertCanonicalArtifactShape(canonicalContract);
 
-  const storageHash = computeStorageHash(canonicalContract);
-  const executionHash = canonicalContract.execution
-    ? computeExecutionHash(canonicalContract)
-    : undefined;
-  const profileHash = computeProfileHash(canonicalContract);
+  const storageHash = contract.storage.storageHash as string;
+  const executionHash = contract.execution?.executionHash as string | undefined;
+  const profileHash = (contract.profileHash ?? '') as string;
 
   const contractWithHashes = {
     ...canonicalContract,
@@ -150,9 +124,6 @@ export async function emit(
     profileHash,
   };
 
-  // Add _generated metadata to indicate this is a generated artifact
-  // This ensures consistency between CLI emit and programmatic emit
-  // Always add/update _generated with standard content for consistency
   const contractJsonObj = JSON.parse(canonicalizeContract(contractWithHashes)) as Record<
     string,
     unknown
@@ -182,7 +153,7 @@ export async function emit(
     profileHash,
   };
   const contractDtsRaw = targetFamily.generateContractTypes(
-    ir,
+    contract,
     codecTypeImports ?? [],
     operationTypeImports ?? [],
     contractTypeHashes,
