@@ -1,5 +1,6 @@
 import { createContract } from '@prisma-next/contract/testing';
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, TargetFamilyHook } from '@prisma-next/contract/types';
+import type { EmitResult } from '@prisma-next/core-control-plane/emission';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -12,9 +13,24 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@prisma-next/core-control-plane/emission', () => ({
+  emit: vi.fn(
+    async (): Promise<EmitResult> => ({
+      storageHash: 'test-core-hash',
+      profileHash: 'test-profile-hash',
+      contractJson: '{"test": true}',
+      contractDts: 'export interface Contract {}',
+    }),
+  ),
+}));
+
+import { emit as emitFn } from '@prisma-next/core-control-plane/emission';
 import { createControlClient } from '../../src/control-api/client';
 import type { ControlProgressEvent } from '../../src/control-api/types';
+
+const mockEmit = vi.mocked(emitFn);
 
 function createMockComponents() {
   const mockDriver = {
@@ -63,16 +79,18 @@ function createMockComponents() {
       marker: { created: false, updated: true },
       timings: { total: 10 },
     }),
-    emitContract: async () => ({
-      storageHash: 'test-core-hash',
-      profileHash: 'test-profile-hash',
-      contractJson: '{"test": true}',
-      contractDts: 'export interface Contract {}',
-    }),
   } as unknown as ControlFamilyInstance<string>;
+
+  const mockHook: TargetFamilyHook = {
+    id: 'sql',
+    validateTypes: () => {},
+    validateStructure: () => {},
+    generateContractTypes: () => 'export type Contract = unknown;\n',
+  };
 
   const mockFamily = {
     familyId: 'sql',
+    hook: mockHook,
     create: () => mockFamilyInstance,
     // biome-ignore lint/suspicious/noExplicitAny: required for mock flexibility
   } as unknown as ControlFamilyDescriptor<any, any>;
@@ -538,14 +556,11 @@ describe('ControlClient progress emission', () => {
       }
     });
 
-    it('emits error outcome when emitContract throws', async () => {
+    it('emits error outcome when emit throws', async () => {
       const events: ControlProgressEvent[] = [];
-      const { mockFamily, mockTarget, mockAdapter, mockFamilyInstance } = createMockComponents();
+      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
 
-      // Override emitContract to throw
-      mockFamilyInstance.emitContract = async () => {
-        throw new Error('Emit error');
-      };
+      mockEmit.mockRejectedValueOnce(new Error('Emit error'));
 
       const client = createControlClient({
         family: mockFamily,

@@ -62,12 +62,6 @@ describe('defineConfig', () => {
         }),
         readMarker: async () => null,
         introspect: async () => ({ tables: {}, extensionPacks: [] }),
-        emitContract: async () => ({
-          contractJson: '{}',
-          contractDts: '',
-          storageHash: 'test',
-          profileHash: 'test',
-        }),
       }),
     },
     target: {

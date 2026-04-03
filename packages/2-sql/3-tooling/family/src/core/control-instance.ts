@@ -1,10 +1,8 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
-import { emit } from '@prisma-next/core-control-plane/emission';
 import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
-  EmitContractResult,
   OperationContext,
   SignDatabaseResult,
   VerifyDatabaseResult,
@@ -18,15 +16,11 @@ import {
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,
-  extractParameterizedRenderers,
-  extractParameterizedTypeImports,
-  extractQueryOperationTypeImports,
 } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -212,8 +206,6 @@ export interface SqlControlFamilyInstance
   }): Promise<SqlSchemaIR>;
 
   toSchemaView(schema: SqlSchemaIR): CoreSchemaView;
-
-  emitContract(options: { readonly contract: Contract | unknown }): Promise<EmitContractResult>;
 }
 
 export type SqlFamilyInstance = SqlControlFamilyInstance;
@@ -297,10 +289,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const operationRegistry = assembleOperationRegistry(descriptors);
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
-  const queryOperationTypeImports = extractQueryOperationTypeImports(descriptors);
   const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
-  const parameterizedRenderers = extractParameterizedRenderers(descriptors);
-  const parameterizedTypeImports = extractParameterizedTypeImports(descriptors);
 
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
     target,
@@ -728,32 +717,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
       return {
         root: rootNode,
-      };
-    },
-
-    async emitContract({ contract }): Promise<EmitContractResult> {
-      const normalizedIR = normalizeProviderContract(contract);
-
-      const result = await emit(
-        normalizedIR,
-        {
-          operationRegistry,
-          codecTypeImports,
-          operationTypeImports,
-          queryOperationTypeImports,
-          extensionIds,
-          parameterizedRenderers,
-          parameterizedTypeImports,
-        },
-        sqlTargetFamilyHook,
-      );
-
-      return {
-        contractJson: result.contractJson,
-        contractDts: result.contractDts,
-        storageHash: result.storageHash,
-        ...(result.executionHash ? { executionHash: result.executionHash } : {}),
-        profileHash: result.profileHash,
       };
     },
   };

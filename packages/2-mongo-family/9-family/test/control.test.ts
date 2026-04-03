@@ -19,7 +19,6 @@ describe('mongoFamilyDescriptor', () => {
 
     expect(instance.familyId).toBe('mongo');
     expect(typeof instance.validateContract).toBe('function');
-    expect(typeof instance.emitContract).toBe('function');
   });
 
   it('has expected descriptor shape', () => {

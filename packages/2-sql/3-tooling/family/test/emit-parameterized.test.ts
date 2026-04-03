@@ -1,18 +1,58 @@
 import { createSqlContract } from '@prisma-next/contract/testing';
+import type { Contract } from '@prisma-next/contract/types';
+import type { EmitResult, EmitStackInput } from '@prisma-next/core-control-plane/emission';
+import { emit } from '@prisma-next/core-control-plane/emission';
 import type { TargetDescriptor } from '@prisma-next/framework-components/components';
+import {
+  extractCodecTypeImports,
+  extractComponentIds,
+  extractOperationTypeImports,
+  extractParameterizedRenderers,
+  extractParameterizedTypeImports,
+  extractQueryOperationTypeImports,
+} from '@prisma-next/framework-components/control';
 import type {
   TypeRenderEntry,
   TypeRenderer,
   TypesImportSpec,
 } from '@prisma-next/framework-components/emission';
+import { createOperationRegistry } from '@prisma-next/operations';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';
-import { createSqlFamilyInstance } from '../src/core/control-instance';
 import type {
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
 } from '../src/core/migrations/types';
+
+interface EmitTestDescriptors {
+  readonly target: TargetDescriptor<'sql', 'postgres'> & SqlControlDescriptorWithContributions;
+  readonly adapter: SqlControlAdapterDescriptor<'postgres'>;
+  readonly extensionPacks: readonly SqlControlExtensionDescriptor<'postgres'>[];
+}
+
+async function emitWithDescriptors(
+  contract: Record<string, unknown>,
+  descriptors: EmitTestDescriptors,
+): Promise<EmitResult> {
+  const allDescs = [descriptors.target, descriptors.adapter, ...descriptors.extensionPacks];
+  const stackInput: EmitStackInput = {
+    codecTypeImports: extractCodecTypeImports(allDescs),
+    operationTypeImports: extractOperationTypeImports(allDescs),
+    queryOperationTypeImports: extractQueryOperationTypeImports(allDescs),
+    extensionIds: extractComponentIds(
+      { id: 'sql' },
+      descriptors.target,
+      descriptors.adapter,
+      descriptors.extensionPacks,
+    ),
+    parameterizedRenderers: extractParameterizedRenderers(allDescs),
+    parameterizedTypeImports: extractParameterizedTypeImports(allDescs),
+    operationRegistry: createOperationRegistry(),
+  };
+  return emit(contract as unknown as Contract, stackInput, sqlTargetFamilyHook);
+}
 
 /**
  * Integration tests for parameterized codec emission plumbing.
@@ -144,12 +184,6 @@ describe('emit parameterized codecs integration', () => {
       (params) => `Vector<${params['length']}>`,
     );
 
-    const familyInstance = createSqlFamilyInstance({
-      target,
-      adapter,
-      extensionPacks: [extension],
-    });
-
     // Create a contract IR with a column using the parameterized codec
     const contract = createTestContract({
       models: {
@@ -186,8 +220,11 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: { pgvector: { version: '0.0.1' } },
     });
 
-    // Emit the contract
-    const result = await familyInstance.emitContract({ contract });
+    const result = await emitWithDescriptors(contract, {
+      target,
+      adapter,
+      extensionPacks: [extension],
+    });
 
     // Verify the parameterized renderer produces the correct type
     expect(result.contractDts).toContain('readonly vector: Vector<1536>');
@@ -220,12 +257,6 @@ describe('emit parameterized codecs integration', () => {
     const adapter = createMockAdapter();
     const extension = createMockExtensionWithParameterizedCodec('pgvector', vectorCodecConfig);
 
-    const familyInstance = createSqlFamilyInstance({
-      target,
-      adapter,
-      extensionPacks: [extension],
-    });
-
     // Create a contract IR with a column using the parameterized codec
     const contract = createTestContract({
       models: {
@@ -262,8 +293,11 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: { pgvector: { version: '0.0.1' } },
     });
 
-    // Emit the contract
-    const result = await familyInstance.emitContract({ contract });
+    const result = await emitWithDescriptors(contract, {
+      target,
+      adapter,
+      extensionPacks: [extension],
+    });
 
     // Verify the parameterized codec's typesImport appears in contract.d.ts
     expect(result.contractDts).toContain(
@@ -279,12 +313,6 @@ describe('emit parameterized codecs integration', () => {
       'pg/vector@1',
       (params) => `Vector<${params['length']}>`,
     );
-
-    const familyInstance = createSqlFamilyInstance({
-      target,
-      adapter,
-      extensionPacks: [extension],
-    });
 
     // Contract with columns WITHOUT typeParams
     const contract = createTestContract({
@@ -316,7 +344,11 @@ describe('emit parameterized codecs integration', () => {
       },
     });
 
-    const result = await familyInstance.emitContract({ contract });
+    const result = await emitWithDescriptors(contract, {
+      target,
+      adapter,
+      extensionPacks: [extension],
+    });
 
     // Standard columns should use CodecTypes lookup
     expect(result.contractDts).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
@@ -332,12 +364,6 @@ describe('emit parameterized codecs integration', () => {
       'pg/vector@1',
       (params) => `Vector<${params['length']}>`,
     );
-
-    const familyInstance = createSqlFamilyInstance({
-      target,
-      adapter,
-      extensionPacks: [extension],
-    });
 
     // Contract with column using a different codecId (no renderer exists)
     const contract = createTestContract({
@@ -372,7 +398,11 @@ describe('emit parameterized codecs integration', () => {
       },
     });
 
-    const result = await familyInstance.emitContract({ contract });
+    const result = await emitWithDescriptors(contract, {
+      target,
+      adapter,
+      extensionPacks: [extension],
+    });
 
     // Should fall back to standard CodecTypes lookup
     expect(result.contractDts).toContain("readonly value: CodecTypes['custom/type@1']['output']");
@@ -415,12 +445,6 @@ describe('emit parameterized codecs integration', () => {
       },
     };
     const extension = createMockExtensionWithParameterizedCodec('pgvector', vectorCodecConfig);
-
-    const familyInstance = createSqlFamilyInstance({
-      target,
-      adapter,
-      extensionPacks: [extension],
-    });
 
     // Create a contract IR with columns using both parameterized codecs
     const contract = createTestContract({
@@ -465,7 +489,11 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: { pgvector: { version: '0.0.1' } },
     });
 
-    const result = await familyInstance.emitContract({ contract });
+    const result = await emitWithDescriptors(contract, {
+      target,
+      adapter,
+      extensionPacks: [extension],
+    });
 
     // Verify both typesImports appear in contract.d.ts
     expect(result.contractDts).toContain(
@@ -510,12 +538,6 @@ describe('emit parameterized codecs integration', () => {
       },
     };
 
-    const familyInstance = createSqlFamilyInstance({
-      target,
-      adapter,
-      extensionPacks: [extension],
-    });
-
     // Contract with columns using BOTH parameterized codecs from the same package
     const contract = createTestContract({
       models: {
@@ -559,7 +581,11 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: { pgvector: { version: '0.0.1' } },
     });
 
-    const result = await familyInstance.emitContract({ contract });
+    const result = await emitWithDescriptors(contract, {
+      target,
+      adapter,
+      extensionPacks: [extension],
+    });
 
     // Both imports should appear (different named exports from the same package)
     // When alias === named, the emitter omits the redundant "as Alias" part
@@ -602,12 +628,6 @@ describe('emit parameterized codecs integration', () => {
       },
     };
 
-    const familyInstance = createSqlFamilyInstance({
-      target,
-      adapter,
-      extensionPacks: [],
-    });
-
     const contract = createTestContract({
       models: {
         Event: {
@@ -646,7 +666,11 @@ describe('emit parameterized codecs integration', () => {
       },
     });
 
-    const result = await familyInstance.emitContract({ contract });
+    const result = await emitWithDescriptors(contract, {
+      target,
+      adapter,
+      extensionPacks: [],
+    });
 
     expect(result.contractDts).toContain('readonly payload: AuditPayload');
     expect(result.contractDts).toContain("readonly metadata: CodecTypes['pg/jsonb@1']['output']");
