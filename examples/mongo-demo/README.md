@@ -5,7 +5,7 @@ End-to-end example of Prisma Next with MongoDB, demonstrating the full **authori
 ## What it shows
 
 - PSL schema (`prisma/schema.psl`) as the authoring surface for MongoDB
-- Contract emission via `@prisma-next/mongo-contract-psl` and `@prisma-next/family-mongo`
+- Contract emission via `prisma-next.config.ts` and the CLI (`prisma-next contract emit`)
 - Runtime query execution using `mongoOrm()` with the emitted contract
 - Reference relation resolution via `$lookup` (Post → User)
 - Integration tests against an in-memory MongoDB replica set
@@ -37,19 +37,19 @@ pnpm test
 
 | Script         | Description                                                                 |
 | -------------- | --------------------------------------------------------------------------- |
-| `pnpm emit`    | Parse `prisma/schema.psl` and emit `src/contract.json` + `src/contract.d.ts` |
+| `pnpm emit`    | Emit `src/contract.json` + `src/contract.d.ts` via `prisma-next contract emit` |
 | `pnpm test`    | Run integration tests against an in-memory MongoDB replica set              |
 | `pnpm dev`     | Start the Vite dev server (React UI)                                        |
 | `pnpm dev:api` | Start the API server (`src/server.ts`)                                      |
 
 ## How emission works
 
-`scripts/generate-contract.ts` runs the full pipeline:
+`prisma-next.config.ts` wires the Mongo family, target, and adapter descriptors together with a `mongoContract()` provider. Running `pnpm emit` invokes the CLI's `contract emit` command, which:
 
-1. Parses `prisma/schema.psl` with `@prisma-next/psl-parser`
-2. Interprets the parsed document into a `ContractIR` via `@prisma-next/mongo-contract-psl`
-3. Assembles a control stack with `mongoFamilyDescriptor` and `mongoTargetDescriptor`
-4. Calls `emitContract()` to produce `contract.json` and `contract.d.ts`
+1. Loads `prisma-next.config.ts` and creates a control stack
+2. Reads and parses `prisma/schema.psl` via the `mongoContract()` provider
+3. Interprets the parsed document into a `ContractIR`
+4. Emits `src/contract.json` and `src/contract.d.ts`
 
 ## How the runtime works
 
@@ -65,7 +65,7 @@ pnpm test
 | File                            | Purpose                                            |
 | ------------------------------- | -------------------------------------------------- |
 | `prisma/schema.psl`            | PSL schema (authoring surface)                     |
-| `scripts/generate-contract.ts` | Emission script (PSL → ContractIR → contract artifacts) |
+| `prisma-next.config.ts`        | CLI config (family + target + adapter + contract provider) |
 | `src/contract.json`            | Emitted contract (generated, do not edit)           |
 | `src/contract.d.ts`            | Emitted type definitions (generated, do not edit)   |
 | `src/db.ts`                    | Runtime composition (adapter → driver → runtime → ORM) |
@@ -77,7 +77,7 @@ pnpm test
 | ------------- | ------------------------------------------- | ------------------------------------------- |
 | Target        | PostgreSQL                                  | MongoDB                                     |
 | Schema        | `schema.prisma` (PSL)                       | `schema.psl` (PSL)                          |
-| Emission      | CLI (`prisma-next emit`)                    | Script (`pnpm emit`)                        |
+| Emission      | CLI (`prisma-next contract emit`)           | CLI (`prisma-next contract emit`)           |
 | Runtime       | `postgres()` one-liner                      | `createMongoAdapter()` + `createMongoDriver()` + `createMongoRuntime()` + `mongoOrm()` |
 | Relations     | SQL joins                                   | `$lookup` aggregation pipeline              |
 | Tests         | Requires running PostgreSQL                 | Uses `mongodb-memory-server` (no external DB) |
