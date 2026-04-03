@@ -221,6 +221,7 @@ type ContractBase = SqlContract<
         ];
       };
     };
+    readonly storageHash: StorageHash;
     readonly types: Record<string, never>;
     readonly storageHash: StorageHash;
   },

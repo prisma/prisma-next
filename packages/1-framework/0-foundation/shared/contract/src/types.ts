@@ -68,8 +68,8 @@ export interface ContractBase<
   readonly target: string;
   readonly targetFamily: string;
   readonly storageHash: TStorageHash;
-  readonly executionHash?: TExecutionHash | undefined;
-  readonly profileHash?: TProfileHash | undefined;
+  readonly executionHash?: TExecutionHash;
+  readonly profileHash?: TProfileHash;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;
   readonly meta: Record<string, unknown>;
