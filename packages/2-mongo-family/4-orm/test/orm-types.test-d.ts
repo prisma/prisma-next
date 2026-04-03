@@ -1,3 +1,4 @@
+import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../1-core/test/fixtures/orm-contract';
 import type { MongoCollection } from '../src/collection';
@@ -133,4 +134,54 @@ test('InferRootRow for non-polymorphic model returns plain row', () => {
   expectTypeOf<UserRow>().toHaveProperty('name');
   expectTypeOf<UserRow>().toHaveProperty('email');
   expectTypeOf<UserRow>().toHaveProperty('addresses');
+});
+
+// --- Collection API type constraints ---
+
+test('all() returns AsyncIterableResult of InferRootRow', () => {
+  type Col = MongoCollection<Contract, 'User'>;
+  type AllResult = ReturnType<Col['all']>;
+  expectTypeOf<AllResult>().toExtend<AsyncIterableResult<InferRootRow<Contract, 'User'>>>();
+});
+
+test('first() returns Promise of InferRootRow or null', () => {
+  type Col = MongoCollection<Contract, 'User'>;
+  type FirstResult = ReturnType<Col['first']>;
+  expectTypeOf<FirstResult>().toExtend<Promise<InferRootRow<Contract, 'User'> | null>>();
+});
+
+test('include() accepts reference relation keys', () => {
+  type Col = MongoCollection<Contract, 'Task'>;
+  type IncludeParam = Parameters<Col['include']>[0];
+  expectTypeOf<'assignee'>().toExtend<IncludeParam>();
+});
+
+test('include() rejects embed relation keys', () => {
+  type Col = MongoCollection<Contract, 'Task'>;
+  type IncludeParam = Parameters<Col['include']>[0];
+  expectTypeOf<'comments'>().not.toExtend<IncludeParam>();
+});
+
+test('select() accepts model field keys', () => {
+  type Col = MongoCollection<Contract, 'User'>;
+  type SelectParam = Parameters<Col['select']>;
+  expectTypeOf<['_id', 'name']>().toExtend<SelectParam>();
+});
+
+test('select() rejects unknown field names', () => {
+  type Col = MongoCollection<Contract, 'User'>;
+  type SelectParam = Parameters<Col['select']>[0];
+  expectTypeOf<'nonexistent'>().not.toExtend<SelectParam>();
+});
+
+test('orderBy() accepts model field keys', () => {
+  type Col = MongoCollection<Contract, 'User'>;
+  type OrderParam = Parameters<Col['orderBy']>[0];
+  expectTypeOf<{ name: 1 }>().toExtend<OrderParam>();
+});
+
+test('orderBy() rejects unknown field names', () => {
+  type Col = MongoCollection<Contract, 'User'>;
+  type OrderParam = Parameters<Col['orderBy']>[0];
+  expectTypeOf<{ nonexistent: 1 }>().not.toExtend<OrderParam>();
 });

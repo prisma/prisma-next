@@ -11,6 +11,12 @@ import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';
 import { compileMongoQuery } from './compile';
 import type { MongoQueryExecutor } from './executor';
+import type { InferRootRow, ReferenceRelationKeys } from './types';
+
+type ModelFieldKeys<
+  TContract extends MongoContract,
+  ModelName extends string & keyof TContract['models'],
+> = keyof TContract['models'][ModelName]['fields'] & string;
 
 function resolveCollectionName(model: MongoModelDefinition, modelName: string): string {
   return model.storage.collection ?? modelName;
@@ -51,11 +57,13 @@ export class MongoCollection<
     });
   }
 
-  select(...fields: string[]): MongoCollection<TContract, ModelName> {
+  select(...fields: ModelFieldKeys<TContract, ModelName>[]): MongoCollection<TContract, ModelName> {
     return this.#clone({ selectedFields: fields });
   }
 
-  include(relationName: string): MongoCollection<TContract, ModelName> {
+  include(
+    relationName: ReferenceRelationKeys<TContract, ModelName> & string,
+  ): MongoCollection<TContract, ModelName> {
     const model = this.#contract.models[this.#modelName] as MongoModelDefinition;
     const relation = model.relations?.[relationName];
     if (!relation) {
@@ -91,8 +99,10 @@ export class MongoCollection<
     });
   }
 
-  orderBy(spec: Record<string, 1 | -1>): MongoCollection<TContract, ModelName> {
-    const merged = { ...this.state.orderBy, ...spec };
+  orderBy(
+    spec: Partial<Record<ModelFieldKeys<TContract, ModelName>, 1 | -1>>,
+  ): MongoCollection<TContract, ModelName> {
+    const merged = { ...this.state.orderBy, ...(spec as Readonly<Record<string, 1 | -1>>) };
     return this.#clone({ orderBy: merged });
   }
 
@@ -104,11 +114,11 @@ export class MongoCollection<
     return this.#clone({ offset: n });
   }
 
-  all(): AsyncIterableResult<unknown> {
+  all(): AsyncIterableResult<InferRootRow<TContract, ModelName>> {
     return this.#execute();
   }
 
-  async first(): Promise<unknown | null> {
+  async first(): Promise<InferRootRow<TContract, ModelName> | null> {
     const limited = this.#clone({ limit: 1 });
     const result = limited.#execute();
     for await (const row of result) {
@@ -117,13 +127,13 @@ export class MongoCollection<
     return null;
   }
 
-  #execute(): AsyncIterableResult<unknown> {
+  #execute(): AsyncIterableResult<InferRootRow<TContract, ModelName>> {
     const plan = this.#compile();
     return this.#executor.execute(plan);
   }
 
-  #compile(): MongoReadPlan {
-    return compileMongoQuery(this.#collectionName, this.state);
+  #compile(): MongoReadPlan<InferRootRow<TContract, ModelName>> {
+    return compileMongoQuery<InferRootRow<TContract, ModelName>>(this.#collectionName, this.state);
   }
 
   #clone(overrides: Partial<MongoCollectionState>): MongoCollection<TContract, ModelName> {
