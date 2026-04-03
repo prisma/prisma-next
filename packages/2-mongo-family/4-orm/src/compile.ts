@@ -40,7 +40,10 @@ function compileIncludes(includes: readonly MongoIncludeExpr[]): MongoReadStage[
   return stages;
 }
 
-export function compileMongoQuery(collection: string, state: MongoCollectionState): MongoReadPlan {
+export function compileMongoQuery<Row = unknown>(
+  collection: string,
+  state: MongoCollectionState,
+): MongoReadPlan<Row> {
   const stages: MongoReadStage[] = [];
 
   if (state.filters.length === 1) {
