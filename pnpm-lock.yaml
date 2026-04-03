@@ -1023,6 +1023,9 @@ importers:
       '@prisma-next/mongo-emitter':
         specifier: workspace:*
         version: link:../3-tooling/emitter
+      '@prisma-next/target-mongo':
+        specifier: workspace:*
+        version: link:../../3-mongo-target/1-mongo-target
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
