@@ -1,4 +1,4 @@
-import type { EmitOptions } from '@prisma-next/core-control-plane/emission';
+import type { EmitStackInput } from '@prisma-next/core-control-plane/emission';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type {
   TargetFamilyHook,
@@ -104,8 +104,7 @@ describe('emitter round-trip', () => {
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
-      const options: EmitOptions = {
-        outputDir: '',
+      const options: EmitStackInput = {
         operationRegistry,
         codecTypeImports,
         operationTypeImports,
@@ -199,8 +198,7 @@ describe('emitter round-trip', () => {
     const codecTypeImports: TypesImportSpec[] = [];
     const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres'];
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports,
       operationTypeImports,
@@ -256,8 +254,7 @@ describe('emitter round-trip', () => {
     const codecTypeImports: TypesImportSpec[] = [];
     const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres', 'pg'];
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports,
       operationTypeImports,
@@ -329,8 +326,7 @@ describe('emitter round-trip', () => {
     const codecTypeImports: TypesImportSpec[] = [];
     const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres', 'pg'];
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports,
       operationTypeImports,

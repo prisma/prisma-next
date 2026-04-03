@@ -1,4 +1,4 @@
-export type { EmitOptions, EmitResult } from '@prisma-next/core-control-plane/emission';
+export type { EmitResult, EmitStackInput } from '@prisma-next/core-control-plane/emission';
 export { emit } from '@prisma-next/core-control-plane/emission';
 export {
   deduplicateImports,
