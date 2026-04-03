@@ -1,11 +1,15 @@
+import type { OperationSignature } from '@prisma-next/operations';
+import { createOperationRegistry } from '@prisma-next/operations';
 import { ObjectId } from 'mongodb';
 import { describe, expect, it } from 'vitest';
+import { MONGO_VECTOR_CODEC_ID } from '../src/core/codec-ids';
 import {
   mongoBooleanCodec,
   mongoDateCodec,
   mongoInt32Codec,
   mongoObjectIdCodec,
   mongoStringCodec,
+  mongoVectorCodec,
 } from '../src/core/codecs';
 
 describe('mongoObjectIdCodec', () => {
@@ -53,5 +57,77 @@ describe('mongoDateCodec', () => {
     const date = new Date('2024-01-15T10:30:00Z');
     expect(mongoDateCodec.decode(date)).toBe(date);
     expect(mongoDateCodec.encode!(date)).toBe(date);
+  });
+});
+
+describe('codec traits', () => {
+  it('objectId has equality trait', () => {
+    expect(mongoObjectIdCodec.traits).toEqual(['equality']);
+  });
+
+  it('string has equality, order, textual traits', () => {
+    expect(mongoStringCodec.traits).toEqual(['equality', 'order', 'textual']);
+  });
+
+  it('int32 has equality, order, numeric traits', () => {
+    expect(mongoInt32Codec.traits).toEqual(['equality', 'order', 'numeric']);
+  });
+
+  it('boolean has equality, boolean traits', () => {
+    expect(mongoBooleanCodec.traits).toEqual(['equality', 'boolean']);
+  });
+
+  it('date has equality, order traits', () => {
+    expect(mongoDateCodec.traits).toEqual(['equality', 'order']);
+  });
+
+  it('vector has equality trait only', () => {
+    expect(mongoVectorCodec.traits).toEqual(['equality']);
+  });
+});
+
+describe('mongoVectorCodec', () => {
+  it('round-trips number array values', () => {
+    const vec = [1.0, 2.5, 3.7];
+    expect(mongoVectorCodec.decode(vec)).toBe(vec);
+    expect(mongoVectorCodec.encode!(vec)).toBe(vec);
+  });
+
+  it('has id mongo/vector@1', () => {
+    expect(mongoVectorCodec.id).toBe('mongo/vector@1');
+  });
+});
+
+describe('extension operations via operation registry', () => {
+  it('registers a $near operation for mongo/vector@1', () => {
+    const registry = createOperationRegistry();
+
+    const nearOp: OperationSignature = {
+      forTypeId: MONGO_VECTOR_CODEC_ID,
+      method: 'near',
+      args: [{ kind: 'param' }],
+      returns: { kind: 'builtin', type: 'number' },
+    };
+
+    registry.register(nearOp);
+
+    const ops = registry.byType(MONGO_VECTOR_CODEC_ID);
+    expect(ops).toHaveLength(1);
+    expect(ops[0]?.method).toBe('near');
+  });
+
+  it('returns no operations for types without registered extensions', () => {
+    const registry = createOperationRegistry();
+
+    const nearOp: OperationSignature = {
+      forTypeId: MONGO_VECTOR_CODEC_ID,
+      method: 'near',
+      args: [{ kind: 'param' }],
+      returns: { kind: 'builtin', type: 'number' },
+    };
+
+    registry.register(nearOp);
+
+    expect(registry.byType('mongo/string@1')).toHaveLength(0);
   });
 });

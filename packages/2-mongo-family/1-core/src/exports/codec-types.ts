@@ -7,4 +7,8 @@ export type CodecTypes = {
   readonly 'mongo/bool@1': { readonly input: boolean; readonly output: boolean };
   readonly 'mongo/date@1': { readonly input: Date; readonly output: Date };
   readonly 'mongo/binary@1': { readonly input: Uint8Array; readonly output: Uint8Array };
+  readonly 'mongo/vector@1': {
+    readonly input: readonly number[];
+    readonly output: readonly number[];
+  };
 };
