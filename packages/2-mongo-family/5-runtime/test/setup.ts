@@ -1,11 +1,7 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import type {
-  AnyMongoCommand,
-  MongoLoweringContext,
-  MongoQueryPlan,
-} from '@prisma-next/mongo-core';
+import type { AnyMongoCommand, MongoLoweringContext } from '@prisma-next/mongo-core';
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -16,7 +12,7 @@ export interface MongodContext {
   readonly dbName: string;
   readonly client: MongoClient;
   readonly runtime: MongoRuntime;
-  makePlan<Row = unknown>(command: AnyMongoCommand): MongoQueryPlan<Row>;
+  readonly stubMeta: PlanMeta;
 }
 
 const stubMeta: PlanMeta = {
@@ -53,9 +49,7 @@ export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Pro
     dbName,
     client,
     runtime,
-    makePlan<Row = unknown>(command: AnyMongoCommand): MongoQueryPlan<Row> {
-      return { command, meta: stubMeta };
-    },
+    stubMeta,
   };
 
   try {

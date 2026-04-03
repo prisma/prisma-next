@@ -7,13 +7,11 @@ describe('insertOne integration', () => {
 
   it('inserts a document and returns insertedId', async () => {
     await withMongod(async (ctx) => {
-      const plan = ctx.makePlan(
-        new InsertOneCommand(collectionName, {
-          name: new MongoParamRef('Dave'),
-          age: new MongoParamRef(28),
-        }),
-      );
-      const rows = await ctx.runtime.execute(plan);
+      const command = new InsertOneCommand(collectionName, {
+        name: new MongoParamRef('Dave'),
+        age: new MongoParamRef(28),
+      });
+      const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toHaveProperty('insertedId');
 

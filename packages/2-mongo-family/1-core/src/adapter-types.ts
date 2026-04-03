@@ -1,13 +1,11 @@
+import type { AnyMongoCommand } from './commands';
 import type { MongoContract } from './contract-types';
-import type { MongoExecutionPlan, MongoQueryPlan } from './plan';
+import type { AnyMongoWireCommand } from './wire-commands';
 
 export interface MongoLoweringContext {
   readonly contract: MongoContract;
 }
 
 export interface MongoAdapter {
-  lower<Row>(
-    queryPlan: MongoQueryPlan<Row>,
-    context: MongoLoweringContext,
-  ): MongoExecutionPlan<Row>;
+  lowerCommand(command: AnyMongoCommand, context: MongoLoweringContext): AnyMongoWireCommand;
 }

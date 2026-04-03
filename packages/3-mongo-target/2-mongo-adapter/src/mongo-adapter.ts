@@ -3,53 +3,21 @@ import type {
   AnyMongoWireCommand,
   Document,
   MongoAdapter,
-  MongoExecutionPlan,
   MongoExpr,
   MongoLoweringContext,
-  MongoQueryPlan,
   MongoValue,
 } from '@prisma-next/mongo-core';
 import {
   AggregateWireCommand,
   DeleteOneWireCommand,
-  FindWireCommand,
   InsertOneWireCommand,
   MongoParamRef,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
 
 class MongoAdapterImpl implements MongoAdapter {
-  lower<Row>(
-    queryPlan: MongoQueryPlan<Row>,
-    _context: MongoLoweringContext,
-  ): MongoExecutionPlan<Row> {
-    const wireCommand = this.#lowerCommand(queryPlan.command);
-    return Object.freeze({
-      wireCommand,
-      command: queryPlan.command,
-      meta: queryPlan.meta,
-    });
-  }
-
-  #lowerCommand(command: AnyMongoCommand): AnyMongoWireCommand {
+  lowerCommand(command: AnyMongoCommand, _context: MongoLoweringContext): AnyMongoWireCommand {
     switch (command.kind) {
-      case 'find': {
-        const options: {
-          projection?: Document;
-          sort?: Document;
-          limit?: number;
-          skip?: number;
-        } = {};
-        if (command.projection) options.projection = { ...command.projection };
-        if (command.sort) options.sort = { ...command.sort };
-        if (command.limit !== undefined) options.limit = command.limit;
-        if (command.skip !== undefined) options.skip = command.skip;
-        return new FindWireCommand(
-          command.collection,
-          command.filter ? this.#resolveDocument(command.filter) : undefined,
-          options,
-        );
-      }
       case 'insertOne':
         return new InsertOneWireCommand(
           command.collection,

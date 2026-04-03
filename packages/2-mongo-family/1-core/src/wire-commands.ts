@@ -13,34 +13,6 @@ abstract class MongoWireCommand {
   }
 }
 
-export class FindWireCommand extends MongoWireCommand {
-  readonly kind = 'find' as const;
-  readonly filter: Document | undefined;
-  readonly projection: Document | undefined;
-  readonly sort: Document | undefined;
-  readonly limit: number | undefined;
-  readonly skip: number | undefined;
-
-  constructor(
-    collection: string,
-    filter?: Document,
-    options?: {
-      projection?: Document;
-      sort?: Document;
-      limit?: number;
-      skip?: number;
-    },
-  ) {
-    super(collection);
-    this.filter = filter;
-    this.projection = options?.projection;
-    this.sort = options?.sort;
-    this.limit = options?.limit;
-    this.skip = options?.skip;
-    this.freeze();
-  }
-}
-
 export class InsertOneWireCommand extends MongoWireCommand {
   readonly kind = 'insertOne' as const;
   readonly document: Document;
@@ -88,7 +60,6 @@ export class AggregateWireCommand extends MongoWireCommand {
 }
 
 export type AnyMongoWireCommand =
-  | FindWireCommand
   | InsertOneWireCommand
   | UpdateOneWireCommand
   | DeleteOneWireCommand

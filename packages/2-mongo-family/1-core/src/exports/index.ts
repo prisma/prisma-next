@@ -3,11 +3,10 @@ export type { MongoCodecRegistry } from '../codec-registry';
 export { createMongoCodecRegistry } from '../codec-registry';
 export type { MongoCodec, MongoCodecJsType, MongoCodecTrait, MongoCodecTraits } from '../codecs';
 export { mongoCodec } from '../codecs';
-export type { AnyMongoCommand, FindOptions } from '../commands';
+export type { AnyMongoCommand } from '../commands';
 export {
   AggregateCommand,
   DeleteOneCommand,
-  FindCommand,
   InsertOneCommand,
   UpdateOneCommand,
 } from '../commands';
@@ -26,7 +25,7 @@ export type {
 } from '../contract-types';
 export type { MongoDriver } from '../driver-types';
 export { MongoParamRef } from '../param-ref';
-export type { MongoExecutionPlan, MongoQueryPlan } from '../plan';
+export type { MongoExecutionPlan } from '../plan';
 export type { DeleteOneResult, InsertOneResult, UpdateOneResult } from '../results';
 export type {
   DomainContractShape,
@@ -51,7 +50,6 @@ export type { AnyMongoWireCommand } from '../wire-commands';
 export {
   AggregateWireCommand,
   DeleteOneWireCommand,
-  FindWireCommand,
   InsertOneWireCommand,
   UpdateOneWireCommand,
 } from '../wire-commands';

@@ -8,7 +8,8 @@ Core types and validation for Prisma Next MongoDB support.
 - **Contract validation**: Three-layer validation pipeline — structural (Arktype), domain-agnostic (`validateContractDomain`), and Mongo-specific storage (`validateMongoStorage`) — composed by `validateMongoContract`
 - **Codec registry**: Built-in MongoDB codecs (`objectId`, `string`, `date`, etc.) and the `MongoCodecDefinition` type
 - **Codec types** (`@prisma-next/mongo-core/codec-types`): Compile-time `CodecTypes` mapping used by emitted `contract.d.ts` files for type inference
-- **Query plan types**: `MongoQueryPlan`, `MongoCommand`, and lowering context types consumed by higher layers
+- **Command types**: Write commands (`InsertOneCommand`, `UpdateOneCommand`, `DeleteOneCommand`, `AggregateCommand`) and wire command equivalents
+- **Adapter interface**: `MongoAdapter` — lowering context and command-to-wire-command conversion consumed by higher layers
 
 ## Dependencies
 
