@@ -29,7 +29,7 @@
     "src"
   ],
   "exports": {
-    ".": "./dist/pack.mjs",
+    "./pack": "./dist/pack.mjs",
     "./package.json": "./package.json"
   },
   "repository": {

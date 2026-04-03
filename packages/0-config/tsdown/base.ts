@@ -38,6 +38,16 @@ export const baseConfig = defineConfigOriginal({
           key = '.';
         }
 
+        // For single-entry packages, tsdown collapses the entry to ".".
+        // Derive the subpath from the output filename so e.g. `src/exports/control.ts`
+        // produces `./control` instead of `.` (consistent with multi-entry packages).
+        if (key === '.' && typeof value === 'string') {
+          const match = value.match(/\/([^/]+)\.mjs$/);
+          if (match && match[1] !== 'index') {
+            key = `./${match[1]}`;
+          }
+        }
+
         out[key] = value;
       }
 
