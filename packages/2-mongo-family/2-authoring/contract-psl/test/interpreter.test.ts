@@ -370,6 +370,38 @@ describe('interpretPslDocumentToMongoContractIR', () => {
     });
   });
 
+  describe('@id validation', () => {
+    it('emits diagnostic when model has no @id field', () => {
+      const result = interpret(`
+        model Item {
+          name String
+        }
+      `);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_MISSING_ID_FIELD',
+            message: expect.stringContaining('Item'),
+          }),
+        ]),
+      );
+    });
+
+    it('accepts model with @id field', () => {
+      const ir = interpretOk(`
+        model Item {
+          id ObjectId @id @map("_id")
+          name String
+        }
+      `);
+
+      expect(ir.models['Item']).toBeDefined();
+    });
+  });
+
   describe('contract structure', () => {
     it('generates roots mapping collection names to model names', () => {
       const ir = interpretOk(`

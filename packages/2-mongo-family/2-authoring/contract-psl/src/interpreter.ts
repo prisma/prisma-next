@@ -6,7 +6,7 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import type { DomainField, DomainReferenceRelation } from '@prisma-next/contract/types';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { getMapName, lowerFirst, parseRelationAttribute } from './psl-helpers';
+import { getAttribute, getMapName, lowerFirst, parseRelationAttribute } from './psl-helpers';
 
 export interface InterpretPslDocumentToMongoContractIRInput {
   readonly document: ParsePslDocumentResult;
@@ -152,6 +152,15 @@ export function interpretPslDocumentToMongoContractIR(
         codecId,
         nullable: field.optional,
       };
+    }
+
+    const hasIdField = pslModel.fields.some((f) => getAttribute(f.attributes, 'id') !== undefined);
+    if (!hasIdField) {
+      diagnostics.push({
+        code: 'PSL_MISSING_ID_FIELD',
+        message: `Model "${pslModel.name}" has no field with @id attribute. Every model must have exactly one @id field.`,
+        sourceId,
+      });
     }
 
     models[pslModel.name] = { fields, relations, storage: { collection: collectionName } };
