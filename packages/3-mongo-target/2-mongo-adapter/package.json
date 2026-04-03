@@ -34,8 +34,8 @@
   ],
   "exports": {
     ".": "./dist/index.mjs",
-    "./control": "./dist/control.mjs",
     "./codec-types": "./dist/codec-types.mjs",
+    "./control": "./dist/control.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",

@@ -1,5 +1,5 @@
 import type { TargetDescriptor } from '@prisma-next/framework-components/components';
-import mongoTargetDescriptorMeta from '@prisma-next/target-mongo';
+import mongoTargetDescriptorMeta from '@prisma-next/target-mongo/pack';
 
 export const mongoTargetDescriptor = {
   ...mongoTargetDescriptorMeta,

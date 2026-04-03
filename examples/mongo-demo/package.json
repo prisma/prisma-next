@@ -25,6 +25,7 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
     "@prisma-next/family-mongo": "workspace:*",
     "@prisma-next/mongo-contract-psl": "workspace:*",
     "@prisma-next/psl-parser": "workspace:*",
