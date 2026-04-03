@@ -1,18 +1,17 @@
 # Milestone 1: Pipeline AST — Design
 
-Implementation design for the typed pipeline AST in `mongo-core`. This document describes the type hierarchies, interfaces, and patterns. For execution order and task breakdown, see [phase-1-mongo-collection-spike.md](./phase-1-mongo-collection-spike.md).
+Implementation design for the typed pipeline AST. This document describes the type hierarchies, interfaces, and patterns. For execution order and task breakdown, see [phase-1-mongo-collection-spike.md](./phase-1-mongo-collection-spike.md).
 
 **Precedent:** The SQL AST in [`relational-core/src/ast/types.ts`](../../../packages/2-sql/4-lanes/relational-core/src/ast/types.ts) — class hierarchy, visitor/rewriter/folder interfaces, immutable frozen instances, hidden abstract bases with exported discriminated unions.
-
-**Location:** `packages/2-mongo-family/1-core/src/pipeline/` (new directory within `mongo-core`)
 
 ## Design principles
 
 1. **Mirror the SQL AST pattern.** Classes with `kind` discriminant, abstract bases hidden from export, concrete classes exposed via discriminated unions. `accept()` for visitors, `rewrite()` for transformations.
 2. **Contract-agnostic.** The AST deals in MongoDB concepts (fields, operators, pipeline stages), not contract concepts (models, codecIds, relations). The ORM bridges the gap.
-3. **Lowering in the adapter.** The AST is structurally close to the MongoDB driver's document format. The adapter performs the thin translation from typed nodes to plain documents. `mongo-core` defines the types; the adapter interprets them.
+3. **Lowering in the adapter.** The AST is structurally close to the MongoDB driver's document format. The adapter performs the thin translation from typed nodes to plain documents. The AST package defines the types; the adapter interprets them.
 4. **Extensible operators via traits.** Filter operators are strings, not a closed enum. The ORM gates which operators appear on `MongoModelAccessor` fields using codec traits — the same pattern as SQL's `COMPARISON_METHODS_META` + `CodecTrait`.
-5. **Raw pipeline is a separate path.** Following SQL's `SqlQueryPlan` (typed AST) vs `ExecutionPlan` (raw SQL string), `AggregateCommand` always carries typed `MongoReadStage[]`. Raw pipelines bypass the typed AST at the plan level.
+5. **Raw pipeline goes through the runtime.** Both typed AST pipelines and raw pipelines flow through `MongoRuntime.execute()` — the same middleware pipeline. The raw escape hatch bypasses the typed AST, not the runtime.
+6. **Prove extensibility with a pass-through operator.** Milestone 1 includes adding one extension operator (e.g., a vector `$near` operator on a vector codec) to validate the trait-gated extensibility pattern end-to-end.
 
 ## Class hierarchy
 
@@ -602,23 +601,24 @@ export class AggregateCommand extends MongoCommand {
 
 ### Raw pipeline escape hatch
 
-Following the SQL pattern, raw pipelines bypass the typed AST at the **plan level**, not inside `AggregateCommand`.
+Both typed AST pipelines and raw pipelines must flow through the same `MongoRuntime.execute()` path — the raw escape hatch bypasses the typed AST representation, **not the runtime middleware pipeline**. This mirrors SQL, where both `SqlQueryPlan` (typed AST) and raw `ExecutionPlan` (pre-built SQL string) converge at `executeAgainstQueryable()` and both pass through `RuntimeCore` with its plugin hooks.
 
-SQL has two plan shapes:
+**SQL's pattern:**
 
-- `SqlQueryPlan` — has `ast: AnyQueryAst`, no `sql` (pre-lowering)
-- `ExecutionPlan` — has `sql: string`, optional `ast` (raw or post-lowering)
+- `SqlQueryPlan` → `toExecutionPlan()` (lowers AST to SQL) → `executeAgainstQueryable()` → `core.execute()` (plugins)
+- `ExecutionPlan` (raw) → `executeAgainstQueryable()` → `core.execute()` (plugins)
+- The runtime discriminates structurally: "has `ast` but no `sql`" → needs lowering; otherwise use as-is
 
-The runtime discriminates structurally: "has `ast` but no `sql`" → needs lowering.
+**Mongo's equivalent:**
 
-Mongo's equivalent:
+`MongoRuntime.execute()` accepts `MongoQueryPlan | MongoExecutionPlan`. It normalizes to `MongoExecutionPlan` (lowering if needed), then runs middleware and executes:
 
-- `MongoQueryPlan` — has `command: AnyMongoCommand` where `AggregateCommand` carries typed `MongoReadStage[]` (pre-lowering)
-- `MongoExecutionPlan` — has `wireCommand: AnyMongoWireCommand` where `AggregateWireCommand` carries `RawPipeline` (raw or post-lowering)
+- `MongoQueryPlan` (typed stages in `AggregateCommand`) → `adapter.lower()` → middleware → `driver.execute()`
+- `MongoExecutionPlan` (raw, pre-built `AggregateWireCommand`) → middleware → `driver.execute()`
 
-A raw pipeline is constructed directly as a `MongoExecutionPlan` with a hand-built `AggregateWireCommand`, bypassing the typed AST entirely. This mirrors how raw SQL creates an `ExecutionPlan` with `sql` already filled in and no `ast`.
+The current `MongoRuntime` is a thin adapter→driver bridge with no middleware. Adding the middleware pipeline is a prerequisite (or parallel track) to making the raw escape hatch useful — but the plan-level architecture should be designed to support it from the start.
 
-The existing `MongoQueryPlan` → `MongoExecutionPlan` flow already supports this: the adapter's `lower()` converts one to the other. A raw pipeline would skip `lower()` and construct `MongoExecutionPlan` directly.
+The raw pipeline is constructed as a `MongoExecutionPlan` with a hand-built `AggregateWireCommand` carrying a `RawPipeline`. It bypasses `AggregateCommand` and the typed AST entirely, but still enters the runtime at `execute()`.
 
 ## Operations extensibility
 
@@ -681,24 +681,60 @@ Extension packs (e.g., a future geospatial or full-text search pack) register ad
 
 No changes to the AST classes are needed — `MongoFieldFilter.op` is a `string`, accommodating any operator. The visitor doesn't need to change either, since all field comparisons go through `visitor.field()` regardless of operator.
 
-## File organization
+### Proof of extensibility (Milestone 1 deliverable)
 
-New files within `packages/2-mongo-family/1-core/src/pipeline/`:
+Milestone 1 includes one pass-through extension operator to validate the pattern end-to-end. Concretely, the Mongo target adds a vector data type with one vector operator (e.g., `$near` for vector similarity search):
+
+1. **Codec:** Define a `mongo/vector` codec in the Mongo target with `traits: ['equality', 'vector']`.
+2. **Operator registration:** Add a `near` entry to the comparison methods metadata gated by the `'vector'` trait: `{ traits: ['vector'], create: (field) => (value) => MongoFieldFilter.of(field, '$near', value) }`.
+3. **Type-level verification:** A field with the `vector` codec gets the `near()` method on `MongoModelAccessor`; fields without the trait do not (type-level test).
+4. **Lowering verification:** The adapter lowers `MongoFieldFilter('embedding', '$near', vectorValue)` to `{ embedding: { $near: vectorValue } }` — no special-casing needed since `MongoFieldFilter` lowering is operator-agnostic.
+
+This validates that:
+- The open `op: string` design accommodates custom operators without AST changes
+- Codec traits correctly gate which operators appear on which fields
+- Lowering is operator-agnostic — new operators pass through without adapter changes
+
+## Package location
+
+The pipeline AST should **not** live in `mongo-core` (`packages/2-mongo-family/1-core/`). That package is already a grab-bag of commands, values, codecs, contract types, validation, wire commands, plan types, param refs, driver types, and codec registry.
+
+The SQL precedent is clear: the query AST lives in `relational-core` (`@prisma-next/sql-relational-core`) at the **lanes** layer (`packages/2-sql/4-lanes/relational-core/`), not in `sql-core` (`packages/2-sql/1-core/`). The lanes layer sits between core and runtime — it's the query representation primitive consumed by both the ORM and query builder surfaces.
+
+Mongo's current layer order has no "lanes" layer: `["core", "tooling", "orm", "runtime", "family"]`. The pipeline AST is a query representation primitive that will be consumed by both `mongo-orm` and a future `mongo-pipeline-builder`, which is exactly the lanes-layer role.
+
+**Recommendation:** Create a new package for the pipeline AST. Concrete name and layer position TBD — candidates:
+
+- `packages/2-mongo-family/4-lanes/pipeline-core/` — mirrors SQL's `4-lanes/relational-core/`, but Mongo currently uses `4-orm` at the same level
+- `packages/2-mongo-family/2-pipeline/` — positions it above core, below tooling, at the unused authoring layer slot
+
+The key constraint: the package must be importable by both `mongo-orm` (layer 4) and a future pipeline builder, and must be able to import from `mongo-core` (layer 1) for types like `MongoValue` and `MongoParamRef`.
+
+## Module organization
+
+Modules are organized by semantic grouping. No `types.ts` monolith. No `index.ts` barrel files. Each module groups closely related types.
 
 ```
-pipeline/
-├── types.ts            Filter expressions, pipeline stages, unions, visitors, rewriters
-└── index.ts            Re-exports from types.ts
+src/
+├── filter-expressions.ts   MongoFieldFilter, MongoAndExpr, MongoOrExpr, MongoNotExpr,
+│                            MongoExistsExpr, MongoFilterExpr union
+├── stages.ts                MongoMatchStage, MongoProjectStage, MongoSortStage,
+│                            MongoLimitStage, MongoSkipStage, MongoLookupStage,
+│                            MongoUnwindStage, MongoReadStage union
+├── visitors.ts              MongoFilterVisitor<R>, MongoFilterRewriter, MongoStageVisitor<R>
+├── ast-node.ts              MongoAstNode base class (shared by both hierarchies)
+└── exports/
+    └── index.ts             Public API re-exports (exports/ folder is the exception
+                             to the no-barrel rule per repo convention)
 ```
 
-Everything in a single `types.ts` file, matching the SQL AST's `relational-core/src/ast/types.ts` pattern. The file is small enough (two hierarchies, ~12 classes) that splitting would be premature.
-
-Exports are added to `packages/2-mongo-family/1-core/src/exports/index.ts` to make the types available to consumers (`mongo-orm`, `mongo-adapter`).
+The hidden abstract bases (`MongoFilterExpression`, `MongoStageNode`) live in their respective modules (`filter-expressions.ts`, `stages.ts`) and are not exported. `MongoAstNode` is in its own module because both hierarchies inherit from it.
 
 ## Comparison with SQL AST
 
-| Aspect | SQL (`relational-core`) | Mongo (`mongo-core`) |
+| Aspect | SQL (`relational-core`) | Mongo (new pipeline AST package) |
 |---|---|---|
+| Package layer | Lanes (`4-lanes/relational-core`) | TBD — new package, not in `mongo-core` |
 | Root abstract base | `AstNode` | `MongoAstNode` |
 | Expression base | `Expression` (abstract) | `MongoFilterExpression` (abstract) |
 | Statement/stage base | `QueryAst` (abstract) | `MongoStageNode` (abstract) |
@@ -712,7 +748,7 @@ Exports are added to `packages/2-mongo-family/1-core/src/exports/index.ts` to ma
 | Operator extensibility | `BinaryOp` union + `OperationExpr` | `MongoFieldFilter.op: string` (open) |
 | Lowering | Adapter calls `adapter.lower(ast, context)` | Adapter calls `lowerStage(stage)` per stage |
 | Pre-lowered plan | `SqlQueryPlan` (has `ast`, no `sql`) | `MongoQueryPlan` (has typed `AggregateCommand`) |
-| Raw escape hatch | `ExecutionPlan` with `sql` (no `ast`) | `MongoExecutionPlan` with `AggregateWireCommand` |
+| Raw escape hatch | `ExecutionPlan` with `sql` — still goes through runtime | `MongoExecutionPlan` with `AggregateWireCommand` — still goes through runtime |
 
 ## References
 
