@@ -1,13 +1,7 @@
 import type { ControlFamilyDescriptor } from '@prisma-next/core-control-plane/types';
-import type { TargetDescriptor } from '@prisma-next/framework-components/components';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import type { SqlControlDescriptorWithContributions } from './assembly';
 import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './control-instance';
-import type {
-  SqlControlAdapterDescriptor,
-  SqlControlExtensionDescriptor,
-} from './migrations/types';
 
 export class SqlFamilyDescriptor
   implements ControlFamilyDescriptor<'sql', SqlControlFamilyInstance>
@@ -21,15 +15,6 @@ export class SqlFamilyDescriptor
   create<TTargetId extends string>(
     stack: ControlStack<'sql', TTargetId>,
   ): SqlControlFamilyInstance {
-    const target = stack.target as unknown as TargetDescriptor<'sql', TTargetId> &
-      SqlControlDescriptorWithContributions;
-    const adapter = stack.adapter as unknown as SqlControlAdapterDescriptor<TTargetId>;
-    const extensionPacks =
-      stack.extensionPacks as unknown as readonly SqlControlExtensionDescriptor<TTargetId>[];
-    return createSqlFamilyInstance({
-      target,
-      adapter,
-      extensionPacks,
-    });
+    return createSqlFamilyInstance(stack);
   }
 }
