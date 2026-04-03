@@ -6,7 +6,7 @@ Restructure the emitted SQL contract to implement ADR 172's domain-storage separ
 
 **Spec:** [projects/contract-domain-extraction/spec.md](spec.md)
 
-**Linear:** [WS4: MongoDB & Cross-Family Architecture](https://linear.app/prisma-company/project/ws4-mongodb-and-cross-family-architecture-89d4dcdbcd9a) — milestones M1–M6. Tickets: [TML-2172](https://linear.app/prisma-company/issue/TML-2172) (M1), [TML-2175](https://linear.app/prisma-company/issue/TML-2175) (M2), [TML-2176](https://linear.app/prisma-company/issue/TML-2176) (M3), [TML-2182](https://linear.app/prisma-company/issue/TML-2182) (M3, task 3.9)
+**Linear:** [WS4: MongoDB & Cross-Family Architecture](https://linear.app/prisma-company/project/ws4-mongodb-and-cross-family-architecture-89d4dcdbcd9a) — milestones M1–M6. Tickets: [TML-2172](https://linear.app/prisma-company/issue/TML-2172) (M1), [TML-2175](https://linear.app/prisma-company/issue/TML-2175) (M2), [TML-2176](https://linear.app/prisma-company/issue/TML-2176) (M3), [TML-2182](https://linear.app/prisma-company/issue/TML-2182) (M3, task 3.9), [TML-2184](https://linear.app/prisma-company/issue/TML-2184) (M5), [TML-2190](https://linear.app/prisma-company/issue/TML-2190) (M5, Phase A)
 
 ## Collaborators
 
