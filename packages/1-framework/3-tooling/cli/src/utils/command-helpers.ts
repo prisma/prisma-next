@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { ControlTargetDescriptor } from '@prisma-next/core-control-plane/types';
+import { hasMigrations } from '@prisma-next/core-control-plane/types';
 import type { PathDecision } from '@prisma-next/migration-tools/dag';
 import { reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
@@ -136,24 +137,12 @@ export function toPathDecisionResult(decision: PathDecision): PathDecisionResult
   };
 }
 
-/**
- * Checks whether a target descriptor supports migrations.
- *
- * The config-level `ControlTargetDescriptor` (from `@prisma-next/config`) does not include
- * `migrations` — that property lives on the migration-control-plane's version of the same
- * interface. At runtime the postgres target descriptor *does* carry `migrations`, so we
- * widen to the migration-aware descriptor and check the optional property directly.
- */
 export function targetSupportsMigrations(target: ControlTargetDescriptor<string, string>): boolean {
-  return !!target.migrations;
+  return hasMigrations(target);
 }
 
-/**
- * Extracts the typed migrations capability from a target descriptor.
- * Returns `undefined` when the target does not support migrations.
- */
 export function getTargetMigrations(target: ControlTargetDescriptor<string, string>) {
-  return target.migrations;
+  return hasMigrations(target) ? target.migrations : undefined;
 }
 
 /**

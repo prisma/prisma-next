@@ -10,6 +10,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import { hasMigrations, hasSchemaView } from '@prisma-next/core-control-plane/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -344,12 +345,10 @@ class ControlClientImpl implements ControlClient {
     await this.connectWithProgress(options.connection, 'dbInit', onProgress);
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
-    // Check target supports migrations
-    if (!this.options.target.migrations) {
+    if (!hasMigrations(this.options.target)) {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
-    // Validate contract using family instance
     let contractIR: ContractIR;
     try {
       contractIR = familyInstance.validateContractIR(options.contractIR);
@@ -358,7 +357,6 @@ class ControlClientImpl implements ControlClient {
       throw new ContractValidationError(message, error);
     }
 
-    // Delegate to extracted dbInit operation
     return executeDbInit({
       driver,
       familyInstance,
@@ -375,7 +373,7 @@ class ControlClientImpl implements ControlClient {
     await this.connectWithProgress(options.connection, 'dbUpdate', onProgress);
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
-    if (!this.options.target.migrations) {
+    if (!hasMigrations(this.options.target)) {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
@@ -409,7 +407,7 @@ class ControlClientImpl implements ControlClient {
     await this.connectWithProgress(options.connection, 'migrationApply', onProgress);
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
-    if (!this.options.target.migrations) {
+    if (!hasMigrations(this.options.target)) {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
@@ -467,7 +465,7 @@ class ControlClientImpl implements ControlClient {
 
   toSchemaView(schemaIR: unknown): CoreSchemaView | undefined {
     this.init();
-    if (this.familyInstance?.toSchemaView) {
+    if (this.familyInstance && hasSchemaView(this.familyInstance)) {
       return this.familyInstance.toSchemaView(schemaIR);
     }
     return undefined;

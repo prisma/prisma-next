@@ -1,9 +1,29 @@
 export type {
-  AssembledAuthoringContributions,
-  ControlStack,
-  CreateControlStackInput,
-} from '../control-stack';
-
+  ControlAdapterDescriptor,
+  ControlDriverDescriptor,
+  ControlExtensionDescriptor,
+  ControlFamilyDescriptor,
+  ControlPlaneStack,
+  ControlTargetDescriptor,
+} from '../control-descriptors';
+export type {
+  ControlAdapterInstance,
+  ControlDriverInstance,
+  ControlExtensionInstance,
+  ControlFamilyInstance,
+  ControlTargetInstance,
+} from '../control-instances';
+export type {
+  EmitContractResult,
+  IntrospectSchemaResult,
+  OperationContext,
+  SchemaIssue,
+  SchemaVerificationNode,
+  SignDatabaseResult,
+  VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
+} from '../control-result-types';
+export type { ControlStack } from '../control-stack';
 export {
   assembleAuthoringContributions,
   assertUniqueCodecOwner,
