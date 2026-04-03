@@ -56,6 +56,10 @@ Extract `Collection<C, M>` base class, `CollectionState`, `InferModelRow`, and i
 
 ## Follow-ups
 
+### Remove legacy command types from mongo-core
+
+Once all consumers produce `MongoReadPlan` (typed AST stages) instead of command-based `MongoQueryPlan`, delete the legacy command infrastructure from `mongo-core`: `FindCommand`, `AggregateCommand`, `InsertOneCommand`, `UpdateOneCommand`, `DeleteOneCommand`, `MongoQueryPlan`, wire command classes, and the adapter's `lower()` method. These are the untyped predecessors of the query AST; removing them eliminates the old core↔query dependency and simplifies the adapter to a thin driver bridge.
+
 ### Restructure Mongo family directories to match layering design
 
 The current `packages/2-mongo-family/` has most numbered directories acting as the package itself rather than as layer directories containing packages. Restructure to match the target layering: each numbered directory is a layer containing one or more packages (e.g., `1-core/mongo-core/`, `4-orm/mongo-orm/`). Only `2-query/` follows the correct convention from the start.

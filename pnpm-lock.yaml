@@ -1011,6 +1011,9 @@ importers:
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../1-core
+      '@prisma-next/mongo-query-ast':
+        specifier: workspace:*
+        version: link:../2-query/query-ast
       '@prisma-next/runtime-executor':
         specifier: workspace:*
         version: link:../../1-framework/4-runtime-executor
