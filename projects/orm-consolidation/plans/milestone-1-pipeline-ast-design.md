@@ -8,7 +8,7 @@ Implementation design for the typed query AST in `@prisma-next/mongo-query-ast`.
 
 1. **Mirror the SQL AST pattern.** Classes with `kind` discriminant, abstract bases hidden from export, concrete classes exposed via discriminated unions. `accept()` for visitors, `rewrite()` for transformations.
 2. **Contract-agnostic.** The AST deals in MongoDB concepts (fields, operators, pipeline stages), not contract concepts (models, codecIds, relations). The ORM bridges the gap.
-3. **Lowering in the adapter.** The AST is structurally close to the MongoDB driver's document format. The adapter performs the thin translation from typed nodes to plain documents. `mongo-query-ast` defines the types; the adapter interprets them.
+3. **Lowering in the AST package.** The AST is structurally close to the MongoDB driver's document format. Lowering is a thin, mechanical translation from typed nodes to plain documents. The functions live in `mongo-query-ast` (not the adapter) because cross-domain import rules prevent `mongo-runtime` (mongo domain) from importing the adapter (targets domain). The shared `resolveValue` utility lives in `mongo-core` to eliminate duplication between AST lowering and command lowering in the adapter.
 4. **Extensible operators via traits.** Filter operators are strings, not a closed enum. The ORM gates which operators appear on `MongoModelAccessor` fields using codec traits — the same pattern as SQL's `COMPARISON_METHODS_META` + `CodecTrait`.
 5. **Raw escape hatch goes through the runtime.** Both typed AST and raw aggregation plans flow through `MongoRuntime.execute()` — the same runtime middleware. The raw escape hatch bypasses the typed AST, not the runtime.
 6. **Prove extensibility with a pass-through operator.** Milestone 1 includes adding one extension operator (e.g., a vector `$near` operator on a vector codec) to validate the trait-gated extensibility pattern end-to-end.
@@ -531,9 +531,9 @@ SQL's `ExpressionFolder<T>` provides monoid-style aggregation with early exit. T
 
 ## Lowering
 
-Lowering translates typed AST nodes into plain `Record<string, unknown>` documents suitable for the MongoDB driver. Per our design decision, **lowering lives in the adapter** (`mongo-adapter`), not in `mongo-query-ast`.
+Lowering translates typed AST nodes into plain `Record<string, unknown>` documents suitable for the MongoDB driver. **Lowering lives in `mongo-query-ast`**, not in the adapter. The original design placed lowering in the adapter, but cross-domain import rules make this impractical: `mongo-runtime` (mongo domain) cannot import from `adapter-mongo` (targets domain), and the `MongoAdapter` interface (in `mongo-core`, core layer) cannot reference `MongoReadPlan` (in `mongo-query-ast`, query layer). `resolveValue` — the shared param-resolution utility — lives in `mongo-core` and is used by both the AST lowering functions and the adapter's command lowering.
 
-### Why the adapter
+### Structure
 
 The AST is structurally close to the driver's document format. Lowering is a thin, largely mechanical translation:
 
@@ -542,7 +542,7 @@ The AST is structurally close to the driver's document format. Lowering is a thi
 | `MongoFieldFilter('email', '$eq', 'alice')` | `{ email: { $eq: 'alice' } }` |
 | `MongoAndExpr([a, b])` | `{ $and: [lower(a), lower(b)] }` |
 | `MongoOrExpr([a, b])` | `{ $or: [lower(a), lower(b)] }` |
-| `MongoNotExpr(a)` | `{ $not: lower(a) }` |
+| `MongoNotExpr(a)` | `{ $nor: [lower(a)] }` |
 | `MongoExistsExpr('name', true)` | `{ name: { $exists: true } }` |
 | `MongoMatchStage(filter)` | `{ $match: lowerFilter(filter) }` |
 | `MongoProjectStage({ name: 1 })` | `{ $project: { name: 1 } }` |
@@ -554,29 +554,9 @@ The AST is structurally close to the driver's document format. Lowering is a thi
 
 The lowering can be implemented as a `MongoFilterVisitor<Document>` for filters and a `MongoStageVisitor<Record<string, unknown>>` for stages, or as simple switch-based functions. Either approach works; the visitor interfaces are available if the adapter prefers structured dispatch.
 
-### Adapter integration
+### Runtime integration
 
-The adapter's existing `#lowerCommand` method handles each command kind via switch. The `aggregate` case currently does:
-
-```typescript
-case 'aggregate':
-  return new AggregateWireCommand(
-    command.collection,
-    command.pipeline.map((stage) => ({ ...stage })),
-  );
-```
-
-After this change, it will lower typed stages:
-
-```typescript
-case 'aggregate':
-  return new AggregateWireCommand(
-    command.collection,
-    command.pipeline.map((stage) => lowerStage(stage)),
-  );
-```
-
-Where `lowerStage` dispatches on `stage.kind` (or uses `stage.accept(loweringVisitor)`).
+The runtime imports `lowerPipeline` from `mongo-query-ast` and calls it directly on `MongoReadPlan.stages` to produce `AggregateWireCommand` documents. The adapter handles only write command lowering (`InsertOneCommand`, `UpdateOneCommand`, `DeleteOneCommand`) and raw `AggregateCommand` pass-through, using the shared `resolveValue` from `mongo-core` for parameter resolution.
 
 ### Param resolution
 
