@@ -5,6 +5,7 @@ export default defineConfig({
     'src/exports/components.ts',
     'src/exports/authoring.ts',
     'src/exports/control.ts',
+    'src/exports/emission.ts',
     'src/exports/execution.ts',
   ],
 });
