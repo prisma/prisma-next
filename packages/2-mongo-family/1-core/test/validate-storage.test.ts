@@ -1,19 +1,27 @@
+import { coreHash } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import type { MongoContract } from '../src/contract-types';
 import { validateMongoStorage } from '../src/validate-storage';
 
+const DUMMY_HASH = coreHash('sha256:test');
+
 function makeMinimalContract(overrides: Partial<MongoContract> = {}): MongoContract {
   return {
+    target: 'mongo',
     targetFamily: 'mongo',
     storageHash: 'test-hash',
     roots: { items: 'Item' },
-    storage: { collections: { items: {} } },
+    storage: { storageHash: DUMMY_HASH, collections: { items: {} } },
     models: {
       Item: {
         fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
         storage: { collection: 'items' },
+        relations: {},
       },
     },
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
     ...overrides,
   };
 }
@@ -40,6 +48,7 @@ describe('validateMongoStorage()', () => {
           Tag: {
             fields: { name: { codecId: 'mongo/string@1', nullable: false } },
             storage: { collection: 'tags' },
+            relations: {},
             owner: 'Item',
           },
         },
@@ -91,6 +100,7 @@ describe('validateMongoStorage()', () => {
           Tag: {
             fields: { name: { codecId: 'mongo/string@1', nullable: false } },
             storage: {},
+            relations: {},
             owner: 'Item',
           },
         },
@@ -117,6 +127,7 @@ describe('validateMongoStorage()', () => {
           User: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
             storage: { collection: 'users' },
+            relations: {},
           },
         },
       });
@@ -145,6 +156,7 @@ describe('validateMongoStorage()', () => {
           User: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
             storage: { collection: 'users' },
+            relations: {},
           },
         },
       });
@@ -155,7 +167,7 @@ describe('validateMongoStorage()', () => {
 
     it('accepts reference relation with valid fields', () => {
       const contract = makeMinimalContract({
-        storage: { collections: { items: {}, users: {} } },
+        storage: { storageHash: DUMMY_HASH, collections: { items: {}, users: {} } },
         models: {
           Item: {
             fields: {
@@ -174,6 +186,7 @@ describe('validateMongoStorage()', () => {
           User: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
             storage: { collection: 'users' },
+            relations: {},
           },
         },
       });
@@ -184,7 +197,7 @@ describe('validateMongoStorage()', () => {
   describe('variant collection must match base', () => {
     it('rejects variant with a different collection than its base', () => {
       const contract = makeMinimalContract({
-        storage: { collections: { items: {}, other: {} } },
+        storage: { storageHash: DUMMY_HASH, collections: { items: {}, other: {} } },
         models: {
           Item: {
             fields: {
@@ -192,12 +205,14 @@ describe('validateMongoStorage()', () => {
               type: { codecId: 'mongo/string@1', nullable: false },
             },
             storage: { collection: 'items' },
+            relations: {},
             discriminator: { field: 'type' },
             variants: { SpecialItem: { value: 'special' } },
           },
           SpecialItem: {
             fields: { extra: { codecId: 'mongo/string@1', nullable: false } },
             storage: { collection: 'other' },
+            relations: {},
             base: 'Item',
           },
         },
@@ -209,7 +224,7 @@ describe('validateMongoStorage()', () => {
 
     it('accepts variant with same collection as its base', () => {
       const contract = makeMinimalContract({
-        storage: { collections: { items: {} } },
+        storage: { storageHash: DUMMY_HASH, collections: { items: {} } },
         models: {
           Item: {
             fields: {
@@ -217,12 +232,14 @@ describe('validateMongoStorage()', () => {
               type: { codecId: 'mongo/string@1', nullable: false },
             },
             storage: { collection: 'items' },
+            relations: {},
             discriminator: { field: 'type' },
             variants: { SpecialItem: { value: 'special' } },
           },
           SpecialItem: {
             fields: { extra: { codecId: 'mongo/string@1', nullable: false } },
             storage: { collection: 'items' },
+            relations: {},
             base: 'Item',
           },
         },
@@ -234,11 +251,12 @@ describe('validateMongoStorage()', () => {
   describe('collection-model consistency', () => {
     it('rejects model referencing a collection not in storage.collections', () => {
       const contract = makeMinimalContract({
-        storage: { collections: {} },
+        storage: { storageHash: DUMMY_HASH, collections: {} },
         models: {
           Item: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
             storage: { collection: 'items' },
+            relations: {},
           },
         },
       });
