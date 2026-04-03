@@ -39,28 +39,8 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     readonly contract: Contract | unknown;
   }): Promise<EmitContractResult> {
     const validatedContract = contract as Contract;
-    const {
-      codecTypeImports,
-      operationTypeImports,
-      queryOperationTypeImports,
-      extensionIds,
-      parameterizedRenderers,
-      parameterizedTypeImports,
-    } = this.controlStack;
 
-    const result = await emit(
-      validatedContract,
-      {
-        outputDir: '',
-        codecTypeImports,
-        operationTypeImports,
-        queryOperationTypeImports,
-        extensionIds,
-        parameterizedRenderers,
-        parameterizedTypeImports,
-      },
-      mongoTargetFamilyHook,
-    );
+    const result = await emit(validatedContract, this.controlStack, mongoTargetFamilyHook);
 
     return {
       contractJson: result.contractJson,

@@ -7,7 +7,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { format } from 'prettier';
 import { canonicalizeContractToObject } from './canonicalization';
-import type { EmitOptions, EmitResult } from './types';
+import type { EmitResult, EmitStackInput } from './types';
 
 const SCHEMA_VERSION = '1';
 
@@ -49,7 +49,7 @@ function assertContractJsonShape(value: unknown): void {
 
 export async function emit(
   contract: Contract,
-  options: EmitOptions,
+  stack: EmitStackInput,
   targetFamily: TargetFamilyHook,
 ): Promise<EmitResult> {
   const {
@@ -60,7 +60,7 @@ export async function emit(
     parameterizedRenderers,
     parameterizedTypeImports,
     queryOperationTypeImports,
-  } = options;
+  } = stack;
 
   const ctx: ValidationContext = {
     ...ifDefined('operationRegistry', operationRegistry),

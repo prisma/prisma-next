@@ -1,27 +1,19 @@
 import type { TypeRenderEntry, TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { OperationRegistry } from '@prisma-next/operations';
 
-export interface EmitOptions {
-  readonly outputDir: string;
+/**
+ * The subset of ControlStack that emit() reads.
+ * All fields are optional so tests can pass minimal objects.
+ * A full ControlStack satisfies this via structural typing.
+ */
+export interface EmitStackInput {
   readonly operationRegistry?: OperationRegistry;
   readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly operationTypeImports?: ReadonlyArray<TypesImportSpec>;
-  readonly extensionIds?: ReadonlyArray<string>;
-  /**
-   * Normalized parameterized type renderers, keyed by codecId.
-   * These are extracted from descriptors and normalized during assembly.
-   */
-  readonly parameterizedRenderers?: Map<string, TypeRenderEntry>;
-  /**
-   * Type imports for parameterized codecs.
-   * These are added to contract.d.ts alongside codec and operation type imports.
-   */
-  readonly parameterizedTypeImports?: ReadonlyArray<TypesImportSpec>;
-  /**
-   * Query operation type imports for the query builder.
-   * Flat operation signatures keyed by operation name.
-   */
   readonly queryOperationTypeImports?: ReadonlyArray<TypesImportSpec>;
+  readonly extensionIds?: ReadonlyArray<string>;
+  readonly parameterizedRenderers?: Map<string, TypeRenderEntry>;
+  readonly parameterizedTypeImports?: ReadonlyArray<TypesImportSpec>;
 }
 
 export interface EmitResult {

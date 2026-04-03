@@ -4,7 +4,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
-import type { EmitOptions } from '@prisma-next/emitter';
+import type { EmitStackInput } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
 import { createTestContract } from '@prisma-next/emitter/test/utils';
 import {
@@ -149,8 +149,7 @@ describe('contract.d.ts imports resolution', () => {
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
-      const options: EmitOptions = {
-        outputDir: testDir,
+      const options: EmitStackInput = {
         operationRegistry,
         codecTypeImports,
         operationTypeImports,
@@ -283,8 +282,7 @@ type UserIdColumn = UserColumns['id'];
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
-      const options: EmitOptions = {
-        outputDir: testDir,
+      const options: EmitStackInput = {
         operationRegistry,
         codecTypeImports,
         operationTypeImports,

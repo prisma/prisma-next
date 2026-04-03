@@ -737,7 +737,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const result = await emit(
         normalizedIR,
         {
-          outputDir: '',
           operationRegistry,
           codecTypeImports,
           operationTypeImports,

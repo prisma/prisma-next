@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { EmitOptions } from '@prisma-next/core-control-plane/emission';
+import type { EmitStackInput } from '@prisma-next/core-control-plane/emission';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type {
   GenerateContractTypesOptions,
@@ -128,8 +128,7 @@ describe('emitter', () => {
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
-      const options: EmitOptions = {
-        outputDir: '',
+      const options: EmitStackInput = {
         operationRegistry,
         codecTypeImports,
         operationTypeImports,
@@ -168,8 +167,7 @@ describe('emitter', () => {
     });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -200,8 +198,7 @@ describe('emitter', () => {
     });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -215,8 +212,7 @@ describe('emitter', () => {
     const contract = emitTestContract({ targetFamily: undefined });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -232,8 +228,7 @@ describe('emitter', () => {
     const contract = emitTestContract({ target: undefined });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -263,8 +258,7 @@ describe('emitter', () => {
     });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -295,8 +289,7 @@ describe('emitter', () => {
     });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -327,8 +320,7 @@ describe('emitter', () => {
     });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -345,8 +337,7 @@ describe('emitter', () => {
     const contract = emitTestContract({ extensionPacks: undefined });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -364,8 +355,7 @@ describe('emitter', () => {
     });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -381,8 +371,7 @@ describe('emitter', () => {
     const contract = emitTestContract({ capabilities: undefined });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -400,8 +389,7 @@ describe('emitter', () => {
     });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -417,8 +405,7 @@ describe('emitter', () => {
     const contract = emitTestContract({ meta: undefined });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -436,8 +423,7 @@ describe('emitter', () => {
     });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -467,8 +453,7 @@ describe('emitter', () => {
     });
 
     const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
@@ -489,8 +474,7 @@ describe('emitter', () => {
       },
     });
 
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
@@ -525,8 +509,7 @@ describe('emitter', () => {
       } as unknown as Record<string, unknown>,
     });
 
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
@@ -569,8 +552,7 @@ export type Contract = unknown;
       },
     };
 
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
@@ -621,8 +603,7 @@ export type Contract = unknown;
     const parameterizedRenderers = new Map<string, TypeRenderEntry>();
     parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-    const options: EmitOptions = {
-      outputDir: '',
+    const options: EmitStackInput = {
       operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
