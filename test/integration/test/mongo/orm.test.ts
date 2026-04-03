@@ -162,6 +162,74 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     }
   });
 
+  it('where() with .not() excludes matching documents', async () => {
+    const db = ctx.client.db(ctx.dbName);
+    await db.collection('users').insertMany([
+      { name: 'Alice', email: 'alice@example.com', addresses: [] },
+      { name: 'Bob', email: 'bob@example.com', addresses: [] },
+      { name: 'Charlie', email: 'charlie@example.com', addresses: [] },
+    ]);
+
+    const orm = mongoOrm({ contract, executor: ctx.runtime });
+    const results = await orm.users.where(MongoFieldFilter.eq('name', 'Alice').not()).all();
+
+    expect(results).toHaveLength(2);
+    const names = results.map((r) => r.name).sort();
+    expect(names).toEqual(['Bob', 'Charlie']);
+  });
+
+  it('orderBy() returns results in specified order', async () => {
+    const db = ctx.client.db(ctx.dbName);
+    await db.collection('users').insertMany([
+      { name: 'Charlie', email: 'charlie@example.com', addresses: [] },
+      { name: 'Alice', email: 'alice@example.com', addresses: [] },
+      { name: 'Bob', email: 'bob@example.com', addresses: [] },
+    ]);
+
+    const orm = mongoOrm({ contract, executor: ctx.runtime });
+    const results = await orm.users.orderBy({ name: 1 }).all();
+
+    expect(results).toHaveLength(3);
+    expect(results[0]!.name).toBe('Alice');
+    expect(results[1]!.name).toBe('Bob');
+    expect(results[2]!.name).toBe('Charlie');
+  });
+
+  it('skip() and take() return correct subset', async () => {
+    const db = ctx.client.db(ctx.dbName);
+    await db.collection('users').insertMany([
+      { name: 'Alice', email: 'alice@example.com', addresses: [] },
+      { name: 'Bob', email: 'bob@example.com', addresses: [] },
+      { name: 'Charlie', email: 'charlie@example.com', addresses: [] },
+    ]);
+
+    const orm = mongoOrm({ contract, executor: ctx.runtime });
+    const results = await orm.users.orderBy({ name: 1 }).skip(1).take(1).all();
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.name).toBe('Bob');
+  });
+
+  it('select() restricts returned fields', async () => {
+    const db = ctx.client.db(ctx.dbName);
+    await db.collection('users').insertMany([
+      { name: 'Alice', email: 'alice@example.com', addresses: [] },
+      { name: 'Bob', email: 'bob@example.com', addresses: [] },
+    ]);
+
+    const orm = mongoOrm({ contract, executor: ctx.runtime });
+    const results = await orm.users.select('name').all();
+
+    expect(results).toHaveLength(2);
+    for (const row of results) {
+      const keys = Object.keys(row as Record<string, unknown>);
+      expect(keys).toContain('name');
+      expect(keys).toContain('_id');
+      expect(keys).not.toContain('email');
+      expect(keys).not.toContain('addresses');
+    }
+  });
+
   it('full flow: ORM -> typed AST -> runtime -> driver -> typed results', async () => {
     const db = ctx.client.db(ctx.dbName);
     await db.collection('users').insertOne({
