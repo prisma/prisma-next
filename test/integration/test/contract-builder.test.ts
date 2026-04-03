@@ -36,10 +36,8 @@ describe('builder integration', () => {
 
     // Runtime checks
     expect(contract).toMatchObject({
-      schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'sha256:test-core',
       storage: {
         tables: expect.objectContaining({
           user: expect.anything(),
@@ -77,8 +75,6 @@ describe('builder integration', () => {
     // Type checks - verify literal types are preserved
     expectTypeOf(contract.target).toEqualTypeOf<'postgres'>();
     expectTypeOf(contract.targetFamily).toEqualTypeOf<'sql'>();
-    expectTypeOf(contract.schemaVersion).toEqualTypeOf<'1'>();
-
     // Verify table name is literal 'user', not string
     expectTypeOf(contract.storage.tables).toHaveProperty('user');
 
@@ -194,7 +190,7 @@ describe('builder integration', () => {
 
     // Runtime checks
     expect(plan.ast).toBeInstanceOf(SelectAst);
-    expect(plan.meta.storageHash).toBe('sha256:test-core');
+    expect(plan.meta.storageHash).toMatch(/^sha256:/);
 
     // Type checks - verify plan types are specific
     expectTypeOf(plan.meta.storageHash).toEqualTypeOf<string>();
@@ -331,7 +327,6 @@ describe('builder integration', () => {
     const fixtureContract = validateContract<Contract>(contractJson);
 
     // Runtime checks
-    expect(builderContract.schemaVersion).toBe(fixtureContract.schemaVersion);
     expect(builderContract.target).toBe(fixtureContract.target);
     expect(builderContract.targetFamily).toBe(fixtureContract.targetFamily);
     expect(builderContract.storage.tables.user.columns).toMatchObject({
@@ -351,7 +346,6 @@ describe('builder integration', () => {
     // Type checks - verify builder contract preserves types like fixture
     expectTypeOf(builderContract.target).toEqualTypeOf<'postgres'>();
     expectTypeOf(builderContract.targetFamily).toEqualTypeOf<'sql'>();
-    expectTypeOf(builderContract.schemaVersion).toEqualTypeOf<'1'>();
 
     // Verify table and column types match
     expectTypeOf(builderContract.storage.tables).toHaveProperty('user');

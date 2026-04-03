@@ -115,13 +115,14 @@ describe('staged contract DSL portability coverage', () => {
     const stripTargetProfileAndStorageHashes = <
       C extends {
         readonly target: string;
+        readonly storageHash: string;
         readonly profileHash: string;
         readonly storage: { readonly storageHash: string } & Record<string, unknown>;
       },
     >(
       c: C,
     ) => {
-      const { target: _t, profileHash: _p, storage, ...rest } = c;
+      const { target: _t, storageHash: _topSh, profileHash: _p, storage, ...rest } = c;
       const { storageHash: _sh, ...storageRest } = storage;
       return { ...rest, storage: storageRest };
     };

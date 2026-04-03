@@ -4,8 +4,10 @@
   "target": "postgres",
   "storageHash": "sha256:6727814657eab2efd444f6b16bf052dcede7f1890d7854eda5f8485998f905ae",
   "executionHash": "sha256:dbb8f4e456a47f7384f4944f2a6e5f04f2f09250139f787a1e26b96fedd94784",
-  "profileHash": "sha256:4a1573b59c964ca68ffbb7cc76f1a5f84a5ca04847cd4b8443e3a4e244d8fc72",
-  "roots": {},
+  "profileHash": "sha256:ffc50246dae57a96ebc1abc212db40a10706095adca83ab257d4cb15f62cd192",
+  "roots": {
+    "user": "User"
+  },
   "models": {
     "User": {
       "fields": {
