@@ -698,16 +698,20 @@ This validates that:
 ## Package
 
 **Package:** `@prisma-next/mongo-query-ast`
-**Directory:** `packages/2-mongo-family/2-query-ast/`
-**Layer:** `query-ast` — a new layer between `core` (1) and `tooling` (3)
+**Directory:** `packages/2-mongo-family/2-query/query-ast/`
+**Layer:** `query` — a new layer between `core` (1) and `tooling` (3)
 
-The query AST lives in its own package, below all consumers. This prevents coupling the AST to ORM or builder concerns. The Mongo layer order becomes: `["core", "query-ast", "tooling", "orm", "runtime", "family"]`.
+The query AST lives in its own package, below all consumers. This prevents coupling the AST to ORM or builder concerns. The Mongo layer order becomes: `["core", "query", "tooling", "lanes", "orm", "runtime", "family"]`.
+
+The layer is named `query` (not `query-ast`) so that other query-representation packages can live alongside the AST in the same layer if needed.
 
 **Why not `mongo-core`?** That package is already a grab-bag of commands, values, codecs, contract types, validation, wire commands, plan types, param refs, driver types, and codec registry. The SQL precedent is clear: the query AST lives in `relational-core` (`@prisma-next/sql-relational-core`) at the lanes layer, not in `sql-core`.
 
 **Why `query-ast` and not `pipeline`?** "Pipeline" is overloaded in this codebase — MongoDB aggregation pipeline, runtime middleware pipeline, emission pipeline. "Query AST" describes what the package contains without ambiguity.
 
 **Import direction:** `mongo-query-ast` imports from `mongo-core` (for `MongoValue`, `MongoParamRef`). Consumers (`mongo-orm`, future pipeline builder, `mongo-adapter`) import from `mongo-query-ast`.
+
+**Layering:** See [mongo-family-layering.md](./mongo-family-layering.md) for the full layer design.
 
 ## Module organization
 
@@ -733,7 +737,7 @@ The hidden abstract bases (`MongoFilterExpression`, `MongoStageNode`) live in th
 
 | Aspect | SQL (`relational-core`) | Mongo (`mongo-query-ast`) |
 |---|---|---|
-| Package layer | Lanes (`4-lanes/relational-core`) | `query-ast` (`2-query-ast/`) — below consumers |
+| Package layer | Lanes (`4-lanes/relational-core`) | `query` (`2-query/query-ast/`) — below consumers |
 | Root abstract base | `AstNode` | `MongoAstNode` |
 | Expression base | `Expression` (abstract) | `MongoFilterExpression` (abstract) |
 | Statement/stage base | `QueryAst` (abstract) | `MongoStageNode` (abstract) |
