@@ -1,0 +1,21 @@
+# @prisma-next/mongo-contract-psl
+
+PSL-to-Mongo ContractIR interpreter for Prisma Next. Transforms Prisma Schema Language (`.prisma`) files into Mongo `ContractIR`, enabling contract-first development with MongoDB.
+
+## Responsibilities
+
+- **PSL interpretation**: `interpretPslDocumentToMongoContractIR()` maps a parsed PSL document to a Mongo `ContractIR` — scalar types, collection/field naming, `@id`/`@map`/`@@map` attributes, and N:1/1:N reference relations with backrelation disambiguation
+- **Scalar type mapping**: `createMongoScalarTypeDescriptors()` provides the default PSL-type → Mongo codec ID mapping (e.g. `String` → `mongo/string@1`, `ObjectId` → `mongo/objectId@1`)
+- **Contract provider**: `mongoContract()` (exported from `./provider`) integrates with the CLI's `prisma-next contract emit` command, reading a `.prisma` schema file and producing a `ContractConfig`
+- **Diagnostics**: Emits structured diagnostics for unsupported field types (`PSL_UNSUPPORTED_FIELD_TYPE`), missing `@id` fields (`PSL_MISSING_ID_FIELD`), orphaned backrelations (`PSL_ORPHANED_BACKRELATION`), and ambiguous backrelations (`PSL_AMBIGUOUS_BACKRELATION`)
+
+## Dependencies
+
+- **Depends on**:
+  - `@prisma-next/psl-parser` (PSL AST types and parser)
+  - `@prisma-next/contract` (domain types: `DomainField`, `DomainReferenceRelation`, `ContractIR`)
+  - `@prisma-next/config` (contract source types: `ContractConfig`, `ContractSourceDiagnostic`)
+  - `@prisma-next/utils` (result types)
+- **Depended on by**:
+  - `@prisma-next/family-mongo` (control stack composition)
+  - `examples/mongo-demo` (via `prisma-next.config.ts`)
