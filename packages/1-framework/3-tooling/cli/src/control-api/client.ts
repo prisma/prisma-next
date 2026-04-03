@@ -1,4 +1,5 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import { emit as emitContract } from '@prisma-next/core-control-plane/emission';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlDriverInstance,
@@ -568,7 +569,7 @@ class ControlClientImpl implements ControlClient {
         });
       }
 
-      const emitResult = await this.familyInstance.emitContract({ contract: enrichedIR });
+      const result = await emitContract(enrichedIR, this.stack!, this.options.family.hook);
 
       onProgress?.({
         action: 'emit',
@@ -578,11 +579,11 @@ class ControlClientImpl implements ControlClient {
       });
 
       return ok({
-        storageHash: emitResult.storageHash,
-        ...ifDefined('executionHash', emitResult.executionHash),
-        profileHash: emitResult.profileHash,
-        contractJson: emitResult.contractJson,
-        contractDts: emitResult.contractDts,
+        storageHash: result.storageHash,
+        ...ifDefined('executionHash', result.executionHash),
+        profileHash: result.profileHash,
+        contractJson: result.contractJson,
+        contractDts: result.contractDts,
       });
     } catch (error) {
       onProgress?.({

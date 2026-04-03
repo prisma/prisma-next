@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
+import { emit } from '@prisma-next/core-control-plane/emission';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -153,8 +154,8 @@ export async function executeContractEmit(
   );
   const enrichedIR = enrichContract(providerResult.value as Contract, frameworkComponents);
 
-  // Emit contract via family instance
-  const emitResult = await unlessAborted(familyInstance.emitContract({ contract: enrichedIR }));
+  familyInstance.validateContract(enrichedIR);
+  const emitResult = await unlessAborted(emit(enrichedIR, stack, config.family.hook));
 
   // Create directory if needed and write files (both colocated)
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
