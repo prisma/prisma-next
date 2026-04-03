@@ -124,22 +124,47 @@ Removes the backward-compatibility shim from `validateContract()` and old fields
 - **4.7** ✅ Update all remaining test fixtures and type tests to reflect the clean types.
 - **4.8** ✅ Run full test suite and typecheck.
 
-### Milestone 5: Unified contract representation (ADR 179)
+### Milestone 5: Unified contract representation (ADR 182)
 
 Replaces `ContractIR`, `SqlSemanticContractDefinition`, and `ContractBase` with a single `Contract<Storage, ModelStorage>` type — model-first, family-parameterized, and structurally identical before and after serialization. See [ADR 182](../../docs/architecture%20docs/adrs/ADR%20182%20-%20Unified%20contract%20representation.md). The top-level `relations` and `mappings` sections were already removed in M4; this milestone eliminates the remaining storage-first layout of `ContractIR` and the reconstruction step in `ContractBase`.
 
+The work is split along the contract JSON serialization boundary into two phases:
+- **Phase A (write side):** Type bridge + authoring/emitter migration — make `SqlContract`/`MongoContract` aliases for `Contract<S,M>`, update authoring surfaces and the emitter to produce `Contract` directly, eliminate `ContractIR` and `SqlSemanticContractDefinition`.
+- **Phase B (read side):** Runtime consumer migration — wire SQL validation through framework `validateContract`, update runtime consumers (execution context, query builder, ORM) to accept `Contract` instead of `ContractBase`, remove `ContractBase`.
+
+The contract JSON format does not change between phases — it's already in the ADR 172 shape from M1–M4. Both phases are updating TypeScript types on their respective sides of the serialization boundary.
+
 **Tasks:**
 
+#### Foundation (complete)
+
 - **5.1** ✅ Audit current `ContractIR` structure vs the unified contract type. Document the remaining structural gaps (IR is still storage-first with tables as the primary key; the unified type is model-first). — Documented in [5.2 plan](plans/5.2-unified-contract-type-plan.md) § Structural audit.
-- **5.2** ✅ (partial) Define `Contract<Storage, ModelStorage>`, `StorageBase`, and `ContractModel<ModelStorage>` in the framework contract package. Renamed `Domain*` → `Contract*` with backward aliases, defined `Contract<TStorage, TModels>` in new `contract-types.ts`, `StorageBase<THash>` in `types.ts`, updated `ExecutionSection` with optional `executionHash`. Type-level tests proving literal preservation, generic storage, and framework consumer compatibility. **Deferred:** Making `SqlStorage`/`MongoStorage` extend `StorageBase`, redefining `SqlContract`/`MongoContract` as `Contract<S, M>`, and `MongoModelDefinition` → `ContractModel<MongoModelStorage>` — these require mechanical consumer/fixture migration (~30+ files). See [5.2 plan § Deferred](plans/5.2-unified-contract-type-plan.md).
-- **5.3** Update the emitter (`emit.ts`) to accept and serialize `Contract` instead of `ContractIR`. Remove translation logic that was bridging the storage-first IR to the model-first JSON.
-- **5.4** Update all contract construction sites: PSL interpreter and staged DSL lower directly to `Contract<SqlStorage, SqlModelStorage>`, eliminating `SqlSemanticContractDefinition` as an intermediate.
-- **5.5** Populate `roots` in the SQL contract authoring layer. Currently the SQL contract builder hardcodes `roots: {}` and the SQL PSL interpreter omits it entirely. Derive root entries from models (e.g. `User` → `users: 'User'`) in both the chain builder and the staged DSL, matching how the Mongo stack already handles roots. Update the SQL ORM client to read collection accessors from `contract.roots` instead of deriving them from storage table names.
-- **5.6** ✅ Move `validateContract` to the framework layer with two-pass validation: framework-owned domain validation (`validateContractDomain()`) followed by a family-provided `StorageValidator`. Strips JSON persistence fields (`schemaVersion`, `sources`). Exported via `@prisma-next/contract/validate-contract`. **Deferred:** Wiring SQL `validateContract` through framework's `validateContract` (refactoring existing SQL validate.ts).
-- **5.7** Remove `ContractIR`, `ContractBase`, and `SqlSemanticContractDefinition`. Remove `DomainModel` if fully superseded by `ContractModel<ModelStorage>`.
+- **5.2** ✅ (partial) Define `Contract<TStorage, TModels>`, `StorageBase`, and `ContractModel<TModelStorage>` in the framework contract package. Renamed `Domain*` → `Contract*` with backward aliases, defined `Contract<TStorage, TModels>` in new `contract-types.ts`, `StorageBase<THash>` in `types.ts`, updated `ExecutionSection` with required `executionHash`. Framework-level `validateContract` with three-pass validation (arktype structural, domain, storage). Type-level and runtime tests. See [5.2 plan](plans/5.2-unified-contract-type-plan.md).
+- **5.6** ✅ Define framework-level `validateContract` with three-pass validation: arktype structural validation, framework-owned domain validation (`validateContractDomain()`), and family-provided `StorageValidator`. Strips JSON persistence fields (`schemaVersion`, `sources`). Exported via `@prisma-next/contract/validate-contract`.
+
+#### Phase A: Write side — type bridge + authoring/emitter migration
+
+Type bridge: make `SqlContract`/`MongoContract` aliases for `Contract<S,M>` so the emitted `contract.d.ts` automatically satisfies the new `Contract` interface. Then update the authoring pipeline and emitter to produce `Contract` directly, eliminating `ContractIR`.
+
+- **5.A1** Make `SqlStorage` extend `StorageBase` (add `storageHash` to SQL storage blocks). Make `MongoStorage` extend `StorageBase`. Redefine `SqlContract<S, M>` = `Contract<S, M>` and `MongoContract<S, M>` = `Contract<S, M>`. Make `MongoModelDefinition` a type alias for `ContractModel<MongoModelStorage>`. Migrate `contract.storageHash` → `contract.storage.storageHash` across all consumer and fixture sites. This is the mechanical type bridge (~30+ files) that enables both phases.
+- **5.A2** Update the emitter (`emit.ts`) to accept and serialize `Contract` instead of `ContractIR`. Remove translation logic that was bridging the storage-first IR to the model-first JSON. (Previously 5.3.)
+- **5.A3** Update all contract construction sites: PSL interpreter and staged DSL lower directly to `Contract<SqlStorage, SqlModelStorage>`, eliminating `SqlSemanticContractDefinition` as an intermediate. (Previously 5.4.)
+- **5.A4** Populate `roots` in the SQL contract authoring layer. Currently the SQL contract builder hardcodes `roots: {}` and the SQL PSL interpreter omits it entirely. Derive root entries from models (e.g. `User` → `users: 'User'`) in both the chain builder and the staged DSL, matching how the Mongo stack already handles roots. (Previously 5.5.)
+- **5.A5** Remove `ContractIR` and `SqlSemanticContractDefinition`. Remove deprecated `Domain*` type aliases if no consumers remain. (Write-side portion of previously 5.7.)
+- **5.A6** Update all authoring/emitter tests, fixtures, and type tests. Run full test suite and typecheck.
+
+#### Phase B: Read side — runtime consumer migration
+
+Wire SQL validation through the framework's `validateContract`, update runtime consumers to accept `Contract` instead of `ContractBase`, and remove `ContractBase`.
+
+- **5.B1** Wire SQL `validateContract` through the framework's `validateContract` with a SQL-specific `StorageValidator`. Refactor existing SQL `validate.ts`. (Deferred from 5.6.)
+- **5.B2** Update runtime consumers (execution context, query builder, ORM client, adapters) to accept `Contract` instead of `ContractBase`/`SqlContract`. The ORM client read from `contract.roots` instead of deriving collection accessors from storage table names.
+- **5.B3** Remove `ContractBase`. Remove remaining deprecated `Domain*` type aliases. (Read-side portion of previously 5.7.)
+- **5.B4** Update all runtime tests, fixtures, and type tests. Run full test suite and typecheck.
+
+#### Orthogonal tasks (can run in parallel with Phase A/B)
+
 - **5.8** Complete the control flow inversion for descriptor assembly. Tasks 3.9 and 3.10 extract assembly to the framework, rename to `createControlStack()` / `createExecutionStack()`, and build the Mongo family using the inverted pattern; this task migrates the SQL family to the same pattern. The framework orchestration layer (`ControlClient`, CLI `executeContractEmit`) calls `createControlStack()` and `emit()` directly — family instances no longer own emission. `ControlFamilyDescriptor.create()` receives the `ControlStack`. Move the SQL family package from `packages/2-sql/3-tooling/family/` to `packages/2-sql/9-family/` (layer 9, top of the import hierarchy). Update runtime assembly if applicable. See [detailed plan](plans/5.8-control-flow-inversion-plan.md).
-- **5.9** Update all tests, fixtures, and type tests for the unified contract type.
-- **5.10** Run full test suite and typecheck.
 - **5.11** Complete `@prisma-next/framework-components` extraction and introduce foundation layer. Task 3.10 creates the package with component types, assembly, and stack creation; task 3.12 absorbs execution-plane types and migrates `@prisma-next/contract/framework-components` consumers. This task finishes the extraction: move emission SPI types (`TypesImportSpec`, `RenderTypeContext`, `TargetFamilyHook`, etc.), authoring contribution types, and `checkContractComponentRequirements()` from `@prisma-next/contract` to `@prisma-next/framework-components`. Remove any remaining backward-compat re-exports (shim packages from 3.10, `core-execution-plane` shim from 3.12, `core-control-plane` shim from 3.13). Introduce a `foundation` layer below `core`; move `utils`, `plan`, and `contract` to `0-foundation/shared/` — making the contract a true leaf with zero framework-domain dependencies. See [detailed plan](plans/5.11-extract-framework-components-package-plan.md).
 
 ### Milestone 6: SQL emitter migration to shared generation
@@ -205,7 +230,13 @@ Migrates the SQL emitter hook onto the shared domain-level generation utilities 
 | Top-level `relations` removed (M4)                                                                                    | Type test + CI     | 4.2, 4.7       | Compile-time verification                                               |
 | Old field shape removed (M4)                                                                                          | Type test + CI     | 4.3, 4.7       | Compile-time verification                                               |
 | `contract.d.ts` reflects final shape (M4)                                                                             | Unit               | 4.4            | Emitter generation tests                                                |
-| `ContractIR` mirrors emitted JSON (M5)                                                                                | Unit + Integration | 5.5            | IR tests                                                                |
+| `SqlContract`/`MongoContract` are aliases for `Contract<S,M>` (M5)                                                    | Type test          | 5.A1           | Type-level assertions; all consumer tests pass                          |
+| Emitter accepts `Contract` instead of `ContractIR` (M5)                                                               | Unit + Regression  | 5.A2           | Emitter tests; emitted JSON unchanged                                   |
+| Authoring surfaces produce `Contract` directly (M5)                                                                    | Unit               | 5.A3           | Authoring tests; contract output unchanged                              |
+| `ContractIR` and `SqlSemanticContractDefinition` removed (M5)                                                          | CI                 | 5.A5           | Compile-time verification; no remaining imports                         |
+| SQL validation wired through framework `validateContract` (M5)                                                         | Unit               | 5.B1           | Validation tests                                                        |
+| Runtime consumers accept `Contract` (M5)                                                                               | Unit + Integration | 5.B2           | Runtime test suites pass                                                |
+| `ContractBase` removed (M5)                                                                                           | CI                 | 5.B3           | Compile-time verification; no remaining imports                         |
 | SQL hook uses shared domain-level generation (M6)                                                                     | Unit + Regression  | 6.3.1–6.3.3    | Byte-identical `.d.ts` output; updated hook unit tests                  |
 | `TargetFamilyHook` interface narrowed (M6)                                                                            | Interface test     | 6.2.1–6.2.2    | Both hooks conform to narrowed interface                                |
 | Framework-components extracted; contract is a leaf with zero framework-domain deps (M5)                               | Lint + CI          | 5.11           | `pnpm lint:deps` clean; `pnpm typecheck`; `pnpm test:packages` pass    |
