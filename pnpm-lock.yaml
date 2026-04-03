@@ -2334,6 +2334,9 @@ importers:
 
   test/integration/test/fixtures/cli/cli-integration-test-app:
     dependencies:
+      '@prisma-next/adapter-mongo':
+        specifier: workspace:*
+        version: link:../../../../../../packages/3-mongo-target/2-mongo-adapter
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../../../../../../packages/3-targets/6-adapters/postgres
@@ -2346,9 +2349,15 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../../../../../packages/3-targets/7-drivers/postgres
+      '@prisma-next/family-mongo':
+        specifier: workspace:*
+        version: link:../../../../../../packages/2-mongo-family/9-family
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../../../../packages/2-sql/3-tooling/family
+      '@prisma-next/mongo-contract-psl':
+        specifier: workspace:*
+        version: link:../../../../../../packages/2-mongo-family/2-authoring/contract-psl
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../../../../packages/2-sql/2-authoring/contract-ts

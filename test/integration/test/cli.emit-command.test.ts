@@ -649,4 +649,100 @@ describe('emit command', () => {
       }
     },
   );
+
+  it(
+    'emits contract.json and contract.d.ts with Mongo config',
+    { timeout: timeouts.typeScriptCompilation },
+    async () => {
+      const command = createContractEmitCommand();
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(
+        fixtureSubdir,
+        'prisma-next.config.mongo.ts',
+      );
+      const testDirMongo = testSetup.testDir;
+      const outputDirMongo = testSetup.outputDir;
+      const cleanupMongo = testSetup.cleanup;
+
+      try {
+        writeFileSync(
+          join(testDirMongo, 'contract.prisma'),
+          `model User {
+  id    ObjectId @id @map("_id")
+  name  String
+  email String
+  posts Post[]
+  @@map("users")
+}
+
+model Post {
+  id        ObjectId @id @map("_id")
+  title     String
+  authorId  ObjectId
+  author    User @relation(fields: [authorId], references: [id])
+  @@map("posts")
+}
+`,
+          'utf-8',
+        );
+
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDirMongo);
+          const exitCode = await executeCommand(command, [
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).toBe(0);
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        const contractJsonPath = join(outputDirMongo, 'contract.json');
+        const contractDtsPath = join(outputDirMongo, 'contract.d.ts');
+
+        expect(existsSync(contractJsonPath)).toBe(true);
+        expect(existsSync(contractDtsPath)).toBe(true);
+
+        const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        expect(contractJson).toMatchObject({
+          targetFamily: 'mongo',
+          target: 'mongo',
+          models: {
+            User: expect.objectContaining({
+              fields: expect.objectContaining({
+                _id: { codecId: 'mongo/objectId@1', nullable: false },
+                name: { codecId: 'mongo/string@1', nullable: false },
+              }),
+            }),
+            Post: expect.objectContaining({
+              relations: expect.objectContaining({
+                author: expect.objectContaining({
+                  to: 'User',
+                  cardinality: 'N:1',
+                }),
+              }),
+            }),
+          },
+        });
+
+        const contractDts = readFileSync(contractDtsPath, 'utf-8');
+        expect(contractDts).toContain('export type Contract');
+        expect(contractDts).toContain('CodecTypes');
+
+        const jsonOutput = consoleOutput.join('\n');
+        const parsed = JSON.parse(jsonOutput);
+        expect(parsed).toMatchObject({
+          ok: true,
+          storageHash: expect.stringMatching(/^sha256:/),
+          files: {
+            json: expect.stringContaining('contract.json'),
+            dts: expect.stringContaining('contract.d.ts'),
+          },
+        });
+      } finally {
+        cleanupMongo();
+      }
+    },
+  );
 });
