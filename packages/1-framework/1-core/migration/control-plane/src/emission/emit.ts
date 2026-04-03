@@ -1,9 +1,8 @@
-import {
-  bigintJsonReplacer,
-  type Contract,
-  type TargetFamilyHook,
-  type ValidationContext,
-} from '@prisma-next/contract/types';
+import { bigintJsonReplacer, type Contract } from '@prisma-next/contract/types';
+import type {
+  TargetFamilyHook,
+  ValidationContext,
+} from '@prisma-next/framework-components/emission';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { format } from 'prettier';

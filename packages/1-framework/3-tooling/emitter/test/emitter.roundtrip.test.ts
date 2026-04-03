@@ -1,10 +1,11 @@
+import type { Contract } from '@prisma-next/contract/types';
+import type { EmitOptions } from '@prisma-next/core-control-plane/emission';
+import { emit } from '@prisma-next/core-control-plane/emission';
 import type {
   TargetFamilyHook,
   TypesImportSpec,
   ValidationContext,
-} from '@prisma-next/contract/types';
-import type { EmitOptions } from '@prisma-next/core-control-plane/emission';
-import { emit } from '@prisma-next/core-control-plane/emission';
+} from '@prisma-next/framework-components/emission';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';

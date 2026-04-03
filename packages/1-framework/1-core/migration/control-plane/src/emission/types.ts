@@ -1,4 +1,4 @@
-import type { TypeRenderEntry, TypesImportSpec } from '@prisma-next/contract/types';
+import type { TypeRenderEntry, TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { OperationRegistry } from '@prisma-next/operations';
 
 export interface EmitOptions {
