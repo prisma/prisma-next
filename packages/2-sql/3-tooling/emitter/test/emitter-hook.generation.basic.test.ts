@@ -1,4 +1,4 @@
-import type { Contract, ExecutionHashBase, TypeRenderEntry } from '@prisma-next/contract/types';
+import type { Contract, ExecutionHashBase } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
@@ -8,6 +8,7 @@ import {
   extractCodecTypeImports,
   extractOperationTypeImports,
 } from '@prisma-next/framework-components/control';
+import type { TypeRenderEntry } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 

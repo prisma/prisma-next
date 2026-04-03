@@ -1,6 +1,10 @@
 import { createSqlContract } from '@prisma-next/contract/testing';
-import type { TypeRenderEntry, TypeRenderer, TypesImportSpec } from '@prisma-next/contract/types';
 import type { TargetDescriptor } from '@prisma-next/framework-components/components';
+import type {
+  TypeRenderEntry,
+  TypeRenderer,
+  TypesImportSpec,
+} from '@prisma-next/framework-components/emission';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';

@@ -1,4 +1,4 @@
-import type { Contract, ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
@@ -22,6 +22,7 @@ import {
   extractParameterizedTypeImports,
   extractQueryOperationTypeImports,
 } from '@prisma-next/framework-components/control';
+import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';

@@ -1,4 +1,5 @@
-import type { Contract, TypeRenderEntry } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { TypeRenderEntry } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 
