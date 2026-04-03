@@ -1,6 +1,5 @@
 export type {
   AssembledAuthoringContributions,
-  AssemblyInput,
   ControlStack,
   CreateControlStackInput,
 } from '../control-stack';

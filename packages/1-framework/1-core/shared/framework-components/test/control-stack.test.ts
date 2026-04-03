@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type AssemblyInput,
   assembleAuthoringContributions,
   createControlStack,
   extractCodecTypeImports,
@@ -10,12 +9,19 @@ import {
   extractParameterizedTypeImports,
   extractQueryOperationTypeImports,
 } from '../src/control-stack';
+import type { ComponentDescriptor } from '../src/framework-components';
 
-function createDescriptor(overrides: Partial<AssemblyInput> = {}): AssemblyInput {
+function createDescriptor<K extends string = 'target'>(
+  overrides: Partial<ComponentDescriptor<string>> & { kind?: K } = {} as Partial<
+    ComponentDescriptor<string>
+  > & { kind?: K },
+): ComponentDescriptor<K> {
   return {
+    kind: 'target' as K,
     id: 'test',
+    version: '0.0.1',
     ...overrides,
-  };
+  } as ComponentDescriptor<K>;
 }
 
 describe('extractCodecTypeImports', () => {
@@ -371,8 +377,9 @@ describe('assembleAuthoringContributions', () => {
 describe('createControlStack', () => {
   it('assembles all component state from family + target + adapter + extensions', () => {
     const state = createControlStack({
-      family: createDescriptor({ id: 'sql' }),
+      family: createDescriptor({ kind: 'family', id: 'sql' }),
       target: createDescriptor({
+        kind: 'target',
         id: 'target',
         types: {
           codecTypes: {
@@ -381,6 +388,7 @@ describe('createControlStack', () => {
         },
       }),
       adapter: createDescriptor({
+        kind: 'adapter',
         id: 'adapter',
         types: {
           codecTypes: {
@@ -417,18 +425,22 @@ describe('createControlStack', () => {
 
   it('preserves ID ordering: family, target, adapter, extensions', () => {
     const state = createControlStack({
-      family: createDescriptor({ id: 'fam' }),
-      target: createDescriptor({ id: 'tgt' }),
-      adapter: createDescriptor({ id: 'adp' }),
-      extensionPacks: [createDescriptor({ id: 'ext1' }), createDescriptor({ id: 'ext2' })],
+      family: createDescriptor({ kind: 'family', id: 'fam' }),
+      target: createDescriptor({ kind: 'target', id: 'tgt' }),
+      adapter: createDescriptor({ kind: 'adapter', id: 'adp' }),
+      extensionPacks: [
+        createDescriptor({ kind: 'extension', id: 'ext1' }),
+        createDescriptor({ kind: 'extension', id: 'ext2' }),
+      ],
     });
     expect(state.extensionIds).toEqual(['fam', 'tgt', 'adp', 'ext1', 'ext2']);
   });
 
   it('works with family + target only (Mongo case)', () => {
     const state = createControlStack({
-      family: createDescriptor({ id: 'mongo' }),
+      family: createDescriptor({ kind: 'family', id: 'mongo' }),
       target: createDescriptor({
+        kind: 'target',
         id: 'mongo',
         types: {
           codecTypes: {
@@ -450,8 +462,8 @@ describe('createControlStack', () => {
 
   it('returns empty state when descriptors have no types', () => {
     const state = createControlStack({
-      family: createDescriptor({ id: 'fam' }),
-      target: createDescriptor({ id: 'tgt' }),
+      family: createDescriptor({ kind: 'family', id: 'fam' }),
+      target: createDescriptor({ kind: 'target', id: 'tgt' }),
     });
     expect(state.codecTypeImports).toEqual([]);
     expect(state.operationTypeImports).toEqual([]);
