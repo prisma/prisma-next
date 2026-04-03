@@ -5,7 +5,7 @@ import type {
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
 } from './framework-authoring';
-import type { ComponentDescriptor } from './framework-components';
+import type { ComponentDescriptor, ComponentMetadata } from './framework-components';
 import type { NormalizedTypeRenderer, TypeRenderer } from './type-renderers';
 import { normalizeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types';
@@ -57,7 +57,7 @@ export function assertUniqueCodecOwner(options: {
 }
 
 export function extractCodecTypeImports(
-  descriptors: ReadonlyArray<ComponentDescriptor<string>>,
+  descriptors: ReadonlyArray<Pick<ComponentMetadata, 'types'>>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -75,7 +75,7 @@ export function extractCodecTypeImports(
 }
 
 export function extractOperationTypeImports(
-  descriptors: ReadonlyArray<ComponentDescriptor<string>>,
+  descriptors: ReadonlyArray<Pick<ComponentMetadata, 'types'>>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -90,7 +90,7 @@ export function extractOperationTypeImports(
 }
 
 export function extractQueryOperationTypeImports(
-  descriptors: ReadonlyArray<ComponentDescriptor<string>>,
+  descriptors: ReadonlyArray<Pick<ComponentMetadata, 'types'>>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -127,7 +127,7 @@ export function extractComponentIds(
 }
 
 export function extractParameterizedRenderers(
-  descriptors: ReadonlyArray<ComponentDescriptor<string>>,
+  descriptors: ReadonlyArray<Pick<ComponentMetadata, 'types'> & { readonly id: string }>,
 ): Map<string, NormalizedTypeRenderer> {
   const renderers = new Map<string, NormalizedTypeRenderer>();
   const owners = new Map<string, string>();
@@ -154,7 +154,7 @@ export function extractParameterizedRenderers(
 }
 
 export function extractParameterizedTypeImports(
-  descriptors: ReadonlyArray<ComponentDescriptor<string>>,
+  descriptors: ReadonlyArray<Pick<ComponentMetadata, 'types'>>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
