@@ -36,10 +36,11 @@
     "node": ">=20"
   },
   "exports": {
+    "./hashing": "./dist/hashing.mjs",
     "./ir": "./dist/ir.mjs",
     "./types": "./dist/types.mjs",
-    "./validate-domain": "./dist/validate-domain.mjs",
     "./validate-contract": "./dist/validate-contract.mjs",
+    "./validate-domain": "./dist/validate-domain.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
