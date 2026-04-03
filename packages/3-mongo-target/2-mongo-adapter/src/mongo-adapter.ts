@@ -10,6 +10,7 @@ import type {
   MongoValue,
 } from '@prisma-next/mongo-core';
 import {
+  AggregateCommand,
   AggregateWireCommand,
   DeleteOneWireCommand,
   FindWireCommand,
@@ -17,6 +18,8 @@ import {
   MongoParamRef,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
+import type { MongoReadPlan } from '@prisma-next/mongo-query-ast';
+import { lowerPipeline } from '@prisma-next/mongo-query-ast';
 
 class MongoAdapterImpl implements MongoAdapter {
   lower<Row>(
@@ -102,4 +105,15 @@ class MongoAdapterImpl implements MongoAdapter {
 
 export function createMongoAdapter(): MongoAdapter {
   return new MongoAdapterImpl();
+}
+
+export function lowerReadPlan<Row>(plan: MongoReadPlan<Row>): MongoExecutionPlan<Row> {
+  const loweredPipeline = lowerPipeline(plan.stages);
+  const wireCommand = new AggregateWireCommand(plan.collection, loweredPipeline);
+  const command = new AggregateCommand(plan.collection, loweredPipeline);
+  return Object.freeze({
+    wireCommand,
+    command,
+    meta: plan.meta,
+  });
 }
