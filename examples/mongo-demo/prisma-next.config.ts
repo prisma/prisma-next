@@ -7,7 +7,7 @@ export default defineConfig({
   family: mongoFamilyDescriptor,
   target: mongoTargetDescriptor,
   adapter: mongoAdapter,
-  contract: mongoContract('./prisma/schema.psl', {
+  contract: mongoContract('./prisma/contract.prisma', {
     output: 'src/contract.json',
   }),
 });
