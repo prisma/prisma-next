@@ -1,7 +1,7 @@
-import type { TargetDescriptor } from '@prisma-next/framework-components/components';
+import type { ControlTargetDescriptor } from '@prisma-next/framework-components/control';
 import mongoTargetDescriptorMeta from '@prisma-next/target-mongo/pack';
 
-export const mongoTargetDescriptor = {
+export const mongoTargetDescriptor: ControlTargetDescriptor<'mongo', 'mongo'> = {
   ...mongoTargetDescriptorMeta,
   types: {
     codecTypes: {
@@ -12,4 +12,7 @@ export const mongoTargetDescriptor = {
       },
     },
   },
-} as const satisfies TargetDescriptor<'mongo', 'mongo'>;
+  create() {
+    return { familyId: 'mongo' as const, targetId: 'mongo' as const };
+  },
+};

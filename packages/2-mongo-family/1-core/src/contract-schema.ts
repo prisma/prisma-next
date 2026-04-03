@@ -70,6 +70,7 @@ export const MongoContractSchema = type({
   'capabilities?': 'Record<string, unknown>',
   'extensionPacks?': 'Record<string, unknown>',
   'meta?': 'Record<string, unknown>',
+  'sources?': 'Record<string, unknown>',
   '_generated?': 'Record<string, unknown>',
   storage: type({
     '+': 'reject',
