@@ -29,7 +29,7 @@ export type ContractVariantEntry = {
   readonly value: string;
 };
 
-export type ModelStorageBase = Record<string, unknown>;
+export type ModelStorageBase = Readonly<Record<string, unknown>>;
 
 export interface ContractModel<TModelStorage extends ModelStorageBase = ModelStorageBase> {
   readonly fields: Record<string, ContractField>;
