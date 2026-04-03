@@ -1,23 +1,11 @@
-import type { ControlStack } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
 import { mongoTargetDescriptor } from '../src/core/mongo-target-descriptor';
 
-function createMinimalControlStack(): ControlStack {
-  return {
-    family: mongoFamilyDescriptor,
-    target: mongoTargetDescriptor,
-    extensionPacks: [],
-    codecTypeImports: [],
-    operationTypeImports: [],
-    queryOperationTypeImports: [],
-    extensionIds: ['mongo', 'mongo'],
-    parameterizedRenderers: new Map(),
-    parameterizedTypeImports: [],
-    authoringContributions: { type: {}, field: {} },
-  };
+function createMinimalControlStack() {
+  return createControlStack({ family: mongoFamilyDescriptor, target: mongoTargetDescriptor });
 }
 
 describe('mongoFamilyDescriptor', () => {
