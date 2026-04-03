@@ -1,4 +1,13 @@
+export type { Contract } from '../contract-types';
 export type {
+  ContractDiscriminator,
+  ContractEmbedRelation,
+  ContractField,
+  ContractModel,
+  ContractReferenceRelation,
+  ContractRelation,
+  ContractRelationOn,
+  ContractVariantEntry,
   DomainDiscriminator,
   DomainEmbedRelation,
   DomainField,
@@ -8,6 +17,7 @@ export type {
   DomainRelationOn,
   DomainVariantEntry,
   EmbedRelationKeys,
+  ModelStorageBase,
   ReferenceRelationKeys,
 } from '../domain-types';
 export type {
@@ -41,6 +51,7 @@ export type {
   RenderTypeContext,
   ResultType,
   Source,
+  StorageBase,
   StorageHashBase,
   TaggedBigInt,
   TaggedLiteralValue,
