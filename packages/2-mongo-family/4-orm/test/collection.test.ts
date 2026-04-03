@@ -43,7 +43,16 @@ const minimalContract = {
           cardinality: 'N:1',
           on: { localFields: ['authorId'], targetFields: ['_id'] },
         },
+        comments: {
+          kind: 'embed',
+          to: 'Comment',
+          cardinality: '1:N',
+        },
       },
+    },
+    Comment: {
+      fields: { text: { codecId: 'mongo/string@1' } },
+      storage: {},
     },
   },
   roots: { users: 'User', posts: 'Post' },
@@ -177,6 +186,12 @@ describe('MongoCollection include()', () => {
     const executor = createMockExecutor();
     const col = new MongoCollection(minimalContract, 'User', executor);
     expect(() => col.include('nonexistent')).toThrow('Unknown relation');
+  });
+
+  it('throws for embed relation', () => {
+    const executor = createMockExecutor();
+    const col = new MongoCollection(minimalContract, 'Post', executor);
+    expect(() => col.include('comments')).toThrow('embed relation');
   });
 });
 

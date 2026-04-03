@@ -1,4 +1,4 @@
-import type { DomainReferenceRelation } from '@prisma-next/contract/types';
+import type { ContractReferenceRelation } from '@prisma-next/contract/types';
 import type {
   ExtractMongoCodecTypes,
   InferModelRow,
@@ -21,7 +21,7 @@ export type ReferenceRelationKeys<
   [K in keyof ModelRelations<TContract, ModelName>]: ModelRelations<
     TContract,
     ModelName
-  >[K] extends DomainReferenceRelation
+  >[K] extends ContractReferenceRelation
     ? K
     : never;
 }[keyof ModelRelations<TContract, ModelName>];
@@ -33,7 +33,7 @@ export type EmbedRelationKeys<
   [K in keyof ModelRelations<TContract, ModelName>]: ModelRelations<
     TContract,
     ModelName
-  >[K] extends DomainReferenceRelation
+  >[K] extends ContractReferenceRelation
     ? never
     : K;
 }[keyof ModelRelations<TContract, ModelName>];
@@ -46,7 +46,7 @@ type EmbedRelationRowType<
   readonly to: infer To extends string & keyof TContract['models'];
   readonly cardinality: infer C;
 }
-  ? ModelRelations<TContract, ModelName>[RelKey] extends DomainReferenceRelation
+  ? ModelRelations<TContract, ModelName>[RelKey] extends ContractReferenceRelation
     ? never
     : C extends '1:N'
       ? InferModelRow<TContract, To>[]
@@ -92,7 +92,7 @@ type IncludeRelationRowType<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
   RelKey extends keyof ModelRelations<TContract, ModelName>,
-> = ModelRelations<TContract, ModelName>[RelKey] extends DomainReferenceRelation
+> = ModelRelations<TContract, ModelName>[RelKey] extends ContractReferenceRelation
   ? ModelRelations<TContract, ModelName>[RelKey] extends {
       readonly to: infer To extends string & keyof TContract['models'];
       readonly cardinality: infer C;

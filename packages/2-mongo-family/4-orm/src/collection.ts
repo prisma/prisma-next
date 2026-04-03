@@ -1,4 +1,4 @@
-import type { DomainReferenceRelation } from '@prisma-next/contract/types';
+import type { ContractReferenceRelation } from '@prisma-next/contract/types';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -62,7 +62,13 @@ export class MongoCollection<
       throw new Error(`Unknown relation "${relationName}" on model "${this.#modelName as string}"`);
     }
 
-    const ref = relation as DomainReferenceRelation;
+    if (!('on' in relation)) {
+      throw new Error(
+        `Relation "${relationName}" is an embed relation — only reference relations can be included`,
+      );
+    }
+
+    const ref = relation as ContractReferenceRelation;
     if (ref.on.localFields.length !== 1 || ref.on.targetFields.length !== 1) {
       throw new Error(`Compound references are not yet supported: relation "${relationName}"`);
     }
