@@ -4,7 +4,7 @@
 
 Build a contract-first e-commerce data access layer using Prisma Next's MongoDB support, inspired by the [retail-store-v2](https://github.com/mongodb-industry-solutions/retail-store-v2) domain model. This is **not a literal port** — it's an equivalent application designed from the contract outward, the way a PN user would build it. The domain model (products, carts, orders, users, locations) stays the same; the data access layer is idiomatic PN.
 
-The goal is to validate that PN's Mongo implementation handles a realistic e-commerce domain: embedded documents, referenced relations, update operators, vector search, change streams, aggregation, and schema migrations — all with full type safety.
+The goal is to **prove real-world usage of Prisma Next** against a realistic e-commerce domain — embedded documents, referenced relations, update operators, vector search, change streams, aggregation, and schema migrations — all with full type safety. This is not a migration/upgrade-path validation (substituting PN for raw Mongo calls or Prisma ORM at existing call sites). We're building a greenfield PN application that happens to share a domain model with an existing MongoDB app.
 
 **Spec:** `projects/mongo-example-apps/spec.md`
 
@@ -20,20 +20,19 @@ The goal is to validate that PN's Mongo implementation handles a realistic e-com
 
 ## What we're building
 
-A typed data access layer for an e-commerce store, living at `examples/retail-store/`. It consists of:
+A working e-commerce application, living at `examples/retail-store/`. It consists of:
 
 1. **A PN contract** defining the domain model (TypeScript DSL → `contract.json` + `contract.d.ts`)
-2. **A data access module** — typed functions for every data operation (queries, mutations, aggregations) built on the PN ORM and runtime
-3. **Integration tests** proving each capability against `mongodb-memory-server`
-4. **Seed data** for demonstrations and tests
+2. **A Next.js App Router application** with a UI and API routes — a representative e-commerce experience (browse products, manage cart, place orders, view order history)
+3. **A typed data access layer** — the API routes use the PN ORM and runtime for all database operations
+4. **Integration tests** proving each PN capability against `mongodb-memory-server`
+5. **Seed data** for demonstrations and tests
 
-No UI, no API routes, no SSE bridge. The example validates the PN framework, not application infrastructure.
+The app should function broadly like the original — a user can browse products, add them to a cart, check out, and view orders. The API routes don't need to be identical to the original, but they should be a representative sample of real-world usage patterns. The UI can be simplified.
 
 ### What we're NOT building
 
-- **The Next.js app** — no frontend, no API routes, no Redux
 - **The chatbot integration** — validates Dataworkz, not PN
-- **The SSE bridge** — app-level HTTP code that stays as-is in the original
 - **Generic CRUD helpers** — the original's `findDocuments`/`insertDocument`/`updateDocument` are the anti-pattern PN replaces
 
 ---
@@ -308,40 +307,54 @@ Each feature we exercise maps to a PN capability we're validating:
 
 ## Architecture
 
+A Next.js App Router application with a clear separation between the UI, API routes, and data access layer:
+
 ```
 examples/retail-store/
 ├── package.json
+├── next.config.js
 ├── tsconfig.json
 ├── biome.jsonc
 ├── vitest.config.ts
 ├── scripts/
-│   └── generate-contract.ts     # ContractIR → emit → contract.json + contract.d.ts
+│   └── generate-contract.ts      # ContractIR → emit → contract.json + contract.d.ts
 ├── src/
-│   ├── contract.json            # generated
-│   ├── contract.d.ts            # generated
-│   ├── db.ts                    # database factory (createDb: uri, dbName → orm instance)
-│   ├── data/                    # data access functions organized by entity
-│   │   ├── products.ts          # findProducts, findProductById, searchProducts, ...
-│   │   ├── users.ts             # findUsers, findUserById
-│   │   ├── carts.ts             # getCart, addToCart, removeFromCart, clearCart, ...
-│   │   ├── orders.ts            # createOrder, getUserOrders, updateOrderStatus, ...
-│   │   ├── locations.ts         # findLocations
-│   │   ├── invoices.ts          # findInvoice
-│   │   └── events.ts            # insertEvent, aggregateEventsByType, ...
-│   └── seed.ts                  # seed data for tests and demos
+│   ├── contract.json             # generated
+│   ├── contract.d.ts             # generated
+│   ├── db.ts                     # database factory (createDb: uri, dbName → orm instance)
+│   ├── data/                     # data access layer (all PN ORM calls live here)
+│   │   ├── products.ts
+│   │   ├── users.ts
+│   │   ├── carts.ts
+│   │   ├── orders.ts
+│   │   ├── locations.ts
+│   │   ├── invoices.ts
+│   │   └── events.ts
+│   └── seed.ts                   # seed data for tests and demos
+├── app/                          # Next.js App Router
+│   ├── layout.tsx
+│   ├── page.tsx                  # product catalog / landing page
+│   ├── cart/
+│   │   └── page.tsx
+│   ├── orders/
+│   │   └── page.tsx
+│   ├── orders/[id]/
+│   │   └── page.tsx
+│   └── api/                      # API routes — representative sample
+│       ├── products/route.ts
+│       ├── cart/route.ts
+│       ├── orders/route.ts
+│       └── ...
 └── test/
     ├── products.test.ts
     ├── users.test.ts
     ├── carts.test.ts
     ├── orders.test.ts
-    ├── locations.test.ts
-    ├── invoices.test.ts
-    ├── events.test.ts
-    ├── relations.test.ts        # cross-collection $lookup tests
-    └── setup.ts                 # shared MongoMemoryReplSet setup
+    ├── relations.test.ts         # cross-collection $lookup tests
+    └── setup.ts                  # shared MongoMemoryReplSet setup
 ```
 
-This follows the `mongo-demo` pattern: `scripts/generate-contract.ts` defines the `ContractIR` and emits artifacts to `src/`. The `db.ts` factory creates the PN runtime + ORM from a connection URI. Each entity module exports typed data access functions. Tests use `mongodb-memory-server`.
+The data access layer (`src/data/`) is the boundary where PN is used — API routes call into it, never touching the MongoDB driver directly. `scripts/generate-contract.ts` defines the `ContractIR` and emits artifacts. Tests use `mongodb-memory-server`.
 
 ---
 
