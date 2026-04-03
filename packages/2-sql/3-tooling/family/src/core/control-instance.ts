@@ -12,12 +12,7 @@ import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
 } from '@prisma-next/framework-components/components';
-import {
-  extractCodecTypeImports,
-  extractComponentIds,
-  extractOperationTypeImports,
-} from '@prisma-next/framework-components/control';
-import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
@@ -29,7 +24,7 @@ import {
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { assembleOperationRegistry, type SqlControlDescriptorWithContributions } from './assembly';
+import type { SqlControlDescriptorWithContributions } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
 import type {
   SqlControlAdapterDescriptor,
@@ -210,15 +205,6 @@ export interface SqlControlFamilyInstance
 
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
-interface CreateSqlFamilyInstanceOptions<TTargetId extends string> {
-  readonly target: TargetDescriptor<'sql', TTargetId> &
-    SqlControlDescriptorWithContributions &
-    DescriptorWithStorageTypes;
-  readonly adapter: SqlControlAdapterDescriptor<TTargetId> & DescriptorWithStorageTypes;
-  readonly extensionPacks: readonly (SqlControlExtensionDescriptor<TTargetId> &
-    DescriptorWithStorageTypes)[];
-}
-
 function isSqlControlAdapter<TTargetId extends string>(
   value: unknown,
 ): value is SqlControlAdapter<TTargetId> {
@@ -280,16 +266,18 @@ function buildSqlTypeMetadataRegistry(options: {
 }
 
 export function createSqlFamilyInstance<TTargetId extends string>(
-  options: CreateSqlFamilyInstanceOptions<TTargetId>,
+  stack: ControlStack<'sql', TTargetId>,
 ): SqlFamilyInstance {
-  const { target, adapter, extensionPacks: extensions = [] } = options;
+  const target = stack.target as unknown as TargetDescriptor<'sql', TTargetId> &
+    SqlControlDescriptorWithContributions &
+    DescriptorWithStorageTypes;
+  const adapter = stack.adapter as unknown as SqlControlAdapterDescriptor<TTargetId> &
+    DescriptorWithStorageTypes;
+  const extensions =
+    stack.extensionPacks as unknown as readonly (SqlControlExtensionDescriptor<TTargetId> &
+      DescriptorWithStorageTypes)[];
 
-  const descriptors: SqlControlDescriptorWithContributions[] = [target, adapter, ...extensions];
-
-  const operationRegistry = assembleOperationRegistry(descriptors);
-  const codecTypeImports = extractCodecTypeImports(descriptors);
-  const operationTypeImports = extractOperationTypeImports(descriptors);
-  const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
+  const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } = stack;
 
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
     target,
