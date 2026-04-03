@@ -15,8 +15,7 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:*",
-    "@prisma-next/core-control-plane": "workspace:*"
+    "@prisma-next/framework-components": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",

@@ -26,9 +26,10 @@
     "src"
   ],
   "exports": {
-    "./components": "./dist/components.mjs",
     "./authoring": "./dist/authoring.mjs",
+    "./components": "./dist/components.mjs",
     "./control": "./dist/control.mjs",
+    "./execution": "./dist/execution.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
