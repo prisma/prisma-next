@@ -5,6 +5,7 @@ import type {
   ExecutionHashBase,
   ExecutionSection,
   ProfileHashBase,
+  StorageBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
@@ -111,7 +112,7 @@ export type StorageTypeInstance = {
   readonly typeParams: Record<string, unknown>;
 };
 
-export type SqlStorage = {
+export type SqlStorage<THash extends string = string> = StorageBase<THash> & {
   readonly tables: Record<string, StorageTable>;
   /**
    * Named type instances for parameterized/custom types.

@@ -1,3 +1,4 @@
+import { computeStorageHash } from '@prisma-next/contract/hashing';
 import type {
   ExecutionHashBase,
   ProfileHashBase,
@@ -110,8 +111,17 @@ export function model(
   };
 }
 
-export function storage(tables: Record<string, StorageTable>): SqlStorage {
-  return { tables };
+export function storage(
+  tables: Record<string, StorageTable>,
+  opts?: { target?: string; targetFamily?: string },
+): SqlStorage {
+  const target = opts?.target ?? 'postgres';
+  const targetFamily = opts?.targetFamily ?? 'sql';
+  const storageObj = { tables };
+  return {
+    ...storageObj,
+    storageHash: computeStorageHash({ target, targetFamily, storage: storageObj }),
+  };
 }
 
 export function contract<
