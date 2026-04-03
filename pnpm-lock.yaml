@@ -348,12 +348,9 @@ importers:
 
   packages/1-framework/1-core/runtime/execution-plane:
     dependencies:
-      '@prisma-next/contract':
+      '@prisma-next/framework-components':
         specifier: workspace:*
-        version: link:../../shared/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../migration/control-plane
+        version: link:../../shared/framework-components
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
