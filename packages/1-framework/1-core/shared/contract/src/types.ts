@@ -56,6 +56,15 @@ export function profileHash<const T extends string>(value: T): ProfileHashBase<T
   return value as ProfileHashBase<T>;
 }
 
+/**
+ * Base type for family-specific storage blocks.
+ * Family storage types (SqlStorage, MongoStorage, etc.) extend this to carry the
+ * storage hash alongside family-specific data (tables, collections, etc.).
+ */
+export interface StorageBase<THash extends string = string> {
+  readonly storageHash: StorageHashBase<THash>;
+}
+
 export interface ContractBase<
   TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
   TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
@@ -149,7 +158,8 @@ export type ExecutionMutationDefault = {
   readonly onUpdate?: ExecutionMutationDefaultValue;
 };
 
-export type ExecutionSection = {
+export type ExecutionSection<THash extends string = string> = {
+  readonly executionHash?: ExecutionHashBase<THash>;
   readonly mutations: {
     readonly defaults: ReadonlyArray<ExecutionMutationDefault>;
   };
