@@ -21,16 +21,12 @@ export type OperationTypes = Record<string, never>;
 export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>;
 
 type ContractBase = {
-  readonly schemaVersion: '1';
   readonly target: 'mongo';
   readonly targetFamily: 'mongo';
-  readonly storageHash: StorageHash;
-  readonly executionHash?: ExecutionHash;
   readonly profileHash: ProfileHash;
   readonly capabilities: {};
   readonly extensionPacks: {};
   readonly meta: {};
-  readonly sources: {};
   readonly roots: { readonly users: 'User'; readonly posts: 'Post' };
   readonly models: {
     readonly User: {
@@ -78,6 +74,7 @@ type ContractBase = {
       readonly users: Record<string, never>;
       readonly posts: Record<string, never>;
     };
+    readonly storageHash: StorageHash;
   };
 };
 

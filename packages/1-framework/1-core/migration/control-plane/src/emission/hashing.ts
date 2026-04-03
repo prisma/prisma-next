@@ -9,7 +9,7 @@ export function computeStorageHash(contract: CanonicalContractInput): string {
   return sharedComputeStorageHash({
     target: contract.target,
     targetFamily: contract.targetFamily,
-    storage: contract.storage,
+    storage: contract.storage as Record<string, unknown>,
   });
 }
 

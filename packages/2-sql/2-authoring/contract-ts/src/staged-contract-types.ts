@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, StorageHashBase } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ContractWithTypeMaps,
@@ -467,6 +467,7 @@ type StagedBuiltStorageTables<Definition> = {
 };
 
 type StagedBuiltStorage<Definition> = {
+  readonly storageHash: StorageHashBase<string>;
   readonly tables: StagedBuiltStorageTables<Definition>;
   readonly types: StagedDefinitionTypes<Definition>;
 };

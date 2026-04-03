@@ -2,7 +2,7 @@
  * Shared test helpers for schema verification tests.
  */
 
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, StorageHashBase } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import {
   applyFkDefaults,
@@ -38,7 +38,11 @@ export function createTestContract(
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'sha256:test',
-    storage: { tables, ...ifDefined('types', storageTypes) },
+    storage: {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      tables,
+      ...ifDefined('types', storageTypes),
+    },
     models: {},
     capabilities: {},
     meta: {},

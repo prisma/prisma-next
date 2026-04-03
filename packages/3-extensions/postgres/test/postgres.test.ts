@@ -73,7 +73,7 @@ const contract: SqlContract<SqlStorage> = {
   storageHash: 'sha256:test' as never,
   models: {},
   roots: {},
-  storage: { tables: {} },
+  storage: { storageHash: 'sha256:test' as never, tables: {} },
   extensionPacks: {},
   capabilities: {},
   meta: {},

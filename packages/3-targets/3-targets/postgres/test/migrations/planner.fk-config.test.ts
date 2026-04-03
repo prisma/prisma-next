@@ -17,6 +17,7 @@ function createFkTestContract(fkConfig: {
     storageHash: coreHash('sha256:contract'),
     profileHash: profileHash('sha256:profile'),
     storage: {
+      storageHash: coreHash('sha256:test'),
       tables: {
         user: {
           columns: {

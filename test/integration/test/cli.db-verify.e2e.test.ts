@@ -2,6 +2,7 @@ import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
+import type { Contract } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import {
@@ -970,7 +971,7 @@ withTempDir(({ createTempDir }) => {
             adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             // driver is missing - this is what we're testing
             extensionPacks: [],
-            contract: typescriptContract(contract, 'output/contract.json'),
+            contract: typescriptContract(contract as Contract, 'output/contract.json'),
             db: {
               connection: connectionString,
             },

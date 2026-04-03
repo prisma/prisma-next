@@ -2,10 +2,13 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:42688420507f30fe04fc98b370813fd10dd8bd336d6770eb026dd81aef527815",
+  "storageHash": "sha256:0f691b1e1a7a296264e99d9b23df3cee54db1d94491998780bee78cee817b724",
   "executionHash": "sha256:e1ebe2d0c623f17a7e66036721cb7b8de43c7955e72fe7d7733b88a92684b16d",
-  "profileHash": "sha256:4c68d253773262f590e742c85e147dd4eb29e082c65856d97671d98ef343de04",
-  "roots": {},
+  "profileHash": "sha256:ffc50246dae57a96ebc1abc212db40a10706095adca83ab257d4cb15f62cd192",
+  "roots": {
+    "post": "Post",
+    "user": "User"
+  },
   "models": {
     "Post": {
       "fields": {
@@ -125,9 +128,7 @@
             "codecId": "pg/vector@1",
             "nativeType": "vector",
             "nullable": true,
-            "typeParams": {
-              "length": 1536
-            }
+            "typeRef": "Embedding1536"
           },
           "id": {
             "codecId": "sql/char@1",

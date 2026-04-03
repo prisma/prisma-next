@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:42688420507f30fe04fc98b370813fd10dd8bd336d6770eb026dd81aef527815'>;
+  StorageHashBase<'sha256:0f691b1e1a7a296264e99d9b23df3cee54db1d94491998780bee78cee817b724'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:e1ebe2d0c623f17a7e66036721cb7b8de43c7955e72fe7d7733b88a92684b16d'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:4c68d253773262f590e742c85e147dd4eb29e082c65856d97671d98ef343de04'>;
+  ProfileHashBase<'sha256:ffc50246dae57a96ebc1abc212db40a10706095adca83ab257d4cb15f62cd192'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -53,35 +53,6 @@ export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTy
 type ContractBase = SqlContract<
   {
     readonly tables: {
-      readonly user: {
-        columns: {
-          readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
-            readonly nullable: false;
-          };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly createdAt: {
-            readonly nativeType: 'timestamptz';
-            readonly codecId: 'pg/timestamptz@1';
-            readonly nullable: false;
-            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-          };
-          readonly kind: {
-            readonly nativeType: 'user_type';
-            readonly codecId: 'pg/enum@1';
-            readonly nullable: false;
-          };
-        };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
-      };
       readonly post: {
         columns: {
           readonly id: {
@@ -123,6 +94,35 @@ type ContractBase = SqlContract<
           },
         ];
       };
+      readonly user: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'character';
+            readonly codecId: 'sql/char@1';
+            readonly nullable: false;
+          };
+          readonly email: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly createdAt: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+          };
+          readonly kind: {
+            readonly nativeType: 'user_type';
+            readonly codecId: 'pg/enum@1';
+            readonly nullable: false;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
+      };
     };
     readonly types: {
       readonly user_type: {
@@ -136,6 +136,7 @@ type ContractBase = SqlContract<
         readonly typeParams: { readonly length: 1536 };
       };
     };
+    readonly storageHash: StorageHash;
   },
   {
     readonly Post: {
@@ -200,7 +201,7 @@ type ContractBase = SqlContract<
   ProfileHash
 > & {
   readonly target: 'postgres';
-  readonly roots: Record<string, string>;
+  readonly roots: { readonly user: 'User'; readonly post: 'Post' };
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;

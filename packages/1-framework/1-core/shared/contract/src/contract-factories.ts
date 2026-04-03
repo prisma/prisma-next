@@ -51,7 +51,6 @@ export function createContract<
   return {
     target,
     targetFamily,
-    storageHash,
     roots: overrides.roots ?? {},
     models: (overrides.models ?? {}) as TModels,
     storage,

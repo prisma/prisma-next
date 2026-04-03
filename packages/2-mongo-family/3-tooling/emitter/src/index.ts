@@ -113,7 +113,7 @@ function generateStorageType(storage: MongoStorageIR): string {
   const collectionsType =
     collectionEntries.length > 0 ? `{ ${collectionEntries.join('; ')} }` : 'Record<string, never>';
 
-  return `{ readonly collections: ${collectionsType} }`;
+  return `{ readonly collections: ${collectionsType}; readonly storageHash: StorageHash }`;
 }
 
 export const mongoTargetFamilyHook = {
@@ -288,11 +288,8 @@ export type OperationTypes = ${operationTypes};
 export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>;
 
 type ContractBase = {
-  readonly schemaVersion: ${serializeValue('1')};
   readonly target: ${serializeValue(contract.target)};
   readonly targetFamily: ${serializeValue(contract.targetFamily)};
-  readonly storageHash: StorageHash;
-  readonly executionHash?: ExecutionHash;
   readonly profileHash: ProfileHash;
   readonly capabilities: ${serializeValue(contract.capabilities)};
   readonly extensionPacks: ${serializeValue(contract.extensionPacks)};

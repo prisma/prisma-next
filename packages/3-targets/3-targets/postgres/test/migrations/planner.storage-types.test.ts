@@ -56,6 +56,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       targetFamily: 'sql',
       storageHash: coreHash('sha256:contract'),
       storage: {
+        storageHash: coreHash('sha256:test'),
         tables: {
           user: {
             columns: {
@@ -141,6 +142,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       targetFamily: 'sql',
       storageHash: coreHash('sha256:contract'),
       storage: {
+        storageHash: coreHash('sha256:test'),
         tables: {},
         types: {
           Role: {
@@ -218,6 +220,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       targetFamily: 'sql',
       storageHash: coreHash('sha256:contract'),
       storage: {
+        storageHash: coreHash('sha256:test'),
         tables: {
           user: {
             columns: {
@@ -278,6 +281,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       targetFamily: 'sql',
       storageHash: coreHash('sha256:contract'),
       storage: {
+        storageHash: coreHash('sha256:test'),
         tables: {
           document: {
             columns: {
@@ -336,6 +340,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       targetFamily: 'sql',
       storageHash: coreHash('sha256:contract'),
       storage: {
+        storageHash: coreHash('sha256:test'),
         tables: {
           document: {
             columns: {

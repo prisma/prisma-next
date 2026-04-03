@@ -20,6 +20,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
     it('does not emit unique operation when satisfied by unique index', () => {
       const contract = createTestContract({
         storage: {
+          storageHash: coreHash('sha256:test'),
           tables: {
             user: {
               columns: {
@@ -73,6 +74,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
     it('does not emit index operation when satisfied by unique index', () => {
       const contract = createTestContract({
         storage: {
+          storageHash: coreHash('sha256:test'),
           tables: {
             user: {
               columns: {
@@ -124,6 +126,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
     it('does not emit index operation when satisfied by unique constraint', () => {
       const contract = createTestContract({
         storage: {
+          storageHash: coreHash('sha256:test'),
           tables: {
             user: {
               columns: {
@@ -177,6 +180,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
     it('succeeds with no operations when only constraint/index names differ', () => {
       const contract = createTestContract({
         storage: {
+          storageHash: coreHash('sha256:test'),
           tables: {
             user: {
               columns: {
@@ -235,6 +239,7 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
     storageHash: coreHash('sha256:contract'),
     profileHash: profileHash('sha256:profile'),
     storage: {
+      storageHash: coreHash('sha256:test'),
       tables: {},
     },
     roots: {},

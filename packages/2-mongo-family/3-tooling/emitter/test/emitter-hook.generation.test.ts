@@ -74,10 +74,9 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
   it('generates contract header fields', () => {
     const ir = createMongoIR();
     const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain("readonly schemaVersion: '1'");
     expect(types).toContain("readonly target: 'mongo'");
     expect(types).toContain("readonly targetFamily: 'mongo'");
-    expect(types).toContain('readonly storageHash: StorageHash');
+    expect(types).not.toContain('schemaVersion');
     expect(types).toContain('readonly profileHash: ProfileHash');
   });
 

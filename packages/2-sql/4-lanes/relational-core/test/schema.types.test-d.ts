@@ -1,3 +1,4 @@
+import type { StorageHashBase } from '@prisma-next/contract/types';
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
@@ -14,6 +15,7 @@ const schemaHandle = schema(context);
 // Contract type with storage.types using literal types (matching emission output)
 type ContractWithTypes = SqlContract<
   {
+    readonly storageHash: StorageHashBase<string>;
     readonly tables: {
       readonly test: {
         readonly columns: {
@@ -122,6 +124,7 @@ const contractWithTypes: ContractWithTypes = {
   targetFamily: 'sql',
   storageHash: coreHash('sha256:test'),
   storage: {
+    storageHash: coreHash('sha256:test'),
     tables: {
       test: {
         columns: {
@@ -250,6 +253,7 @@ test('schema.types is generic record when contract does not specify types', () =
   // Contract type without explicit storage.types - typing is generic
   type ContractWithoutTypes = SqlContract<
     {
+      readonly storageHash: StorageHashBase<string>;
       readonly tables: {
         readonly test: {
           readonly columns: {
@@ -275,6 +279,7 @@ test('schema.types is generic record when contract does not specify types', () =
     targetFamily: 'sql',
     storageHash: coreHash('sha256:test'),
     storage: {
+      storageHash: coreHash('sha256:test'),
       tables: {
         test: {
           columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },

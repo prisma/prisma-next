@@ -506,52 +506,59 @@ describe('buildBuiltinIdentityValue (built-in fallback)', () => {
   });
 });
 
-function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlContract<SqlStorage> {
+function createTestContract(
+  overrides?: Partial<Omit<SqlContract<SqlStorage>, 'storage'>> & {
+    storage?: Omit<SqlStorage, 'storageHash'>;
+  },
+): SqlContract<SqlStorage> {
+  const storageHashValue = coreHash('sha256:contract');
+  const storage = overrides?.storage ?? {
+    tables: {
+      user: {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [{ columns: ['email'] }],
+        indexes: [{ columns: ['email'] }],
+        foreignKeys: [],
+      },
+      post: {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [
+          {
+            columns: ['userId'],
+            references: { table: 'user', columns: ['id'] },
+            constraint: true,
+            index: true,
+          },
+        ],
+      },
+    },
+  };
+  const { storage: _s, ...rest } = overrides ?? {};
   return {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:contract'),
+    storageHash: storageHashValue,
     profileHash: profileHash('sha256:profile'),
-    storage: {
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [{ columns: ['email'] }],
-          indexes: [{ columns: ['email'] }],
-          foreignKeys: [],
-        },
-        post: {
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [
-            {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
-              constraint: true,
-              index: true,
-            },
-          ],
-        },
-      },
-    },
+    storage: { ...storage, storageHash: storageHashValue },
     roots: {},
     models: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},
     sources: {},
-    ...overrides,
+    ...rest,
   };
 }
 

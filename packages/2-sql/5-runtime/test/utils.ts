@@ -265,19 +265,23 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
  * This helper allows tests to create contracts without depending on sql-query.
  */
 export function createTestContract(
-  contract: Partial<Omit<SqlContract<SqlStorage>, 'storageHash' | 'profileHash'>> & {
+  contract: Partial<Omit<SqlContract<SqlStorage>, 'storageHash' | 'profileHash' | 'storage'>> & {
     storageHash?: string;
     profileHash?: string;
+    storage?: Omit<SqlStorage, 'storageHash'>;
   },
 ): SqlContract<SqlStorage> {
   const { execution, ...rest } = contract;
+  const storageHashValue = coreHash(rest.storageHash ?? 'sha256:testcore');
 
   return {
     ...rest,
     schemaVersion: rest.schemaVersion ?? '1',
     target: rest.target ?? 'postgres',
     targetFamily: rest.targetFamily ?? 'sql',
-    storage: rest.storage ?? { tables: {} },
+    storage: rest.storage
+      ? { ...rest.storage, storageHash: storageHashValue }
+      : { storageHash: storageHashValue, tables: {} },
     models: rest.models ?? {},
     roots: rest.roots ?? {},
     capabilities: rest.capabilities ?? {},
@@ -285,7 +289,7 @@ export function createTestContract(
     meta: rest.meta ?? {},
     sources: rest.sources ?? {},
     ...(execution ? { execution } : {}),
-    storageHash: coreHash(rest.storageHash ?? 'sha256:testcore'),
+    storageHash: storageHashValue,
     profileHash: profileHash(rest.profileHash ?? 'sha256:testprofile'),
   } satisfies SqlContract<SqlStorage>;
 }

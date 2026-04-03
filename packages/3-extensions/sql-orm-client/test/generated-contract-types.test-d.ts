@@ -1,3 +1,4 @@
+import type { StorageHashBase } from '@prisma-next/contract/types';
 import type {
   ContractWithTypeMaps,
   SqlContract,
@@ -28,6 +29,7 @@ type GeneratedLikeTypeMaps = TypeMaps<GeneratedLikeCodecTypes>;
 
 type GeneratedLikeContractBase = SqlContract<
   {
+    storageHash: StorageHashBase<string>;
     tables: {
       user: {
         columns: {

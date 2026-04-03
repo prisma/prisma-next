@@ -221,6 +221,7 @@ type ContractBase = SqlContract<
         foreignKeys: readonly [];
       };
     };
+    readonly storageHash: StorageHash;
     readonly types: Record<string, never>;
   },
   {

@@ -1,5 +1,6 @@
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
 
+import type { StorageBase } from './types';
 import { bigintJsonReplacer } from './types';
 
 const TOP_LEVEL_ORDER = [
@@ -237,42 +238,43 @@ function orderTopLevel(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 export type CanonicalContractInput = {
-  schemaVersion?: string | undefined;
-  targetFamily: string;
-  target: string;
-  roots?: Record<string, string> | undefined;
-  models: Record<string, unknown>;
-  storage: Record<string, unknown>;
-  execution?: Record<string, unknown> | undefined;
-  extensionPacks: Record<string, unknown>;
-  capabilities: Record<string, Record<string, boolean>>;
-  meta: Record<string, unknown>;
-  storageHash?: string | undefined;
-  executionHash?: string | undefined;
-  profileHash?: string | undefined;
+  readonly schemaVersion?: string | undefined;
+  readonly targetFamily: string;
+  readonly target: string;
+  readonly roots?: Record<string, string> | undefined;
+  readonly models: Record<string, unknown>;
+  readonly storage: StorageBase | Record<string, unknown>;
+  readonly execution?: Record<string, unknown> | undefined;
+  readonly extensionPacks: Record<string, unknown>;
+  readonly capabilities: Record<string, Record<string, boolean>>;
+  readonly meta: Record<string, unknown>;
+  readonly storageHash?: string | undefined;
+  readonly executionHash?: string | undefined;
+  readonly profileHash?: string | undefined;
 };
 
 export function canonicalizeContract(input: CanonicalContractInput): string {
+  const i = input as Record<string, unknown>;
   const normalized: Record<string, unknown> = {
-    ...(input.schemaVersion !== undefined ? { schemaVersion: input.schemaVersion } : {}),
-    targetFamily: input.targetFamily,
-    target: input.target,
-    ...(input.roots !== undefined ? { roots: input.roots } : {}),
-    models: input.models,
-    storage: input.storage,
-    ...(input.execution !== undefined ? { execution: input.execution } : {}),
-    extensionPacks: input.extensionPacks,
-    capabilities: input.capabilities,
-    meta: input.meta,
+    ...(i['schemaVersion'] !== undefined ? { schemaVersion: i['schemaVersion'] } : {}),
+    targetFamily: i['targetFamily'],
+    target: i['target'],
+    ...(i['roots'] !== undefined ? { roots: i['roots'] } : {}),
+    models: i['models'],
+    storage: i['storage'],
+    ...(i['execution'] !== undefined ? { execution: i['execution'] } : {}),
+    extensionPacks: i['extensionPacks'],
+    capabilities: i['capabilities'],
+    meta: i['meta'],
   };
-  if (input.storageHash !== undefined) {
-    normalized['storageHash'] = input.storageHash;
+  if (i['storageHash'] !== undefined) {
+    normalized['storageHash'] = i['storageHash'];
   }
-  if (input.executionHash !== undefined) {
-    normalized['executionHash'] = input.executionHash;
+  if (i['executionHash'] !== undefined) {
+    normalized['executionHash'] = i['executionHash'];
   }
-  if (input.profileHash !== undefined) {
-    normalized['profileHash'] = input.profileHash;
+  if (i['profileHash'] !== undefined) {
+    normalized['profileHash'] = i['profileHash'];
   }
 
   const withDefaultsOmitted = omitDefaults(normalized, []) as Record<string, unknown>;

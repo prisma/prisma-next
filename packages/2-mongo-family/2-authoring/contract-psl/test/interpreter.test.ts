@@ -530,7 +530,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           post: {},
         },
       });
-      expect(ir.storageHash).toMatch(/^sha256:/);
+      expect(ir.storage.storageHash).toMatch(/^sha256:/);
     });
 
     it('includes empty extensionPacks, capabilities, and meta', () => {
@@ -612,8 +612,8 @@ describe('interpretPslDocumentToMongoContract', () => {
             storage: { collection: 'posts' },
           },
         },
-        storageHash: expect.stringMatching(/^sha256:/),
         storage: {
+          storageHash: expect.stringMatching(/^sha256:/),
           collections: {
             users: {},
             posts: {},

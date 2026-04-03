@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, StorageHashBase } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   SqlContract,
@@ -81,6 +81,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts a single table with columns', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         User: table({
           columns: {
@@ -105,6 +106,7 @@ describe('contractToSchemaIR', () => {
 
   it('drops codecId, typeParams, and typeRef from columns', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -130,6 +132,7 @@ describe('contractToSchemaIR', () => {
 
   it('expands parameterized native types when expandNativeType is provided', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -165,6 +168,7 @@ describe('contractToSchemaIR', () => {
 
   it('uses base nativeType when no expandNativeType is provided', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -184,6 +188,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts literal column defaults', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -202,6 +207,7 @@ describe('contractToSchemaIR', () => {
 
   it('escapes single quotes in string literal defaults', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -220,6 +226,7 @@ describe('contractToSchemaIR', () => {
 
   it('escapes repeated single quotes in string literal defaults', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -238,6 +245,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts function column defaults', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -256,6 +264,7 @@ describe('contractToSchemaIR', () => {
 
   it('omits default field when column has no default', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -272,6 +281,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts primary key', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -288,6 +298,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts unique constraints', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -304,6 +315,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts indexes with unique: false', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -322,6 +334,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts foreign keys (reshapes references)', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         Post: table({
           columns: {
@@ -353,6 +366,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts multiple tables', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         User: table({
           columns: { id: col({ nativeType: 'text' }) },
@@ -370,6 +384,7 @@ describe('contractToSchemaIR', () => {
 
   it('propagates storage types into annotations', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -402,6 +417,7 @@ describe('contractToSchemaIR', () => {
 
   it('writes storage type annotations using the configured namespace', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -435,6 +451,7 @@ describe('contractToSchemaIR', () => {
 
   it('sets dependencies to empty array', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: { id: col({ nativeType: 'text' }) },
@@ -448,6 +465,7 @@ describe('contractToSchemaIR', () => {
 
   it('deduplicates dependency IDs from framework components', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: { id: col({ nativeType: 'text' }) },
@@ -482,6 +500,7 @@ describe('contractToSchemaIR', () => {
 
   it('throws for empty dependency IDs from framework components', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: { id: col({ nativeType: 'text' }) },
@@ -514,6 +533,7 @@ describe('contractToSchemaIR', () => {
 
   it('handles unique constraints without names', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -531,6 +551,7 @@ describe('contractToSchemaIR', () => {
 
   it('handles foreign keys without names', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         Post: table({
           columns: { authorId: col({ nativeType: 'text' }) },
@@ -556,6 +577,7 @@ describe('contractToSchemaIR', () => {
 
   it('does not synthesize FK backing index when FK columns match primary key columns', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         User: table({
           columns: { id: col({ nativeType: 'text' }) },
@@ -582,6 +604,7 @@ describe('contractToSchemaIR', () => {
 
   it('does not synthesize FK backing index when FK columns match unique columns', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         User: table({
           columns: { id: col({ nativeType: 'text' }) },
@@ -608,6 +631,7 @@ describe('contractToSchemaIR', () => {
 
   it('deduplicates synthesized FK backing indexes for repeated FK column sets', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         User: table({
           columns: { id: col({ nativeType: 'text' }) },
@@ -643,6 +667,7 @@ describe('contractToSchemaIR', () => {
 describe('detectDestructiveChanges', () => {
   it('returns empty for null from', () => {
     const to: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
     };
     expect(detectDestructiveChanges(null, to)).toEqual([]);
@@ -650,6 +675,7 @@ describe('detectDestructiveChanges', () => {
 
   it('returns empty when no removals', () => {
     const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
     };
     expect(detectDestructiveChanges(storage, storage)).toEqual([]);
@@ -657,9 +683,11 @@ describe('detectDestructiveChanges', () => {
 
   it('returns empty when columns are added', () => {
     const from: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
     };
     const to: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
       },
@@ -669,11 +697,13 @@ describe('detectDestructiveChanges', () => {
 
   it('detects removed column', () => {
     const from: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
       },
     };
     const to: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
     };
 
@@ -687,12 +717,14 @@ describe('detectDestructiveChanges', () => {
 
   it('detects removed table', () => {
     const from: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         A: table({ columns: { id: col({ nativeType: 'text' }) } }),
         B: table({ columns: { id: col({ nativeType: 'text' }) } }),
       },
     };
     const to: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: { A: table({ columns: { id: col({ nativeType: 'text' }) } }) },
     };
 
@@ -706,13 +738,17 @@ describe('detectDestructiveChanges', () => {
 
   it('does not report columns of a removed table individually', () => {
     const from: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) },
         }),
       },
     };
-    const to: SqlStorage = { tables: {} };
+    const to: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      tables: {},
+    };
 
     const conflicts = detectDestructiveChanges(from, to);
     expect(conflicts).toHaveLength(1);
@@ -721,6 +757,7 @@ describe('detectDestructiveChanges', () => {
 
   it('detects multiple removals', () => {
     const from: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         A: table({
           columns: { id: col({ nativeType: 'text' }), name: col({ nativeType: 'text' }) },
@@ -729,6 +766,7 @@ describe('detectDestructiveChanges', () => {
       },
     };
     const to: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         A: table({ columns: { id: col({ nativeType: 'text' }) } }),
       },
@@ -743,11 +781,15 @@ describe('detectDestructiveChanges', () => {
 
   it('detects removed table with prototype-name identifier', () => {
     const from: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         toString: table({ columns: { id: col({ nativeType: 'text' }) } }),
       },
     };
-    const to: SqlStorage = { tables: {} };
+    const to: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      tables: {},
+    };
 
     const conflicts = detectDestructiveChanges(from, to);
     expect(conflicts).toEqual([
@@ -760,6 +802,7 @@ describe('detectDestructiveChanges', () => {
 
   it('detects removed column with prototype-name identifier', () => {
     const from: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({
           columns: {
@@ -769,6 +812,7 @@ describe('detectDestructiveChanges', () => {
       },
     };
     const to: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({ columns: {} }),
       },
