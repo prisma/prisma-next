@@ -100,9 +100,10 @@ describe('canonicalizeContractToObject', () => {
       }),
     );
     const keys = Object.keys(result);
-    expect(keys.indexOf('storageHash')).toBeLessThan(keys.indexOf('executionHash'));
-    expect(keys.indexOf('executionHash')).toBeLessThan(keys.indexOf('profileHash'));
-    expect(keys.indexOf('profileHash')).toBeLessThan(keys.indexOf('roots'));
+    const ordered = keys.filter((k) =>
+      ['storageHash', 'executionHash', 'profileHash', 'roots'].includes(k),
+    );
+    expect(ordered).toEqual(['storageHash', 'executionHash', 'profileHash', 'roots']);
   });
 
   it('excludes keys not in the CanonicalContractInput schema', () => {
