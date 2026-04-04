@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import type { ApiPost, ApiUser } from '../types';
 import { PostList } from './PostList';
 import { UserList } from './UserList';
 
@@ -7,8 +6,8 @@ type Tab = 'posts' | 'users';
 
 export function App() {
   const [tab, setTab] = useState<Tab>('posts');
-  const [posts, setPosts] = useState<ApiPost[]>([]);
-  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [posts, setPosts] = useState<Parameters<typeof PostList>[0]['posts']>([]);
+  const [users, setUsers] = useState<Parameters<typeof UserList>[0]['users']>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,8 +20,8 @@ export function App() {
           throw new Error('API request failed');
         }
 
-        setPosts((await postsRes.json()) as ApiPost[]);
-        setUsers((await usersRes.json()) as ApiUser[]);
+        setPosts(await postsRes.json());
+        setUsers(await usersRes.json());
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
