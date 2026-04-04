@@ -48,6 +48,7 @@ class MongoAdapterImpl implements MongoAdapter {
           command.collection,
           command.pipeline.map((stage) => ({ ...stage })),
         );
+      // v8 ignore next 4
       default: {
         const _exhaustive: never = command;
         throw new Error(`Unknown command kind: ${(_exhaustive as { kind: string }).kind}`);
