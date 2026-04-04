@@ -12,7 +12,7 @@ Provides the Mongo family descriptor (`ControlFamilyDescriptor`) that includes:
 ## Responsibilities
 
 - **Family Descriptor Export**: Exports the Mongo `ControlFamilyDescriptor` for use in CLI configuration files and the Mongo demo
-- **Family Instance Creation**: Creates `MongoControlFamilyInstance` objects that implement control-plane domain actions (`validateContractIR`, `emitContract`)
+- **Family Instance Creation**: Creates `MongoControlFamilyInstance` objects that implement control-plane domain actions (`validateContract`, `emitContract`)
 - **Family Hook Integration**: Integrates the Mongo target family hook (`mongoTargetFamilyHook`) from `@prisma-next/mongo-emitter`
 - **Target Descriptor Export**: Exports a pre-built `mongoTargetDescriptor` with codec type imports pointing to `@prisma-next/mongo-core/codec-types`
 - **Contract Validation**: Validates Mongo contract JSON via `validateMongoContract()` from `@prisma-next/mongo-core`
@@ -31,14 +31,14 @@ const stack = createControlStack({
 
 const familyInstance = mongoFamilyDescriptor.create(stack);
 
-const contractIR = familyInstance.validateContractIR(contractJson);
-const result = await familyInstance.emitContract({ contractIR });
+const contract = familyInstance.validateContract(contractJson);
+const result = await familyInstance.emitContract({ contract });
 ```
 
 ## Package Structure
 
 - **`src/core/control-descriptor.ts`**: `MongoFamilyDescriptor` class implementing `ControlFamilyDescriptor` (pure data + factory)
-- **`src/core/control-instance.ts`**: `createMongoFamilyInstance()` factory and `MongoControlFamilyInstance` interface with domain action methods (`validateContractIR`, `emitContract`)
+- **`src/core/control-instance.ts`**: `createMongoFamilyInstance()` factory and `MongoControlFamilyInstance` interface with domain action methods (`validateContract`, `emitContract`)
 - **`src/core/mongo-target-descriptor.ts`**: Pre-built `mongoTargetDescriptor` with codec type import metadata
 - **`src/exports/control.ts`**: Control plane entry point
 
@@ -50,7 +50,7 @@ const result = await familyInstance.emitContract({ contractIR });
 
 - **`@prisma-next/framework-components`**: `ControlStack`, `ControlFamilyDescriptor`, component types
 - **`@prisma-next/core-control-plane`**: `emit()` function, control-plane types (re-exported from `framework-components`)
-- **`@prisma-next/contract`**: `ContractIR`, `ContractMarkerRecord`
+- **`@prisma-next/contract`**: `Contract`, `ContractMarkerRecord`
 - **`@prisma-next/mongo-core`**: `MongoContract`, `validateMongoContract()`
 - **`@prisma-next/mongo-emitter`**: `mongoTargetFamilyHook`
 - **`@prisma-next/target-mongo`**: Target descriptor metadata

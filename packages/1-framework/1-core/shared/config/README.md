@@ -34,7 +34,7 @@ const config = defineConfig({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   contract: {
-    source: async () => /* Result<ContractIR, ContractSourceDiagnostics> */ null as never,
+    source: async () => /* Result<Contract, ContractSourceDiagnostics> */ null as never,
   },
 });
 

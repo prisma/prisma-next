@@ -11,7 +11,7 @@ The runner in `cli.emit-parity-fixtures.test.ts` validates parity between:
 
 For each parity case it asserts:
 
-- normalized IR parity (`validateContractIR`)
+- normalized IR parity (`validateContract`)
 - emitted canonical `contract.json` parity
 - hash parity (`storageHash`, `profileHash`, and `executionHash` when present)
 - determinism (repeated emits are byte-equivalent for `contractJson`)

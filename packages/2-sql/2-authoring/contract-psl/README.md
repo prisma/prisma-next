@@ -6,14 +6,14 @@ PSL-first SQL contract interpretation for Prisma Next.
 
 `@prisma-next/sql-contract-psl` provides two entrypoints:
 
-- **Pure interpreter** (`@prisma-next/sql-contract-psl`): parsed PSL document -> SQL `ContractIR`
+- **Pure interpreter** (`@prisma-next/sql-contract-psl`): parsed PSL document -> SQL `Contract`
 - **Provider helper** (`@prisma-next/sql-contract-psl/provider`): read file -> parse -> interpret -> `ContractConfig`
 
 This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line config helper.
 
 ## Responsibilities
 
-- Interpret `ParsePslDocumentResult` into SQL `ContractIR`
+- Interpret `ParsePslDocumentResult` into SQL `Contract`
 - Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`)
 - Lower supported default functions through composed registry inputs
 - Support selected Postgres native-type attributes on named types for brownfield round-trips (`@db.Char`, `@db.VarChar`, `@db.Numeric`, `@db.Uuid`, `@db.SmallInt`, `@db.Real`, `@db.Timestamp`, `@db.Timestamptz`, `@db.Date`, `@db.Time`, `@db.Timetz`, `@db.Json`)
@@ -66,7 +66,7 @@ Supported `@default(...)` surface in v1 when composed contributors provide handl
 ## Public API
 
 - `@prisma-next/sql-contract-psl`
-  - `interpretPslDocumentToSqlContractIR({ document, target, scalarTypeDescriptors, controlMutationDefaults?, composedExtensionPacks? })`
+  - `interpretPslDocumentToSqlContract({ document, target, scalarTypeDescriptors, controlMutationDefaults?, composedExtensionPacks? })`
 - `@prisma-next/sql-contract-psl/provider`
   - `prismaContract(schemaPath, { output?, target, scalarTypeDescriptors, controlMutationDefaults?, composedExtensionPacks? })`
   - Provider input is fully preassembled by composition layers (for example `@prisma-next/family-sql/control` helpers).
@@ -92,7 +92,7 @@ flowchart LR
   fsRead --> parser[@prisma-next/psl-parser]
   parser --> parsed[ParsePslDocumentResult]
   parsed --> interpreter[@prisma-next/sql-contract-psl]
-  interpreter --> irResult[Result_ContractIR_Diagnostics]
+  interpreter --> irResult[Result_Contract_Diagnostics]
   irResult --> emit[Framework emit pipeline]
 ```
 

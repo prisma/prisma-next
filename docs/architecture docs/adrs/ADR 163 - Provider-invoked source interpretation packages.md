@@ -8,9 +8,9 @@ Accepted
 
 Prisma Next supports multiple authoring inputs (TS-first and PSL-first) that must converge on the same deterministic emission pipeline:
 
-`provider (input-specific) → ContractIR → validate/normalize → canonicalize/hash → emit`
+`provider (input-specific) → Contract → validate/normalize → canonicalize/hash → emit`
 
-We introduced provider-based contract sources (`config.contract.source: () => Promise<Result<ContractIR, Diagnostics>>`) to keep the CLI/control plane **source-agnostic**. At the same time, we want to keep input-specific logic (like PSL parsing + interpretation) pluggable and out of the CLI and control plane wiring.
+We introduced provider-based contract sources (`config.contract.source: () => Promise<Result<Contract, ContractSourceDiagnostics>>`) to keep the CLI/control plane **source-agnostic**. At the same time, we want to keep input-specific logic (like PSL parsing + interpretation) pluggable and out of the CLI and control plane wiring.
 
 During initial implementation, SQL PSL interpretation code lived in the TS authoring package (`@prisma-next/sql-contract-ts`). That mixed concerns and increased the dependency surface of the TS authoring surface with PSL-specific logic.
 
@@ -22,9 +22,9 @@ Input-specific parsing and interpretation live in **provider-invoked authoring p
 - perform **no file I/O**
 - return structured diagnostics with stable codes and spans when available
 
-For SQL PSL-first, we create `@prisma-next/sql-contract-psl` as the dedicated package that interprets PSL input into SQL `ContractIR`.
+For SQL PSL-first, we create `@prisma-next/sql-contract-psl` as the dedicated package that interprets PSL input into a SQL `Contract<SqlStorage, SqlModelStorage>`.
 
-The CLI / ControlClient remain source-agnostic and do not import PSL-specific packages. They only call `config.contract.source()` and then emit from the returned `ContractIR`.
+The CLI / ControlClient remain source-agnostic and do not import PSL-specific packages. They only call `config.contract.source()` and then emit from the returned `Contract`.
 
 ## Consequences
 
@@ -45,7 +45,7 @@ The CLI / ControlClient remain source-agnostic and do not import PSL-specific pa
 
 ## Implementation notes (non-normative)
 
-- The interpretation package accepts **PSL parser output** (AST + parser diagnostics) and produces `ContractIR`.
+- The interpretation package accepts **PSL parser output** (AST + parser diagnostics) and produces `Contract` (e.g. `interpretPslDocumentToSqlContract` in `@prisma-next/sql-contract-psl`).
 - The provider owns parsing: it calls `parsePslDocument({ schema, sourceId })`, then passes the parser output to the interpreter.
 - File paths belong in diagnostics only; canonical artifacts must not embed provenance.
 

@@ -287,7 +287,7 @@ interface ControlPlaneStack<TFamilyId, TTargetId> {
 interface ControlFamilyInstance {
   verify(options: {
     driver: ControlDriverInstance;
-    contractIR: ContractIR;
+    contract: Contract;
     expectedTargetId: string;
     contractPath: string;
     configPath?: string;
@@ -477,7 +477,7 @@ The family must provide:
 interface ControlFamilyInstance {
   introspect(options: {
     driver: ControlDriverInstance;
-    contractIR?: ContractIR;
+    contract?: Contract;
     schema?: string;
   }): Promise<FamilySchemaIR>;
 
@@ -676,7 +676,7 @@ The family must provide a `create()` method in the family descriptor that return
 interface ControlFamilyInstance {
   schemaVerify(options: {
     driver: ControlDriverInstance;
-    contractIR: ContractIR;
+    contract: Contract;
     strict: boolean;
     contractPath: string;
     configPath?: string;
@@ -684,7 +684,7 @@ interface ControlFamilyInstance {
 
   sign(options: {
     driver: ControlDriverInstance;
-    contractIR: ContractIR;
+    contract: Contract;
     contractPath: string;
     configPath?: string;
   }): Promise<SignDatabaseResult>;
@@ -764,7 +764,7 @@ export default defineConfig({
    - `contract.target` matches `config.target.targetId`
    - `contract.extensionPacks` (if present) are provided by `config.extensionPacks` (matched by descriptor `id`)
 6. **Create Planner/Runner**: Uses `config.target.migrations.createPlanner()` and `config.target.migrations.createRunner()`
-7. **Plan Migration**: Calls `planner.plan()` with the contract IR, schema IR, additive-only policy, and `frameworkComponents` (the active target/adapter/extension descriptors)
+7. **Plan Migration**: Calls `planner.plan()` with the contract, schema IR, additive-only policy, and `frameworkComponents` (the active target/adapter/extension descriptors)
    - On conflict: Returns a structured failure with conflict list
    - On success: Returns a migration plan with operations
 8. **Apply Migration** (if not `--dry-run`):
@@ -902,7 +902,7 @@ export default defineConfig({
 ```
 
 Prefer helper utilities for authoring mode selection:
-- `typescriptContract(contractIR, outputPath?)` from `@prisma-next/sql-contract-ts/config-types` for TS-authored contracts
+- `typescriptContract(contract, outputPath?)` from `@prisma-next/sql-contract-ts/config-types` for TS-authored contracts
 - `prismaContract(schemaPath, { output?, target? })` from `@prisma-next/sql-contract-psl/provider` for PSL-authored providers
 - Provider failures are returned as structured diagnostics for CLI rendering
 
@@ -1113,7 +1113,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Error Handling**: Uses structured errors (`CliStructuredError`), Result pattern, and `process.exit()`. Commands return `Result<T, CliStructuredError>`, process results with `handleResult()`, and call `process.exit(exitCode)` directly. See `.cursor/rules/cli-error-handling.mdc` for details.
 - Loads the user's config module (`prisma-next.config.ts`)
 - Resolves contract from provider:
-  - Calls `config.contract.source()` and expects `Result<ContractIR, Diagnostics>`
+  - Calls `config.contract.source()` and expects `Result<Contract, ContractSourceDiagnostics>`
   - Source-specific parsing/loading stays inside providers
   - Provider diagnostics are surfaced as actionable CLI failures
   - Throws error if `config.contract` is missing
@@ -1124,7 +1124,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 
 ### Programmatic API (`api/emit-contract.ts`)
 - **`emitContract(options)`**: Programmatic API for emitting contracts
-  - Accepts resolved contract IR, output paths, and assembly data
+  - Accepts resolved contract, output paths, and assembly data
   - Caller is responsible for loading the contract and resolving paths
   - Returns result with hashes, file paths, and timings
   - Used by CLI command internally
@@ -1171,7 +1171,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
   - `create(options)` - Creates a family instance that implements domain actions
   - `hook` - Target family hook for contract emission
 - Family instances provide:
-  - `validateContractIR(contractJson)` - Validates and normalizes contract, returns ContractIR without mappings
+  - `validateContract(contractJson)` - Validates and normalizes contract, returns `Contract` without mappings
   - `emitContract(options)` - Emits contract (handles stripping mappings and validation internally)
   - `verify(options)` - Verifies database marker against contract
   - `schemaVerify(options)` - Verifies database schema against contract
@@ -1333,9 +1333,9 @@ try {
   await client.connect(databaseUrl);
 
   // Run operations
-  const verifyResult = await client.verify({ contractIR });
-  const initResult = await client.dbInit({ contractIR, mode: 'apply' });
-  const updateResult = await client.dbUpdate({ contractIR, mode: 'apply' });
+  const verifyResult = await client.verify({ contract });
+  const initResult = await client.dbInit({ contract, mode: 'apply' });
+  const updateResult = await client.dbUpdate({ contract, mode: 'apply' });
   const introspectResult = await client.introspect();
 } finally {
   // Clean up
@@ -1383,7 +1383,7 @@ Operations return structured result types:
 | Aspect | CLI | Control API |
 |--------|-----|-------------|
 | Config | Reads `prisma-next.config.ts` | Accepts descriptors directly |
-| File I/O | Reads contract.json from disk | Accepts contract IR directly |
+| File I/O | Reads contract.json from disk | Accepts contract directly |
 | Output | Formats for console | Returns structured data |
 | Exit codes | Uses `process.exit()` | Returns results/throws |
 

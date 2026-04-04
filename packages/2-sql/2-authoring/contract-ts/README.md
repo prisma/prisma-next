@@ -43,7 +43,7 @@ flowchart LR
   builderInput[TS builder calls] --> sqlContractTs[@prisma-next/sql-contract-ts]
   sqlContractTs --> authoringCore[@prisma-next/contract-authoring]
   sqlContractTs --> sqlTypes[@prisma-next/sql-contract/types]
-  sqlContractTs --> contractIR[SQL ContractIR]
+  sqlContractTs --> contract[SQL Contract]
 ```
 
 This package is part of the package layering architecture:
@@ -307,5 +307,5 @@ Integration tests that depend on both `sql-contract-ts` and `sql-query` are loca
 ## See Also
 
 - `@prisma-next/contract-authoring` - Target-agnostic builder core that this package composes
-- `@prisma-next/sql-contract-psl` - PSL parser-output to SQL `ContractIR` interpreter for provider-based flows
+- `@prisma-next/sql-contract-psl` - PSL parser-output to SQL `Contract` interpreter for provider-based flows
 - `@prisma-next/sql-contract-psl/provider` - SQL PSL-first `prismaContract()` helper (read -> parse -> interpret)
