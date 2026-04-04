@@ -1,6 +1,7 @@
-import type { MongoValue, RawPipeline } from '@prisma-next/mongo-core';
+import type { MongoValue } from '@prisma-next/mongo-core';
 import { MongoAstNode } from './ast-node';
 import type { MongoFilterExpr } from './filter-expressions';
+import type { MongoReadStage } from './stages';
 
 export class InsertOneCommand extends MongoAstNode {
   readonly kind = 'insertOne' as const;
@@ -119,12 +120,14 @@ export class FindOneAndDeleteCommand extends MongoAstNode {
   }
 }
 
+export type AggregatePipelineEntry = MongoReadStage | Record<string, unknown>;
+
 export class AggregateCommand extends MongoAstNode {
   readonly kind = 'aggregate' as const;
   readonly collection: string;
-  readonly pipeline: RawPipeline;
+  readonly pipeline: ReadonlyArray<AggregatePipelineEntry>;
 
-  constructor(collection: string, pipeline: RawPipeline) {
+  constructor(collection: string, pipeline: ReadonlyArray<AggregatePipelineEntry>) {
     super();
     this.collection = collection;
     this.pipeline = pipeline;

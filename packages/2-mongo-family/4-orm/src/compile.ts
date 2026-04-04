@@ -1,6 +1,7 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { MongoReadPlan, MongoReadStage } from '@prisma-next/mongo-query-ast';
+import type { MongoQueryPlan, MongoReadStage } from '@prisma-next/mongo-query-ast';
 import {
+  AggregateCommand,
   MongoAndExpr,
   MongoLimitStage,
   MongoLookupStage,
@@ -37,7 +38,7 @@ export function compileMongoQuery<Row = unknown>(
   collection: string,
   state: MongoCollectionState,
   storageHash: string,
-): MongoReadPlan<Row> {
+): MongoQueryPlan<Row> {
   const stages: MongoReadStage[] = [];
 
   const singleFilter = state.filters.length === 1 ? state.filters[0] : undefined;
@@ -80,5 +81,6 @@ export function compileMongoQuery<Row = unknown>(
     lane: 'mongo-orm',
     paramDescriptors: [],
   };
-  return { collection, stages, meta };
+  const command = new AggregateCommand(collection, stages);
+  return { collection, command, meta };
 }

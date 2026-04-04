@@ -1,11 +1,11 @@
-import type { PlanMeta } from '@prisma-next/contract/types';
-import type { AnyMongoCommand, MongoReadPlan } from '@prisma-next/mongo-query-ast';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
 import {
   MongoFieldFilter,
   type MongoLimitStage,
   type MongoLookupStage,
   type MongoMatchStage,
   type MongoProjectStage,
+  type MongoReadStage,
   type MongoSkipStage,
   type MongoSortStage,
 } from '@prisma-next/mongo-query-ast';
@@ -18,31 +18,28 @@ import type { MongoQueryExecutor } from '../src/executor';
 
 const contract = ormContractJson as unknown as Contract;
 
-function createMockExecutor(
-  rows: unknown[] = [],
-  commandRows: unknown[] = [],
-): MongoQueryExecutor & {
-  lastPlan: MongoReadPlan | undefined;
-  lastCommand: AnyMongoCommand | undefined;
+function createMockExecutor(...responses: unknown[][]): MongoQueryExecutor & {
+  lastPlan: MongoQueryPlan | undefined;
+  readonly lastCommand: MongoQueryPlan['command'] | undefined;
+  readonly lastStages: ReadonlyArray<MongoReadStage> | undefined;
 } {
+  let callIndex = 0;
   const mock = {
-    lastPlan: undefined as MongoReadPlan | undefined,
-    lastCommand: undefined as AnyMongoCommand | undefined,
-    execute<Row>(plan: MongoReadPlan<Row>): AsyncIterableResult<Row> {
-      mock.lastPlan = plan as MongoReadPlan;
-      async function* gen(): AsyncGenerator<Row> {
-        for (const row of rows) {
-          yield row as Row;
-        }
-      }
-      return new AsyncIterableResult(gen());
+    lastPlan: undefined as MongoQueryPlan | undefined,
+    get lastCommand() {
+      return mock.lastPlan?.command;
     },
-    executeCommand<Row>(command: AnyMongoCommand, _meta: PlanMeta): AsyncIterableResult<Row> {
-      mock.lastCommand = command;
+    get lastStages(): ReadonlyArray<MongoReadStage> | undefined {
+      const cmd = mock.lastPlan?.command;
+      if (cmd?.kind === 'aggregate') return cmd.pipeline as ReadonlyArray<MongoReadStage>;
+      return undefined;
+    },
+    execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {
+      mock.lastPlan = plan as MongoQueryPlan;
+      const data = responses[callIndex] ?? [];
+      if (callIndex < responses.length - 1) callIndex++;
       async function* gen(): AsyncGenerator<Row> {
-        for (const row of commandRows) {
-          yield row as Row;
-        }
+        for (const row of data) yield row as Row;
       }
       return new AsyncIterableResult(gen());
     },
@@ -64,7 +61,7 @@ describe('MongoCollection chaining', () => {
       .where(MongoFieldFilter.eq('name', 'Alice'))
       .where(MongoFieldFilter.gte('email', 'a'));
     col.all();
-    const match = executor.lastPlan!.stages[0] as MongoMatchStage;
+    const match = executor.lastStages![0] as MongoMatchStage;
     expect(match.filter.kind).toBe('and');
   });
 
@@ -74,16 +71,14 @@ describe('MongoCollection chaining', () => {
     const selected = col.select('name');
     expect(selected).not.toBe(col);
     selected.all();
-    expect(executor.lastPlan!.stages.some((s) => s.kind === 'project')).toBe(true);
+    expect(executor.lastStages!.some((s) => s.kind === 'project')).toBe(true);
   });
 
   it('accumulates fields across multiple select() calls', () => {
     const executor = createMockExecutor();
     const col = createMongoCollection(contract, 'User', executor).select('name').select('_id');
     col.all();
-    const project = executor.lastPlan!.stages.find(
-      (s) => s.kind === 'project',
-    ) as MongoProjectStage;
+    const project = executor.lastStages!.find((s) => s.kind === 'project') as MongoProjectStage;
     expect(project.projection).toEqual({ name: 1, _id: 1 });
   });
 
@@ -93,7 +88,7 @@ describe('MongoCollection chaining', () => {
     const ordered = col.orderBy({ name: 1 });
     expect(ordered).not.toBe(col);
     ordered.all();
-    const sort = executor.lastPlan!.stages.find((s) => s.kind === 'sort') as MongoSortStage;
+    const sort = executor.lastStages!.find((s) => s.kind === 'sort') as MongoSortStage;
     expect(sort.sort).toEqual({ name: 1 });
   });
 
@@ -103,7 +98,7 @@ describe('MongoCollection chaining', () => {
       .orderBy({ name: 1 })
       .orderBy({ email: -1 });
     col.all();
-    const sort = executor.lastPlan!.stages.find((s) => s.kind === 'sort') as MongoSortStage;
+    const sort = executor.lastStages!.find((s) => s.kind === 'sort') as MongoSortStage;
     expect(sort.sort).toEqual({ name: 1, email: -1 });
   });
 
@@ -113,7 +108,7 @@ describe('MongoCollection chaining', () => {
     const limited = col.take(10);
     expect(limited).not.toBe(col);
     limited.all();
-    const limit = executor.lastPlan!.stages.find((s) => s.kind === 'limit') as MongoLimitStage;
+    const limit = executor.lastStages!.find((s) => s.kind === 'limit') as MongoLimitStage;
     expect(limit.limit).toBe(10);
   });
 
@@ -123,7 +118,7 @@ describe('MongoCollection chaining', () => {
     const skipped = col.skip(5);
     expect(skipped).not.toBe(col);
     skipped.all();
-    const skip = executor.lastPlan!.stages.find((s) => s.kind === 'skip') as MongoSkipStage;
+    const skip = executor.lastStages!.find((s) => s.kind === 'skip') as MongoSkipStage;
     expect(skip.skip).toBe(5);
   });
 
@@ -132,7 +127,7 @@ describe('MongoCollection chaining', () => {
     const col = createMongoCollection(contract, 'User', executor);
     col.where(MongoFieldFilter.eq('name', 'Alice'));
     col.all();
-    expect(executor.lastPlan!.stages).toHaveLength(0);
+    expect(executor.lastStages!).toHaveLength(0);
   });
 
   it('chains where, orderBy, take, skip together', () => {
@@ -143,7 +138,7 @@ describe('MongoCollection chaining', () => {
       .skip(10)
       .take(5);
     col.all();
-    const stageKinds = executor.lastPlan!.stages.map((s) => s.kind);
+    const stageKinds = executor.lastStages!.map((s) => s.kind);
     expect(stageKinds).toEqual(['match', 'sort', 'skip', 'limit']);
   });
 });
@@ -153,7 +148,7 @@ describe('MongoCollection include()', () => {
     const executor = createMockExecutor();
     const col = createMongoCollection(contract, 'Task', executor).include('assignee');
     col.all();
-    const lookup = executor.lastPlan!.stages.find((s) => s.kind === 'lookup') as MongoLookupStage;
+    const lookup = executor.lastStages!.find((s) => s.kind === 'lookup') as MongoLookupStage;
     expect(lookup.from).toBe('users');
     expect(lookup.localField).toBe('assigneeId');
     expect(lookup.foreignField).toBe('_id');
@@ -182,6 +177,7 @@ describe('MongoCollection terminal methods', () => {
     col.all();
     expect(executor.lastPlan).toBeDefined();
     expect(executor.lastPlan!.collection).toBe('users');
+    expect(executor.lastPlan!.command.kind).toBe('aggregate');
   });
 
   it('first() returns the first row', async () => {
@@ -195,7 +191,7 @@ describe('MongoCollection terminal methods', () => {
   });
 
   it('first() returns null when no results', async () => {
-    const executor = createMockExecutor([]);
+    const executor = createMockExecutor();
     const col = createMongoCollection(contract, 'User', executor);
     const result = await col.first();
     expect(result).toBeNull();
@@ -205,7 +201,7 @@ describe('MongoCollection terminal methods', () => {
     const executor = createMockExecutor([{ _id: '1', name: 'Alice', email: 'a@b.c' }]);
     const col = createMongoCollection(contract, 'User', executor);
     await col.first();
-    const limitStage = executor.lastPlan!.stages.find((s) => s.kind === 'limit') as
+    const limitStage = executor.lastStages!.find((s) => s.kind === 'limit') as
       | MongoLimitStage
       | undefined;
     expect(limitStage?.limit).toBe(1);
@@ -215,14 +211,14 @@ describe('MongoCollection terminal methods', () => {
 describe('MongoCollection write methods', () => {
   describe('create()', () => {
     it('returns created row with _id from insertedId', async () => {
-      const executor = createMockExecutor([], [{ insertedId: 'new-id-1' }]);
+      const executor = createMockExecutor([{ insertedId: 'new-id-1' }]);
       const col = createMongoCollection(contract, 'User', executor);
       const result = await col.create({ name: 'Alice', email: 'a@b.c' });
       expect(result).toEqual({ _id: 'new-id-1', name: 'Alice', email: 'a@b.c' });
     });
 
     it('sends an InsertOneCommand', async () => {
-      const executor = createMockExecutor([], [{ insertedId: 'id' }]);
+      const executor = createMockExecutor([{ insertedId: 'id' }]);
       const col = createMongoCollection(contract, 'User', executor);
       await col.create({ name: 'Bob', email: 'b@b.c' });
       expect(executor.lastCommand).toBeDefined();
@@ -233,10 +229,7 @@ describe('MongoCollection write methods', () => {
 
   describe('createAll()', () => {
     it('returns all created rows with _ids', async () => {
-      const executor = createMockExecutor(
-        [],
-        [{ insertedIds: ['id-1', 'id-2'], insertedCount: 2 }],
-      );
+      const executor = createMockExecutor([{ insertedIds: ['id-1', 'id-2'], insertedCount: 2 }]);
       const col = createMongoCollection(contract, 'User', executor);
       const rows: unknown[] = [];
       for await (const row of col.createAll([
@@ -254,7 +247,7 @@ describe('MongoCollection write methods', () => {
 
   describe('createCount()', () => {
     it('returns the count of inserted documents', async () => {
-      const executor = createMockExecutor([], [{ insertedIds: ['a', 'b'], insertedCount: 2 }]);
+      const executor = createMockExecutor([{ insertedIds: ['a', 'b'], insertedCount: 2 }]);
       const col = createMongoCollection(contract, 'User', executor);
       const count = await col.createCount([
         { name: 'Alice', email: 'a@b.c' },
@@ -272,7 +265,7 @@ describe('MongoCollection write methods', () => {
     });
 
     it('returns updated row via findOneAndUpdate', async () => {
-      const executor = createMockExecutor([], [{ _id: 'id-1', name: 'Updated', email: 'a@b.c' }]);
+      const executor = createMockExecutor([{ _id: 'id-1', name: 'Updated', email: 'a@b.c' }]);
       const col = createMongoCollection(contract, 'User', executor);
       const result = await col
         .where(MongoFieldFilter.eq('_id', 'id-1'))
@@ -282,7 +275,7 @@ describe('MongoCollection write methods', () => {
     });
 
     it('passes MongoFilterExpr to command', async () => {
-      const executor = createMockExecutor([], [{ _id: 'id-1', name: 'Updated', email: 'a@b.c' }]);
+      const executor = createMockExecutor([{ _id: 'id-1', name: 'Updated', email: 'a@b.c' }]);
       const col = createMongoCollection(contract, 'User', executor);
       await col.where(MongoFieldFilter.eq('_id', 'id-1')).update({ name: 'Updated' });
       const command = executor.lastCommand!;
@@ -294,7 +287,7 @@ describe('MongoCollection write methods', () => {
     });
 
     it('returns null when no match', async () => {
-      const executor = createMockExecutor([], []);
+      const executor = createMockExecutor();
       const col = createMongoCollection(contract, 'User', executor);
       const result = await col.where(MongoFieldFilter.eq('_id', 'missing')).update({ name: 'X' });
       expect(result).toBeNull();
@@ -309,7 +302,7 @@ describe('MongoCollection write methods', () => {
     });
 
     it('returns the modified count', async () => {
-      const executor = createMockExecutor([], [{ matchedCount: 3, modifiedCount: 3 }]);
+      const executor = createMockExecutor([{ matchedCount: 3, modifiedCount: 3 }]);
       const col = createMongoCollection(contract, 'User', executor);
       const count = await col.where(MongoFieldFilter.eq('email', 'a')).updateCount({ name: 'X' });
       expect(count).toBe(3);
@@ -324,7 +317,7 @@ describe('MongoCollection write methods', () => {
     });
 
     it('returns deleted row via findOneAndDelete', async () => {
-      const executor = createMockExecutor([], [{ _id: 'id-1', name: 'Alice', email: 'a@b.c' }]);
+      const executor = createMockExecutor([{ _id: 'id-1', name: 'Alice', email: 'a@b.c' }]);
       const col = createMongoCollection(contract, 'User', executor);
       const result = await col.where(MongoFieldFilter.eq('_id', 'id-1')).delete();
       expect(result).toEqual({ _id: 'id-1', name: 'Alice', email: 'a@b.c' });
@@ -332,7 +325,7 @@ describe('MongoCollection write methods', () => {
     });
 
     it('passes MongoFilterExpr to command', async () => {
-      const executor = createMockExecutor([], [{ _id: 'id-1', name: 'Alice', email: 'a@b.c' }]);
+      const executor = createMockExecutor([{ _id: 'id-1', name: 'Alice', email: 'a@b.c' }]);
       const col = createMongoCollection(contract, 'User', executor);
       await col.where(MongoFieldFilter.eq('_id', 'id-1')).delete();
       const command = executor.lastCommand!;
@@ -343,7 +336,7 @@ describe('MongoCollection write methods', () => {
     });
 
     it('returns null when no match', async () => {
-      const executor = createMockExecutor([], []);
+      const executor = createMockExecutor();
       const col = createMongoCollection(contract, 'User', executor);
       const result = await col.where(MongoFieldFilter.eq('_id', 'none')).delete();
       expect(result).toBeNull();
@@ -358,7 +351,7 @@ describe('MongoCollection write methods', () => {
     });
 
     it('returns the deleted count', async () => {
-      const executor = createMockExecutor([], [{ deletedCount: 2 }]);
+      const executor = createMockExecutor([{ deletedCount: 2 }]);
       const col = createMongoCollection(contract, 'User', executor);
       const count = await col.where(MongoFieldFilter.eq('email', 'x')).deleteCount();
       expect(count).toBe(2);
@@ -367,7 +360,7 @@ describe('MongoCollection write methods', () => {
 
   describe('upsert()', () => {
     it('sends findOneAndUpdate with upsert true', async () => {
-      const executor = createMockExecutor([], [{ _id: 'new-id', name: 'Alice', email: 'a@b.c' }]);
+      const executor = createMockExecutor([{ _id: 'new-id', name: 'Alice', email: 'a@b.c' }]);
       const col = createMongoCollection(contract, 'User', executor);
       const result = await col.upsert({
         create: { name: 'Alice', email: 'a@b.c' },
@@ -378,7 +371,7 @@ describe('MongoCollection write methods', () => {
     });
 
     it('passes null filter when no where clause', async () => {
-      const executor = createMockExecutor([], [{ _id: 'id', name: 'A', email: 'a@b.c' }]);
+      const executor = createMockExecutor([{ _id: 'id', name: 'A', email: 'a@b.c' }]);
       const col = createMongoCollection(contract, 'User', executor);
       await col.upsert({
         create: { name: 'A', email: 'a@b.c' },
@@ -394,7 +387,7 @@ describe('MongoCollection write methods', () => {
 
   describe('immutability', () => {
     it('write methods do not mutate collection state', async () => {
-      const executor = createMockExecutor([], [{ insertedId: 'x' }]);
+      const executor = createMockExecutor([{ insertedId: 'x' }]);
       const col = createMongoCollection(contract, 'User', executor);
       await col.create({ name: 'Alice', email: 'a@b.c' });
       const filtered = col.where(MongoFieldFilter.eq('name', 'Alice'));

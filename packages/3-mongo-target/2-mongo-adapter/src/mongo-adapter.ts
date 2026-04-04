@@ -2,10 +2,8 @@ import type {
   AnyMongoWireCommand,
   Document,
   MongoAdapter,
-  MongoCommandLike,
   MongoExpr,
-  MongoLoweringContext,
-  MongoReadPlanLike,
+  MongoQueryPlanLike,
 } from '@prisma-next/mongo-core';
 import {
   AggregateWireCommand,
@@ -18,7 +16,7 @@ import {
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
-import type { AnyMongoCommand, MongoReadStage } from '@prisma-next/mongo-query-ast';
+import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast';
 import { lowerFilter, lowerPipeline } from './lowering';
 import { resolveValue } from './resolve-value';
 
@@ -31,13 +29,8 @@ function resolveDocument(expr: MongoExpr): Document {
 }
 
 class MongoAdapterImpl implements MongoAdapter {
-  lowerReadPlan(plan: MongoReadPlanLike): AggregateWireCommand {
-    const rawPipeline = lowerPipeline(plan.stages as ReadonlyArray<MongoReadStage>);
-    return new AggregateWireCommand(plan.collection, rawPipeline);
-  }
-
-  lowerCommand(commandLike: MongoCommandLike, _context: MongoLoweringContext): AnyMongoWireCommand {
-    const command = commandLike as AnyMongoCommand;
+  lower(plan: MongoQueryPlanLike): AnyMongoWireCommand {
+    const command = plan.command as AnyMongoCommand;
     switch (command.kind) {
       case 'insertOne':
         return new InsertOneWireCommand(command.collection, resolveDocument(command.document));
@@ -72,10 +65,7 @@ class MongoAdapterImpl implements MongoAdapter {
       case 'findOneAndDelete':
         return new FindOneAndDeleteWireCommand(command.collection, lowerFilter(command.filter));
       case 'aggregate':
-        return new AggregateWireCommand(
-          command.collection,
-          command.pipeline.map((stage) => ({ ...stage })),
-        );
+        return new AggregateWireCommand(command.collection, lowerPipeline(command.pipeline));
       // v8 ignore next 4
       default: {
         const _exhaustive: never = command;

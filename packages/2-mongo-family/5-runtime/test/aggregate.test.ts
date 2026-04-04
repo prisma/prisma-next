@@ -18,7 +18,11 @@ describe('aggregate integration', () => {
         { $group: { _id: '$department', total: { $sum: '$amount' } } },
         { $sort: { _id: 1 } },
       ]);
-      const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
+      const rows = await ctx.runtime.execute({
+        collection: collectionName,
+        command,
+        meta: ctx.stubMeta,
+      });
       expect(rows).toHaveLength(2);
 
       const typed = rows as Array<{ _id: string; total: number }>;

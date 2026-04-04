@@ -1,4 +1,4 @@
-export type { AnyMongoCommand } from '../commands';
+export type { AggregatePipelineEntry, AnyMongoCommand } from '../commands';
 export {
   AggregateCommand,
   DeleteManyCommand,
@@ -18,7 +18,7 @@ export {
   MongoNotExpr,
   MongoOrExpr,
 } from '../filter-expressions';
-export type { MongoReadPlan } from '../read-plan';
+export type { MongoQueryPlan } from '../query-plan';
 export type { MongoReadStage } from '../stages';
 export {
   MongoLimitStage,

@@ -1,14 +1,16 @@
 # @prisma-next/mongo-query-ast
 
-Typed AST for MongoDB aggregation pipelines with lowering to wire format.
+Typed AST for MongoDB filters, pipeline stages, and command variants, plus the unified **query plan** envelope.
 
 ## Responsibilities
 
 - **Filter expressions**: Composable typed filter nodes (`MongoFieldFilter`, `MongoAndExpr`, `MongoOrExpr`, `MongoNotExpr`, `MongoExistsExpr`) representing `$match` predicates
 - **Pipeline stages**: Typed stage classes (`MongoMatchStage`, `MongoProjectStage`, `MongoSortStage`, `MongoLimitStage`, `MongoSkipStage`, `MongoLookupStage`, `MongoUnwindStage`) that model aggregation pipeline operations
-- **Read plan**: `MongoReadPlan<Row>` — a branded typed representation of a complete read query (collection + stages + metadata)
-- **Lowering**: `lowerPipeline`, `lowerStage`, `lowerFilter` — convert typed AST nodes into raw MongoDB aggregation pipeline documents
+- **Commands**: `AnyMongoCommand` and related command types (reads, writes, aggregates) carried on a plan
+- **Query plan**: `MongoQueryPlan<Row>` — a branded typed representation with shape `{ collection, command: AnyMongoCommand, meta: PlanMeta }`
 - **Visitors**: `MongoFilterVisitor`, `MongoFilterRewriter`, `MongoStageVisitor` interfaces for traversing and transforming AST nodes
+
+Lowering typed nodes to wire BSON is performed by `@prisma-next/adapter-mongo` via `lower(plan)` on `MongoQueryPlanLike`, which dispatches on `command.kind` and uses internal helpers for filters and pipelines.
 
 ## Dependencies
 
@@ -16,5 +18,5 @@ Typed AST for MongoDB aggregation pipelines with lowering to wire format.
   - `@prisma-next/contract` (plan metadata types)
   - `@prisma-next/mongo-core` (document types, param resolution)
 - **Depended on by**:
-  - `@prisma-next/mongo-orm` (compiles ORM queries into read plans)
-  - `@prisma-next/adapter-mongo` (lowers read plans to wire commands)
+  - `@prisma-next/mongo-orm` (compiles ORM queries into `MongoQueryPlan`)
+  - `@prisma-next/adapter-mongo` (`lower(plan)` from `MongoQueryPlanLike` to wire commands)

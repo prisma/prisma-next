@@ -1,9 +1,4 @@
-export type {
-  MongoAdapter,
-  MongoCommandLike,
-  MongoLoweringContext,
-  MongoReadPlanLike,
-} from '../adapter-types';
+export type { MongoAdapter, MongoLoweringContext, MongoQueryPlanLike } from '../adapter-types';
 export type { MongoCodecRegistry } from '../codec-registry';
 export { createMongoCodecRegistry } from '../codec-registry';
 export type { MongoCodec, MongoCodecJsType, MongoCodecTrait, MongoCodecTraits } from '../codecs';
@@ -23,7 +18,6 @@ export type {
 } from '../contract-types';
 export type { MongoDriver } from '../driver-types';
 export { MongoParamRef } from '../param-ref';
-export type { MongoExecutionPlan } from '../plan';
 export type {
   DeleteManyResult,
   DeleteOneResult,

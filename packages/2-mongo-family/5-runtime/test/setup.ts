@@ -1,8 +1,6 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
 import type { PlanMeta } from '@prisma-next/contract/types';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import type { MongoLoweringContext } from '@prisma-next/mongo-core';
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -35,20 +33,7 @@ export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Pro
 
   const adapter = createMongoAdapter();
   const driver = await createMongoDriver(connectionUri, dbName);
-  const loweringContext: MongoLoweringContext = {
-    contract: {
-      target: 'mongo',
-      targetFamily: 'mongo',
-      roots: {},
-      storage: { storageHash: coreHash('sha256:test'), collections: {} },
-      models: {},
-      capabilities: {},
-      extensionPacks: {},
-      profileHash: profileHash('sha256:test'),
-      meta: {},
-    },
-  };
-  const runtime = createMongoRuntime({ adapter, driver, loweringContext });
+  const runtime = createMongoRuntime({ adapter, driver });
 
   const ctx: MongodContext = {
     connectionUri,

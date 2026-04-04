@@ -12,7 +12,11 @@ describe('insertMany integration', () => {
         { name: new MongoParamRef('Alice'), age: 30 },
         { name: new MongoParamRef('Bob'), age: 25 },
       ]);
-      const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
+      const rows = await ctx.runtime.execute({
+        collection: collectionName,
+        command,
+        meta: ctx.stubMeta,
+      });
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ insertedCount: 2 });
       expect((rows[0] as { insertedIds: unknown[] }).insertedIds).toHaveLength(2);

@@ -1,6 +1,5 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import type { MongoLoweringContext } from '@prisma-next/mongo-core';
 import { validateMongoContract } from '@prisma-next/mongo-core';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtime';
@@ -12,8 +11,7 @@ const { contract } = validateMongoContract<Contract>(contractJson);
 export async function createClient(connectionUri: string, dbName: string) {
   const adapter = createMongoAdapter();
   const driver = await createMongoDriver(connectionUri, dbName);
-  const loweringContext: MongoLoweringContext = { contract };
-  const runtime = createMongoRuntime({ adapter, driver, loweringContext });
+  const runtime = createMongoRuntime({ adapter, driver });
   const orm = mongoOrm({ contract, executor: runtime });
 
   return { orm, runtime, contract };

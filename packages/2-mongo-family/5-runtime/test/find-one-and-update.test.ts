@@ -17,7 +17,11 @@ describe('findOneAndUpdate integration', () => {
         { $set: { age: 31 } },
         false,
       );
-      const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
+      const rows = await ctx.runtime.execute({
+        collection: collectionName,
+        command,
+        meta: ctx.stubMeta,
+      });
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ name: 'Grace', age: 31 });
     });
@@ -31,7 +35,11 @@ describe('findOneAndUpdate integration', () => {
         { $set: { age: 20 } },
         true,
       );
-      const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
+      const rows = await ctx.runtime.execute({
+        collection: collectionName,
+        command,
+        meta: ctx.stubMeta,
+      });
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ name: 'NewUser', age: 20 });
     });
