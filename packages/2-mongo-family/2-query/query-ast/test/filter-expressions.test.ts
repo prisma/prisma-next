@@ -59,6 +59,10 @@ describe('MongoAndExpr', () => {
     expect(and.exprs).toHaveLength(2);
   });
 
+  it('rejects empty expression array', () => {
+    expect(() => MongoAndExpr.of([])).toThrow('$and requires at least one expression');
+  });
+
   it('is frozen after construction', () => {
     const and = MongoAndExpr.of([MongoFieldFilter.eq('x', 1)]);
     expect(Object.isFrozen(and)).toBe(true);
@@ -73,6 +77,10 @@ describe('MongoOrExpr', () => {
     const or = MongoOrExpr.of([a, b]);
     expect(or.kind).toBe('or');
     expect(or.exprs).toHaveLength(2);
+  });
+
+  it('rejects empty expression array', () => {
+    expect(() => MongoOrExpr.of([])).toThrow('$or requires at least one expression');
   });
 
   it('is frozen after construction', () => {
