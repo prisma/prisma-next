@@ -6,8 +6,13 @@ export { mongoCodec } from '../codecs';
 export type { AnyMongoCommand } from '../commands';
 export {
   AggregateCommand,
+  DeleteManyCommand,
   DeleteOneCommand,
+  FindOneAndDeleteCommand,
+  FindOneAndUpdateCommand,
+  InsertManyCommand,
   InsertOneCommand,
+  UpdateManyCommand,
   UpdateOneCommand,
 } from '../commands';
 export type {
@@ -26,7 +31,14 @@ export type {
 export type { MongoDriver } from '../driver-types';
 export { MongoParamRef } from '../param-ref';
 export type { MongoExecutionPlan } from '../plan';
-export type { DeleteOneResult, InsertOneResult, UpdateOneResult } from '../results';
+export type {
+  DeleteManyResult,
+  DeleteOneResult,
+  InsertManyResult,
+  InsertOneResult,
+  UpdateManyResult,
+  UpdateOneResult,
+} from '../results';
 export type {
   DomainContractShape,
   DomainModelShape,
@@ -49,7 +61,12 @@ export type {
 export type { AnyMongoWireCommand } from '../wire-commands';
 export {
   AggregateWireCommand,
+  DeleteManyWireCommand,
   DeleteOneWireCommand,
+  FindOneAndDeleteWireCommand,
+  FindOneAndUpdateWireCommand,
+  InsertManyWireCommand,
   InsertOneWireCommand,
+  UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '../wire-commands';
