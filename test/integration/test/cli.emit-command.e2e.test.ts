@@ -96,7 +96,7 @@ withTempDir(({ createTempDir }) => {
         // Verify JSON output matches actual files
         expect(parsed.files.json).toBe(contractJsonPath);
         expect(parsed.files.dts).toBe(contractDtsPath);
-        expect(parsed.storageHash).toBe(contractJson.storage.storageHash);
+        expect(parsed.storageHash).toBe(contractJson.storageHash);
       },
       timeouts.typeScriptCompilation,
     );

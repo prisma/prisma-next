@@ -2,6 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
+  "storageHash": "sha256:b2ebe614b4dd858b83770dec78fbcb187e5aac60ce3cf4099a26b4ee48b79507",
   "profileHash": "sha256:dac42ff24bf5238eef80f2fd845d34eab8e6381ddafc571bed5e4af1ea61b9b8",
   "roots": {
     "document": "Document"
@@ -31,7 +32,6 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:b2ebe614b4dd858b83770dec78fbcb187e5aac60ce3cf4099a26b4ee48b79507",
     "tables": {
       "document": {
         "columns": {
