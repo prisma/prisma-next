@@ -1,4 +1,9 @@
-import type { Contract, TargetFamilyHook, ValidationContext } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  StorageBase,
+  TargetFamilyHook,
+  ValidationContext,
+} from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { format } from 'prettier';
@@ -29,31 +34,11 @@ const CanonicalContractSchema = type({
   meta: CanonicalMetaSchema,
 });
 
-function stripStrategyFromRelations(
-  relations: Record<string, Record<string, unknown>> | undefined,
-): Record<string, Record<string, unknown>> | undefined {
-  if (!relations) return undefined;
-  const result: Record<string, Record<string, unknown>> = {};
-  for (const [relName, rel] of Object.entries(relations)) {
-    const { strategy: _, ...rest } = rel;
-    result[relName] = rest;
-  }
-  return result;
-}
-
-function stripRelationStrategies(models: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [modelName, modelUnknown] of Object.entries(models)) {
-    const model = modelUnknown as Record<string, unknown>;
-    const relations = model['relations'] as Record<string, Record<string, unknown>> | undefined;
-    const cleanedRelations = stripStrategyFromRelations(relations);
-
-    result[modelName] = {
-      ...model,
-      ...(cleanedRelations !== undefined ? { relations: cleanedRelations } : {}),
-    };
-  }
-  return result;
+function stripStorageHash(storage: StorageBase): Record<string, unknown> {
+  const { storageHash: _, ...rest } = storage as Record<string, unknown> & {
+    storageHash: unknown;
+  };
+  return rest;
 }
 
 function assertCanonicalArtifactShape(value: unknown): void {
@@ -94,18 +79,13 @@ export async function emit(
 
   targetFamily.validateStructure(contract);
 
-  const { storageHash: _sh, ...storageWithoutHash } = contract.storage as Record<
-    string,
-    unknown
-  > & { storageHash: unknown };
-
   const canonicalContract = {
     schemaVersion: SCHEMA_VERSION,
     targetFamily: contract.targetFamily,
     target: contract.target,
     roots: contract.roots,
-    models: stripRelationStrategies(contract.models as Record<string, unknown>),
-    storage: storageWithoutHash,
+    models: contract.models as Record<string, unknown>,
+    storage: stripStorageHash(contract.storage),
     ...ifDefined('execution', contract.execution),
     extensionPacks: contract.extensionPacks,
     capabilities: contract.capabilities,
