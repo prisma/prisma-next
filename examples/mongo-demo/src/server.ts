@@ -122,7 +122,9 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error('Fatal:', err);
-  process.exit(1);
-});
+if (import.meta.filename === process.argv[1]) {
+  main().catch((err) => {
+    console.error('Fatal:', err);
+    process.exit(1);
+  });
+}
