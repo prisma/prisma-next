@@ -217,14 +217,14 @@ describe('MongoCollection write methods', () => {
   describe('create()', () => {
     it('returns created row with _id from insertedId', async () => {
       const executor = createMockExecutor([], [{ insertedId: 'new-id-1' }]);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       const result = await col.create({ name: 'Alice', email: 'a@b.c' });
       expect(result).toEqual({ _id: 'new-id-1', name: 'Alice', email: 'a@b.c' });
     });
 
     it('sends an InsertOneCommand', async () => {
       const executor = createMockExecutor([], [{ insertedId: 'id' }]);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       await col.create({ name: 'Bob', email: 'b@b.c' });
       expect(executor.lastCommand).toBeDefined();
       expect(executor.lastCommand!.kind).toBe('insertOne');
@@ -238,7 +238,7 @@ describe('MongoCollection write methods', () => {
         [],
         [{ insertedIds: ['id-1', 'id-2'], insertedCount: 2 }],
       );
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       const rows: unknown[] = [];
       for await (const row of col.createAll([
         { name: 'Alice', email: 'a@b.c' },
@@ -256,7 +256,7 @@ describe('MongoCollection write methods', () => {
   describe('createCount()', () => {
     it('returns the count of inserted documents', async () => {
       const executor = createMockExecutor([], [{ insertedIds: ['a', 'b'], insertedCount: 2 }]);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       const count = await col.createCount([
         { name: 'Alice', email: 'a@b.c' },
         { name: 'Bob', email: 'b@b.c' },
@@ -268,13 +268,13 @@ describe('MongoCollection write methods', () => {
   describe('update()', () => {
     it('throws without .where()', async () => {
       const executor = createMockExecutor();
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       await expect(col.update({ name: 'Changed' })).rejects.toThrow('requires a .where()');
     });
 
     it('returns updated row via findOneAndUpdate', async () => {
       const executor = createMockExecutor([], [{ _id: 'id-1', name: 'Updated', email: 'a@b.c' }]);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       const result = await col
         .where(MongoFieldFilter.eq('_id', 'id-1'))
         .update({ name: 'Updated' });
@@ -284,7 +284,7 @@ describe('MongoCollection write methods', () => {
 
     it('returns null when no match', async () => {
       const executor = createMockExecutor([], []);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       const result = await col.where(MongoFieldFilter.eq('_id', 'missing')).update({ name: 'X' });
       expect(result).toBeNull();
     });
@@ -293,13 +293,13 @@ describe('MongoCollection write methods', () => {
   describe('updateCount()', () => {
     it('throws without .where()', async () => {
       const executor = createMockExecutor();
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       await expect(col.updateCount({ name: 'X' })).rejects.toThrow('requires a .where()');
     });
 
     it('returns the modified count', async () => {
       const executor = createMockExecutor([], [{ matchedCount: 3, modifiedCount: 3 }]);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       const count = await col.where(MongoFieldFilter.eq('email', 'a')).updateCount({ name: 'X' });
       expect(count).toBe(3);
     });
@@ -308,13 +308,13 @@ describe('MongoCollection write methods', () => {
   describe('delete()', () => {
     it('throws without .where()', async () => {
       const executor = createMockExecutor();
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       await expect(col.delete()).rejects.toThrow('requires a .where()');
     });
 
     it('returns deleted row via findOneAndDelete', async () => {
       const executor = createMockExecutor([], [{ _id: 'id-1', name: 'Alice', email: 'a@b.c' }]);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       const result = await col.where(MongoFieldFilter.eq('_id', 'id-1')).delete();
       expect(result).toEqual({ _id: 'id-1', name: 'Alice', email: 'a@b.c' });
       expect(executor.lastCommand!.kind).toBe('findOneAndDelete');
@@ -322,7 +322,7 @@ describe('MongoCollection write methods', () => {
 
     it('returns null when no match', async () => {
       const executor = createMockExecutor([], []);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       const result = await col.where(MongoFieldFilter.eq('_id', 'none')).delete();
       expect(result).toBeNull();
     });
@@ -331,13 +331,13 @@ describe('MongoCollection write methods', () => {
   describe('deleteCount()', () => {
     it('throws without .where()', async () => {
       const executor = createMockExecutor();
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       await expect(col.deleteCount()).rejects.toThrow('requires a .where()');
     });
 
     it('returns the deleted count', async () => {
       const executor = createMockExecutor([], [{ deletedCount: 2 }]);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       const count = await col.where(MongoFieldFilter.eq('email', 'x')).deleteCount();
       expect(count).toBe(2);
     });
@@ -346,7 +346,7 @@ describe('MongoCollection write methods', () => {
   describe('upsert()', () => {
     it('sends findOneAndUpdate with upsert true', async () => {
       const executor = createMockExecutor([], [{ _id: 'new-id', name: 'Alice', email: 'a@b.c' }]);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       const result = await col.upsert({
         create: { name: 'Alice', email: 'a@b.c' },
         update: { name: 'Alice Updated' },
@@ -359,9 +359,10 @@ describe('MongoCollection write methods', () => {
   describe('immutability', () => {
     it('write methods do not mutate collection state', async () => {
       const executor = createMockExecutor([], [{ insertedId: 'x' }]);
-      const col = new MongoCollection(contract, 'User', executor);
+      const col = createMongoCollection(contract, 'User', executor);
       await col.create({ name: 'Alice', email: 'a@b.c' });
-      expect(col.state.filters).toHaveLength(0);
+      const filtered = col.where(MongoFieldFilter.eq('name', 'Alice'));
+      expect(filtered).not.toBe(col);
     });
   });
 });

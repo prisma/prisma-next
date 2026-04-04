@@ -17,11 +17,11 @@ import {
   UpdateManyCommand,
 } from '@prisma-next/mongo-core';
 import type { MongoFilterExpr, MongoReadPlan } from '@prisma-next/mongo-query-ast';
-import { lowerFilter, MongoAndExpr } from '@prisma-next/mongo-query-ast';
+import { MongoAndExpr } from '@prisma-next/mongo-query-ast';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';
-import { compileMongoQuery } from './compile';
+import { compileFilter, compileMongoQuery } from './compile';
 import type { MongoQueryExecutor } from './executor';
 import type {
   CreateInput,
@@ -56,6 +56,27 @@ export interface MongoCollection<
   skip(n: number): MongoCollection<TContract, ModelName, TIncludes>;
   all(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
   first(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
+  create(
+    data: CreateInput<TContract, ModelName>,
+  ): Promise<IncludedRow<TContract, ModelName, TIncludes>>;
+  createAll(
+    data: ReadonlyArray<CreateInput<TContract, ModelName>>,
+  ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
+  createCount(data: ReadonlyArray<CreateInput<TContract, ModelName>>): Promise<number>;
+  update(
+    data: Partial<DefaultModelRow<TContract, ModelName>>,
+  ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
+  updateAll(
+    data: Partial<DefaultModelRow<TContract, ModelName>>,
+  ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
+  updateCount(data: Partial<DefaultModelRow<TContract, ModelName>>): Promise<number>;
+  delete(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
+  deleteAll(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
+  deleteCount(): Promise<number>;
+  upsert(input: {
+    create: CreateInput<TContract, ModelName>;
+    update: Partial<DefaultModelRow<TContract, ModelName>>;
+  }): Promise<IncludedRow<TContract, ModelName, TIncludes>>;
 }
 
 function resolveCollectionName(model: MongoModelDefinition, modelName: string): string {
@@ -281,7 +302,7 @@ class MongoCollectionImpl<
     create: CreateInput<TContract, ModelName>;
     update: Partial<DefaultModelRow<TContract, ModelName>>;
   }): Promise<IncludedRow<TContract, ModelName, TIncludes>> {
-    const filter = this.state.filters.length > 0 ? this.#compileFilter() : {};
+    const filter = this.#state.filters.length > 0 ? this.#compileFilter() : {};
     const setFields = this.#toSetFields(input.update as Record<string, unknown>);
     const allCreateFields = this.#toDocument(input.create as Record<string, unknown>);
     const setKeys = new Set(Object.keys(setFields));
@@ -339,13 +360,13 @@ class MongoCollectionImpl<
   }
 
   #compileFilter(): Record<string, MongoValue> {
-    const singleFilter = this.state.filters.length === 1 ? this.state.filters[0] : undefined;
-    const filterExpr = singleFilter ?? MongoAndExpr.of([...this.state.filters]);
-    return lowerFilter(filterExpr) as Record<string, MongoValue>;
+    const singleFilter = this.#state.filters.length === 1 ? this.#state.filters[0] : undefined;
+    const filterExpr = singleFilter ?? MongoAndExpr.of([...this.#state.filters]);
+    return compileFilter(filterExpr) as Record<string, MongoValue>;
   }
 
   #requireFilters(methodName: string): void {
-    if (this.state.filters.length === 0) {
+    if (this.#state.filters.length === 0) {
       throw new Error(
         `${methodName}() requires a .where() filter. Call .where() before .${methodName}()`,
       );
