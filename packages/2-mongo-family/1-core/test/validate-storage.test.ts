@@ -9,7 +9,6 @@ function makeMinimalContract(overrides: Partial<MongoContract> = {}): MongoContr
   return {
     target: 'mongo',
     targetFamily: 'mongo',
-    storageHash: 'test-hash',
     roots: { items: 'Item' },
     storage: { storageHash: DUMMY_HASH, collections: { items: {} } },
     models: {
