@@ -155,8 +155,10 @@ describe('emit parity fixtures', () => {
           expect(pslEmitFirst.storageHash).toBe(tsEmitFirst.storageHash);
           expect(pslEmitFirst.profileHash).toBe(tsEmitFirst.profileHash);
 
-          const tsExecutionHash = tsContractJson['executionHash'];
-          const pslExecutionHash = pslContractJson['executionHash'];
+          const tsExecution = tsContractJson['execution'] as Record<string, unknown> | undefined;
+          const pslExecution = pslContractJson['execution'] as Record<string, unknown> | undefined;
+          const tsExecutionHash = tsExecution?.['executionHash'];
+          const pslExecutionHash = pslExecution?.['executionHash'];
           expect(pslExecutionHash).toBe(tsExecutionHash);
           if (tsExecutionHash !== undefined) {
             expect(typeof tsExecutionHash).toBe('string');

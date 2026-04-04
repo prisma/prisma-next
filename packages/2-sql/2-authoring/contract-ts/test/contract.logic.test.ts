@@ -50,6 +50,7 @@ describe('validateContract logic validation', () => {
     const invalid = {
       ...validContractInput,
       execution: {
+        executionHash: 'sha256:test',
         mutations: {
           defaults: [
             {

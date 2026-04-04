@@ -1,6 +1,6 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import type {
-  ExecutionHashBase,
+  ExecutionSection,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -126,12 +126,10 @@ export function storage(
 
 export function contract<
   TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
-  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
 >(opts: {
   target: string;
   storageHash: TStorageHash;
-  executionHash?: TExecutionHash;
   storage: SqlStorage;
   models?: Record<string, unknown>;
   schemaVersion?: '1';
@@ -141,20 +139,21 @@ export function contract<
   extensionPacks?: Record<string, unknown>;
   meta?: Record<string, unknown>;
   sources?: Record<string, unknown>;
-}): SqlContract<SqlStorage, Record<string, unknown>, TStorageHash, TExecutionHash, TProfileHash> {
+  execution?: ExecutionSection;
+}): SqlContract<SqlStorage, Record<string, unknown>, TStorageHash, TProfileHash> {
   return {
     schemaVersion: opts.schemaVersion ?? '1',
     target: opts.target,
     targetFamily: opts.targetFamily ?? 'sql',
     storageHash: opts.storageHash,
-    ...(opts.executionHash !== undefined && { executionHash: opts.executionHash }),
     storage: opts.storage,
     models: opts.models ?? {},
     roots: {},
+    ...(opts.execution !== undefined && { execution: opts.execution }),
     ...(opts.profileHash !== undefined && { profileHash: opts.profileHash }),
     ...(opts.capabilities !== undefined && { capabilities: opts.capabilities }),
     ...(opts.extensionPacks !== undefined && { extensionPacks: opts.extensionPacks }),
     ...(opts.meta !== undefined && { meta: opts.meta }),
     ...(opts.sources !== undefined && { sources: opts.sources as Record<string, unknown> }),
-  } as SqlContract<SqlStorage, Record<string, unknown>, TStorageHash, TExecutionHash, TProfileHash>;
+  } as SqlContract<SqlStorage, Record<string, unknown>, TStorageHash, TProfileHash>;
 }
