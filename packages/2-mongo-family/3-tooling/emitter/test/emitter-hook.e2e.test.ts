@@ -1,7 +1,7 @@
 import type { TypesImportSpec } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { mongoTargetFamilyHook } from '../src/index';
-import { blogContractIR } from './fixtures/blog-contract-ir';
+import { blogContract } from './fixtures/blog-contract';
 
 const testHashes = { storageHash: 'sha256:blog-test', profileHash: 'sha256:blog-profile' };
 
@@ -14,14 +14,14 @@ const mongoCodecImports: TypesImportSpec[] = [
 ];
 
 describe('Mongo emitter hook end-to-end (blog fixture)', () => {
-  it('validates the blog contract IR', () => {
-    expect(() => mongoTargetFamilyHook.validateTypes(blogContractIR, {})).not.toThrow();
-    expect(() => mongoTargetFamilyHook.validateStructure(blogContractIR)).not.toThrow();
+  it('validates the blog contract', () => {
+    expect(() => mongoTargetFamilyHook.validateTypes(blogContract, {})).not.toThrow();
+    expect(() => mongoTargetFamilyHook.validateStructure(blogContract)).not.toThrow();
   });
 
-  it('generates complete contract.d.ts from blog IR', () => {
+  it('generates complete contract.d.ts from blog contract', () => {
     const types = mongoTargetFamilyHook.generateContractTypes(
-      blogContractIR,
+      blogContract,
       mongoCodecImports,
       [],
       testHashes,
@@ -68,7 +68,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
   });
 
   it('generates storage section with collections', () => {
-    const types = mongoTargetFamilyHook.generateContractTypes(blogContractIR, [], [], testHashes);
+    const types = mongoTargetFamilyHook.generateContractTypes(blogContract, [], [], testHashes);
 
     expect(types).toContain('readonly collections:');
     expect(types).toContain('readonly users: Record<string, never>');
@@ -76,7 +76,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
   });
 
   it('generates Comment model with owner and empty storage', () => {
-    const types = mongoTargetFamilyHook.generateContractTypes(blogContractIR, [], [], testHashes);
+    const types = mongoTargetFamilyHook.generateContractTypes(blogContract, [], [], testHashes);
 
     expect(types).toContain(
       "readonly text: { readonly codecId: 'mongo/string@1'; readonly nullable: false }",

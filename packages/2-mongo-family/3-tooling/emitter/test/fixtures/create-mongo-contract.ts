@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 
-export function createMongoIR(overrides: Partial<Contract> = {}): Contract {
+export function createMongoContract(overrides: Partial<Contract> = {}): Contract {
   return {
     targetFamily: 'mongo',
     target: 'mongo',

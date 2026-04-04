@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 
-export const blogContractIR: Contract = {
+export const blogContract: Contract = {
   targetFamily: 'mongo',
   target: 'mongo',
   profileHash: 'sha256:test',
