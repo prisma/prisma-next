@@ -121,31 +121,26 @@ export function storage(
 
 export function contract(opts: {
   target: string;
-  storageHash: string;
   storage: SqlStorage;
+  profileHash: string;
   models?: Record<string, unknown>;
-  schemaVersion?: '1';
+  roots?: Record<string, string>;
   targetFamily?: 'sql';
-  profileHash?: string;
   capabilities?: Record<string, Record<string, boolean>>;
   extensionPacks?: Record<string, unknown>;
   meta?: Record<string, unknown>;
-  sources?: Record<string, unknown>;
   execution?: Record<string, unknown>;
 }): Contract<SqlStorage> {
   return {
-    schemaVersion: opts.schemaVersion ?? '1',
     target: opts.target,
     targetFamily: opts.targetFamily ?? 'sql',
-    storageHash: opts.storageHash,
+    profileHash: opts.profileHash,
     storage: opts.storage,
     models: opts.models ?? {},
-    roots: {},
+    roots: opts.roots ?? {},
+    capabilities: opts.capabilities ?? {},
+    extensionPacks: opts.extensionPacks ?? {},
+    meta: opts.meta ?? {},
     ...(opts.execution !== undefined && { execution: opts.execution }),
-    ...(opts.profileHash !== undefined && { profileHash: opts.profileHash }),
-    ...(opts.capabilities !== undefined && { capabilities: opts.capabilities }),
-    ...(opts.extensionPacks !== undefined && { extensionPacks: opts.extensionPacks }),
-    ...(opts.meta !== undefined && { meta: opts.meta }),
-    ...(opts.sources !== undefined && { sources: opts.sources as Record<string, unknown> }),
-  } as unknown as Contract<SqlStorage>;
+  } as Contract<SqlStorage>;
 }
