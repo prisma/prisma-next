@@ -190,9 +190,8 @@ export async function readContractEnvelope(config: {
   const content = await readFile(contractPath, 'utf-8');
   const json = JSON.parse(content) as Record<string, unknown>;
 
-  const { schemaVersion, target, targetFamily, profileHash } = json;
-  const storage = json['storage'] as Record<string, unknown> | undefined;
-  const storageHash = storage?.['storageHash'] as string | undefined;
+  const { schemaVersion, target, targetFamily, profileHash, storageHash: rawStorageHash } = json;
+  const storageHash = rawStorageHash as string | undefined;
 
   if (typeof storageHash !== 'string') {
     throw new Error(
