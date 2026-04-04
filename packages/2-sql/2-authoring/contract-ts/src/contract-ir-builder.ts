@@ -8,6 +8,9 @@ import type {
   ColumnDefaultLiteralInputValue,
   ColumnDefaultLiteralValue,
   Contract,
+  ContractField,
+  ContractModel,
+  ContractRelation,
   ExecutionMutationDefault,
   ExecutionMutationDefaultValue,
   TaggedRaw,
@@ -227,7 +230,7 @@ export function buildContract(state: RuntimeBuilderState): Contract {
       })
     : undefined;
 
-  const models: Record<string, Record<string, unknown>> = {};
+  const models: Record<string, ContractModel> = {};
   const roots: Record<string, string> = {};
 
   for (const modelName in state.models) {
@@ -243,7 +246,7 @@ export function buildContract(state: RuntimeBuilderState): Contract {
       : {};
 
     const storageFields: Record<string, { readonly column: string }> = {};
-    const domainFields: Record<string, Record<string, unknown>> = {};
+    const domainFields: Record<string, ContractField> = {};
 
     for (const fieldName in modelState.fields) {
       const columnName = modelState.fields[fieldName];
@@ -260,17 +263,20 @@ export function buildContract(state: RuntimeBuilderState): Contract {
       }
     }
 
-    const modelRelations: Record<string, Record<string, unknown>> = {};
+    // RelationDefinition.cardinality includes 'N:M' which isn't in
+    // ContractReferenceRelation yet — cast is needed until the contract
+    // type is extended to cover many-to-many.
+    const modelRelations: Record<string, ContractRelation> = {};
     if (modelState.relations) {
       for (const relName in modelState.relations) {
         const rel = modelState.relations[relName];
         if (!rel) continue;
         modelRelations[relName] = {
           to: rel.to,
-          cardinality: rel.cardinality,
+          cardinality: rel.cardinality as ContractRelation['cardinality'],
           on: {
-            localFields: rel.on.parentCols,
-            targetFields: rel.on.childCols,
+            localFields: [...rel.on.parentCols],
+            targetFields: [...rel.on.childCols],
           },
         };
       }
@@ -294,14 +300,14 @@ export function buildContract(state: RuntimeBuilderState): Contract {
     }
   }
 
-  const capabilities = state.capabilities || {};
+  const capabilities: Record<string, Record<string, boolean>> = state.capabilities || {};
   const profileHash = computeProfileHash({ target, targetFamily, capabilities });
 
   const executionWithHash = executionSection
     ? { ...executionSection, executionHash: executionHash! }
     : undefined;
 
-  const contract = {
+  const contract: Contract = {
     target,
     targetFamily,
     models,
@@ -316,7 +322,7 @@ export function buildContract(state: RuntimeBuilderState): Contract {
 
   assertStorageSemantics(contract.storage as SqlStorage);
 
-  return contract as unknown as Contract;
+  return contract;
 }
 
 function assertKnownTargetModel(
