@@ -1,5 +1,9 @@
 {
+  "target": "mongo",
   "targetFamily": "mongo",
+  "capabilities": {},
+  "extensionPacks": {},
+  "meta": {},
   "roots": {
     "tasks": "Task",
     "users": "User"

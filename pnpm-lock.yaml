@@ -2250,6 +2250,9 @@ importers:
       '@prisma-next/extension-pgvector':
         specifier: workspace:*
         version: link:../../packages/3-extensions/pgvector
+      '@prisma-next/family-mongo':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/9-family
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../packages/2-sql/3-tooling/family
