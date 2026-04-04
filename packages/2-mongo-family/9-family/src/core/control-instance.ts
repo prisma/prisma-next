@@ -38,7 +38,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
   }: {
     readonly contract: Contract | unknown;
   }): Promise<EmitContractResult> {
-    const ir = contract as Contract;
+    const validatedContract = contract as Contract;
     const {
       codecTypeImports,
       operationTypeImports,
@@ -49,7 +49,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     } = this.controlStack;
 
     const result = await emit(
-      ir,
+      validatedContract,
       {
         outputDir: '',
         codecTypeImports,

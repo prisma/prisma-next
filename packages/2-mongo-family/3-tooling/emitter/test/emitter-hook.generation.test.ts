@@ -1,14 +1,14 @@
 import type { TypesImportSpec } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { mongoTargetFamilyHook } from '../src/index';
-import { createMongoIR } from './fixtures/create-mongo-ir';
+import { createMongoContract } from './fixtures/create-mongo-contract';
 
 const testHashes = { storageHash: 'test-storage-hash', profileHash: 'test-profile-hash' };
 
 describe('mongoTargetFamilyHook.generateContractTypes', () => {
   it('generates Contract and TypeMaps exports', () => {
-    const ir = createMongoIR();
-    const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+    const contract = createMongoContract();
+    const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
     expect(types).toContain(
       'export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>',
     );
@@ -16,15 +16,15 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
   });
 
   it('generates hash type aliases', () => {
-    const ir = createMongoIR();
-    const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+    const contract = createMongoContract();
+    const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
     expect(types).toContain("StorageHashBase<'test-storage-hash'>");
     expect(types).toContain("ProfileHashBase<'test-profile-hash'>");
   });
 
   it('generates concrete execution hash when provided', () => {
-    const ir = createMongoIR();
-    const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], {
+    const contract = createMongoContract();
+    const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], {
       ...testHashes,
       executionHash: 'test-exec-hash',
     });
@@ -32,14 +32,14 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
   });
 
   it('generates generic execution hash when not provided', () => {
-    const ir = createMongoIR();
-    const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+    const contract = createMongoContract();
+    const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
     expect(types).toContain('ExecutionHashBase<string>');
   });
 
   it('includes framework imports', () => {
-    const ir = createMongoIR();
-    const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+    const contract = createMongoContract();
+    const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
     expect(types).toContain("from '@prisma-next/mongo-core'");
     expect(types).toContain("from '@prisma-next/contract/types'");
     expect(types).toContain('MongoContractWithTypeMaps');
@@ -50,7 +50,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
   });
 
   it('generates codec type imports and intersection', () => {
-    const ir = createMongoIR();
+    const contract = createMongoContract();
     const codecImports: TypesImportSpec[] = [
       {
         package: '@prisma-next/mongo-core/codec-types',
@@ -58,7 +58,12 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
         alias: 'MongoCodecTypes',
       },
     ];
-    const types = mongoTargetFamilyHook.generateContractTypes(ir, codecImports, [], testHashes);
+    const types = mongoTargetFamilyHook.generateContractTypes(
+      contract,
+      codecImports,
+      [],
+      testHashes,
+    );
     expect(types).toContain(
       "import type { CodecTypes as MongoCodecTypes } from '@prisma-next/mongo-core/codec-types'",
     );
@@ -66,14 +71,14 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
   });
 
   it('generates empty CodecTypes when no codec imports', () => {
-    const ir = createMongoIR();
-    const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+    const contract = createMongoContract();
+    const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
     expect(types).toContain('export type CodecTypes = Record<string, never>');
   });
 
   it('generates contract header fields', () => {
-    const ir = createMongoIR();
-    const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+    const contract = createMongoContract();
+    const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
     expect(types).toContain("readonly target: 'mongo'");
     expect(types).toContain("readonly targetFamily: 'mongo'");
     expect(types).not.toContain('schemaVersion');
@@ -81,17 +86,17 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
   });
 
   it('generates roots type', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       roots: { users: 'User', posts: 'Post' },
     });
-    const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+    const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
     expect(types).toContain("readonly users: 'User'");
     expect(types).toContain("readonly posts: 'Post'");
   });
 
   describe('model generation', () => {
     it('generates model domain fields with codecId and nullable', () => {
-      const ir = createMongoIR({
+      const contract = createMongoContract({
         models: {
           User: {
             fields: {
@@ -105,7 +110,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
         },
         storage: { collections: { users: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
       expect(types).toContain(
         "readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false }",
       );
@@ -118,7 +123,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
     });
 
     it('generates model relations without strategy', () => {
-      const ir = createMongoIR({
+      const contract = createMongoContract({
         models: {
           User: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -148,7 +153,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
         },
         storage: { collections: { users: {}, posts: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
       expect(types).toContain("readonly to: 'Post'");
       expect(types).toContain("readonly cardinality: '1:N'");
       expect(types).toContain("readonly localFields: readonly ['_id']");
@@ -157,7 +162,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
     });
 
     it('generates root model storage with collection', () => {
-      const ir = createMongoIR({
+      const contract = createMongoContract({
         models: {
           User: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -167,12 +172,12 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
         },
         storage: { collections: { users: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
       expect(types).toContain("readonly collection: 'users'");
     });
 
     it('generates embedded model storage as empty record', () => {
-      const ir = createMongoIR({
+      const contract = createMongoContract({
         models: {
           User: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -191,13 +196,13 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
         },
         storage: { collections: { users: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
       expect(types).toContain('readonly Address: { readonly fields:');
       expect(types).toContain("readonly owner: 'User'");
     });
 
     it('generates model with owner field', () => {
-      const ir = createMongoIR({
+      const contract = createMongoContract({
         models: {
           Post: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -213,12 +218,12 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
         },
         storage: { collections: { posts: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
       expect(types).toContain("readonly owner: 'Post'");
     });
 
     it('generates polymorphic model with discriminator and variants', () => {
-      const ir = createMongoIR({
+      const contract = createMongoContract({
         models: {
           Task: {
             fields: {
@@ -245,7 +250,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
         },
         storage: { collections: { tasks: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
       expect(types).toContain("discriminator: { readonly field: 'type' }");
       expect(types).toContain("readonly Bug: { readonly value: 'bug' }");
       expect(types).toContain("readonly Feature: { readonly value: 'feature' }");
@@ -253,7 +258,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
     });
 
     it('generates storage.relations on parent model', () => {
-      const ir = createMongoIR({
+      const contract = createMongoContract({
         models: {
           User: {
             fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -272,7 +277,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
         },
         storage: { collections: { users: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
       expect(types).toContain(
         "readonly relations: { readonly addresses: { readonly field: 'addresses' } }",
       );
@@ -281,18 +286,18 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
 
   describe('storage generation', () => {
     it('generates storage with collections', () => {
-      const ir = createMongoIR({
+      const contract = createMongoContract({
         storage: { collections: { users: {}, posts: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
       expect(types).toContain('readonly collections:');
       expect(types).toContain('readonly users: Record<string, never>');
       expect(types).toContain('readonly posts: Record<string, never>');
     });
 
     it('generates empty collections', () => {
-      const ir = createMongoIR({ storage: { collections: {} } });
-      const types = mongoTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      const contract = createMongoContract({ storage: { collections: {} } });
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
       expect(types).toContain('readonly collections: Record<string, never>');
     });
   });

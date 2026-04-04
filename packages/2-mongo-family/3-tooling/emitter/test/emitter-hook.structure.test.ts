@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { mongoTargetFamilyHook } from '../src/index';
-import { createMongoIR } from './fixtures/create-mongo-ir';
+import { createMongoContract } from './fixtures/create-mongo-contract';
 
 describe('mongoTargetFamilyHook.validateStructure', () => {
   it('passes for valid minimal contract', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -14,25 +14,25 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).not.toThrow();
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).not.toThrow();
   });
 
   it('throws for wrong targetFamily', () => {
-    const ir = createMongoIR({ targetFamily: 'sql' });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    const contract = createMongoContract({ targetFamily: 'sql' });
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'Expected targetFamily "mongo"',
     );
   });
 
   it('throws for missing storage.collections', () => {
-    const ir = createMongoIR({ storage: {} });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    const contract = createMongoContract({ storage: {} });
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'must have storage.collections',
     );
   });
 
   it('throws when model references non-existent collection', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -42,13 +42,13 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: {} },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'references collection "users" which is not in storage.collections',
     );
   });
 
   it('throws when model is missing fields', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           relations: {},
@@ -57,13 +57,13 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'missing required field "fields"',
     );
   });
 
   it('throws when model is missing relations', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -72,13 +72,13 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'missing required field "relations"',
     );
   });
 
   it('throws when owned model has a collection', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -94,13 +94,13 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'Owned model "Address" must not have storage.collection',
     );
   });
 
   it('throws when owner model does not exist', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         Address: {
           fields: { street: { codecId: 'mongo/string@1', nullable: false } },
@@ -111,13 +111,13 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: {} },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'declares owner "NonExistent" which does not exist',
     );
   });
 
   it('passes with valid owner/embedded model', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -136,11 +136,11 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).not.toThrow();
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).not.toThrow();
   });
 
   it('passes with polymorphic models sharing collection', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         Task: {
           fields: {
@@ -161,11 +161,11 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { tasks: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).not.toThrow();
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).not.toThrow();
   });
 
   it('throws when variant does not share base collection', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         Task: {
           fields: {
@@ -186,13 +186,13 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { tasks: {}, bugs: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       "must share its base's collection",
     );
   });
 
   it('throws when model is missing storage', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -201,13 +201,13 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'missing required field "storage"',
     );
   });
 
   it('throws when base model does not exist', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         Bug: {
           fields: { severity: { codecId: 'mongo/string@1', nullable: false } },
@@ -218,13 +218,13 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { tasks: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'declares base "NonExistent" which does not exist',
     );
   });
 
   it('throws when embed relation to owned model is missing storage.relations entry', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -240,13 +240,13 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'embed relation "addresses" to owned model "Address" but no matching storage.relations entry',
     );
   });
 
   it('throws when storage.relations key has no matching domain-level relation', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
@@ -259,7 +259,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(ir)).toThrow(
+    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
       'storage.relations.addresses but no matching domain-level relation',
     );
   });

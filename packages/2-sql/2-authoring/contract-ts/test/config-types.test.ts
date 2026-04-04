@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { typescriptContract } from '../src/config-types';
 
 describe('typescriptContract', () => {
-  it('returns provider result with contract IR', async () => {
+  it('returns provider result with contract', async () => {
     const contract = { targetFamily: 'sql', target: 'postgres' } as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
     const result = await config.source({ composedExtensionPacks: [] });

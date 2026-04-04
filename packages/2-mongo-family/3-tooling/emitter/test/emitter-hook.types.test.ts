@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { mongoTargetFamilyHook } from '../src/index';
-import { createMongoIR } from './fixtures/create-mongo-ir';
+import { createMongoContract } from './fixtures/create-mongo-contract';
 
 describe('mongoTargetFamilyHook.validateTypes', () => {
   it('passes with valid codec IDs', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: {
@@ -16,16 +16,16 @@ describe('mongoTargetFamilyHook.validateTypes', () => {
         },
       },
     });
-    expect(() => mongoTargetFamilyHook.validateTypes(ir, {})).not.toThrow();
+    expect(() => mongoTargetFamilyHook.validateTypes(contract, {})).not.toThrow();
   });
 
   it('passes with no models', () => {
-    const ir = createMongoIR({ models: {} });
-    expect(() => mongoTargetFamilyHook.validateTypes(ir, {})).not.toThrow();
+    const contract = createMongoContract({ models: {} });
+    expect(() => mongoTargetFamilyHook.validateTypes(contract, {})).not.toThrow();
   });
 
   it('throws for missing codecId', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: {
@@ -36,11 +36,11 @@ describe('mongoTargetFamilyHook.validateTypes', () => {
         },
       },
     });
-    expect(() => mongoTargetFamilyHook.validateTypes(ir, {})).toThrow('missing codecId');
+    expect(() => mongoTargetFamilyHook.validateTypes(contract, {})).toThrow('missing codecId');
   });
 
   it('throws for invalid codec ID format', () => {
-    const ir = createMongoIR({
+    const contract = createMongoContract({
       models: {
         User: {
           fields: {
@@ -51,6 +51,8 @@ describe('mongoTargetFamilyHook.validateTypes', () => {
         },
       },
     });
-    expect(() => mongoTargetFamilyHook.validateTypes(ir, {})).toThrow('invalid codec ID format');
+    expect(() => mongoTargetFamilyHook.validateTypes(contract, {})).toThrow(
+      'invalid codec ID format',
+    );
   });
 });
