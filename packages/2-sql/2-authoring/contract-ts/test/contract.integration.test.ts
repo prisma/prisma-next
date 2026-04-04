@@ -9,6 +9,7 @@ describe('validateContract', () => {
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'sha256:test',
+    profileHash: 'sha256:test',
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -88,6 +89,7 @@ describe('validateContract', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:test',
+      profileHash: 'sha256:test',
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -122,6 +124,7 @@ describe('validateContract', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:test',
+      profileHash: 'sha256:test',
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -145,12 +148,13 @@ describe('validateContract', () => {
     expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 
-  it('accepts foreignKey referencing non-existent table (cross-ref validated by emitter)', () => {
+  it('rejects foreignKey referencing non-existent table', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:test',
+      profileHash: 'sha256:test',
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -188,6 +192,8 @@ describe('validateContract', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow(
+      /foreignKey references non-existent table "NonExistent"/,
+    );
   });
 });

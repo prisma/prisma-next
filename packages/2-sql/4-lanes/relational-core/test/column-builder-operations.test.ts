@@ -16,6 +16,7 @@ describe('ColumnBuilder operations', () => {
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'test-hash',
+    profileHash: 'sha256:test',
     roots: {},
     capabilities: {},
     extensionPacks: {},

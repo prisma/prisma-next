@@ -350,22 +350,25 @@ describe('SQL contract factories', () => {
   });
 
   describe('contract', () => {
-    it('creates a SqlContract with minimal options', () => {
+    it('creates a Contract with minimal options', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        storageHash: 'sha256:abc123',
+        profileHash: 'sha256:profile',
         storage: s,
       });
       expect(c.target).toBe('postgres');
       expect(c.targetFamily).toBe('sql');
-      expect(c.storageHash).toBe('sha256:abc123');
+      expect(c.profileHash).toBe('sha256:profile');
       expect(c.storage).toEqual(s);
       expect(c.models).toEqual({});
-      expect(c.schemaVersion).toBe('1');
+      expect(c.roots).toEqual({});
+      expect(c.capabilities).toEqual({});
+      expect(c.extensionPacks).toEqual({});
+      expect(c.meta).toEqual({});
     });
 
     it('creates contract with models', () => {
@@ -382,25 +385,11 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        storageHash: 'sha256:abc123',
+        profileHash: 'sha256:profile',
         storage: s,
         models: m,
       });
       expect(c.models).toEqual(m);
-    });
-
-    it('creates contract with profileHash', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        profileHash: 'sha256:def456',
-        storage: s,
-      });
-      expect(c.profileHash).toBe('sha256:def456');
     });
 
     it('creates contract with capabilities', () => {
@@ -417,7 +406,7 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        storageHash: 'sha256:abc123',
+        profileHash: 'sha256:profile',
         storage: s,
         capabilities,
       });
@@ -437,7 +426,7 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        storageHash: 'sha256:abc123',
+        profileHash: 'sha256:profile',
         storage: s,
         extensionPacks,
       });
@@ -455,31 +444,11 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        storageHash: 'sha256:abc123',
+        profileHash: 'sha256:profile',
         storage: s,
         meta,
       });
       expect(c.meta).toEqual(meta);
-    });
-
-    it('creates contract with sources', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const sources = {
-        userView: {
-          kind: 'view',
-          sql: 'SELECT * FROM "user"',
-        },
-      };
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
-        sources,
-      });
-      expect(c.sources).toEqual(sources);
     });
   });
 });
