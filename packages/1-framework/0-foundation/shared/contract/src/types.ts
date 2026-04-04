@@ -1,5 +1,3 @@
-import type { Contract } from './contract-types';
-
 /**
  * Unique symbol used as the key for branding types.
  */
@@ -168,14 +166,6 @@ export interface DocCollection {
   readonly readOnly?: boolean;
 }
 
-export interface DocumentStorage extends StorageBase {
-  readonly document: {
-    readonly collections: Record<string, DocCollection>;
-  };
-}
-
-export type DocumentContract = Contract<DocumentStorage>;
-
 // Plan types - target-family agnostic execution types
 export interface ParamDescriptor {
   readonly index?: number;
@@ -248,18 +238,6 @@ export interface ExecutionPlan<Row = unknown, Ast = unknown> {
  */
 export type ResultType<P> =
   P extends ExecutionPlan<infer R, unknown> ? R : P extends { readonly _Row?: infer R } ? R : never;
-
-/**
- * Type guard to check if a contract is a Document contract
- */
-export function isDocumentContract(contract: unknown): contract is DocumentContract {
-  return (
-    typeof contract === 'object' &&
-    contract !== null &&
-    'targetFamily' in contract &&
-    contract.targetFamily === 'document'
-  );
-}
 
 /**
  * Contract marker record stored in the database.
