@@ -1,6 +1,6 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
 import type { PlanMeta } from '@prisma-next/contract/types';
-import { coreHash } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import type { MongoLoweringContext } from '@prisma-next/mongo-core';
 import { timeouts } from '@prisma-next/test-utils';
@@ -45,6 +45,7 @@ export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Pro
       models: {},
       capabilities: {},
       extensionPacks: {},
+      profileHash: profileHash('sha256:test'),
       meta: {},
     },
   };

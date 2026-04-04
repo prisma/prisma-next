@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract-types';
-import type { ProfileHashBase, StorageHashBase } from '../src/types';
+import type { StorageHashBase } from '../src/types';
 import type { StorageValidator } from '../src/validate-contract';
 import { validateContract } from '../src/validate-contract';
 
 const hash = 'sha256:abc' as StorageHashBase<'sha256:abc'>;
-const profileHashValue = 'sha256:profile' as ProfileHashBase<'sha256:profile'>;
 
 function minimalContract(overrides?: Partial<Contract>): Record<string, unknown> {
   return {
@@ -20,7 +19,6 @@ function minimalContract(overrides?: Partial<Contract>): Record<string, unknown>
       },
     },
     storage: { storageHash: hash },
-    profileHash: profileHashValue,
     capabilities: {},
     extensionPacks: {},
     meta: {},

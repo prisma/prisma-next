@@ -1,4 +1,4 @@
-import { coreHash } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import type { MongoContract } from '../src/contract-types';
 import { validateMongoStorage } from '../src/validate-storage';
@@ -21,6 +21,7 @@ function makeMinimalContract(overrides: Partial<MongoContract> = {}): MongoContr
     },
     capabilities: {},
     extensionPacks: {},
+    profileHash: profileHash('sha256:test'),
     meta: {},
     ...overrides,
   };

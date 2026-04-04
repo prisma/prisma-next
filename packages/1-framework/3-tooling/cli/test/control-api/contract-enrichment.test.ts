@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { coreHash } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import { enrichContract } from '../../src/control-api/contract-enrichment';
@@ -13,6 +13,7 @@ function makeIR(overrides?: Partial<Contract>): Contract {
     storage: { storageHash: coreHash('sha256:test') },
     extensionPacks: {},
     capabilities: {},
+    profileHash: profileHash('sha256:test'),
     meta: {},
     ...overrides,
   };

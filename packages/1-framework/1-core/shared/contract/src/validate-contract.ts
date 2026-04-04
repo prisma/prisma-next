@@ -23,12 +23,12 @@ const ContractSchema = type({
   extensionPacks: 'Record<string, unknown>',
   meta: 'Record<string, unknown>',
   'execution?': {
-    executionHash: 'string',
+    'executionHash?': 'string',
     mutations: {
       defaults: 'unknown[]',
     },
   },
-  profileHash: 'string',
+  'profileHash?': 'string',
 });
 
 function stripPersistenceFields(raw: Record<string, unknown>): Record<string, unknown> {

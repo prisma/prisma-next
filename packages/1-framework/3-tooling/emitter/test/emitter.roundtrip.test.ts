@@ -1,5 +1,4 @@
 import type {
-  Contract,
   TargetFamilyHook,
   TypesImportSpec,
   ValidationContext,
@@ -13,7 +12,7 @@ import { createTestContract } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (ir: Contract, _ctx: ValidationContext) => {
+  validateTypes: (ir, _ctx: ValidationContext) => {
     const storage = ir.storage as
       | { tables?: Record<string, { columns?: Record<string, { codecId?: string }> }> }
       | undefined;
@@ -60,7 +59,7 @@ const mockSqlHook: TargetFamilyHook = {
       }
     }
   },
-  validateStructure: (ir: Contract) => {
+  validateStructure: (ir) => {
     if (ir.targetFamily !== 'sql') {
       throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
     }

@@ -249,10 +249,9 @@ export function validateSqlContract<T extends SqlContract<SqlStorage>>(value: un
     throw new Error(`Contract structural validation failed: ${messages}`);
   }
 
-  // After validation, contractResult matches the schema and preserves the input structure
-  // TypeScript needs an assertion here due to exactOptionalPropertyTypes differences
-  // between Arktype's inferred type and the generic T, but runtime-wise they're compatible
-  return contractResult as T;
+  // Arktype's inferred output type differs from T due to exactOptionalPropertyTypes
+  // and branded hash types — the runtime value is structurally compatible after validation
+  return contractResult as unknown as T;
 }
 
 /**

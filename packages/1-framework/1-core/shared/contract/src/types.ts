@@ -67,13 +67,15 @@ export interface StorageBase<THash extends string = string> {
 
 export interface ContractBase<
   TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
+  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
 > {
   readonly schemaVersion: string;
   readonly target: string;
   readonly targetFamily: string;
   readonly storageHash: TStorageHash;
-  readonly profileHash?: TProfileHash;
+  readonly executionHash?: TExecutionHash | undefined;
+  readonly profileHash?: TProfileHash | undefined;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;
   readonly meta: Record<string, unknown>;
@@ -199,8 +201,9 @@ export interface DocumentStorage {
 
 export interface DocumentContract<
   TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
+  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> extends ContractBase<TStorageHash, TProfileHash> {
+> extends ContractBase<TStorageHash, TExecutionHash, TProfileHash> {
   // Accept string to work with JSON imports; runtime validation ensures 'document'
   readonly targetFamily: string;
   readonly storage: DocumentStorage;
