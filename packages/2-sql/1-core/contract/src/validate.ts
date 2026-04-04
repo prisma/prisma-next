@@ -299,13 +299,20 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
 
   const storageWithHash = { ...normalizedStorage, storageHash };
 
+  const rawExecution = contractObj['execution'] as Record<string, unknown> | undefined;
+  const executionHash =
+    (rawExecution?.['executionHash'] as string | undefined) ??
+    (contractObj['executionHash'] as string | undefined);
+  const normalizedExecution = rawExecution
+    ? { ...rawExecution, ...(executionHash ? { executionHash } : {}) }
+    : undefined;
+
   return {
     ...pick('schemaVersion'),
     target,
     targetFamily,
     ...pick('coreHash'),
     storageHash,
-    ...pick('executionHash'),
     ...pick('profileHash'),
     ...pick('_generated'),
     roots: contractObj['roots'] ?? {},
@@ -315,7 +322,7 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
     capabilities: contractObj['capabilities'] ?? {},
     meta: contractObj['meta'] ?? {},
     sources: contractObj['sources'] ?? {},
-    ...pick('execution'),
+    ...(normalizedExecution ? { execution: normalizedExecution } : {}),
   } as SqlContract<SqlStorage>;
 }
 
