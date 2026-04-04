@@ -75,6 +75,7 @@ describe('composed runtime mutation default generators', () => {
       contract: {
         ...testContract,
         execution: {
+          executionHash: coreHash('sha256:test'),
           mutations: {
             defaults: [
               {
@@ -117,6 +118,7 @@ describe('composed runtime mutation default generators', () => {
       contract: {
         ...testContract,
         execution: {
+          executionHash: coreHash('sha256:test'),
           mutations: {
             defaults: [
               {
@@ -189,6 +191,7 @@ describe('composed runtime mutation default generators', () => {
       contract: {
         ...testContract,
         execution: {
+          executionHash: coreHash('sha256:test'),
           mutations: {
             defaults: [
               {
@@ -224,6 +227,7 @@ describe('composed runtime mutation default generators', () => {
       contract: {
         ...testContract,
         execution: {
+          executionHash: coreHash('sha256:test'),
           mutations: {
             defaults: [
               {

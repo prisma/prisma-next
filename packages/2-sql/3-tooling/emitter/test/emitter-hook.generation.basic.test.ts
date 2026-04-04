@@ -1,4 +1,4 @@
-import type { Contract, TypeRenderEntry } from '@prisma-next/contract/types';
+import type { Contract, ExecutionHashBase, TypeRenderEntry } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
@@ -1005,6 +1005,7 @@ describe('sql-target-family-hook', () => {
         },
       },
       execution: {
+        executionHash: 'sha256:test-exec-hash' as ExecutionHashBase<string>,
         mutations: {
           defaults: [
             {
