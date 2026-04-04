@@ -72,7 +72,7 @@ This keeps the framework independent of authoring formats, while still ensuring 
 
 `prisma-next.config.ts` declares:
 
-- `contract.source`: an async provider `() => Promise<Result<Contract, ContractSourceDiagnostics>>`
+- `contract.source`: an async provider `(context: ContractSourceContext) => Promise<Result<Contract, ContractSourceDiagnostics>>`
 - `contract.output`: path to `contract.json` (types are colocated as `contract.d.ts`)
 
 Example (helper-first PSL path):
