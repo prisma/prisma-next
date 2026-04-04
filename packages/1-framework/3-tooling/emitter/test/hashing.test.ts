@@ -1,56 +1,34 @@
-import { computeProfileHash, computeStorageHash } from '@prisma-next/core-control-plane/emission';
+import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
 import { describe, expect, it } from 'vitest';
 
 describe('hashing', () => {
   it('computes storage hash', () => {
-    const contract = {
-      schemaVersion: '1',
+    const hash = computeStorageHash({
       targetFamily: 'sql',
       target: 'postgres',
-      models: {},
       storage: { tables: {} },
-      extensionPacks: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
-
-    const hash = computeStorageHash(contract);
+    });
     expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
   it('computes profile hash', () => {
-    const contract = {
-      schemaVersion: '1',
+    const hash = computeProfileHash({
       targetFamily: 'sql',
       target: 'postgres',
-      models: {},
-      storage: { tables: {} },
-      extensionPacks: {},
       capabilities: { postgres: { jsonAgg: true } },
-      meta: {},
-      sources: {},
-    };
-
-    const hash = computeProfileHash(contract);
+    });
     expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
   it('produces stable hashes for identical input', () => {
-    const contract = {
-      schemaVersion: '1',
+    const args = {
       targetFamily: 'sql',
       target: 'postgres',
-      models: {},
       storage: { tables: {} },
-      extensionPacks: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
     };
 
-    const hash1 = computeStorageHash(contract);
-    const hash2 = computeStorageHash(contract);
+    const hash1 = computeStorageHash(args);
+    const hash2 = computeStorageHash(args);
     expect(hash1).toBe(hash2);
   });
 });
