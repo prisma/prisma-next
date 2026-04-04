@@ -22,11 +22,6 @@ function resolveCollectionName(model: MongoModelDefinition, modelName: string): 
   return model.storage.collection ?? modelName;
 }
 
-export interface MongoCollectionInit {
-  readonly state?: MongoCollectionState;
-  readonly collectionName?: string;
-}
-
 export class MongoCollection<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
@@ -35,33 +30,28 @@ export class MongoCollection<
   readonly #contract: TContract;
   readonly #modelName: ModelName;
   readonly #executor: MongoQueryExecutor;
-  readonly #collectionName: string;
-  readonly state: MongoCollectionState;
+  #collectionName: string;
+  #state: MongoCollectionState;
 
-  constructor(
-    contract: TContract,
-    modelName: ModelName,
-    executor: MongoQueryExecutor,
-    init: MongoCollectionInit = {},
-  ) {
+  constructor(contract: TContract, modelName: ModelName, executor: MongoQueryExecutor) {
     this.#contract = contract;
     this.#modelName = modelName;
     this.#executor = executor;
     const model = contract.models[modelName] as MongoModelDefinition;
-    this.#collectionName = init.collectionName ?? resolveCollectionName(model, modelName);
-    this.state = init.state ?? emptyCollectionState();
+    this.#collectionName = resolveCollectionName(model, modelName);
+    this.#state = emptyCollectionState();
   }
 
   where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes> {
     return this.#clone({
-      filters: [...this.state.filters, filter],
+      filters: [...this.#state.filters, filter],
     });
   }
 
   select(
     ...fields: ModelFieldKeys<TContract, ModelName>[]
   ): MongoCollection<TContract, ModelName, TIncludes> {
-    return this.#clone({ selectedFields: [...(this.state.selectedFields ?? []), ...fields] });
+    return this.#clone({ selectedFields: [...(this.#state.selectedFields ?? []), ...fields] });
   }
 
   include<K extends ReferenceRelationKeys<TContract, ModelName> & string>(
@@ -105,14 +95,14 @@ export class MongoCollection<
     };
 
     return this.#clone({
-      includes: [...this.state.includes, includeExpr],
+      includes: [...this.#state.includes, includeExpr],
     }) as MongoCollection<TContract, ModelName, TIncludes & Record<K, true>>;
   }
 
   orderBy(
     spec: Partial<Record<ModelFieldKeys<TContract, ModelName>, 1 | -1>>,
   ): MongoCollection<TContract, ModelName, TIncludes> {
-    const merged = { ...this.state.orderBy, ...(spec as Readonly<Record<string, 1 | -1>>) };
+    const merged = { ...this.#state.orderBy, ...(spec as Readonly<Record<string, 1 | -1>>) };
     return this.#clone({ orderBy: merged });
   }
 
@@ -145,7 +135,7 @@ export class MongoCollection<
   #compile(): MongoReadPlan<IncludedRow<TContract, ModelName, TIncludes>> {
     return compileMongoQuery<IncludedRow<TContract, ModelName, TIncludes>>(
       this.#collectionName,
-      this.state,
+      this.#state,
       this.#contract.storageHash,
     );
   }
@@ -154,7 +144,7 @@ export class MongoCollection<
     overrides: Partial<MongoCollectionState>,
   ): MongoCollection<TContract, ModelName, TIncludes> {
     return this.#createSelf({
-      ...this.state,
+      ...this.#state,
       ...overrides,
     });
   }
@@ -164,12 +154,11 @@ export class MongoCollection<
       contract: TContract,
       modelName: ModelName,
       executor: MongoQueryExecutor,
-      init: MongoCollectionInit,
     ) => MongoCollection<TContract, ModelName, TIncludes>;
 
-    return new Ctor(this.#contract, this.#modelName, this.#executor, {
-      state,
-      collectionName: this.#collectionName,
-    });
+    const instance = new Ctor(this.#contract, this.#modelName, this.#executor);
+    instance.#state = state;
+    instance.#collectionName = this.#collectionName;
+    return instance;
   }
 }
