@@ -158,7 +158,7 @@ class MongoCollectionImpl<
     return compileMongoQuery<IncludedRow<TContract, ModelName, TIncludes>>(
       this.#collectionName,
       this.#state,
-      this.#contract.storageHash,
+      this.#contract.storage.storageHash,
     );
   }
 
