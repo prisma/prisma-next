@@ -32,16 +32,16 @@ import type {
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
 import {
-  type ComposedAuthoringHelpers,
-  createComposedAuthoringHelpers,
-} from './composed-authoring-helpers';
-import {
   buildContract,
   buildSqlContractFromSemanticDefinition,
   type RuntimeBuilderState,
-} from './contract-ir-builder';
+} from './build-contract';
+import {
+  type ComposedAuthoringHelpers,
+  createComposedAuthoringHelpers,
+} from './composed-authoring-helpers';
 
-export { buildSqlContractFromSemanticDefinition } from './contract-ir-builder';
+export { buildSqlContractFromSemanticDefinition } from './build-contract';
 
 import {
   field,
