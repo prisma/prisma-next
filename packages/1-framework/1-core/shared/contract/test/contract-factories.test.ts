@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createContract, createSqlContract } from '../src/contract-factories';
+import { createContract, createSqlContract } from '../src/testing-factories';
 
 describe('createContract', () => {
   it('creates a contract with defaults', () => {
