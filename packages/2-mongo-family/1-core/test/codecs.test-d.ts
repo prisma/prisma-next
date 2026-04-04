@@ -39,3 +39,14 @@ test('MongoCodecTraits extracts multiple traits as union', () => {
 test('MongoCodecTraits extracts vector trait', () => {
   expectTypeOf<MongoCodecTraits<typeof vectorCodec>>().toEqualTypeOf<'equality' | 'vector'>();
 });
+
+const traitlessCodec = mongoCodec({
+  typeId: 'test/traitless@1',
+  targetTypes: ['blob'],
+  decode: (w: Buffer) => w,
+  encode: (v: Buffer) => v,
+});
+
+test('MongoCodecTraits is never for codec without traits', () => {
+  expectTypeOf<MongoCodecTraits<typeof traitlessCodec>>().toEqualTypeOf<never>();
+});
