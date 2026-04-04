@@ -92,7 +92,12 @@ describe('MongoAdapter', () => {
           new MongoMatchStage(MongoFieldFilter.eq('status', new MongoParamRef('active'))),
           new MongoProjectStage({ name: 1, email: 1 }),
         ],
-        meta: { storageHash: 'test-hash' },
+        meta: {
+          target: 'mongo',
+          storageHash: 'test-hash',
+          lane: 'mongo-orm',
+          paramDescriptors: [],
+        },
       };
       const wire = adapter.lowerReadPlan(plan);
       expect(wire.kind).toBe('aggregate');
@@ -107,7 +112,12 @@ describe('MongoAdapter', () => {
       const plan = {
         collection: 'orders',
         stages: [],
-        meta: { storageHash: 'test-hash' },
+        meta: {
+          target: 'mongo',
+          storageHash: 'test-hash',
+          lane: 'mongo-orm',
+          paramDescriptors: [],
+        },
       };
       const wire = adapter.lowerReadPlan(plan);
       expect(wire.kind).toBe('aggregate');

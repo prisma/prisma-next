@@ -38,7 +38,7 @@ export function lowerStage(stage: MongoReadStage): Record<string, unknown> {
         as: stage.as,
       };
       if (stage.pipeline) {
-        lookup.pipeline = stage.pipeline.map((s) => lowerStage(s));
+        lookup['pipeline'] = stage.pipeline.map((s) => lowerStage(s));
       }
       return { $lookup: lookup };
     }

@@ -45,7 +45,13 @@ export function describeWithMongoDB(name: string, fn: (ctx: MongodContext) => vo
       const adapter = createMongoAdapter();
       const driver = await createMongoDriver(replSet.getUri(), dbName);
       const loweringContext: MongoLoweringContext = {
-        contract: { targetFamily: 'mongo', roots: {}, storage: { collections: {} }, models: {} },
+        contract: {
+          targetFamily: 'mongo',
+          storageHash: 'test-hash',
+          roots: {},
+          storage: { collections: {} },
+          models: {},
+        },
       };
       runtime = createMongoRuntime({ adapter, driver, loweringContext });
     }, timeouts.spinUpDbServer);

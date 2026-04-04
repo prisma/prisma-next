@@ -226,8 +226,8 @@ describe('composite nesting', () => {
 
     expect(expr.kind).toBe('and');
     const and = expr as MongoAndExpr;
-    expect(and.exprs[0].kind).toBe('or');
-    expect(and.exprs[1].kind).toBe('not');
-    expect(and.exprs[2].kind).toBe('exists');
+    expect(and.exprs[0]!.kind).toBe('or');
+    expect(and.exprs[1]!.kind).toBe('not');
+    expect(and.exprs[2]!.kind).toBe('exists');
   });
 });
