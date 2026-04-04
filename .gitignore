@@ -30,3 +30,5 @@ CLAUDE.local.md
 test/**/fixtures/generated/
 !test/e2e/framework/test/fixtures/generated/
 !test/e2e/framework/test/fixtures/generated/**
+!test/integration/test/mongo/fixtures/generated/
+!test/integration/test/mongo/fixtures/generated/**

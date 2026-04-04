@@ -66,8 +66,8 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,jsonc}": [
-      "biome format --write",
-      "biome check --write"
+      "biome format --write --no-errors-on-unmatched",
+      "biome check --write --no-errors-on-unmatched"
     ],
     "*.{ts,tsx,js,jsx}": [
       "node scripts/lint-deps-focused.mjs"
