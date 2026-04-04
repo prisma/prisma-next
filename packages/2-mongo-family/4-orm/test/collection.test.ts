@@ -1,5 +1,5 @@
 import type { MongoReadPlan } from '@prisma-next/mongo-query-ast';
-import { MongoFieldFilter } from '@prisma-next/mongo-query-ast';
+import { lowerPipeline, MongoFieldFilter } from '@prisma-next/mongo-query-ast';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../../1-core/test/fixtures/orm-contract';
@@ -27,6 +27,10 @@ function createMockExecutor(
   return mock;
 }
 
+function loweredStageKinds(plan: MongoReadPlan): string[] {
+  return lowerPipeline(plan.stages).map((s) => Object.keys(s)[0] as string);
+}
+
 describe('MongoCollection chaining', () => {
   it('returns a new instance from where()', () => {
     const executor = createMockExecutor();
@@ -41,7 +45,11 @@ describe('MongoCollection chaining', () => {
     const col = new MongoCollection(contract, 'User', executor)
       .where(MongoFieldFilter.eq('name', 'Alice'))
       .where(MongoFieldFilter.gte('email', 'a'));
-    expect(col.state.filters).toHaveLength(2);
+    col.all();
+    const lowered = lowerPipeline(executor.lastPlan!.stages);
+    expect(lowered[0]).toEqual({
+      $match: { $and: [{ name: { $eq: 'Alice' } }, { email: { $gte: 'a' } }] },
+    });
   });
 
   it('returns a new instance from select()', () => {
@@ -49,13 +57,17 @@ describe('MongoCollection chaining', () => {
     const col = new MongoCollection(contract, 'User', executor);
     const selected = col.select('name');
     expect(selected).not.toBe(col);
-    expect(selected.state.selectedFields).toEqual(['name']);
+    selected.all();
+    expect(loweredStageKinds(executor.lastPlan!)).toContain('$project');
   });
 
   it('accumulates fields across multiple select() calls', () => {
     const executor = createMockExecutor();
     const col = new MongoCollection(contract, 'User', executor).select('name').select('_id');
-    expect(col.state.selectedFields).toEqual(['name', '_id']);
+    col.all();
+    const lowered = lowerPipeline(executor.lastPlan!.stages);
+    const project = lowered.find((s) => '$project' in s);
+    expect(project).toEqual({ $project: { name: 1, _id: 1 } });
   });
 
   it('returns a new instance from orderBy()', () => {
@@ -63,7 +75,9 @@ describe('MongoCollection chaining', () => {
     const col = new MongoCollection(contract, 'User', executor);
     const ordered = col.orderBy({ name: 1 });
     expect(ordered).not.toBe(col);
-    expect(ordered.state.orderBy).toEqual({ name: 1 });
+    ordered.all();
+    const lowered = lowerPipeline(executor.lastPlan!.stages);
+    expect(lowered).toContainEqual({ $sort: { name: 1 } });
   });
 
   it('merges orderBy across calls', () => {
@@ -71,7 +85,9 @@ describe('MongoCollection chaining', () => {
     const col = new MongoCollection(contract, 'User', executor)
       .orderBy({ name: 1 })
       .orderBy({ email: -1 });
-    expect(col.state.orderBy).toEqual({ name: 1, email: -1 });
+    col.all();
+    const lowered = lowerPipeline(executor.lastPlan!.stages);
+    expect(lowered).toContainEqual({ $sort: { name: 1, email: -1 } });
   });
 
   it('returns a new instance from take()', () => {
@@ -79,7 +95,9 @@ describe('MongoCollection chaining', () => {
     const col = new MongoCollection(contract, 'User', executor);
     const limited = col.take(10);
     expect(limited).not.toBe(col);
-    expect(limited.state.limit).toBe(10);
+    limited.all();
+    const lowered = lowerPipeline(executor.lastPlan!.stages);
+    expect(lowered).toContainEqual({ $limit: 10 });
   });
 
   it('returns a new instance from skip()', () => {
@@ -87,14 +105,17 @@ describe('MongoCollection chaining', () => {
     const col = new MongoCollection(contract, 'User', executor);
     const skipped = col.skip(5);
     expect(skipped).not.toBe(col);
-    expect(skipped.state.offset).toBe(5);
+    skipped.all();
+    const lowered = lowerPipeline(executor.lastPlan!.stages);
+    expect(lowered).toContainEqual({ $skip: 5 });
   });
 
   it('does not mutate original instance', () => {
     const executor = createMockExecutor();
     const col = new MongoCollection(contract, 'User', executor);
     col.where(MongoFieldFilter.eq('name', 'Alice'));
-    expect(col.state.filters).toHaveLength(0);
+    col.all();
+    expect(executor.lastPlan!.stages).toHaveLength(0);
   });
 
   it('chains where, orderBy, take, skip together', () => {
@@ -104,11 +125,9 @@ describe('MongoCollection chaining', () => {
       .orderBy({ name: 1 })
       .skip(10)
       .take(5);
-
-    expect(col.state.filters).toHaveLength(1);
-    expect(col.state.orderBy).toEqual({ name: 1 });
-    expect(col.state.offset).toBe(10);
-    expect(col.state.limit).toBe(5);
+    col.all();
+    const stageKinds = loweredStageKinds(executor.lastPlan!);
+    expect(stageKinds).toEqual(['$match', '$sort', '$skip', '$limit']);
   });
 
   it('preserves custom subclasses via #createSelf', () => {
@@ -129,13 +148,15 @@ describe('MongoCollection include()', () => {
   it('adds a relation include', () => {
     const executor = createMockExecutor();
     const col = new MongoCollection(contract, 'Task', executor).include('assignee');
-    expect(col.state.includes).toHaveLength(1);
-    expect(col.state.includes[0]).toEqual({
-      relationName: 'assignee',
-      from: 'users',
-      localField: 'assigneeId',
-      foreignField: '_id',
-      cardinality: 'N:1',
+    col.all();
+    const lowered = lowerPipeline(executor.lastPlan!.stages);
+    expect(lowered).toContainEqual({
+      $lookup: {
+        from: 'users',
+        localField: 'assigneeId',
+        foreignField: '_id',
+        as: 'assignee',
+      },
     });
   });
 
@@ -184,6 +205,9 @@ describe('MongoCollection terminal methods', () => {
     const executor = createMockExecutor([{ _id: '1', name: 'Alice', email: 'a@b.c' }]);
     const col = new MongoCollection(contract, 'User', executor);
     await col.first();
-    expect(executor.lastPlan!.stages.some((s) => s.kind === 'limit')).toBe(true);
+    const limitStage = executor.lastPlan!.stages.find((s) => s.kind === 'limit') as
+      | { kind: 'limit'; limit: number }
+      | undefined;
+    expect(limitStage?.limit).toBe(1);
   });
 });
