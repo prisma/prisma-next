@@ -11,7 +11,6 @@ import {
 } from '@prisma-next/emitter/domain-type-generation';
 import type {
   GenerateContractTypesOptions,
-  TargetFamilyHook,
   TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
