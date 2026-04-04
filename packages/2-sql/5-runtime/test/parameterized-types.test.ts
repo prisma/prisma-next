@@ -1,5 +1,6 @@
-import { coreHash } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
@@ -29,12 +30,11 @@ function createParamTypesTestContract(
       }
     >;
   }>,
-): SqlContract<SqlStorage> {
+): Contract<SqlStorage> {
   return {
-    schemaVersion: '1',
     targetFamily: 'sql',
     target: 'postgres',
-    storageHash: coreHash('sha256:test'),
+    profileHash: profileHash('sha256:test'),
     models: {},
     roots: {},
     storage: {
@@ -55,7 +55,6 @@ function createParamTypesTestContract(
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    sources: {},
   };
 }
 

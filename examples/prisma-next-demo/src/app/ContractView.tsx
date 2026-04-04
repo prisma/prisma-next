@@ -123,7 +123,7 @@ export function ContractView({ contract }: { contract: Contract }) {
     <>
       <div className="hash">
         <span className="hash-label">Storage Hash: </span>
-        <span className="hash-value">{contract.storageHash}</span>
+        <span className="hash-value">{contract.storage.storageHash}</span>
       </div>
 
       <Section title={`Target: ${contract.target}`}>{null}</Section>

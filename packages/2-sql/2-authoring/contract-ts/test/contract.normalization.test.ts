@@ -1,6 +1,7 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { normalizeContract, validateContract } from '../src/contract';
+import { validateContract } from '../src/contract';
 
 describe('validateContract normalization', () => {
   it('normalizes missing nullable in columns', () => {
@@ -24,7 +25,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect(contract.storage.tables['User']?.columns['id']?.nullable).toBe(false);
   });
 
@@ -48,7 +49,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect(contract.storage.tables['User']?.['uniques']).toEqual([]);
   });
 
@@ -72,7 +73,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect(contract.storage.tables['User']?.['indexes']).toEqual([]);
   });
 
@@ -96,7 +97,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect(contract.storage.tables['User']?.['foreignKeys']).toEqual([]);
   });
 
@@ -121,7 +122,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect(contract.storage.tables['User']).toBeDefined();
   });
 
@@ -144,7 +145,7 @@ describe('validateContract normalization', () => {
       },
     };
     // This will fail validation because columns are required, but normalization should handle it
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('normalizes table with null columns', () => {
@@ -168,7 +169,7 @@ describe('validateContract normalization', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     // This will fail validation because columns are required, but normalization should handle it
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('normalizes table with empty columns object', () => {
@@ -192,7 +193,7 @@ describe('validateContract normalization', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     // This will fail validation because columns are required, but normalization should handle it
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('normalizes multiple tables where some have columns and some do not', () => {
@@ -225,104 +226,7 @@ describe('validateContract normalization', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     // This will fail validation because Post table is missing columns, but normalization should handle it
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow();
-  });
-
-  it('normalizeContract handles table without columns property', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {},
-      storage: {
-        tables: {
-          User: {
-            // No columns property - should hit else branch at line 403-404
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
-    const normalized = normalizeContract(contractInput);
-    // Normalization should complete even though validation would fail
-    expect(normalized.storage.tables['User']).toBeDefined();
-    expect(normalized.storage.tables['User']).not.toHaveProperty('columns');
-  });
-
-  it('normalizeContract handles table with undefined columns', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {},
-      storage: {
-        tables: {
-          User: {
-            columns: undefined,
-            // No columns property - should hit else branch at line 403-404
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
-    const normalized = normalizeContract(contractInput);
-    // Normalization should complete even though validation would fail
-    expect(normalized.storage.tables['User']).toBeDefined();
-  });
-
-  it('normalizeContract handles models with existing relations', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {
-        User: {
-          storage: { table: 'User' },
-          fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
-          },
-          relations: {
-            posts: {
-              to: 'Post',
-              on: { localFields: ['id'], targetFields: ['userId'] },
-              cardinality: '1:N',
-            },
-          },
-        },
-      },
-      storage: {
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-    const normalized = normalizeContract(contractInput);
-    expect((normalized.models['User'] as { relations?: unknown })['relations']).toEqual({
-      posts: {
-        to: 'Post',
-        on: { localFields: ['id'], targetFields: ['userId'] },
-        cardinality: '1:N',
-      },
-    });
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('normalizes missing relations in models', () => {
@@ -353,7 +257,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({});
   });
 
@@ -378,7 +282,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect(contract.extensionPacks).toEqual({});
   });
 
@@ -403,7 +307,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect(contract.capabilities).toEqual({});
   });
 
@@ -428,33 +332,8 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect(contract.meta).toEqual({});
-  });
-
-  it('normalizes missing sources', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {},
-      storage: {
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.sources).toEqual({});
   });
 
   it('normalizes models with multiple entries', () => {
@@ -500,7 +379,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({});
     expect((contract.models['Post'] as { relations?: unknown })['relations']).toEqual({});
   });
@@ -569,7 +448,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
@@ -643,7 +522,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
@@ -652,38 +531,6 @@ describe('validateContract normalization', () => {
       },
     });
     expect((contract.models['Post'] as { relations?: unknown })['relations']).toEqual({});
-  });
-
-  it('normalizeContract handles storage that is not an object', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {},
-      storage: null, // Storage is null - should hit else branch at line 390
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
-    const normalized = normalizeContract(contractInput);
-    expect(normalized.storage).toHaveProperty('storageHash');
-  });
-
-  it('normalizeContract handles storage without tables property', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {},
-      storage: {
-        // No tables property - should hit else branch at line 394
-      },
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
-    const normalized = normalizeContract(contractInput);
-    // Normalization should pass through storage without tables unchanged
-    expect(normalized.storage).toBeDefined();
-    expect(normalized.storage).not.toHaveProperty('tables');
   });
 
   it('normalizes FK entries with missing constraint/index to defaults', () => {
@@ -722,7 +569,7 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     const fk = contract.storage.tables['post']?.foreignKeys[0];
     expect(fk?.constraint).toBe(true);
     expect(fk?.index).toBe(true);
@@ -766,25 +613,9 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     const fk = contract.storage.tables['post']?.foreignKeys[0];
     expect(fk?.constraint).toBe(false);
     expect(fk?.index).toBe(true);
-  });
-
-  it('normalizeContract handles models that is not an object', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: null, // Models is null - should hit else branch at line 436
-      storage: {
-        tables: {},
-      },
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
-    const normalized = normalizeContract(contractInput);
-    expect(normalized.models).toEqual({});
   });
 });

@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 
@@ -26,20 +27,20 @@ describe('validateContract structure validation', () => {
   };
 
   it('accepts valid contract structure', () => {
-    const result = validateContract<SqlContract<SqlStorage>>(validContractInput);
+    const result = validateContract<Contract<SqlStorage>>(validContractInput);
     expect(result.storage.tables).toHaveProperty('User');
   });
 
   it('throws on missing targetFamily', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, targetFamily: undefined } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/targetFamily/);
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/targetFamily/);
   });
 
   it('throws on wrong targetFamily', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, targetFamily: 'document' } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /Unsupported target family/,
     );
   });
@@ -47,26 +48,26 @@ describe('validateContract structure validation', () => {
   it('throws on missing target', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, target: undefined } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/target/);
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/target/);
   });
 
   it('computes storageHash when missing from top level', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const input = { ...validContractInput, storageHash: undefined } as any;
-    const result = validateContract<SqlContract<SqlStorage>>(input);
-    expect(result.storageHash).toMatch(/^sha256:/);
+    const result = validateContract<Contract<SqlStorage>>(input);
+    expect(result.storage.storageHash).toMatch(/^sha256:/);
   });
 
   it('throws on missing storage', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, storage: undefined } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/storage/);
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/storage/);
   });
 
   it('defaults missing models to empty object', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, models: undefined } as any;
-    const result = validateContract<SqlContract<SqlStorage>>(invalid);
+    const result = validateContract<Contract<SqlStorage>>(invalid);
     expect(result.models).toEqual({});
   });
 
@@ -84,7 +85,7 @@ describe('validateContract structure validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /nativeType.*must be.*string|Column.*validation failed/,
     );
   });
@@ -107,7 +108,7 @@ describe('validateContract structure validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /Column.*validation failed|nullable.*must be.*boolean/,
     );
   });
@@ -120,7 +121,7 @@ describe('validateContract structure validation', () => {
       extensions: { pack: { config: true } },
       meta: { key: 'value' },
     };
-    const result = validateContract<SqlContract<SqlStorage>>(withOptional);
+    const result = validateContract<Contract<SqlStorage>>(withOptional);
     expect(result.profileHash).toBe('sha256:profile');
     expect(result.capabilities).toEqual({ feature: { enabled: true } });
   });

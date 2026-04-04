@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 
@@ -43,7 +44,7 @@ describe('validateContract logic validation', () => {
   };
 
   it('accepts valid contract logic', () => {
-    expect(() => validateContract<SqlContract<SqlStorage>>(validContractInput)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(validContractInput)).not.toThrow();
   });
 
   it('rejects invalid execution-default generator ids', () => {
@@ -68,7 +69,7 @@ describe('validateContract logic validation', () => {
       },
     };
 
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/a flat generator id/);
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/a flat generator id/);
   });
 
   it('throws when primaryKey references non-existent column', () => {
@@ -92,7 +93,7 @@ describe('validateContract logic validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /primaryKey references non-existent column/,
     );
   });
@@ -117,7 +118,7 @@ describe('validateContract logic validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /unique constraint references non-existent column/,
     );
   });
@@ -142,7 +143,7 @@ describe('validateContract logic validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /index references non-existent column/,
     );
   });
@@ -173,7 +174,7 @@ describe('validateContract logic validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /foreignKey references non-existent table/,
     );
   });
@@ -204,7 +205,7 @@ describe('validateContract logic validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /foreignKey references non-existent column.*nonExistent/,
     );
   });
@@ -235,7 +236,7 @@ describe('validateContract logic validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /foreignKey references non-existent column.*nonExistent.*User/,
     );
   });
@@ -266,7 +267,7 @@ describe('validateContract logic validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /column count.*does not match/,
     );
   });
@@ -305,7 +306,7 @@ describe('validateContract logic validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /foreignKey references non-existent column.*nonExistentColumn.*User/,
     );
   });
@@ -344,7 +345,7 @@ describe('validateContract logic validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /column count.*does not match/,
     );
   });
@@ -384,7 +385,7 @@ describe('validateContract logic validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /column count.*does not match/,
     );
   });
@@ -407,7 +408,7 @@ describe('validateContract logic validation', () => {
         },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 
   it('validates composite foreign keys', () => {
@@ -444,7 +445,7 @@ describe('validateContract logic validation', () => {
         },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 
   describe('model validation', () => {
@@ -511,7 +512,7 @@ describe('validateContract logic validation', () => {
         'User'
       ] as Record<string, unknown>;
       userModel['storage'] = { table: 'MissingTable' };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
         /references non-existent table "MissingTable"/,
       );
     });
@@ -524,7 +525,7 @@ describe('validateContract logic validation', () => {
           Record<string, unknown>
         >
       )?.['User']?.['primaryKey'];
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
         /table "User" is missing a primary key/,
       );
     });
@@ -537,7 +538,7 @@ describe('validateContract logic validation', () => {
       (userModel['storage'] as Record<string, unknown>)['fields'] = {
         id: { column: 'missing' },
       };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
         /references non-existent column "missing"/,
       );
     });
@@ -569,7 +570,7 @@ describe('validateContract logic validation', () => {
           references: { table: 'User', columns: ['id'] },
         },
       ];
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
     });
 
     it('throws when an N:1 relation lacks a matching foreign key', () => {
@@ -586,7 +587,7 @@ describe('validateContract logic validation', () => {
           cardinality: 'N:1',
         },
       };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
         /relation "user" does not have a corresponding foreign key/,
       );
     });
@@ -618,7 +619,7 @@ describe('validateContract logic validation', () => {
           references: { table: 'User', columns: ['id'] },
         },
       ];
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
     });
   });
 
@@ -651,7 +652,7 @@ describe('validateContract logic validation', () => {
     };
 
     it('accepts function defaults without capability gating', () => {
-      expect(() => validateContract<SqlContract<SqlStorage>>(baseContract)).not.toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(baseContract)).not.toThrow();
     });
 
     it('accepts multiple function defaults without capability gating', () => {
@@ -689,7 +690,7 @@ describe('validateContract logic validation', () => {
           },
         },
       };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
     });
 
     it('ignores non-function defaults (literal)', () => {
@@ -716,7 +717,7 @@ describe('validateContract logic validation', () => {
         },
         // No capabilities needed for non-function defaults
       };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
     });
 
     it('keeps ISO string defaults as strings for timestamp columns', () => {
@@ -743,7 +744,7 @@ describe('validateContract logic validation', () => {
         },
       };
 
-      const validated = validateContract<SqlContract<SqlStorage>>(contract);
+      const validated = validateContract<Contract<SqlStorage>>(contract);
       const defaultValue = validated.storage.tables['Post']!.columns['createdAt']!.default;
       if (defaultValue?.kind !== 'literal') {
         throw new Error('Expected literal default');
@@ -774,7 +775,7 @@ describe('validateContract logic validation', () => {
           },
         },
       };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow();
     });
 
     it('throws for default missing value', () => {
@@ -800,7 +801,7 @@ describe('validateContract logic validation', () => {
           },
         },
       };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow();
     });
 
     it('throws for default expression with non-string type', () => {
@@ -826,7 +827,7 @@ describe('validateContract logic validation', () => {
           },
         },
       };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow();
     });
   });
 });

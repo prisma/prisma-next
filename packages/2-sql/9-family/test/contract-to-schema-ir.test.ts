@@ -1,11 +1,6 @@
-import type { ColumnDefault, StorageHashBase } from '@prisma-next/contract/types';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type {
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-contract/types';
+import type { ColumnDefault, Contract, StorageHashBase } from '@prisma-next/contract/types';
+import { profileHash } from '@prisma-next/contract/types';
+import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import type { DefaultRenderer } from '../src/core/migrations/contract-to-schema-ir';
@@ -26,12 +21,10 @@ const testRenderer: DefaultRenderer = (def: ColumnDefault, column: StorageColumn
   return `'${json}'`;
 };
 
-function wrap(storage: SqlStorage): SqlContract<SqlStorage> {
+function wrap(storage: SqlStorage): Contract<SqlStorage> {
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:test'),
     profileHash: profileHash('sha256:test'),
     storage,
     models: {},
@@ -39,7 +32,6 @@ function wrap(storage: SqlStorage): SqlContract<SqlStorage> {
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
   };
 }
 
@@ -63,7 +55,7 @@ function table(
 }
 
 function contractToSchemaIR(
-  contract: SqlContract<SqlStorage> | null,
+  contract: Contract<SqlStorage> | null,
   options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,
 ): SqlSchemaIR {
   return contractToSchemaIRImpl(contract, { annotationNamespace: 'pg', ...options });

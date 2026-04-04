@@ -271,7 +271,7 @@ describe('staged contract DSL authoring surface', () => {
         columns: Record<string, unknown>;
       }
     >;
-    const models = contract.models as Record<
+    const models = contract.models as unknown as Record<
       string,
       { storage: { fields: Record<string, unknown> }; fields: Record<string, unknown> }
     >;
@@ -530,7 +530,7 @@ describe('staged contract DSL authoring surface', () => {
     expect(tables['blog_post']).toBeDefined();
     expect(tables['blog_post']?.columns['created_at']).toBeDefined();
     expect(tables['blog_post']?.columns['author_identifier']).toBeDefined();
-    const models = contract.models as Record<
+    const models = contract.models as unknown as Record<
       string,
       { storage: { fields: Record<string, unknown> } }
     >;

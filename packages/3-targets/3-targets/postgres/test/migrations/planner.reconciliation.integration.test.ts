@@ -26,18 +26,15 @@ function makeContract(
   hashSuffix = 'default',
 ): SqlContract<SqlStorage> {
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`),
-    profileHash: profileHash(`sha256:reconciliation-integ-${hashSuffix}`),
+    profileHash: profileHash('sha256:test'),
     storage: { storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`), tables },
     roots: {},
     models: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
   };
 }
 
@@ -970,13 +967,11 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     await applyBaseline(driver!, baselineContract);
 
     const updatedContract: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
-      profileHash: profileHash('sha256:reconciliation-integ-text-to-enum-updated'),
+      profileHash: profileHash('sha256:test'),
       storage: {
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
         tables: {
           item: {
             columns: {
@@ -1007,7 +1002,6 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       capabilities: {},
       extensionPacks: {},
       meta: {},
-      sources: {},
     };
 
     await planAndExecute(driver!, updatedContract);
@@ -1251,13 +1245,11 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       await applyBaseline(driver!, baselineContract);
 
       const updatedContract: SqlContract<SqlStorage> = {
-        schemaVersion: '1',
         target: 'postgres',
         targetFamily: 'sql',
-        storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
-        profileHash: profileHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
+        profileHash: profileHash('sha256:test'),
         storage: {
-          storageHash: coreHash('sha256:test'),
+          storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
           tables: {
             item: {
               columns: {
@@ -1288,7 +1280,6 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         capabilities: {},
         extensionPacks: {},
         meta: {},
-        sources: {},
       };
 
       // planAndExecute succeeds iff the postcheck passes — the postcheck

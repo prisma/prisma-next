@@ -66,19 +66,17 @@ vi.mock('pg', () => {
 import { Client, Pool } from 'pg';
 import postgres from '../src/runtime/postgres';
 
-const contract: SqlContract<SqlStorage> = {
-  schemaVersion: '1',
+const contract = {
   targetFamily: 'sql',
   target: 'postgres',
-  storageHash: 'sha256:test' as never,
+  profileHash: 'sha256:test' as never,
   models: {},
   roots: {},
   storage: { storageHash: 'sha256:test' as never, tables: {} },
   extensionPacks: {},
   capabilities: {},
   meta: {},
-  sources: {},
-};
+} as SqlContract<SqlStorage>;
 
 describe('postgres', () => {
   beforeEach(() => {

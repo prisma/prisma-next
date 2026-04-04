@@ -1,4 +1,5 @@
 import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
+import type { Contract } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
@@ -7,7 +8,6 @@ import type {
   SqlPlannerConflict,
 } from '@prisma-next/family-sql/control';
 import type {
-  SqlContract,
   SqlStorage,
   StorageColumn,
   StorageTypeInstance,
@@ -36,7 +36,7 @@ import {
 // ============================================================================
 
 export function buildReconciliationPlan(options: {
-  readonly contract: SqlContract<SqlStorage>;
+  readonly contract: Contract<SqlStorage>;
   readonly issues: readonly SchemaIssue[];
   readonly schemaName: string;
   readonly mode: PlanningMode;
@@ -121,7 +121,7 @@ function isAdditiveIssue(issue: SchemaIssue): boolean {
 
 function buildReconciliationOperationFromIssue(options: {
   readonly issue: SchemaIssue;
-  readonly contract: SqlContract<SqlStorage>;
+  readonly contract: Contract<SqlStorage>;
   readonly schemaName: string;
   readonly mode: PlanningMode;
   readonly codecHooks: Map<string, CodecControlHooks>;
@@ -275,7 +275,7 @@ function buildReconciliationOperationFromIssue(options: {
 }
 
 function getContractColumn(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   columnName: string,
 ): StorageColumn | null {

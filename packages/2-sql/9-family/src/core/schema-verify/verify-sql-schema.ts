@@ -220,8 +220,8 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 type VerificationStatus = 'pass' | 'warn' | 'fail';
 
 function extractContractMetadata(contract: Contract<SqlStorage>): {
-  contractStorageHash: Contract<SqlStorage>['storageHash'];
-  contractProfileHash?: Contract<SqlStorage>['profileHash'];
+  contractStorageHash: SqlStorage['storageHash'];
+  contractProfileHash?: Contract<SqlStorage>['profileHash'] | undefined;
   contractTarget: Contract<SqlStorage>['target'];
 } {
   return {

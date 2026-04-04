@@ -199,7 +199,10 @@ export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
 
 export type SqlContract<
   S extends SqlStorage,
-  TModels extends Record<string, ContractModel<SqlModelStorage>>,
+  TModels extends Record<string, ContractModel<SqlModelStorage>> = Record<
+    string,
+    ContractModel<SqlModelStorage>
+  >,
 > = Contract<S, TModels>;
 
 export type ExtractTypeMapsFromContract<T> = TypeMapsPhantomKey extends keyof T

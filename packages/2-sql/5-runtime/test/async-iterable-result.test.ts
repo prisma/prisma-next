@@ -45,7 +45,6 @@ class MockDriver {
 }
 
 const fixtureContract = createTestContract({
-  schemaVersion: '1',
   targetFamily: 'sql',
   target: 'postgres',
   storageHash: 'test-hash',

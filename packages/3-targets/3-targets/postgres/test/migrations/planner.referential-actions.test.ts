@@ -24,11 +24,9 @@ function createRefActionContract(
   };
 
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:contract'),
-    profileHash: profileHash('sha256:profile'),
+    profileHash: profileHash('sha256:test'),
     storage: {
       storageHash: coreHash('sha256:contract'),
       tables: {
@@ -58,7 +56,6 @@ function createRefActionContract(
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
   };
 }
 

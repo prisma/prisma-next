@@ -546,18 +546,15 @@ function createTestContract(
   };
   const { storage: _s, ...rest } = overrides ?? {};
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: storageHashValue,
-    profileHash: profileHash('sha256:profile'),
+    profileHash: profileHash('sha256:test'),
     storage: { ...storage, storageHash: storageHashValue },
     roots: {},
     models: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
     ...rest,
   };
 }

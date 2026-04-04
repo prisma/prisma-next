@@ -1,11 +1,12 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
 import { createMockRuntime, type TestContract } from './helpers';
 
 type RowOf<TCollection> =
   TCollection extends Collection<
-    infer _Contract extends SqlContract<SqlStorage>,
+    infer _Contract extends Contract<SqlStorage>,
     infer _ModelName extends string,
     infer Row,
     infer _State

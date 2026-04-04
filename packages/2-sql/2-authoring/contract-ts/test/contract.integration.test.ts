@@ -1,9 +1,10 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { validateContract } from '../src/contract';
 
 describe('validateContract', () => {
-  const validContract = validateContract<SqlContract<SqlStorage>>({
+  const validContract = validateContract<Contract<SqlStorage>>({
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
@@ -26,14 +27,14 @@ describe('validateContract', () => {
   });
 
   it('performs both structural and logical validation', () => {
-    const result = validateContract<SqlContract<SqlStorage>>(validContract);
+    const result = validateContract<Contract<SqlStorage>>(validContract);
     expect(result).toEqual(validContract);
   });
 
   it('throws on structural validation failure', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContract, targetFamily: undefined } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /Invalid targetFamily|Contract header validation failed|structural validation failed/,
     );
   });
@@ -51,7 +52,7 @@ describe('validateContract', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /primaryKey references non-existent column/,
     );
   });
@@ -70,7 +71,7 @@ describe('validateContract', () => {
       },
     };
 
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /Contract semantic validation failed:.*user_pkey/,
     );
   });
@@ -98,9 +99,9 @@ describe('validateContract', () => {
         },
       },
     };
-    const result = validateContract<SqlContract<SqlStorage>>(contractJson);
+    const result = validateContract<Contract<SqlStorage>>(contractJson);
     // After validation, types should match the type parameter
-    expectTypeOf(result).toEqualTypeOf<SqlContract<SqlStorage>>();
+    expectTypeOf(result).toEqualTypeOf<Contract<SqlStorage>>();
     // Verify structure is validated at runtime
     expect(result.storage.tables).toHaveProperty('User');
     expect(result.storage.tables['User']?.columns).toHaveProperty('id');
@@ -127,7 +128,7 @@ describe('validateContract', () => {
         },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 
   it('handles missing foreignKey references table', () => {
@@ -166,7 +167,7 @@ describe('validateContract', () => {
         },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow(
       /foreignKey references non-existent table/,
     );
   });
@@ -198,7 +199,7 @@ describe('validateContract', () => {
         },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow(
       /foreignKey references non-existent table/,
     );
   });

@@ -5,7 +5,7 @@ import type {
   PlanRefs,
 } from '@prisma-next/contract/types';
 import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
-import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type { ExtractCodecTypes, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import type {
   AnyExpression,
@@ -304,9 +304,6 @@ type ExtractColumnToField<
     : never
   : never;
 
-/**
- * Extracts the field value type from a model's fields.
- */
 type ExtractFieldValue<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
@@ -325,10 +322,19 @@ type ExtractFieldValue<
     : never
   : never;
 
-/**
- * Extracts the JavaScript type for a column from model fields if available.
- * Model fields in the .d.ts carry concrete JS types (e.g. `string`, `Char<36>`).
- */
+type ResolveModelFieldToJsType<
+  TContract extends Contract<SqlStorage>,
+  FieldValue,
+> = FieldValue extends { readonly codecId: infer Id extends string }
+  ? Id extends keyof ExtractCodecTypes<TContract>
+    ? ExtractCodecTypes<TContract>[Id] extends { readonly output: infer O }
+      ? FieldValue extends { readonly nullable: true }
+        ? O | null
+        : O
+      : never
+    : never
+  : FieldValue;
+
 type ExtractColumnJsTypeFromModels<
   TContract extends Contract<SqlStorage>,
   TableName extends string,
@@ -337,7 +343,7 @@ type ExtractColumnJsTypeFromModels<
   ? ModelName extends string
     ? ExtractColumnToField<TContract, TableName, ColumnName> extends infer FieldName
       ? FieldName extends string
-        ? ExtractFieldValue<TContract, ModelName, FieldName>
+        ? ResolveModelFieldToJsType<TContract, ExtractFieldValue<TContract, ModelName, FieldName>>
         : never
       : never
     : never
