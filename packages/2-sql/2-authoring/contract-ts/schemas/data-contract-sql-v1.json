@@ -29,11 +29,6 @@
       "pattern": "^sha256:[a-f0-9]{64}$",
       "description": "SHA-256 hash of the storage section (DB-satisfied expectations)"
     },
-    "executionHash": {
-      "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$",
-      "description": "SHA-256 hash of the execution section (client-side behavior)"
-    },
     "profileHash": {
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$",
@@ -107,6 +102,11 @@
       "description": "Execution-only behavior not satisfied by the database",
       "additionalProperties": false,
       "properties": {
+        "executionHash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "SHA-256 hash of the execution section (client-side behavior)"
+        },
         "mutations": {
           "type": "object",
           "additionalProperties": false,
@@ -119,7 +119,7 @@
           "required": ["defaults"]
         }
       },
-      "required": ["mutations"]
+      "required": ["executionHash", "mutations"]
     }
   },
   "required": [
