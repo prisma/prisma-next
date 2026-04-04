@@ -45,7 +45,7 @@ Reference the appropriate JSON schema in your `contract.json` files to enable ID
 }
 ```
 
-For SQL contracts, use `@prisma-next/sql-query/schemas/data-contract-sql-v1.json` instead.
+For SQL contracts, use `@prisma-next/sql-contract-ts/schemas/data-contract-sql-v1.json` instead.
 
 ## Exports
 
