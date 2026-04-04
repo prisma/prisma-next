@@ -5,6 +5,8 @@ export type { MongoQueryExecutor } from '../executor';
 export type { MongoOrmClient, MongoOrmOptions } from '../mongo-orm';
 export { mongoOrm } from '../mongo-orm';
 export type {
+  CreateInput,
+  DefaultModelRow,
   IncludedRow,
   IncludeResultFields,
   InferFullRow,
