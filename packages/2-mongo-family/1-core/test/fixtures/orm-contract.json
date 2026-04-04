@@ -1,5 +1,6 @@
 {
   "targetFamily": "mongo",
+  "storageHash": "fixture-hash",
   "roots": {
     "tasks": "Task",
     "users": "User"

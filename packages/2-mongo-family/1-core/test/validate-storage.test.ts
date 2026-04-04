@@ -5,6 +5,7 @@ import { validateMongoStorage } from '../src/validate-storage';
 function makeMinimalContract(overrides: Partial<MongoContract> = {}): MongoContract {
   return {
     targetFamily: 'mongo',
+    storageHash: 'test-hash',
     roots: { items: 'Item' },
     storage: { collections: { items: {} } },
     models: {

@@ -4,12 +4,15 @@ import type { MongoCollectionState } from '../src/collection-state';
 import { emptyCollectionState } from '../src/collection-state';
 import { compileMongoQuery } from '../src/compile';
 
+const testHash = 'test-hash';
+
 describe('compileMongoQuery', () => {
   it('produces empty pipeline from empty state', () => {
-    const plan = compileMongoQuery('users', emptyCollectionState());
+    const plan = compileMongoQuery('users', emptyCollectionState(), testHash);
     expect(plan.collection).toBe('users');
     expect(plan.stages).toEqual([]);
     expect(plan.meta.lane).toBe('mongo-orm');
+    expect(plan.meta.storageHash).toBe(testHash);
   });
 
   it('compiles a single filter to $match', () => {
@@ -17,7 +20,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       filters: [MongoFieldFilter.eq('name', 'Alice')],
     };
-    const plan = compileMongoQuery('users', state);
+    const plan = compileMongoQuery('users', state, testHash);
     const lowered = lowerPipeline(plan.stages);
     expect(lowered).toEqual([{ $match: { name: { $eq: 'Alice' } } }]);
   });
@@ -27,7 +30,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       filters: [MongoFieldFilter.eq('name', 'Alice'), MongoFieldFilter.gte('age', 18)],
     };
-    const plan = compileMongoQuery('users', state);
+    const plan = compileMongoQuery('users', state, testHash);
     const lowered = lowerPipeline(plan.stages);
     expect(lowered).toEqual([
       {
@@ -43,7 +46,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       selectedFields: ['name', 'email'],
     };
-    const plan = compileMongoQuery('users', state);
+    const plan = compileMongoQuery('users', state, testHash);
     const lowered = lowerPipeline(plan.stages);
     expect(lowered).toEqual([{ $project: { name: 1, email: 1 } }]);
   });
@@ -53,7 +56,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       orderBy: { age: -1, name: 1 },
     };
-    const plan = compileMongoQuery('users', state);
+    const plan = compileMongoQuery('users', state, testHash);
     const lowered = lowerPipeline(plan.stages);
     expect(lowered).toEqual([{ $sort: { age: -1, name: 1 } }]);
   });
@@ -63,7 +66,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       limit: 10,
     };
-    const plan = compileMongoQuery('users', state);
+    const plan = compileMongoQuery('users', state, testHash);
     const lowered = lowerPipeline(plan.stages);
     expect(lowered).toEqual([{ $limit: 10 }]);
   });
@@ -73,7 +76,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       offset: 5,
     };
-    const plan = compileMongoQuery('users', state);
+    const plan = compileMongoQuery('users', state, testHash);
     const lowered = lowerPipeline(plan.stages);
     expect(lowered).toEqual([{ $skip: 5 }]);
   });
@@ -91,7 +94,7 @@ describe('compileMongoQuery', () => {
         },
       ],
     };
-    const plan = compileMongoQuery('posts', state);
+    const plan = compileMongoQuery('posts', state, testHash);
     const lowered = lowerPipeline(plan.stages);
     expect(lowered).toEqual([
       {
@@ -119,7 +122,7 @@ describe('compileMongoQuery', () => {
         },
       ],
     };
-    const plan = compileMongoQuery('users', state);
+    const plan = compileMongoQuery('users', state, testHash);
     const lowered = lowerPipeline(plan.stages);
     expect(lowered).toEqual([
       {
@@ -150,7 +153,7 @@ describe('compileMongoQuery', () => {
       limit: 5,
       selectedFields: ['name', 'email'],
     };
-    const plan = compileMongoQuery('users', state);
+    const plan = compileMongoQuery('users', state, testHash);
     const lowered = lowerPipeline(plan.stages);
 
     const stageKeys = lowered.map((s) => Object.keys(s)[0]);

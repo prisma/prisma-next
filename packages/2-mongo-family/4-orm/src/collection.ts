@@ -133,7 +133,11 @@ export class MongoCollection<
   }
 
   #compile(): MongoReadPlan<InferRootRow<TContract, ModelName>> {
-    return compileMongoQuery<InferRootRow<TContract, ModelName>>(this.#collectionName, this.state);
+    return compileMongoQuery<InferRootRow<TContract, ModelName>>(
+      this.#collectionName,
+      this.state,
+      this.#contract.storageHash,
+    );
   }
 
   #clone(overrides: Partial<MongoCollectionState>): MongoCollection<TContract, ModelName> {

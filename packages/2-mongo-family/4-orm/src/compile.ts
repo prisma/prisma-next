@@ -12,13 +12,6 @@ import {
 } from '@prisma-next/mongo-query-ast';
 import type { MongoCollectionState, MongoIncludeExpr } from './collection-state';
 
-const stubMeta: PlanMeta = {
-  target: 'mongo',
-  storageHash: 'orm',
-  lane: 'mongo-orm',
-  paramDescriptors: [],
-};
-
 function compileIncludes(includes: readonly MongoIncludeExpr[]): MongoReadStage[] {
   const stages: MongoReadStage[] = [];
 
@@ -43,6 +36,7 @@ function compileIncludes(includes: readonly MongoIncludeExpr[]): MongoReadStage[
 export function compileMongoQuery<Row = unknown>(
   collection: string,
   state: MongoCollectionState,
+  storageHash: string,
 ): MongoReadPlan<Row> {
   const stages: MongoReadStage[] = [];
 
@@ -76,5 +70,11 @@ export function compileMongoQuery<Row = unknown>(
     stages.push(new MongoProjectStage(projection));
   }
 
-  return { collection, stages, meta: stubMeta };
+  const meta: PlanMeta = {
+    target: 'mongo',
+    storageHash,
+    lane: 'mongo-orm',
+    paramDescriptors: [],
+  };
+  return { collection, stages, meta };
 }
