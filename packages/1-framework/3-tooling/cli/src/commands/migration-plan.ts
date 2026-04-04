@@ -144,16 +144,15 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  const toStorageHash = (toContractJson as unknown as Record<string, unknown>)['storageHash'] as
-    | string
-    | undefined;
-  if (!toStorageHash) {
+  const rawStorageHash = (toContractJson as { readonly storageHash?: unknown }).storageHash;
+  if (typeof rawStorageHash !== 'string') {
     return notOk(
       errorContractValidationFailed('Contract is missing storageHash', {
         where: { path: contractPathAbsolute },
       }),
     );
   }
+  const toStorageHash = rawStorageHash;
 
   // Read existing migrations and determine "from" contract
   let fromContract: Contract | null = null;
