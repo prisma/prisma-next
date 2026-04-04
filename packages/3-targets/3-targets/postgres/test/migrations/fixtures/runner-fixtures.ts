@@ -16,7 +16,6 @@ import postgresTargetDescriptor from '../../../src/exports/control';
 export const contract: SqlContract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
-  storageHash: 'sha256:contract',
   profileHash: profileHash('sha256:test'),
   storage: {
     storageHash: coreHash('sha256:contract'),
