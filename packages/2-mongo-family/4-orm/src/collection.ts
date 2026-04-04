@@ -19,6 +19,7 @@ import {
   InsertManyCommand,
   InsertOneCommand,
   MongoAndExpr,
+  MongoFieldFilter,
   UpdateManyCommand,
 } from '@prisma-next/mongo-query-ast';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
@@ -71,10 +72,7 @@ export interface MongoCollection<
   update(
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
-  /**
-   * Non-atomic: updates matching docs then re-reads them with the original filter.
-   * If the update modifies fields used in the filter, the re-read may return fewer or different documents.
-   */
+  /** Non-atomic: captures matching `_id`s, updates, then re-reads by `_id`. */
   updateAll(
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
@@ -206,6 +204,7 @@ class MongoCollectionImpl<
   async create(
     data: CreateInput<TContract, ModelName>,
   ): Promise<IncludedRow<TContract, ModelName, TIncludes>> {
+    this.#rejectIncludes('create');
     const document = this.#toDocument(data as Record<string, unknown>);
     const command = new InsertOneCommand(this.#collectionName, document);
     const results = await this.#drainPlan(command);
@@ -220,6 +219,7 @@ class MongoCollectionImpl<
   createAll(
     data: ReadonlyArray<CreateInput<TContract, ModelName>>,
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>> {
+    this.#rejectIncludes('createAll');
     const self = this;
     async function* gen(): AsyncGenerator<IncludedRow<TContract, ModelName, TIncludes>> {
       const documents = data.map((d) => self.#toDocument(d as Record<string, unknown>));
@@ -249,6 +249,7 @@ class MongoCollectionImpl<
   ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null> {
     this.#requireFilters('update');
     this.#rejectWindowing('update');
+    this.#rejectIncludes('update');
     const filter = this.#mergeFilters();
     const updateDoc = this.#toUpdateDocument(data as Record<string, unknown>);
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, false);
@@ -263,12 +264,19 @@ class MongoCollectionImpl<
     this.#rejectWindowing('updateAll');
     const self = this;
     async function* gen(): AsyncGenerator<IncludedRow<TContract, ModelName, TIncludes>> {
+      const ids = await self.#readMatchingIds();
+      if (ids.length === 0) return;
+
       const filter = self.#mergeFilters();
       const updateDoc = self.#toUpdateDocument(data as Record<string, unknown>);
       const command = new UpdateManyCommand(self.#collectionName, filter, updateDoc);
       await self.#drainPlan(command);
-      const readResult = self.#execute();
-      yield* readResult;
+
+      const idFilter = MongoFieldFilter.in(
+        '_id',
+        ids.map((id) => new MongoParamRef(id)),
+      );
+      yield* self.#clone({ filters: [idFilter] }).#execute();
     }
     return new AsyncIterableResult(gen());
   }
@@ -286,6 +294,7 @@ class MongoCollectionImpl<
   async delete(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null> {
     this.#requireFilters('delete');
     this.#rejectWindowing('delete');
+    this.#rejectIncludes('delete');
     const filter = this.#mergeFilters();
     const command = new FindOneAndDeleteCommand(this.#collectionName, filter);
     const results = await this.#drainPlan(command);
@@ -324,6 +333,7 @@ class MongoCollectionImpl<
   }): Promise<IncludedRow<TContract, ModelName, TIncludes>> {
     this.#requireFilters('upsert');
     this.#rejectWindowing('upsert');
+    this.#rejectIncludes('upsert');
     const filter = this.#mergeFilters();
     const setFields = this.#toSetFields(input.update as Record<string, unknown>);
     const allCreateFields = this.#toDocument(input.create as Record<string, unknown>);
@@ -344,6 +354,21 @@ class MongoCollectionImpl<
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, true);
     const results = await this.#drainPlan(command);
     return results[0] as IncludedRow<TContract, ModelName, TIncludes>;
+  }
+
+  async #readMatchingIds(): Promise<unknown[]> {
+    const idQuery = this.#clone({
+      includes: [],
+      selectedFields: ['_id'],
+      orderBy: undefined,
+      limit: undefined,
+      offset: undefined,
+    });
+    const ids: unknown[] = [];
+    for await (const row of idQuery.#execute()) {
+      ids.push((row as Record<string, unknown>)['_id']);
+    }
+    return ids;
   }
 
   #execute(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>> {
@@ -419,6 +444,14 @@ class MongoCollectionImpl<
     ) {
       throw new Error(
         `${methodName}() does not support orderBy/skip/take. Remove windowing before calling .${methodName}()`,
+      );
+    }
+  }
+
+  #rejectIncludes(methodName: string): void {
+    if (this.#state.includes.length > 0) {
+      throw new Error(
+        `${methodName}() does not support .include(). Remove includes before calling .${methodName}()`,
       );
     }
   }

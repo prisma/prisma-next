@@ -437,6 +437,83 @@ describe('MongoCollection write methods', () => {
     });
   });
 
+  describe('updateAll()', () => {
+    it('re-reads by _id after update, not original filter', async () => {
+      const executor = createMockExecutor(
+        [{ _id: 'id-1' }, { _id: 'id-2' }],
+        [{ matchedCount: 2, modifiedCount: 2 }],
+        [
+          { _id: 'id-1', name: 'Updated', email: 'a@b.c' },
+          { _id: 'id-2', name: 'Updated', email: 'b@b.c' },
+        ],
+      );
+      const col = createMongoCollection(contract, 'User', executor);
+      const rows: unknown[] = [];
+      for await (const row of col
+        .where(MongoFieldFilter.eq('name', 'Alice'))
+        .updateAll({ name: 'Updated' })) {
+        rows.push(row);
+      }
+      expect(rows).toHaveLength(2);
+      const reReadPlan = executor.lastPlan!;
+      expect(reReadPlan.command.kind).toBe('aggregate');
+      if (reReadPlan.command.kind === 'aggregate') {
+        const matchStage = reReadPlan.command.pipeline[0] as MongoMatchStage;
+        expect(matchStage.filter.kind).toBe('field');
+        if (matchStage.filter.kind === 'field') {
+          expect(matchStage.filter.field).toBe('_id');
+          expect(matchStage.filter.op).toBe('$in');
+        }
+      }
+    });
+  });
+
+  describe('include rejection on write terminals', () => {
+    function taskWithInclude(executor: MongoQueryExecutor) {
+      return createMongoCollection(contract, 'Task', executor)
+        .where(MongoFieldFilter.eq('title', 'test'))
+        .include('assignee');
+    }
+
+    it('create() throws with .include()', async () => {
+      const executor = createMockExecutor();
+      await expect(
+        createMongoCollection(contract, 'Task', executor)
+          .include('assignee')
+          .create({ title: 'test', type: 'bug', assigneeId: 'u1' }),
+      ).rejects.toThrow('include');
+    });
+
+    it('createAll() throws with .include()', () => {
+      const executor = createMockExecutor();
+      expect(() =>
+        createMongoCollection(contract, 'Task', executor)
+          .include('assignee')
+          .createAll([{ title: 'test', type: 'bug', assigneeId: 'u1' }]),
+      ).toThrow('include');
+    });
+
+    it('update() throws with .include()', async () => {
+      const executor = createMockExecutor();
+      await expect(taskWithInclude(executor).update({ title: 'X' })).rejects.toThrow('include');
+    });
+
+    it('delete() throws with .include()', async () => {
+      const executor = createMockExecutor();
+      await expect(taskWithInclude(executor).delete()).rejects.toThrow('include');
+    });
+
+    it('upsert() throws with .include()', async () => {
+      const executor = createMockExecutor();
+      await expect(
+        taskWithInclude(executor).upsert({
+          create: { title: 'A', type: 'bug', assigneeId: 'u1' },
+          update: { title: 'B' },
+        }),
+      ).rejects.toThrow('include');
+    });
+  });
+
   describe('immutability', () => {
     it('write methods do not mutate collection state', async () => {
       const executor = createMockExecutor([{ insertedId: 'x' }]);
