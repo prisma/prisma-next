@@ -8,11 +8,15 @@ const PORT = 3456;
 const DB_NAME = 'blog';
 
 async function seed(orm: Db['orm']) {
-  const [alice, bob, carol] = await orm.users.createAll([
+  const createdUsers = await orm.users.createAll([
     { name: 'Alice Chen', email: 'alice@example.com', bio: 'Full-stack engineer and tech blogger' },
     { name: 'Bob Kumar', email: 'bob@example.com', bio: 'DevOps enthusiast' },
     { name: 'Carol Santos', email: 'carol@example.com', bio: null },
   ]);
+  const alice = createdUsers[0];
+  const bob = createdUsers[1];
+  const carol = createdUsers[2];
+  if (!alice || !bob || !carol) throw new Error('Failed to seed users');
 
   await orm.posts.createAll([
     {
