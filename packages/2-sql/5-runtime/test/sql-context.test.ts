@@ -330,7 +330,6 @@ describe('applyMutationDefaults', () => {
       },
     },
     execution: {
-      executionHash: coreHash('sha256:test'),
       mutations: {
         defaults: [
           {

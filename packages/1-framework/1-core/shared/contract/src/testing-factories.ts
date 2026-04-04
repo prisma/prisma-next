@@ -1,6 +1,6 @@
 import type { Contract } from './contract-types';
 import type { ContractModel, ModelStorageBase } from './domain-types';
-import { computeProfileHash, computeStorageHash } from './hashing';
+import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
 import type { ExecutionSection, ProfileHashBase, StorageBase } from './types';
 import { coreHash } from './types';
 
@@ -55,7 +55,18 @@ export function createContract<
     storage,
     capabilities,
     extensionPacks: overrides.extensionPacks ?? {},
-    ...(overrides.execution !== undefined ? { execution: overrides.execution } : {}),
+    ...(overrides.execution !== undefined
+      ? {
+          execution: {
+            ...overrides.execution,
+            executionHash: computeExecutionHash({
+              target,
+              targetFamily,
+              execution: overrides.execution,
+            }),
+          },
+        }
+      : {}),
     profileHash: computedProfileHash,
     meta: overrides.meta ?? {},
   };

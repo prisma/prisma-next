@@ -1,5 +1,9 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
-import type { StorageHashBase } from '@prisma-next/contract/types';
+import {
+  type ProfileHashBase,
+  profileHash,
+  type StorageHashBase,
+} from '@prisma-next/contract/types';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import type { MongoLoweringContext } from '@prisma-next/mongo-core';
 import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtime';
@@ -54,7 +58,7 @@ export function describeWithMongoDB(name: string, fn: (ctx: MongodContext) => vo
           models: {},
           capabilities: {},
           extensionPacks: {},
-          profileHash: 'sha256:test',
+          profileHash: profileHash('sha256:test'),
           meta: {},
         },
       };

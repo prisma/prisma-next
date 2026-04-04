@@ -34,7 +34,7 @@ function emitTestContract(patch: Record<string, unknown>): Contract {
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (contract: Contract) => {
+  validateTypes: (contract) => {
     const storage = contract.storage as
       | { tables?: Record<string, { columns?: Record<string, { codecId?: string }> }> }
       | undefined;
@@ -61,17 +61,12 @@ const mockSqlHook: TargetFamilyHook = {
       }
     }
   },
-  validateStructure: (contract: Contract) => {
+  validateStructure: (contract) => {
     if (contract.targetFamily !== 'sql') {
       throw new Error(`Expected targetFamily "sql", got "${contract.targetFamily}"`);
     }
   },
-  generateContractTypes: (
-    contract: Contract,
-    _codecTypeImports,
-    _operationTypeImports,
-    _hashes,
-  ) => {
+  generateContractTypes: (contract, _codecTypeImports, _operationTypeImports, _hashes) => {
     void contract;
     void _codecTypeImports;
     void _operationTypeImports;
@@ -556,17 +551,12 @@ describe('emitter', () => {
     const mockHookNoTypeValidation: TargetFamilyHook = {
       id: 'sql',
       validateTypes: () => {},
-      validateStructure: (contract: Contract) => {
+      validateStructure: (contract) => {
         if (contract.targetFamily !== 'sql') {
           throw new Error(`Expected targetFamily "sql", got "${contract.targetFamily}"`);
         }
       },
-      generateContractTypes: (
-        contract: Contract,
-        _codecTypeImports,
-        _operationTypeImports,
-        _hashes,
-      ) => {
+      generateContractTypes: (contract, _codecTypeImports, _operationTypeImports, _hashes) => {
         void contract;
         void _codecTypeImports;
         void _operationTypeImports;
@@ -607,7 +597,7 @@ export type Contract = unknown;
       validateTypes: () => {},
       validateStructure: () => {},
       generateContractTypes: (
-        contract: Contract,
+        contract,
         _codecTypeImports,
         _operationTypeImports,
         _hashes,

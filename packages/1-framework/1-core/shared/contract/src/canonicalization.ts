@@ -1,5 +1,6 @@
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
 
+import type { StorageBase } from './types';
 import { bigintJsonReplacer } from './types';
 
 const TOP_LEVEL_ORDER = [
@@ -241,7 +242,7 @@ export type CanonicalContractInput = {
   readonly target: string;
   readonly roots?: Record<string, string> | undefined;
   readonly models: Record<string, unknown>;
-  readonly storage: Record<string, unknown>;
+  readonly storage: StorageBase | Record<string, unknown>;
   readonly execution?: Record<string, unknown> | undefined;
   readonly extensionPacks: Record<string, unknown>;
   readonly capabilities: Record<string, Record<string, boolean>>;

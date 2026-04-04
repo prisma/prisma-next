@@ -22,7 +22,9 @@ export default defineConfig({
         '**/*.config.ts',
         '**/exports/**',
         'schemas/**',
-        '**/types.ts', // Types-only file
+        '**/types.ts',
+        '**/contract-types.ts',
+        '**/domain-types.ts',
       ],
       thresholds: {
         lines: 90,

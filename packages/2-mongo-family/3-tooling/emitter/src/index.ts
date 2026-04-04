@@ -1,7 +1,6 @@
 import type {
   Contract,
   GenerateContractTypesOptions,
-  TargetFamilyHook,
   TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/contract/types';
@@ -302,4 +301,4 @@ type ContractBase = {
 export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;
 `;
   },
-} as const satisfies TargetFamilyHook;
+};
