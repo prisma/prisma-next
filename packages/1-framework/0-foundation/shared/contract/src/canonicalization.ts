@@ -8,6 +8,8 @@ const TOP_LEVEL_ORDER = [
   'canonicalVersion',
   'targetFamily',
   'target',
+  'storageHash',
+  'executionHash',
   'profileHash',
   'roots',
   'models',
@@ -251,6 +253,9 @@ export type CanonicalContractInput = {
   readonly extensionPacks: Record<string, unknown>;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly meta: Record<string, unknown>;
+  readonly storageHash?: string | undefined;
+  readonly executionHash?: string | undefined;
+  readonly profileHash?: string | undefined;
 };
 
 export function canonicalizeContractToObject(
@@ -270,6 +275,15 @@ export function canonicalizeContractToObject(
     capabilities: i['capabilities'],
     meta: i['meta'],
   };
+  if (i['storageHash'] !== undefined) {
+    normalized['storageHash'] = i['storageHash'];
+  }
+  if (i['executionHash'] !== undefined) {
+    normalized['executionHash'] = i['executionHash'];
+  }
+  if (i['profileHash'] !== undefined) {
+    normalized['profileHash'] = i['profileHash'];
+  }
 
   const withDefaultsOmitted = omitDefaults(normalized, []) as Record<string, unknown>;
   const withSortedIndexes = sortIndexesAndUniques(withDefaultsOmitted['storage']);
