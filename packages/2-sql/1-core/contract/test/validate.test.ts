@@ -61,6 +61,7 @@ describe('validateContract', () => {
     const contract = {
       ...baseContract,
       execution: {
+        executionHash: 'sha256:abc123',
         mutations: {
           defaults: [
             {
@@ -85,6 +86,7 @@ describe('validateContract', () => {
     const contract = {
       ...baseContract,
       execution: {
+        executionHash: 'sha256:abc123',
         mutations: {
           defaults: [
             {
