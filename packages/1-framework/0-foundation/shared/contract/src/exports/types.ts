@@ -26,7 +26,6 @@ export type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
   ColumnDefaultLiteralValue,
-  ContractBase,
   ContractMarkerRecord,
   DocCollection,
   DocIndex,
