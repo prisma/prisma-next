@@ -1,4 +1,4 @@
-import { coreHash } from '@prisma-next/contract/types';
+import { coreHash, executionHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -75,7 +75,7 @@ describe('composed runtime mutation default generators', () => {
       contract: {
         ...testContract,
         execution: {
-          executionHash: coreHash('sha256:test'),
+          executionHash: executionHash('sha256:test'),
           mutations: {
             defaults: [
               {
@@ -118,7 +118,7 @@ describe('composed runtime mutation default generators', () => {
       contract: {
         ...testContract,
         execution: {
-          executionHash: coreHash('sha256:test'),
+          executionHash: executionHash('sha256:test'),
           mutations: {
             defaults: [
               {
@@ -191,7 +191,7 @@ describe('composed runtime mutation default generators', () => {
       contract: {
         ...testContract,
         execution: {
-          executionHash: coreHash('sha256:test'),
+          executionHash: executionHash('sha256:test'),
           mutations: {
             defaults: [
               {
@@ -227,7 +227,7 @@ describe('composed runtime mutation default generators', () => {
       contract: {
         ...testContract,
         execution: {
-          executionHash: coreHash('sha256:test'),
+          executionHash: executionHash('sha256:test'),
           mutations: {
             defaults: [
               {

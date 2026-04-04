@@ -1,4 +1,4 @@
-import { coreHash } from '@prisma-next/contract/types';
+import { coreHash, executionHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -330,6 +330,7 @@ describe('applyMutationDefaults', () => {
       },
     },
     execution: {
+      executionHash: executionHash('sha256:test'),
       mutations: {
         defaults: [
           {
