@@ -362,7 +362,7 @@ describe('MongoCollection write methods', () => {
     it('sends findOneAndUpdate with upsert true', async () => {
       const executor = createMockExecutor([{ _id: 'new-id', name: 'Alice', email: 'a@b.c' }]);
       const col = createMongoCollection(contract, 'User', executor);
-      const result = await col.upsert({
+      const result = await col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
         create: { name: 'Alice', email: 'a@b.c' },
         update: { name: 'Alice Updated' },
       });
@@ -370,18 +370,70 @@ describe('MongoCollection write methods', () => {
       expect(executor.lastCommand!.kind).toBe('findOneAndUpdate');
     });
 
-    it('passes null filter when no where clause', async () => {
-      const executor = createMockExecutor([{ _id: 'id', name: 'A', email: 'a@b.c' }]);
+    it('throws without .where()', async () => {
+      const executor = createMockExecutor();
       const col = createMongoCollection(contract, 'User', executor);
-      await col.upsert({
-        create: { name: 'A', email: 'a@b.c' },
-        update: { name: 'B' },
-      });
-      const command = executor.lastCommand!;
-      expect(command.kind).toBe('findOneAndUpdate');
-      if (command.kind === 'findOneAndUpdate') {
-        expect(command.filter).toBeNull();
-      }
+      await expect(
+        col.upsert({
+          create: { name: 'A', email: 'a@b.c' },
+          update: { name: 'B' },
+        }),
+      ).rejects.toThrow('requires a .where()');
+    });
+  });
+
+  describe('windowing rejection on mutations', () => {
+    function withFilter(executor: MongoQueryExecutor) {
+      return createMongoCollection(contract, 'User', executor).where(
+        MongoFieldFilter.eq('name', 'Alice'),
+      );
+    }
+
+    it('update() throws with orderBy', async () => {
+      const executor = createMockExecutor();
+      await expect(withFilter(executor).orderBy({ name: 1 }).update({ name: 'X' })).rejects.toThrow(
+        'orderBy/skip/take',
+      );
+    });
+
+    it('updateAll() throws with take', () => {
+      const executor = createMockExecutor();
+      expect(() => withFilter(executor).take(5).updateAll({ name: 'X' })).toThrow(
+        'orderBy/skip/take',
+      );
+    });
+
+    it('updateCount() throws with skip', async () => {
+      const executor = createMockExecutor();
+      await expect(withFilter(executor).skip(2).updateCount({ name: 'X' })).rejects.toThrow(
+        'orderBy/skip/take',
+      );
+    });
+
+    it('delete() throws with take', async () => {
+      const executor = createMockExecutor();
+      await expect(withFilter(executor).take(1).delete()).rejects.toThrow('orderBy/skip/take');
+    });
+
+    it('deleteAll() throws with orderBy', () => {
+      const executor = createMockExecutor();
+      expect(() => withFilter(executor).orderBy({ name: -1 }).deleteAll()).toThrow(
+        'orderBy/skip/take',
+      );
+    });
+
+    it('deleteCount() throws with skip', async () => {
+      const executor = createMockExecutor();
+      await expect(withFilter(executor).skip(3).deleteCount()).rejects.toThrow('orderBy/skip/take');
+    });
+
+    it('upsert() throws with take', async () => {
+      const executor = createMockExecutor();
+      await expect(
+        withFilter(executor)
+          .take(1)
+          .upsert({ create: { name: 'A', email: 'a@b.c' }, update: { name: 'B' } }),
+      ).rejects.toThrow('orderBy/skip/take');
     });
   });
 
