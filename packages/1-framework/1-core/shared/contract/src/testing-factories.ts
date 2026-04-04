@@ -2,7 +2,7 @@ import type { Contract } from './contract-types';
 import type { ContractModel, ModelStorageBase } from './domain-types';
 import { computeProfileHash, computeStorageHash } from './hashing';
 import type { ExecutionSection, ProfileHashBase, StorageBase } from './types';
-import { coreHash, profileHash as toProfileHash } from './types';
+import { coreHash } from './types';
 
 type ContractOverrides<
   TStorage extends StorageBase = StorageBase,
@@ -45,8 +45,7 @@ export function createContract<
   } as TStorage;
 
   const computedProfileHash =
-    overrides.profileHash ??
-    toProfileHash(computeProfileHash({ target, targetFamily, capabilities }) as unknown as string);
+    overrides.profileHash ?? computeProfileHash({ target, targetFamily, capabilities });
 
   return {
     target,
