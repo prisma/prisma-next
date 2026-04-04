@@ -222,14 +222,6 @@ export function buildContract(state: RuntimeBuilderState): Contract {
         }
       : undefined;
 
-  const executionHash = executionSection
-    ? computeExecutionHash({
-        target,
-        targetFamily,
-        execution: executionSection,
-      })
-    : undefined;
-
   const models: Record<string, ContractModel> = {};
   const roots: Record<string, string> = {};
 
@@ -304,7 +296,10 @@ export function buildContract(state: RuntimeBuilderState): Contract {
   const profileHash = computeProfileHash({ target, targetFamily, capabilities });
 
   const executionWithHash = executionSection
-    ? { ...executionSection, executionHash: executionHash! }
+    ? {
+        ...executionSection,
+        executionHash: computeExecutionHash({ target, targetFamily, execution: executionSection }),
+      }
     : undefined;
 
   const contract: Contract = {
