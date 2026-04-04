@@ -1,4 +1,4 @@
-import type { DomainModel } from './domain-types';
+import type { Contract } from './contract-types';
 
 /**
  * Unique symbol used as the key for branding types.
@@ -57,26 +57,6 @@ export function profileHash<const T extends string>(value: T): ProfileHashBase<T
  */
 export interface StorageBase<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
-}
-
-export interface ContractBase<
-  TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
-  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
-  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> {
-  readonly schemaVersion: string;
-  readonly target: string;
-  readonly targetFamily: string;
-  readonly storageHash: TStorageHash;
-  readonly executionHash?: TExecutionHash;
-  readonly profileHash?: TProfileHash;
-  readonly capabilities: Record<string, Record<string, boolean>>;
-  readonly extensionPacks: Record<string, unknown>;
-  readonly meta: Record<string, unknown>;
-  readonly sources: Record<string, Source>;
-  readonly execution?: ExecutionSection;
-  readonly roots: Record<string, string>;
-  readonly models: Record<string, DomainModel>;
 }
 
 export interface FieldType {
@@ -188,21 +168,13 @@ export interface DocCollection {
   readonly readOnly?: boolean;
 }
 
-export interface DocumentStorage {
+export interface DocumentStorage extends StorageBase {
   readonly document: {
     readonly collections: Record<string, DocCollection>;
   };
 }
 
-export interface DocumentContract<
-  TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
-  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
-  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> extends ContractBase<TStorageHash, TExecutionHash, TProfileHash> {
-  // Accept string to work with JSON imports; runtime validation ensures 'document'
-  readonly targetFamily: string;
-  readonly storage: DocumentStorage;
-}
+export type DocumentContract = Contract<DocumentStorage>;
 
 // Plan types - target-family agnostic execution types
 export interface ParamDescriptor {
