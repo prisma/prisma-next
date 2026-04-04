@@ -9,6 +9,16 @@ import type {
 
 type Simplify<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
+export type SimplifyDeep<T> = T extends readonly (infer E)[]
+  ? SimplifyDeep<E>[]
+  : T extends Date | RegExp | Function
+    ? T
+    : T extends object
+      ? T extends unknown
+        ? { [K in keyof T]: SimplifyDeep<T[K]> }
+        : never
+      : T;
+
 type ModelRelations<
   TContract extends MongoContract,
   ModelName extends string & keyof TContract['models'],
@@ -133,3 +143,11 @@ export type MongoIncludeSpec<
 > = {
   readonly [K in ReferenceRelationKeys<TContract, ModelName>]?: true;
 };
+
+export type NoIncludes = Pick<Record<string, boolean>, never>;
+
+export type IncludedRow<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+  TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
+> = InferRootRow<TContract, ModelName> & IncludeResultFields<TContract, ModelName, TIncludes>;

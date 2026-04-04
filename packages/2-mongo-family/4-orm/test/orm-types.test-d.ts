@@ -5,6 +5,7 @@ import type { MongoCollection } from '../src/collection';
 import type { MongoOrmClient } from '../src/mongo-orm';
 import type {
   EmbedRelationKeys,
+  IncludedRow,
   InferFullRow,
   InferRootRow,
   MongoIncludeSpec,
@@ -197,10 +198,29 @@ test('where().select().all() returns AsyncIterableResult<InferRootRow>', () => {
   expectTypeOf(result).toExtend<AsyncIterableResult<InferRootRow<Contract, 'User'>>>();
 });
 
-test('include().first() returns Promise<InferRootRow | null>', () => {
+test('include().first() returns row with included relation field', () => {
   const col = {} as MongoCollection<Contract, 'Task'>;
   const result = col.include('assignee').first();
-  expectTypeOf(result).toExtend<Promise<InferRootRow<Contract, 'Task'> | null>>();
+  expectTypeOf(result).toExtend<
+    Promise<
+      (InferRootRow<Contract, 'Task'> & { assignee: InferFullRow<Contract, 'User'> | null }) | null
+    >
+  >();
+});
+
+test('include().all() returns rows with included relation field', () => {
+  const col = {} as MongoCollection<Contract, 'Task'>;
+  const result = col.include('assignee').all();
+  expectTypeOf(result).toExtend<
+    AsyncIterableResult<
+      InferRootRow<Contract, 'Task'> & { assignee: InferFullRow<Contract, 'User'> | null }
+    >
+  >();
+});
+
+test('all() without include() does not have relation field', () => {
+  type Row = IncludedRow<Contract, 'Task'>;
+  expectTypeOf<Row>().not.toHaveProperty('assignee');
 });
 
 test('where().orderBy().skip().take().all() preserves row type', () => {
