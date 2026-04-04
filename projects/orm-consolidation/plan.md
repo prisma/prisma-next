@@ -42,8 +42,9 @@ Phase 1 is read-only. The SQL ORM already has `create()`, `createAll()`, `update
 1. Add `create()` / `createAll()` — compile to `InsertOneCommand` / `InsertManyCommand` through the adapter
 2. Add `update()` / `updateAll()` — compile filter state + update payload to `UpdateOneCommand` / `UpdateManyCommand`
 3. Add `delete()` / `deleteAll()` — compile filter state to `DeleteOneCommand` / `DeleteManyCommand`
-4. Replace raw `MongoClient` seeding in the demo with ORM write calls
-5. Integration tests for full lifecycle (create → read → update → delete)
+4. Split `types.ts` into meaningful modules — row inference, relation keys, include types, where types, utility types
+5. Replace raw `MongoClient` seeding in the demo with ORM write calls
+6. Integration tests for full lifecycle (create → read → update → delete)
 
 **Proof:** Mongo demo seeds data via ORM write methods. Integration tests verify create/update/delete round-trip against `mongodb-memory-server`.
 
