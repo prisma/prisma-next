@@ -473,7 +473,7 @@ describe('emit command', () => {
           const tsContract = JSON.parse(
             readFileSync(join(outputDir, 'contract.json'), 'utf-8'),
           ) as Record<string, unknown>;
-          const storageHash = tsContract['storageHash'];
+          const storageHash = (tsContract['storage'] as Record<string, unknown>)?.['storageHash'];
           const profileHash = tsContract['profileHash'];
           expect(storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
           expect(profileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
@@ -510,7 +510,7 @@ describe('emit command', () => {
         expect(existsSync(contractDtsPath)).toBe(true);
 
         const emitted = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
-        const emittedStorageHash = emitted['storageHash'];
+        const emittedStorageHash = (emitted['storage'] as Record<string, unknown>)?.['storageHash'];
         const emittedProfileHash = emitted['profileHash'];
 
         expect(emitted).toMatchObject({
