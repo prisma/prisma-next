@@ -26,6 +26,7 @@ class MongoDriverImpl implements MongoDriver {
         return this.#executeDeleteOneCommand(wireCommand) as AsyncIterable<Row>;
       case 'aggregate':
         return this.#executeAggregateCommand<Row>(wireCommand);
+      // v8 ignore next 4
       default: {
         const _exhaustive: never = wireCommand;
         throw new Error(`Unknown wire command kind: ${(_exhaustive as { kind: string }).kind}`);
