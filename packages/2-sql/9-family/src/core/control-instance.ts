@@ -13,6 +13,7 @@ import type {
   TargetDescriptor,
 } from '@prisma-next/framework-components/components';
 import type { ControlStack } from '@prisma-next/framework-components/control';
+import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';

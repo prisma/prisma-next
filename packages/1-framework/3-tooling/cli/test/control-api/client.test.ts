@@ -1,5 +1,5 @@
 import { createContract } from '@prisma-next/contract/testing';
-import type { Contract, TargetFamilyHook } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { EmitResult } from '@prisma-next/core-control-plane/emission';
 import type {
   ControlAdapterDescriptor,
@@ -12,6 +12,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import type { TargetFamilyHook } from '@prisma-next/framework-components/emission';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 
