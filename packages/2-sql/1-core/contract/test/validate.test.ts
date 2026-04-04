@@ -109,6 +109,134 @@ describe('validateContract', () => {
     );
   });
 
+  it('throws when primary key references missing column', () => {
+    const invalid = makeContract();
+    invalid.storage.tables.User.primaryKey = { columns: ['missing'] };
+
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+      /primaryKey references non-existent column/,
+    );
+  });
+
+  it('throws when unique references missing column', () => {
+    const invalid = makeContract();
+    invalid.storage.tables.User.uniques = [{ columns: ['missing'] }];
+
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+      /unique constraint references non-existent column/,
+    );
+  });
+
+  it('throws when index references missing column', () => {
+    const invalid = makeContract();
+    invalid.storage.tables.User.indexes = [{ columns: ['missing'] }];
+
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+      /index references non-existent column/,
+    );
+  });
+
+  it('throws when foreign key references missing local column', () => {
+    const invalid = makeContract();
+    invalid.storage.tables.User.foreignKeys = [
+      {
+        columns: ['missing'],
+        references: { table: 'User', columns: ['id'] },
+        constraint: true,
+        index: true,
+      },
+    ];
+
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+      /foreignKey references non-existent column "missing"/,
+    );
+  });
+
+  it('throws when foreign key references missing remote column', () => {
+    const invalid = makeContract();
+    invalid.storage.tables.User.foreignKeys = [
+      {
+        columns: ['id'],
+        references: { table: 'User', columns: ['missing'] },
+        constraint: true,
+        index: true,
+      },
+    ];
+
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+      /references non-existent column "missing" in table "User"/,
+    );
+  });
+
+  it('throws when foreign key column counts differ', () => {
+    const invalid = makeContract();
+    invalid.storage.tables.User.columns.otherId = {
+      codecId: 'pg/text@1',
+      nativeType: 'text',
+      nullable: false,
+    };
+    invalid.storage.tables.User.foreignKeys = [
+      {
+        columns: ['id', 'otherId'],
+        references: { table: 'User', columns: ['id'] },
+        constraint: true,
+        index: true,
+      },
+    ];
+
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+      /foreignKey column count \(2\) does not match referenced column count \(1\)/,
+    );
+  });
+
+  it('throws for invalid foreign key table reference', () => {
+    const invalid = makeContract();
+    invalid.storage.tables.Post = {
+      columns: {
+        id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+        userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+      },
+      primaryKey: { columns: ['id'] },
+      uniques: [],
+      indexes: [],
+      foreignKeys: [
+        {
+          columns: ['userId'],
+          references: { table: 'Missing', columns: ['id'] },
+          constraint: true,
+          index: true,
+        },
+      ],
+    };
+
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+      /foreignKey references non-existent table/,
+    );
+  });
+
+  it('throws on NOT NULL column with literal null default', () => {
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          name: {
+            codecId: 'pg/text@1',
+            nativeType: 'text',
+            nullable: false,
+            default: { kind: 'literal', value: null },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
+      /NOT NULL but has a literal null default/,
+    );
+  });
+
   it('accepts valid index and foreign key references', () => {
     const valid = makeContract();
     valid.storage.tables.User.indexes = [{ columns: ['email'] }];
@@ -537,7 +665,40 @@ describe('validateContract', () => {
     });
   });
 
-  it('accepts a valid model-to-storage mapping', () => {
-    expect(() => validateContract(structuredClone(baseContract))).not.toThrow();
+  describe('model-to-storage cross-validation', () => {
+    it('rejects model whose storage.table does not exist in storage.tables', () => {
+      const contract = structuredClone(baseContract);
+      (contract as Record<string, unknown>).models = {
+        User: {
+          storage: { table: 'nonexistent', fields: { id: { column: 'id' } } },
+          fields: { id: {} },
+          relations: {},
+        },
+      };
+      expect(() => validateContract(contract)).toThrow(
+        'Model "User" references non-existent table "nonexistent"',
+      );
+    });
+
+    it('rejects model whose storage.fields reference a non-existent column', () => {
+      const contract = structuredClone(baseContract);
+      (contract as Record<string, unknown>).models = {
+        User: {
+          storage: {
+            table: 'User',
+            fields: { id: { column: 'id' }, email: { column: 'no_such_column' } },
+          },
+          fields: { id: {}, email: {} },
+          relations: {},
+        },
+      };
+      expect(() => validateContract(contract)).toThrow(
+        'Model "User" field "email" references non-existent column "no_such_column" in table "User"',
+      );
+    });
+
+    it('accepts a valid model-to-storage mapping', () => {
+      expect(() => validateContract(structuredClone(baseContract))).not.toThrow();
+    });
   });
 });

@@ -9,6 +9,7 @@ describe('validateContract logic validation', () => {
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'sha256:test',
+    profileHash: 'sha256:test',
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -79,7 +80,7 @@ describe('validateContract logic validation', () => {
     expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/a flat generator id/);
   });
 
-  it('accepts primaryKey referencing non-existent column (cross-ref validated by emitter)', () => {
+  it('rejects primaryKey referencing non-existent column', () => {
     const contract = {
       ...validContractInput,
       storage: {
@@ -95,10 +96,12 @@ describe('validateContract logic validation', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
+      /primaryKey references non-existent column "nonExistent"/,
+    );
   });
 
-  it('accepts unique referencing non-existent column (cross-ref validated by emitter)', () => {
+  it('rejects unique referencing non-existent column', () => {
     const contract = {
       ...validContractInput,
       storage: {
@@ -113,10 +116,12 @@ describe('validateContract logic validation', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
+      /unique constraint references non-existent column "nonExistent"/,
+    );
   });
 
-  it('accepts index referencing non-existent column (cross-ref validated by emitter)', () => {
+  it('rejects index referencing non-existent column', () => {
     const contract = {
       ...validContractInput,
       storage: {
@@ -131,10 +136,12 @@ describe('validateContract logic validation', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
+      /index references non-existent column "nonExistent"/,
+    );
   });
 
-  it('accepts foreignKey referencing non-existent table (cross-ref validated by emitter)', () => {
+  it('rejects foreignKey referencing non-existent table', () => {
     const contract = {
       ...validContractInput,
       storage: {
@@ -162,7 +169,9 @@ describe('validateContract logic validation', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
+      /foreignKey references non-existent table "NonExistent"/,
+    );
   });
 
   it('validates composite primary keys', () => {
@@ -234,6 +243,7 @@ describe('validateContract logic validation', () => {
         target: 'postgres',
         targetFamily: 'sql',
         storageHash: 'sha256:test',
+        profileHash: 'sha256:test',
         capabilities: {},
         extensionPacks: {},
         meta: {},
@@ -293,16 +303,18 @@ describe('validateContract logic validation', () => {
       return contract;
     };
 
-    it('accepts model referencing missing table (cross-ref validated by emitter)', () => {
+    it('rejects model referencing missing table', () => {
       const contract = createModelContract();
       const userModel = (contract['models'] as Record<string, Record<string, unknown>>)[
         'User'
       ] as Record<string, unknown>;
       userModel['storage'] = { table: 'MissingTable', fields: {} };
-      expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
+        /references non-existent table "MissingTable"/,
+      );
     });
 
-    it('accepts model table without primary key (cross-ref validated by emitter)', () => {
+    it('accepts model table without primary key', () => {
       const contract = createModelContract();
       delete (
         (contract['storage'] as Record<string, Record<string, unknown>>)?.['tables'] as Record<
@@ -313,7 +325,7 @@ describe('validateContract logic validation', () => {
       expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
     });
 
-    it('accepts model field referencing missing column (cross-ref validated by emitter)', () => {
+    it('rejects model field referencing missing column', () => {
       const contract = createModelContract();
       const userModel = (contract['models'] as Record<string, Record<string, unknown>>)[
         'User'
@@ -321,7 +333,9 @@ describe('validateContract logic validation', () => {
       (userModel['storage'] as Record<string, unknown>)['fields'] = {
         id: { column: 'missing' },
       };
-      expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
+        /references non-existent column "missing"/,
+      );
     });
 
     it('skips foreign key validation for 1:N relations', () => {
@@ -356,7 +370,7 @@ describe('validateContract logic validation', () => {
       expect(() => validateContract<Contract<SqlStorage>>(contract)).not.toThrow();
     });
 
-    it('accepts N:1 relation without matching FK (cross-ref validated by emitter)', () => {
+    it('accepts N:1 relation without matching FK', () => {
       const contract = addPostModel(createModelContract());
       (
         (contract['models'] as Record<string, Record<string, unknown>>)?.['Post'] as Record<
@@ -412,6 +426,7 @@ describe('validateContract logic validation', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:test',
+      profileHash: 'sha256:test',
       capabilities: {},
       extensionPacks: {},
       meta: {},

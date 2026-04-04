@@ -9,6 +9,7 @@ describe('validateContract model validation', () => {
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'sha256:test',
+    profileHash: 'sha256:test',
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -48,7 +49,7 @@ describe('validateContract model validation', () => {
     );
   });
 
-  it('accepts model referencing non-existent table (cross-ref validated by emitter)', () => {
+  it('rejects model referencing non-existent table', () => {
     const valid = {
       ...baseContract,
       models: {
@@ -58,10 +59,12 @@ describe('validateContract model validation', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).toThrow(
+      /references non-existent table "NonExistent"/,
+    );
   });
 
-  it('accepts model table without primary key (cross-ref validated by emitter)', () => {
+  it('accepts model table without primary key', () => {
     const valid = {
       ...baseContract,
       storage: {
@@ -104,7 +107,7 @@ describe('validateContract model validation', () => {
     expect(() => validateContract<Contract<SqlStorage>>(invalid)).not.toThrow();
   });
 
-  it('accepts model field with empty column string (cross-ref validated by emitter)', () => {
+  it('accepts model field with empty column string', () => {
     const valid = {
       ...baseContract,
       models: {
@@ -117,7 +120,7 @@ describe('validateContract model validation', () => {
     expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 
-  it('accepts model field referencing non-existent column (cross-ref validated by emitter)', () => {
+  it('rejects model field referencing non-existent column', () => {
     const valid = {
       ...baseContract,
       models: {
@@ -127,10 +130,12 @@ describe('validateContract model validation', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).toThrow(
+      /references non-existent column "nonExistent"/,
+    );
   });
 
-  it('accepts N:1 relation without matching FK (cross-ref validated by emitter)', () => {
+  it('accepts N:1 relation without matching FK', () => {
     const valid = {
       ...baseContract,
       storage: {

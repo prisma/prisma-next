@@ -19,6 +19,7 @@ function minimalContract(overrides?: Partial<Contract>): Record<string, unknown>
       },
     },
     storage: { storageHash: hash },
+    profileHash: 'sha256:test',
     capabilities: {},
     extensionPacks: {},
     meta: {},
