@@ -1,4 +1,4 @@
-export type { MongoAdapter, MongoLoweringContext } from '../adapter-types';
+export type { MongoAdapter, MongoLoweringContext, MongoReadPlanLike } from '../adapter-types';
 export type { MongoCodecRegistry } from '../codec-registry';
 export { createMongoCodecRegistry } from '../codec-registry';
 export type { MongoCodec, MongoCodecJsType, MongoCodecTrait, MongoCodecTraits } from '../codecs';

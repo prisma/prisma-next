@@ -5,6 +5,7 @@ import type {
   MongoAdapter,
   MongoExpr,
   MongoLoweringContext,
+  MongoReadPlanLike,
 } from '@prisma-next/mongo-core';
 import {
   AggregateWireCommand,
@@ -13,6 +14,8 @@ import {
   resolveValue,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
+import type { MongoReadStage } from '@prisma-next/mongo-query-ast';
+import { lowerPipeline } from '@prisma-next/mongo-query-ast';
 
 function resolveDocument(expr: MongoExpr): Document {
   const result: Record<string, unknown> = {};
@@ -23,6 +26,11 @@ function resolveDocument(expr: MongoExpr): Document {
 }
 
 class MongoAdapterImpl implements MongoAdapter {
+  lowerReadPlan(plan: MongoReadPlanLike): AggregateWireCommand {
+    const rawPipeline = lowerPipeline(plan.stages as ReadonlyArray<MongoReadStage>);
+    return new AggregateWireCommand(plan.collection, rawPipeline);
+  }
+
   lowerCommand(command: AnyMongoCommand, _context: MongoLoweringContext): AnyMongoWireCommand {
     switch (command.kind) {
       case 'insertOne':

@@ -17,6 +17,7 @@
   "dependencies": {
     "@prisma-next/config": "workspace:*",
     "@prisma-next/mongo-core": "workspace:*",
+    "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "mongodb": "catalog:"
   },
