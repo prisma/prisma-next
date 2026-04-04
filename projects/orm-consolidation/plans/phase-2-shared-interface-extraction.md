@@ -39,7 +39,7 @@ Extract the family-agnostic state bag and the immutable chaining machinery into 
   - Terminal methods (`.all()`, `.first()`) that delegate to an abstract `compile(state)` method.
   - The `where` method accepts a callback with a family-specific accessor type (abstract `createModelAccessor()` method).
 - **1.3** Update SQL `Collection` to extend the shared base. Override `compile()` to produce `SqlQueryPlan`. Override `createModelAccessor()` to produce SQL `ModelAccessor`.
-- **1.4** Update Mongo `MongoCollection` to extend the shared base. Override `compile()` to produce `MongoQueryPlan`. Override `createModelAccessor()` to produce `MongoModelAccessor`.
+- **1.4** Update Mongo `MongoCollection` to extend the shared base. Override `compile()` to produce `MongoReadPlan`. Override `createModelAccessor()` to produce `MongoModelAccessor`.
 - **1.5** Verify all existing SQL ORM tests pass.
 - **1.6** Verify all existing Mongo ORM tests pass.
 
@@ -107,12 +107,12 @@ Extract the ORM client factory pattern (roots → Collection instances) into the
 
 ## Open Items
 
-1. **Where DSL generalization.** The base `Collection.where()` needs to accept a callback that receives a family-specific accessor. The accessor type is different per family (SQL produces `AnyWhereExpr`, Mongo produces `MongoExpr`). Design options: (a) generic type parameter on Collection for the accessor, (b) abstract `createModelAccessor()` method, (c) intersection type with common operators. Recommendation: (b) abstract method — cleanest separation.
+1. **Where DSL generalization.** The base `Collection.where()` needs to accept a callback that receives a family-specific accessor. The accessor type is different per family (SQL produces `AnyWhereExpr`, Mongo produces `MongoFilterExpr`). Design options: (a) generic type parameter on Collection for the accessor, (b) abstract `createModelAccessor()` method, (c) intersection type with common operators. Recommendation: (b) abstract method — cleanest separation.
 
 2. **Coordination timing with Alexey.** Phase 2 changes the SQL Collection's inheritance hierarchy. This should be sequenced when Alexey has a natural pause point. The extraction should be mechanical (no behavior change to SQL ORM), but merge conflicts are likely if timed poorly.
 
 3. **Package placement.** Where does the shared `Collection` base class live? Options: (a) `packages/1-framework/4-lanes/orm/` (new package), (b) within `packages/1-framework/1-core/`. Recommendation: (a) new package at the lanes layer — the ORM is a lane, and the base class is the framework's contribution to that lane.
 
-4. **Mutation interface.** Mutations are deferred from Phase 1 scope. When mutations are added to the Mongo Collection later, the shared base will need abstract mutation compilation methods. This doesn't affect Phase 2 design but should be considered in the base class extension points.
+4. **Mutation interface.** Mutations are implemented on the Mongo Collection (Phase 1.5). The shared base will need abstract mutation compilation methods. Both SQL and Mongo now have `create`, `update`, `delete`, `upsert` surfaces to extract from.
 
-5. **`CollectionState` filter type parameter.** SQL filters are `AnyWhereExpr[]`, Mongo filters are `MongoExpr[]`. The shared `CollectionState` needs a type parameter for the filter expression type, or the filters must be stored as an opaque type. The type parameter approach is cleaner but adds a generic to every `Collection` signature.
+5. **`CollectionState` filter type parameter.** SQL filters are `AnyWhereExpr[]`, Mongo filters are `MongoFilterExpr[]`. The shared `CollectionState` needs a type parameter for the filter expression type, or the filters must be stored as an opaque type. The type parameter approach is cleaner but adds a generic to every `Collection` signature.

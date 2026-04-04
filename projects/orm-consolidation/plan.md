@@ -19,14 +19,14 @@ Consolidate the SQL and Mongo ORM clients onto a shared `Collection` interface w
 
 ### Phase 1: Mongo Collection spike (isolated)
 
-Build `MongoCollection` with the same fluent chaining API as SQL, compiling to `MongoQueryPlan` at terminal methods. No changes to the SQL ORM or framework layer.
+Build `MongoCollection` with the same fluent chaining API as SQL, compiling to `MongoReadPlan` (typed pipeline AST) at terminal methods. No changes to the SQL ORM or framework layer.
 
 **Detailed plan:** [plans/phase-1-mongo-collection-spike.md](plans/phase-1-mongo-collection-spike.md)
 
 **Milestones:**
 
 1. Query AST (`@prisma-next/mongo-query-ast`) — filter expressions, read stages, visitors, lowering, extension operator proof
-2. ORM Collection with chaining + compilation (CollectionState → MongoQueryPlan)
+2. ORM Collection with chaining + compilation (CollectionState → MongoReadPlan)
 3. Wire `mongoOrm()` + update demo + integration tests
 
 **Proof:** Mongo demo uses `.where().select().include().orderBy().take().all()` chaining, executing against `mongodb-memory-server`.
@@ -41,10 +41,11 @@ Phase 1 is read-only. The SQL ORM already has `create()`, `createAll()`, `create
 
 **Milestones:**
 
-1. Command types + driver + adapter — add `InsertManyCommand`, `UpdateManyCommand`, `DeleteManyCommand`, `FindOneAndUpdateCommand`, `FindOneAndDeleteCommand` with wire commands, result types, adapter lowering, and driver execution
+1. Command types + driver + adapter — add `InsertManyCommand`, `UpdateManyCommand`, `DeleteManyCommand`, `FindOneAndUpdateCommand`, `FindOneAndDeleteCommand` as `MongoAstNode` subclasses in `mongo-query-ast` (filter fields accept `MongoFilterExpr`), with wire commands in `mongo-core`, result types, adapter lowering (via `lowerFilter()`), and driver execution
 2. ORM write methods — add `create`, `createAll`, `createCount`, `update`, `updateAll`, `updateCount`, `delete`, `deleteAll`, `deleteCount`, `upsert` to `MongoCollection`
 3. Demo + integration tests — replace raw `MongoClient` seeding with ORM writes, full CRUD lifecycle tests
 4. Dot-path field accessor mutations ([ADR 180](../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md)) — add targeted mutation operators (`set`, `inc`, `push`, etc.) via the callable string accessor `u("field.path")`. Maps to MongoDB's native `$set`/`$inc`/`$push` with dot-notation. Depends on value objects landing in the contract ([ADR 178](../../docs/architecture%20docs/adrs/ADR%20178%20-%20Value%20objects%20in%20the%20contract.md)); can be sequenced after milestones 1–3 or deferred to the value objects project.
+5. Unified query plan — introduce `MongoQueryPlan` in `mongo-query-ast`, collapse the bifurcated `execute`/`executeCommand` into a single `execute(plan)` at the executor, runtime, and adapter layers. This must ship with Phase 1.5 to avoid propagating the dual interface into Phase 2's shared Collection extraction. See [design doc](plans/unified-mongo-query-plan.md).
 
 **Proof:** Mongo demo seeds data via ORM write methods. Integration tests verify create/update/delete round-trip against `mongodb-memory-server`.
 
@@ -75,13 +76,20 @@ Extract `Collection<C, M>` base class, `CollectionState`, `InferModelRow`, and i
 
 ## Follow-ups
 
-### Remove legacy command types from mongo-core
+### ~~Remove legacy command types from mongo-core~~ (done)
 
-Once all consumers produce `MongoReadPlan` (typed AST stages) instead of command-based `MongoQueryPlan`, delete the legacy command infrastructure from `mongo-core`: `FindCommand`, `AggregateCommand`, `InsertOneCommand`, `UpdateOneCommand`, `DeleteOneCommand`, `MongoQueryPlan`, wire command classes, and the adapter's `lower()` method. These are the untyped predecessors of the query AST; removing them eliminates the old core↔query dependency and simplifies the adapter to a thin driver bridge.
+Resolved during Phase 1.5. Legacy `FindCommand`, `MongoQueryPlan`, and the adapter's `lower()` method were deleted in Phase 1. In Phase 1.5, write command classes (`InsertOneCommand`, `UpdateOneCommand`, `DeleteOneCommand`, plus new `InsertManyCommand`, `UpdateManyCommand`, `DeleteManyCommand`, `FindOneAndUpdateCommand`, `FindOneAndDeleteCommand`) were moved from `mongo-core` to `@prisma-next/mongo-query-ast` as proper AST nodes (extending `MongoAstNode`). Command filter fields now accept `MongoFilterExpr` (typed AST) instead of pre-lowered `MongoExpr` documents. A structural `MongoCommandLike` interface in `mongo-core` allows the adapter to reference commands without a direct dependency on `mongo-query-ast`. The adapter is the sole component that performs filter lowering (converting `MongoFilterExpr` to wire-level filter documents). Wire commands remain in `mongo-core` as they represent the driver-facing wire protocol.
 
-### Restructure Mongo family directories to match layering design
+### Mongo family layering reorganization
 
-The current `packages/2-mongo-family/` has most numbered directories acting as the package itself rather than as layer directories containing packages. Restructure to match the target layering: each numbered directory is a layer containing one or more packages (e.g., `1-core/mongo-core/`, `4-orm/mongo-orm/`). Only `2-query/` follows the correct convention from the start.
+The current Mongo family has two related structural problems:
+
+1. **Over-burdened `1-core`**: contains contract types, codecs, values, wire commands, adapter/driver interfaces, and result types — responsibilities that belong at different layers.
+2. **Adapter interface placement**: the adapter interface sits in `1-core` (layer 1) but needs to reference AST types from `2-query` (layer 2). This forces structural shim types (`MongoCommandLike`, `MongoReadPlanLike`) that exist solely to work around the layering constraint.
+
+The target design introduces 8 layers: `foundation` (split into `mongo-contract`, `mongo-codec`, `mongo-value`), `authoring`, `tooling`, `query`, `query-builders`, `transport` (adapter/driver interfaces + wire types), `runtime`, and `family`. Wire commands and adapter/driver interfaces move out of foundation into the transport layer, where they can reference AST types directly. Structural shims are eliminated.
+
+This is a separate refactor from the unified query plan (Phase 1.5 milestone 5). The unified query plan fixes the API shape (single execute, single lower); the layering reorganization fixes where those interfaces live.
 
 **Design:** [plans/mongo-family-layering.md](plans/mongo-family-layering.md)
 
