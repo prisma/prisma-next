@@ -1,1 +1,1 @@
-export { createContract, createSqlContract, DUMMY_HASH } from '../contract-factories';
+export { createContract, createSqlContract, DUMMY_HASH } from '../testing-factories';
