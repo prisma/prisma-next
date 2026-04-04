@@ -26,11 +26,11 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:f31648e0fc4bdc9d1a2ed322c9eca3a88cf5eee5f9068d8256949f08e2e633c7'>;
+  StorageHashBase<'sha256:b90530d44770bf240fe845acebb0fc0682c3d4d6d432c581b3ba3f9c6d45b877'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:f744c820f5efe500202b9a1d30dff6243359b10bee2ac27753411f386c7052e0'>;
+  ExecutionHashBase<'sha256:1df716ed39e078263526f932e62df44a995247cc389d57701b1abc31af80e34d'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98'>;
+  ProfileHashBase<'sha256:ffc50246dae57a96ebc1abc212db40a10706095adca83ab257d4cb15f62cd192'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -49,36 +49,54 @@ export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTy
 type ContractBase = SqlContract<
   {
     readonly tables: {
-      readonly users: {
+      readonly articles: {
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
           };
-          readonly name: {
+          readonly title: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly invited_by_id: {
+          readonly reviewer_id: {
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
-            readonly nullable: true;
+            readonly nullable: false;
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [{ readonly columns: readonly ['email'] }];
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
+      };
+      readonly comments: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly body: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly post_id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
         indexes: readonly [];
         foreignKeys: readonly [
           {
-            readonly columns: readonly ['invited_by_id'];
-            readonly references: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly columns: readonly ['post_id'];
+            readonly references: { readonly table: 'posts'; readonly columns: readonly ['id'] };
             readonly constraint: true;
             readonly index: true;
           },
@@ -119,36 +137,6 @@ type ContractBase = SqlContract<
           },
         ];
       };
-      readonly comments: {
-        columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
-          };
-          readonly body: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly post_id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
-          };
-        };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [
-          {
-            readonly columns: readonly ['post_id'];
-            readonly references: { readonly table: 'posts'; readonly columns: readonly ['id'] };
-            readonly constraint: true;
-            readonly index: true;
-          },
-        ];
-      };
       readonly profiles: {
         columns: {
           readonly id: {
@@ -179,29 +167,6 @@ type ContractBase = SqlContract<
           },
         ];
       };
-      readonly articles: {
-        columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
-          };
-          readonly title: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly reviewer_id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
-          };
-        };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
-      };
       readonly tags: {
         columns: {
           readonly id: {
@@ -220,11 +185,161 @@ type ContractBase = SqlContract<
         indexes: readonly [];
         foreignKeys: readonly [];
       };
+      readonly users: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly name: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly email: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly invited_by_id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: true;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [{ readonly columns: readonly ['email'] }];
+        indexes: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['invited_by_id'];
+            readonly references: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly constraint: true;
+            readonly index: true;
+          },
+        ];
+      };
     };
-    readonly storageHash: StorageHash;
     readonly types: Record<string, never>;
+    readonly storageHash: StorageHash;
   },
   {
+    readonly Article: {
+      readonly storage: {
+        readonly table: 'articles';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly title: { readonly column: 'title' };
+          readonly reviewerId: { readonly column: 'reviewer_id' };
+        };
+      };
+      readonly fields: {
+        readonly id: CodecTypes['pg/int4@1']['output'];
+        readonly title: CodecTypes['pg/text@1']['output'];
+        readonly reviewerId: CodecTypes['pg/int4@1']['output'];
+      };
+      readonly relations: {
+        readonly reviewer: {
+          readonly to: 'User';
+          readonly cardinality: 'N:1';
+          readonly on: {
+            readonly localFields: readonly ['reviewerId'];
+            readonly targetFields: readonly ['id'];
+          };
+        };
+      };
+    };
+    readonly Comment: {
+      readonly storage: {
+        readonly table: 'comments';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly body: { readonly column: 'body' };
+          readonly postId: { readonly column: 'post_id' };
+        };
+      };
+      readonly fields: {
+        readonly id: CodecTypes['pg/int4@1']['output'];
+        readonly body: CodecTypes['pg/text@1']['output'];
+        readonly postId: CodecTypes['pg/int4@1']['output'];
+      };
+      readonly relations: {};
+    };
+    readonly Post: {
+      readonly storage: {
+        readonly table: 'posts';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly title: { readonly column: 'title' };
+          readonly userId: { readonly column: 'user_id' };
+          readonly views: { readonly column: 'views' };
+        };
+      };
+      readonly fields: {
+        readonly id: CodecTypes['pg/int4@1']['output'];
+        readonly title: CodecTypes['pg/text@1']['output'];
+        readonly userId: CodecTypes['pg/int4@1']['output'];
+        readonly views: CodecTypes['pg/int4@1']['output'];
+      };
+      readonly relations: {
+        readonly comments: {
+          readonly to: 'Comment';
+          readonly cardinality: '1:N';
+          readonly on: {
+            readonly localFields: readonly ['id'];
+            readonly targetFields: readonly ['postId'];
+          };
+        };
+        readonly author: {
+          readonly to: 'User';
+          readonly cardinality: 'N:1';
+          readonly on: {
+            readonly localFields: readonly ['userId'];
+            readonly targetFields: readonly ['id'];
+          };
+        };
+      };
+    };
+    readonly Profile: {
+      readonly storage: {
+        readonly table: 'profiles';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly userId: { readonly column: 'user_id' };
+          readonly bio: { readonly column: 'bio' };
+        };
+      };
+      readonly fields: {
+        readonly id: CodecTypes['pg/int4@1']['output'];
+        readonly userId: CodecTypes['pg/int4@1']['output'];
+        readonly bio: CodecTypes['pg/text@1']['output'];
+      };
+      readonly relations: {
+        readonly user: {
+          readonly to: 'User';
+          readonly cardinality: '1:1';
+          readonly on: {
+            readonly localFields: readonly ['userId'];
+            readonly targetFields: readonly ['id'];
+          };
+        };
+      };
+    };
+    readonly Tag: {
+      readonly storage: {
+        readonly table: 'tags';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly name: { readonly column: 'name' };
+        };
+      };
+      readonly fields: {
+        readonly id: CodecTypes['pg/text@1']['output'];
+        readonly name: CodecTypes['pg/text@1']['output'];
+      };
+      readonly relations: {};
+    };
     readonly User: {
       readonly storage: {
         readonly table: 'users';
@@ -276,127 +391,20 @@ type ContractBase = SqlContract<
         };
       };
     };
-    readonly Post: {
-      readonly storage: {
-        readonly table: 'posts';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly title: { readonly column: 'title' };
-          readonly userId: { readonly column: 'user_id' };
-          readonly views: { readonly column: 'views' };
-        };
-      };
-      readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly title: CodecTypes['pg/text@1']['output'];
-        readonly userId: CodecTypes['pg/int4@1']['output'];
-        readonly views: CodecTypes['pg/int4@1']['output'];
-      };
-      readonly relations: {
-        readonly comments: {
-          readonly to: 'Comment';
-          readonly cardinality: '1:N';
-          readonly on: {
-            readonly localFields: readonly ['id'];
-            readonly targetFields: readonly ['postId'];
-          };
-        };
-        readonly author: {
-          readonly to: 'User';
-          readonly cardinality: 'N:1';
-          readonly on: {
-            readonly localFields: readonly ['userId'];
-            readonly targetFields: readonly ['id'];
-          };
-        };
-      };
-    };
-    readonly Comment: {
-      readonly storage: {
-        readonly table: 'comments';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly body: { readonly column: 'body' };
-          readonly postId: { readonly column: 'post_id' };
-        };
-      };
-      readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly body: CodecTypes['pg/text@1']['output'];
-        readonly postId: CodecTypes['pg/int4@1']['output'];
-      };
-      readonly relations: {};
-    };
-    readonly Profile: {
-      readonly storage: {
-        readonly table: 'profiles';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly userId: { readonly column: 'user_id' };
-          readonly bio: { readonly column: 'bio' };
-        };
-      };
-      readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly userId: CodecTypes['pg/int4@1']['output'];
-        readonly bio: CodecTypes['pg/text@1']['output'];
-      };
-      readonly relations: {
-        readonly user: {
-          readonly to: 'User';
-          readonly cardinality: '1:1';
-          readonly on: {
-            readonly localFields: readonly ['userId'];
-            readonly targetFields: readonly ['id'];
-          };
-        };
-      };
-    };
-    readonly Article: {
-      readonly storage: {
-        readonly table: 'articles';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly title: { readonly column: 'title' };
-          readonly reviewerId: { readonly column: 'reviewer_id' };
-        };
-      };
-      readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly title: CodecTypes['pg/text@1']['output'];
-        readonly reviewerId: CodecTypes['pg/int4@1']['output'];
-      };
-      readonly relations: {
-        readonly reviewer: {
-          readonly to: 'User';
-          readonly cardinality: 'N:1';
-          readonly on: {
-            readonly localFields: readonly ['reviewerId'];
-            readonly targetFields: readonly ['id'];
-          };
-        };
-      };
-    };
-    readonly Tag: {
-      readonly storage: {
-        readonly table: 'tags';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly name: { readonly column: 'name' };
-        };
-      };
-      readonly fields: {
-        readonly id: CodecTypes['pg/text@1']['output'];
-        readonly name: CodecTypes['pg/text@1']['output'];
-      };
-      readonly relations: {};
-    };
   },
   StorageHash,
   ExecutionHash,
   ProfileHash
 > & {
   readonly target: 'postgres';
+  readonly roots: {
+    readonly users: 'User';
+    readonly posts: 'Post';
+    readonly comments: 'Comment';
+    readonly profiles: 'Profile';
+    readonly articles: 'Article';
+    readonly tags: 'Tag';
+  };
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;
@@ -405,7 +413,7 @@ type ContractBase = SqlContract<
       readonly orderBy: true;
       readonly returning: true;
     };
-    readonly sql: { readonly enums: true };
+    readonly sql: { readonly enums: true; readonly returning: true };
   };
   readonly extensionPacks: {};
   readonly execution: {
@@ -417,6 +425,7 @@ type ContractBase = SqlContract<
         },
       ];
     };
+    readonly executionHash: 'sha256:1df716ed39e078263526f932e62df44a995247cc389d57701b1abc31af80e34d';
   };
 };
 

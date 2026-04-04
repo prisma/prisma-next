@@ -3,9 +3,14 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:53ddbcbb7c51252e81bf3d593ac785329b1ad41d01a7f8cb97bf604f5b883775",
-  "executionHash": "sha256:3799b761ae6ab41489db39f42919160264dd9bfc87dcf81ef7cf826ab1e6191d",
-  "profileHash": "sha256:4de522912e1428d81da3867223cb20cef72526f8e9e2f34dbea4cab7cfa30cf8",
-  "roots": {},
+  "profileHash": "sha256:292ff6a99ea69c2918aa5c194d5c97d88f17410e865a1396cdf6e9ca7230493e",
+  "roots": {
+    "articles": "Article",
+    "comments": "Comment",
+    "posts": "Post",
+    "profiles": "Profile",
+    "users": "User"
+  },
   "models": {
     "Article": {
       "fields": {
@@ -77,7 +82,7 @@
           "cardinality": "N:1",
           "on": {
             "localFields": [
-              "user_id"
+              "userId"
             ],
             "targetFields": [
               "id"
@@ -92,7 +97,7 @@
               "id"
             ],
             "targetFields": [
-              "post_id"
+              "postId"
             ]
           },
           "to": "Comment"
@@ -165,7 +170,7 @@
           "cardinality": "N:1",
           "on": {
             "localFields": [
-              "invited_by_id"
+              "invitedById"
             ],
             "targetFields": [
               "id"
@@ -180,7 +185,7 @@
               "id"
             ],
             "targetFields": [
-              "invited_by_id"
+              "invitedById"
             ]
           },
           "to": "User"
@@ -192,7 +197,7 @@
               "id"
             ],
             "targetFields": [
-              "user_id"
+              "userId"
             ]
           },
           "to": "Post"
@@ -204,7 +209,7 @@
               "id"
             ],
             "targetFields": [
-              "user_id"
+              "userId"
             ]
           },
           "to": "Profile"
@@ -367,6 +372,7 @@
     }
   },
   "execution": {
+    "executionHash": "sha256:3799b761ae6ab41489db39f42919160264dd9bfc87dcf81ef7cf826ab1e6191d",
     "mutations": {
       "defaults": [
         {
