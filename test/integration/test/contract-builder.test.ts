@@ -39,7 +39,7 @@ describe('builder integration', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storage: {
-        storageHash: expect.stringMatching(/^sha256:/),
+        storageHash: 'sha256:test-core',
         tables: expect.objectContaining({
           user: expect.anything(),
         }),
