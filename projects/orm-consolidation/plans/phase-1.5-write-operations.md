@@ -19,8 +19,8 @@ Add write operations (`create`, `update`, `delete`, `upsert`) to `MongoCollectio
 
 - SQL `Collection` writes: [`sql-orm-client/src/collection.ts`](../../../packages/3-extensions/sql-orm-client/src/collection.ts) — `create`, `createAll`, `createCount`, `update`, `updateAll`, `updateCount`, `delete`, `deleteAll`, `deleteCount`, `upsert`
 - SQL mutation compilation: [`sql-orm-client/src/query-plan-mutations.ts`](../../../packages/3-extensions/sql-orm-client/src/query-plan-mutations.ts)
-- Mongo `MongoCollection` (read-only): [`mongo-orm/src/collection.ts`](../../../packages/2-mongo-family/4-orm/src/collection.ts)
-- Mongo commands: [`mongo-core/src/commands.ts`](../../../packages/2-mongo-family/1-core/src/commands.ts) — `InsertOneCommand`, `UpdateOneCommand`, `DeleteOneCommand`
+- Mongo `MongoCollection`: [`mongo-orm/src/collection.ts`](../../../packages/2-mongo-family/4-orm/src/collection.ts)
+- Mongo commands (AST nodes): [`mongo-query-ast/src/commands.ts`](../../../packages/2-mongo-family/2-query/query-ast/src/commands.ts) — all command classes extend `MongoAstNode`, filter fields accept `MongoFilterExpr`
 - Mongo wire commands: [`mongo-core/src/wire-commands.ts`](../../../packages/2-mongo-family/1-core/src/wire-commands.ts)
 - Mongo results: [`mongo-core/src/results.ts`](../../../packages/2-mongo-family/1-core/src/results.ts)
 - Mongo adapter: [`mongo-adapter/src/mongo-adapter.ts`](../../../packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts)
@@ -42,7 +42,8 @@ MongoCollection.create(data)
   Attach codec metadata for encoding
         │
         ▼
-  Build InsertOneCommand / InsertManyCommand
+  Build command AST node (InsertOneCommand, FindOneAndUpdateCommand, etc.)
+  Filter fields receive MongoFilterExpr (typed AST) directly
         │
         ▼
   MongoQueryExecutor.executeCommand(command, meta)
@@ -52,7 +53,8 @@ MongoCollection.create(data)
         │
         ▼
   MongoAdapter.lowerCommand(command, context)
-    ├── resolveDocument(): encode values for driver
+    ├── lowerFilter(): convert MongoFilterExpr → wire-level filter document
+    ├── resolveDocument(): resolve MongoParamRef in update/insert documents
     └── Build wire command (InsertOneWireCommand, etc.)
         │
         ▼
@@ -144,52 +146,56 @@ class MongoCollection<TContract, ModelName, TIncludes> {
 
 ## New command types
 
-### `mongo-core` commands
+### `mongo-query-ast` commands
 
-Add batch and document-returning commands alongside existing `*One` commands:
+Command classes are AST nodes in `@prisma-next/mongo-query-ast` (extending `MongoAstNode`), not in `mongo-core`. Filter fields accept `MongoFilterExpr` (typed AST), not pre-lowered `MongoExpr` documents. The adapter is solely responsible for lowering `MongoFilterExpr` to wire-level filter documents via `lowerFilter()`.
+
+A structural `MongoCommandLike` interface in `mongo-core` (`adapter-types.ts`) allows the `MongoAdapter` to type its `lowerCommand` method without a direct dependency on `mongo-query-ast`.
+
+Batch and document-returning commands alongside existing `*One` commands:
 
 ```typescript
 // Batch insert
-export class InsertManyCommand extends MongoCommand {
+export class InsertManyCommand extends MongoAstNode {
   readonly kind = 'insertMany' as const;
   readonly documents: ReadonlyArray<Record<string, MongoValue>>;
 
   constructor(collection: string, documents: ReadonlyArray<Record<string, MongoValue>>) { ... }
 }
 
-// Batch update
-export class UpdateManyCommand extends MongoCommand {
+// Batch update — filter is MongoFilterExpr (typed AST)
+export class UpdateManyCommand extends MongoAstNode {
   readonly kind = 'updateMany' as const;
-  readonly filter: MongoExpr;
-  readonly update: MongoUpdateDocument;
+  readonly filter: MongoFilterExpr;
+  readonly update: Record<string, MongoValue>;
 
-  constructor(collection: string, filter: MongoExpr, update: MongoUpdateDocument) { ... }
+  constructor(collection: string, filter: MongoFilterExpr, update: Record<string, MongoValue>) { ... }
 }
 
-// Batch delete
-export class DeleteManyCommand extends MongoCommand {
+// Batch delete — filter is MongoFilterExpr
+export class DeleteManyCommand extends MongoAstNode {
   readonly kind = 'deleteMany' as const;
-  readonly filter: MongoExpr;
+  readonly filter: MongoFilterExpr;
 
-  constructor(collection: string, filter: MongoExpr) { ... }
+  constructor(collection: string, filter: MongoFilterExpr) { ... }
 }
 
-// Atomic update + return document
-export class FindOneAndUpdateCommand extends MongoCommand {
+// Atomic update + return document — filter is MongoFilterExpr | null (null for upsert without where)
+export class FindOneAndUpdateCommand extends MongoAstNode {
   readonly kind = 'findOneAndUpdate' as const;
-  readonly filter: MongoExpr;
-  readonly update: MongoUpdateDocument;
+  readonly filter: MongoFilterExpr | null;
+  readonly update: Record<string, MongoValue>;
   readonly upsert: boolean;
 
-  constructor(collection: string, filter: MongoExpr, update: MongoUpdateDocument, upsert: boolean) { ... }
+  constructor(collection: string, filter: MongoFilterExpr | null, update: Record<string, MongoValue>, upsert: boolean) { ... }
 }
 
-// Atomic delete + return document
-export class FindOneAndDeleteCommand extends MongoCommand {
+// Atomic delete + return document — filter is MongoFilterExpr
+export class FindOneAndDeleteCommand extends MongoAstNode {
   readonly kind = 'findOneAndDelete' as const;
-  readonly filter: MongoExpr;
+  readonly filter: MongoFilterExpr;
 
-  constructor(collection: string, filter: MongoExpr) { ... }
+  constructor(collection: string, filter: MongoFilterExpr) { ... }
 }
 ```
 
@@ -220,7 +226,7 @@ export interface DeleteManyResult {
 
 ### Adapter lowering
 
-Extend `MongoAdapter.lowerCommand()` to handle the new command kinds. Each new command lowers to its wire command by resolving `MongoValue` / `MongoExpr` fields via `resolveDocument()` / `resolveValue()`.
+Extend `MongoAdapter.lowerCommand()` to handle the new command kinds. For filter-bearing commands, the adapter calls `lowerFilter()` to convert `MongoFilterExpr` (typed AST) to a wire-level filter document. For document fields (`update`, `documents`), the adapter calls `resolveDocument()` to resolve `MongoParamRef` values. The adapter accepts `MongoCommandLike` (structural interface from `mongo-core`) and casts to `AnyMongoCommand` (from `mongo-query-ast`) internally.
 
 ### Driver execution
 
@@ -269,24 +275,24 @@ For construct-from-input: the ORM knows the complete data that was inserted (the
 ### `update(data)` / `updateAll(data)`
 
 1. **Runtime guard:** Throw if `state.filters` is empty.
-2. Compile `state.filters` to a `MongoExpr` filter (reuse filter compilation from the read path).
+2. Merge `state.filters` into a single `MongoFilterExpr` (via `MongoAndExpr.of(...)` when multiple).
 3. Map update payload fields to storage field names.
-4. Wrap in `$set`: `{ $set: { ...mappedData } }` as the `MongoUpdateDocument`.
-5. For singular (`update`): Build `FindOneAndUpdateCommand(collection, filter, update, false)`. The driver returns the updated document directly.
-6. For batch (`updateAll`): Build `UpdateManyCommand(collection, filter, update)`. After execution, issue a follow-up read (aggregate pipeline with the same filter) to return the updated documents.
+4. Wrap in `$set`: `{ $set: { ...mappedData } }`.
+5. For singular (`update`): Build `FindOneAndUpdateCommand(collection, filterExpr, update, false)`. The driver returns the updated document directly.
+6. For batch (`updateAll`): Build `UpdateManyCommand(collection, filterExpr, update)`. After execution, issue a follow-up read (aggregate pipeline with the same filter) to return the updated documents.
 
 ### `delete()` / `deleteAll()`
 
 1. **Runtime guard:** Throw if `state.filters` is empty.
-2. Compile `state.filters` to a `MongoExpr` filter.
-3. For singular (`delete`): Build `FindOneAndDeleteCommand(collection, filter)`. The driver returns the deleted document directly.
-4. For batch (`deleteAll`): Issue an aggregate read first (to capture matching documents), then build `DeleteManyCommand(collection, filter)`. Return the pre-read documents.
+2. Merge `state.filters` into a single `MongoFilterExpr`.
+3. For singular (`delete`): Build `FindOneAndDeleteCommand(collection, filterExpr)`. The driver returns the deleted document directly.
+4. For batch (`deleteAll`): Issue an aggregate read first (to capture matching documents), then build `DeleteManyCommand(collection, filterExpr)`. Return the pre-read documents.
 
 ### `upsert(input)`
 
-1. Compile `state.filters` to a filter (if any `.where()` was chained), or use the create data's identity fields.
+1. Merge `state.filters` into a `MongoFilterExpr` (if any `.where()` was chained), or pass `null` (no filter).
 2. Map create and update payloads to storage field names.
-3. Build `FindOneAndUpdateCommand(collection, filter, { $set: updateData, $setOnInsert: createOnlyData }, true)`.
+3. Build `FindOneAndUpdateCommand(collection, filterExpr, { $set: updateData, $setOnInsert: createOnlyData }, true)`.
 4. The driver returns the document (either existing-updated or newly-inserted).
 
 ### `*Count` variants
@@ -297,15 +303,11 @@ These are simpler — execute the write command and return the count from the re
 - `updateCount`: `UpdateManyCommand` → return `modifiedCount`
 - `deleteCount`: `DeleteManyCommand` → return `deletedCount`
 
-### Filter compilation for writes
+### Filters in write commands
 
-The read path already compiles `state.filters` into `MongoMatchStage` (via `MongoAndExpr` when multiple). Write operations need the filter in a different form — as a plain `MongoExpr` (a `Record<string, MongoValue>` used by `UpdateOneCommand.filter`, `DeleteOneCommand.filter`), not wrapped in a pipeline stage.
+Write command classes accept `MongoFilterExpr` (typed AST) directly — the same type the ORM already holds in `state.filters`. The ORM merges multiple filters into a single `MongoFilterExpr` (via `MongoAndExpr.of(...)` when more than one) and passes it directly to the command constructor. No filter compilation or lowering happens in the ORM.
 
-The compilation should extract a shared `compileFilter(state.filters)` → `MongoFilterExpr` function, then:
-- Reads: wrap in `MongoMatchStage`
-- Writes: lower the `MongoFilterExpr` to `MongoExpr` for the command
-
-This may require a thin `lowerFilterToExpr(filter: MongoFilterExpr)` utility that produces the `Record<string, MongoValue>` form expected by the command types. This is similar to what the adapter's `lowerCommand` does via `resolveDocument()`, but at the ORM compilation level.
+The adapter's `lowerCommand()` is the sole component that lowers `MongoFilterExpr` to a wire-level filter document, using the same `lowerFilter()` utility that handles read pipeline `$match` stages. This keeps filter lowering centralized in the adapter layer.
 
 ## Milestones
 
@@ -315,9 +317,9 @@ Add the new command types, wire commands, result types, adapter lowering, and dr
 
 **Tasks:**
 
-#### 1.1 New command classes in `mongo-core`
+#### 1.1 New command classes in `mongo-query-ast`
 
-Add `InsertManyCommand`, `UpdateManyCommand`, `DeleteManyCommand`, `FindOneAndUpdateCommand`, `FindOneAndDeleteCommand`. Update `AnyMongoCommand` union.
+Add `InsertManyCommand`, `UpdateManyCommand`, `DeleteManyCommand`, `FindOneAndUpdateCommand`, `FindOneAndDeleteCommand` as `MongoAstNode` subclasses. Filter fields accept `MongoFilterExpr`. Update `AnyMongoCommand` union. Add `MongoCommandLike` structural interface to `mongo-core` for adapter typing.
 
 #### 1.2 New wire command classes in `mongo-core`
 
@@ -329,7 +331,7 @@ Add `InsertManyResult`, `UpdateManyResult`, `DeleteManyResult`.
 
 #### 1.4 Adapter lowering
 
-Extend `MongoAdapterImpl.lowerCommand()` to handle the five new command kinds. Each translates to its wire command using `resolveDocument()` / `resolveValue()`.
+Extend `MongoAdapterImpl.lowerCommand()` to handle the five new command kinds. For filter-bearing commands, call `lowerFilter()` to convert `MongoFilterExpr` to wire-level filter documents. For document fields, call `resolveDocument()` / `resolveValue()`.
 
 #### 1.5 Driver execution
 
@@ -379,7 +381,7 @@ Implement `create(data)`, `createAll(data[])`, `createCount(data[])` on `MongoCo
 Implement `update(data)`, `updateAll(data)`, `updateCount(data)` on `MongoCollection`:
 
 - Runtime guard: throw if no filters
-- Compile filters to `MongoExpr`
+- Merge `state.filters` into a single `MongoFilterExpr` (passed directly to command)
 - Map update data to storage fields, wrap in `$set`
 - `update()`: `FindOneAndUpdateCommand` → return document
 - `updateAll()`: `UpdateManyCommand` → re-read via aggregate
@@ -390,7 +392,7 @@ Implement `update(data)`, `updateAll(data)`, `updateCount(data)` on `MongoCollec
 Implement `delete()`, `deleteAll()`, `deleteCount()` on `MongoCollection`:
 
 - Runtime guard: throw if no filters
-- Compile filters to `MongoExpr`
+- Merge `state.filters` into a single `MongoFilterExpr` (passed directly to command)
 - `delete()`: `FindOneAndDeleteCommand` → return document
 - `deleteAll()`: aggregate read → `DeleteManyCommand` → return pre-read docs
 - `deleteCount()`: `DeleteManyCommand` → return `deletedCount`
@@ -505,4 +507,4 @@ Move the `.where()` requirement for `update`/`delete` from a runtime check to a 
 
 2. **`_id` generation.** MongoDB auto-generates `_id` if not provided. Should `CreateInput` include `_id` as optional? The SQL ORM includes PK fields in `CreateInput` for user-provided IDs but also supports auto-generated sequences.
 
-3. **Filter lowering for writes.** The read path wraps filters in `MongoMatchStage` (pipeline stages). The write path needs filters as `MongoExpr` (`Record<string, MongoValue>`). Determine whether to add a `lowerFilterToExpr()` utility in the query AST package, or handle this in the ORM compilation layer.
+3. ~~**Filter lowering for writes.**~~ **Resolved:** Command classes accept `MongoFilterExpr` (typed AST) directly. The ORM passes filter expressions to commands without lowering. The adapter's `lowerFilter()` handles conversion to wire-level filter documents — the same function used for read pipeline `$match` stages.

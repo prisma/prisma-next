@@ -1,109 +1,188 @@
 # MongoDB Family — Package Layering
 
-Design for the package layer structure in `packages/2-mongo-family/`. This addresses the current structural issue where most numbered layer directories contain a single package (the directory IS the package), rather than acting as layer groupings that contain one or more packages.
+Defines the layer and package structure for `packages/2-mongo-family/`. Each numbered directory is a **layer** (a conceptual category); each sub-directory within a layer is a **package** (a workspace project with its own `package.json`). Layers may contain multiple packages. Packages within the same layer are peers and may import from each other.
 
-## Current state
+## Design principles
+
+1. **Layers are concepts, packages are inhabitants.** A layer name should be a category that accommodates growth — never a single package name.
+2. **Package directory = package name.** The directory name matches the `name` field in `package.json` (minus the `@prisma-next/` scope). No indirection — you can identify any package at a glance without opening `package.json`.
+3. **Singular names for interface/type packages.** `mongo-codec` (the interface for defining a codec), not `mongo-codecs` (a bag of codec implementations). Concrete collections belong in the `family` or `target` layers.
+4. **No name collisions with the target domain.** The target domain (`packages/3-mongo-target/`) owns `adapter-mongo` and `driver-mongo`. Family-domain packages must not shadow those names.
+5. **Foundation packages have bounded responsibilities.** Each package name limits what can accumulate in it.
+6. **Transport spans both planes.** The adapter and driver operate in both migration (control) and runtime (execution) planes. The transport layer is plane: shared.
+
+## Layer order
+
+```json
+"mongo": ["foundation", "authoring", "tooling", "query", "query-builders", "transport", "runtime", "family"]
+```
+
+Higher layers may import from lower layers. Same-layer packages may import from each other. Upward imports are forbidden.
+
+## Structure
 
 ```
 packages/2-mongo-family/
-├── 1-core/          ← IS the package (mongo-core) — should be a layer containing packages
-├── 3-tooling/
-│   └── emitter/     ← correct: layer directory containing a package
-├── 4-orm/           ← IS the package (mongo-orm)
-├── 5-runtime/       ← IS the package (mongo-runtime)
-└── 9-family/        ← IS the package (family-mongo)
+
+  1-foundation/                         LAYER: foundation
+  │  mongo-contract/                      @prisma-next/mongo-contract
+  │  │  contract-types.ts                   MongoContract, MongoStorage, MongoModelStorage,
+  │  │                                      MongoTypeMaps, InferModelRow
+  │  │  contract-schema.ts                  Arktype structural schemas
+  │  │  validate-mongo-contract.ts          Validation entry point + indices
+  │  │  validate-storage.ts                 Storage-specific validation rules
+  │  │  validate-domain.ts                  Re-export of framework domain validation
+  │  │
+  │  mongo-codec/                         @prisma-next/mongo-codec
+  │  │  codecs.ts                           MongoCodec interface, mongoCodec() factory, trait types
+  │  │  codec-registry.ts                   MongoCodecRegistry interface + createMongoCodecRegistry()
+  │  │  codec-types.ts                      Static codec type map (CodecTypes)
+  │  │
+  │  mongo-value/                         @prisma-next/mongo-value
+  │     values.ts                           MongoValue, Document, RawPipeline, MongoExpr, etc.
+  │     param-ref.ts                        MongoParamRef
+
+  2-authoring/                          LAYER: authoring
+  │  mongo-contract-psl/                  @prisma-next/mongo-contract-psl
+
+  3-tooling/                            LAYER: tooling
+  │  mongo-emitter/                       @prisma-next/mongo-emitter
+
+  4-query/                              LAYER: query
+  │  mongo-query-ast/                     @prisma-next/mongo-query-ast
+  │                                       AST nodes, filter expressions, read stages,
+  │                                       command classes, visitors, MongoReadPlan,
+  │                                       MongoQueryPlan (unified), MongoQueryExecutor i/f
+
+  5-query-builders/                     LAYER: query-builders
+  │  mongo-orm/                           @prisma-next/mongo-orm
+
+  6-transport/                          LAYER: transport (plane: shared)
+  │  mongo-wire/                          @prisma-next/mongo-wire
+  │  │                                    Wire command classes, result types
+  │  │
+  │  mongo-lowering/                      @prisma-next/mongo-lowering
+  │                                       MongoAdapter i/f, MongoLoweringContext,
+  │                                       MongoDriver i/f
+
+  7-runtime/                            LAYER: runtime
+  │  mongo-runtime/                       @prisma-next/mongo-runtime
+
+  9-family/                             LAYER: family
+  │  family-mongo/                        @prisma-next/family-mongo
 ```
 
-Current layer order in `architecture.config.json`:
+## Foundation packages
 
-```json
-"mongo": ["core", "tooling", "orm", "runtime", "family"]
-```
+The current `1-core` (`@prisma-next/mongo-core`) splits into three packages with zero cross-dependencies:
 
-Only `3-tooling/` follows the correct convention (layer directory containing `emitter/` as a sub-package). All other numbered directories are the packages themselves.
+| Package | Responsibility | Depends on |
+|---|---|---|
+| `mongo-contract` | Contract shape and validation | framework contract types, arktype |
+| `mongo-codec` | Codec interface, factory, registry | nothing Mongo-specific |
+| `mongo-value` | Primitive value types (`MongoValue`, `Document`, `RawPipeline`, `MongoParamRef`) | nothing |
 
-## Problem
+The names bound what each package can accumulate. You wouldn't put wire commands in `mongo-contract`, validation in `mongo-codec`, or adapter interfaces in `mongo-value`.
 
-There is no layer for the query AST — the typed representation of MongoDB aggregation queries (filter expressions, read stages, visitors). This is a foundational primitive consumed by:
+## Transport packages
 
-- The ORM (`MongoCollection` compiles state to AST stages)
-- A future pipeline builder (user-facing aggregation DSL)
-- The adapter (lowers AST to driver documents)
+The transport layer splits into two packages, separating data structures from behavioral contracts:
 
-It cannot live in `mongo-core` — it's a consumer of core types (`MongoValue`, `MongoParamRef`), not a peer. It cannot live in a lanes or ORM layer — those are consumers of the AST, and placing it alongside them would allow upward coupling.
+| Package | Responsibility | Depends on |
+|---|---|---|
+| `mongo-wire` | Wire command classes (`InsertOneWireCommand`, etc.), result types (`InsertOneResult`, etc.) | `mongo-value` (wire commands use `Document`) |
+| `mongo-lowering` | `MongoAdapter` interface, `MongoDriver` interface, `MongoLoweringContext` | `mongo-wire` (adapter produces wire commands, driver consumes them), `mongo-query-ast` (adapter consumes AST types), `mongo-contract` (lowering context) |
 
-## Target layering
+`mongo-wire` is stable vocabulary — pure data structures with no behavioral interfaces. Consumers that only need wire command types (e.g. test stubs) don't pull in the adapter/driver contracts.
 
-```
-Layer        Dir              Packages                         Depends on
-─────        ───              ────────                         ──────────
-core         1-core/          mongo-core                       (foundation)
-query        2-query/         query-ast                        core
-tooling      3-tooling/       emitter                          core
-lanes        4-lanes/         pipeline-builder (future)        core, query
-orm          4-orm/           mongo-orm                        core, query
-runtime      5-runtime/       mongo-runtime                    core, query
-adapters     (in 3-targets)   mongo-adapter                    core, query
-family       9-family/        family-mongo                     core
-```
+## What moves from `1-core`
 
-**Layer order** for `architecture.config.json`:
+| Item | From | To | Rationale |
+|---|---|---|---|
+| `MongoAdapter` interface | `1-core` | `6-transport/mongo-lowering` | Needs to reference AST types (layer 4); can't do that from layer 1 |
+| `MongoDriver` interface | `1-core` | `6-transport/mongo-lowering` | Behavioral contract co-located with adapter |
+| `MongoLoweringContext` | `1-core` | `6-transport/mongo-lowering` | Part of the adapter interface |
+| Wire command classes | `1-core` | `6-transport/mongo-wire` | Adapter output / driver input — belongs at the transport boundary |
+| Result types | `1-core` | `6-transport/mongo-wire` | Driver output types |
+| `MongoExecutionPlan` | `1-core` | **deleted** | Post-lowering plan holding wire commands; unused |
+| `MongoCommandLike` shim | `1-core` | **deleted** | Existed only because adapter couldn't see real AST types |
+| `MongoReadPlanLike` shim | `1-core` | **deleted** | Same — adapter can now reference `MongoReadPlan` directly |
 
-```json
-"mongo": ["core", "query", "tooling", "lanes", "orm", "runtime", "family"]
-```
+## What moves from ORM
 
-### Key relationships
+| Item | From | To | Rationale |
+|---|---|---|---|
+| `MongoQueryExecutor` interface | `5-query-builders/mongo-orm` | `4-query/mongo-query-ast` | ORM consumes it, runtime implements it; defined in terms of plan types |
 
-- **`query` is below all query-surface consumers.** The ORM, lanes (future pipeline builder), runtime, and adapter all import from `query-ast`. The AST package cannot import from any of them.
-- **`lanes` and `orm` are peers.** Neither can import from the other. Both consume the query AST. This mirrors SQL where the query builder lanes and the ORM (in extensions) are independent surfaces.
-- **`tooling` is independent of `query`.** The emitter works with contract/schema types, not query representations. It depends only on `core`.
-- **`adapters` live in the targets domain** (`packages/3-mongo-target/`), not the mongo-family domain. They import cross-domain from `mongo` → `query-ast`.
+## Unified query plan
 
-### Directory convention
+A new `MongoQueryPlan` type is introduced in `4-query/mongo-query-ast` — a discriminated union encompassing both read plans and command AST nodes. This replaces the current bifurcated executor interface (`execute` + `executeCommand`) with a single `execute(plan: MongoQueryPlan)` method. See [unified-mongo-query-plan.md](unified-mongo-query-plan.md).
 
-Each numbered directory is a **layer** containing one or more **packages**:
+## Dependency flow
 
 ```
-packages/2-mongo-family/
-├── 1-core/
-│   └── mongo-core/          @prisma-next/mongo-core
-├── 2-query/
-│   └── query-ast/           @prisma-next/mongo-query-ast
-├── 3-tooling/
-│   └── emitter/             @prisma-next/mongo-emitter
-├── 4-lanes/
-│   └── pipeline-builder/    (future) @prisma-next/mongo-pipeline-builder
-├── 4-orm/
-│   └── mongo-orm/           @prisma-next/mongo-orm
-├── 5-runtime/
-│   └── mongo-runtime/       @prisma-next/mongo-runtime
-└── 9-family/
-    └── family-mongo/        @prisma-next/family-mongo
+9-family ──→ 7-runtime ──→ 6-transport/{lowering, wire} ──→ 4-query ──→ 1-foundation
+                │                     │                                      ↑
+                │                     └── 1-foundation/{contract, codec, value}
+                │                                                            │
+                └────────────────────────────────────────────────────────────┘
+                                                                             ↑
+           5-query-builders/mongo-orm ──→ 4-query ──→ 1-foundation/{contract, value}
+
+           3-tooling/mongo-emitter ──→ 2-authoring ──→ 1-foundation/mongo-contract
 ```
 
-### Migration path
+### Within the transport layer
 
-Restructuring existing packages (moving `1-core/` contents into `1-core/mongo-core/`, etc.) is **not** in scope for this project. The only structural change is creating `2-query/query-ast/` correctly from the start.
+```
+mongo-lowering ──→ mongo-wire ──→ mongo-value (foundation)
+      │
+      └──→ mongo-query-ast (query layer — AST types for adapter interface)
+      └──→ mongo-contract (foundation — lowering context)
+```
 
-Existing packages that are layer-as-package (`1-core`, `4-orm`, `5-runtime`, `9-family`) will be restructured in a future cleanup. The `architecture.config.json` globs can accommodate both the current flat structure and the target nested structure.
+## Target domain (concretions)
+
+```
+packages/3-mongo-target/
+  target-mongo/              @prisma-next/target-mongo       target descriptor
+  adapter-mongo/             @prisma-next/adapter-mongo      implements MongoAdapter
+  driver-mongo/              @prisma-next/driver-mongo       implements MongoDriver
+```
+
+The target domain imports from `mongo-lowering` for the interfaces it implements, from `mongo-wire` for wire command types, from `mongo-query-ast` for AST types it pattern-matches during lowering, and from `mongo-value` for value types.
+
+## Room for growth
+
+| Layer | Current packages | Future possibilities |
+|---|---|---|
+| `foundation` | `mongo-contract`, `mongo-codec`, `mongo-value` | `mongo-error` |
+| `authoring` | `mongo-contract-psl` | TS contract authoring |
+| `tooling` | `mongo-emitter` | introspection |
+| `query` | `mongo-query-ast` | `mongo-query-plan` (if split from AST) |
+| `query-builders` | `mongo-orm` | aggregation builder, raw collection builder |
+| `transport` | `mongo-wire`, `mongo-lowering` | change-stream transport |
+| `runtime` | `mongo-runtime` | plugin packages |
+| `family` | `family-mongo` | — |
 
 ## Comparison with SQL
 
-| Layer | SQL (`packages/2-sql/`) | Mongo (`packages/2-mongo-family/`) |
+| Conceptual layer | SQL | Mongo |
 |---|---|---|
-| Core | `1-core/` → `contract/`, `errors/`, `operations/`, `schema-ir/` | `1-core/` → `mongo-core` (currently flat) |
-| Query representation | `4-lanes/relational-core/` | `2-query/query-ast/` |
-| Tooling | `3-tooling/emitter/` | `3-tooling/emitter/` |
-| Query surfaces | `4-lanes/sql-builder/`, `query-builder/` | `4-lanes/pipeline-builder/` (future) |
-| ORM | `3-extensions/sql-orm-client/` (extensions domain) | `4-orm/mongo-orm/` |
-| Runtime | `5-runtime/` | `5-runtime/mongo-runtime/` |
+| Foundation | `1-core/{contract, errors, operations, schema-ir}` | `1-foundation/{mongo-contract, mongo-codec, mongo-value}` |
+| Authoring | `2-authoring/` | `2-authoring/mongo-contract-psl` |
+| Tooling | `3-tooling/emitter` | `3-tooling/mongo-emitter` |
+| Query | `4-lanes/relational-core` (AST + plan + adapter i/f mixed) | `4-query/mongo-query-ast` (AST + plan + executor i/f) |
+| Query builders | `4-lanes/{sql-builder, query-builder}` | `5-query-builders/mongo-orm` |
+| Transport | (implicit — SQL string is the wire format) | `6-transport/{mongo-wire, mongo-lowering}` |
+| Runtime | `5-runtime/` | `7-runtime/mongo-runtime` |
+| Family | `9-family/` (pending task 5.8) | `9-family/family-mongo` |
 
-The SQL AST (`relational-core`) lives at the lanes layer (4), alongside the query builders. This means it's at the same level as its consumers — the layering doesn't prevent coupling between the AST and builder packages. For Mongo, we're placing the query AST at its own layer (2) below all consumers, which is a stricter separation.
+SQL's `relational-core` bundles AST, plan types, and adapter interface in one package at the lanes layer. The Mongo layering separates these: AST/plan at `query`, transport interfaces at `transport`. This is stricter — the adapter interface can reference AST types (transport is above query) but the query layer has no knowledge of transport concerns.
 
 ## References
 
-- [Milestone 1: Mongo Query AST — Design](./milestone-1-pipeline-ast-design.md)
-- [Phase 1: Mongo Collection Spike](./phase-1-mongo-collection-spike.md)
-- [`architecture.config.json`](../../../architecture.config.json)
+- [Unified Mongo Query Plan](unified-mongo-query-plan.md) — single plan type and executor interface
+- [`architecture.config.json`](../../../architecture.config.json) — layer ordering and import rules
 - [Repo Map & Layering](../../../docs/onboarding/Repo-Map-and-Layering.md)
+- [Contract Domain Extraction — Task 5.11](../../contract-domain-extraction/plan.md) — foundation layer in framework domain

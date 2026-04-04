@@ -42,7 +42,9 @@ What's shared across families: `PlanMeta` (operation name, model, lane, target, 
 
 ## MongoQueryPlan
 
-**Status: implemented**
+**Status: superseded.** `MongoQueryPlan` and `FindCommand` have been deleted. Reads now use `MongoReadPlan` (typed pipeline AST in `@prisma-next/mongo-query-ast`), executed via `MongoRuntime.execute()`. Writes use command AST nodes (`InsertOneCommand`, `UpdateOneCommand`, `DeleteOneCommand`, `InsertManyCommand`, `UpdateManyCommand`, `DeleteManyCommand`, `FindOneAndUpdateCommand`, `FindOneAndDeleteCommand`, `AggregateCommand`) also in `@prisma-next/mongo-query-ast`, executed via `MongoRuntime.executeCommand()`. Command filter fields accept `MongoFilterExpr` (typed AST). The adapter's `lowerCommand()` accepts a structural `MongoCommandLike` interface and lowers filters via `lowerFilter()`.
+
+The original design (retained for historical context):
 
 A query plan pairs a command (what to do) with metadata (context for plugins and telemetry):
 
