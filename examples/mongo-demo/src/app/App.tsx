@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { PostsResponse, UsersResponse } from '../server';
 import { PostList } from './PostList';
 import { UserList } from './UserList';
 
@@ -6,8 +7,8 @@ type Tab = 'posts' | 'users';
 
 export function App() {
   const [tab, setTab] = useState<Tab>('posts');
-  const [posts, setPosts] = useState<Parameters<typeof PostList>[0]['posts']>([]);
-  const [users, setUsers] = useState<Parameters<typeof UserList>[0]['users']>([]);
+  const [posts, setPosts] = useState<PostsResponse>([]);
+  const [users, setUsers] = useState<UsersResponse>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

@@ -1,11 +1,6 @@
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-  bio: string | null;
-}
+import type { UsersResponse } from '../server';
 
-function UserCard({ user }: { user: User }) {
+function UserCard({ user }: { user: UsersResponse[number] }) {
   return (
     <div className="card">
       <div className="card-header">
@@ -21,7 +16,7 @@ function UserCard({ user }: { user: User }) {
   );
 }
 
-export function UserList({ users }: { users: User[] }) {
+export function UserList({ users }: { users: UsersResponse }) {
   return (
     <div className="user-list">
       <h2>Authors ({users.length})</h2>
