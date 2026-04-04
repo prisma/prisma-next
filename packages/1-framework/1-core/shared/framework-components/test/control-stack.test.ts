@@ -472,6 +472,69 @@ describe('createControlStack', () => {
     expect(state.parameterizedRenderers.size).toBe(0);
   });
 
+  it('assembles operationRegistry from descriptor operationSignatures', () => {
+    const state = createControlStack(
+      stubInput({
+        family: createDescriptor({ kind: 'family', id: 'sql' }),
+        target: createDescriptor({
+          kind: 'target',
+          id: 'postgres',
+          operationSignatures: () => [
+            {
+              forTypeId: 'int4',
+              method: 'increment',
+              args: [{ kind: 'param' as const }],
+              returns: { kind: 'typeId' as const, type: 'int4' },
+            },
+          ],
+        }),
+        adapter: createDescriptor({
+          kind: 'adapter',
+          id: 'pg-adapter',
+          operationSignatures: () => [
+            {
+              forTypeId: 'text',
+              method: 'concat',
+              args: [{ kind: 'param' as const }],
+              returns: { kind: 'typeId' as const, type: 'text' },
+            },
+          ],
+        }),
+        extensionPacks: [
+          createDescriptor({
+            kind: 'extension',
+            id: 'pgvector',
+            operationSignatures: () => [
+              {
+                forTypeId: 'vector',
+                method: 'distance',
+                args: [{ kind: 'typeId' as const, type: 'vector' }],
+                returns: { kind: 'builtin' as const, type: 'number' as const },
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    expect(state.operationRegistry.byType('int4')).toHaveLength(1);
+    expect(state.operationRegistry.byType('int4')[0]?.method).toBe('increment');
+    expect(state.operationRegistry.byType('text')).toHaveLength(1);
+    expect(state.operationRegistry.byType('text')[0]?.method).toBe('concat');
+    expect(state.operationRegistry.byType('vector')).toHaveLength(1);
+    expect(state.operationRegistry.byType('vector')[0]?.method).toBe('distance');
+  });
+
+  it('returns empty operationRegistry when descriptors lack operationSignatures', () => {
+    const state = createControlStack(
+      stubInput({
+        family: createDescriptor({ kind: 'family', id: 'fam' }),
+        target: createDescriptor({ kind: 'target', id: 'tgt' }),
+      }),
+    );
+    expect(state.operationRegistry.byType('anything')).toEqual([]);
+  });
+
   it('returns empty state when descriptors have no types', () => {
     const state = createControlStack(
       stubInput({
