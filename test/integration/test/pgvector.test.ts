@@ -84,7 +84,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('descriptor provides operation signatures', () => {
-    const operations = pgvector.operationSignatures();
+    const operations = pgvector.operationSignatures!();
     expect(operations).toBeDefined();
     expect(operations.length).toBe(2);
 
@@ -110,7 +110,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('operations can be registered in registry', () => {
-    const operations = pgvector.operationSignatures();
+    const operations = pgvector.operationSignatures!();
     expect(operations).toBeDefined();
 
     const registry = createOperationRegistry();

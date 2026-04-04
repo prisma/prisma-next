@@ -2,6 +2,7 @@ import type {
   ColumnDefault,
   ContractBase,
   DomainRelationOn,
+  ExecutionHashBase,
   ExecutionSection,
   ProfileHashBase,
   StorageBase,

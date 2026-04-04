@@ -68,7 +68,7 @@ async function emitContract(
     extensionPacks: [],
   });
 
-  const emitResult = await emit(contract, stack, sqlTargetFamilyHook);
+  const emitResult = await emit(contract as unknown as Contract, stack, sqlTargetFamilyHook);
 
   // Write contract files
   const contractJsonPath = resolve(testDir, 'output/contract.json');

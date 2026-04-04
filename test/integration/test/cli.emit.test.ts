@@ -55,7 +55,6 @@ describe('emit command functionality', () => {
       const result = await emit(
         contract,
         {
-          outputDir,
           operationRegistry,
           codecTypeImports,
           operationTypeImports,
@@ -102,7 +101,6 @@ describe('emit command functionality', () => {
       const result = await emit(
         contract,
         {
-          outputDir,
           operationRegistry,
           codecTypeImports,
           operationTypeImports,
@@ -128,7 +126,6 @@ describe('emit command functionality', () => {
       const result = await emit(
         contract,
         {
-          outputDir: newOutputDir,
           operationRegistry,
           codecTypeImports,
           operationTypeImports,
