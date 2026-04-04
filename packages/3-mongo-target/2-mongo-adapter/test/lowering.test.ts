@@ -1,22 +1,20 @@
 import { MongoParamRef } from '@prisma-next/mongo-core';
-import { describe, expect, it } from 'vitest';
 import {
   MongoAndExpr,
   MongoExistsExpr,
   MongoFieldFilter,
-  MongoNotExpr,
-  MongoOrExpr,
-} from '../src/filter-expressions';
-import { lowerFilter, lowerPipeline, lowerStage } from '../src/lowering';
-import {
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
+  MongoNotExpr,
+  MongoOrExpr,
   MongoProjectStage,
   MongoSkipStage,
   MongoSortStage,
   MongoUnwindStage,
-} from '../src/stages';
+} from '@prisma-next/mongo-query-ast';
+import { describe, expect, it } from 'vitest';
+import { lowerFilter, lowerPipeline, lowerStage } from '../src/lowering';
 
 describe('lowerFilter', () => {
   it('lowers MongoFieldFilter with $eq', () => {

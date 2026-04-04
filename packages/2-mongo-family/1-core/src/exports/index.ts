@@ -26,7 +26,6 @@ export type {
 export type { MongoDriver } from '../driver-types';
 export { MongoParamRef } from '../param-ref';
 export type { MongoExecutionPlan } from '../plan';
-export { resolveValue } from '../resolve-value';
 export type { DeleteOneResult, InsertOneResult, UpdateOneResult } from '../results';
 export type {
   DomainContractShape,

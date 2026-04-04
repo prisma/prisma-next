@@ -6,7 +6,6 @@ export {
   MongoNotExpr,
   MongoOrExpr,
 } from '../filter-expressions';
-export { lowerFilter, lowerPipeline, lowerStage } from '../lowering';
 export type { MongoReadPlan } from '../read-plan';
 export type { MongoReadStage } from '../stages';
 export {
