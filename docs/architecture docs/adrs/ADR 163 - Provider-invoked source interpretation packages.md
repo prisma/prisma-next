@@ -10,7 +10,7 @@ Prisma Next supports multiple authoring inputs (TS-first and PSL-first) that mus
 
 `provider (input-specific) → Contract → validate/normalize → canonicalize/hash → emit`
 
-We introduced provider-based contract sources (`config.contract.source: () => Promise<Result<Contract, ContractSourceDiagnostics>>`) to keep the CLI/control plane **source-agnostic**. At the same time, we want to keep input-specific logic (like PSL parsing + interpretation) pluggable and out of the CLI and control plane wiring.
+We introduced provider-based contract sources (`config.contract.source: (context: ContractSourceContext) => Promise<Result<Contract, ContractSourceDiagnostics>>`) to keep the CLI/control plane **source-agnostic**. At the same time, we want to keep input-specific logic (like PSL parsing + interpretation) pluggable and out of the CLI and control plane wiring.
 
 During initial implementation, SQL PSL interpretation code lived in the TS authoring package (`@prisma-next/sql-contract-ts`). That mixed concerns and increased the dependency surface of the TS authoring surface with PSL-specific logic.
 
