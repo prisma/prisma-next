@@ -41,14 +41,33 @@ describe('compileMongoQuery', () => {
     ]);
   });
 
-  it('compiles selectedFields to $project', () => {
+  it('compiles selectedFields to $project with _id suppressed', () => {
     const state: MongoCollectionState = {
       ...emptyCollectionState(),
       selectedFields: ['name', 'email'],
     };
     const plan = compileMongoQuery('users', state, testHash);
     const lowered = lowerPipeline(plan.stages);
-    expect(lowered).toEqual([{ $project: { name: 1, email: 1 } }]);
+    expect(lowered).toEqual([{ $project: { name: 1, email: 1, _id: 0 } }]);
+  });
+
+  it('preserves _id when explicitly selected', () => {
+    const state: MongoCollectionState = {
+      ...emptyCollectionState(),
+      selectedFields: ['_id', 'name'],
+    };
+    const plan = compileMongoQuery('users', state, testHash);
+    const lowered = lowerPipeline(plan.stages);
+    expect(lowered).toEqual([{ $project: { _id: 1, name: 1 } }]);
+  });
+
+  it('skips $project when selectedFields is empty', () => {
+    const state: MongoCollectionState = {
+      ...emptyCollectionState(),
+      selectedFields: [],
+    };
+    const plan = compileMongoQuery('users', state, testHash);
+    expect(plan.stages).toEqual([]);
   });
 
   it('compiles orderBy to $sort', () => {
@@ -151,7 +170,7 @@ describe('compileMongoQuery', () => {
       orderBy: { name: 1 },
       offset: 10,
       limit: 5,
-      selectedFields: ['name', 'email'],
+      selectedFields: ['_id', 'name', 'email'],
     };
     const plan = compileMongoQuery('users', state, testHash);
     const lowered = lowerPipeline(plan.stages);

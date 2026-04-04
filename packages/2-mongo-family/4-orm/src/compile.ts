@@ -63,10 +63,13 @@ export function compileMongoQuery<Row = unknown>(
     stages.push(new MongoLimitStage(state.limit));
   }
 
-  if (state.selectedFields) {
-    const projection: Record<string, 1> = {};
+  if (state.selectedFields && state.selectedFields.length > 0) {
+    const projection: Record<string, 0 | 1> = {};
     for (const field of state.selectedFields) {
       projection[field] = 1;
+    }
+    if (!Object.hasOwn(projection, '_id')) {
+      projection['_id'] = 0;
     }
     stages.push(new MongoProjectStage(projection));
   }
