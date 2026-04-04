@@ -297,14 +297,17 @@ export function buildContract(state: RuntimeBuilderState): Contract {
   const capabilities = state.capabilities || {};
   const profileHash = computeProfileHash({ target, targetFamily, capabilities });
 
+  const executionWithHash = executionSection
+    ? { ...executionSection, executionHash: executionHash! }
+    : undefined;
+
   const contract = {
     target,
     targetFamily,
     models,
     roots,
     storage,
-    ...(executionSection ? { execution: executionSection } : {}),
-    ...(executionHash !== undefined ? { executionHash } : {}),
+    ...(executionWithHash ? { execution: executionWithHash } : {}),
     extensionPacks,
     capabilities,
     profileHash,
