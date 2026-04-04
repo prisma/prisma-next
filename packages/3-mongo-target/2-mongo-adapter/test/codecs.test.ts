@@ -1,4 +1,3 @@
-import type { OperationSignature } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { ObjectId } from 'mongodb';
 import { describe, expect, it } from 'vitest';
@@ -11,6 +10,7 @@ import {
   mongoStringCodec,
   mongoVectorCodec,
 } from '../src/core/codecs';
+import { mongoVectorNearOperation, mongoVectorOperationSignatures } from '../src/core/operations';
 
 describe('mongoObjectIdCodec', () => {
   it('decodes ObjectId to hex string', () => {
@@ -98,18 +98,22 @@ describe('mongoVectorCodec', () => {
   });
 });
 
-describe('extension operations via operation registry', () => {
-  it('registers a $near operation for mongo/vector@1', () => {
+describe('vector operation signatures (production-defined)', () => {
+  it('mongoVectorNearOperation targets mongo/vector@1', () => {
+    expect(mongoVectorNearOperation.forTypeId).toBe(MONGO_VECTOR_CODEC_ID);
+    expect(mongoVectorNearOperation.method).toBe('near');
+  });
+
+  it('mongoVectorOperationSignatures includes near', () => {
+    expect(mongoVectorOperationSignatures).toHaveLength(1);
+    expect(mongoVectorOperationSignatures[0]).toBe(mongoVectorNearOperation);
+  });
+
+  it('registers production-defined operations in registry', () => {
     const registry = createOperationRegistry();
-
-    const nearOp: OperationSignature = {
-      forTypeId: MONGO_VECTOR_CODEC_ID,
-      method: 'near',
-      args: [{ kind: 'param' }],
-      returns: { kind: 'builtin', type: 'number' },
-    };
-
-    registry.register(nearOp);
+    for (const op of mongoVectorOperationSignatures) {
+      registry.register(op);
+    }
 
     const ops = registry.byType(MONGO_VECTOR_CODEC_ID);
     expect(ops).toHaveLength(1);
@@ -118,15 +122,9 @@ describe('extension operations via operation registry', () => {
 
   it('returns no operations for types without registered extensions', () => {
     const registry = createOperationRegistry();
-
-    const nearOp: OperationSignature = {
-      forTypeId: MONGO_VECTOR_CODEC_ID,
-      method: 'near',
-      args: [{ kind: 'param' }],
-      returns: { kind: 'builtin', type: 'number' },
-    };
-
-    registry.register(nearOp);
+    for (const op of mongoVectorOperationSignatures) {
+      registry.register(op);
+    }
 
     expect(registry.byType('mongo/string@1')).toHaveLength(0);
   });

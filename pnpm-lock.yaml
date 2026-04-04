@@ -1875,6 +1875,9 @@ importers:
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../../2-mongo-family/1-core
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/shared/operations
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
@@ -1882,9 +1885,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/contract
-      '@prisma-next/operations':
-        specifier: workspace:*
-        version: link:../../1-framework/1-core/shared/operations
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
