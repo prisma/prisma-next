@@ -173,7 +173,7 @@ test('refined object contract preserves downstream schema and model token infere
   expectTypeOf<RefinedUserColumns>().toExtend<Record<string, { readonly codecId: string }>>();
   expectTypeOf(validated.models.User.storage.table).toExtend<string>();
   expectTypeOf<
-    NonNullable<(typeof validated.models.Post.fields)['userId']>['column']
+    NonNullable<(typeof validated.models.Post.storage.fields)['userId']>['column']
   >().toExtend<string>();
   expectTypeOf(User.refs.id.fieldName).toEqualTypeOf<'id'>();
   expectTypeOf(User.refs.id.modelName).toEqualTypeOf<'User'>();

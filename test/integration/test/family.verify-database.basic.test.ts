@@ -159,8 +159,8 @@ describe('family instance verify - basic', () => {
 
             // Write marker matching contract
             const write = writeContractMarker({
-              storageHash: contractWithDb.storageHash,
-              profileHash: contractWithDb.profileHash ?? contractWithDb.storageHash,
+              storageHash: contractWithDb.storage.storageHash,
+              profileHash: contractWithDb.profileHash ?? contractWithDb.storage.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -176,7 +176,7 @@ describe('family instance verify - basic', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            storageHash: contractWithDb.storageHash,
+            storageHash: contractWithDb.storage.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -231,8 +231,8 @@ describe('family instance verify - basic', () => {
 
             // Write marker matching contract (using storageHash for profileHash since contract doesn't have it)
             const write = writeContractMarker({
-              storageHash: contractWithDb.storageHash,
-              profileHash: contractWithDb.storageHash, // Use storageHash since contract doesn't have profileHash
+              storageHash: contractWithDb.storage.storageHash,
+              profileHash: contractWithDb.storage.storageHash, // Use storageHash since contract doesn't have profileHash
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -251,7 +251,7 @@ describe('family instance verify - basic', () => {
           expect(result).toMatchObject({
             ok: true,
             summary: 'Database matches contract',
-            contract: { storageHash: contractWithDb.storageHash },
+            contract: { storageHash: contractWithDb.storage.storageHash },
             meta: { contractPath: expect.any(String) },
           });
           expect(result.contract.profileHash).toBeUndefined();

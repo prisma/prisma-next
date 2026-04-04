@@ -39,8 +39,8 @@ function createTestContract(
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'sha256:test',
     storage: {
+      storageHash: 'sha256:test',
       tables: Object.fromEntries(
         Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
           name,
@@ -85,8 +85,8 @@ async function writeMatchingMarker(
     await executeStatement(client, ensureTableStatement);
 
     const write = writeContractMarker({
-      storageHash: contract.storageHash,
-      profileHash: contract.profileHash ?? contract.storageHash,
+      storageHash: contract.storage.storageHash,
+      profileHash: contract.profileHash ?? contract.storage.storageHash,
       contractJson: contract,
       canonicalVersion: 1,
     });
@@ -207,10 +207,10 @@ withTempDir(({ createTempDir }) => {
 
             // Verify storageHash matches
             expect((parsed['contract'] as { storageHash: string }).storageHash).toBe(
-              contract.storageHash,
+              contract.storage.storageHash,
             );
             expect((parsed['marker'] as { storageHash: string }).storageHash).toBe(
-              contract.storageHash,
+              contract.storage.storageHash,
             );
           },
           // Use random ports to avoid conflicts in CI (no options = random ports)
@@ -864,7 +864,7 @@ withTempDir(({ createTempDir }) => {
           const contractJsonPath = join(testDir, 'output', 'contract.json');
           const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
           expect(contract).toBeDefined();
-          expect(contract.storageHash).toBeDefined();
+          expect(contract.storage.storageHash).toBeDefined();
 
           const command = createDbVerifyCommand();
           const verifyCwd4 = process.cwd();
@@ -950,8 +950,8 @@ withTempDir(({ createTempDir }) => {
 
             // Write marker matching contract
             const write = writeContractMarker({
-              storageHash: contract.storageHash,
-              profileHash: contract.profileHash ?? contract.storageHash,
+              storageHash: contract.storage.storageHash,
+              profileHash: contract.profileHash ?? contract.storage.storageHash,
               contractJson: contract,
               canonicalVersion: 1,
             });

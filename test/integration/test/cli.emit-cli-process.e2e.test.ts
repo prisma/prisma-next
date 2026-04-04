@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
-import type { StorageHashBase } from '@prisma-next/contract/types';
+import type { ContractRelation, StorageHashBase } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { timeouts } from '@prisma-next/test-utils';
@@ -43,12 +43,18 @@ type EmittedContract = SqlContract<
   },
   {
     readonly User: {
-      readonly storage: { readonly table: 'user' };
       readonly fields: {
-        readonly id: { readonly column: 'id' };
-        readonly email: { readonly column: 'email' };
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
       };
-      readonly relations: Record<string, never>;
+      readonly storage: {
+        readonly table: 'user';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly email: { readonly column: 'email' };
+        };
+      };
+      readonly relations: Record<string, ContractRelation>;
     };
   }
 >;

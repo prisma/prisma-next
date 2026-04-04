@@ -166,7 +166,7 @@ describe('family instance verify - errors', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            storageHash: contractWithDb.storageHash,
+            storageHash: contractWithDb.storage.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -208,7 +208,7 @@ describe('family instance verify - errors', () => {
             // Write marker with different hash
             const write = writeContractMarker({
               storageHash: 'sha256:different-hash',
-              profileHash: contractWithDb.profileHash ?? contractWithDb.storageHash,
+              profileHash: contractWithDb.profileHash ?? contractWithDb.storage.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -224,7 +224,7 @@ describe('family instance verify - errors', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            storageHash: contractWithDb.storageHash,
+            storageHash: contractWithDb.storage.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -265,7 +265,7 @@ describe('family instance verify - errors', () => {
 
             // Write marker with different profileHash
             const write = writeContractMarker({
-              storageHash: contractWithDb.storageHash,
+              storageHash: contractWithDb.storage.storageHash,
               profileHash: 'sha256:different-profile-hash',
               contractJson: contractWithDb,
               canonicalVersion: 1,
@@ -282,7 +282,7 @@ describe('family instance verify - errors', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            storageHash: contractWithDb.storageHash,
+            storageHash: contractWithDb.storage.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -361,8 +361,8 @@ describe('family instance verify - errors', () => {
             await executeStatement(client, ensureTableStatement);
 
             const write = writeContractMarker({
-              storageHash: contractWithDb.storageHash,
-              profileHash: contractWithDb.profileHash ?? contractWithDb.storageHash,
+              storageHash: contractWithDb.storage.storageHash,
+              profileHash: contractWithDb.profileHash ?? contractWithDb.storage.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -379,7 +379,7 @@ describe('family instance verify - errors', () => {
 
           // Should succeed but report missing codecs if contract uses types not in supported list
           const expectedContract: Record<string, unknown> = {
-            storageHash: contractWithDb.storageHash,
+            storageHash: contractWithDb.storage.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
