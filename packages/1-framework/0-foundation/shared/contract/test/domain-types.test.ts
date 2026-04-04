@@ -39,6 +39,11 @@ describe('contract types', () => {
 
     const _extendsRelation: AssertExtends<ContractEmbedRelation, ContractRelation> = true;
     expect(_extendsRelation).toBe(true);
+
+    // @ts-expect-error — N:1 is reference-only, not assignable to ContractEmbedRelation
+    const _n1NotEmbed: AssertExtends<{ to: string; cardinality: 'N:1' }, ContractEmbedRelation> =
+      true;
+    void _n1NotEmbed;
   });
 
   it('ContractRelation is a union of reference and embed', () => {
