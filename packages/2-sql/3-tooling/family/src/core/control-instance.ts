@@ -307,6 +307,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionPacks: extensions,
   });
 
+  // PHASE-B-REMOVE: This double cast bridges the Phase A write-side Contract type
+  // with the Phase B read-side SqlContract type. When Phase B redefines
+  // SqlContract = Contract<S, M>, this function should validate directly as
+  // Contract and the `as unknown as` cast can be removed.
+  // See: projects/contract-domain-extraction/plan.md task 5.B1
   function normalizeProviderContract(contract: unknown): Contract {
     const validated = validateContract<SqlContract<SqlStorage>>(contract);
     return validated as unknown as Contract;
