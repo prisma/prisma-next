@@ -56,7 +56,7 @@ describe('contract builder methods', () => {
       .target(postgresTargetPack)
       .storageHash(hash)
       .build();
-    expect(contract.storage.storageHash).toMatch(/^sha256:/);
+    expect(contract.storage.storageHash).toBe('sha256:custom-hash');
   });
 
   it('uses default storageHash when not provided', () => {
@@ -201,7 +201,7 @@ describe('contract builder methods', () => {
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
-    expect(contract.storage.storageHash).toMatch(/^sha256:/);
+    expect(contract.storage.storageHash).toBe('sha256:custom');
     expect(contract.capabilities).toEqual({ feature: { enabled: true } });
   });
 

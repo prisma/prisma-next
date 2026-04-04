@@ -25,6 +25,8 @@ import type {
 import {
   applyFkDefaults,
   type SqlStorage,
+  type StorageColumn,
+  type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
@@ -106,7 +108,7 @@ function assertStorageSemantics(storage: SqlStorage): void {
   }
 }
 
-export function buildContract(state: RuntimeBuilderState): Contract {
+export function buildContract(state: RuntimeBuilderState): Contract<SqlStorage> {
   if (!state.target) {
     throw new Error('target is required. Call .target() before .build()');
   }
@@ -114,23 +116,14 @@ export function buildContract(state: RuntimeBuilderState): Contract {
   const target = state.target;
   const targetFamily = 'sql';
 
-  const storageTables: Record<
-    string,
-    {
-      columns: Record<string, unknown>;
-      uniques: unknown[];
-      indexes: unknown[];
-      foreignKeys: unknown[];
-      primaryKey?: unknown;
-    }
-  > = {};
+  const storageTables: Record<string, StorageTable> = {};
   const executionDefaults: ExecutionMutationDefault[] = [];
 
   for (const tableName of Object.keys(state.tables)) {
     const tableState = state.tables[tableName];
     if (!tableState) continue;
 
-    const columns: Record<string, unknown> = {};
+    const columns: Record<string, StorageColumn> = {};
 
     for (const columnName in tableState.columns) {
       const columnState = tableState.columns[columnName];
@@ -200,11 +193,13 @@ export function buildContract(state: RuntimeBuilderState): Contract {
     tables: storageTables,
     types: storageTypes,
   };
-  const storageHash = computeStorageHash({
-    target,
-    targetFamily,
-    storage: storageWithoutHash,
-  });
+  const storageHash =
+    state.storageHash ??
+    computeStorageHash({
+      target,
+      targetFamily,
+      storage: storageWithoutHash,
+    });
   const storage = { ...storageWithoutHash, storageHash };
 
   const executionSection =
@@ -311,7 +306,7 @@ export function buildContract(state: RuntimeBuilderState): Contract {
       }
     : undefined;
 
-  const contract: Contract = {
+  const contract: Contract<SqlStorage> = {
     target,
     targetFamily,
     models,
@@ -324,7 +319,7 @@ export function buildContract(state: RuntimeBuilderState): Contract {
     meta: {},
   };
 
-  assertStorageSemantics(contract.storage as SqlStorage);
+  assertStorageSemantics(contract.storage);
 
   return contract;
 }
