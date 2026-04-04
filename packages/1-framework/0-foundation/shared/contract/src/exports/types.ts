@@ -57,6 +57,7 @@ export type {
 export {
   bigintJsonReplacer,
   coreHash,
+  executionHash,
   isDocumentContract,
   isTaggedBigInt,
   isTaggedRaw,

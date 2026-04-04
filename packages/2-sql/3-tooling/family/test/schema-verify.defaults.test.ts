@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import { type ColumnDefault, executionHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import type { DefaultNormalizer } from '../src/core/schema-verify/verify-sql-schema';
@@ -345,6 +345,7 @@ describe('verifySqlSchema - defaults', () => {
     const contract = {
       ...baseContract,
       execution: {
+        executionHash: executionHash('sha256:test'),
         mutations: {
           defaults: [
             {

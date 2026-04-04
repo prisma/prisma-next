@@ -3,20 +3,20 @@ import {
   computeProfileHash,
   computeStorageHash,
 } from '@prisma-next/contract/hashing';
-import type {
-  ColumnDefault,
-  ColumnDefaultLiteralInputValue,
-  ColumnDefaultLiteralValue,
-  Contract,
-  ContractField,
-  ContractModel,
-  ContractRelation,
-  ExecutionMutationDefault,
-  ExecutionMutationDefaultValue,
-  StorageHashBase,
-  TaggedRaw,
+import {
+  type ColumnDefault,
+  type ColumnDefaultLiteralInputValue,
+  type ColumnDefaultLiteralValue,
+  type Contract,
+  type ContractField,
+  type ContractModel,
+  type ContractRelation,
+  coreHash,
+  type ExecutionMutationDefault,
+  type ExecutionMutationDefaultValue,
+  type StorageHashBase,
+  type TaggedRaw,
 } from '@prisma-next/contract/types';
-import { coreHash } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
   ContractBuilderState,

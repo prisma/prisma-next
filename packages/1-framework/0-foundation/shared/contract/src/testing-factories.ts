@@ -15,7 +15,7 @@ type ContractOverrides<
   storage?: Omit<TStorage, 'storageHash'>;
   capabilities?: Record<string, Record<string, boolean>>;
   extensionPacks?: Record<string, unknown>;
-  execution?: ExecutionSection;
+  execution?: Omit<ExecutionSection, 'executionHash'>;
   profileHash?: ProfileHashBase<string>;
   meta?: Record<string, unknown>;
 };

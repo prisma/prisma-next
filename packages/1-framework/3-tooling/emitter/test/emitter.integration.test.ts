@@ -1,4 +1,3 @@
-import type { Contract } from '@prisma-next/contract/types';
 import type { EmitOptions } from '@prisma-next/core-control-plane/emission';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type {
