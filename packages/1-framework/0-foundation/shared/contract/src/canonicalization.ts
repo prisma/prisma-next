@@ -245,7 +245,6 @@ export type CanonicalContractInput = {
   readonly schemaVersion?: string | undefined;
   readonly targetFamily: string;
   readonly target: string;
-  readonly profileHash?: string | undefined;
   readonly roots: Record<string, string>;
   readonly models: Record<string, unknown>;
   readonly storage: StorageBase | Record<string, unknown>;
