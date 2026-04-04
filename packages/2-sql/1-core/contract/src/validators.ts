@@ -170,7 +170,6 @@ const SqlContractSchema = type({
   target: 'string',
   targetFamily: "'sql'",
   'coreHash?': 'string',
-  'storageHash?': 'string',
   'profileHash?': 'string',
   '_generated?': 'Record<string, unknown>',
   'capabilities?': 'Record<string, Record<string, boolean>>',
