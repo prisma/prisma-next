@@ -17,11 +17,11 @@ Phase 1 of the ORM consolidation: replaces the Mongo ORM's options-bag API with 
 - **Type safety at the API boundary.** `all()`/`first()` return `InferRootRow<TContract, ModelName>`. `include()` constrains to `ReferenceRelationKeys`. `select()` and `orderBy()` constrain to model field keys. Type-level tests verify all constraints including chained method chains. `where()` input remains untyped (deferred to `MongoModelAccessor`).
 - **Chained type tests.** Type tests now verify that row types survive through full chains: `where().select().all()`, `include().first()`, `where().orderBy().skip().take().all()`, and that constraints are preserved after chaining.
 - **Test coverage.** Unit tests, type-level tests (including chained result types), compilation tests, lowering tests (including `$nor`, `isNull`/`isNotNull`), and 11 integration tests against `mongodb-memory-server`. Codec trait extraction tested via `codecs.test-d.ts`.
-- **Clean layering.** No import violations. Runtime dispatches through the adapter interface (`MongoAdapter.lowerReadPlan()` defined in `mongo-core`). Adapter imports `lowerPipeline` from `mongo-query-ast`.
+- **Clean layering.** Runtime dispatches through the adapter interface (`MongoAdapter.lowerReadPlan()` defined in `mongo-core`). Lowering functions (`lowerPipeline`, `lowerFilter`, `lowerStage`) live in the adapter, where they belong. `resolveValue` is a local utility in the adapter.
 - **Legacy cleanup.** All dead code deleted. Runtime accepts `MongoReadPlan` directly.
 - **ADR 183.** Clear, focused. Subsystem docs and planning docs updated.
 - **Compilation stage ordering.** Correct and tested: `$match → $lookup/$unwind → $sort → $skip → $limit → $project`.
-- **`resolveValue` deduplicated.** Shared utility in `mongo-core`.
+- **`resolveValue` local to adapter.** Moved from `mongo-core` shared export to adapter-internal utility, since only lowering uses it.
 - **`select()` accumulates.** Multiple `.select()` calls accumulate fields, consistent with `.where()` and `.orderBy()`. Tested.
 - **`storageHash` from contract.** `compileMongoQuery` receives the hash from the contract, not a hardcoded stub.
 - **Phantom type uses branded symbol.** `MongoReadPlan` uses `declare const __mongoReadPlanRow: unique symbol` — no collision risk.
@@ -46,10 +46,16 @@ Phase 1 of the ORM consolidation: replaces the Mongo ORM's options-bag API with 
 | **F16** — Integration tests don't exercise negative paths | Fixed: tests for negation, ordering, pagination, selection. |
 | **F17** — Type utilities disconnected from collection API | Fixed: `all()`/`first()` return `InferRootRow`, `include()` constrains to `ReferenceRelationKeys`, `select()`/`orderBy()` constrain to model field keys. |
 | **F18** — `include()` crashes on embed relations | Fixed: runtime guard + compile-time constraint. Unit test. |
-| **F19** — Lowering in wrong package per design doc | Subsumed by F14. Lowering functions stay in `mongo-query-ast`; adapter imports them. |
+| **F19** — Lowering in wrong package per design doc | Resolved via F25: lowering functions moved to adapter. |
 | **F21** — Demo types misleading | Fixed: `types.ts` deleted. `server.ts` exports query functions; response types derived via `ReturnType`. `App.tsx` uses them directly — no casts, no manual types. |
 | **F22** — Unit test fixture erases type info | Fixed: shared typed contract fixture (`orm-contract.d.ts` + `orm-contract.json`) using the standard type parameter pattern. |
 | **F23** — No type tests for chained result types | Fixed: 4 chaining type tests added — `where().select().all()`, `include().first()`, `where().orderBy().skip().take().all()`, and constraint preservation after chaining. |
+
+---
+
+## Blocking issues
+
+None remaining.
 
 ---
 
@@ -83,3 +89,4 @@ Phase 1 of the ORM consolidation: replaces the Mongo ORM's options-bag API with 
 | Finding | Resolution |
 |---|---|
 | **F24** — Constructor leaks internal state into public API | Fixed: `MongoCollectionInit` removed. Constructor takes only `(contract, modelName, executor)`. State is fully private (`#state`). `#createSelf` sets state on new instances via private field access. `MongoCollectionState` and `emptyCollectionState` removed from public exports. |
+| **F25** — Lowering functions must not live in the AST package | Fixed: `lowerPipeline`, `lowerFilter`, `lowerStage` moved from `mongo-query-ast` to `mongo-adapter`. `resolveValue` moved from `mongo-core` shared export to adapter-local utility. ORM tests updated to assert on AST stage types instead of lowered wire format. |
