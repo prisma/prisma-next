@@ -2,8 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:b90530d44770bf240fe845acebb0fc0682c3d4d6d432c581b3ba3f9c6d45b877",
-  "profileHash": "sha256:ffc50246dae57a96ebc1abc212db40a10706095adca83ab257d4cb15f62cd192",
+  "profileHash": "sha256:dac42ff24bf5238eef80f2fd845d34eab8e6381ddafc571bed5e4af1ea61b9b8",
   "roots": {
     "articles": "Article",
     "comments": "Comment",
@@ -290,6 +289,7 @@
     }
   },
   "storage": {
+    "storageHash": "sha256:eeb580eceaaaa9e750d705b6422798ea4c4a8e907205f22b816ae2dd8f7ef78c",
     "tables": {
       "articles": {
         "columns": {
@@ -511,7 +511,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:1df716ed39e078263526f932e62df44a995247cc389d57701b1abc31af80e34d",
+    "executionHash": "sha256:211c5b21768fe82d743537f9487a01059313932772ef994b20b016951a21f78d",
     "mutations": {
       "defaults": [
         {
