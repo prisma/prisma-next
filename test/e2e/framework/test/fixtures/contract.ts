@@ -16,9 +16,8 @@ import {
   varcharColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import { uuidv7 } from '@prisma-next/ids';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
-// Use relative import to avoid module resolution issues in test context
-import { defineContract } from '../../../../../packages/2-sql/2-authoring/contract-ts/src/exports/contract-builder';
 
 export const contract = defineContract()
   .target(postgresPack)

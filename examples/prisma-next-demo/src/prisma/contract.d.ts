@@ -140,7 +140,7 @@ type ContractBase = SqlContract<
   },
   {
     readonly Post: {
-      storage: {
+      readonly storage: {
         readonly table: 'post';
         readonly fields: {
           readonly id: { readonly column: 'id' };
@@ -150,14 +150,14 @@ type ContractBase = SqlContract<
           readonly embedding: { readonly column: 'embedding' };
         };
       };
-      fields: {
+      readonly fields: {
         readonly id: Char<36>;
         readonly title: CodecTypes['pg/text@1']['output'];
         readonly userId: CodecTypes['pg/text@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
         readonly embedding: Vector<1536> | null;
       };
-      relations: {
+      readonly relations: {
         readonly user: {
           readonly to: 'User';
           readonly cardinality: 'N:1';
@@ -169,7 +169,7 @@ type ContractBase = SqlContract<
       };
     };
     readonly User: {
-      storage: {
+      readonly storage: {
         readonly table: 'user';
         readonly fields: {
           readonly id: { readonly column: 'id' };
@@ -178,13 +178,13 @@ type ContractBase = SqlContract<
           readonly kind: { readonly column: 'kind' };
         };
       };
-      fields: {
+      readonly fields: {
         readonly id: Char<36>;
         readonly email: CodecTypes['pg/text@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
         readonly kind: 'admin' | 'user';
       };
-      relations: {
+      readonly relations: {
         readonly posts: {
           readonly to: 'Post';
           readonly cardinality: '1:N';
@@ -275,6 +275,7 @@ type ContractBase = SqlContract<
         },
       ];
     };
+    readonly executionHash: 'sha256:e1ebe2d0c623f17a7e66036721cb7b8de43c7955e72fe7d7733b88a92684b16d';
   };
 };
 

@@ -13,5 +13,10 @@ export default defineConfig({
   adapter: postgresAdapter,
   driver: postgresDriver,
   extensionPacks: [],
-  contract: typescriptContract(contract as Contract, 'test/fixtures/generated/contract.json'),
+  // TML-2191 will align SqlContract.execution with ContractExecutionSection;
+  // until then the builder's return type and Contract diverge on execution shape.
+  contract: typescriptContract(
+    contract as unknown as Contract,
+    'test/fixtures/generated/contract.json',
+  ),
 });

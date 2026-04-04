@@ -2,36 +2,31 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:3e6baed937240f07b4df3fcfef21dbf122f6220c8540576ab0545a442de52613",
-  "executionHash": "sha256:f744c820f5efe500202b9a1d30dff6243359b10bee2ac27753411f386c7052e0",
-  "profileHash": "sha256:a9868829161d6f7e3a139d8cf9f42d59e0503281d26342ddf900d9b054a51b98",
+  "storageHash": "sha256:b90530d44770bf240fe845acebb0fc0682c3d4d6d432c581b3ba3f9c6d45b877",
+  "profileHash": "sha256:ffc50246dae57a96ebc1abc212db40a10706095adca83ab257d4cb15f62cd192",
   "roots": {
-    "User": "User",
-    "Post": "Post",
-    "Comment": "Comment",
-    "Article": "Article",
-    "Profile": "Profile",
-    "Tag": "Tag"
+    "articles": "Article",
+    "comments": "Comment",
+    "posts": "Post",
+    "profiles": "Profile",
+    "tags": "Tag",
+    "users": "User"
   },
   "models": {
     "Article": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "codecId": "pg/int4@1"
         },
         "reviewerId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "codecId": "pg/int4@1"
         },
         "title": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "codecId": "pg/text@1"
         }
       },
       "relations": {
         "reviewer": {
-          "to": "User",
           "cardinality": "N:1",
           "on": {
             "localFields": [
@@ -40,11 +35,11 @@
             "targetFields": [
               "id"
             ]
-          }
+          },
+          "to": "User"
         }
       },
       "storage": {
-        "table": "articles",
         "fields": {
           "id": {
             "column": "id"
@@ -55,27 +50,24 @@
           "title": {
             "column": "title"
           }
-        }
+        },
+        "table": "articles"
       }
     },
     "Comment": {
       "fields": {
         "body": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "codecId": "pg/text@1"
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "codecId": "pg/int4@1"
         },
         "postId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "codecId": "pg/int4@1"
         }
       },
       "relations": {},
       "storage": {
-        "table": "comments",
         "fields": {
           "body": {
             "column": "body"
@@ -86,43 +78,27 @@
           "postId": {
             "column": "post_id"
           }
-        }
+        },
+        "table": "comments"
       }
     },
     "Post": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "codecId": "pg/int4@1"
         },
         "title": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "codecId": "pg/text@1"
         },
         "userId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "codecId": "pg/int4@1"
         },
         "views": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "codecId": "pg/int4@1"
         }
       },
       "relations": {
-        "comments": {
-          "to": "Comment",
-          "cardinality": "1:N",
-          "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "postId"
-            ]
-          }
-        },
         "author": {
-          "to": "User",
           "cardinality": "N:1",
           "on": {
             "localFields": [
@@ -131,11 +107,23 @@
             "targetFields": [
               "id"
             ]
-          }
+          },
+          "to": "User"
+        },
+        "comments": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "postId"
+            ]
+          },
+          "to": "Comment"
         }
       },
       "storage": {
-        "table": "posts",
         "fields": {
           "id": {
             "column": "id"
@@ -149,27 +137,24 @@
           "views": {
             "column": "views"
           }
-        }
+        },
+        "table": "posts"
       }
     },
     "Profile": {
       "fields": {
         "bio": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "codecId": "pg/text@1"
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "codecId": "pg/int4@1"
         },
         "userId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "codecId": "pg/int4@1"
         }
       },
       "relations": {
         "user": {
-          "to": "User",
           "cardinality": "1:1",
           "on": {
             "localFields": [
@@ -178,11 +163,11 @@
             "targetFields": [
               "id"
             ]
-          }
+          },
+          "to": "User"
         }
       },
       "storage": {
-        "table": "profiles",
         "fields": {
           "bio": {
             "column": "bio"
@@ -193,23 +178,21 @@
           "userId": {
             "column": "user_id"
           }
-        }
+        },
+        "table": "profiles"
       }
     },
     "Tag": {
       "fields": {
         "id": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "codecId": "pg/text@1"
         },
         "name": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "codecId": "pg/text@1"
         }
       },
       "relations": {},
       "storage": {
-        "table": "tags",
         "fields": {
           "id": {
             "column": "id"
@@ -217,43 +200,28 @@
           "name": {
             "column": "name"
           }
-        }
+        },
+        "table": "tags"
       }
     },
     "User": {
       "fields": {
         "email": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "codecId": "pg/text@1"
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "codecId": "pg/int4@1"
         },
         "invitedById": {
           "codecId": "pg/int4@1",
           "nullable": true
         },
         "name": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "codecId": "pg/text@1"
         }
       },
       "relations": {
-        "invitedUsers": {
-          "to": "User",
-          "cardinality": "1:N",
-          "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "invitedById"
-            ]
-          }
-        },
         "invitedBy": {
-          "to": "User",
           "cardinality": "N:1",
           "on": {
             "localFields": [
@@ -262,10 +230,22 @@
             "targetFields": [
               "id"
             ]
-          }
+          },
+          "to": "User"
+        },
+        "invitedUsers": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "invitedById"
+            ]
+          },
+          "to": "User"
         },
         "posts": {
-          "to": "Post",
           "cardinality": "1:N",
           "on": {
             "localFields": [
@@ -274,10 +254,10 @@
             "targetFields": [
               "userId"
             ]
-          }
+          },
+          "to": "Post"
         },
         "profile": {
-          "to": "Profile",
           "cardinality": "1:1",
           "on": {
             "localFields": [
@@ -286,11 +266,11 @@
             "targetFields": [
               "userId"
             ]
-          }
+          },
+          "to": "Profile"
         }
       },
       "storage": {
-        "table": "users",
         "fields": {
           "email": {
             "column": "email"
@@ -304,7 +284,8 @@
           "name": {
             "column": "name"
           }
-        }
+        },
+        "table": "users"
       }
     }
   },
@@ -530,6 +511,7 @@
     }
   },
   "execution": {
+    "executionHash": "sha256:1df716ed39e078263526f932e62df44a995247cc389d57701b1abc31af80e34d",
     "mutations": {
       "defaults": [
         {
@@ -554,13 +536,14 @@
       "returning": true
     },
     "sql": {
-      "enums": true
+      "enums": true,
+      "returning": true
     }
   },
   "extensionPacks": {},
   "meta": {},
   "_generated": {
-    "warning": "\u26a0\ufe0f  GENERATED FILE - DO NOT EDIT",
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
     "message": "This file is automatically generated by \"prisma-next contract emit\".",
     "regenerate": "To regenerate, run: prisma-next contract emit"
   }
