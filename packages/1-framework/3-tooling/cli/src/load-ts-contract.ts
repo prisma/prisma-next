@@ -10,7 +10,7 @@ export interface LoadTsContractOptions {
   readonly allowlist?: ReadonlyArray<string>;
 }
 
-const DEFAULT_ALLOWLIST = ['@prisma-next/*', 'node:*'];
+const DEFAULT_ALLOWLIST = ['@prisma-next/*', 'node:crypto'];
 
 function isAllowedImport(importPath: string, allowlist: ReadonlyArray<string>): boolean {
   for (const pattern of allowlist) {
