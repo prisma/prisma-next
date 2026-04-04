@@ -101,6 +101,12 @@ describe('MongoCollection chaining', () => {
     expect(selected.state.selectedFields).toEqual(['name']);
   });
 
+  it('accumulates fields across multiple select() calls', () => {
+    const executor = createMockExecutor();
+    const col = new MongoCollection(minimalContract, 'User', executor).select('name').select('_id');
+    expect(col.state.selectedFields).toEqual(['name', '_id']);
+  });
+
   it('returns a new instance from orderBy()', () => {
     const executor = createMockExecutor();
     const col = new MongoCollection(minimalContract, 'User', executor);
