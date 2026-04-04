@@ -158,7 +158,8 @@ export type ExecutionMutationDefault = {
   readonly onUpdate?: ExecutionMutationDefaultValue;
 };
 
-export type ExecutionSection = {
+export type ExecutionSection<THash extends string = string> = {
+  readonly executionHash: ExecutionHashBase<THash>;
   readonly mutations: {
     readonly defaults: ReadonlyArray<ExecutionMutationDefault>;
   };
