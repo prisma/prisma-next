@@ -13,6 +13,7 @@ describe('mongoCodec()', () => {
 
     expect(codec.id).toBe('test/string@1');
     expect(codec.targetTypes).toEqual(['string']);
+    expect(codec.traits).toEqual([]);
     expect(codec.decode('hello')).toBe('hello');
     expect(codec.encode?.('hello')).toBe('hello');
   });

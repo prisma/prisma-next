@@ -8,7 +8,7 @@ export interface MongoCodec<
 > {
   readonly id: Id;
   readonly targetTypes: readonly string[];
-  readonly traits?: TTraits;
+  readonly traits: TTraits;
   decode(wire: TWire): TJs;
   encode?(value: TJs): TWire;
 }
@@ -25,16 +25,16 @@ export function mongoCodec<
   encode: (value: TJs) => TWire;
   decode: (wire: TWire) => TJs;
 }): MongoCodec<Id, TTraits, TWire, TJs> {
-  const result: MongoCodec<Id, TTraits, TWire, TJs> = {
+  const traits = config.traits
+    ? (Object.freeze([...config.traits]) as TTraits)
+    : (Object.freeze([] as const) as unknown as TTraits);
+  return {
     id: config.typeId,
     targetTypes: config.targetTypes,
+    traits,
     decode: config.decode,
     encode: config.encode,
   };
-  if (config.traits) {
-    (result as { traits: TTraits }).traits = Object.freeze([...config.traits]) as TTraits;
-  }
-  return result;
 }
 
 export type MongoCodecJsType<T> =
