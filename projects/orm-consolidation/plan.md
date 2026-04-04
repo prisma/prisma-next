@@ -31,9 +31,25 @@ Build `MongoCollection` with the same fluent chaining API as SQL, compiling to `
 
 **Proof:** Mongo demo uses `.where().select().include().orderBy().take().all()` chaining, executing against `mongodb-memory-server`.
 
+### Phase 1.5: Mongo write operations
+
+**Linear:** [TML-2194](https://linear.app/prisma-company/issue/TML-2194)
+
+Phase 1 is read-only. The SQL ORM already has `create()`, `createAll()`, `update()`, `updateAll()`, `delete()`, `deleteAll()`, and `upsert()`. We can't extract a meaningful shared `Collection` interface until the Mongo ORM covers the same surface area — otherwise we'd extract only the read portion and have to refactor the base class again when writes land.
+
+**Milestones:**
+
+1. Add `create()` / `createAll()` — compile to `InsertOneCommand` / `InsertManyCommand` through the adapter
+2. Add `update()` / `updateAll()` — compile filter state + update payload to `UpdateOneCommand` / `UpdateManyCommand`
+3. Add `delete()` / `deleteAll()` — compile filter state to `DeleteOneCommand` / `DeleteManyCommand`
+4. Replace raw `MongoClient` seeding in the demo with ORM write calls
+5. Integration tests for full lifecycle (create → read → update → delete)
+
+**Proof:** Mongo demo seeds data via ORM write methods. Integration tests verify create/update/delete round-trip against `mongodb-memory-server`.
+
 ### Phase 2: Shared interface extraction (coordinate with Alexey)
 
-Extract `Collection<C, M>` base class, `CollectionState`, `InferModelRow`, and include interface from the two concrete implementations into the framework layer.
+Extract `Collection<C, M>` base class, `CollectionState`, `InferModelRow`, and include interface from the two concrete implementations into the framework layer. Both SQL and Mongo now have complete read + write surfaces to compare.
 
 **Detailed plan:** [plans/phase-2-shared-interface-extraction.md](plans/phase-2-shared-interface-extraction.md)
 
@@ -42,15 +58,17 @@ Extract `Collection<C, M>` base class, `CollectionState`, `InferModelRow`, and i
 1. Extract `CollectionState` and chaining base
 2. Extract `InferModelRow` utility type
 3. Extract shared include interface
-4. Verify custom collection subclasses
-5. Client shape extraction
+4. Extract shared mutation interface (`create`, `update`, `delete`)
+5. Verify custom collection subclasses
+6. Client shape extraction
 
 **Proof:** Both SQL and Mongo Collections extend a shared base class. Custom collection subclasses work identically for both families. All existing tests pass.
 
 ## Dependencies
 
 - **No dependency on M5 (unified contract) or M6 (SQL emitter migration)** from the contract domain extraction project — the ORM query surface is independent.
-- **Phase 2 depends on Phase 1** — can't extract a shared interface without two concrete implementations.
+- **Phase 1.5 depends on Phase 1** — write operations build on the collection class and adapter interface established in Phase 1.
+- **Phase 2 depends on Phase 1.5** — can't extract a shared interface until both implementations cover reads and writes.
 - **Phase 2 requires coordination with Alexey** — extraction changes the SQL Collection's inheritance hierarchy.
 - **WS4-3 (polymorphic models) depends on Phase 2** — polymorphic models extend the shared Collection interface.
 
