@@ -144,8 +144,15 @@ describe('lowerStage', () => {
       as: 'userPosts',
       pipeline: [new MongoMatchStage(MongoFieldFilter.eq('published', true))],
     });
-    const lowered = lowerStage(stage) as Record<string, Record<string, unknown>>;
-    expect(lowered['$lookup']!['pipeline']).toEqual([{ $match: { published: { $eq: true } } }]);
+    expect(lowerStage(stage)).toEqual({
+      $lookup: {
+        from: 'posts',
+        localField: '_id',
+        foreignField: 'authorId',
+        as: 'userPosts',
+        pipeline: [{ $match: { published: { $eq: true } } }],
+      },
+    });
   });
 
   it('lowers $unwind stage', () => {

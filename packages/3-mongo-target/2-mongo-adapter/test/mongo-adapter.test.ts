@@ -73,12 +73,12 @@ describe('MongoAdapter', () => {
   describe('nested values', () => {
     it('resolves deeply nested param refs', () => {
       const command = new InsertOneCommand('orders', {
-        'shipping.address.city': new MongoParamRef('Sydney'),
+        shipping: { address: { city: new MongoParamRef('Sydney') } },
         items: [{ sku: new MongoParamRef('ABC') }],
       });
       const wire = narrowWire(adapter.lowerCommand(command, stubContext), 'insertOne');
       expect(wire.document).toEqual({
-        'shipping.address.city': 'Sydney',
+        shipping: { address: { city: 'Sydney' } },
         items: [{ sku: 'ABC' }],
       });
     });
