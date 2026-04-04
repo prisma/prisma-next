@@ -258,17 +258,26 @@ export function buildContract(state: RuntimeBuilderState): Contract {
     // RelationDefinition.cardinality includes 'N:M' which isn't in
     // ContractReferenceRelation yet — cast is needed until the contract
     // type is extended to cover many-to-many.
+    const columnToField = new Map(
+      Object.entries(modelState.fields).map(([field, col]) => [col, field]),
+    );
     const modelRelations: Record<string, ContractRelation> = {};
     if (modelState.relations) {
       for (const relName in modelState.relations) {
         const rel = modelState.relations[relName];
         if (!rel) continue;
+
+        const targetModelState = state.models[rel.to];
+        const targetColumnToField = targetModelState
+          ? new Map(Object.entries(targetModelState.fields).map(([field, col]) => [col, field]))
+          : undefined;
+
         modelRelations[relName] = {
           to: rel.to,
           cardinality: rel.cardinality as ContractRelation['cardinality'],
           on: {
-            localFields: [...rel.on.parentCols],
-            targetFields: [...rel.on.childCols],
+            localFields: rel.on.parentCols.map((col) => columnToField.get(col) ?? col),
+            targetFields: rel.on.childCols.map((col) => targetColumnToField?.get(col) ?? col),
           },
         };
       }
