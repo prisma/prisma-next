@@ -167,7 +167,7 @@ describe('shared semantic contract lowering', () => {
       cardinality: '1:N',
       on: {
         localFields: ['id'],
-        targetFields: ['author_id'],
+        targetFields: ['authorId'],
       },
     });
     expect(models['Post']?.storage.fields['authorId']).toEqual({

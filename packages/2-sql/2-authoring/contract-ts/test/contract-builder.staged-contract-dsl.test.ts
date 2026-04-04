@@ -207,7 +207,7 @@ describe('staged contract DSL authoring surface', () => {
         cardinality: '1:N',
         on: {
           localFields: ['id'],
-          targetFields: ['user_id'],
+          targetFields: ['userId'],
         },
       },
     });
@@ -216,7 +216,7 @@ describe('staged contract DSL authoring surface', () => {
         to: 'User',
         cardinality: 'N:1',
         on: {
-          localFields: ['user_id'],
+          localFields: ['userId'],
           targetFields: ['id'],
         },
       },
@@ -492,7 +492,7 @@ describe('staged contract DSL authoring surface', () => {
         cardinality: expectedCardinality,
         on: {
           localFields: ['id'],
-          targetFields: ['user_id'],
+          targetFields: ['userId'],
         },
       },
     });
@@ -501,7 +501,7 @@ describe('staged contract DSL authoring surface', () => {
         to: 'User',
         cardinality: 'N:1',
         on: {
-          localFields: ['user_id'],
+          localFields: ['userId'],
           targetFields: ['id'],
         },
       },
