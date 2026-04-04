@@ -88,13 +88,13 @@ export class DeleteManyCommand extends MongoAstNode {
 export class FindOneAndUpdateCommand extends MongoAstNode {
   readonly kind = 'findOneAndUpdate' as const;
   readonly collection: string;
-  readonly filter: MongoFilterExpr | null;
+  readonly filter: MongoFilterExpr;
   readonly update: Record<string, MongoValue>;
   readonly upsert: boolean;
 
   constructor(
     collection: string,
-    filter: MongoFilterExpr | null,
+    filter: MongoFilterExpr,
     update: Record<string, MongoValue>,
     upsert: boolean,
   ) {

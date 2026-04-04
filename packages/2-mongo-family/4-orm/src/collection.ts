@@ -237,6 +237,7 @@ class MongoCollectionImpl<
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null> {
     this.#requireFilters('update');
+    this.#rejectWindowing('update');
     const filter = this.#mergeFilters();
     const updateDoc = this.#toUpdateDocument(data as Record<string, unknown>);
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, false);
@@ -248,6 +249,7 @@ class MongoCollectionImpl<
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>> {
     this.#requireFilters('updateAll');
+    this.#rejectWindowing('updateAll');
     const self = this;
     async function* gen(): AsyncGenerator<IncludedRow<TContract, ModelName, TIncludes>> {
       const filter = self.#mergeFilters();
@@ -262,6 +264,7 @@ class MongoCollectionImpl<
 
   async updateCount(data: Partial<DefaultModelRow<TContract, ModelName>>): Promise<number> {
     this.#requireFilters('updateCount');
+    this.#rejectWindowing('updateCount');
     const filter = this.#mergeFilters();
     const updateDoc = this.#toUpdateDocument(data as Record<string, unknown>);
     const command = new UpdateManyCommand(this.#collectionName, filter, updateDoc);
@@ -271,6 +274,7 @@ class MongoCollectionImpl<
 
   async delete(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null> {
     this.#requireFilters('delete');
+    this.#rejectWindowing('delete');
     const filter = this.#mergeFilters();
     const command = new FindOneAndDeleteCommand(this.#collectionName, filter);
     const results = await this.#drainPlan(command);
@@ -279,6 +283,7 @@ class MongoCollectionImpl<
 
   deleteAll(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>> {
     this.#requireFilters('deleteAll');
+    this.#rejectWindowing('deleteAll');
     const self = this;
     async function* gen(): AsyncGenerator<IncludedRow<TContract, ModelName, TIncludes>> {
       const docs: IncludedRow<TContract, ModelName, TIncludes>[] = [];
@@ -295,6 +300,7 @@ class MongoCollectionImpl<
 
   async deleteCount(): Promise<number> {
     this.#requireFilters('deleteCount');
+    this.#rejectWindowing('deleteCount');
     const filter = this.#mergeFilters();
     const command = new DeleteManyCommand(this.#collectionName, filter);
     const results = await this.#drainPlan(command);
@@ -305,7 +311,9 @@ class MongoCollectionImpl<
     create: CreateInput<TContract, ModelName>;
     update: Partial<DefaultModelRow<TContract, ModelName>>;
   }): Promise<IncludedRow<TContract, ModelName, TIncludes>> {
-    const filter = this.#state.filters.length > 0 ? this.#mergeFilters() : null;
+    this.#requireFilters('upsert');
+    this.#rejectWindowing('upsert');
+    const filter = this.#mergeFilters();
     const setFields = this.#toSetFields(input.update as Record<string, unknown>);
     const allCreateFields = this.#toDocument(input.create as Record<string, unknown>);
     const setKeys = new Set(Object.keys(setFields));
@@ -388,6 +396,18 @@ class MongoCollectionImpl<
     if (this.#state.filters.length === 0) {
       throw new Error(
         `${methodName}() requires a .where() filter. Call .where() before .${methodName}()`,
+      );
+    }
+  }
+
+  #rejectWindowing(methodName: string): void {
+    if (
+      this.#state.orderBy !== undefined ||
+      this.#state.limit !== undefined ||
+      this.#state.offset !== undefined
+    ) {
+      throw new Error(
+        `${methodName}() does not support orderBy/skip/take. Remove windowing before calling .${methodName}()`,
       );
     }
   }

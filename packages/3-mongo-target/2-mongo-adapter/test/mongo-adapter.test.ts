@@ -171,17 +171,6 @@ describe('MongoAdapter', () => {
       const wire = narrowWire(adapter.lower(plan('users', command)), 'findOneAndUpdate');
       expect(wire.upsert).toBe(true);
     });
-
-    it('uses empty filter when null', () => {
-      const command = new FindOneAndUpdateCommand(
-        'users',
-        null,
-        { $set: { name: 'Upserted' } },
-        true,
-      );
-      const wire = narrowWire(adapter.lower(plan('users', command)), 'findOneAndUpdate');
-      expect(wire.filter).toEqual({});
-    });
   });
 
   describe('FindOneAndDeleteCommand', () => {
