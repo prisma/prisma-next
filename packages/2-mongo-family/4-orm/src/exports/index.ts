@@ -1,4 +1,5 @@
-export { MongoCollection } from '../collection';
+export type { MongoCollection } from '../collection';
+export { createMongoCollection } from '../collection';
 export { compileMongoQuery } from '../compile';
 export type { MongoQueryExecutor } from '../executor';
 export type { MongoOrmClient, MongoOrmOptions } from '../mongo-orm';
