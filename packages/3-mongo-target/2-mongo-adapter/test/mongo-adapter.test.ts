@@ -82,6 +82,16 @@ describe('MongoAdapter', () => {
         items: [{ sku: 'ABC' }],
       });
     });
+
+    it('preserves Date values as-is', () => {
+      const now = new Date('2025-01-01T00:00:00Z');
+      const command = new InsertOneCommand('events', {
+        name: 'launch',
+        occurredAt: now,
+      });
+      const wire = narrowWire(adapter.lowerCommand(command, stubContext), 'insertOne');
+      expect(wire.document['occurredAt']).toBe(now);
+    });
   });
 
   describe('lowerReadPlan', () => {
