@@ -17,7 +17,7 @@ The pipeline has three components. Each is family-specific — the Mongo version
 Data flows top-down:
 
 ```text
-MongoQueryPlan { command, meta }
+MongoQueryPlan { collection, command, meta }
   │
   ▼
 MongoRuntime
@@ -50,6 +50,7 @@ A query plan pairs a command (what to do) with metadata (context for plugins and
 
 ```typescript
 interface MongoQueryPlan<Row = unknown> {
+  readonly collection: string;
   readonly command: AnyMongoCommand;
   readonly meta: PlanMeta;
 }

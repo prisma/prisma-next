@@ -8,7 +8,7 @@ export interface MongoLoweringContext {
 
 export interface MongoQueryPlanLike {
   readonly collection: string;
-  readonly command: { readonly kind: string };
+  readonly command: { readonly kind: string; readonly collection: string };
   readonly meta: PlanMeta;
 }
 

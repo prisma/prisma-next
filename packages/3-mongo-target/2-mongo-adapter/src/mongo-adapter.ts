@@ -58,7 +58,7 @@ class MongoAdapterImpl implements MongoAdapter {
       case 'findOneAndUpdate':
         return new FindOneAndUpdateWireCommand(
           command.collection,
-          command.filter ? lowerFilter(command.filter) : {},
+          lowerFilter(command.filter),
           resolveDocument(command.update),
           command.upsert,
         );

@@ -1,6 +1,5 @@
 import { createServer } from 'node:http';
 import type { SimplifyDeep } from '@prisma-next/mongo-orm';
-import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import type { Db } from './db';
 import { createClient } from './db';
@@ -68,10 +67,7 @@ async function main() {
   const uri = replSet.getUri();
   console.log(`MongoDB ready at ${uri}`);
 
-  const client = new MongoClient(uri);
-  await client.connect();
-
-  const { orm } = await createClient(uri, DB_NAME);
+  const { orm, runtime } = await createClient(uri, DB_NAME);
 
   console.log('Seeding data...');
   await seed(orm);
@@ -104,7 +100,7 @@ async function main() {
   process.on('SIGINT', async () => {
     console.log('\nShutting down...');
     server.close();
-    await client.close();
+    await runtime.close();
     await replSet.stop();
     process.exit(0);
   });
