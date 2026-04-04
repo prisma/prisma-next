@@ -94,7 +94,7 @@ describe('mongoVectorCodec', () => {
   });
 
   it('has id mongo/vector@1', () => {
-    expect(mongoVectorCodec.id).toBe('mongo/vector@1');
+    expect(mongoVectorCodec.id).toBe(MONGO_VECTOR_CODEC_ID);
   });
 });
 

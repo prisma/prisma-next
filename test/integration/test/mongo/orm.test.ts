@@ -17,7 +17,7 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     ]);
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
-    const results = await orm.users.all();
+    const results = await orm.users.orderBy({ name: 1 }).all();
 
     expect(results).toHaveLength(2);
     expect(results[0]).toMatchObject({ name: 'Alice', email: 'alice@example.com' });
@@ -224,7 +224,7 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     for (const row of results) {
       const keys = Object.keys(row as Record<string, unknown>);
       expect(keys).toContain('name');
-      expect(keys).toContain('_id');
+      expect(keys).not.toContain('_id');
       expect(keys).not.toContain('email');
       expect(keys).not.toContain('addresses');
     }
