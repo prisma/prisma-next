@@ -606,9 +606,9 @@ export const sqlTargetFamilyHook = {
       }
 
       const modelParts: string[] = [
-        `storage: { ${storageParts.join('; ')} }`,
-        `fields: { ${fields.join('; ')} }`,
-        `relations: { ${relations.join('; ')} }`,
+        `readonly storage: { ${storageParts.join('; ')} }`,
+        `readonly fields: { ${fields.join('; ')} }`,
+        `readonly relations: { ${relations.join('; ')} }`,
       ];
 
       if (model.owner) {
