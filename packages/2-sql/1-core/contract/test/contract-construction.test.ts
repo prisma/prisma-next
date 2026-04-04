@@ -4,10 +4,14 @@ import type { SqlStorage } from '../src/types';
 import { validateContract } from '../src/validate';
 
 const baseContract = {
-  schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
+  profileHash: 'sha256:test',
   storageHash: 'sha256:test-storage',
+  roots: { User: 'User' },
+  capabilities: {},
+  extensionPacks: {},
+  meta: {},
   models: {
     User: {
       storage: {
@@ -25,6 +29,7 @@ const baseContract = {
     },
   },
   storage: {
+    storageHash: 'sha256:test-storage',
     tables: {
       User: {
         columns: {

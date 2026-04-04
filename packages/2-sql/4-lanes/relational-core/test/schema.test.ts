@@ -75,6 +75,10 @@ describe('schema', () => {
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'test-hash',
+    roots: {},
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
     storage: {
       storageHash: 'test-hash',
       tables: {
@@ -183,6 +187,10 @@ describe('schema', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
         storageHash: 'test-hash',
         tables: {

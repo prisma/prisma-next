@@ -2,6 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
+  "storageHash": "sha256:eeb580eceaaaa9e750d705b6422798ea4c4a8e907205f22b816ae2dd8f7ef78c",
   "profileHash": "sha256:dac42ff24bf5238eef80f2fd845d34eab8e6381ddafc571bed5e4af1ea61b9b8",
   "roots": {
     "articles": "Article",
@@ -295,15 +296,18 @@
         "columns": {
           "id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "reviewer_id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "title": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           }
         },
         "foreignKeys": [],
@@ -319,15 +323,18 @@
         "columns": {
           "body": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "post_id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           }
         },
         "foreignKeys": [
@@ -357,19 +364,23 @@
         "columns": {
           "id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "title": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "user_id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "views": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           }
         },
         "foreignKeys": [
@@ -399,15 +410,18 @@
         "columns": {
           "bio": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "user_id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           }
         },
         "foreignKeys": [
@@ -437,11 +451,13 @@
         "columns": {
           "id": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "name": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           }
         },
         "foreignKeys": [],
@@ -463,11 +479,13 @@
         "columns": {
           "email": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "invited_by_id": {
             "codecId": "pg/int4@1",
@@ -476,7 +494,8 @@
           },
           "name": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           }
         },
         "foreignKeys": [

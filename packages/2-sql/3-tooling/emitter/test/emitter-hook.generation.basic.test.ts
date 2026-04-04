@@ -166,7 +166,7 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain('SqlContract,');
+    expect(types).toContain('Contract as ContractShape,');
     expect(types).toContain('ContractWithTypeMaps,');
     expect(types).toContain('TypeMaps as TypeMapsType,');
     expect(types).toContain("from '@prisma-next/sql-contract/types';");

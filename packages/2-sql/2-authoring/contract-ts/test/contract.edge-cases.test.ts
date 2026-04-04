@@ -10,8 +10,13 @@ describe('validateContract edge cases', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:test',
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      roots: {},
       models: {},
       storage: {
+        storageHash: 'sha256:test',
         tables: null,
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -25,22 +30,30 @@ describe('validateContract edge cases', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:test',
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      roots: {},
       models: {},
-      storage: {},
+      storage: { storageHash: 'sha256:test' },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
-  it('handles models with null relations', () => {
+  it('rejects models with null relations', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:test',
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      roots: {},
       models: {
         User: {
-          storage: { table: 'user' },
+          storage: { table: 'user', fields: { id: { column: 'id' } } },
           fields: {
             id: { column: 'id' },
           },
@@ -48,6 +61,7 @@ describe('validateContract edge cases', () => {
         },
       },
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           user: {
             columns: {
@@ -62,8 +76,7 @@ describe('validateContract edge cases', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    const contract = validateContract<Contract<SqlStorage>>(contractInput);
-    expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({});
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow(/relations/);
   });
 
   it('handles table without columns in normalization', () => {
@@ -72,8 +85,13 @@ describe('validateContract edge cases', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:test',
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      roots: {},
       models: {},
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             primaryKey: { columns: ['id'] },
@@ -89,15 +107,19 @@ describe('validateContract edge cases', () => {
     expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
-  it('handles relation without on property', () => {
+  it('rejects relation targeting non-existent model', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:test',
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      roots: {},
       models: {
         User: {
-          storage: { table: 'user' },
+          storage: { table: 'user', fields: { id: { column: 'id' } } },
           fields: {
             id: { column: 'id' },
           },
@@ -110,85 +132,7 @@ describe('validateContract edge cases', () => {
         },
       },
       storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
-    // Relations without 'on' property should be skipped in validation
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
-  });
-
-  it('handles relation without to property', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-          },
-          relations: {
-            posts: {
-              on: { parentCols: ['id'], childCols: ['userId'] },
-              cardinality: '1:N',
-            },
-          },
-        },
-      },
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
-    // Relations without 'to' property should be skipped in validation
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
-  });
-
-  it('rejects relation using old parentCols/childCols format', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
-          },
-          relations: {
-            posts: {
-              to: 'Post',
-              on: { parentCols: ['id'], childCols: ['userId'] },
-              cardinality: '1:N',
-            },
-          },
-        },
-      },
-      storage: {
+        storageHash: 'sha256:test',
         tables: {
           user: {
             columns: {
@@ -204,7 +148,115 @@ describe('validateContract edge cases', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow(
-      'unsupported relation format (expected localFields/targetFields)',
+      /targets "Post" which does not exist/,
     );
+  });
+
+  it('rejects relation without to property (domain validation)', () => {
+    const contractInput = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      roots: {},
+      models: {
+        User: {
+          storage: { table: 'user', fields: { id: { column: 'id' } } },
+          fields: {
+            id: { column: 'id' },
+          },
+          relations: {
+            posts: {
+              on: { parentCols: ['id'], childCols: ['userId'] },
+              cardinality: '1:N',
+            },
+          },
+        },
+      },
+      storage: {
+        storageHash: 'sha256:test',
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    } as any;
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow(
+      /does not exist in models/,
+    );
+  });
+
+  it('accepts relation using old parentCols/childCols format (format validated by emitter)', () => {
+    const contractInput = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      roots: {},
+      models: {
+        User: {
+          storage: { table: 'user', fields: { id: { column: 'id' } } },
+          fields: {
+            id: { codecId: 'pg/text@1', nullable: false },
+          },
+          relations: {
+            posts: {
+              to: 'Post',
+              on: { parentCols: ['id'], childCols: ['userId'] },
+              cardinality: '1:N',
+            },
+          },
+        },
+        Post: {
+          storage: {
+            table: 'post',
+            fields: { id: { column: 'id' }, userId: { column: 'userId' } },
+          },
+          fields: {
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
+          },
+        },
+      },
+      storage: {
+        storageHash: 'sha256:test',
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          post: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    };
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 });

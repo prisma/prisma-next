@@ -9,8 +9,13 @@ describe('validateContract model validation', () => {
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'sha256:test',
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    roots: {},
     models: {},
     storage: {
+      storageHash: 'sha256:test',
       tables: {
         User: {
           columns: {
@@ -43,26 +48,24 @@ describe('validateContract model validation', () => {
     );
   });
 
-  it('throws when model references non-existent table', () => {
-    const invalid = {
+  it('accepts model referencing non-existent table (cross-ref validated by emitter)', () => {
+    const valid = {
       ...baseContract,
       models: {
         User: {
-          storage: { table: 'NonExistent' },
+          storage: { table: 'NonExistent', fields: { id: { column: 'id' } } },
           fields: { id: { column: 'id' } },
         },
-        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-      } as any,
+      },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
-      /references non-existent table/,
-    );
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 
-  it('throws when model table is missing primary key', () => {
-    const invalid = {
+  it('accepts model table without primary key (cross-ref validated by emitter)', () => {
+    const valid = {
       ...baseContract,
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             columns: {
@@ -76,13 +79,12 @@ describe('validateContract model validation', () => {
       },
       models: {
         User: {
-          storage: { table: 'User' },
+          storage: { table: 'User', fields: { id: { column: 'id' } } },
           fields: { id: { column: 'id' } },
         },
-        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-      } as any,
+      },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/missing a primary key/);
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 
   it('throws when model has empty fields object', () => {
@@ -90,7 +92,7 @@ describe('validateContract model validation', () => {
       ...baseContract,
       models: {
         User: {
-          storage: { table: 'User' },
+          storage: { table: 'User', fields: {} },
           fields: {},
         },
         // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -102,42 +104,37 @@ describe('validateContract model validation', () => {
     expect(() => validateContract<Contract<SqlStorage>>(invalid)).not.toThrow();
   });
 
-  it('throws when model field is missing column property', () => {
-    const invalid = {
+  it('accepts model field with empty column string (cross-ref validated by emitter)', () => {
+    const valid = {
       ...baseContract,
       models: {
         User: {
           storage: { table: 'User', fields: { id: { column: '' } } },
           fields: { id: { codecId: 'pg/int4@1', nullable: false } },
-          // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        } as any,
+        },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
-      /missing column property/,
-    );
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 
-  it('throws when model field references non-existent column', () => {
-    const invalid = {
+  it('accepts model field referencing non-existent column (cross-ref validated by emitter)', () => {
+    const valid = {
       ...baseContract,
       models: {
         User: {
           storage: { table: 'User', fields: { id: { column: 'nonExistent' } } },
           fields: { id: { codecId: 'pg/int4@1', nullable: false } },
-          // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        } as any,
+        },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
-      /references non-existent column/,
-    );
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 
-  it('throws when N:1 relation does not have matching foreign key', () => {
-    const invalid = {
+  it('accepts N:1 relation without matching FK (cross-ref validated by emitter)', () => {
+    const valid = {
       ...baseContract,
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             columns: {
@@ -181,17 +178,20 @@ describe('validateContract model validation', () => {
             },
           },
         },
+        User: {
+          storage: { table: 'User', fields: { id: { column: 'id' } } },
+          fields: { id: { codecId: 'pg/text@1', nullable: false } },
+        },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
-      /does not have a corresponding foreign key/,
-    );
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 
   it('accepts 1:N relation without foreign key on parent table', () => {
     const valid = {
       ...baseContract,
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             columns: {
@@ -214,6 +214,8 @@ describe('validateContract model validation', () => {
               {
                 columns: ['userId'],
                 references: { table: 'User', columns: ['id'] },
+                constraint: true,
+                index: true,
               },
             ],
           },
@@ -238,6 +240,16 @@ describe('validateContract model validation', () => {
             },
           },
         },
+        Post: {
+          storage: {
+            table: 'Post',
+            fields: { id: { column: 'id' }, userId: { column: 'userId' } },
+          },
+          fields: {
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
+          },
+        },
       },
     };
     expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
@@ -247,6 +259,7 @@ describe('validateContract model validation', () => {
     const valid = {
       ...baseContract,
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             columns: {
@@ -269,6 +282,8 @@ describe('validateContract model validation', () => {
               {
                 columns: ['userId'],
                 references: { table: 'User', columns: ['id'] },
+                constraint: true,
+                index: true,
               },
             ],
           },
@@ -294,6 +309,10 @@ describe('validateContract model validation', () => {
               cardinality: 'N:1',
             },
           },
+        },
+        User: {
+          storage: { table: 'User', fields: { id: { column: 'id' } } },
+          fields: { id: { codecId: 'pg/text@1', nullable: false } },
         },
       },
     };
