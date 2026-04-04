@@ -9,8 +9,13 @@ import type {
 } from '@prisma-next/mongo-core';
 import {
   AggregateWireCommand,
+  DeleteManyWireCommand,
   DeleteOneWireCommand,
+  FindOneAndDeleteWireCommand,
+  FindOneAndUpdateWireCommand,
+  InsertManyWireCommand,
   InsertOneWireCommand,
+  UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
 import type { MongoReadStage } from '@prisma-next/mongo-query-ast';
@@ -41,8 +46,30 @@ class MongoAdapterImpl implements MongoAdapter {
           resolveDocument(command.filter),
           resolveDocument(command.update),
         );
+      case 'insertMany':
+        return new InsertManyWireCommand(
+          command.collection,
+          command.documents.map((doc) => resolveDocument(doc)),
+        );
+      case 'updateMany':
+        return new UpdateManyWireCommand(
+          command.collection,
+          resolveDocument(command.filter),
+          resolveDocument(command.update),
+        );
       case 'deleteOne':
         return new DeleteOneWireCommand(command.collection, resolveDocument(command.filter));
+      case 'deleteMany':
+        return new DeleteManyWireCommand(command.collection, resolveDocument(command.filter));
+      case 'findOneAndUpdate':
+        return new FindOneAndUpdateWireCommand(
+          command.collection,
+          resolveDocument(command.filter),
+          resolveDocument(command.update),
+          command.upsert,
+        );
+      case 'findOneAndDelete':
+        return new FindOneAndDeleteWireCommand(command.collection, resolveDocument(command.filter));
       case 'aggregate':
         return new AggregateWireCommand(
           command.collection,
