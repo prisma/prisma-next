@@ -2,7 +2,6 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:8a3d148525627454f6ec4ed197e2160baff36f7d623d8e2dec4c1b586688886e",
   "profileHash": "sha256:ffc50246dae57a96ebc1abc212db40a10706095adca83ab257d4cb15f62cd192",
   "roots": {
     "org_team": "Team",
@@ -22,8 +21,8 @@
         "team": {
           "cardinality": "N:1",
           "on": {
-            "localFields": ["team_ref"],
-            "targetFields": ["team_id"]
+            "localFields": ["teamId"],
+            "targetFields": ["id"]
           },
           "to": "Team"
         }
@@ -58,6 +57,7 @@
     }
   },
   "storage": {
+    "storageHash": "sha256:8a3d148525627454f6ec4ed197e2160baff36f7d623d8e2dec4c1b586688886e",
     "tables": {
       "org_team": {
         "columns": {
