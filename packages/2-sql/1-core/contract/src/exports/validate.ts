@@ -1,6 +1,1 @@
-export {
-  decodeContractDefaults,
-  isBigIntColumn,
-  normalizeContract,
-  validateContract,
-} from '../validate';
+export { decodeContractDefaults, isBigIntColumn, validateContract } from '../validate';
