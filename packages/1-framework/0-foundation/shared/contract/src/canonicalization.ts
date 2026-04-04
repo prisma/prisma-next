@@ -246,9 +246,6 @@ export type CanonicalContractInput = {
   readonly profileHash?: string | undefined;
   readonly roots: Record<string, string>;
   readonly models: Record<string, unknown>;
-  // StorageBase is an interface without an index signature, so it is not
-  // assignable to Record<string, unknown>. The union allows callers to pass
-  // either the typed StorageBase or a plain record.
   readonly storage: StorageBase | Record<string, unknown>;
   readonly execution?: Record<string, unknown> | undefined;
   readonly extensionPacks: Record<string, unknown>;
