@@ -17,6 +17,15 @@ type TestContractOverrides = {
 };
 
 export function createTestContract(overrides: TestContractOverrides = {}): Contract {
-  const { storageHash: _sh, schemaVersion: _sv, sources: _src, ...rest } = overrides;
-  return createContract(rest as Parameters<typeof createContract>[0]);
+  const { storageHash: _sh, schemaVersion: _sv, sources: _src, storage, ...rest } = overrides;
+  const cleanStorage = storage
+    ? (() => {
+        const { storageHash: _innerSh, ...storageRest } = storage as Record<string, unknown>;
+        return storageRest;
+      })()
+    : undefined;
+  return createContract({
+    ...rest,
+    ...(cleanStorage ? { storage: cleanStorage } : {}),
+  } as Parameters<typeof createContract>[0]);
 }
