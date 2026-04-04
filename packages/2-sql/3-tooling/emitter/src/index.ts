@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   GenerateContractTypesOptions,
-  TypeRenderContext,
+  RenderTypeContext,
   TypeRenderEntry,
   TypesImportSpec,
   ValidationContext,
@@ -304,7 +304,7 @@ export const sqlTargetFamilyHook = {
       .map((imp) => imp.alias)
       .join(' & ');
 
-    const renderCtx: TypeRenderContext = { codecTypesName: 'CodecTypes' };
+    const renderCtx: RenderTypeContext = { codecTypesName: 'CodecTypes' };
     const storageType = this.generateStorageType(storage, 'StorageHash');
     const modelsType = this.generateModelsType(models, storage, parameterizedRenderers, renderCtx);
     const rootsType = this.generateRootsType(contract.roots);
@@ -537,7 +537,7 @@ export const sqlTargetFamilyHook = {
     models: Record<string, IRModelDefinition> | undefined,
     storage: SqlStorage,
     parameterizedRenderers: Map<string, TypeRenderEntry> | undefined,
-    renderCtx: TypeRenderContext,
+    renderCtx: RenderTypeContext,
   ): string {
     if (!models) {
       return 'Record<string, never>';
@@ -630,7 +630,7 @@ export const sqlTargetFamilyHook = {
     column: StorageColumn,
     storage: SqlStorage,
     parameterizedRenderers: Map<string, TypeRenderEntry> | undefined,
-    renderCtx: TypeRenderContext,
+    renderCtx: RenderTypeContext,
   ): string {
     const typeParams = resolveColumnTypeParams(column, storage);
     const nullable = column.nullable ?? false;
