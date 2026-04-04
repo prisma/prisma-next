@@ -37,6 +37,12 @@ async function emitWithDescriptors(
   descriptors: EmitTestDescriptors,
 ): Promise<EmitResult> {
   const allDescs = [descriptors.target, descriptors.adapter, ...descriptors.extensionPacks];
+  const operationRegistry = createOperationRegistry();
+  for (const desc of allDescs) {
+    for (const sig of desc.operationSignatures?.() ?? []) {
+      operationRegistry.register(sig);
+    }
+  }
   const stackInput: EmitStackInput = {
     codecTypeImports: extractCodecTypeImports(allDescs),
     operationTypeImports: extractOperationTypeImports(allDescs),
@@ -49,7 +55,7 @@ async function emitWithDescriptors(
     ),
     parameterizedRenderers: extractParameterizedRenderers(allDescs),
     parameterizedTypeImports: extractParameterizedTypeImports(allDescs),
-    operationRegistry: createOperationRegistry(),
+    operationRegistry,
   };
   return emit(contract as unknown as Contract, stackInput, sqlTargetFamilyHook);
 }

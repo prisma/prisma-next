@@ -227,7 +227,7 @@ import { createOperationRegistry } from '@prisma-next/operations';
 // Assembles registry using framework primitives, not SQL-specific re-exports
 const registry = createOperationRegistry();
 for (const desc of descriptors) {
-  for (const sig of desc.operationSignatures()) {
+  for (const sig of desc.operationSignatures?.() ?? []) {
     registry.register(sig);
   }
 }
