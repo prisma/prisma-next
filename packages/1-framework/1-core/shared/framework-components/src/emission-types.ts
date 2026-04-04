@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { RenderTypeContext, TypeRenderer } from './type-renderers';
-import type { TypesImportSpec } from './types';
+import type { TypesImportSpec } from './types-import-spec';
 
 export interface TypeRenderEntry {
   readonly codecId: string;

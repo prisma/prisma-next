@@ -15,7 +15,7 @@ import type {
 import type { ComponentMetadata } from './framework-components';
 import type { NormalizedTypeRenderer, TypeRenderer } from './type-renderers';
 import { normalizeRenderer } from './type-renderers';
-import type { TypesImportSpec } from './types';
+import type { TypesImportSpec } from './types-import-spec';
 
 export interface AssembledAuthoringContributions {
   readonly field: AuthoringFieldNamespace;

@@ -6,4 +6,4 @@ export type {
   ValidationContext,
 } from '../emission-types';
 export type { RenderTypeContext, TypeRenderer } from '../type-renderers';
-export type { TypesImportSpec } from '../types';
+export type { TypesImportSpec } from '../types-import-spec';
