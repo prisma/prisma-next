@@ -1,9 +1,5 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
-import {
-  type ProfileHashBase,
-  profileHash,
-  type StorageHashBase,
-} from '@prisma-next/contract/types';
+import { profileHash, type StorageHashBase } from '@prisma-next/contract/types';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import type { MongoLoweringContext } from '@prisma-next/mongo-core';
 import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtime';
