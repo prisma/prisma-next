@@ -167,7 +167,7 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
 
     const contract = this.contract as {
       storageHash: string;
-      executionHash?: string | null;
+      execution?: { executionHash?: string | null };
       profileHash?: string | null;
     };
     if (marker.storageHash !== contract.storageHash) {
