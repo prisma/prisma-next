@@ -28,11 +28,11 @@ const ContractSchema = type({
       defaults: 'unknown[]',
     },
   },
-  'profileHash?': 'string',
+  profileHash: 'string',
 });
 
 function stripPersistenceFields(raw: Record<string, unknown>): Record<string, unknown> {
-  const { schemaVersion: _, sources: _s, _generated: _g, ...rest } = raw;
+  const { schemaVersion: _, sources: _s, _generated: _g, storageHash: _h, ...rest } = raw;
   return rest;
 }
 
@@ -54,9 +54,9 @@ function extractDomainShape(contract: Contract): DomainContractShape {
  * 3. **Storage validation** (family-provided): SQL validates tables/columns/FKs;
  *    Mongo validates collections/embedding.
  *
- * JSON persistence fields (`schemaVersion`, `sources`, `_generated`) are
- * stripped before validation — they are not part of the in-memory contract
- * representation.
+ * JSON persistence fields (`schemaVersion`, `sources`, `_generated`,
+ * top-level `storageHash`) are stripped before validation — they are not
+ * part of the in-memory contract representation.
  *
  * @template TContract  The fully-typed contract type (preserves literal types).
  * @param value           Raw contract value (e.g. parsed from JSON).
