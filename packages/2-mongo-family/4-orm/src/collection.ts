@@ -59,9 +59,11 @@ export interface MongoCollection<
   skip(n: number): MongoCollection<TContract, ModelName, TIncludes>;
   all(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
   first(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
+  /** Returns the input data with the server-assigned `_id`. Does not re-read the stored document. */
   create(
     data: CreateInput<TContract, ModelName>,
   ): Promise<IncludedRow<TContract, ModelName, TIncludes>>;
+  /** Returns input rows with server-assigned `_id`s. Does not re-read stored documents. */
   createAll(
     data: ReadonlyArray<CreateInput<TContract, ModelName>>,
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
@@ -69,13 +71,19 @@ export interface MongoCollection<
   update(
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
+  /** Non-atomic: updates matching docs then re-reads them. Concurrent writes may cause stale results. */
   updateAll(
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
   updateCount(data: Partial<DefaultModelRow<TContract, ModelName>>): Promise<number>;
   delete(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
+  /** Non-atomic: reads matching docs then deletes them. Concurrent writes may cause stale results. */
   deleteAll(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
   deleteCount(): Promise<number>;
+  /**
+   * On insert: `update` fields are applied via `$set`, remaining `create` fields via `$setOnInsert`.
+   * This means `update` values take precedence over `create` for overlapping fields on insert.
+   */
   upsert(input: {
     create: CreateInput<TContract, ModelName>;
     update: Partial<DefaultModelRow<TContract, ModelName>>;
