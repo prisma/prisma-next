@@ -1,7 +1,12 @@
 import {
   AggregateWireCommand,
+  DeleteManyWireCommand,
   DeleteOneWireCommand,
+  FindOneAndDeleteWireCommand,
+  FindOneAndUpdateWireCommand,
+  InsertManyWireCommand,
   InsertOneWireCommand,
+  UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
 import { MongoClient } from 'mongodb';
@@ -87,6 +92,174 @@ describe('MongoDriver', () => {
         const rows = await collect(driver.execute(cmd));
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ deletedCount: 1 });
+      } finally {
+        await driver.close();
+      }
+    });
+  });
+
+  describe('insertMany', () => {
+    const col = 'driver_insert_many';
+
+    it('inserts multiple documents and returns ids', async () => {
+      const driver = await createMongoDriver(connectionUri, dbName);
+      try {
+        const cmd = new InsertManyWireCommand(col, [
+          { name: 'Alice', age: 30 },
+          { name: 'Bob', age: 25 },
+        ]);
+        const rows = await collect(driver.execute(cmd));
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ insertedCount: 2 });
+        expect((rows[0] as { insertedIds: unknown[] }).insertedIds).toHaveLength(2);
+      } finally {
+        await driver.close();
+      }
+    });
+  });
+
+  describe('updateMany', () => {
+    const col = 'driver_update_many';
+
+    it('updates multiple documents and returns counts', async () => {
+      const driver = await createMongoDriver(connectionUri, dbName);
+      try {
+        const db = seedClient.db(dbName);
+        await db.collection(col).deleteMany({});
+        await db.collection(col).insertMany([
+          { status: 'active', name: 'A' },
+          { status: 'active', name: 'B' },
+          { status: 'inactive', name: 'C' },
+        ]);
+
+        const cmd = new UpdateManyWireCommand(
+          col,
+          { status: 'active' },
+          { $set: { status: 'archived' } },
+        );
+        const rows = await collect(driver.execute(cmd));
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ matchedCount: 2, modifiedCount: 2 });
+      } finally {
+        await driver.close();
+      }
+    });
+  });
+
+  describe('deleteMany', () => {
+    const col = 'driver_delete_many';
+
+    it('deletes multiple documents and returns count', async () => {
+      const driver = await createMongoDriver(connectionUri, dbName);
+      try {
+        const db = seedClient.db(dbName);
+        await db.collection(col).deleteMany({});
+        await db
+          .collection(col)
+          .insertMany([{ status: 'old' }, { status: 'old' }, { status: 'new' }]);
+
+        const cmd = new DeleteManyWireCommand(col, { status: 'old' });
+        const rows = await collect(driver.execute(cmd));
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ deletedCount: 2 });
+      } finally {
+        await driver.close();
+      }
+    });
+  });
+
+  describe('findOneAndUpdate', () => {
+    const col = 'driver_find_update';
+
+    it('updates and returns the modified document', async () => {
+      const driver = await createMongoDriver(connectionUri, dbName);
+      try {
+        const db = seedClient.db(dbName);
+        await db.collection(col).deleteMany({});
+        await db.collection(col).insertOne({ name: 'Grace', age: 30 });
+
+        const cmd = new FindOneAndUpdateWireCommand(
+          col,
+          { name: 'Grace' },
+          { $set: { age: 31 } },
+          false,
+        );
+        const rows = await collect(driver.execute(cmd));
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ name: 'Grace', age: 31 });
+      } finally {
+        await driver.close();
+      }
+    });
+
+    it('upserts when document does not exist', async () => {
+      const driver = await createMongoDriver(connectionUri, dbName);
+      try {
+        const db = seedClient.db(dbName);
+        await db.collection(col).deleteMany({});
+
+        const cmd = new FindOneAndUpdateWireCommand(
+          col,
+          { name: 'Heidi' },
+          { $set: { age: 25 } },
+          true,
+        );
+        const rows = await collect(driver.execute(cmd));
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ name: 'Heidi', age: 25 });
+      } finally {
+        await driver.close();
+      }
+    });
+
+    it('yields nothing when no match and upsert is false', async () => {
+      const driver = await createMongoDriver(connectionUri, dbName);
+      try {
+        const db = seedClient.db(dbName);
+        await db.collection(col).deleteMany({});
+
+        const cmd = new FindOneAndUpdateWireCommand(
+          col,
+          { name: 'Nobody' },
+          { $set: { age: 99 } },
+          false,
+        );
+        const rows = await collect(driver.execute(cmd));
+        expect(rows).toHaveLength(0);
+      } finally {
+        await driver.close();
+      }
+    });
+  });
+
+  describe('findOneAndDelete', () => {
+    const col = 'driver_find_delete';
+
+    it('deletes and returns the removed document', async () => {
+      const driver = await createMongoDriver(connectionUri, dbName);
+      try {
+        const db = seedClient.db(dbName);
+        await db.collection(col).deleteMany({});
+        await db.collection(col).insertOne({ name: 'Ivan', age: 40 });
+
+        const cmd = new FindOneAndDeleteWireCommand(col, { name: 'Ivan' });
+        const rows = await collect(driver.execute(cmd));
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ name: 'Ivan', age: 40 });
+      } finally {
+        await driver.close();
+      }
+    });
+
+    it('yields nothing when no match', async () => {
+      const driver = await createMongoDriver(connectionUri, dbName);
+      try {
+        const db = seedClient.db(dbName);
+        await db.collection(col).deleteMany({});
+
+        const cmd = new FindOneAndDeleteWireCommand(col, { name: 'Nobody' });
+        const rows = await collect(driver.execute(cmd));
+        expect(rows).toHaveLength(0);
       } finally {
         await driver.close();
       }
