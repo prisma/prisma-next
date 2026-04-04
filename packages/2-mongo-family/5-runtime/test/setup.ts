@@ -37,6 +37,7 @@ export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Pro
   const loweringContext: MongoLoweringContext = {
     contract: {
       targetFamily: 'mongo',
+      storageHash: 'test-hash',
       roots: {},
       storage: { collections: {} },
       models: {},

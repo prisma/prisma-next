@@ -32,6 +32,7 @@ export type MongoContract<
   M extends Record<string, MongoModelDefinition> = Record<string, MongoModelDefinition>,
 > = {
   readonly targetFamily: string;
+  readonly storageHash: string;
   readonly roots: Roots;
   readonly storage: S;
   readonly models: M;
