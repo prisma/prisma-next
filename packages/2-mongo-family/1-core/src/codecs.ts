@@ -1,4 +1,4 @@
-export type MongoCodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
+export type MongoCodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual' | 'vector';
 
 export interface MongoCodec<
   Id extends string = string,
