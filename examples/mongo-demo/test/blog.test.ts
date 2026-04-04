@@ -1,6 +1,5 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import type { MongoLoweringContext } from '@prisma-next/mongo-core';
 import { validateMongoContract } from '@prisma-next/mongo-core';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtime';
@@ -28,8 +27,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
 
     const adapter = createMongoAdapter();
     const driver = await createMongoDriver(replSet.getUri(), dbName);
-    const loweringContext: MongoLoweringContext = { contract };
-    runtime = createMongoRuntime({ adapter, driver, loweringContext });
+    runtime = createMongoRuntime({ adapter, driver });
   }, timeouts.spinUpDbServer);
 
   beforeEach(async () => {
@@ -111,10 +109,13 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
   it('full flow: seed users and posts, query with include', async () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
-    const [alice, bob] = await orm.users.createAll([
+    const createdUsers = await orm.users.createAll([
       { name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
       { name: 'Bob', email: 'bob@example.com', bio: null },
     ]);
+    const alice = createdUsers[0];
+    const bob = createdUsers[1];
+    if (!alice || !bob) throw new Error('Expected 2 users');
 
     await orm.posts.createAll([
       {
