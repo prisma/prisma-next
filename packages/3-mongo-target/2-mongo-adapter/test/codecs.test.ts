@@ -81,8 +81,8 @@ describe('codec traits', () => {
     expect(mongoDateCodec.traits).toEqual(['equality', 'order']);
   });
 
-  it('vector has equality trait only', () => {
-    expect(mongoVectorCodec.traits).toEqual(['equality']);
+  it('vector has equality and vector traits', () => {
+    expect(mongoVectorCodec.traits).toEqual(['equality', 'vector']);
   });
 });
 
