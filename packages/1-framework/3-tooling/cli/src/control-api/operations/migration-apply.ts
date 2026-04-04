@@ -1,4 +1,3 @@
-import type { Contract } from '@prisma-next/contract/types';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type {
   ControlDriverInstance,
@@ -130,7 +129,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       operations,
     };
 
-    const destinationContract = familyInstance.validateContract(migration.toContract as Contract);
+    const destinationContract = familyInstance.validateContract(migration.toContract);
 
     const runnerResult: MigrationRunnerResult = await runner.execute({
       plan,

@@ -4,15 +4,15 @@ import { sqlTargetFamilyHook } from '../src/index';
 
 function createContract(overrides: Partial<Contract>): Contract {
   return {
-    schemaVersion: '1',
     targetFamily: 'sql',
     target: 'test-db',
     models: {},
+    roots: {},
     storage: { tables: {} },
-    extensions: {},
+    extensionPacks: {},
     capabilities: {},
     meta: {},
-    sources: {},
+    profileHash: 'sha256:test',
     ...overrides,
   };
 }

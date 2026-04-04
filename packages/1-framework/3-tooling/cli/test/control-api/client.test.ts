@@ -1,3 +1,4 @@
+import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
@@ -827,7 +828,7 @@ describe('ControlClient progress emission', () => {
             dirName: '001_init',
             from: 'sha256:empty',
             to: 'sha256:abc',
-            toContract: {},
+            toContract: createContract(),
             operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
           },
         ],
@@ -907,7 +908,7 @@ describe('ControlClient progress emission', () => {
             dirName: '001_init',
             from: 'sha256:empty',
             to: 'sha256:abc',
-            toContract: {},
+            toContract: createContract(),
             operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
           },
         ],
@@ -966,14 +967,14 @@ describe('ControlClient progress emission', () => {
             dirName: '001_init',
             from: 'sha256:empty',
             to: 'sha256:aaa',
-            toContract: {},
+            toContract: createContract(),
             operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
           },
           {
             dirName: '002_gap',
             from: 'sha256:bbb',
             to: 'sha256:ccc',
-            toContract: {},
+            toContract: createContract(),
             operations: [{ id: 'op2', label: 'ALTER TABLE', operationClass: 'additive' }],
           },
         ],
