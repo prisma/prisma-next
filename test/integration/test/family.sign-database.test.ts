@@ -122,7 +122,7 @@ describe('family instance sign', () => {
               updated: false,
             },
             contract: {
-              storageHash: validatedContract.storageHash,
+              storageHash: validatedContract.storage.storageHash,
             },
           });
           expect(result.timings.total).toBeGreaterThanOrEqual(0);
@@ -130,7 +130,7 @@ describe('family instance sign', () => {
           // Verify marker was written to database
           const marker = await readMarker(driver);
           expect(marker).not.toBeNull();
-          expect(marker?.storageHash).toBe(validatedContract.storageHash);
+          expect(marker?.storageHash).toBe(validatedContract.storage.storageHash);
         } finally {
           await driver.close();
         }
@@ -210,7 +210,7 @@ describe('family instance sign', () => {
               },
             },
             contract: {
-              storageHash: validatedContract.storageHash,
+              storageHash: validatedContract.storage.storageHash,
             },
           });
           expect(result.summary).toContain('Database signed (marker updated from');
@@ -219,7 +219,7 @@ describe('family instance sign', () => {
           // Verify marker was updated in database
           const marker = await readMarker(driver);
           expect(marker).not.toBeNull();
-          expect(marker?.storageHash).toBe(validatedContract.storageHash);
+          expect(marker?.storageHash).toBe(validatedContract.storage.storageHash);
           expect(marker?.storageHash).not.toBe('sha256:old-hash');
         } finally {
           await driver.close();
@@ -304,7 +304,7 @@ describe('family instance sign', () => {
               updated: false,
             },
             contract: {
-              storageHash: validatedContract.storageHash,
+              storageHash: validatedContract.storage.storageHash,
             },
           });
           expect(secondResult.marker.previous).toBeUndefined();
