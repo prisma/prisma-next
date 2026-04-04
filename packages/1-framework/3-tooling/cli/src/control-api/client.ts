@@ -1,5 +1,5 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
-import { emit as emitContract } from '@prisma-next/core-control-plane/emission';
+import { emit as emitContractArtifacts } from '@prisma-next/core-control-plane/emission';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlDriverInstance,
@@ -569,7 +569,7 @@ class ControlClientImpl implements ControlClient {
         });
       }
 
-      const result = await emitContract(enrichedIR, this.stack!, this.options.family.hook);
+      const result = await emitContractArtifacts(enrichedIR, this.stack!, this.options.family.hook);
 
       onProgress?.({
         action: 'emit',
