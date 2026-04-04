@@ -35,16 +35,16 @@ Build `MongoCollection` with the same fluent chaining API as SQL, compiling to `
 
 **Linear:** [TML-2194](https://linear.app/prisma-company/issue/TML-2194)
 
-Phase 1 is read-only. The SQL ORM already has `create()`, `createAll()`, `update()`, `updateAll()`, `delete()`, `deleteAll()`, and `upsert()`. We can't extract a meaningful shared `Collection` interface until the Mongo ORM covers the same surface area — otherwise we'd extract only the read portion and have to refactor the base class again when writes land.
+**Detailed plan:** [plans/phase-1.5-write-operations.md](plans/phase-1.5-write-operations.md)
+
+Phase 1 is read-only. The SQL ORM already has `create()`, `createAll()`, `createCount()`, `update()`, `updateAll()`, `updateCount()`, `delete()`, `deleteAll()`, `deleteCount()`, and `upsert()`. We can't extract a meaningful shared `Collection` interface until the Mongo ORM covers the same surface area — otherwise we'd extract only the read portion and have to refactor the base class again when writes land.
 
 **Milestones:**
 
-1. Add `create()` / `createAll()` — compile to `InsertOneCommand` / `InsertManyCommand` through the adapter
-2. Add `update()` / `updateAll()` — compile filter state + update payload to `UpdateOneCommand` / `UpdateManyCommand`
-3. Add `delete()` / `deleteAll()` — compile filter state to `DeleteOneCommand` / `DeleteManyCommand`
-4. Split `types.ts` into meaningful modules — row inference, relation keys, include types, where types, utility types
-5. Replace raw `MongoClient` seeding in the demo with ORM write calls
-6. Integration tests for full lifecycle (create → read → update → delete)
+1. Command types + driver + adapter — add `InsertManyCommand`, `UpdateManyCommand`, `DeleteManyCommand`, `FindOneAndUpdateCommand`, `FindOneAndDeleteCommand` with wire commands, result types, adapter lowering, and driver execution
+2. ORM write methods — add `create`, `createAll`, `createCount`, `update`, `updateAll`, `updateCount`, `delete`, `deleteAll`, `deleteCount`, `upsert` to `MongoCollection`
+3. Demo + integration tests — replace raw `MongoClient` seeding with ORM writes, full CRUD lifecycle tests
+4. Dot-path field accessor mutations ([ADR 180](../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md)) — add targeted mutation operators (`set`, `inc`, `push`, etc.) via the callable string accessor `u("field.path")`. Maps to MongoDB's native `$set`/`$inc`/`$push` with dot-notation. Depends on value objects landing in the contract ([ADR 178](../../docs/architecture%20docs/adrs/ADR%20178%20-%20Value%20objects%20in%20the%20contract.md)); can be sequenced after milestones 1–3 or deferred to the value objects project.
 
 **Proof:** Mongo demo seeds data via ORM write methods. Integration tests verify create/update/delete round-trip against `mongodb-memory-server`.
 
