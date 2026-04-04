@@ -1,13 +1,6 @@
-interface Post {
-  _id: string;
-  title: string;
-  content: string;
-  authorId: string;
-  createdAt: string;
-  author?: { _id: string; name: string; email: string; bio: string | null };
-}
+import type { PostsResponse } from '../server';
 
-function PostCard({ post }: { post: Post }) {
+function PostCard({ post }: { post: PostsResponse[number] }) {
   return (
     <div className="card">
       <div className="card-header">
@@ -22,7 +15,7 @@ function PostCard({ post }: { post: Post }) {
   );
 }
 
-export function PostList({ posts }: { posts: Post[] }) {
+export function PostList({ posts }: { posts: PostsResponse }) {
   return (
     <div className="post-list">
       <h2>Posts ({posts.length})</h2>

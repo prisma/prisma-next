@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
+import type { SimplifyDeep } from '@prisma-next/mongo-orm';
 import { MongoClient, ObjectId } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import type { Db } from './db';
 import { createClient } from './db';
 
 const PORT = 3456;
@@ -54,6 +56,17 @@ async function seed(client: MongoClient) {
   ]);
 }
 
+export async function getPosts(orm: Db['orm']) {
+  return orm.posts.include('author').all();
+}
+
+export async function getUsers(orm: Db['orm']) {
+  return orm.users.all();
+}
+
+export type PostsResponse = SimplifyDeep<Awaited<ReturnType<typeof getPosts>>>;
+export type UsersResponse = SimplifyDeep<Awaited<ReturnType<typeof getUsers>>>;
+
 function jsonResponse(res: import('node:http').ServerResponse, data: unknown, status = 200) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
@@ -79,10 +92,10 @@ async function main() {
   const server = createServer(async (req, res) => {
     try {
       if (req.method === 'GET' && req.url === '/api/posts') {
-        const posts = await orm.posts.include('author').all();
+        const posts = await getPosts(orm);
         jsonResponse(res, posts);
       } else if (req.method === 'GET' && req.url === '/api/users') {
-        const users = await orm.users.all();
+        const users = await getUsers(orm);
         jsonResponse(res, users);
       } else {
         jsonResponse(res, { error: 'Not found' }, 404);
