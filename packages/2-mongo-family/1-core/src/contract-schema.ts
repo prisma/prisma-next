@@ -64,7 +64,6 @@ export const MongoContractSchema = type({
   'schemaVersion?': 'string',
   'target?': 'string',
   'storageHash?': 'string',
-  'executionHash?': 'string',
   'profileHash?': 'string',
   roots: 'Record<string, string>',
   'capabilities?': 'Record<string, unknown>',

@@ -54,6 +54,7 @@ const ExecutionMutationDefaultSchema = type({
 
 const ExecutionSchema = type({
   '+': 'reject',
+  executionHash: 'string',
   mutations: {
     '+': 'reject',
     defaults: ExecutionMutationDefaultSchema.array().readonly(),
@@ -170,7 +171,6 @@ const SqlContractSchema = type({
   targetFamily: "'sql'",
   'coreHash?': 'string',
   storageHash: 'string',
-  'executionHash?': 'string',
   'profileHash?': 'string',
   '_generated?': 'Record<string, unknown>',
   'capabilities?': 'Record<string, Record<string, boolean>>',
