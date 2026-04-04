@@ -223,7 +223,7 @@ function sortIndexesAndUniques(storage: unknown): unknown {
   return result;
 }
 
-function orderTopLevel(obj: Record<string, unknown>): Record<string, unknown> {
+export function orderTopLevel(obj: Record<string, unknown>): Record<string, unknown> {
   const ordered: Record<string, unknown> = {};
   const remaining = new Set(Object.keys(obj));
 
