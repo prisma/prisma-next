@@ -79,6 +79,18 @@ describe('MongoLimitStage', () => {
     expect(stage.limit).toBe(10);
   });
 
+  it('accepts zero', () => {
+    expect(new MongoLimitStage(0).limit).toBe(0);
+  });
+
+  it('rejects negative values', () => {
+    expect(() => new MongoLimitStage(-1)).toThrow(RangeError);
+  });
+
+  it('rejects non-integer values', () => {
+    expect(() => new MongoLimitStage(1.5)).toThrow(RangeError);
+  });
+
   it('is frozen', () => {
     expect(Object.isFrozen(new MongoLimitStage(5))).toBe(true);
   });
@@ -94,6 +106,18 @@ describe('MongoSkipStage', () => {
     const stage = new MongoSkipStage(20);
     expect(stage.kind).toBe('skip');
     expect(stage.skip).toBe(20);
+  });
+
+  it('accepts zero', () => {
+    expect(new MongoSkipStage(0).skip).toBe(0);
+  });
+
+  it('rejects negative values', () => {
+    expect(() => new MongoSkipStage(-1)).toThrow(RangeError);
+  });
+
+  it('rejects non-integer values', () => {
+    expect(() => new MongoSkipStage(2.5)).toThrow(RangeError);
   });
 
   it('is frozen', () => {

@@ -6,10 +6,8 @@ abstract class MongoFilterExpression extends MongoAstNode {
   abstract accept<R>(visitor: MongoFilterVisitor<R>): R;
   abstract rewrite(rewriter: MongoFilterRewriter): MongoFilterExpr;
 
-  not(): MongoNotExpr {
-    // MongoFilterExpression is the hidden abstract base; all concrete subclasses
-    // are members of MongoFilterExpr, so this cast is structurally safe.
-    return new MongoNotExpr(this as unknown as MongoFilterExpr);
+  not(this: MongoFilterExpr): MongoNotExpr {
+    return new MongoNotExpr(this);
   }
 }
 
@@ -55,7 +53,7 @@ export class MongoFieldFilter extends MongoFilterExpression {
     return new MongoFieldFilter(field, '$lte', value);
   }
 
-  static in(field: string, values: MongoValue): MongoFieldFilter {
+  static in(field: string, values: ReadonlyArray<MongoValue>): MongoFieldFilter {
     return new MongoFieldFilter(field, '$in', values);
   }
 
@@ -82,6 +80,9 @@ export class MongoAndExpr extends MongoFilterExpression {
 
   constructor(exprs: ReadonlyArray<MongoFilterExpr>) {
     super();
+    if (exprs.length === 0) {
+      throw new Error('$and requires at least one expression');
+    }
     this.exprs = Object.freeze([...exprs]);
     this.freeze();
   }
@@ -106,6 +107,9 @@ export class MongoOrExpr extends MongoFilterExpression {
 
   constructor(exprs: ReadonlyArray<MongoFilterExpr>) {
     super();
+    if (exprs.length === 0) {
+      throw new Error('$or requires at least one expression');
+    }
     this.exprs = Object.freeze([...exprs]);
     this.freeze();
   }

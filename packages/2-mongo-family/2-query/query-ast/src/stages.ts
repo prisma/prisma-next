@@ -70,6 +70,9 @@ export class MongoLimitStage extends MongoStageNode {
 
   constructor(limit: number) {
     super();
+    if (!Number.isInteger(limit) || limit < 0) {
+      throw new RangeError('limit must be a non-negative integer');
+    }
     this.limit = limit;
     this.freeze();
   }
@@ -89,6 +92,9 @@ export class MongoSkipStage extends MongoStageNode {
 
   constructor(skip: number) {
     super();
+    if (!Number.isInteger(skip) || skip < 0) {
+      throw new RangeError('skip must be a non-negative integer');
+    }
     this.skip = skip;
     this.freeze();
   }
