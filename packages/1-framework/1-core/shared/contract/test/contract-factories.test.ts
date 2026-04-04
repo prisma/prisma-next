@@ -28,6 +28,20 @@ describe('createContract', () => {
     expect(contract.roots).toEqual({ users: 'User' });
   });
 
+  it('computes executionHash when execution is provided', () => {
+    const contract = createContract({
+      execution: {
+        mutations: {
+          defaults: [
+            { ref: { table: 'user', column: 'id' }, onCreate: { kind: 'generator', id: 'uuidv4' } },
+          ],
+        },
+      },
+    });
+    expect(contract.execution).toBeDefined();
+    expect(contract.execution!.executionHash).toMatch(/^sha256:/);
+  });
+
   it('computes different storageHash for different storage', () => {
     const c1 = createContract({ storage: { tables: {} } });
     const c2 = createContract({
