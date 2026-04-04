@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import type { SimplifyDeep } from '@prisma-next/mongo-orm';
-import { MongoClient, ObjectId } from 'mongodb';
+import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import type { Db } from './db';
 import { createClient } from './db';
@@ -8,49 +8,37 @@ import { createClient } from './db';
 const PORT = 3456;
 const DB_NAME = 'blog';
 
-// Seeds data via raw MongoClient because the ORM is currently read-only.
-async function seed(client: MongoClient) {
-  const db = client.db(DB_NAME);
-
-  const alice = new ObjectId().toHexString();
-  const bob = new ObjectId().toHexString();
-  const carol = new ObjectId().toHexString();
-
-  await db.collection('users').insertMany([
-    {
-      _id: alice as never,
-      name: 'Alice Chen',
-      email: 'alice@example.com',
-      bio: 'Full-stack engineer and tech blogger',
-    },
-    { _id: bob as never, name: 'Bob Kumar', email: 'bob@example.com', bio: 'DevOps enthusiast' },
-    { _id: carol as never, name: 'Carol Santos', email: 'carol@example.com', bio: null },
+async function seed(orm: Db['orm']) {
+  const [alice, bob, carol] = await orm.users.createAll([
+    { name: 'Alice Chen', email: 'alice@example.com', bio: 'Full-stack engineer and tech blogger' },
+    { name: 'Bob Kumar', email: 'bob@example.com', bio: 'DevOps enthusiast' },
+    { name: 'Carol Santos', email: 'carol@example.com', bio: null },
   ]);
 
-  await db.collection('posts').insertMany([
+  await orm.posts.createAll([
     {
       title: 'Getting Started with Prisma Next',
       content: 'Learn how to build contract-first data access layers with Prisma Next and MongoDB.',
-      authorId: alice,
+      authorId: alice._id as string,
       createdAt: new Date('2026-01-15'),
     },
     {
       title: 'Contract-First Development',
       content:
         'Why contract-first architecture leads to better type safety and developer experience.',
-      authorId: alice,
+      authorId: alice._id as string,
       createdAt: new Date('2026-02-01'),
     },
     {
       title: 'MongoDB Best Practices',
       content: 'Tips and tricks for designing efficient MongoDB schemas.',
-      authorId: bob,
+      authorId: bob._id as string,
       createdAt: new Date('2026-02-20'),
     },
     {
       title: 'The Future of ORMs',
       content: 'How modern ORMs are evolving to support multiple database paradigms.',
-      authorId: carol,
+      authorId: carol._id as string,
       createdAt: new Date('2026-03-10'),
     },
   ]);
@@ -83,11 +71,11 @@ async function main() {
   const client = new MongoClient(uri);
   await client.connect();
 
-  console.log('Seeding data...');
-  await seed(client);
-  console.log('Seed complete.');
-
   const { orm } = await createClient(uri, DB_NAME);
+
+  console.log('Seeding data...');
+  await seed(orm);
+  console.log('Seed complete.');
 
   const server = createServer(async (req, res) => {
     try {

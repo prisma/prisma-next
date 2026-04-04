@@ -282,13 +282,22 @@ class MongoCollectionImpl<
     update: Partial<DefaultModelRow<TContract, ModelName>>;
   }): Promise<IncludedRow<TContract, ModelName, TIncludes>> {
     const filter = this.state.filters.length > 0 ? this.#compileFilter() : {};
-    const setOnInsert = this.#toDocument(input.create as Record<string, unknown>);
     const setFields = this.#toSetFields(input.update as Record<string, unknown>);
+    const allCreateFields = this.#toDocument(input.create as Record<string, unknown>);
+    const setKeys = new Set(Object.keys(setFields));
+    const insertOnlyFields: Record<string, MongoValue> = {};
+    for (const [key, value] of Object.entries(allCreateFields)) {
+      if (!setKeys.has(key)) {
+        insertOnlyFields[key] = value;
+      }
+    }
     const updateDoc: Record<string, MongoValue> = {};
     if (Object.keys(setFields).length > 0) {
       updateDoc['$set'] = setFields;
     }
-    updateDoc['$setOnInsert'] = setOnInsert;
+    if (Object.keys(insertOnlyFields).length > 0) {
+      updateDoc['$setOnInsert'] = insertOnlyFields;
+    }
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, true);
     const results = await this.#executeCommand(command);
     return results[0] as IncludedRow<TContract, ModelName, TIncludes>;

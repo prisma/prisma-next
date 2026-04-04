@@ -41,13 +41,12 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
   }, timeouts.spinUpDbServer);
 
   it('all() returns seeded users', async () => {
-    const db = client.db(dbName);
-    await db.collection('users').insertMany([
-      { _id: 'u1' as never, name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
-      { _id: 'u2' as never, name: 'Bob', email: 'bob@example.com', bio: null },
+    const orm = mongoOrm({ contract, executor: runtime });
+    await orm.users.createAll([
+      { name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
+      { name: 'Bob', email: 'bob@example.com', bio: null },
     ]);
 
-    const orm = mongoOrm({ contract, executor: runtime });
     const users = await orm.users.all();
     const sorted = [...users].sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
@@ -57,31 +56,27 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
   });
 
   it('all() returns seeded posts', async () => {
-    const db = client.db(dbName);
-    await db.collection('users').insertOne({
-      _id: 'u1' as never,
+    const orm = mongoOrm({ contract, executor: runtime });
+    const alice = await orm.users.create({
       name: 'Alice',
       email: 'alice@example.com',
       bio: null,
     });
-    await db.collection('posts').insertMany([
+    await orm.posts.createAll([
       {
-        _id: 'p1' as never,
         title: 'Hello World',
         content: 'My first post',
-        authorId: 'u1',
+        authorId: alice._id as string,
         createdAt: new Date('2026-01-15'),
       },
       {
-        _id: 'p2' as never,
         title: 'Second Post',
         content: 'More content',
-        authorId: 'u1',
+        authorId: alice._id as string,
         createdAt: new Date('2026-02-01'),
       },
     ]);
 
-    const orm = mongoOrm({ contract, executor: runtime });
     const posts = await orm.posts.all();
     const sorted = [...posts].sort((a, b) => String(a.title).localeCompare(String(b.title)));
 
@@ -91,22 +86,19 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
   });
 
   it('include() resolves Post -> User via $lookup', async () => {
-    const db = client.db(dbName);
-    await db.collection('users').insertOne({
-      _id: 'u1' as never,
+    const orm = mongoOrm({ contract, executor: runtime });
+    const alice = await orm.users.create({
       name: 'Alice',
       email: 'alice@example.com',
       bio: 'Writer',
     });
-    await db.collection('posts').insertOne({
-      _id: 'p1' as never,
+    await orm.posts.create({
       title: 'Hello World',
       content: 'My first post',
-      authorId: 'u1',
+      authorId: alice._id as string,
       createdAt: new Date('2026-01-15'),
     });
 
-    const orm = mongoOrm({ contract, executor: runtime });
     const posts = await orm.posts.include('author').all();
 
     expect(posts).toHaveLength(1);
@@ -117,31 +109,27 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
   });
 
   it('full flow: seed users and posts, query with include', async () => {
-    const db = client.db(dbName);
+    const orm = mongoOrm({ contract, executor: runtime });
 
-    await db.collection('users').insertMany([
-      { _id: 'u1' as never, name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
-      { _id: 'u2' as never, name: 'Bob', email: 'bob@example.com', bio: null },
+    const [alice, bob] = await orm.users.createAll([
+      { name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
+      { name: 'Bob', email: 'bob@example.com', bio: null },
     ]);
 
-    await db.collection('posts').insertMany([
+    await orm.posts.createAll([
       {
-        _id: 'p1' as never,
         title: 'Hello World',
         content: 'My first post',
-        authorId: 'u1',
+        authorId: alice._id as string,
         createdAt: new Date('2026-01-15'),
       },
       {
-        _id: 'p2' as never,
         title: 'Mongo with Prisma Next',
         content: 'Using the contract-first approach',
-        authorId: 'u2',
+        authorId: bob._id as string,
         createdAt: new Date('2026-02-20'),
       },
     ]);
-
-    const orm = mongoOrm({ contract, executor: runtime });
 
     const users = await orm.users.all();
     expect(users).toHaveLength(2);
@@ -149,13 +137,13 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     const posts = await orm.posts.include('author').all();
     expect(posts).toHaveLength(2);
 
-    const alicePost = posts.find((p) => p.authorId === 'u1');
+    const alicePost = posts.find((p) => String(p.authorId) === String(alice._id));
     expect(alicePost).toMatchObject({
       title: 'Hello World',
       author: { name: 'Alice' },
     });
 
-    const bobPost = posts.find((p) => p.authorId === 'u2');
+    const bobPost = posts.find((p) => String(p.authorId) === String(bob._id));
     expect(bobPost).toMatchObject({
       title: 'Mongo with Prisma Next',
       author: { name: 'Bob' },
