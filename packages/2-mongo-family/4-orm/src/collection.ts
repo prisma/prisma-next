@@ -80,7 +80,14 @@ export class MongoCollection<
     }
 
     const ref = relation as ContractReferenceRelation;
-    if (ref.on.localFields.length !== 1 || ref.on.targetFields.length !== 1) {
+    const localField = ref.on.localFields[0];
+    const foreignField = ref.on.targetFields[0];
+    if (
+      !localField ||
+      !foreignField ||
+      ref.on.localFields.length !== 1 ||
+      ref.on.targetFields.length !== 1
+    ) {
       throw new Error(`Compound references are not yet supported: relation "${relationName}"`);
     }
 
@@ -92,8 +99,8 @@ export class MongoCollection<
     const includeExpr: MongoIncludeExpr = {
       relationName,
       from: resolveCollectionName(targetModel, ref.to),
-      localField: ref.on.localFields[0]!,
-      foreignField: ref.on.targetFields[0]!,
+      localField,
+      foreignField,
       cardinality: ref.cardinality,
     };
 
