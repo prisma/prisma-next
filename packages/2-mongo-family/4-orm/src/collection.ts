@@ -18,15 +18,37 @@ type ModelFieldKeys<
   ModelName extends string & keyof TContract['models'],
 > = keyof TContract['models'][ModelName]['fields'] & string;
 
-function resolveCollectionName(model: MongoModelDefinition, modelName: string): string {
-  return model.storage.collection ?? modelName;
-}
-
-export class MongoCollection<
+export interface MongoCollection<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
   TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
 > {
+  where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes>;
+  select(
+    ...fields: ModelFieldKeys<TContract, ModelName>[]
+  ): MongoCollection<TContract, ModelName, TIncludes>;
+  include<K extends ReferenceRelationKeys<TContract, ModelName> & string>(
+    relationName: K,
+  ): MongoCollection<TContract, ModelName, TIncludes & Record<K, true>>;
+  orderBy(
+    spec: Partial<Record<ModelFieldKeys<TContract, ModelName>, 1 | -1>>,
+  ): MongoCollection<TContract, ModelName, TIncludes>;
+  take(n: number): MongoCollection<TContract, ModelName, TIncludes>;
+  skip(n: number): MongoCollection<TContract, ModelName, TIncludes>;
+  all(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
+  first(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
+}
+
+function resolveCollectionName(model: MongoModelDefinition, modelName: string): string {
+  return model.storage.collection ?? modelName;
+}
+
+class MongoCollectionImpl<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+  TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
+> implements MongoCollection<TContract, ModelName, TIncludes>
+{
   readonly #contract: TContract;
   readonly #modelName: ModelName;
   readonly #executor: MongoQueryExecutor;
@@ -96,7 +118,7 @@ export class MongoCollection<
 
     return this.#clone({
       includes: [...this.#state.includes, includeExpr],
-    }) as MongoCollection<TContract, ModelName, TIncludes & Record<K, true>>;
+    }) as MongoCollectionImpl<TContract, ModelName, TIncludes & Record<K, true>>;
   }
 
   orderBy(
@@ -142,23 +164,25 @@ export class MongoCollection<
 
   #clone(
     overrides: Partial<MongoCollectionState>,
-  ): MongoCollection<TContract, ModelName, TIncludes> {
-    return this.#createSelf({
-      ...this.#state,
-      ...overrides,
-    });
-  }
-
-  #createSelf(state: MongoCollectionState): MongoCollection<TContract, ModelName, TIncludes> {
-    const Ctor = this.constructor as new (
-      contract: TContract,
-      modelName: ModelName,
-      executor: MongoQueryExecutor,
-    ) => MongoCollection<TContract, ModelName, TIncludes>;
-
-    const instance = new Ctor(this.#contract, this.#modelName, this.#executor);
-    instance.#state = state;
+  ): MongoCollectionImpl<TContract, ModelName, TIncludes> {
+    const instance = new MongoCollectionImpl<TContract, ModelName, TIncludes>(
+      this.#contract,
+      this.#modelName,
+      this.#executor,
+    );
+    instance.#state = { ...this.#state, ...overrides };
     instance.#collectionName = this.#collectionName;
     return instance;
   }
+}
+
+export function createMongoCollection<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+>(
+  contract: TContract,
+  modelName: ModelName,
+  executor: MongoQueryExecutor,
+): MongoCollection<TContract, ModelName> {
+  return new MongoCollectionImpl(contract, modelName, executor);
 }

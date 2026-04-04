@@ -3,7 +3,8 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-core';
-import { MongoCollection } from './collection';
+import type { MongoCollection } from './collection';
+import { createMongoCollection } from './collection';
 import type { MongoQueryExecutor } from './executor';
 
 export interface MongoOrmOptions<TContract extends MongoContract> {
@@ -27,7 +28,7 @@ export function mongoOrm<TContract extends MongoContractWithTypeMaps<MongoContra
   const client: Record<string, unknown> = {};
 
   for (const [rootName, modelName] of Object.entries(contract.roots)) {
-    client[rootName] = new MongoCollection(
+    client[rootName] = createMongoCollection(
       contract,
       modelName as string & keyof TContract['models'],
       executor,
