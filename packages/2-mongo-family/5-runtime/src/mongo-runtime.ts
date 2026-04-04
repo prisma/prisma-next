@@ -4,10 +4,8 @@ import type {
   MongoAdapter,
   MongoDriver,
   MongoLoweringContext,
+  MongoReadPlanLike,
 } from '@prisma-next/mongo-core';
-import { AggregateWireCommand } from '@prisma-next/mongo-core';
-import type { MongoReadPlan } from '@prisma-next/mongo-query-ast';
-import { lowerPipeline } from '@prisma-next/mongo-query-ast';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 
 export interface MongoRuntimeOptions {
@@ -17,7 +15,7 @@ export interface MongoRuntimeOptions {
 }
 
 export interface MongoRuntime {
-  execute<Row>(plan: MongoReadPlan<Row>): AsyncIterableResult<Row>;
+  execute<Row>(plan: MongoReadPlanLike): AsyncIterableResult<Row>;
   executeCommand<Row>(command: AnyMongoCommand, meta: PlanMeta): AsyncIterableResult<Row>;
   close(): Promise<void>;
 }
@@ -33,9 +31,8 @@ class MongoRuntimeImpl implements MongoRuntime {
     this.#loweringContext = options.loweringContext;
   }
 
-  execute<Row>(plan: MongoReadPlan<Row>): AsyncIterableResult<Row> {
-    const rawPipeline = lowerPipeline(plan.stages);
-    const wireCommand = new AggregateWireCommand(plan.collection, rawPipeline);
+  execute<Row>(plan: MongoReadPlanLike): AsyncIterableResult<Row> {
+    const wireCommand = this.#adapter.lowerReadPlan(plan);
     return this.#wrapIterable(this.#driver.execute<Row>(wireCommand));
   }
 

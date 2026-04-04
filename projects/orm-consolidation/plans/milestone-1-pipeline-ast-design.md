@@ -531,7 +531,7 @@ SQL's `ExpressionFolder<T>` provides monoid-style aggregation with early exit. T
 
 ## Lowering
 
-Lowering translates typed AST nodes into plain `Record<string, unknown>` documents suitable for the MongoDB driver. **Lowering lives in `mongo-query-ast`**, not in the adapter. The original design placed lowering in the adapter, but cross-domain import rules make this impractical: `mongo-runtime` (mongo domain) cannot import from `adapter-mongo` (targets domain), and the `MongoAdapter` interface (in `mongo-core`, core layer) cannot reference `MongoReadPlan` (in `mongo-query-ast`, query layer). `resolveValue` — the shared param-resolution utility — lives in `mongo-core` and is used by both the AST lowering functions and the adapter's command lowering.
+Lowering translates typed AST nodes into plain `Record<string, unknown>` documents suitable for the MongoDB driver. The lowering functions (`lowerFilter`, `lowerStage`, `lowerPipeline`) live in `mongo-query-ast`. The adapter (`adapter-mongo`) imports these functions and exposes lowering through the `MongoAdapter.lowerReadPlan()` method. The `MongoAdapter` interface in `mongo-core` uses a structural type (`MongoReadPlanLike`) to avoid cross-layer imports of `MongoReadPlan`. `resolveValue` — the shared param-resolution utility — lives in `mongo-core` and is used by both the AST lowering functions and the adapter's command lowering.
 
 ### Structure
 
@@ -554,9 +554,9 @@ The AST is structurally close to the driver's document format. Lowering is a thi
 
 The lowering can be implemented as a `MongoFilterVisitor<Document>` for filters and a `MongoStageVisitor<Record<string, unknown>>` for stages, or as simple switch-based functions. Either approach works; the visitor interfaces are available if the adapter prefers structured dispatch.
 
-### Runtime integration
+### Adapter integration
 
-The runtime imports `lowerPipeline` from `mongo-query-ast` and calls it directly on `MongoReadPlan.stages` to produce `AggregateWireCommand` documents. The adapter handles only write command lowering (`InsertOneCommand`, `UpdateOneCommand`, `DeleteOneCommand`) and raw `AggregateCommand` pass-through, using the shared `resolveValue` from `mongo-core` for parameter resolution.
+All lowering is routed through the `MongoAdapter` interface. The `MongoAdapter.lowerReadPlan()` method accepts a `MongoReadPlanLike` (a structural type defined in `mongo-core` to avoid cross-layer imports of `MongoReadPlan`) and calls `lowerPipeline` from `mongo-query-ast` internally. The runtime delegates all lowering to the adapter — both read plans via `lowerReadPlan()` and write commands via `lowerCommand()`. This ensures middleware can intercept all query execution uniformly.
 
 ### Param resolution
 

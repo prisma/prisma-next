@@ -6,6 +6,7 @@ import {
   MongoParamRef,
   UpdateOneCommand,
 } from '@prisma-next/mongo-core';
+import { MongoFieldFilter, MongoMatchStage, MongoProjectStage } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { createMongoAdapter } from '../src/mongo-adapter';
 
@@ -80,6 +81,38 @@ describe('MongoAdapter', () => {
         'shipping.address.city': 'Sydney',
         items: [{ sku: 'ABC' }],
       });
+    });
+  });
+
+  describe('lowerReadPlan', () => {
+    it('lowers a read plan with match and project stages', () => {
+      const plan = {
+        collection: 'users',
+        stages: [
+          new MongoMatchStage(MongoFieldFilter.eq('status', new MongoParamRef('active'))),
+          new MongoProjectStage({ name: 1, email: 1 }),
+        ],
+        meta: { storageHash: 'test-hash' },
+      };
+      const wire = adapter.lowerReadPlan(plan);
+      expect(wire.kind).toBe('aggregate');
+      expect(wire.collection).toBe('users');
+      expect(wire.pipeline).toEqual([
+        { $match: { status: { $eq: 'active' } } },
+        { $project: { name: 1, email: 1 } },
+      ]);
+    });
+
+    it('returns an AggregateWireCommand for an empty pipeline', () => {
+      const plan = {
+        collection: 'orders',
+        stages: [],
+        meta: { storageHash: 'test-hash' },
+      };
+      const wire = adapter.lowerReadPlan(plan);
+      expect(wire.kind).toBe('aggregate');
+      expect(wire.collection).toBe('orders');
+      expect(wire.pipeline).toEqual([]);
     });
   });
 });

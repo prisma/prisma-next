@@ -1875,6 +1875,9 @@ importers:
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../../2-mongo-family/1-core
+      '@prisma-next/mongo-query-ast':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/2-query/query-ast
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/operations

@@ -1,7 +1,7 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import type { AnyMongoCommand, MongoLoweringContext } from '@prisma-next/mongo-core';
+import type { MongoLoweringContext } from '@prisma-next/mongo-core';
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
