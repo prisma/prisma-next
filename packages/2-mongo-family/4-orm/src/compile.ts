@@ -1,5 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { MongoFilterExpr, MongoReadPlan, MongoReadStage } from '@prisma-next/mongo-query-ast';
+import type { MongoReadPlan, MongoReadStage } from '@prisma-next/mongo-query-ast';
 import {
   MongoAndExpr,
   MongoLimitStage,
@@ -11,21 +11,6 @@ import {
   MongoUnwindStage,
 } from '@prisma-next/mongo-query-ast';
 import type { MongoCollectionState, MongoIncludeExpr } from './collection-state';
-
-export function compileFilter(filter: MongoFilterExpr): Record<string, unknown> {
-  switch (filter.kind) {
-    case 'field':
-      return { [filter.field]: { [filter.op]: filter.value } };
-    case 'and':
-      return { $and: filter.exprs.map((e) => compileFilter(e)) };
-    case 'or':
-      return { $or: filter.exprs.map((e) => compileFilter(e)) };
-    case 'not':
-      return { $nor: [compileFilter(filter.expr)] };
-    case 'exists':
-      return { [filter.field]: { $exists: filter.exists } };
-  }
-}
 
 function compileIncludes(includes: readonly MongoIncludeExpr[]): MongoReadStage[] {
   const stages: MongoReadStage[] = [];

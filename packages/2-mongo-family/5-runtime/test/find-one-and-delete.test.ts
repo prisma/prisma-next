@@ -1,4 +1,5 @@
-import { FindOneAndDeleteCommand, MongoParamRef } from '@prisma-next/mongo-core';
+import { MongoParamRef } from '@prisma-next/mongo-core';
+import { FindOneAndDeleteCommand, MongoFieldFilter } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 
@@ -10,9 +11,10 @@ describe('findOneAndDelete integration', () => {
       const db = ctx.client.db(ctx.dbName);
       await db.collection(collectionName).insertOne({ name: 'Ivan', age: 40 });
 
-      const command = new FindOneAndDeleteCommand(collectionName, {
-        name: new MongoParamRef('Ivan'),
-      });
+      const command = new FindOneAndDeleteCommand(
+        collectionName,
+        MongoFieldFilter.eq('name', new MongoParamRef('Ivan')),
+      );
       const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ name: 'Ivan', age: 40 });

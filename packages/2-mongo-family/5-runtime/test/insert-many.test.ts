@@ -1,4 +1,5 @@
-import { InsertManyCommand, MongoParamRef } from '@prisma-next/mongo-core';
+import { MongoParamRef } from '@prisma-next/mongo-core';
+import { InsertManyCommand } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 

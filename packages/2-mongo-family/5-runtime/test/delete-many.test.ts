@@ -1,4 +1,5 @@
-import { DeleteManyCommand, MongoParamRef } from '@prisma-next/mongo-core';
+import { MongoParamRef } from '@prisma-next/mongo-core';
+import { DeleteManyCommand, MongoFieldFilter } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 
@@ -12,9 +13,10 @@ describe('deleteMany integration', () => {
         .collection(collectionName)
         .insertMany([{ status: 'old' }, { status: 'old' }, { status: 'new' }]);
 
-      const command = new DeleteManyCommand(collectionName, {
-        status: new MongoParamRef('old'),
-      });
+      const command = new DeleteManyCommand(
+        collectionName,
+        MongoFieldFilter.eq('status', new MongoParamRef('old')),
+      );
       const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ deletedCount: 2 });

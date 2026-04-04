@@ -1,5 +1,4 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { AnyMongoCommand } from './commands';
 import type { MongoContract } from './contract-types';
 import type { AggregateWireCommand, AnyMongoWireCommand } from './wire-commands';
 
@@ -13,7 +12,12 @@ export interface MongoReadPlanLike {
   readonly meta: PlanMeta;
 }
 
+export interface MongoCommandLike {
+  readonly kind: string;
+  readonly collection: string;
+}
+
 export interface MongoAdapter {
-  lowerCommand(command: AnyMongoCommand, context: MongoLoweringContext): AnyMongoWireCommand;
+  lowerCommand(command: MongoCommandLike, context: MongoLoweringContext): AnyMongoWireCommand;
   lowerReadPlan(plan: MongoReadPlanLike): AggregateWireCommand;
 }

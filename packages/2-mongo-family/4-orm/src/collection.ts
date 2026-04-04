@@ -1,27 +1,26 @@
 import type { ContractReferenceRelation, PlanMeta } from '@prisma-next/contract/types';
 import type {
-  AnyMongoCommand,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoModelDefinition,
   MongoTypeMaps,
   MongoValue,
 } from '@prisma-next/mongo-core';
+import { MongoParamRef } from '@prisma-next/mongo-core';
+import type { AnyMongoCommand, MongoFilterExpr, MongoReadPlan } from '@prisma-next/mongo-query-ast';
 import {
   DeleteManyCommand,
   FindOneAndDeleteCommand,
   FindOneAndUpdateCommand,
   InsertManyCommand,
   InsertOneCommand,
-  MongoParamRef,
+  MongoAndExpr,
   UpdateManyCommand,
-} from '@prisma-next/mongo-core';
-import type { MongoFilterExpr, MongoReadPlan } from '@prisma-next/mongo-query-ast';
-import { MongoAndExpr } from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';
-import { compileFilter, compileMongoQuery } from './compile';
+import { compileMongoQuery } from './compile';
 import type { MongoQueryExecutor } from './executor';
 import type {
   CreateInput,
@@ -234,7 +233,7 @@ class MongoCollectionImpl<
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null> {
     this.#requireFilters('update');
-    const filter = this.#compileFilter();
+    const filter = this.#mergeFilters();
     const updateDoc = this.#toUpdateDocument(data as Record<string, unknown>);
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, false);
     const results = await this.#executeCommand(command);
@@ -247,7 +246,7 @@ class MongoCollectionImpl<
     this.#requireFilters('updateAll');
     const self = this;
     async function* gen(): AsyncGenerator<IncludedRow<TContract, ModelName, TIncludes>> {
-      const filter = self.#compileFilter();
+      const filter = self.#mergeFilters();
       const updateDoc = self.#toUpdateDocument(data as Record<string, unknown>);
       const command = new UpdateManyCommand(self.#collectionName, filter, updateDoc);
       await self.#executeCommand(command);
@@ -259,7 +258,7 @@ class MongoCollectionImpl<
 
   async updateCount(data: Partial<DefaultModelRow<TContract, ModelName>>): Promise<number> {
     this.#requireFilters('updateCount');
-    const filter = this.#compileFilter();
+    const filter = this.#mergeFilters();
     const updateDoc = this.#toUpdateDocument(data as Record<string, unknown>);
     const command = new UpdateManyCommand(this.#collectionName, filter, updateDoc);
     const results = await this.#executeCommand(command);
@@ -268,7 +267,7 @@ class MongoCollectionImpl<
 
   async delete(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null> {
     this.#requireFilters('delete');
-    const filter = this.#compileFilter();
+    const filter = this.#mergeFilters();
     const command = new FindOneAndDeleteCommand(this.#collectionName, filter);
     const results = await this.#executeCommand(command);
     return (results[0] as IncludedRow<TContract, ModelName, TIncludes>) ?? null;
@@ -282,7 +281,7 @@ class MongoCollectionImpl<
       for await (const row of self.#execute()) {
         docs.push(row);
       }
-      const filter = self.#compileFilter();
+      const filter = self.#mergeFilters();
       const command = new DeleteManyCommand(self.#collectionName, filter);
       await self.#executeCommand(command);
       yield* docs;
@@ -292,7 +291,7 @@ class MongoCollectionImpl<
 
   async deleteCount(): Promise<number> {
     this.#requireFilters('deleteCount');
-    const filter = this.#compileFilter();
+    const filter = this.#mergeFilters();
     const command = new DeleteManyCommand(this.#collectionName, filter);
     const results = await this.#executeCommand(command);
     return (results[0] as { deletedCount: number }).deletedCount;
@@ -302,7 +301,7 @@ class MongoCollectionImpl<
     create: CreateInput<TContract, ModelName>;
     update: Partial<DefaultModelRow<TContract, ModelName>>;
   }): Promise<IncludedRow<TContract, ModelName, TIncludes>> {
-    const filter = this.#state.filters.length > 0 ? this.#compileFilter() : {};
+    const filter = this.#state.filters.length > 0 ? this.#mergeFilters() : null;
     const setFields = this.#toSetFields(input.update as Record<string, unknown>);
     const allCreateFields = this.#toDocument(input.create as Record<string, unknown>);
     const setKeys = new Set(Object.keys(setFields));
@@ -359,10 +358,11 @@ class MongoCollectionImpl<
     return { $set: this.#toSetFields(data) };
   }
 
-  #compileFilter(): Record<string, MongoValue> {
-    const singleFilter = this.#state.filters.length === 1 ? this.#state.filters[0] : undefined;
-    const filterExpr = singleFilter ?? MongoAndExpr.of([...this.#state.filters]);
-    return compileFilter(filterExpr) as Record<string, MongoValue>;
+  #mergeFilters(): MongoFilterExpr {
+    if (this.#state.filters.length === 1) {
+      return this.#state.filters[0]!;
+    }
+    return MongoAndExpr.of([...this.#state.filters]);
   }
 
   #requireFilters(methodName: string): void {

@@ -1,4 +1,5 @@
-import { MongoParamRef, UpdateManyCommand } from '@prisma-next/mongo-core';
+import { MongoParamRef } from '@prisma-next/mongo-core';
+import { MongoFieldFilter, UpdateManyCommand } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 
@@ -16,7 +17,7 @@ describe('updateMany integration', () => {
 
       const command = new UpdateManyCommand(
         collectionName,
-        { status: new MongoParamRef('active') },
+        MongoFieldFilter.eq('status', new MongoParamRef('active')),
         { $set: { status: new MongoParamRef('archived') } },
       );
       const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);

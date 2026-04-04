@@ -1,4 +1,4 @@
-import { AggregateCommand } from '@prisma-next/mongo-core';
+import { AggregateCommand } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 
