@@ -15,9 +15,9 @@ export interface MongoCodec<
 
 export function mongoCodec<
   Id extends string,
-  const TTraits extends readonly MongoCodecTrait[],
-  TWire,
-  TJs,
+  const TTraits extends readonly MongoCodecTrait[] = readonly [],
+  TWire = unknown,
+  TJs = unknown,
 >(config: {
   typeId: Id;
   targetTypes: readonly string[];
