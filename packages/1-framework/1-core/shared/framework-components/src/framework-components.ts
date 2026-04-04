@@ -1,6 +1,6 @@
 import type { AuthoringContributions } from './framework-authoring';
 import type { TypeRenderer } from './type-renderers';
-import type { TypesImportSpec } from './types';
+import type { TypesImportSpec } from './types-import-spec';
 
 /**
  * Declarative fields that describe component metadata.
