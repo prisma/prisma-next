@@ -58,7 +58,7 @@ export class MongoCollection<
   }
 
   select(...fields: ModelFieldKeys<TContract, ModelName>[]): MongoCollection<TContract, ModelName> {
-    return this.#clone({ selectedFields: fields });
+    return this.#clone({ selectedFields: [...(this.state.selectedFields ?? []), ...fields] });
   }
 
   include(
