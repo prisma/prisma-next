@@ -17,11 +17,11 @@
   "dependencies": {
     "@prisma-next/config": "workspace:*",
     "@prisma-next/mongo-core": "workspace:*",
+    "@prisma-next/operations": "workspace:*",
     "mongodb": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/operations": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
