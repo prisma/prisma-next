@@ -1,6 +1,11 @@
-import type { ApiUser } from '../types';
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  bio: string | null;
+}
 
-function UserCard({ user }: { user: ApiUser }) {
+function UserCard({ user }: { user: User }) {
   return (
     <div className="card">
       <div className="card-header">
@@ -16,7 +21,7 @@ function UserCard({ user }: { user: ApiUser }) {
   );
 }
 
-export function UserList({ users }: { users: ApiUser[] }) {
+export function UserList({ users }: { users: User[] }) {
   return (
     <div className="user-list">
       <h2>Authors ({users.length})</h2>

@@ -1,6 +1,13 @@
-import type { ApiPost } from '../types';
+interface Post {
+  _id: string;
+  title: string;
+  content: string;
+  authorId: string;
+  createdAt: string;
+  author?: { _id: string; name: string; email: string; bio: string | null };
+}
 
-function PostCard({ post }: { post: ApiPost }) {
+function PostCard({ post }: { post: Post }) {
   return (
     <div className="card">
       <div className="card-header">
@@ -15,7 +22,7 @@ function PostCard({ post }: { post: ApiPost }) {
   );
 }
 
-export function PostList({ posts }: { posts: ApiPost[] }) {
+export function PostList({ posts }: { posts: Post[] }) {
   return (
     <div className="post-list">
       <h2>Posts ({posts.length})</h2>
