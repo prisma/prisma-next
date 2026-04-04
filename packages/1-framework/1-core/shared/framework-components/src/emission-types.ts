@@ -1,13 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
-import type { RenderTypeContext } from './type-renderers';
+import type { RenderTypeContext, TypeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types';
-
-export type TypeRenderContext = RenderTypeContext;
 
 export interface TypeRenderEntry {
   readonly codecId: string;
-  readonly render: (params: Record<string, unknown>, ctx: TypeRenderContext) => string;
+  readonly render: (params: Record<string, unknown>, ctx: RenderTypeContext) => string;
 }
 
 export interface GenerateContractTypesOptions {
@@ -43,10 +41,6 @@ export interface TargetFamilyHook {
     options?: GenerateContractTypesOptions,
   ): string;
 }
-
-export type TypeRenderer =
-  | string
-  | ((params: Record<string, unknown>, ctx: RenderTypeContext) => string);
 
 export interface ParameterizedCodecDescriptor {
   readonly codecId: string;
