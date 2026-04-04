@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RelationCardinalityTag } from './types';
 
 type ModelStorageFields = Record<string, { column?: string }>;
@@ -9,11 +10,11 @@ type ModelEntry = {
 };
 type ModelsMap = Record<string, ModelEntry>;
 
-function modelsOf(contract: SqlContract<SqlStorage>): ModelsMap {
+function modelsOf(contract: Contract<SqlStorage>): ModelsMap {
   return contract.models as ModelsMap;
 }
 
-export function modelOf(contract: SqlContract<SqlStorage>, name: string): ModelEntry | undefined {
+export function modelOf(contract: Contract<SqlStorage>, name: string): ModelEntry | undefined {
   return modelsOf(contract)[name];
 }
 
@@ -22,7 +23,7 @@ const columnToFieldCache = new WeakMap<object, Map<string, Record<string, string
 const tableToModelCache = new WeakMap<object, Map<string, string>>();
 
 export function resolveFieldToColumn(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   fieldName: string,
 ): string {
@@ -30,7 +31,7 @@ export function resolveFieldToColumn(
 }
 
 export function getFieldToColumnMap(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
 ): Record<string, string> {
   let perContract = fieldToColumnCache.get(contract);
@@ -51,7 +52,7 @@ export function getFieldToColumnMap(
 }
 
 export function getColumnToFieldMap(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
 ): Record<string, string> {
   let perContract = columnToFieldCache.get(contract);
@@ -74,7 +75,7 @@ export function getColumnToFieldMap(
 // Assumes 1:1 table→model mapping. When multiple models can share a storage
 // table (e.g. owned models), callers should thread modelName directly instead.
 export function findModelNameForTable(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
 ): string | undefined {
   let reverseMap = tableToModelCache.get(contract);
@@ -107,7 +108,7 @@ export interface ResolvedIncludeRelation {
 }
 
 export function resolveIncludeRelation(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   relationName: string,
 ): ResolvedIncludeRelation {
@@ -140,7 +141,7 @@ export function resolveIncludeRelation(
 const modelRelationsCache = new WeakMap<object, Map<string, Record<string, ResolvedRelation>>>();
 
 export function resolveModelRelations(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
 ): Record<string, ResolvedRelation> {
   let perContract = modelRelationsCache.get(contract);
@@ -192,7 +193,7 @@ export function parseRelationCardinality(value: unknown): RelationCardinalityTag
 }
 
 export function resolveUpsertConflictColumns(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   conflictOn: Record<string, unknown> | undefined,
 ): string[] {
@@ -210,10 +211,7 @@ export function resolveUpsertConflictColumns(
   return [...primaryKeyColumns];
 }
 
-export function resolveModelTableName(
-  contract: SqlContract<SqlStorage>,
-  modelName: string,
-): string {
+export function resolveModelTableName(contract: Contract<SqlStorage>, modelName: string): string {
   const model = modelsOf(contract)[modelName];
   if (!model) {
     throw new Error(`Model "${modelName}" not found in contract`);
@@ -224,14 +222,11 @@ export function resolveModelTableName(
   throw new Error(`Model "${modelName}" has invalid or missing storage.table in the contract`);
 }
 
-export function resolvePrimaryKeyColumn(
-  contract: SqlContract<SqlStorage>,
-  tableName: string,
-): string {
+export function resolvePrimaryKeyColumn(contract: Contract<SqlStorage>, tableName: string): string {
   return contract.storage.tables[tableName]?.primaryKey?.columns[0] ?? 'id';
 }
 
-export function assertReturningCapability(contract: SqlContract<SqlStorage>, action: string): void {
+export function assertReturningCapability(contract: Contract<SqlStorage>, action: string): void {
   if (hasContractCapability(contract, 'returning')) {
     return;
   }
@@ -239,10 +234,7 @@ export function assertReturningCapability(contract: SqlContract<SqlStorage>, act
   throw new Error(`${action} requires contract capability "returning"`);
 }
 
-export function hasContractCapability(
-  contract: SqlContract<SqlStorage>,
-  capability: string,
-): boolean {
+export function hasContractCapability(contract: Contract<SqlStorage>, capability: string): boolean {
   const capabilities = contract.capabilities as Record<string, unknown> | undefined;
   const value = capabilities?.[capability];
 

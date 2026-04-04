@@ -483,14 +483,14 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     destination: SqlMigrationPlanContractInfo,
     contract: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['destinationContract'],
   ): Result<void, SqlMigrationRunnerFailure> {
-    if (destination.storageHash !== contract.storageHash) {
+    if (destination.storageHash !== contract.storage.storageHash) {
       return runnerFailure(
         'DESTINATION_CONTRACT_MISMATCH',
-        `Plan destination storage hash (${destination.storageHash}) does not match provided contract storage hash (${contract.storageHash}).`,
+        `Plan destination storage hash (${destination.storageHash}) does not match provided contract storage hash (${contract.storage.storageHash}).`,
         {
           meta: {
             planStorageHash: destination.storageHash,
-            contractStorageHash: contract.storageHash,
+            contractStorageHash: contract.storage.storageHash,
           },
         },
       );

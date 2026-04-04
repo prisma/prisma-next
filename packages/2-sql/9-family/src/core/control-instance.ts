@@ -15,7 +15,7 @@ import type {
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { OperationRegistry } from '@prisma-next/operations';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   ensureSchemaStatement,
@@ -296,7 +296,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   // Contract and the `as unknown as` cast can be removed.
   // See: projects/contract-domain-extraction/plan.md task 5.B1
   function normalizeProviderContract(contract: unknown): Contract {
-    const validated = validateContract<SqlContract<SqlStorage>>(contract);
+    const validated = validateContract<Contract<SqlStorage>>(contract);
     return validated as unknown as Contract;
   }
 
@@ -450,7 +450,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
       const { driver, contract: contractInput, strict, context, frameworkComponents } = options;
 
-      const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+      const contract = validateContract<Contract<SqlStorage>>(contractInput);
 
       const controlAdapter = adapter.create();
       if (!isSqlControlAdapter(controlAdapter)) {
@@ -479,9 +479,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const { driver, contract: contractInput, contractPath, configPath } = options;
       const startTime = Date.now();
 
-      const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+      const contract = validateContract<Contract<SqlStorage>>(contractInput);
 
-      const contractStorageHash = contract.storageHash;
+      const contractStorageHash = contract.storage.storageHash;
       const contractProfileHash =
         'profileHash' in contract && typeof contract.profileHash === 'string'
           ? contract.profileHash

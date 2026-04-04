@@ -1,6 +1,6 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   PrimaryKey,
-  SqlContract,
   SqlStorage,
   StorageTypeInstance,
   UniqueConstraint,
@@ -141,7 +141,7 @@ const SqlContractSchema = type({
  * @returns The validated contract if structure is valid
  * @throws Error if the contract structure is invalid
  */
-function validateContractStructure<T extends SqlContract<SqlStorage>>(
+function validateContractStructure<T extends Contract<SqlStorage>>(
   value: unknown,
 ): O.Overwrite<T, { targetFamily: 'sql' }> {
   // Check targetFamily first to provide a clear error message for unsupported target families
@@ -175,7 +175,7 @@ function validateContractStructure<T extends SqlContract<SqlStorage>>(
  * @param structurallyValidatedContract - The contract whose structure has already been validated
  * @throws Error if logical validation fails
  */
-function validateContractLogic(structurallyValidatedContract: SqlContract<SqlStorage>): void {
+function validateContractLogic(structurallyValidatedContract: Contract<SqlStorage>): void {
   const { storage, models } = structurallyValidatedContract;
   const tableNames = new Set(Object.keys(storage.tables));
 
@@ -431,7 +431,7 @@ export { normalizeContract };
  *
  *
  * The type parameter `TContract` must be a fully-typed contract type (e.g., from `contract.d.ts`),
- * NOT a generic `SqlContract<SqlStorage>`.
+ * NOT a generic `Contract<SqlStorage>`.
  *
  * **Correct:**
  * ```typescript
@@ -442,7 +442,7 @@ export { normalizeContract };
  * **Incorrect:**
  * ```typescript
  * import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
- * const contract = validateContract<SqlContract<SqlStorage>>(contractJson);
+ * const contract = validateContract<Contract<SqlStorage>>(contractJson);
  * // ❌ Types will be inferred as 'unknown' - this won't work!
  * ```
  *
@@ -454,15 +454,15 @@ export { normalizeContract };
  * @returns A validated contract matching the TContract type
  * @throws Error if the contract structure or logic is invalid
  */
-export function validateContract<TContract extends SqlContract<SqlStorage>>(
+export function validateContract<TContract extends Contract<SqlStorage>>(
   value: unknown,
 ): TContract {
   // Normalize contract first (add defaults for missing fields)
   const normalized = normalizeContract(value);
 
-  const structurallyValid = validateContractStructure<SqlContract<SqlStorage>>(normalized);
+  const structurallyValid = validateContractStructure<Contract<SqlStorage>>(normalized);
 
-  const contractForValidation = structurallyValid as SqlContract<SqlStorage>;
+  const contractForValidation = structurallyValid as Contract<SqlStorage>;
 
   validateContractLogic(contractForValidation);
 

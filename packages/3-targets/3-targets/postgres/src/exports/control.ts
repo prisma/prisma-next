@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type {
   ControlTargetInstance,
   MigrationPlanner,
@@ -10,7 +10,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR, extractCodecControlHooks } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
@@ -71,7 +71,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
       },
       contractToSchema(contract, frameworkComponents) {
         const expander = buildNativeTypeExpander(frameworkComponents);
-        return contractToSchemaIR(contract as SqlContract<SqlStorage> | null, {
+        return contractToSchemaIR(contract as Contract<SqlStorage> | null, {
           annotationNamespace: 'pg',
           ...ifDefined('expandNativeType', expander),
           renderDefault: postgresRenderDefault,

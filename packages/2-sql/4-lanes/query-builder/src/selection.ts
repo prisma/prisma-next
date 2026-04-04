@@ -1,8 +1,5 @@
-import type {
-  ExtractCodecTypes,
-  SqlContract,
-  StorageColumn,
-} from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { ExtractCodecTypes, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { DrainOuterGeneric } from './type-atoms';
 
 /**
@@ -14,7 +11,7 @@ import type { DrainOuterGeneric } from './type-atoms';
  * @template TColumnName The name of the column whose output type is to be extracted.
  */
 export type ExtractOutputType<
-  TContract extends SqlContract,
+  TContract extends Contract<SqlStorage>,
   TTableName extends keyof TContract['storage']['tables'] & string,
   TColumnName extends keyof TContract['storage']['tables'][TTableName]['columns'] & string,
   _TColumn = TContract['storage']['tables'][TTableName]['columns'][TColumnName],
@@ -48,7 +45,7 @@ export interface SelectionValue<TOutput, TDatatype extends string | unknown = un
  * @template TTableName The name of the table whose columns will be included in the selection.
  */
 export type TableToSelection<
-  TContract extends SqlContract,
+  TContract extends Contract<SqlStorage>,
   TTableName extends keyof TContract['storage']['tables'] & string,
 > = DrainOuterGeneric<{
   readonly [ColumnName in keyof TContract['storage']['tables'][TTableName]['columns'] &

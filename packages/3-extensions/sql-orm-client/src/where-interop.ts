@@ -1,10 +1,11 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyExpression, ToWhereExpr, WhereArg } from '@prisma-next/sql-relational-core/ast';
 import { isWhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { bindWhereExpr } from './where-binding';
 
 interface NormalizeWhereArgOptions {
-  readonly contract?: SqlContract<SqlStorage>;
+  readonly contract?: Contract<SqlStorage>;
 }
 
 export function normalizeWhereArg(arg: undefined): undefined;

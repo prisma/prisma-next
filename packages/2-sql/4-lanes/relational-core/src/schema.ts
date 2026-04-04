@@ -1,10 +1,10 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { planInvalid } from '@prisma-next/plan';
 import type {
   ExtractTypeMapsFromContract,
   ResolveCodecTypes,
   ResolveOperationTypes,
-  SqlContract,
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
@@ -26,7 +26,7 @@ import type {
 type TableColumns<Table extends { columns: Record<string, StorageColumn> }> = Table['columns'];
 
 type ColumnBuilders<
-  Contract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TableName extends string,
   Columns extends Record<string, StorageColumn>,
   CodecTypes extends CodecTypesType,
@@ -35,7 +35,7 @@ type ColumnBuilders<
   readonly [K in keyof Columns]: ColumnBuilder<
     K & string,
     Columns[K],
-    ComputeColumnJsType<Contract, TableName, K & string, Columns[K], CodecTypes>,
+    ComputeColumnJsType<TContract, TableName, K & string, Columns[K], CodecTypes>,
     Operations
   >;
 };
@@ -167,7 +167,7 @@ export class ColumnBuilderImpl<
 }
 
 export class TableBuilderImpl<
-  Contract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TableName extends string,
   Columns extends Record<string, StorageColumn>,
   CodecTypes extends CodecTypesType,
@@ -175,12 +175,12 @@ export class TableBuilderImpl<
 > implements TableRef
 {
   readonly kind = 'table' as const;
-  readonly columns: ColumnBuilders<Contract, TableName, Columns, CodecTypes, Operations>;
+  readonly columns: ColumnBuilders<TContract, TableName, Columns, CodecTypes, Operations>;
   private readonly _name: TableName;
 
   constructor(
     name: TableName,
-    columns: ColumnBuilders<Contract, TableName, Columns, CodecTypes, Operations>,
+    columns: ColumnBuilders<TContract, TableName, Columns, CodecTypes, Operations>,
   ) {
     this._name = name;
     this.columns = columns;
@@ -192,20 +192,20 @@ export class TableBuilderImpl<
 }
 
 function buildColumns<
-  Contract extends SqlContract<SqlStorage>,
-  TableName extends keyof Contract['storage']['tables'] & string,
+  TContract extends Contract<SqlStorage>,
+  TableName extends keyof TContract['storage']['tables'] & string,
   CodecTypes extends CodecTypesType,
   Operations extends OperationTypes,
 >(
   tableName: TableName,
   storage: SqlStorage,
-  _contract: Contract,
+  _contract: TContract,
   operationRegistry?: OperationRegistry,
   contractCapabilities?: Record<string, Record<string, boolean>>,
 ): ColumnBuilders<
-  Contract,
+  TContract,
   TableName,
-  Contract['storage']['tables'][TableName]['columns'],
+  TContract['storage']['tables'][TableName]['columns'],
   CodecTypes,
   Operations
 > {
@@ -215,14 +215,14 @@ function buildColumns<
     throw planInvalid(`Unknown table ${tableName}`);
   }
 
-  type Columns = Contract['storage']['tables'][TableName]['columns'];
+  type Columns = TContract['storage']['tables'][TableName]['columns'];
   const tableColumns = table.columns as Columns;
 
   const result = {} as {
     [K in keyof Columns]: ColumnBuilder<
       K & string,
       Columns[K],
-      ComputeColumnJsType<Contract, TableName, K & string, Columns[K], CodecTypes>,
+      ComputeColumnJsType<TContract, TableName, K & string, Columns[K], CodecTypes>,
       Operations
     >;
   };
@@ -232,7 +232,7 @@ function buildColumns<
     columnDef: Columns[ColumnKey],
   ) => {
     type JsType = ComputeColumnJsType<
-      Contract,
+      TContract,
       TableName,
       ColumnKey,
       Columns[ColumnKey],
@@ -271,7 +271,7 @@ function buildColumns<
     assignColumn(columnName, columnDef);
   }
 
-  return result as ColumnBuilders<Contract, TableName, Columns, CodecTypes, Operations>;
+  return result as ColumnBuilders<TContract, TableName, Columns, CodecTypes, Operations>;
 }
 
 /**
@@ -287,14 +287,14 @@ function buildColumns<
  * like `name`, `kind`, and `columns`.
  */
 function createTableProxy<
-  Contract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TableName extends string,
   Columns extends Record<string, StorageColumn>,
   CodecTypes extends CodecTypesType,
   Operations extends OperationTypes,
 >(
-  table: TableBuilderImpl<Contract, TableName, Columns, CodecTypes, Operations>,
-): TableBuilderImpl<Contract, TableName, Columns, CodecTypes, Operations> {
+  table: TableBuilderImpl<TContract, TableName, Columns, CodecTypes, Operations>,
+): TableBuilderImpl<TContract, TableName, Columns, CodecTypes, Operations> {
   return new Proxy(table, {
     get(target, prop) {
       if (prop === 'name' || prop === 'kind' || prop === 'columns') {
@@ -309,14 +309,14 @@ function createTableProxy<
 }
 
 type ExtractSchemaTables<
-  Contract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   CodecTypes extends CodecTypesType,
   Operations extends OperationTypes,
 > = {
-  readonly [TableName in keyof Contract['storage']['tables']]: TableBuilderImpl<
-    Contract,
+  readonly [TableName in keyof TContract['storage']['tables']]: TableBuilderImpl<
+    TContract,
     TableName & string,
-    TableColumns<Contract['storage']['tables'][TableName]>,
+    TableColumns<TContract['storage']['tables'][TableName]>,
     CodecTypes,
     Operations
   > &
@@ -329,33 +329,33 @@ type ExtractSchemaTables<
  * literal type from the contract (including codecId, nativeType, and typeParams).
  * Returns an empty object type {} when storage.types is undefined.
  */
-type ExtractSchemaTypes<Contract extends SqlContract<SqlStorage>> =
-  Contract['storage']['types'] extends infer Types
+type ExtractSchemaTypes<TContract extends Contract<SqlStorage>> =
+  TContract['storage']['types'] extends infer Types
     ? Types extends Record<string, unknown>
       ? { readonly [TypeName in keyof Types]: Types[TypeName] }
       : Record<string, never>
     : Record<string, never>;
 
 export type SchemaHandle<
-  Contract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
   CodecTypes extends CodecTypesType = CodecTypesType,
   Operations extends OperationTypes = Record<string, never>,
 > = {
-  readonly tables: ExtractSchemaTables<Contract, CodecTypes, Operations>;
+  readonly tables: ExtractSchemaTables<TContract, CodecTypes, Operations>;
   /**
    * Initialized type helpers from storage.types.
    * Each entry corresponds to a named type instance in the contract's storage.types.
    */
-  readonly types: ExtractSchemaTypes<Contract>;
+  readonly types: ExtractSchemaTypes<TContract>;
 };
 
 type SchemaReturnType<
-  Contract extends SqlContract<SqlStorage>,
-  TTypeMaps = ExtractTypeMapsFromContract<Contract>,
+  TContract extends Contract<SqlStorage>,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 > = SchemaHandle<
-  Contract,
-  ResolveCodecTypes<Contract, TTypeMaps>,
-  ToOperationTypes<ResolveOperationTypes<Contract, TTypeMaps>>
+  TContract,
+  ResolveCodecTypes<TContract, TTypeMaps>,
+  ToOperationTypes<ResolveOperationTypes<TContract, TTypeMaps>>
 >;
 
 type NormalizeOperationTypes<T> = {
@@ -377,29 +377,29 @@ type ToOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationType
  * @example
  * ```typescript
  * // No-emit: infers TypeMaps from ContractWithTypeMaps
- * const schemaHandle = schema<Contract>(context);
+ * const schemaHandle = schema<TContract>(context);
  *
  * // Emitted: pass TypeMaps explicitly
- * const schemaHandle = schema<Contract, TypeMaps>(context);
+ * const schemaHandle = schema<TContract, TypeMaps>(context);
  * ```
  */
 export function schema<
-  Contract extends SqlContract<SqlStorage>,
-  TTypeMaps = ExtractTypeMapsFromContract<Contract>,
->(context: ExecutionContext<Contract>): SchemaReturnType<Contract, TTypeMaps> {
+  TContract extends Contract<SqlStorage>,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
+>(context: ExecutionContext<TContract>): SchemaReturnType<TContract, TTypeMaps> {
   const contract = context.contract;
   const storage = contract.storage;
-  type CodecTypes = ResolveCodecTypes<Contract, TTypeMaps>;
-  type Operations = ToOperationTypes<ResolveOperationTypes<Contract, TTypeMaps>>;
-  const tables = {} as ExtractSchemaTables<Contract, CodecTypes, Operations>;
+  type CodecTypes = ResolveCodecTypes<TContract, TTypeMaps>;
+  type Operations = ToOperationTypes<ResolveOperationTypes<TContract, TTypeMaps>>;
+  const tables = {} as ExtractSchemaTables<TContract, CodecTypes, Operations>;
   const contractCapabilities = contract.capabilities;
 
   const operationRegistry = context.operations;
 
   for (const tableName of Object.keys(storage.tables) as Array<
-    keyof Contract['storage']['tables'] & string
+    keyof TContract['storage']['tables'] & string
   >) {
-    const columns = buildColumns<Contract, typeof tableName, CodecTypes, Operations>(
+    const columns = buildColumns<TContract, typeof tableName, CodecTypes, Operations>(
       tableName,
       storage,
       contract,
@@ -407,28 +407,28 @@ export function schema<
       contractCapabilities,
     );
     const table = new TableBuilderImpl<
-      Contract,
+      TContract,
       typeof tableName & string,
-      Contract['storage']['tables'][typeof tableName]['columns'],
+      TContract['storage']['tables'][typeof tableName]['columns'],
       CodecTypes,
       Operations
     >(tableName, columns);
     const proxiedTable = createTableProxy<
-      Contract,
+      TContract,
       typeof tableName & string,
-      Contract['storage']['tables'][typeof tableName]['columns'],
+      TContract['storage']['tables'][typeof tableName]['columns'],
       CodecTypes,
       Operations
     >(table);
     (tables as Record<string, unknown>)[tableName] = Object.freeze(
       proxiedTable,
-    ) as ExtractSchemaTables<Contract, CodecTypes, Operations>[typeof tableName];
+    ) as ExtractSchemaTables<TContract, CodecTypes, Operations>[typeof tableName];
   }
 
   // Get type helpers from context (populated by runtime context creation)
-  const types = context.types as ExtractSchemaTypes<Contract>;
+  const types = context.types as ExtractSchemaTypes<TContract>;
 
-  return Object.freeze({ tables, types }) as SchemaReturnType<Contract, TTypeMaps>;
+  return Object.freeze({ tables, types }) as SchemaReturnType<TContract, TTypeMaps>;
 }
 
 export type { ColumnBuilderImpl as Column, TableBuilderImpl as Table };

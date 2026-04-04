@@ -1,8 +1,9 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { runtimeError } from '@prisma-next/runtime-executor';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 
-export function extractCodecIds(contract: SqlContract<SqlStorage>): Set<string> {
+export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
   const codecIds = new Set<string>();
 
   for (const table of Object.values(contract.storage.tables)) {
@@ -15,7 +16,7 @@ export function extractCodecIds(contract: SqlContract<SqlStorage>): Set<string> 
   return codecIds;
 }
 
-function extractCodecIdsFromColumns(contract: SqlContract<SqlStorage>): Map<string, string> {
+function extractCodecIdsFromColumns(contract: Contract<SqlStorage>): Map<string, string> {
   const codecIds = new Map<string, string>();
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
@@ -31,7 +32,7 @@ function extractCodecIdsFromColumns(contract: SqlContract<SqlStorage>): Map<stri
 
 export function validateContractCodecMappings(
   registry: CodecRegistry,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
 ): void {
   const codecIds = extractCodecIdsFromColumns(contract);
   const invalidCodecs: Array<{ table: string; column: string; codecId: string }> = [];
@@ -61,7 +62,7 @@ export function validateContractCodecMappings(
 
 export function validateCodecRegistryCompleteness(
   registry: CodecRegistry,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
 ): void {
   validateContractCodecMappings(registry, contract);
 }

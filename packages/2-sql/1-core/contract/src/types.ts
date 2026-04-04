@@ -1,12 +1,9 @@
 import type {
   ColumnDefault,
-  ContractBase,
-  DomainRelationOn,
-  ExecutionHashBase,
-  ExecutionSection,
-  ProfileHashBase,
+  Contract,
+  ContractModel,
+  ContractRelationOn,
   StorageBase,
-  StorageHashBase,
 } from '@prisma-next/contract/types';
 
 /**
@@ -135,7 +132,7 @@ export type SqlModelStorage = {
 export type SqlRelation = {
   readonly to: string;
   readonly cardinality: '1:1' | '1:N' | 'N:1';
-  readonly on: DomainRelationOn;
+  readonly on: ContractRelationOn;
 };
 
 export const DEFAULT_FK_CONSTRAINT = true;
@@ -201,17 +198,9 @@ export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
 };
 
 export type SqlContract<
-  S extends SqlStorage = SqlStorage,
-  TModels extends Record<string, unknown> = Record<string, unknown>,
-  TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
-  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
-  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> = Omit<ContractBase<TStorageHash, TExecutionHash, TProfileHash>, 'models'> & {
-  readonly targetFamily: string;
-  readonly storage: S;
-  readonly models: TModels;
-  readonly execution?: ExecutionSection;
-};
+  S extends SqlStorage,
+  TModels extends Record<string, ContractModel<SqlModelStorage>>,
+> = Contract<S, TModels>;
 
 export type ExtractTypeMapsFromContract<T> = TypeMapsPhantomKey extends keyof T
   ? NonNullable<T[TypeMapsPhantomKey & keyof T]>

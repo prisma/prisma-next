@@ -1,11 +1,11 @@
-import type { ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract, ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyQueryAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 function resolveProjectionCodecs(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   ast: AnyQueryAst,
 ): Record<string, string> | undefined {
   const codecs: Record<string, string> = {};
@@ -51,10 +51,7 @@ export function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }): {
   };
 }
 
-export function resolveTableColumns(
-  contract: SqlContract<SqlStorage>,
-  tableName: string,
-): string[] {
+export function resolveTableColumns(contract: Contract<SqlStorage>, tableName: string): string[] {
   const table = contract.storage.tables[tableName];
   if (!table) {
     throw new Error(`Unknown table "${tableName}" in SQL ORM query planner`);
@@ -63,13 +60,13 @@ export function resolveTableColumns(
 }
 
 export function buildOrmPlanMeta(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   paramDescriptors: readonly ParamDescriptor[] = [],
 ): PlanMeta {
   return {
     target: contract.target,
     targetFamily: contract.targetFamily,
-    storageHash: contract.storageHash,
+    storageHash: contract.storage.storageHash,
     ...(contract.profileHash !== undefined ? { profileHash: contract.profileHash } : {}),
     lane: 'orm-client',
     paramDescriptors: [...paramDescriptors],
@@ -77,7 +74,7 @@ export function buildOrmPlanMeta(
 }
 
 export function buildOrmQueryPlan<Row>(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   ast: AnyQueryAst,
   params: readonly unknown[],
   paramDescriptors: readonly ParamDescriptor[] = [],

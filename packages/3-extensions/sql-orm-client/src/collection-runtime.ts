@@ -1,5 +1,6 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   findModelNameForTable,
   getColumnToFieldMap,
@@ -41,7 +42,7 @@ export function augmentSelectionForJoinColumns(
 }
 
 export function stripHiddenMappedFields(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   mapped: Record<string, unknown>,
   hiddenColumns: readonly string[],
@@ -59,7 +60,7 @@ export function stripHiddenMappedFields(
 }
 
 export function createRowEnvelope(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   raw: Record<string, unknown>,
 ): RowEnvelope {
@@ -70,7 +71,7 @@ export function createRowEnvelope(
 }
 
 export function mapStorageRowToModelFields(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -92,7 +93,7 @@ export function mapStorageRowToModelFields(
 }
 
 export function mapModelDataToStorageRow(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -121,7 +122,7 @@ export function mapResultRows<TIn, TOut>(
 }
 
 export async function acquireRuntimeScope(
-  runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'],
+  runtime: CollectionContext<Contract<SqlStorage>>['runtime'],
 ): Promise<{
   scope: RuntimeScope;
   release?: () => Promise<void>;

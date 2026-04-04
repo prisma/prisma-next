@@ -319,12 +319,12 @@ export const sqlTargetFamilyHook = {
   ${importLines.join('\n')}
 
   import type {
+    Contract as ContractShape,
     ExecutionHashBase,
     ProfileHashBase,
     StorageHashBase,
   } from '@prisma-next/contract/types';
   import type {
-    SqlContract,
     ContractWithTypeMaps,
     TypeMaps as TypeMapsType,
   } from '@prisma-next/sql-contract/types';
@@ -346,18 +346,16 @@ export const sqlTargetFamilyHook = {
 
   export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
-  type ContractBase = SqlContract<
+  type ContractBase = ContractShape<
   ${storageType},
-  ${modelsType},
-  StorageHash,
-  ExecutionHash,
-  ProfileHash
+  ${modelsType}
   > & {
     readonly target: ${this.serializeValue(contract.target)};
     readonly roots: ${rootsType};
     readonly capabilities: ${this.serializeValue(contract.capabilities)};
     readonly extensionPacks: ${this.serializeValue(contract.extensionPacks)};
     readonly execution: ${this.serializeValue(contract.execution)};
+    readonly profileHash: ProfileHash;
   };
 
   export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;

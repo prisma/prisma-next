@@ -1,4 +1,5 @@
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SelectBuilder } from './select-builder';
 import type { TableReference, TableReferenceTooWideError } from './table-reference';
 import type { PreviousFunctionReceivedBadInputError } from './type-errors';
@@ -8,7 +9,7 @@ import type { PreviousFunctionReceivedBadInputError } from './type-errors';
  *
  * @template TContract The contract that describes the database.
  */
-export class Root<TContract extends SqlContract> {
+export class Root<TContract extends Contract<SqlStorage>> {
   readonly #contract: TContract;
 
   constructor(contract: TContract) {
@@ -29,7 +30,7 @@ export class Root<TContract extends SqlContract> {
   from<TName extends string>(
     table: string extends TName
       ? TableReferenceTooWideError<'[error] `root.from()` call received a table reference without a specific table name'>
-      : TableReference<TName, TContract['storageHash']>,
+      : TableReference<TName, TContract['storage']['storageHash']>,
   ): TName extends string
     ? SelectBuilder<TContract, Pick<TContract['storage']['tables'], TName>>
     : PreviousFunctionReceivedBadInputError<'[error] invalid table reference in previous `root.from()` call will probably cause runtime errors'>;
@@ -54,10 +55,12 @@ export function createRoot(
 /**
  * @template TContract The contract that describes the database.
  */
-export function createRoot<TContract extends SqlContract>(contract: TContract): Root<TContract>;
+export function createRoot<TContract extends Contract<SqlStorage>>(
+  contract: TContract,
+): Root<TContract>;
 /**
  * @internal
  */
 export function createRoot(contract: unknown): unknown {
-  return new Root(contract as SqlContract);
+  return new Root(contract as Contract<SqlStorage>);
 }
