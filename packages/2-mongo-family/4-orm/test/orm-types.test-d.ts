@@ -185,3 +185,38 @@ test('orderBy() rejects unknown field names', () => {
   type OrderParam = Parameters<Col['orderBy']>[0];
   expectTypeOf<{ nonexistent: 1 }>().not.toExtend<OrderParam>();
 });
+
+// --- Chained method result types ---
+
+test('where().select().all() returns AsyncIterableResult<InferRootRow>', () => {
+  const col = {} as MongoCollection<Contract, 'User'>;
+  const result = col
+    .where({} as never)
+    .select('name')
+    .all();
+  expectTypeOf(result).toExtend<AsyncIterableResult<InferRootRow<Contract, 'User'>>>();
+});
+
+test('include().first() returns Promise<InferRootRow | null>', () => {
+  const col = {} as MongoCollection<Contract, 'Task'>;
+  const result = col.include('assignee').first();
+  expectTypeOf(result).toExtend<Promise<InferRootRow<Contract, 'Task'> | null>>();
+});
+
+test('where().orderBy().skip().take().all() preserves row type', () => {
+  const col = {} as MongoCollection<Contract, 'User'>;
+  const result = col
+    .where({} as never)
+    .orderBy({ name: 1 })
+    .skip(10)
+    .take(5)
+    .all();
+  expectTypeOf(result).toExtend<AsyncIterableResult<InferRootRow<Contract, 'User'>>>();
+});
+
+test('select() rejects nonexistent field after chaining', () => {
+  const col = {} as MongoCollection<Contract, 'User'>;
+  const chained = col.where({} as never);
+  type SelectParam = Parameters<typeof chained.select>[0];
+  expectTypeOf<'nonexistent'>().not.toExtend<SelectParam>();
+});
