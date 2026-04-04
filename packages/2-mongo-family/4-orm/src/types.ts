@@ -11,7 +11,7 @@ type Simplify<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
 export type SimplifyDeep<T> = T extends readonly (infer E)[]
   ? SimplifyDeep<E>[]
-  : T extends Date | RegExp | Function
+  : T extends Date | RegExp | ((...args: never[]) => unknown)
     ? T
     : T extends object
       ? T extends unknown
