@@ -49,6 +49,6 @@ export interface Contract<
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;
   readonly execution?: ContractExecutionSection;
-  readonly profileHash?: ProfileHashBase<string>;
+  readonly profileHash: ProfileHashBase<string>;
   readonly meta: Record<string, unknown>;
 }

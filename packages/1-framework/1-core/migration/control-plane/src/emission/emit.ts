@@ -115,7 +115,7 @@ export async function emit(
 
   const storageHash = contract.storage.storageHash as string;
   const executionHash = contract.execution?.executionHash as string | undefined;
-  const profileHash = (contract.profileHash ?? '') as string;
+  const profileHash = contract.profileHash as string;
 
   const contractWithHashes = {
     ...canonicalContract,

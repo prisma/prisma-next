@@ -30,6 +30,7 @@ describe('unified contract types', () => {
   describe('Contract<TStorage, TModels>', () => {
     it('accepts a full contract value', () => {
       const hash = 'sha256:abc123' as StorageHashBase<'sha256:abc123'>;
+      const profHash = 'sha256:prof789' as ProfileHashBase<'sha256:prof789'>;
       const contract: Contract = {
         target: 'postgres',
         targetFamily: 'sql',
@@ -44,13 +45,14 @@ describe('unified contract types', () => {
         storage: { storageHash: hash },
         capabilities: {},
         extensionPacks: {},
+        profileHash: profHash,
         meta: {},
       };
       expect(contract.target).toBe('postgres');
       expect(contract.roots['users']).toBe('User');
     });
 
-    it('accepts optional execution and profileHash', () => {
+    it('accepts optional execution section', () => {
       const hash = 'sha256:abc123' as StorageHashBase<'sha256:abc123'>;
       const execHash = 'sha256:exec456' as ExecutionHashBase<'sha256:exec456'>;
       const profHash = 'sha256:prof789' as ProfileHashBase<'sha256:prof789'>;
@@ -84,6 +86,7 @@ describe('unified contract types', () => {
       }
 
       const hash = 'sha256:abc123' as StorageHashBase<'sha256:abc123'>;
+      const profHash = 'sha256:prof789' as ProfileHashBase<'sha256:prof789'>;
       const contract: Contract = {
         target: 'postgres',
         targetFamily: 'sql',
@@ -101,6 +104,7 @@ describe('unified contract types', () => {
         storage: { storageHash: hash },
         capabilities: {},
         extensionPacks: {},
+        profileHash: profHash,
         meta: {},
       };
 
