@@ -1,20 +1,20 @@
-import type { ContractBase, DomainRelation } from '@prisma-next/contract/types';
+import type { Contract, ContractRelation } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import type { SqlContract, SqlRelation, SqlStorage } from '../src/types';
 
 type AssertExtends<T, U> = T extends U ? true : never;
 
 describe('domain type compatibility', () => {
-  describe('SqlContract extends ContractBase', () => {
+  describe('Contract<SqlStorage> extends Contract', () => {
     it('type-level assertion', () => {
-      const _proof: AssertExtends<SqlContract, ContractBase> = true;
+      const _proof: AssertExtends<Contract<SqlStorage>, Contract> = true;
       expect(_proof).toBe(true);
     });
   });
 
-  describe('domain fields accessible on SqlContract models', () => {
-    it('DomainModel fields are accessible via index signature', () => {
-      type ModelFromContract = SqlContract['models'][string];
+  describe('domain fields accessible on Contract<SqlStorage> models', () => {
+    it('ContractModel fields are accessible via index signature', () => {
+      type ModelFromContract = Contract<SqlStorage>['models'][string];
       type FieldsFromModel = ModelFromContract['fields'];
 
       const fields: FieldsFromModel = {
@@ -25,17 +25,17 @@ describe('domain type compatibility', () => {
     });
   });
 
-  describe('roots accessible on SqlContract via ContractBase', () => {
-    it('roots field exists on SqlContract', () => {
-      type Roots = SqlContract['roots'];
+  describe('roots accessible on Contract<SqlStorage>', () => {
+    it('roots field exists on Contract<SqlStorage>', () => {
+      type Roots = Contract<SqlStorage>['roots'];
       const roots: Roots = { users: 'User' };
       expect(roots.users).toBe('User');
     });
   });
 
-  describe('SqlRelation extends DomainRelation', () => {
+  describe('SqlRelation extends ContractRelation', () => {
     it('type-level assertion', () => {
-      const _proof: AssertExtends<SqlRelation, DomainRelation> = true;
+      const _proof: AssertExtends<SqlRelation, ContractRelation> = true;
       expect(_proof).toBe(true);
     });
   });

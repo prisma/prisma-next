@@ -1,4 +1,4 @@
-import type { StorageHashBase } from '@prisma-next/contract/types';
+import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type { ExecutionContext, TypeHelperRegistry } from '../src/sql-context';
@@ -63,6 +63,6 @@ test('ExecutionContext preserves contract type parameter', () => {
 test('ExecutionContext accepts generic SqlContract', () => {
   // Verify ExecutionContext defaults work
   type DefaultContext = ExecutionContext;
-  expectTypeOf<DefaultContext['contract']>().toExtend<SqlContract<SqlStorage>>();
+  expectTypeOf<DefaultContext['contract']>().toExtend<Contract<SqlStorage>>();
   expectTypeOf<DefaultContext['types']>().toEqualTypeOf<TypeHelperRegistry>();
 });

@@ -33,11 +33,9 @@ function createFrameworkComponentWithDependencies(
 
 function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlContract<SqlStorage> {
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:contract'),
-    profileHash: profileHash('sha256:profile'),
+    profileHash: profileHash('sha256:test'),
     storage: {
       storageHash: coreHash('sha256:contract'),
       tables: {
@@ -79,7 +77,6 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
       pgvector: {},
     },
     meta: {},
-    sources: {},
     ...overrides,
   };
 }
@@ -192,13 +189,11 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
   it('renders parameterized column types in DDL', () => {
     const planner = createPostgresMigrationPlanner();
     const contract: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: coreHash('sha256:contract'),
-      profileHash: profileHash('sha256:profile'),
+      profileHash: profileHash('sha256:test'),
       storage: {
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('sha256:contract'),
         tables: {
           params: {
             columns: {
@@ -257,7 +252,6 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-      sources: {},
     };
 
     const result = planner.plan({
@@ -286,13 +280,11 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
   it('renders pgvector vector(N) column types in DDL', () => {
     const planner = createPostgresMigrationPlanner();
     const contract: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: coreHash('sha256:contract'),
-      profileHash: profileHash('sha256:profile'),
+      profileHash: profileHash('sha256:test'),
       storage: {
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('sha256:contract'),
         tables: {
           documents: {
             columns: {
@@ -316,7 +308,6 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-      sources: {},
     };
 
     const result = planner.plan({
@@ -504,13 +495,11 @@ describe('PostgresMigrationPlanner - composite unique constraint DDL', () => {
   it('generates correct ALTER TABLE SQL for composite unique constraint', () => {
     const planner = createPostgresMigrationPlanner();
     const compositeContract: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: coreHash('sha256:composite-unique'),
-      profileHash: profileHash('sha256:composite-unique-profile'),
+      profileHash: profileHash('sha256:test'),
       storage: {
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('sha256:composite-unique'),
         tables: {
           user: {
             columns: {
@@ -530,7 +519,6 @@ describe('PostgresMigrationPlanner - composite unique constraint DDL', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-      sources: {},
     } as SqlContract<SqlStorage>;
 
     const result = planner.plan({
@@ -573,13 +561,11 @@ describe('PostgresMigrationPlanner - column defaults', () => {
     columns: Record<string, ColumnDef>,
   ): SqlContract<SqlStorage> {
     return {
-      schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: coreHash('sha256:test-defaults'),
-      profileHash: profileHash('sha256:test-defaults-profile'),
+      profileHash: profileHash('sha256:test'),
       storage: {
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('sha256:test-defaults'),
         tables: {
           [tableName]: {
             columns,
@@ -595,7 +581,6 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-      sources: {},
     } as SqlContract<SqlStorage>;
   }
 

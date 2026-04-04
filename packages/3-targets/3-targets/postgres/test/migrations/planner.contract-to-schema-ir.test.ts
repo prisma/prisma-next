@@ -55,18 +55,15 @@ function createTestContract(
 ): SqlContract<SqlStorage> {
   const storageHashValue = coreHash('sha256:test');
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: storageHashValue,
-    profileHash: profileHash('sha256:profile'),
+    profileHash: profileHash('sha256:test'),
     storage: { ...storage, storageHash: storageHashValue },
     roots: {},
     models: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
     ...overrides,
   };
 }
@@ -805,18 +802,15 @@ function createDemoContract(
 ): SqlContract<SqlStorage> {
   const storageHashValue = coreHash('sha256:demo');
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: storageHashValue,
-    profileHash: profileHash('sha256:demo-profile'),
+    profileHash: profileHash('sha256:test'),
     storage: { ...storage, storageHash: storageHashValue },
     roots: {},
     models: {},
     capabilities: {},
     extensionPacks: { pgvector: {} },
     meta: {},
-    sources: {},
     ...overrides,
   };
 }

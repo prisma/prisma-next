@@ -1,11 +1,12 @@
-import { coreHash, type ExecutionPlan } from '@prisma-next/contract/types';
+import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeDriverInstance,
   RuntimeExtensionInstance,
 } from '@prisma-next/core-execution-plane/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   CodecRegistry,
   SelectAst,
@@ -22,18 +23,16 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 
-const testContract: SqlContract<SqlStorage> = {
-  schemaVersion: '1',
+const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  storageHash: coreHash('sha256:test'),
+  profileHash: profileHash('sha256:test'),
   models: {},
   roots: {},
   storage: { storageHash: coreHash('sha256:test'), tables: {} },
   extensionPacks: {},
   capabilities: {},
   meta: {},
-  sources: {},
 };
 
 interface DriverExecuteSpies {
@@ -201,7 +200,7 @@ function createRawExecutionPlan<Row = Record<string, unknown>>(): ExecutionPlan<
     meta: {
       target: testContract.target,
       targetFamily: testContract.targetFamily,
-      storageHash: testContract.storageHash,
+      storageHash: testContract.storage.storageHash,
       lane: 'raw',
       paramDescriptors: [],
     },

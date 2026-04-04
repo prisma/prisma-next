@@ -1,22 +1,20 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
-import { coreHash } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { SqlFamilyAdapter } from '../src/sql-family-adapter';
 
 // Minimal test contract
-const testContract: SqlContract<SqlStorage> = {
-  schemaVersion: '1',
+const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  storageHash: coreHash('sha256:test-hash'),
+  profileHash: profileHash('sha256:test-hash'),
   models: {},
   roots: {},
   storage: { storageHash: coreHash('sha256:test-hash'), tables: {} },
   extensionPacks: {},
   capabilities: {},
   meta: {},
-  sources: {},
 };
 
 describe('SqlFamilyAdapter', () => {

@@ -118,8 +118,10 @@ describe('staged contract DSL portability coverage', () => {
       return { ...rest, storage: storageRest };
     };
 
-    expect(stripTargetProfileAndStorageHashes(sqliteContract)).toEqual(
-      stripTargetProfileAndStorageHashes(postgresContract),
+    expect(
+      stripTargetProfileAndStorageHashes(sqliteContract as unknown as Record<string, unknown>),
+    ).toEqual(
+      stripTargetProfileAndStorageHashes(postgresContract as unknown as Record<string, unknown>),
     );
   });
 });

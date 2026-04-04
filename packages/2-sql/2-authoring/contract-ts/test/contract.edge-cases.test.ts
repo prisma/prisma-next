@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 
@@ -15,7 +16,7 @@ describe('validateContract edge cases', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('handles storage without tables property', () => {
@@ -28,7 +29,7 @@ describe('validateContract edge cases', () => {
       storage: {},
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('handles models with null relations', () => {
@@ -61,7 +62,7 @@ describe('validateContract edge cases', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    const contract = validateContract<Contract<SqlStorage>>(contractInput);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({});
   });
 
@@ -85,7 +86,7 @@ describe('validateContract edge cases', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     // This will fail validation, but normalization should handle it
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('handles relation without on property', () => {
@@ -124,7 +125,7 @@ describe('validateContract edge cases', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     // Relations without 'on' property should be skipped in validation
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 
   it('handles relation without to property', () => {
@@ -163,7 +164,7 @@ describe('validateContract edge cases', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     // Relations without 'to' property should be skipped in validation
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 
   it('rejects relation using old parentCols/childCols format', () => {
@@ -202,7 +203,7 @@ describe('validateContract edge cases', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(contractInput)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow(
       'unsupported relation format (expected localFields/targetFields)',
     );
   });

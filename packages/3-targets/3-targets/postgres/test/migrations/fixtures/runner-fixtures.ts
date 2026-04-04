@@ -14,11 +14,9 @@ import type { SqlStatement } from '../../../src/core/migrations/statement-builde
 import postgresTargetDescriptor from '../../../src/exports/control';
 
 export const contract: SqlContract<SqlStorage> = {
-  schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  storageHash: coreHash('sha256:contract'),
-  profileHash: profileHash('sha256:profile'),
+  profileHash: profileHash('sha256:test'),
   storage: {
     storageHash: coreHash('sha256:contract'),
     tables: {
@@ -39,7 +37,6 @@ export const contract: SqlContract<SqlStorage> = {
   capabilities: {},
   extensionPacks: {},
   meta: {},
-  sources: {},
 };
 
 export const emptySchema: SqlSchemaIR = {
@@ -106,7 +103,7 @@ export function createFailingPlan() {
 }
 
 export function toPlanContractInfo(c: SqlContract<SqlStorage>) {
-  return { storageHash: c.storageHash, profileHash: c.profileHash! };
+  return { storageHash: c.storage.storageHash, profileHash: c.profileHash };
 }
 
 export async function executeStatement(

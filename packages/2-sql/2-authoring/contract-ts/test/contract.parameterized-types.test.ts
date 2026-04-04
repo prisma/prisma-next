@@ -1,13 +1,14 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 
 /**
- * Concrete contract type for these tests. Using the generic SqlContract<SqlStorage>
+ * Concrete contract type for these tests. Using the generic Contract<SqlStorage>
  * breaks type inference because JSON imports lose literal types. This concrete type
  * provides sufficient structure for validateContract to narrow correctly.
  */
-type TestContract = SqlContract<SqlStorage>;
+type TestContract = Contract<SqlStorage>;
 
 describe('validateContract parameterized type fields', () => {
   const baseContractInput = {

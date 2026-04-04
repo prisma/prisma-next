@@ -1,5 +1,5 @@
-import { type ColumnDefault, executionHash } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { type ColumnDefault, type Contract, executionHash } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import type { DefaultNormalizer } from '../src/core/schema-verify/verify-sql-schema';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
@@ -355,7 +355,7 @@ describe('verifySqlSchema - defaults', () => {
           ],
         },
       },
-    } satisfies SqlContract<SqlStorage>;
+    } satisfies Contract<SqlStorage>;
 
     const schema = createTestSchemaIR({
       user: createSchemaTable('user', {

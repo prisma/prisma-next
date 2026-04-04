@@ -1,10 +1,10 @@
-import type { ExecutionPlan, ResultType } from '@prisma-next/contract/types';
+import type { Contract, ExecutionPlan, ResultType } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -76,7 +76,7 @@ export async function executeStatement(client: Client, statement: SqlStatement):
  */
 export async function setupTestDatabase(
   client: Client,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   setupFn: (client: Client) => Promise<void>,
 ): Promise<void> {
   await client.query('drop schema if exists prisma_contract cascade');
@@ -87,8 +87,8 @@ export async function setupTestDatabase(
   await executeStatement(client, ensureSchemaStatement);
   await executeStatement(client, ensureTableStatement);
   const write = writeContractMarker({
-    storageHash: contract.storageHash,
-    profileHash: contract.profileHash ?? contract.storageHash,
+    storageHash: contract.storage.storageHash,
+    profileHash: contract.profileHash,
     contractJson: contract,
     canonicalVersion: 1,
   });
@@ -101,11 +101,11 @@ export async function setupTestDatabase(
  */
 export async function writeTestContractMarker(
   client: Client,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
 ): Promise<void> {
   const write = writeContractMarker({
-    storageHash: contract.storageHash,
-    profileHash: contract.profileHash ?? contract.storageHash,
+    storageHash: contract.storage.storageHash,
+    profileHash: contract.profileHash,
     contractJson: contract,
     canonicalVersion: 1,
   });
@@ -118,7 +118,7 @@ export async function writeTestContractMarker(
  * derived from the adapter's codec registry.
  */
 export function createTestAdapterDescriptor(
-  adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+  adapter: Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
 ): SqlRuntimeAdapterDescriptor<'postgres'> {
   const codecRegistry = adapter.profile.codecs();
   return {
@@ -163,9 +163,9 @@ export function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgr
  * Accepts a raw adapter and optional extension descriptors, wrapping the
  * adapter in a descriptor internally for descriptor-first context creation.
  */
-export function createTestContext<TContract extends SqlContract<SqlStorage>>(
+export function createTestContext<TContract extends Contract<SqlStorage>>(
   contract: TContract,
-  adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+  adapter: Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
   options?: {
     extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   },
@@ -206,7 +206,7 @@ export function createTestStackInstance(options?: {
  * The stub adapter includes simple codecs for common test types (pg/int4@1, pg/text@1, pg/timestamptz@1)
  * to enable type inference in tests without requiring the postgres adapter package.
  */
-export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
+export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> {
   const codecRegistry = createCodecRegistry();
 
   // Register stub codecs for common test types
@@ -248,7 +248,7 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
         return codecRegistry;
       },
     },
-    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
+    lower(ast: SelectAst, ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
       return {
         profileId: this.profile.id,
@@ -258,40 +258,30 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
   };
 }
 
-/**
- * Creates a valid test contract without using validateContract.
- * Ensures all required fields are present (capabilities, extensionPacks, meta, sources)
- * and returns the contract with proper typing.
- * This helper allows tests to create contracts without depending on sql-query.
- */
 export function createTestContract(
-  contract: Partial<Omit<SqlContract<SqlStorage>, 'storageHash' | 'profileHash' | 'storage'>> & {
+  contract: Partial<Omit<Contract<SqlStorage>, 'profileHash' | 'storage'>> & {
     storageHash?: string;
     profileHash?: string;
     storage?: Omit<SqlStorage, 'storageHash'>;
   },
-): SqlContract<SqlStorage> {
+): Contract<SqlStorage> {
   const { execution, ...rest } = contract;
-  const storageHashValue = coreHash(rest.storageHash ?? 'sha256:testcore');
+  const storageHashValue = coreHash(rest['storageHash'] ?? 'sha256:testcore');
 
   return {
-    ...rest,
-    schemaVersion: rest.schemaVersion ?? '1',
-    target: rest.target ?? 'postgres',
-    targetFamily: rest.targetFamily ?? 'sql',
-    storage: rest.storage
-      ? { ...rest.storage, storageHash: storageHashValue }
+    target: rest['target'] ?? 'postgres',
+    targetFamily: rest['targetFamily'] ?? 'sql',
+    storage: rest['storage']
+      ? { ...rest['storage'], storageHash: storageHashValue }
       : { storageHash: storageHashValue, tables: {} },
-    models: rest.models ?? {},
-    roots: rest.roots ?? {},
-    capabilities: rest.capabilities ?? {},
-    extensionPacks: rest.extensionPacks ?? {},
-    meta: rest.meta ?? {},
-    sources: rest.sources ?? {},
+    models: rest['models'] ?? {},
+    roots: rest['roots'] ?? {},
+    capabilities: rest['capabilities'] ?? {},
+    extensionPacks: rest['extensionPacks'] ?? {},
+    meta: rest['meta'] ?? {},
     ...(execution ? { execution } : {}),
-    storageHash: storageHashValue,
-    profileHash: profileHash(rest.profileHash ?? 'sha256:testprofile'),
-  } satisfies SqlContract<SqlStorage>;
+    profileHash: profileHash(rest['profileHash'] ?? 'sha256:testprofile'),
+  };
 }
 
 // Re-export generic utilities from test-utils

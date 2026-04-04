@@ -1,5 +1,5 @@
-import { coreHash, executionHash } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
@@ -13,11 +13,10 @@ import {
   createTestTargetDescriptor,
 } from './utils';
 
-const testContract: SqlContract<SqlStorage> = {
-  schemaVersion: '1',
+const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  storageHash: coreHash('sha256:test'),
+  profileHash: profileHash('sha256:test'),
   models: {},
   roots: {},
   storage: {
@@ -36,7 +35,6 @@ const testContract: SqlContract<SqlStorage> = {
   extensionPacks: {},
   capabilities: {},
   meta: {},
-  sources: {},
 };
 
 function createStack(

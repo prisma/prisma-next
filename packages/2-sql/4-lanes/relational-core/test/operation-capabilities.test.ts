@@ -1,4 +1,6 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import { vectorColumn as vectorColumnType } from '@prisma-next/test-utils';
@@ -8,16 +10,19 @@ import { createStubAdapter, createTestContext } from './utils';
 
 describe('Operation capability gating', () => {
   it('exposes operation with required capability when capability is present', () => {
-    const contract = validateContract<SqlContract<SqlStorage>>({
+    const contract = validateContract<Contract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: profileHash('sha256:test'),
+      roots: {},
+      extensionPacks: {},
       capabilities: {
         pgvector: {
           'index.ivfflat': true,
         },
       },
       storage: {
+        storageHash: coreHash('sha256:test-hash'),
         tables: {
           user: {
             columns: {
@@ -31,6 +36,7 @@ describe('Operation capability gating', () => {
         },
       },
       models: {},
+      meta: {},
     });
 
     const signature: SqlOperationSignature = {
@@ -64,12 +70,15 @@ describe('Operation capability gating', () => {
   });
 
   it('does not expose operation with required capability when capability is missing', () => {
-    const contract = validateContract<SqlContract<SqlStorage>>({
+    const contract = validateContract<Contract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: profileHash('sha256:test'),
+      roots: {},
+      extensionPacks: {},
       capabilities: {},
       storage: {
+        storageHash: coreHash('sha256:test-hash'),
         tables: {
           user: {
             columns: {
@@ -83,6 +92,7 @@ describe('Operation capability gating', () => {
         },
       },
       models: {},
+      meta: {},
     });
 
     const signature: SqlOperationSignature = {
@@ -116,12 +126,15 @@ describe('Operation capability gating', () => {
   });
 
   it('exposes operation without capabilities regardless of contract capabilities', () => {
-    const contract = validateContract<SqlContract<SqlStorage>>({
+    const contract = validateContract<Contract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: profileHash('sha256:test'),
+      roots: {},
+      extensionPacks: {},
       capabilities: {},
       storage: {
+        storageHash: coreHash('sha256:test-hash'),
         tables: {
           user: {
             columns: {
@@ -135,6 +148,7 @@ describe('Operation capability gating', () => {
         },
       },
       models: {},
+      meta: {},
     });
 
     const signature: SqlOperationSignature = {
@@ -167,16 +181,19 @@ describe('Operation capability gating', () => {
   });
 
   it('requires all capabilities when multiple are specified', () => {
-    const contract = validateContract<SqlContract<SqlStorage>>({
+    const contract = validateContract<Contract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: profileHash('sha256:test'),
+      roots: {},
+      extensionPacks: {},
       capabilities: {
         pgvector: {
           'index.ivfflat': true,
         },
       },
       storage: {
+        storageHash: coreHash('sha256:test-hash'),
         tables: {
           user: {
             columns: {
@@ -190,6 +207,7 @@ describe('Operation capability gating', () => {
         },
       },
       models: {},
+      meta: {},
     });
 
     const signature: SqlOperationSignature = {

@@ -1,6 +1,6 @@
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -16,12 +16,10 @@ import {
   testTimeout,
 } from './fixtures/runner-fixtures';
 
-const contractWithEnum: SqlContract<SqlStorage> = {
-  schemaVersion: '1',
+const contractWithEnum: Contract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
-  storageHash: coreHash('sha256:enum-test'),
-  profileHash: profileHash('sha256:profile'),
+  profileHash: profileHash('sha256:test'),
   storage: {
     storageHash: coreHash('sha256:test'),
     tables: {
@@ -49,7 +47,6 @@ const contractWithEnum: SqlContract<SqlStorage> = {
   capabilities: {},
   extensionPacks: {},
   meta: {},
-  sources: {},
 };
 
 describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () => {

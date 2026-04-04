@@ -11,13 +11,11 @@ function createFkTestContract(fkConfig: {
   includeUserIndex?: boolean;
 }): SqlContract<SqlStorage> {
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:contract'),
-    profileHash: profileHash('sha256:profile'),
+    profileHash: profileHash('sha256:test'),
     storage: {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('sha256:contract'),
       tables: {
         user: {
           columns: {
@@ -54,7 +52,6 @@ function createFkTestContract(fkConfig: {
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
   };
 }
 

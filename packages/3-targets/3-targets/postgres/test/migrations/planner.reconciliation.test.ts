@@ -169,17 +169,14 @@ function createContract(
   tables: SqlContract<SqlStorage>['storage']['tables'],
 ): SqlContract<SqlStorage> {
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:reconciliation-contract'),
-    profileHash: profileHash('sha256:reconciliation-profile'),
+    profileHash: profileHash('sha256:test'),
     storage: { storageHash: coreHash('sha256:reconciliation-contract'), tables },
     roots: {},
     models: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
   };
 }

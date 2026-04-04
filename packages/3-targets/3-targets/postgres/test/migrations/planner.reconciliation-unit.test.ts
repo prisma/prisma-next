@@ -50,10 +50,8 @@ function issue(
 
 function emptyContract(): SqlContract<SqlStorage> {
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:test'),
     profileHash: profileHash('sha256:test'),
     storage: { storageHash: coreHash('sha256:test'), tables: {} },
     roots: {},
@@ -61,7 +59,6 @@ function emptyContract(): SqlContract<SqlStorage> {
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
   };
 }
 

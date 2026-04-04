@@ -1,10 +1,9 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/core-control-plane/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ForeignKey,
   Index,
-  SqlContract,
   SqlStorage,
   StorageColumn,
   StorageTable,
@@ -206,7 +205,7 @@ export interface ContractToSchemaIROptions {
  * Returns an empty schema IR when `contract` is `null` (new project).
  */
 export function contractToSchemaIR(
-  contract: SqlContract<SqlStorage> | null,
+  contract: Contract<SqlStorage> | null,
   options: ContractToSchemaIROptions,
 ): SqlSchemaIR {
   if (options.annotationNamespace.length === 0) {

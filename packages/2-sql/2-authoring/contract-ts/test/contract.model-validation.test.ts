@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 
@@ -37,7 +38,7 @@ describe('validateContract model validation', () => {
       } as any,
     };
     // Structural validation catches this first, but we can still test the error
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /storage.table|structural validation/,
     );
   });
@@ -53,7 +54,7 @@ describe('validateContract model validation', () => {
         // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
       } as any,
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /references non-existent table/,
     );
   });
@@ -81,9 +82,7 @@ describe('validateContract model validation', () => {
         // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
       } as any,
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
-      /missing a primary key/,
-    );
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/missing a primary key/);
   });
 
   it('throws when model has empty fields object', () => {
@@ -100,7 +99,7 @@ describe('validateContract model validation', () => {
     // Empty fields object is valid structurally, but logic validation should catch it
     // However, empty fields is actually valid - a model can have no fields
     // So we'll skip this test as it's not a real error case
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).not.toThrow();
   });
 
   it('throws when model field is missing column property', () => {
@@ -114,7 +113,7 @@ describe('validateContract model validation', () => {
         } as any,
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /missing column property/,
     );
   });
@@ -130,7 +129,7 @@ describe('validateContract model validation', () => {
         } as any,
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /references non-existent column/,
     );
   });
@@ -184,7 +183,7 @@ describe('validateContract model validation', () => {
         },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /does not have a corresponding foreign key/,
     );
   });
@@ -241,7 +240,7 @@ describe('validateContract model validation', () => {
         },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(valid)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 
   it('accepts N:1 relation with matching foreign key', () => {
@@ -298,6 +297,6 @@ describe('validateContract model validation', () => {
         },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(valid)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 });

@@ -1,6 +1,6 @@
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   contract,
@@ -61,7 +61,7 @@ describe.sequential('Schema verification after runner - integration', () => {
 
   async function runSuccessfulMigrationForContract(
     d: PostgresControlDriver,
-    contractInput: SqlContract<SqlStorage>,
+    contractInput: Contract<SqlStorage>,
   ): Promise<void> {
     const planner = postgresTargetDescriptor.createPlanner(familyInstance);
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
@@ -106,14 +106,12 @@ describe.sequential('Schema verification after runner - integration', () => {
     });
 
     it('returns ok: true with normalized defaults', { timeout: testTimeout }, async () => {
-      const contractWithDefaults: SqlContract<SqlStorage> = {
-        schemaVersion: '1',
+      const contractWithDefaults: Contract<SqlStorage> = {
         target: 'postgres',
         targetFamily: 'sql',
-        storageHash: coreHash('sha256:contract-with-defaults'),
-        profileHash: profileHash('sha256:profile-with-defaults'),
+        profileHash: profileHash('sha256:test'),
         storage: {
-          storageHash: coreHash('sha256:test'),
+          storageHash: coreHash('sha256:contract-with-defaults'),
           tables: {
             user: {
               columns: {
@@ -143,7 +141,6 @@ describe.sequential('Schema verification after runner - integration', () => {
         capabilities: {},
         extensionPacks: {},
         meta: {},
-        sources: {},
       };
 
       await runSuccessfulMigrationForContract(driver!, contractWithDefaults);
@@ -167,14 +164,12 @@ describe.sequential('Schema verification after runner - integration', () => {
       async () => {
         // Contract with mixed-case enum type name (e.g., "BillingState")
         // PostgreSQL's format_type() quotes these: "BillingState" vs BillingState
-        const enumContract: SqlContract<SqlStorage> = {
-          schemaVersion: '1',
+        const enumContract: Contract<SqlStorage> = {
           target: 'postgres',
           targetFamily: 'sql',
-          storageHash: coreHash('sha256:contract-enum-mixed-case'),
-          profileHash: profileHash('sha256:profile-enum-mixed-case'),
+          profileHash: profileHash('sha256:test'),
           storage: {
-            storageHash: coreHash('sha256:test'),
+            storageHash: coreHash('sha256:contract-enum-mixed-case'),
             tables: {
               Organization: {
                 columns: {
@@ -205,7 +200,6 @@ describe.sequential('Schema verification after runner - integration', () => {
           capabilities: {},
           extensionPacks: {},
           meta: {},
-          sources: {},
         };
 
         // This should NOT throw - the runner's post-apply verification must handle
