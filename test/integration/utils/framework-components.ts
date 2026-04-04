@@ -8,6 +8,8 @@ import type {
   SqlControlExtensionDescriptor,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
+import type { OperationRegistry } from '@prisma-next/operations';
+import { createOperationRegistry } from '@prisma-next/operations';
 import postgresTarget from '@prisma-next/target-postgres/control';
 import postgresTargetRuntime from '@prisma-next/target-postgres/runtime';
 
@@ -37,6 +39,18 @@ export function getSqlDescriptorBundle(options?: {
     extensions,
     descriptors,
   };
+}
+
+export function assembleOperationRegistry(
+  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
+): OperationRegistry {
+  const registry = createOperationRegistry();
+  for (const descriptor of descriptors) {
+    for (const signature of descriptor.operationSignatures()) {
+      registry.register(signature);
+    }
+  }
+  return registry;
 }
 
 export const pgvectorExtensionDescriptor = pgvectorDescriptor;

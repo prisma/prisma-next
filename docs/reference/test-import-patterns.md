@@ -222,10 +222,15 @@ export function assembleOperationRegistryFromPacks(packs: ReadonlyArray<...>): O
   // ...
 }
 
-// packages/framework/tooling/cli/test/emit.test.ts (different package)
-import { assembleOperationRegistry } from '@prisma-next/family-sql/test-utils';
-// Uses the public test utility, not the private function
-const registry = assembleOperationRegistry(packs);
+// test/integration/utils/framework-components.ts (integration test utility)
+import { createOperationRegistry } from '@prisma-next/operations';
+// Assembles registry using framework primitives, not SQL-specific re-exports
+const registry = createOperationRegistry();
+for (const desc of descriptors) {
+  for (const sig of desc.operationSignatures()) {
+    registry.register(sig);
+  }
+}
 ```
 
 **Why?**

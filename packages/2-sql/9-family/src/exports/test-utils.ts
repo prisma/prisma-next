@@ -8,4 +8,3 @@ export {
   extractOperationTypeImports,
   extractQueryOperationTypeImports,
 } from '@prisma-next/framework-components/control';
-export { assembleOperationRegistry } from '../core/assembly';

@@ -1,13 +1,16 @@
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import {
-  assembleOperationRegistry,
   extractCodecTypeImports,
   extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../utils/framework-components';
+import {
+  assembleOperationRegistry,
+  getSqlDescriptorBundle,
+  pgvectorExtensionDescriptor,
+} from '../utils/framework-components';
 
 describe('pgvector extension pack integration', () => {
   it('exposes pgvector descriptor metadata', () => {
