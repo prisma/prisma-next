@@ -1,5 +1,6 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import type {
+  ExecutionHashBase,
   ExecutionSection,
   ProfileHashBase,
   StorageHashBase,
@@ -140,7 +141,13 @@ export function contract<
   meta?: Record<string, unknown>;
   sources?: Record<string, unknown>;
   execution?: ExecutionSection;
-}): SqlContract<SqlStorage, Record<string, unknown>, TStorageHash, TProfileHash> {
+}): SqlContract<
+  SqlStorage,
+  Record<string, unknown>,
+  TStorageHash,
+  ExecutionHashBase<string>,
+  TProfileHash
+> {
   return {
     schemaVersion: opts.schemaVersion ?? '1',
     target: opts.target,
@@ -155,5 +162,11 @@ export function contract<
     ...(opts.extensionPacks !== undefined && { extensionPacks: opts.extensionPacks }),
     ...(opts.meta !== undefined && { meta: opts.meta }),
     ...(opts.sources !== undefined && { sources: opts.sources as Record<string, unknown> }),
-  } as SqlContract<SqlStorage, Record<string, unknown>, TStorageHash, TProfileHash>;
+  } as SqlContract<
+    SqlStorage,
+    Record<string, unknown>,
+    TStorageHash,
+    ExecutionHashBase<string>,
+    TProfileHash
+  >;
 }

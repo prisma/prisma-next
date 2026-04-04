@@ -204,8 +204,9 @@ export type SqlContract<
   S extends SqlStorage = SqlStorage,
   TModels extends Record<string, unknown> = Record<string, unknown>,
   TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
+  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> = Omit<ContractBase<TStorageHash, ExecutionHashBase<string>, TProfileHash>, 'models'> & {
+> = Omit<ContractBase<TStorageHash, TExecutionHash, TProfileHash>, 'models'> & {
   readonly targetFamily: string;
   readonly storage: S;
   readonly models: TModels;
