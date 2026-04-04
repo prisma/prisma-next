@@ -1,4 +1,9 @@
-import type { ColumnDefault, Contract, StorageHashBase } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  Contract,
+  ContractRelation,
+  StorageHashBase,
+} from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ContractWithTypeMaps,
@@ -55,12 +60,6 @@ type StagedDefinitionTargetId<Definition> = Definition extends {
 }
   ? Target
   : never;
-
-type StagedDefinitionStorageHash<Definition> = Definition extends {
-  readonly storageHash?: infer StorageHash extends string;
-}
-  ? StorageHash
-  : undefined;
 
 type Present<T> = Exclude<T, undefined>;
 
@@ -404,19 +403,26 @@ type StagedBuiltModels<Definition> = {
   readonly [ModelName in StagedModelNames<Definition>]: {
     readonly storage: {
       readonly table: StagedModelTableName<Definition, ModelName>;
+      readonly fields: {
+        readonly [FieldName in StagedModelFieldNames<Definition, ModelName>]: {
+          readonly column: StagedModelColumnName<Definition, ModelName, FieldName>;
+        };
+      };
     };
     readonly fields: {
       readonly [FieldName in StagedModelFieldNames<Definition, ModelName>]: {
-        readonly column: StagedModelColumnName<Definition, ModelName, FieldName>;
+        readonly codecId: StagedModelStorageColumn<Definition, ModelName, FieldName>['codecId'];
+        readonly nullable: StagedModelStorageColumn<Definition, ModelName, FieldName>['nullable'];
       };
     };
+    readonly relations: Record<string, ContractRelation>;
   };
 };
 
-type StagedBuiltModelFields<
+type StagedBuiltModelColumnMappings<
   Definition,
   ModelName extends StagedModelNames<Definition>,
-> = StagedBuiltModels<Definition>[ModelName]['fields'];
+> = StagedBuiltModels<Definition>[ModelName]['storage']['fields'];
 
 type StagedBuiltModelTableName<
   Definition,
@@ -424,8 +430,8 @@ type StagedBuiltModelTableName<
 > = StagedBuiltModels<Definition>[ModelName]['storage']['table'];
 
 type StagedBuiltStorageTableColumns<Definition, ModelName extends StagedModelNames<Definition>> = {
-  readonly [FieldName in keyof StagedBuiltModelFields<Definition, ModelName> &
-    string as StagedBuiltModelFields<
+  readonly [FieldName in keyof StagedBuiltModelColumnMappings<Definition, ModelName> &
+    string as StagedBuiltModelColumnMappings<
     Definition,
     ModelName
   >[FieldName]['column']]: StagedModelStorageColumn<Definition, ModelName, FieldName>;
@@ -472,14 +478,9 @@ type StagedBuiltStorage<Definition> = {
 };
 
 export type SqlContractResult<Definition> = ContractWithTypeMaps<
-  Contract<StagedBuiltStorage<Definition>> & {
-    readonly models: StagedBuiltModels<Definition>;
-    readonly schemaVersion: '1';
+  Contract<StagedBuiltStorage<Definition>, StagedBuiltModels<Definition>> & {
     readonly target: StagedDefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';
-    readonly storageHash: StagedDefinitionStorageHash<Definition> extends string
-      ? StagedDefinitionStorageHash<Definition>
-      : string;
   } & {
     readonly extensionPacks: keyof StagedDefinitionExtensionPacks<Definition> extends never
       ? Record<string, never>
