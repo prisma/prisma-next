@@ -4,6 +4,7 @@ import {
   type CanonicalContractInput,
   canonicalizeContract,
   canonicalizeContractToObject,
+  orderTopLevel,
 } from '../src/canonicalization';
 
 function minimal(overrides?: Partial<CanonicalContractInput>): CanonicalContractInput {
@@ -78,6 +79,30 @@ describe('canonicalizeContractToObject', () => {
   it('omits profileHash when undefined', () => {
     const result = canonicalizeContractToObject(minimal());
     expect(result).not.toHaveProperty('profileHash');
+  });
+
+  it('includes top-level storageHash when provided', () => {
+    const result = canonicalizeContractToObject(minimal({ storageHash: 'sha256:storage' }));
+    expect(result['storageHash']).toBe('sha256:storage');
+  });
+
+  it('includes top-level executionHash when provided', () => {
+    const result = canonicalizeContractToObject(minimal({ executionHash: 'sha256:exec' }));
+    expect(result['executionHash']).toBe('sha256:exec');
+  });
+
+  it('places hashes in canonical top-level order', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storageHash: 'sha256:s',
+        executionHash: 'sha256:e',
+        profileHash: 'sha256:p',
+      }),
+    );
+    const keys = Object.keys(result);
+    expect(keys.indexOf('storageHash')).toBeLessThan(keys.indexOf('executionHash'));
+    expect(keys.indexOf('executionHash')).toBeLessThan(keys.indexOf('profileHash'));
+    expect(keys.indexOf('profileHash')).toBeLessThan(keys.indexOf('roots'));
   });
 
   it('excludes keys not in the CanonicalContractInput schema', () => {
@@ -378,6 +403,44 @@ describe('index and unique sorting', () => {
     expect(field['default']).toEqual(date);
   });
 
+  it('sorts indexes without name using empty-string fallback', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: {
+          tables: {
+            users: {
+              columns: {},
+              indexes: [{ columns: ['b'] }, { name: 'idx_a', columns: ['a'] }],
+            },
+          },
+        },
+      }),
+    );
+    const table = drill(result, 'storage', 'tables', 'users');
+    const indexes = table['indexes'] as Array<{ name?: string }>;
+    expect(indexes[0]?.['name']).toBeUndefined();
+    expect(indexes[1]?.['name']).toBe('idx_a');
+  });
+
+  it('sorts uniques without name using empty-string fallback', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: {
+          tables: {
+            users: {
+              columns: {},
+              uniques: [{ columns: ['b'] }, { name: 'uq_a', columns: ['a'] }],
+            },
+          },
+        },
+      }),
+    );
+    const table = drill(result, 'storage', 'tables', 'users');
+    const uniques = table['uniques'] as Array<{ name?: string }>;
+    expect(uniques[0]?.['name']).toBeUndefined();
+    expect(uniques[1]?.['name']).toBe('uq_a');
+  });
+
   it('handles non-object table entries gracefully', () => {
     const result = canonicalizeContractToObject(
       minimal({
@@ -415,5 +478,17 @@ describe('canonicalizeContract', () => {
     const objResult = canonicalizeContractToObject(input);
     const strResult = canonicalizeContract(input);
     expect(JSON.parse(strResult)).toEqual(objResult);
+  });
+});
+
+describe('orderTopLevel', () => {
+  it('places known keys in canonical order followed by unknown keys sorted alphabetically', () => {
+    const result = orderTopLevel({
+      zebra: 'z',
+      target: 'postgres',
+      apple: 'a',
+      targetFamily: 'sql',
+    });
+    expect(Object.keys(result)).toEqual(['targetFamily', 'target', 'apple', 'zebra']);
   });
 });
