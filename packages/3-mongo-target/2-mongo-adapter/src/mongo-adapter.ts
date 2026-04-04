@@ -11,11 +11,11 @@ import {
   AggregateWireCommand,
   DeleteOneWireCommand,
   InsertOneWireCommand,
-  resolveValue,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
 import type { MongoReadStage } from '@prisma-next/mongo-query-ast';
-import { lowerPipeline } from '@prisma-next/mongo-query-ast';
+import { lowerPipeline } from './lowering';
+import { resolveValue } from './resolve-value';
 
 function resolveDocument(expr: MongoExpr): Document {
   const result: Record<string, unknown> = {};

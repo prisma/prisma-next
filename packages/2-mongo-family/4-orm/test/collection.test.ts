@@ -1,5 +1,13 @@
 import type { MongoReadPlan } from '@prisma-next/mongo-query-ast';
-import { lowerPipeline, MongoFieldFilter } from '@prisma-next/mongo-query-ast';
+import {
+  MongoFieldFilter,
+  type MongoLimitStage,
+  type MongoLookupStage,
+  type MongoMatchStage,
+  type MongoProjectStage,
+  type MongoSkipStage,
+  type MongoSortStage,
+} from '@prisma-next/mongo-query-ast';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../../1-core/test/fixtures/orm-contract';
@@ -27,10 +35,6 @@ function createMockExecutor(
   return mock;
 }
 
-function loweredStageKinds(plan: MongoReadPlan): string[] {
-  return lowerPipeline(plan.stages).map((s) => Object.keys(s)[0] as string);
-}
-
 describe('MongoCollection chaining', () => {
   it('returns a new instance from where()', () => {
     const executor = createMockExecutor();
@@ -46,10 +50,8 @@ describe('MongoCollection chaining', () => {
       .where(MongoFieldFilter.eq('name', 'Alice'))
       .where(MongoFieldFilter.gte('email', 'a'));
     col.all();
-    const lowered = lowerPipeline(executor.lastPlan!.stages);
-    expect(lowered[0]).toEqual({
-      $match: { $and: [{ name: { $eq: 'Alice' } }, { email: { $gte: 'a' } }] },
-    });
+    const match = executor.lastPlan!.stages[0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('and');
   });
 
   it('returns a new instance from select()', () => {
@@ -58,16 +60,17 @@ describe('MongoCollection chaining', () => {
     const selected = col.select('name');
     expect(selected).not.toBe(col);
     selected.all();
-    expect(loweredStageKinds(executor.lastPlan!)).toContain('$project');
+    expect(executor.lastPlan!.stages.some((s) => s.kind === 'project')).toBe(true);
   });
 
   it('accumulates fields across multiple select() calls', () => {
     const executor = createMockExecutor();
     const col = new MongoCollection(contract, 'User', executor).select('name').select('_id');
     col.all();
-    const lowered = lowerPipeline(executor.lastPlan!.stages);
-    const project = lowered.find((s) => '$project' in s);
-    expect(project).toEqual({ $project: { name: 1, _id: 1 } });
+    const project = executor.lastPlan!.stages.find(
+      (s) => s.kind === 'project',
+    ) as MongoProjectStage;
+    expect(project.projection).toEqual({ name: 1, _id: 1 });
   });
 
   it('returns a new instance from orderBy()', () => {
@@ -76,8 +79,8 @@ describe('MongoCollection chaining', () => {
     const ordered = col.orderBy({ name: 1 });
     expect(ordered).not.toBe(col);
     ordered.all();
-    const lowered = lowerPipeline(executor.lastPlan!.stages);
-    expect(lowered).toContainEqual({ $sort: { name: 1 } });
+    const sort = executor.lastPlan!.stages.find((s) => s.kind === 'sort') as MongoSortStage;
+    expect(sort.sort).toEqual({ name: 1 });
   });
 
   it('merges orderBy across calls', () => {
@@ -86,8 +89,8 @@ describe('MongoCollection chaining', () => {
       .orderBy({ name: 1 })
       .orderBy({ email: -1 });
     col.all();
-    const lowered = lowerPipeline(executor.lastPlan!.stages);
-    expect(lowered).toContainEqual({ $sort: { name: 1, email: -1 } });
+    const sort = executor.lastPlan!.stages.find((s) => s.kind === 'sort') as MongoSortStage;
+    expect(sort.sort).toEqual({ name: 1, email: -1 });
   });
 
   it('returns a new instance from take()', () => {
@@ -96,8 +99,8 @@ describe('MongoCollection chaining', () => {
     const limited = col.take(10);
     expect(limited).not.toBe(col);
     limited.all();
-    const lowered = lowerPipeline(executor.lastPlan!.stages);
-    expect(lowered).toContainEqual({ $limit: 10 });
+    const limit = executor.lastPlan!.stages.find((s) => s.kind === 'limit') as MongoLimitStage;
+    expect(limit.limit).toBe(10);
   });
 
   it('returns a new instance from skip()', () => {
@@ -106,8 +109,8 @@ describe('MongoCollection chaining', () => {
     const skipped = col.skip(5);
     expect(skipped).not.toBe(col);
     skipped.all();
-    const lowered = lowerPipeline(executor.lastPlan!.stages);
-    expect(lowered).toContainEqual({ $skip: 5 });
+    const skip = executor.lastPlan!.stages.find((s) => s.kind === 'skip') as MongoSkipStage;
+    expect(skip.skip).toBe(5);
   });
 
   it('does not mutate original instance', () => {
@@ -126,8 +129,8 @@ describe('MongoCollection chaining', () => {
       .skip(10)
       .take(5);
     col.all();
-    const stageKinds = loweredStageKinds(executor.lastPlan!);
-    expect(stageKinds).toEqual(['$match', '$sort', '$skip', '$limit']);
+    const stageKinds = executor.lastPlan!.stages.map((s) => s.kind);
+    expect(stageKinds).toEqual(['match', 'sort', 'skip', 'limit']);
   });
 
   it('preserves custom subclasses via #createSelf', () => {
@@ -149,15 +152,11 @@ describe('MongoCollection include()', () => {
     const executor = createMockExecutor();
     const col = new MongoCollection(contract, 'Task', executor).include('assignee');
     col.all();
-    const lowered = lowerPipeline(executor.lastPlan!.stages);
-    expect(lowered).toContainEqual({
-      $lookup: {
-        from: 'users',
-        localField: 'assigneeId',
-        foreignField: '_id',
-        as: 'assignee',
-      },
-    });
+    const lookup = executor.lastPlan!.stages.find((s) => s.kind === 'lookup') as MongoLookupStage;
+    expect(lookup.from).toBe('users');
+    expect(lookup.localField).toBe('assigneeId');
+    expect(lookup.foreignField).toBe('_id');
+    expect(lookup.as).toBe('assignee');
   });
 
   it('throws for unknown relation', () => {
@@ -206,7 +205,7 @@ describe('MongoCollection terminal methods', () => {
     const col = new MongoCollection(contract, 'User', executor);
     await col.first();
     const limitStage = executor.lastPlan!.stages.find((s) => s.kind === 'limit') as
-      | { kind: 'limit'; limit: number }
+      | MongoLimitStage
       | undefined;
     expect(limitStage?.limit).toBe(1);
   });

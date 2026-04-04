@@ -1,4 +1,14 @@
-import { lowerPipeline, MongoFieldFilter } from '@prisma-next/mongo-query-ast';
+import {
+  type MongoAndExpr,
+  MongoFieldFilter,
+  MongoLimitStage,
+  MongoLookupStage,
+  MongoMatchStage,
+  MongoProjectStage,
+  MongoSkipStage,
+  MongoSortStage,
+  MongoUnwindStage,
+} from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import type { MongoCollectionState } from '../src/collection-state';
 import { emptyCollectionState } from '../src/collection-state';
@@ -21,8 +31,10 @@ describe('compileMongoQuery', () => {
       filters: [MongoFieldFilter.eq('name', 'Alice')],
     };
     const plan = compileMongoQuery('users', state, testHash);
-    const lowered = lowerPipeline(plan.stages);
-    expect(lowered).toEqual([{ $match: { name: { $eq: 'Alice' } } }]);
+    expect(plan.stages).toHaveLength(1);
+    const match = plan.stages[0] as MongoMatchStage;
+    expect(match).toBeInstanceOf(MongoMatchStage);
+    expect(match.filter.kind).toBe('field');
   });
 
   it('combines multiple filters with $and', () => {
@@ -31,14 +43,10 @@ describe('compileMongoQuery', () => {
       filters: [MongoFieldFilter.eq('name', 'Alice'), MongoFieldFilter.gte('age', 18)],
     };
     const plan = compileMongoQuery('users', state, testHash);
-    const lowered = lowerPipeline(plan.stages);
-    expect(lowered).toEqual([
-      {
-        $match: {
-          $and: [{ name: { $eq: 'Alice' } }, { age: { $gte: 18 } }],
-        },
-      },
-    ]);
+    expect(plan.stages).toHaveLength(1);
+    const match = plan.stages[0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('and');
+    expect((match.filter as MongoAndExpr).exprs).toHaveLength(2);
   });
 
   it('compiles selectedFields to $project with _id suppressed', () => {
@@ -47,8 +55,10 @@ describe('compileMongoQuery', () => {
       selectedFields: ['name', 'email'],
     };
     const plan = compileMongoQuery('users', state, testHash);
-    const lowered = lowerPipeline(plan.stages);
-    expect(lowered).toEqual([{ $project: { name: 1, email: 1, _id: 0 } }]);
+    expect(plan.stages).toHaveLength(1);
+    const project = plan.stages[0] as MongoProjectStage;
+    expect(project).toBeInstanceOf(MongoProjectStage);
+    expect(project.projection).toEqual({ name: 1, email: 1, _id: 0 });
   });
 
   it('preserves _id when explicitly selected', () => {
@@ -57,8 +67,8 @@ describe('compileMongoQuery', () => {
       selectedFields: ['_id', 'name'],
     };
     const plan = compileMongoQuery('users', state, testHash);
-    const lowered = lowerPipeline(plan.stages);
-    expect(lowered).toEqual([{ $project: { _id: 1, name: 1 } }]);
+    const project = plan.stages[0] as MongoProjectStage;
+    expect(project.projection).toEqual({ _id: 1, name: 1 });
   });
 
   it('skips $project when selectedFields is empty', () => {
@@ -76,8 +86,10 @@ describe('compileMongoQuery', () => {
       orderBy: { age: -1, name: 1 },
     };
     const plan = compileMongoQuery('users', state, testHash);
-    const lowered = lowerPipeline(plan.stages);
-    expect(lowered).toEqual([{ $sort: { age: -1, name: 1 } }]);
+    expect(plan.stages).toHaveLength(1);
+    const sort = plan.stages[0] as MongoSortStage;
+    expect(sort).toBeInstanceOf(MongoSortStage);
+    expect(sort.sort).toEqual({ age: -1, name: 1 });
   });
 
   it('compiles limit to $limit', () => {
@@ -86,8 +98,10 @@ describe('compileMongoQuery', () => {
       limit: 10,
     };
     const plan = compileMongoQuery('users', state, testHash);
-    const lowered = lowerPipeline(plan.stages);
-    expect(lowered).toEqual([{ $limit: 10 }]);
+    expect(plan.stages).toHaveLength(1);
+    const limit = plan.stages[0] as MongoLimitStage;
+    expect(limit).toBeInstanceOf(MongoLimitStage);
+    expect(limit.limit).toBe(10);
   });
 
   it('compiles offset to $skip', () => {
@@ -96,8 +110,10 @@ describe('compileMongoQuery', () => {
       offset: 5,
     };
     const plan = compileMongoQuery('users', state, testHash);
-    const lowered = lowerPipeline(plan.stages);
-    expect(lowered).toEqual([{ $skip: 5 }]);
+    expect(plan.stages).toHaveLength(1);
+    const skip = plan.stages[0] as MongoSkipStage;
+    expect(skip).toBeInstanceOf(MongoSkipStage);
+    expect(skip.skip).toBe(5);
   });
 
   it('compiles includes to $lookup + $unwind for to-one', () => {
@@ -114,18 +130,17 @@ describe('compileMongoQuery', () => {
       ],
     };
     const plan = compileMongoQuery('posts', state, testHash);
-    const lowered = lowerPipeline(plan.stages);
-    expect(lowered).toEqual([
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'authorId',
-          foreignField: '_id',
-          as: 'author',
-        },
-      },
-      { $unwind: { path: '$author', preserveNullAndEmptyArrays: true } },
-    ]);
+    expect(plan.stages).toHaveLength(2);
+    const lookup = plan.stages[0] as MongoLookupStage;
+    expect(lookup).toBeInstanceOf(MongoLookupStage);
+    expect(lookup.from).toBe('users');
+    expect(lookup.localField).toBe('authorId');
+    expect(lookup.foreignField).toBe('_id');
+    expect(lookup.as).toBe('author');
+    const unwind = plan.stages[1] as MongoUnwindStage;
+    expect(unwind).toBeInstanceOf(MongoUnwindStage);
+    expect(unwind.path).toBe('$author');
+    expect(unwind.preserveNullAndEmptyArrays).toBe(true);
   });
 
   it('compiles includes to $lookup without $unwind for to-many', () => {
@@ -142,17 +157,8 @@ describe('compileMongoQuery', () => {
       ],
     };
     const plan = compileMongoQuery('users', state, testHash);
-    const lowered = lowerPipeline(plan.stages);
-    expect(lowered).toEqual([
-      {
-        $lookup: {
-          from: 'posts',
-          localField: '_id',
-          foreignField: 'authorId',
-          as: 'posts',
-        },
-      },
-    ]);
+    expect(plan.stages).toHaveLength(1);
+    expect(plan.stages[0]).toBeInstanceOf(MongoLookupStage);
   });
 
   it('orders stages: $match → $lookup → $sort → $skip → $limit → $project', () => {
@@ -173,9 +179,8 @@ describe('compileMongoQuery', () => {
       selectedFields: ['_id', 'name', 'email'],
     };
     const plan = compileMongoQuery('users', state, testHash);
-    const lowered = lowerPipeline(plan.stages);
 
-    const stageKeys = lowered.map((s) => Object.keys(s)[0]);
-    expect(stageKeys).toEqual(['$match', '$lookup', '$sort', '$skip', '$limit', '$project']);
+    const stageKinds = plan.stages.map((s) => s.kind);
+    expect(stageKinds).toEqual(['match', 'lookup', 'sort', 'skip', 'limit', 'project']);
   });
 });

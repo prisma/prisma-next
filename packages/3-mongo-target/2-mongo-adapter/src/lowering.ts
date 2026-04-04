@@ -1,7 +1,6 @@
 import type { Document } from '@prisma-next/mongo-core';
-import { resolveValue } from '@prisma-next/mongo-core';
-import type { MongoFilterExpr } from './filter-expressions';
-import type { MongoReadStage } from './stages';
+import type { MongoFilterExpr, MongoReadStage } from '@prisma-next/mongo-query-ast';
+import { resolveValue } from './resolve-value';
 
 export function lowerFilter(filter: MongoFilterExpr): Document {
   switch (filter.kind) {
