@@ -40,8 +40,9 @@ export function compileMongoQuery<Row = unknown>(
 ): MongoReadPlan<Row> {
   const stages: MongoReadStage[] = [];
 
-  if (state.filters.length === 1) {
-    stages.push(new MongoMatchStage(state.filters[0]!));
+  const singleFilter = state.filters.length === 1 ? state.filters[0] : undefined;
+  if (singleFilter) {
+    stages.push(new MongoMatchStage(singleFilter));
   } else if (state.filters.length > 1) {
     stages.push(new MongoMatchStage(MongoAndExpr.of([...state.filters])));
   }
