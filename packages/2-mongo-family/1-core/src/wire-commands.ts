@@ -48,6 +48,67 @@ export class DeleteOneWireCommand extends MongoWireCommand {
   }
 }
 
+export class InsertManyWireCommand extends MongoWireCommand {
+  readonly kind = 'insertMany' as const;
+  readonly documents: ReadonlyArray<Document>;
+
+  constructor(collection: string, documents: ReadonlyArray<Document>) {
+    super(collection);
+    this.documents = documents;
+    this.freeze();
+  }
+}
+
+export class UpdateManyWireCommand extends MongoWireCommand {
+  readonly kind = 'updateMany' as const;
+  readonly filter: Document;
+  readonly update: Document;
+
+  constructor(collection: string, filter: Document, update: Document) {
+    super(collection);
+    this.filter = filter;
+    this.update = update;
+    this.freeze();
+  }
+}
+
+export class DeleteManyWireCommand extends MongoWireCommand {
+  readonly kind = 'deleteMany' as const;
+  readonly filter: Document;
+
+  constructor(collection: string, filter: Document) {
+    super(collection);
+    this.filter = filter;
+    this.freeze();
+  }
+}
+
+export class FindOneAndUpdateWireCommand extends MongoWireCommand {
+  readonly kind = 'findOneAndUpdate' as const;
+  readonly filter: Document;
+  readonly update: Document;
+  readonly upsert: boolean;
+
+  constructor(collection: string, filter: Document, update: Document, upsert: boolean) {
+    super(collection);
+    this.filter = filter;
+    this.update = update;
+    this.upsert = upsert;
+    this.freeze();
+  }
+}
+
+export class FindOneAndDeleteWireCommand extends MongoWireCommand {
+  readonly kind = 'findOneAndDelete' as const;
+  readonly filter: Document;
+
+  constructor(collection: string, filter: Document) {
+    super(collection);
+    this.filter = filter;
+    this.freeze();
+  }
+}
+
 export class AggregateWireCommand extends MongoWireCommand {
   readonly kind = 'aggregate' as const;
   readonly pipeline: RawPipeline;
@@ -61,6 +122,11 @@ export class AggregateWireCommand extends MongoWireCommand {
 
 export type AnyMongoWireCommand =
   | InsertOneWireCommand
+  | InsertManyWireCommand
   | UpdateOneWireCommand
+  | UpdateManyWireCommand
   | DeleteOneWireCommand
+  | DeleteManyWireCommand
+  | FindOneAndUpdateWireCommand
+  | FindOneAndDeleteWireCommand
   | AggregateWireCommand;
