@@ -3,7 +3,11 @@ import type {
   ContractSourceDiagnostics,
 } from '@prisma-next/config/config-types';
 import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
-import type { Contract, DomainField, DomainReferenceRelation } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractField,
+  ContractReferenceRelation,
+} from '@prisma-next/contract/types';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { getAttribute, getMapName, lowerFirst, parseRelationAttribute } from './psl-helpers';
@@ -63,8 +67,8 @@ export function interpretPslDocumentToMongoContract(
   const modelNames = new Set(document.ast.models.map((m) => m.name));
 
   interface MutableDomainModel {
-    readonly fields: Record<string, DomainField>;
-    readonly relations: Record<string, DomainReferenceRelation>;
+    readonly fields: Record<string, ContractField>;
+    readonly relations: Record<string, ContractReferenceRelation>;
     readonly storage: { readonly collection: string };
   }
 
@@ -87,8 +91,8 @@ export function interpretPslDocumentToMongoContract(
     const collectionName = resolveCollectionName(pslModel);
     const fieldMappings = resolveFieldMappings(pslModel);
 
-    const fields: Record<string, DomainField> = {};
-    const relations: Record<string, DomainReferenceRelation> = {};
+    const fields: Record<string, ContractField> = {};
+    const relations: Record<string, ContractReferenceRelation> = {};
 
     for (const field of pslModel.fields) {
       if (isRelationField(field, modelNames)) {
