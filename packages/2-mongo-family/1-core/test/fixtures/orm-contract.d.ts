@@ -1,6 +1,7 @@
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
+  MongoStorage,
   MongoTypeMaps,
 } from '@prisma-next/mongo-core';
 
@@ -41,6 +42,7 @@ type BugModel = {
   readonly fields: {
     readonly severity: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
   };
+  readonly relations: Record<string, never>;
   readonly base: 'Task';
 };
 
@@ -50,6 +52,7 @@ type FeatureModel = {
     readonly priority: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
     readonly targetRelease: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
   };
+  readonly relations: Record<string, never>;
   readonly base: 'Task';
 };
 
@@ -78,6 +81,7 @@ type AddressModel = {
     readonly city: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
     readonly zip: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
   };
+  readonly relations: Record<string, never>;
   readonly owner: 'User';
 };
 
@@ -88,29 +92,34 @@ type CommentModel = {
     readonly text: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
     readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
   };
+  readonly relations: Record<string, never>;
   readonly owner: 'Task';
 };
 
-type OrmContract = MongoContract<
-  {
-    readonly tasks: 'Task';
-    readonly users: 'User';
-  },
-  {
-    readonly collections: {
-      readonly tasks: Record<string, never>;
-      readonly users: Record<string, never>;
-    };
-  },
-  {
-    readonly Task: TaskModel;
-    readonly Bug: BugModel;
-    readonly Feature: FeatureModel;
-    readonly User: UserModel;
-    readonly Address: AddressModel;
-    readonly Comment: CommentModel;
-  }
->;
+type OrmModels = {
+  readonly Task: TaskModel;
+  readonly Bug: BugModel;
+  readonly Feature: FeatureModel;
+  readonly User: UserModel;
+  readonly Address: AddressModel;
+  readonly Comment: CommentModel;
+};
+
+type OrmStorage = MongoStorage & {
+  readonly collections: {
+    readonly tasks: Record<string, never>;
+    readonly users: Record<string, never>;
+  };
+};
+
+type OrmRoots = {
+  readonly tasks: 'Task';
+  readonly users: 'User';
+};
+
+type OrmContract = MongoContract<OrmStorage, OrmModels> & {
+  readonly roots: OrmRoots;
+};
 
 type OrmCodecTypes = {
   readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };

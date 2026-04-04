@@ -3,7 +3,6 @@
   "targetFamily": "sql",
   "target": "postgres",
   "storageHash": "sha256:8cee28de4a57172eef3735273e1d5bc4d99566cf0908622cdfba75744d7835af",
-  "executionHash": "sha256:387bc19a3c925deaaed136837125d95849d47666ea493500715677eb8bb0518e",
   "profileHash": "sha256:ffc50246dae57a96ebc1abc212db40a10706095adca83ab257d4cb15f62cd192",
   "roots": {
     "user": "User"
@@ -48,6 +47,7 @@
     }
   },
   "execution": {
+    "executionHash": "sha256:387bc19a3c925deaaed136837125d95849d47666ea493500715677eb8bb0518e",
     "mutations": {
       "defaults": [
         {

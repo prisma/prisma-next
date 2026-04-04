@@ -1,8 +1,9 @@
-import type {
-  Contract,
-  StorageBase,
-  TargetFamilyHook,
-  ValidationContext,
+import {
+  bigintJsonReplacer,
+  type Contract,
+  type StorageBase,
+  type TargetFamilyHook,
+  type ValidationContext,
 } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
@@ -113,7 +114,7 @@ export async function emit(
         regenerate: 'To regenerate, run: prisma-next contract emit',
       },
     },
-    null,
+    bigintJsonReplacer,
     2,
   );
 
