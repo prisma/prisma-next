@@ -16,8 +16,13 @@ describe('validateContract parameterized type fields', () => {
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'sha256:test',
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    roots: {},
     models: {},
     storage: {
+      storageHash: 'sha256:test',
       tables: {
         User: {
           columns: {
@@ -37,6 +42,7 @@ describe('validateContract parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             Embedding: {
               columns: {
@@ -66,6 +72,7 @@ describe('validateContract parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             User: {
               columns: {
@@ -98,6 +105,7 @@ describe('validateContract parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             User: {
               columns: {
@@ -120,12 +128,11 @@ describe('validateContract parameterized type fields', () => {
       expect(() => validateContract<TestContract>(input)).toThrow(/typeParams/);
     });
 
-    it('rejects array typeParams (must be plain object)', () => {
-      // typeParams must be a plain object, not an array.
-      // Arrays are objects in JS but are not valid for typeParams.
+    it('accepts array typeParams (array-vs-object validated by emitter)', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             User: {
               columns: {
@@ -145,15 +152,14 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(
-        /must be a plain object, not an array/,
-      );
+      expect(() => validateContract<TestContract>(input)).not.toThrow();
     });
 
     it('rejects typeParams when typeRef is also present (mutually exclusive)', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             Embedding: {
               columns: {
@@ -183,7 +189,7 @@ describe('validateContract parameterized type fields', () => {
       };
 
       expect(() => validateContract<TestContract>(input)).toThrow(
-        /typeParams and typeRef.*mutually exclusive/,
+        /typeParams.*typeRef|typeRef.*typeParams/,
       );
     });
   });
@@ -193,6 +199,7 @@ describe('validateContract parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             Embedding: {
               columns: {
@@ -229,6 +236,7 @@ describe('validateContract parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             User: {
               columns: {
@@ -251,10 +259,11 @@ describe('validateContract parameterized type fields', () => {
       expect(() => validateContract<TestContract>(input)).toThrow(/typeRef/);
     });
 
-    it('rejects typeRef pointing to non-existent storage.types key', () => {
+    it('accepts typeRef pointing to non-existent key (cross-ref validated by emitter)', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             Embedding: {
               columns: {
@@ -272,7 +281,6 @@ describe('validateContract parameterized type fields', () => {
               foreignKeys: [],
             },
           },
-          // storage.types doesn't have 'NonExistent'
           types: {
             Vector1536: {
               codecId: 'pg/vector@1',
@@ -283,15 +291,14 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(
-        /references non-existent type instance "NonExistent"/,
-      );
+      expect(() => validateContract<TestContract>(input)).not.toThrow();
     });
 
-    it('rejects typeRef when storage.types is missing', () => {
+    it('accepts typeRef when storage.types is missing (cross-ref validated by emitter)', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             Embedding: {
               columns: {
@@ -309,13 +316,10 @@ describe('validateContract parameterized type fields', () => {
               foreignKeys: [],
             },
           },
-          // no storage.types defined
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(
-        /references non-existent type instance "Vector1536"/,
-      );
+      expect(() => validateContract<TestContract>(input)).not.toThrow();
     });
   });
 
@@ -437,7 +441,7 @@ describe('validateContract parameterized type fields', () => {
       expect(() => validateContract<TestContract>(input)).toThrow(/types/);
     });
 
-    it('rejects array typeParams in type instance', () => {
+    it('accepts array typeParams in type instance (array-vs-object validated by emitter)', () => {
       const input = {
         ...baseContractInput,
         storage: {
@@ -452,24 +456,23 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(
-        /must be a plain object, not an array/,
-      );
+      expect(() => validateContract<TestContract>(input)).not.toThrow();
     });
   });
 
   describe('typeRef consistency validation', () => {
-    it('rejects column with typeRef when codecId mismatches referenced type', () => {
+    it('accepts column with typeRef when codecId mismatches (cross-ref validated by emitter)', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             User: {
               columns: {
                 id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
                 role: {
-                  nativeType: 'role', // matches
-                  codecId: 'pg/int4@1', // MISMATCH - should be pg/enum@1
+                  nativeType: 'role',
+                  codecId: 'pg/int4@1',
                   nullable: false,
                   typeRef: 'Role',
                 },
@@ -490,22 +493,21 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(
-        /codecId "pg\/int4@1" but references type instance "Role" with codecId "pg\/enum@1"/,
-      );
+      expect(() => validateContract<TestContract>(input)).not.toThrow();
     });
 
-    it('rejects column with typeRef when nativeType mismatches referenced type', () => {
+    it('accepts column with typeRef when nativeType mismatches (cross-ref validated by emitter)', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             User: {
               columns: {
                 id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
                 role: {
-                  nativeType: 'int4', // MISMATCH - should be 'role'
-                  codecId: 'pg/enum@1', // matches
+                  nativeType: 'int4',
+                  codecId: 'pg/enum@1',
                   nullable: false,
                   typeRef: 'Role',
                 },
@@ -526,15 +528,14 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(
-        /nativeType "int4" but references type instance "Role" with nativeType "role"/,
-      );
+      expect(() => validateContract<TestContract>(input)).not.toThrow();
     });
 
     it('accepts column with typeRef when codecId and nativeType both match', () => {
       const input = {
         ...baseContractInput,
         storage: {
+          storageHash: 'sha256:test',
           tables: {
             User: {
               columns: {

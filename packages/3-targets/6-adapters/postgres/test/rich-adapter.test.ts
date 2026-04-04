@@ -30,7 +30,12 @@ const contract = validateContract<PostgresContract>({
   targetFamily: 'sql',
   storageHash: 'sha256:test-core',
   profileHash: 'sha256:test-profile',
+  roots: {},
+  capabilities: {},
+  extensionPacks: {},
+  meta: {},
   storage: {
+    storageHash: 'sha256:test-core',
     tables: {
       user: {
         columns: {

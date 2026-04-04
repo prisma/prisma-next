@@ -1,10 +1,11 @@
 {
-  "$schema": "../../schemas/data-contract-sql-v1.json",
   "schemaVersion": "1",
   "target": "postgres",
   "targetFamily": "sql",
   "storageHash": "sha256:test-core",
   "profileHash": "sha256:test-profile",
+  "roots": {},
+  "meta": {},
   "models": {
     "User": {
       "storage": {
@@ -24,6 +25,7 @@
     }
   },
   "storage": {
+    "storageHash": "sha256:test-core",
     "tables": {
       "user": {
         "columns": {

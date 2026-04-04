@@ -13,6 +13,7 @@ describe('Operation capability gating', () => {
     const contract = validateContract<Contract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
+      storageHash: 'sha256:test-hash',
       profileHash: profileHash('sha256:test'),
       roots: {},
       extensionPacks: {},
@@ -73,6 +74,7 @@ describe('Operation capability gating', () => {
     const contract = validateContract<Contract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
+      storageHash: 'sha256:test-hash',
       profileHash: profileHash('sha256:test'),
       roots: {},
       extensionPacks: {},
@@ -129,6 +131,7 @@ describe('Operation capability gating', () => {
     const contract = validateContract<Contract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
+      storageHash: 'sha256:test-hash',
       profileHash: profileHash('sha256:test'),
       roots: {},
       extensionPacks: {},
@@ -184,6 +187,7 @@ describe('Operation capability gating', () => {
     const contract = validateContract<Contract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
+      storageHash: 'sha256:test-hash',
       profileHash: profileHash('sha256:test'),
       roots: {},
       extensionPacks: {},

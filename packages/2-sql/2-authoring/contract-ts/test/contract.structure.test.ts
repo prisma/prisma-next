@@ -9,8 +9,13 @@ describe('validateContract structure validation', () => {
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'sha256:test',
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    roots: {},
     models: {},
     storage: {
+      storageHash: 'sha256:test',
       tables: {
         User: {
           columns: {
@@ -51,10 +56,8 @@ describe('validateContract structure validation', () => {
     expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/target/);
   });
 
-  it('computes storageHash when missing from top level', () => {
-    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    const input = { ...validContractInput, storageHash: undefined } as any;
-    const result = validateContract<Contract<SqlStorage>>(input);
+  it('preserves storageHash in storage', () => {
+    const result = validateContract<Contract<SqlStorage>>(validContractInput);
     expect(result.storage.storageHash).toMatch(/^sha256:/);
   });
 
@@ -64,17 +67,17 @@ describe('validateContract structure validation', () => {
     expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/storage/);
   });
 
-  it('defaults missing models to empty object', () => {
+  it('throws on missing models', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, models: undefined } as any;
-    const result = validateContract<Contract<SqlStorage>>(invalid);
-    expect(result.models).toEqual({});
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/models/);
   });
 
   it('throws on invalid column type', () => {
     const invalid = {
       ...validContractInput,
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             columns: {
@@ -94,6 +97,7 @@ describe('validateContract structure validation', () => {
     const invalid = {
       ...validContractInput,
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             columns: {
@@ -118,8 +122,9 @@ describe('validateContract structure validation', () => {
       ...validContractInput,
       profileHash: 'sha256:profile',
       capabilities: { feature: { enabled: true } },
-      extensions: { pack: { config: true } },
+      extensionPacks: { pack: { config: true } },
       meta: { key: 'value' },
+      roots: {},
     };
     const result = validateContract<Contract<SqlStorage>>(withOptional);
     expect(result.profileHash).toBe('sha256:profile');

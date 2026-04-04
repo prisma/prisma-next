@@ -452,7 +452,7 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).not.toContain('SqlMappings');
-    expect(types).toContain('\n  Record<string, never>,\n  StorageHash,\n');
+    expect(types).toContain('storageHash: StorageHash');
   });
 
   it('generates models type with relations missing on/cols properties', () => {

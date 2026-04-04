@@ -83,7 +83,11 @@ describe('operations-registry', () => {
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'test-hash',
+    roots: {},
+    extensionPacks: {},
+    meta: {},
     storage: {
+      storageHash: 'test-hash',
       tables: {
         user: {
           columns: {
@@ -98,6 +102,7 @@ describe('operations-registry', () => {
       },
     },
     models: {},
+    capabilities: {},
   });
 
   it('attaches operations when registry is provided', () => {
@@ -158,7 +163,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -173,13 +182,18 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const contractWithCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -257,7 +271,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -313,7 +331,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -340,7 +362,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -448,7 +474,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -463,6 +493,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -597,7 +628,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -611,6 +646,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -666,7 +702,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -680,6 +720,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -741,7 +782,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -755,6 +800,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -820,7 +866,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -889,7 +939,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -903,6 +957,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -947,7 +1002,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -961,6 +1020,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1017,7 +1077,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1031,6 +1095,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1092,7 +1157,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1106,6 +1175,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1141,7 +1211,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1155,6 +1229,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1178,7 +1253,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1192,6 +1271,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1251,7 +1331,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1265,6 +1349,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1291,7 +1376,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1305,6 +1394,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1354,7 +1444,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1368,6 +1462,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1398,7 +1493,12 @@ describe('operations-registry', () => {
         target: 'postgres',
         targetFamily: 'sql',
         storageHash: 'test-hash',
+        roots: {},
+        capabilities: {},
+        extensionPacks: {},
+        meta: {},
         storage: {
+          storageHash: 'test-hash',
           tables: {
             user: {
               columns: {
@@ -1422,7 +1522,11 @@ describe('operations-registry', () => {
         target: 'postgres',
         targetFamily: 'sql',
         storageHash: 'test-hash',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
         storage: {
+          storageHash: 'test-hash',
           tables: {
             user: {
               columns: {
@@ -1451,7 +1555,11 @@ describe('operations-registry', () => {
         target: 'postgres',
         targetFamily: 'sql',
         storageHash: 'test-hash',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
         storage: {
+          storageHash: 'test-hash',
           tables: {
             user: {
               columns: {
@@ -1527,7 +1635,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1541,6 +1653,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1575,7 +1688,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1589,6 +1706,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1636,7 +1754,11 @@ describe('operations-registry', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'test-hash',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1650,6 +1772,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
