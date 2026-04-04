@@ -7,9 +7,12 @@ export type { MongoQueryExecutor } from '../executor';
 export type { MongoOrmClient, MongoOrmOptions } from '../mongo-orm';
 export { mongoOrm } from '../mongo-orm';
 export type {
+  IncludedRow,
   IncludeResultFields,
   InferFullRow,
   InferRootRow,
   MongoIncludeSpec,
   MongoWhereFilter,
+  NoIncludes,
+  SimplifyDeep,
 } from '../types';

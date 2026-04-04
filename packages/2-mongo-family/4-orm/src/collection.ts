@@ -11,7 +11,7 @@ import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';
 import { compileMongoQuery } from './compile';
 import type { MongoQueryExecutor } from './executor';
-import type { InferRootRow, ReferenceRelationKeys } from './types';
+import type { IncludedRow, MongoIncludeSpec, NoIncludes, ReferenceRelationKeys } from './types';
 
 type ModelFieldKeys<
   TContract extends MongoContract,
@@ -30,6 +30,7 @@ export interface MongoCollectionInit {
 export class MongoCollection<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
+  TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
 > {
   readonly #contract: TContract;
   readonly #modelName: ModelName;
@@ -51,19 +52,21 @@ export class MongoCollection<
     this.state = init.state ?? emptyCollectionState();
   }
 
-  where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName> {
+  where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes> {
     return this.#clone({
       filters: [...this.state.filters, filter],
     });
   }
 
-  select(...fields: ModelFieldKeys<TContract, ModelName>[]): MongoCollection<TContract, ModelName> {
+  select(
+    ...fields: ModelFieldKeys<TContract, ModelName>[]
+  ): MongoCollection<TContract, ModelName, TIncludes> {
     return this.#clone({ selectedFields: [...(this.state.selectedFields ?? []), ...fields] });
   }
 
-  include(
-    relationName: ReferenceRelationKeys<TContract, ModelName> & string,
-  ): MongoCollection<TContract, ModelName> {
+  include<K extends ReferenceRelationKeys<TContract, ModelName> & string>(
+    relationName: K,
+  ): MongoCollection<TContract, ModelName, TIncludes & Record<K, true>> {
     const model = this.#contract.models[this.#modelName] as MongoModelDefinition;
     const relation = model.relations?.[relationName];
     if (!relation) {
@@ -96,29 +99,29 @@ export class MongoCollection<
 
     return this.#clone({
       includes: [...this.state.includes, includeExpr],
-    });
+    }) as MongoCollection<TContract, ModelName, TIncludes & Record<K, true>>;
   }
 
   orderBy(
     spec: Partial<Record<ModelFieldKeys<TContract, ModelName>, 1 | -1>>,
-  ): MongoCollection<TContract, ModelName> {
+  ): MongoCollection<TContract, ModelName, TIncludes> {
     const merged = { ...this.state.orderBy, ...(spec as Readonly<Record<string, 1 | -1>>) };
     return this.#clone({ orderBy: merged });
   }
 
-  take(n: number): MongoCollection<TContract, ModelName> {
+  take(n: number): MongoCollection<TContract, ModelName, TIncludes> {
     return this.#clone({ limit: n });
   }
 
-  skip(n: number): MongoCollection<TContract, ModelName> {
+  skip(n: number): MongoCollection<TContract, ModelName, TIncludes> {
     return this.#clone({ offset: n });
   }
 
-  all(): AsyncIterableResult<InferRootRow<TContract, ModelName>> {
+  all(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>> {
     return this.#execute();
   }
 
-  async first(): Promise<InferRootRow<TContract, ModelName> | null> {
+  async first(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null> {
     const limited = this.#clone({ limit: 1 });
     const result = limited.#execute();
     for await (const row of result) {
@@ -127,33 +130,35 @@ export class MongoCollection<
     return null;
   }
 
-  #execute(): AsyncIterableResult<InferRootRow<TContract, ModelName>> {
+  #execute(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>> {
     const plan = this.#compile();
     return this.#executor.execute(plan);
   }
 
-  #compile(): MongoReadPlan<InferRootRow<TContract, ModelName>> {
-    return compileMongoQuery<InferRootRow<TContract, ModelName>>(
+  #compile(): MongoReadPlan<IncludedRow<TContract, ModelName, TIncludes>> {
+    return compileMongoQuery<IncludedRow<TContract, ModelName, TIncludes>>(
       this.#collectionName,
       this.state,
       this.#contract.storageHash,
     );
   }
 
-  #clone(overrides: Partial<MongoCollectionState>): MongoCollection<TContract, ModelName> {
+  #clone(
+    overrides: Partial<MongoCollectionState>,
+  ): MongoCollection<TContract, ModelName, TIncludes> {
     return this.#createSelf({
       ...this.state,
       ...overrides,
     });
   }
 
-  #createSelf(state: MongoCollectionState): MongoCollection<TContract, ModelName> {
+  #createSelf(state: MongoCollectionState): MongoCollection<TContract, ModelName, TIncludes> {
     const Ctor = this.constructor as new (
       contract: TContract,
       modelName: ModelName,
       executor: MongoQueryExecutor,
       init: MongoCollectionInit,
-    ) => MongoCollection<TContract, ModelName>;
+    ) => MongoCollection<TContract, ModelName, TIncludes>;
 
     return new Ctor(this.#contract, this.#modelName, this.#executor, {
       state,
