@@ -76,6 +76,7 @@ describe('schema', () => {
     targetFamily: 'sql',
     storageHash: 'test-hash',
     storage: {
+      storageHash: 'test-hash',
       tables: {
         user: {
           columns: {
@@ -183,6 +184,7 @@ describe('schema', () => {
       targetFamily: 'sql',
       storageHash: 'test-hash',
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
