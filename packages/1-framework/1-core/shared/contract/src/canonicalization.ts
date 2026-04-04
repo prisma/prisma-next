@@ -8,7 +8,6 @@ const TOP_LEVEL_ORDER = [
   'canonicalVersion',
   'targetFamily',
   'target',
-  'storageHash',
   'profileHash',
   'roots',
   'models',
@@ -85,6 +84,9 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isModelRelations =
         currentPath.length === 3 &&
         isArrayEqual([currentPath[0], currentPath[2]], ['models', 'relations']);
+      const isModelStorage =
+        currentPath.length === 3 &&
+        isArrayEqual([currentPath[0], currentPath[2]], ['models', 'storage']);
       const isTableUniques =
         currentPath.length === 4 &&
         isArrayEqual(
@@ -123,6 +125,7 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isRequiredExecutionDefaults &&
         !isExtensionNamespace &&
         !isModelRelations &&
+        !isModelStorage &&
         !isTableUniques &&
         !isTableIndexes &&
         !isTableForeignKeys &&
@@ -240,15 +243,17 @@ export type CanonicalContractInput = {
   readonly schemaVersion?: string | undefined;
   readonly targetFamily: string;
   readonly target: string;
-  readonly roots?: Record<string, string> | undefined;
+  readonly profileHash?: string | undefined;
+  readonly roots: Record<string, string>;
   readonly models: Record<string, unknown>;
+  // StorageBase is an interface without an index signature, so it is not
+  // assignable to Record<string, unknown>. The union allows callers to pass
+  // either the typed StorageBase or a plain record.
   readonly storage: StorageBase | Record<string, unknown>;
   readonly execution?: Record<string, unknown> | undefined;
   readonly extensionPacks: Record<string, unknown>;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly meta: Record<string, unknown>;
-  readonly storageHash?: string | undefined;
-  readonly profileHash?: string | undefined;
 };
 
 export function canonicalizeContractToObject(
@@ -259,7 +264,8 @@ export function canonicalizeContractToObject(
     ...(i['schemaVersion'] !== undefined ? { schemaVersion: i['schemaVersion'] } : {}),
     targetFamily: i['targetFamily'],
     target: i['target'],
-    ...(i['roots'] !== undefined ? { roots: i['roots'] } : {}),
+    ...(i['profileHash'] !== undefined ? { profileHash: i['profileHash'] } : {}),
+    roots: i['roots'],
     models: i['models'],
     storage: i['storage'],
     ...(i['execution'] !== undefined ? { execution: i['execution'] } : {}),
@@ -267,12 +273,6 @@ export function canonicalizeContractToObject(
     capabilities: i['capabilities'],
     meta: i['meta'],
   };
-  if (i['storageHash'] !== undefined) {
-    normalized['storageHash'] = i['storageHash'];
-  }
-  if (i['profileHash'] !== undefined) {
-    normalized['profileHash'] = i['profileHash'];
-  }
 
   const withDefaultsOmitted = omitDefaults(normalized, []) as Record<string, unknown>;
   const withSortedIndexes = sortIndexesAndUniques(withDefaultsOmitted['storage']);

@@ -10,6 +10,7 @@ function minimal(overrides?: Partial<CanonicalContractInput>): CanonicalContract
   return {
     targetFamily: 'sql',
     target: 'postgres',
+    roots: {},
     models: {},
     storage: { tables: {} },
     extensionPacks: {},
@@ -34,6 +35,7 @@ describe('canonicalizeContractToObject', () => {
     expect(keys).toEqual([
       'targetFamily',
       'target',
+      'roots',
       'models',
       'storage',
       'capabilities',
@@ -61,9 +63,11 @@ describe('canonicalizeContractToObject', () => {
     expect(result['execution']).toEqual({ mutations: { defaults: [] } });
   });
 
-  it('includes storageHash when provided', () => {
-    const result = canonicalizeContractToObject(minimal({ storageHash: 'sha256:abc' }));
-    expect(result['storageHash']).toBe('sha256:abc');
+  it('includes storageHash when provided inside storage', () => {
+    const result = canonicalizeContractToObject(
+      minimal({ storage: { tables: {}, storageHash: 'sha256:abc' } }),
+    );
+    expect(drill(result, 'storage')['storageHash']).toBe('sha256:abc');
   });
 
   it('includes profileHash when provided', () => {
@@ -71,9 +75,8 @@ describe('canonicalizeContractToObject', () => {
     expect(result['profileHash']).toBe('sha256:def');
   });
 
-  it('omits storageHash and profileHash when undefined', () => {
+  it('omits profileHash when undefined', () => {
     const result = canonicalizeContractToObject(minimal());
-    expect(result).not.toHaveProperty('storageHash');
     expect(result).not.toHaveProperty('profileHash');
   });
 
@@ -254,6 +257,23 @@ describe('default omission', () => {
     expect(storage['collections']).toEqual({ tasks: {} });
   });
 
+  it('preserves empty model storage (embedded documents)', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        models: {
+          Address: {
+            fields: { street: { codecId: 'string' } },
+            storage: {},
+            relations: {},
+            owner: 'User',
+          },
+        },
+      }),
+    );
+    const address = drill(result, 'models', 'Address');
+    expect(address['storage']).toEqual({});
+  });
+
   it('strips non-required empty objects', () => {
     const result = canonicalizeContractToObject(
       minimal({
@@ -388,7 +408,10 @@ describe('canonicalizeContract', () => {
   });
 
   it('produces identical output as JSON.stringify of canonicalizeContractToObject', () => {
-    const input = minimal({ storageHash: 'sha256:test', profileHash: 'sha256:profile' });
+    const input = minimal({
+      storage: { tables: {}, storageHash: 'sha256:test' },
+      profileHash: 'sha256:profile',
+    });
     const objResult = canonicalizeContractToObject(input);
     const strResult = canonicalizeContract(input);
     expect(JSON.parse(strResult)).toEqual(objResult);

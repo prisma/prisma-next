@@ -1,7 +1,6 @@
 import {
   bigintJsonReplacer,
   type Contract,
-  type StorageBase,
   type TargetFamilyHook,
   type ValidationContext,
 } from '@prisma-next/contract/types';
@@ -17,11 +16,12 @@ const CanonicalMetaSchema = type({
   '[string]': 'unknown',
 });
 
-const CanonicalContractSchema = type({
+const ContractJsonSchema = type({
   '+': 'reject',
   schemaVersion: 'string',
   targetFamily: 'string',
   target: 'string',
+  profileHash: 'string',
   models: type({ '[string]': 'unknown' }),
   roots: 'Record<string, string>',
   storage: type({ '[string]': 'unknown' }),
@@ -35,15 +35,8 @@ const CanonicalContractSchema = type({
   meta: CanonicalMetaSchema,
 });
 
-function stripStorageHash(storage: StorageBase): Record<string, unknown> {
-  const { storageHash: _, ...rest } = storage as Record<string, unknown> & {
-    storageHash: unknown;
-  };
-  return rest;
-}
-
-function assertCanonicalArtifactShape(value: unknown): void {
-  const result = CanonicalContractSchema(value);
+function assertContractJsonShape(value: unknown): void {
+  const result = ContractJsonSchema(value);
   if (result instanceof type.errors) {
     const issues = result
       .map((error) => {
@@ -84,27 +77,22 @@ export async function emit(
     schemaVersion: SCHEMA_VERSION,
     targetFamily: contract.targetFamily,
     target: contract.target,
+    profileHash: contract.profileHash,
     roots: contract.roots,
     models: contract.models as Record<string, unknown>,
-    storage: stripStorageHash(contract.storage),
+    storage: contract.storage,
     ...ifDefined('execution', contract.execution),
     extensionPacks: contract.extensionPacks,
     capabilities: contract.capabilities,
     meta: contract.meta,
   };
-  assertCanonicalArtifactShape(canonicalContract);
+  assertContractJsonShape(canonicalContract);
 
   const { storageHash } = contract.storage;
   const executionHash = contract.execution?.executionHash;
   const { profileHash } = contract;
 
-  const contractWithHashes = {
-    ...canonicalContract,
-    storageHash,
-    profileHash,
-  };
-
-  const canonicalized = canonicalizeContractToObject(contractWithHashes);
+  const canonicalized = canonicalizeContractToObject(canonicalContract);
   const contractJsonString = JSON.stringify(
     {
       ...canonicalized,
