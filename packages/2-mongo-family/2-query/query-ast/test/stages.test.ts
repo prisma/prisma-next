@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { MongoFilterExpr } from '../src/filter-expressions';
 import { MongoFieldFilter } from '../src/filter-expressions';
 import {
   MongoLimitStage,
