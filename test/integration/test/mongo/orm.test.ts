@@ -2,8 +2,8 @@ import { validateMongoContract } from '@prisma-next/mongo-core';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { MongoFieldFilter } from '@prisma-next/mongo-query-ast';
 import { expect, expectTypeOf, it } from 'vitest';
-import type { Contract } from './fixtures/orm-contract';
-import ormContractJson from './fixtures/orm-contract.json';
+import type { Contract } from './fixtures/generated/contract';
+import ormContractJson from './fixtures/generated/contract.json';
 import { describeWithMongoDB } from './setup';
 
 const { contract } = validateMongoContract<Contract>(ormContractJson);
