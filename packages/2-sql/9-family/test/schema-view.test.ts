@@ -1,41 +1,49 @@
-import type { TargetDescriptor } from '@prisma-next/framework-components/components';
+import type { ControlFamilyDescriptor } from '@prisma-next/framework-components/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
-import type { SqlControlAdapterDescriptor } from '../src/core/migrations/types';
 
-function createMockTarget(): TargetDescriptor<'sql', 'postgres'> &
-  SqlControlDescriptorWithContributions {
-  return {
-    kind: 'target',
-    id: 'postgres',
-    version: '0.0.1',
-    familyId: 'sql',
-    targetId: 'postgres',
-    operationSignatures: () => [],
-  };
-}
-
-function createMockAdapter(): SqlControlAdapterDescriptor<'postgres'> {
-  return {
-    kind: 'adapter',
-    id: 'postgres',
-    version: '0.0.1',
-    familyId: 'sql',
-    targetId: 'postgres',
-    operationSignatures: () => [],
-    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
-  };
+function createMockStack() {
+  return createControlStack({
+    family: {
+      kind: 'family',
+      id: 'sql',
+      familyId: 'sql',
+      version: '0.0.1',
+      create: (() => ({})) as unknown as ControlFamilyDescriptor<'sql'>['create'],
+      hook: {
+        id: 'sql',
+        validateTypes() {},
+        validateStructure() {},
+        generateContractTypes: () => '',
+      },
+    },
+    target: {
+      kind: 'target',
+      id: 'postgres',
+      version: '0.0.1',
+      familyId: 'sql',
+      targetId: 'postgres',
+      operationSignatures: () => [],
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    },
+    adapter: {
+      kind: 'adapter',
+      id: 'postgres',
+      version: '0.0.1',
+      familyId: 'sql',
+      targetId: 'postgres',
+      operationSignatures: () => [],
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    },
+    extensionPacks: [],
+  });
 }
 
 describe('SqlFamilyInstance.toSchemaView', () => {
   it('stores column defaults in meta, not in label', () => {
-    const familyInstance = createSqlFamilyInstance({
-      target: createMockTarget(),
-      adapter: createMockAdapter(),
-      extensionPacks: [],
-    });
+    const familyInstance = createSqlFamilyInstance(createMockStack());
 
     const schema: SqlSchemaIR = {
       tables: {
@@ -46,13 +54,13 @@ describe('SqlFamilyInstance.toSchemaView', () => {
               name: 'id',
               nativeType: 'int4',
               nullable: false,
-              default: "nextval('users_id_seq'::regclass)", // Raw Postgres default
+              default: "nextval('users_id_seq'::regclass)",
             },
             status: {
               name: 'status',
               nativeType: 'text',
               nullable: false,
-              default: "'draft'::text", // Raw Postgres default
+              default: "'draft'::text",
             },
           },
           primaryKey: { columns: ['id'] },
@@ -71,8 +79,6 @@ describe('SqlFamilyInstance.toSchemaView', () => {
     const columnsGroup = userTable?.children?.find((n) => n.id === 'columns-User');
     expect(columnsGroup?.kind).toBe('collection');
 
-    // Defaults are in meta (for JSON/programmatic access), not in label (for tree output)
-    // Defaults are now raw strings from the database
     const idNode = columnsGroup?.children?.find((n) => n.id === 'column-User-id');
     expect(idNode?.kind).toBe('field');
     expect(idNode?.label).toBe('id: int4 (not nullable)');
@@ -93,11 +99,7 @@ describe('SqlFamilyInstance.toSchemaView', () => {
   });
 
   it('renders dependency nodes with dependency-oriented wording', () => {
-    const familyInstance = createSqlFamilyInstance({
-      target: createMockTarget(),
-      adapter: createMockAdapter(),
-      extensionPacks: [],
-    });
+    const familyInstance = createSqlFamilyInstance(createMockStack());
 
     const schema: SqlSchemaIR = {
       tables: {},

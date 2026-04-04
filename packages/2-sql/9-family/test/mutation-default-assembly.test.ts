@@ -12,7 +12,6 @@ function createDescriptor(
 ): SqlControlDescriptorWithContributions {
   return {
     id,
-    operationSignatures: () => [],
     ...options,
   };
 }

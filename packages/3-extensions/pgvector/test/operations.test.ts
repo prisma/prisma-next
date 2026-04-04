@@ -1,4 +1,5 @@
 import { createOperationRegistry } from '@prisma-next/operations';
+import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../src/exports/runtime';
@@ -22,7 +23,7 @@ describe('pgvector operations', () => {
   });
 
   it('descriptor provides operation signatures', () => {
-    const operations = pgvectorDescriptor.operationSignatures();
+    const operations = pgvectorDescriptor.operationSignatures!() as SqlOperationSignature[];
     expect(operations).toBeDefined();
     expect(operations.length).toBe(2);
 
@@ -50,7 +51,7 @@ describe('pgvector operations', () => {
   });
 
   it('operations can be registered in operation registry', () => {
-    const operations = pgvectorDescriptor.operationSignatures();
+    const operations = pgvectorDescriptor.operationSignatures!();
     expect(operations).toBeDefined();
 
     const registry = createOperationRegistry();
