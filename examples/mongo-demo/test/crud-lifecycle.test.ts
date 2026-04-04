@@ -1,6 +1,5 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import type { MongoLoweringContext } from '@prisma-next/mongo-core';
 import { validateMongoContract } from '@prisma-next/mongo-core';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { MongoFieldFilter } from '@prisma-next/mongo-query-ast';
@@ -29,8 +28,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
 
     const adapter = createMongoAdapter();
     const driver = await createMongoDriver(replSet.getUri(), dbName);
-    const loweringContext: MongoLoweringContext = { contract };
-    runtime = createMongoRuntime({ adapter, driver, loweringContext });
+    runtime = createMongoRuntime({ adapter, driver });
   }, timeouts.spinUpDbServer);
 
   beforeEach(async () => {
