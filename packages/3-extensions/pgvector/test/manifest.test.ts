@@ -1,3 +1,4 @@
+import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { pgvectorExtensionDescriptor } from '../src/exports/control';
@@ -31,7 +32,8 @@ describe('pgvector descriptor', () => {
   });
 
   it('has cosineDistance operation via operationSignatures()', () => {
-    const operations = pgvectorExtensionDescriptor.operationSignatures();
+    const operations =
+      pgvectorExtensionDescriptor.operationSignatures!() as SqlOperationSignature[];
     expect(operations.length).toBe(2);
 
     const cosineDistanceOp = operations.find(
@@ -49,7 +51,8 @@ describe('pgvector descriptor', () => {
   });
 
   it('has cosineSimilarity operation via operationSignatures()', () => {
-    const operations = pgvectorExtensionDescriptor.operationSignatures();
+    const operations =
+      pgvectorExtensionDescriptor.operationSignatures!() as SqlOperationSignature[];
 
     const cosineSimilarityOp = operations.find(
       (op) => op.forTypeId === 'pg/vector@1' && op.method === 'cosineSimilarity',

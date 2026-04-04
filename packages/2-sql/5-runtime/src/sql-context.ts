@@ -10,11 +10,11 @@ import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
 } from '@prisma-next/core-execution-plane/types';
+import type { ComponentMetadata } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type {
   Adapter,
   AnyQueryAst,
@@ -51,7 +51,6 @@ export type RuntimeParameterizedCodecDescriptor<
 
 export interface SqlStaticContributions {
   readonly codecs: () => CodecRegistry;
-  readonly operationSignatures: () => ReadonlyArray<SqlOperationSignature>;
   // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
   readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
   readonly queryOperations?: () => ReadonlyArray<QueryOperationDescriptor>;
@@ -456,17 +455,14 @@ export function createExecutionContext<
   const codecRegistry = createCodecRegistry();
   const operationRegistry = createOperationRegistry();
 
-  const contributors: Array<SqlStaticContributions & { readonly id: string }> = [
-    stack.target,
-    stack.adapter,
-    ...stack.extensionPacks,
-  ];
+  const contributors: Array<SqlStaticContributions & ComponentMetadata & { readonly id: string }> =
+    [stack.target, stack.adapter, ...stack.extensionPacks];
 
   for (const contributor of contributors) {
     for (const c of contributor.codecs().values()) {
       codecRegistry.register(c);
     }
-    for (const operation of contributor.operationSignatures()) {
+    for (const operation of contributor.operationSignatures?.() ?? []) {
       operationRegistry.register(operation);
     }
   }
