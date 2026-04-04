@@ -336,7 +336,7 @@ describe('family instance verify - errors', () => {
               dbUrl: connectionString,
               contractPath: join(testDirWithDb, 'output/contract.json'),
             }),
-          ).rejects.toThrow('Contract is missing required fields: storageHash or target');
+          ).rejects.toThrow('Contract is missing required fields: storage or target');
         } finally {
           if (existsSync(testDirWithDb)) {
             rmSync(testDirWithDb, { recursive: true, force: true });

@@ -39,7 +39,6 @@ export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Pro
     contract: {
       target: 'mongo',
       targetFamily: 'mongo',
-      storageHash: 'test-hash',
       roots: {},
       storage: { storageHash: coreHash('sha256:test'), collections: {} },
       models: {},

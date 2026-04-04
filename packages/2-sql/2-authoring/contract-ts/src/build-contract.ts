@@ -13,8 +13,10 @@ import type {
   ContractRelation,
   ExecutionMutationDefault,
   ExecutionMutationDefaultValue,
+  StorageHashBase,
   TaggedRaw,
 } from '@prisma-next/contract/types';
+import { coreHash } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
   ContractBuilderState,
@@ -193,14 +195,14 @@ export function buildContract(state: RuntimeBuilderState): Contract<SqlStorage> 
     tables: storageTables,
     types: storageTypes,
   };
-  const storageHash =
-    state.storageHash ??
-    computeStorageHash({
-      target,
-      targetFamily,
-      storage: storageWithoutHash,
-    });
-  const storage = { ...storageWithoutHash, storageHash };
+  const storageHash: StorageHashBase<string> = state.storageHash
+    ? coreHash(state.storageHash)
+    : computeStorageHash({
+        target,
+        targetFamily,
+        storage: storageWithoutHash,
+      });
+  const storage: SqlStorage = { ...storageWithoutHash, storageHash };
 
   const executionSection =
     executionDefaults.length > 0
