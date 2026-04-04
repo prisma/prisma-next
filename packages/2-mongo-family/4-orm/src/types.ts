@@ -151,3 +151,16 @@ export type IncludedRow<
   ModelName extends string & keyof TContract['models'],
   TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
 > = InferRootRow<TContract, ModelName> & IncludeResultFields<TContract, ModelName, TIncludes>;
+
+export type DefaultModelRow<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+> = InferModelRow<TContract, ModelName>;
+
+export type CreateInput<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+> = Omit<InferModelRow<TContract, ModelName>, '_id'> &
+  Partial<
+    Pick<InferModelRow<TContract, ModelName>, '_id' & keyof InferModelRow<TContract, ModelName>>
+  >;
