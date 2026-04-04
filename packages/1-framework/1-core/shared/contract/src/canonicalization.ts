@@ -251,7 +251,9 @@ export type CanonicalContractInput = {
   readonly profileHash?: string | undefined;
 };
 
-export function canonicalizeContract(input: CanonicalContractInput): string {
+export function canonicalizeContractToObject(
+  input: CanonicalContractInput,
+): Record<string, unknown> {
   const i = input as Record<string, unknown>;
   const normalized: Record<string, unknown> = {
     ...(i['schemaVersion'] !== undefined ? { schemaVersion: i['schemaVersion'] } : {}),
@@ -276,7 +278,9 @@ export function canonicalizeContract(input: CanonicalContractInput): string {
   const withSortedIndexes = sortIndexesAndUniques(withDefaultsOmitted['storage']);
   const withSortedStorage = { ...withDefaultsOmitted, storage: withSortedIndexes };
   const withSortedKeys = sortObjectKeys(withSortedStorage) as Record<string, unknown>;
-  const withOrderedTopLevel = orderTopLevel(withSortedKeys);
+  return orderTopLevel(withSortedKeys);
+}
 
-  return JSON.stringify(withOrderedTopLevel, bigintJsonReplacer, 2);
+export function canonicalizeContract(input: CanonicalContractInput): string {
+  return JSON.stringify(canonicalizeContractToObject(input), bigintJsonReplacer, 2);
 }
