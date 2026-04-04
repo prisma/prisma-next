@@ -41,7 +41,7 @@ The aggregation pipeline is the single query representation for reads. The ORM c
 
 Produce a `find()` call when the query has no `$lookup` or other pipeline-only stages, since `find()` can be marginally faster for simple filter+sort+limit queries.
 
-**Rejected.** The performance difference is marginal on modern MongoDB — the query planner optimizes both paths. The cost of maintaining two code paths far outweighs the micro-optimization. If profiling ever shows a measurable difference, the adapter can internally emit `find()` for trivially simple pipelines as an invisible optimization — this doesn't need to be exposed in the query plan.
+**Rejected.** The performance difference is marginal on modern MongoDB — the query planner optimizes both paths. The cost of maintaining two code paths far outweighs the micro-optimization.
 
 ## Costs
 
