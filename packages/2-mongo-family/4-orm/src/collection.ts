@@ -377,8 +377,9 @@ class MongoCollectionImpl<
   }
 
   #mergeFilters(): MongoFilterExpr {
-    if (this.#state.filters.length === 1) {
-      return this.#state.filters[0]!;
+    const [single] = this.#state.filters;
+    if (this.#state.filters.length === 1 && single) {
+      return single;
     }
     return MongoAndExpr.of([...this.#state.filters]);
   }
@@ -394,7 +395,7 @@ class MongoCollectionImpl<
   #planMeta(): PlanMeta {
     return {
       target: 'mongo',
-      storageHash: this.#contract.storageHash,
+      storageHash: this.#contract.storage.storageHash,
       lane: 'mongo-orm',
       paramDescriptors: [],
     };

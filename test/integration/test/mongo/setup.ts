@@ -1,7 +1,5 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
-import { profileHash, type StorageHashBase } from '@prisma-next/contract/types';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import type { MongoLoweringContext } from '@prisma-next/mongo-core';
 import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
@@ -45,20 +43,7 @@ export function describeWithMongoDB(name: string, fn: (ctx: MongodContext) => vo
 
       const adapter = createMongoAdapter();
       const driver = await createMongoDriver(replSet.getUri(), dbName);
-      const loweringContext: MongoLoweringContext = {
-        contract: {
-          targetFamily: 'mongo',
-          target: 'mongo',
-          roots: {},
-          storage: { collections: {}, storageHash: 'sha256:test' as StorageHashBase<string> },
-          models: {},
-          capabilities: {},
-          extensionPacks: {},
-          profileHash: profileHash('sha256:test'),
-          meta: {},
-        },
-      };
-      runtime = createMongoRuntime({ adapter, driver, loweringContext });
+      runtime = createMongoRuntime({ adapter, driver });
     }, timeouts.spinUpDbServer);
 
     beforeEach(async () => {
