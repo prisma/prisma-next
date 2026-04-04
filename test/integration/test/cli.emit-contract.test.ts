@@ -1,7 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
+import { emit } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers';
@@ -52,22 +54,15 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      // Create family instance (assembles operation registry, type imports, extension IDs)
-      if (!config.driver) {
-        throw new Error('Config.driver is required');
-      }
-      const familyInstance = config.family.create(
-        createControlStack({
-          family: config.family,
-          target: config.target,
-          adapter: config.adapter,
-          driver: config.driver,
-          extensionPacks: config.extensionPacks ?? [],
-        }),
-      );
+      const stack = createControlStack({
+        family: config.family,
+        target: config.target,
+        adapter: config.adapter,
+        driver: config.driver,
+        extensionPacks: config.extensionPacks ?? [],
+      });
 
-      // emitContract handles stripping mappings and validation internally
-      const result = await familyInstance.emitContract({ contract: contractRaw });
+      const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
       expect(result).toBeDefined();
       expect(result.storageHash).toBeDefined();
@@ -114,22 +109,15 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      // Create family instance (assembles operation registry, type imports, extension IDs)
-      if (!config.driver) {
-        throw new Error('Config.driver is required');
-      }
-      const familyInstance = config.family.create(
-        createControlStack({
-          family: config.family,
-          target: config.target,
-          adapter: config.adapter,
-          driver: config.driver,
-          extensionPacks: config.extensionPacks ?? [],
-        }),
-      );
+      const stack = createControlStack({
+        family: config.family,
+        target: config.target,
+        adapter: config.adapter,
+        driver: config.driver,
+        extensionPacks: config.extensionPacks ?? [],
+      });
 
-      // emitContract handles stripping mappings and validation internally
-      const result = await familyInstance.emitContract({ contract: contractRaw });
+      const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
       // Write files and verify paths (dts is colocated with json)
       const contractJsonPath = resolve(testDir, contractConfig.output);
@@ -171,22 +159,15 @@ describe('emitContract API', () => {
           throw new Error('Contract config must have output path');
         }
 
-        // Create family instance (assembles operation registry, type imports, extension IDs)
-        if (!config.driver) {
-          throw new Error('Config.driver is required');
-        }
-        const familyInstance = config.family.create(
-          createControlStack({
-            family: config.family,
-            target: config.target,
-            adapter: config.adapter,
-            driver: config.driver,
-            extensionPacks: config.extensionPacks ?? [],
-          }),
-        );
+        const stack = createControlStack({
+          family: config.family,
+          target: config.target,
+          adapter: config.adapter,
+          driver: config.driver,
+          extensionPacks: config.extensionPacks ?? [],
+        });
 
-        // emitContract handles stripping mappings and validation internally
-        const result = await familyInstance.emitContract({ contract: contractRaw });
+        const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
         // Write files (dts is colocated with json)
         const contractJsonPath = resolve(customTestDir, contractConfig.output);
@@ -220,22 +201,15 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      // Create family instance (assembles operation registry, type imports, extension IDs)
-      if (!config.driver) {
-        throw new Error('Config.driver is required');
-      }
-      const familyInstance = config.family.create(
-        createControlStack({
-          family: config.family,
-          target: config.target,
-          adapter: config.adapter,
-          driver: config.driver,
-          extensionPacks: config.extensionPacks ?? [],
-        }),
-      );
+      const stack = createControlStack({
+        family: config.family,
+        target: config.target,
+        adapter: config.adapter,
+        driver: config.driver,
+        extensionPacks: config.extensionPacks ?? [],
+      });
 
-      // emitContract handles stripping mappings and validation internally
-      const result = await familyInstance.emitContract({ contract: contractRaw });
+      const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
       // profileHash is always present
       expect(typeof result.profileHash).toBe('string');
@@ -260,22 +234,15 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      // Create family instance (assembles operation registry, type imports, extension IDs)
-      if (!config.driver) {
-        throw new Error('Config.driver is required');
-      }
-      const familyInstance = config.family.create(
-        createControlStack({
-          family: config.family,
-          target: config.target,
-          adapter: config.adapter,
-          driver: config.driver,
-          extensionPacks: config.extensionPacks ?? [],
-        }),
-      );
+      const stack = createControlStack({
+        family: config.family,
+        target: config.target,
+        adapter: config.adapter,
+        driver: config.driver,
+        extensionPacks: config.extensionPacks ?? [],
+      });
 
-      // emitContract handles stripping mappings and validation internally
-      const result = await familyInstance.emitContract({ contract: contractRaw });
+      const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
       // Timings are no longer returned in the result
       expect(result).toBeDefined();
@@ -300,22 +267,15 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      // Create family instance (assembles operation registry, type imports, extension IDs)
-      if (!config.driver) {
-        throw new Error('Config.driver is required');
-      }
-      const familyInstance = config.family.create(
-        createControlStack({
-          family: config.family,
-          target: config.target,
-          adapter: config.adapter,
-          driver: config.driver,
-          extensionPacks: config.extensionPacks ?? [],
-        }),
-      );
+      const stack = createControlStack({
+        family: config.family,
+        target: config.target,
+        adapter: config.adapter,
+        driver: config.driver,
+        extensionPacks: config.extensionPacks ?? [],
+      });
 
-      // emitContract handles stripping mappings and validation internally
-      const result = await familyInstance.emitContract({ contract: contractRaw });
+      const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
       expect(result).toBeDefined();
     },

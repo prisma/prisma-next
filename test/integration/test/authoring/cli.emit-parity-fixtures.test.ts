@@ -4,7 +4,9 @@ import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-em
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/cli/config-types';
 import { enrichContract } from '@prisma-next/cli/control-api';
+import { emit } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { executeCommand, setupCommandMocks } from '../utils/cli-test-helpers';
@@ -106,15 +108,14 @@ describe('emit parity fixtures', () => {
             throw new Error(`PSL provider failed: ${pslProviderResultFirst.failure.summary}`);
           }
 
-          const familyInstance = tsConfig.family.create(
-            createControlStack({
-              family: tsConfig.family,
-              target: tsConfig.target,
-              adapter: tsConfig.adapter,
-              driver: tsConfig.driver,
-              extensionPacks: tsConfig.extensionPacks ?? [],
-            }),
-          );
+          const stack = createControlStack({
+            family: tsConfig.family,
+            target: tsConfig.target,
+            adapter: tsConfig.adapter,
+            driver: tsConfig.driver,
+            extensionPacks: tsConfig.extensionPacks ?? [],
+          });
+          const familyInstance = tsConfig.family.create(stack);
 
           const frameworkComponents = [
             tsConfig.target,
@@ -128,10 +129,10 @@ describe('emit parity fixtures', () => {
           const normalizedPsl = familyInstance.validateContract(enrichedPsl);
           expect(normalizedTs).toEqual(normalizedPsl);
 
-          const tsEmitFirst = await familyInstance.emitContract({ contract: normalizedTs });
-          const tsEmitSecond = await familyInstance.emitContract({ contract: normalizedTs });
-          const pslEmitFirst = await familyInstance.emitContract({ contract: normalizedPsl });
-          const pslEmitSecond = await familyInstance.emitContract({ contract: normalizedPsl });
+          const tsEmitFirst = await emit(normalizedTs, stack, sqlTargetFamilyHook);
+          const tsEmitSecond = await emit(normalizedTs, stack, sqlTargetFamilyHook);
+          const pslEmitFirst = await emit(normalizedPsl, stack, sqlTargetFamilyHook);
+          const pslEmitSecond = await emit(normalizedPsl, stack, sqlTargetFamilyHook);
 
           expect(tsEmitFirst).toMatchObject({
             contractJson: tsEmitSecond.contractJson,

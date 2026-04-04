@@ -8,7 +8,6 @@ import type { EmitStackInput } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
 import { createTestContract } from '@prisma-next/emitter/test/utils';
 import {
-  assembleOperationRegistry,
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,
@@ -16,7 +15,7 @@ import {
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getSqlDescriptorBundle } from '../utils/framework-components';
+import { assembleOperationRegistry, getSqlDescriptorBundle } from '../utils/framework-components';
 
 const execFileAsync = promisify(execFile);
 

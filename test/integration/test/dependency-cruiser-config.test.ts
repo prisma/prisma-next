@@ -22,7 +22,7 @@ function regexesContaining(fragment: string): RegExp[] {
 
 describe('dependency-cruiser config glob normalization', () => {
   it('matches file-specific glob targets', () => {
-    const target = 'packages/2-sql/3-tooling/family/src/exports/control.ts';
+    const target = 'packages/2-sql/9-family/src/exports/control.ts';
     const regexes = regexesContaining(target);
 
     expect(regexes.length).toBeGreaterThan(0);

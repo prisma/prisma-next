@@ -2,12 +2,14 @@ import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient, enrichContract } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
+import { emit } from '@prisma-next/emitter';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql, {
   assembleAuthoringContributions,
   assemblePslInterpretationContributions,
 } from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
@@ -61,17 +63,15 @@ describe(
       }
 
       const enrichedIR = enrichContract(pslResult.value, frameworkComponents);
-      const familyInstance = sql.create(
-        createControlStack({
-          family: sql,
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: undefined,
-          extensionPacks: [pgvector],
-        }),
-      );
+      const stack = createControlStack({
+        family: sql,
+        target: postgres,
+        adapter: postgresAdapter,
+        driver: undefined,
+        extensionPacks: [pgvector],
+      });
 
-      const emitted = await familyInstance.emitContract({ contract: enrichedIR });
+      const emitted = await emit(enrichedIR, stack, sqlTargetFamilyHook);
       return JSON.parse(emitted.contractJson) as Record<string, unknown>;
     }
 
