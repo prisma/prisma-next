@@ -14,6 +14,7 @@ import {
   serializeObjectKey,
   serializeValue,
 } from '@prisma-next/emitter/domain-type-generation';
+import type { MongoStorage } from '@prisma-next/mongo-core';
 
 interface MongoModelIR {
   readonly fields: Record<string, { readonly codecId: string; readonly nullable: boolean }>;
@@ -23,10 +24,6 @@ interface MongoModelIR {
   readonly variants?: Record<string, unknown>;
   readonly base?: string;
   readonly owner?: string;
-}
-
-interface MongoStorageIR {
-  readonly collections: Record<string, Record<string, unknown>>;
 }
 
 function generateModelFieldsType(
@@ -98,7 +95,7 @@ function generateModelsType(models: Record<string, MongoModelIR>): string {
   return `{ ${modelTypes.join('; ')} }`;
 }
 
-function generateStorageType(storage: MongoStorageIR): string {
+function generateStorageType(storage: MongoStorage): string {
   const collectionEntries: string[] = [];
   for (const [collName, collVal] of Object.entries(storage.collections)) {
     if (Object.keys(collVal).length === 0) {
@@ -145,7 +142,7 @@ export const mongoTargetFamilyHook = {
       throw new Error(`Expected targetFamily "mongo", got "${contract.targetFamily}"`);
     }
 
-    const storage = contract.storage as unknown as MongoStorageIR | undefined;
+    const storage = contract.storage as MongoStorage | undefined;
     if (!storage || !storage.collections || typeof storage.collections !== 'object') {
       throw new Error('Mongo contract must have storage.collections');
     }
@@ -247,7 +244,7 @@ export const mongoTargetFamilyHook = {
   ): string {
     const parameterizedTypeImports = options?.parameterizedTypeImports;
     const models = contract.models as Record<string, MongoModelIR>;
-    const storage = contract.storage as unknown as MongoStorageIR;
+    const storage = contract.storage as MongoStorage;
 
     const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
     if (parameterizedTypeImports) {
