@@ -20,7 +20,11 @@ describe('updateMany integration', () => {
         MongoFieldFilter.eq('status', new MongoParamRef('active')),
         { $set: { status: new MongoParamRef('archived') } },
       );
-      const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
+      const rows = await ctx.runtime.execute({
+        collection: collectionName,
+        command,
+        meta: ctx.stubMeta,
+      });
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ matchedCount: 2, modifiedCount: 2 });
     });

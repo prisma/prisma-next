@@ -19,7 +19,11 @@ describe('updateOne integration', () => {
         MongoFieldFilter.eq('name', new MongoParamRef('Alice')),
         { $set: { age: new MongoParamRef(31) } },
       );
-      const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
+      const rows = await ctx.runtime.execute({
+        collection: collectionName,
+        command,
+        meta: ctx.stubMeta,
+      });
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ matchedCount: 1, modifiedCount: 1 });
 

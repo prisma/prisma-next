@@ -1,4 +1,4 @@
-import { MongoFieldFilter, MongoMatchStage } from '@prisma-next/mongo-query-ast';
+import { AggregateCommand, MongoFieldFilter, MongoMatchStage } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 
@@ -14,12 +14,14 @@ describe('execute (read plan)', () => {
         { name: 'Carol', role: 'admin' },
       ]);
 
-      const plan = {
+      const command = new AggregateCommand(collectionName, [
+        new MongoMatchStage(MongoFieldFilter.eq('role', 'admin')),
+      ]);
+      const rows = await ctx.runtime.execute<{ name: string; role: string }>({
         collection: collectionName,
-        stages: [new MongoMatchStage(MongoFieldFilter.eq('role', 'admin'))],
+        command,
         meta: ctx.stubMeta,
-      };
-      const rows = await ctx.runtime.execute<{ name: string; role: string }>(plan);
+      });
       expect(rows).toHaveLength(2);
       expect(rows.map((r) => r.name).sort()).toEqual(['Alice', 'Carol']);
     });

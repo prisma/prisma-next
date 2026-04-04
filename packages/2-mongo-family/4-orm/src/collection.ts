@@ -7,7 +7,11 @@ import type {
   MongoValue,
 } from '@prisma-next/mongo-core';
 import { MongoParamRef } from '@prisma-next/mongo-core';
-import type { AnyMongoCommand, MongoFilterExpr, MongoReadPlan } from '@prisma-next/mongo-query-ast';
+import type {
+  AnyMongoCommand,
+  MongoFilterExpr,
+  MongoQueryPlan,
+} from '@prisma-next/mongo-query-ast';
 import {
   DeleteManyCommand,
   FindOneAndDeleteCommand,
@@ -193,7 +197,7 @@ class MongoCollectionImpl<
   ): Promise<IncludedRow<TContract, ModelName, TIncludes>> {
     const document = this.#toDocument(data as Record<string, unknown>);
     const command = new InsertOneCommand(this.#collectionName, document);
-    const results = await this.#executeCommand(command);
+    const results = await this.#drainPlan(command);
     const insertedId = (results[0] as { insertedId: unknown }).insertedId;
     return { _id: insertedId, ...(data as object) } as unknown as IncludedRow<
       TContract,
@@ -209,7 +213,7 @@ class MongoCollectionImpl<
     async function* gen(): AsyncGenerator<IncludedRow<TContract, ModelName, TIncludes>> {
       const documents = data.map((d) => self.#toDocument(d as Record<string, unknown>));
       const command = new InsertManyCommand(self.#collectionName, documents);
-      const results = await self.#executeCommand(command);
+      const results = await self.#drainPlan(command);
       const insertedIds = (results[0] as { insertedIds: readonly unknown[] }).insertedIds;
       for (let i = 0; i < data.length; i++) {
         yield { _id: insertedIds[i], ...(data[i] as object) } as unknown as IncludedRow<
@@ -225,7 +229,7 @@ class MongoCollectionImpl<
   async createCount(data: ReadonlyArray<CreateInput<TContract, ModelName>>): Promise<number> {
     const documents = data.map((d) => this.#toDocument(d as Record<string, unknown>));
     const command = new InsertManyCommand(this.#collectionName, documents);
-    const results = await this.#executeCommand(command);
+    const results = await this.#drainPlan(command);
     return (results[0] as { insertedCount: number }).insertedCount;
   }
 
@@ -236,7 +240,7 @@ class MongoCollectionImpl<
     const filter = this.#mergeFilters();
     const updateDoc = this.#toUpdateDocument(data as Record<string, unknown>);
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, false);
-    const results = await this.#executeCommand(command);
+    const results = await this.#drainPlan(command);
     return (results[0] as IncludedRow<TContract, ModelName, TIncludes>) ?? null;
   }
 
@@ -249,7 +253,7 @@ class MongoCollectionImpl<
       const filter = self.#mergeFilters();
       const updateDoc = self.#toUpdateDocument(data as Record<string, unknown>);
       const command = new UpdateManyCommand(self.#collectionName, filter, updateDoc);
-      await self.#executeCommand(command);
+      await self.#drainPlan(command);
       const readResult = self.#execute();
       yield* readResult;
     }
@@ -261,7 +265,7 @@ class MongoCollectionImpl<
     const filter = this.#mergeFilters();
     const updateDoc = this.#toUpdateDocument(data as Record<string, unknown>);
     const command = new UpdateManyCommand(this.#collectionName, filter, updateDoc);
-    const results = await this.#executeCommand(command);
+    const results = await this.#drainPlan(command);
     return (results[0] as { modifiedCount: number }).modifiedCount;
   }
 
@@ -269,7 +273,7 @@ class MongoCollectionImpl<
     this.#requireFilters('delete');
     const filter = this.#mergeFilters();
     const command = new FindOneAndDeleteCommand(this.#collectionName, filter);
-    const results = await this.#executeCommand(command);
+    const results = await this.#drainPlan(command);
     return (results[0] as IncludedRow<TContract, ModelName, TIncludes>) ?? null;
   }
 
@@ -283,7 +287,7 @@ class MongoCollectionImpl<
       }
       const filter = self.#mergeFilters();
       const command = new DeleteManyCommand(self.#collectionName, filter);
-      await self.#executeCommand(command);
+      await self.#drainPlan(command);
       yield* docs;
     }
     return new AsyncIterableResult(gen());
@@ -293,7 +297,7 @@ class MongoCollectionImpl<
     this.#requireFilters('deleteCount');
     const filter = this.#mergeFilters();
     const command = new DeleteManyCommand(this.#collectionName, filter);
-    const results = await this.#executeCommand(command);
+    const results = await this.#drainPlan(command);
     return (results[0] as { deletedCount: number }).deletedCount;
   }
 
@@ -319,7 +323,7 @@ class MongoCollectionImpl<
       updateDoc['$setOnInsert'] = insertOnlyFields;
     }
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, true);
-    const results = await this.#executeCommand(command);
+    const results = await this.#drainPlan(command);
     return results[0] as IncludedRow<TContract, ModelName, TIncludes>;
   }
 
@@ -328,12 +332,26 @@ class MongoCollectionImpl<
     return this.#executor.execute(plan);
   }
 
-  #compile(): MongoReadPlan<IncludedRow<TContract, ModelName, TIncludes>> {
+  #compile(): MongoQueryPlan<IncludedRow<TContract, ModelName, TIncludes>> {
     return compileMongoQuery<IncludedRow<TContract, ModelName, TIncludes>>(
       this.#collectionName,
       this.#state,
       this.#contract.storage.storageHash,
     );
+  }
+
+  #wrapCommand(command: AnyMongoCommand): MongoQueryPlan {
+    return { collection: this.#collectionName, command, meta: this.#planMeta() };
+  }
+
+  async #drainPlan(command: AnyMongoCommand): Promise<unknown[]> {
+    const plan = this.#wrapCommand(command);
+    const result = this.#executor.execute(plan);
+    const rows: unknown[] = [];
+    for await (const row of result) {
+      rows.push(row);
+    }
+    return rows;
   }
 
   #toDocument(data: Record<string, unknown>): Record<string, MongoValue> {
@@ -380,15 +398,6 @@ class MongoCollectionImpl<
       lane: 'mongo-orm',
       paramDescriptors: [],
     };
-  }
-
-  async #executeCommand(command: AnyMongoCommand): Promise<unknown[]> {
-    const result = this.#executor.executeCommand(command, this.#planMeta());
-    const rows: unknown[] = [];
-    for await (const row of result) {
-      rows.push(row);
-    }
-    return rows;
   }
 
   #clone(

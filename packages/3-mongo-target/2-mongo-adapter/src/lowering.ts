@@ -1,5 +1,9 @@
 import type { Document } from '@prisma-next/mongo-core';
-import type { MongoFilterExpr, MongoReadStage } from '@prisma-next/mongo-query-ast';
+import type {
+  AggregatePipelineEntry,
+  MongoFilterExpr,
+  MongoReadStage,
+} from '@prisma-next/mongo-query-ast';
 import { resolveValue } from './resolve-value';
 
 export function lowerFilter(filter: MongoFilterExpr): Document {
@@ -51,8 +55,12 @@ export function lowerStage(stage: MongoReadStage): Record<string, unknown> {
   }
 }
 
+function isTypedStage(entry: AggregatePipelineEntry): entry is MongoReadStage {
+  return typeof (entry as MongoReadStage).kind === 'string' && 'accept' in entry;
+}
+
 export function lowerPipeline(
-  stages: ReadonlyArray<MongoReadStage>,
+  entries: ReadonlyArray<AggregatePipelineEntry>,
 ): Array<Record<string, unknown>> {
-  return stages.map((stage) => lowerStage(stage));
+  return entries.map((entry) => (isTypedStage(entry) ? lowerStage(entry) : { ...entry }));
 }

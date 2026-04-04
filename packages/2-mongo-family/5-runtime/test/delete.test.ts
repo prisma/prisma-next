@@ -18,7 +18,11 @@ describe('deleteOne integration', () => {
         collectionName,
         MongoFieldFilter.eq('name', new MongoParamRef('Bob')),
       );
-      const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
+      const rows = await ctx.runtime.execute({
+        collection: collectionName,
+        command,
+        meta: ctx.stubMeta,
+      });
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ deletedCount: 1 });
 

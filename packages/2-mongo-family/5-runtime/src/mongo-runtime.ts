@@ -1,43 +1,27 @@
-import type { PlanMeta } from '@prisma-next/contract/types';
-import type {
-  MongoAdapter,
-  MongoCommandLike,
-  MongoDriver,
-  MongoLoweringContext,
-  MongoReadPlanLike,
-} from '@prisma-next/mongo-core';
+import type { MongoAdapter, MongoDriver, MongoQueryPlanLike } from '@prisma-next/mongo-core';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 
 export interface MongoRuntimeOptions {
   readonly adapter: MongoAdapter;
   readonly driver: MongoDriver;
-  readonly loweringContext: MongoLoweringContext;
 }
 
 export interface MongoRuntime {
-  execute<Row>(plan: MongoReadPlanLike): AsyncIterableResult<Row>;
-  executeCommand<Row>(command: MongoCommandLike, meta: PlanMeta): AsyncIterableResult<Row>;
+  execute<Row>(plan: MongoQueryPlanLike): AsyncIterableResult<Row>;
   close(): Promise<void>;
 }
 
 class MongoRuntimeImpl implements MongoRuntime {
   readonly #adapter: MongoAdapter;
   readonly #driver: MongoDriver;
-  readonly #loweringContext: MongoLoweringContext;
 
   constructor(options: MongoRuntimeOptions) {
     this.#adapter = options.adapter;
     this.#driver = options.driver;
-    this.#loweringContext = options.loweringContext;
   }
 
-  execute<Row>(plan: MongoReadPlanLike): AsyncIterableResult<Row> {
-    const wireCommand = this.#adapter.lowerReadPlan(plan);
-    return this.#wrapIterable(this.#driver.execute<Row>(wireCommand));
-  }
-
-  executeCommand<Row>(command: MongoCommandLike, _meta: PlanMeta): AsyncIterableResult<Row> {
-    const wireCommand = this.#adapter.lowerCommand(command, this.#loweringContext);
+  execute<Row>(plan: MongoQueryPlanLike): AsyncIterableResult<Row> {
+    const wireCommand = this.#adapter.lower(plan);
     return this.#wrapIterable(this.#driver.execute<Row>(wireCommand));
   }
 
