@@ -154,7 +154,7 @@ Base instances:
 ```ts
 export interface ControlFamilyInstance<TFamilyId extends string = string> {
   readonly familyId: TFamilyId;
-  // Family-specific methods such as validateContractIR, verify, schemaVerify, introspect, emitContract, etc.
+  // Family-specific methods such as validateContract, verify, schemaVerify, introspect, emitContract, etc.
 }
 
 export interface ControlTargetInstance<
@@ -298,7 +298,7 @@ Non-goals for this ADR:
    - `@prisma-next/targets-postgres-driver/control` exports a default `ControlDriverDescriptor<'sql','postgres'>`
 5. ✅ Updated `defineConfig` and CLI config types to expect `Control*Descriptor` shapes exclusively
 6. ✅ Updated all tests and CLI commands to use `Control*Descriptor` types
-7. ✅ Retained `FamilyInstance` interface for CLI command handlers (provides full method set: `validateContractIR`, `verify`, `schemaVerify`, `introspect`, `emitContract`, `toSchemaView`)
+7. ✅ Retained `FamilyInstance` interface for CLI command handlers (provides full method set: `validateContract`, `verify`, `schemaVerify`, `introspect`, `emitContract`, `toSchemaView`)
 
 **Note**: `ControlFamilyDescriptor.create()` requires a `driver` parameter even for commands that don't use it (e.g., `contract emit`) to ensure consistent descriptor patterns.
 

@@ -157,7 +157,7 @@ import { sql } from '../src/sql';
 
 ```typescript
 // packages/framework/tooling/emitter/test/emitter.test.ts
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Contract } from '@prisma-next/contract/types';
 ```
 
 **Rule:** Tests should always use workspace package names (`@prisma-next/package-name/...`) when importing from other packages, regardless of whether they're in the same domain or not. This ensures:

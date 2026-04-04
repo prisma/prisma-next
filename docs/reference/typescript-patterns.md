@@ -1196,7 +1196,7 @@ const mockedFamily = {
   ...config.family,  // Methods are lost!
   verify: mockedVerify,
 };
-// config.family.validateContractIR is now undefined
+// config.family.validateContract is now undefined
 ```
 
 **✅ CORRECT: Preserve prototype when mocking class instances**
@@ -1207,7 +1207,7 @@ const mockedFamily = Object.create(Object.getPrototypeOf(config.family));
 Object.assign(mockedFamily, config.family, {
   verify: mockedVerify,
 });
-// All methods (validateContractIR, convertOperationManifest, etc.) are preserved
+// All methods (validateContract, convertOperationManifest, etc.) are preserved
 ```
 
 **Why?**

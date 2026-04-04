@@ -21,7 +21,7 @@ We want a single, simple way for applications to declare their target family, ta
 - The config's `family` export includes:
   - `hook: TargetFamilyHook` (used by `@prisma-next/emitter`)
   - `assembleOperationRegistry`, `extractCodecTypeImports`, `extractOperationTypeImports` (assembly helpers)
-  - `validateContractIR` (validates and normalizes contract, returns ContractIR without mappings)
+  - `validateContract` (validates and normalizes contract, returns Contract without mappings)
   - `stripMappings?` (optionally strips runtime-only mappings from contract)
 - The CLI calls these helpers to assemble inputs for emit and validate contracts; manifests remain opaque to the CLI.
 
@@ -57,7 +57,7 @@ Trade‑offs
 3) ✅ Emit command updated to read helpers from `config.family`, assemble inputs, and call emitter with `family.hook`.
 4) ✅ Flags removed: `--adapter` and `--extensions` flags removed; config-only model enforced.
 5) ✅ Pack loading/assembly removed from framework CLI; family-provided helpers handle all assembly logic.
-6) ✅ Contract validation decoupled: Framework CLI uses `family.validateContractIR()` instead of direct SQL imports.
+6) ✅ Contract validation decoupled: Framework CLI uses `family.validateContract()` instead of direct SQL imports.
 7) ✅ Dependency boundaries enforced: All CLI→SQL exceptions removed from dependency-cruiser; framework CLI is fully family-agnostic.
 
 ## References

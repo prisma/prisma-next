@@ -48,7 +48,7 @@ pnpm test
 
 1. Loads `prisma-next.config.ts` and creates a control stack
 2. Reads and parses `prisma/contract.prisma` via the `mongoContract()` provider
-3. Interprets the parsed document into a `ContractIR`
+3. Interprets the parsed document into a `Contract`
 4. Emits `src/contract.json` and `src/contract.d.ts`
 
 ## How the runtime works

@@ -22,7 +22,7 @@ This package defines the core types for the SQL Schema IR, a target-agnostic rep
 
 ## Dependencies
 
-- **`@prisma-next/contract`**: For `ContractIR` type (used in `SqlContractIR`)
+- **`@prisma-next/contract`**: For `Contract` type (used in `SqlSchemaIR`)
 
 **Dependents:**
 - **Migration Plane**:

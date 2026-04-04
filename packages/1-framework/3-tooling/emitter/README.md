@@ -17,7 +17,7 @@ Provide a deterministic, verifiable representation of the application's data con
 
 ## Responsibilities
 
-- **Parse**: Accept contract IR (Intermediate Representation) from authoring surfaces
+- **Parse**: Accept `Contract` values from authoring surfaces
 - **Validate**: Core structure validation plus family-specific type and structure validation via hooks
 - **Canonicalize**: Compute `storageHash` (schema meaning), `executionHash` (execution defaults), and `profileHash` (capabilities/pins) from canonical JSON
 - **Emit**: Generate `contract.json` and `contract.d.ts` with family-specific type generation
@@ -41,7 +41,7 @@ flowchart TD
     end
 
     subgraph "Emitter Core"
-        IR[Contract IR]
+        IR[Contract]
         VAL[Validate Core Structure]
         HASH[Compute Hashes]
         EMIT[Emit JSON + DTS]
@@ -98,7 +98,7 @@ flowchart TD
 - `computeProfileHash`: SHA-256 of capabilities and adapter pins
 
 ### Canonicalization (`canonicalization.ts`)
-- `canonicalizeContract`: Normalizes contract IR into stable JSON string for hashing
+- `canonicalizeContract`: Normalizes contract into stable JSON string for hashing
 - Excludes `_generated` metadata field from canonicalization to ensure determinism
 - Sorts object keys, omits default values, and orders top-level fields consistently
 
@@ -135,7 +135,7 @@ This package is part of the **framework domain**, **tooling layer**, **migration
 
 ```typescript
 import { emit } from '@prisma-next/emitter';
-import type { ContractIR, EmitOptions } from '@prisma-next/emitter';
+import type { Contract } from '@prisma-next/contract/types';
 import { createOperationRegistry } from '@prisma-next/operations';
 
 // Determine target family SPI based on target family
@@ -143,7 +143,7 @@ import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 // or: import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
 
 // Emit contract
-const ir: ContractIR = {
+const contract: Contract = {
   schemaVersion: '1',
   targetFamily: 'sql',
   target: 'postgres',
@@ -151,7 +151,7 @@ const ir: ContractIR = {
 };
 
 // Pass pre-assembled context to emit() (pack loading happens in CLI layer)
-const result = await emit(ir, {
+const result = await emit(contract, {
   outputDir: './dist',
   operationRegistry: createOperationRegistry(), // Pre-assembled from packs
   codecTypeImports: [], // Extracted from packs (codec types)
@@ -170,12 +170,12 @@ const result = await emit(ir, {
 
 ## Test Utilities
 
-When writing tests that create `ContractIR` objects, use the factory function from test utilities:
+When writing tests that create `Contract` objects, use the factory helpers from `@prisma-next/contract/testing` or this package’s `test/utils` (`createTestContract`):
 
 ```typescript
-import { createContractIR } from './test/utils';
+import { createTestContract } from './test/utils';
 
-const ir = createContractIR({
+const contract = createTestContract({
   storage: {
     tables: {
       user: {

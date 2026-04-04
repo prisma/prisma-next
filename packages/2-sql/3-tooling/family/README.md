@@ -11,7 +11,7 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 ## Responsibilities
 
 - **Family Descriptor Export**: Exports the SQL `ControlFamilyDescriptor` for use in CLI configuration files
-- **Family Instance Creation**: Creates `SqlFamilyInstance` objects that implement control-plane domain actions (`verify`, `schemaVerify`, `introspect`, `emitContract`, `validateContractIR`)
+- **Family Instance Creation**: Creates `SqlFamilyInstance` objects that implement control-plane domain actions (`verify`, `schemaVerify`, `introspect`, `emitContract`, `validateContract`)
 - **Planner & Runner SPI**: Owns the `MigrationPlanner` / `MigrationRunner` interfaces plus the `SqlControlTargetDescriptor` helper so targets can expose planners and runners (e.g., Postgres init planner/runner)
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlTargetFamilyHook`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
@@ -48,9 +48,9 @@ const familyInstance = sql.create({
 });
 
 // Use instance methods for domain actions
-const contractIR = familyInstance.validateContractIR(contractJson);
-const verifyResult = await familyInstance.verify({ driver, contractIR, ... });
-const emitResult = await familyInstance.emitContract({ contractIR: rawContract }); // Handles stripping mappings and validation internally
+const contract = familyInstance.validateContract(contractJson);
+const verifyResult = await familyInstance.verify({ driver, contract, ... });
+const emitResult = await familyInstance.emitContract({ contract: rawContract }); // Handles stripping mappings and validation internally
 
 // Targets that implement SqlControlTargetDescriptor can build planners
 const planner = postgresTargetDescriptor.migrations.createPlanner(familyInstance);
@@ -107,19 +107,19 @@ The framework CLI uses this descriptor to:
 1. Create family instances for control-plane operations (via `create()`)
 
 Family instances implement domain actions:
-- **`validateContractIR(contractJson)`**: Validates and normalizes contract, returns ContractIR without mappings
+- **`validateContract(contractJson)`**: Validates and normalizes contract, returns `Contract` without mappings
 - **`verify()`**: Verifies database marker against contract (compares target, storageHash, profileHash)
 - **`schemaVerify()`**: Verifies database schema against contract (compares contract requirements vs live schema)
 - **`introspect()`**: Introspects database schema and returns `SqlSchemaIR`
 - **`toSchemaView(schema)`**: Projects `SqlSchemaIR` into `CoreSchemaView` for human-readable display. Always displays native database types (e.g., `int4`, `text`) rather than mapped codec IDs (e.g., `pg/int4@1`) to reflect actual database state.
-- **`emitContract({ contractIR })`**: Emits contract JSON and DTS as strings. Handles stripping mappings and validation internally. Uses preassembled state (operation registry, type imports, extension IDs).
+- **`emitContract({ contract })`**: Emits contract JSON and DTS as strings. Handles stripping mappings and validation internally. Uses preassembled state (operation registry, type imports, extension IDs).
 
 The descriptor is "pure data + factory" - it only provides the hook and factory method. All family-specific logic lives on the instance.
 
 ## Package Structure
 
 - **`src/core/control-descriptor.ts`**: `SqlFamilyDescriptor` class implementing `ControlFamilyDescriptor` interface (pure data + factory)
-- **`src/core/control-instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
+- **`src/core/control-instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContract`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
 - **`src/core/assembly.ts`**: Assembly helpers for building operation registries, extracting type imports, collecting codec-owned storage type control hooks, and composing mutation-default registries with duplicate detection.
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
 - **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations

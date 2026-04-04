@@ -485,15 +485,15 @@ const literalExpr: LiteralExpr = { kind: 'literal', value: 'test' };
 
 **Why?** The rich AST helpers ensure consistency, type safety, and make refactoring easier. Manual object creation duplicates AST structure definitions and is error-prone.
 
-### ContractIR Factory Functions
+### Contract Factory Functions
 
-When creating `ContractIR` objects in tests, use factory functions instead of manual object creation:
+When creating `Contract` values in tests, use `createContract` from `@prisma-next/contract/testing` (or a local helper such as `createTestContract` in package test `utils`) instead of manual object creation:
 
 ```typescript
 // ✅ CORRECT: Use factory function
-import { createContractIR } from './utils';
+import { createContract } from '@prisma-next/contract/testing';
 
-const ir = createContractIR({
+const contract = createContract({
   storage: {
     tables: {
       user: {
@@ -508,23 +508,24 @@ const ir = createContractIR({
 
 ```typescript
 // ❌ WRONG: Manual object creation
-const ir: ContractIR = {
-  schemaVersion: '1',
-  targetFamily: 'sql',
+import type { Contract } from '@prisma-next/contract/types';
+
+const contract: Contract = {
   target: 'postgres',
+  targetFamily: 'sql',
+  roots: {},
   models: {},
-  relations: {},
-  storage: { tables: {} },
-  extensions: {},
+  storage: { tables: {} } as Contract['storage'],
   capabilities: {},
+  extensionPacks: {},
+  profileHash: 'sha256:stub' as Contract['profileHash'],
   meta: {},
-  sources: {},
 };
 ```
 
-**Why?** Factory functions ensure all required fields are present with proper defaults, making tests more maintainable and less error-prone.
+**Why?** Factory functions ensure required fields (including nested hashes such as `storage.storageHash`) are present with proper defaults, making tests more maintainable and less error-prone.
 
-**Note:** The `capabilities` field in `ContractIR` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`. Extension pack metadata is represented as a simple object map (`contract.extensionPacks`) keyed by descriptor ID—there is no manifest/path wrapper in tests.
+**Note:** The `capabilities` field in `Contract` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`. Extension pack metadata is represented as a simple object map (`contract.extensionPacks`) keyed by descriptor ID—there is no manifest/path wrapper in tests.
 
 See `.cursor/rules/use-contract-ir-factories.mdc` for detailed guidelines.
 

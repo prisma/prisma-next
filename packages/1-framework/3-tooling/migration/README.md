@@ -47,7 +47,7 @@ graph TD
 
 | Package | Why |
 |---|---|
-| `@prisma-next/contract` | `ContractIR` type for embedded contracts in manifests |
+| `@prisma-next/contract` | `Contract` type for embedded contracts in manifests |
 | `@prisma-next/core-control-plane` | `MigrationPlanOperation` types, `EMPTY_CONTRACT_HASH`, `canonicalizeContract` |
 | `arktype` | Runtime shape validation for `migration.json` and `ops.json` |
 | `@prisma-next/utils` | Workspace utility dependency (currently no direct runtime imports in this package) |
