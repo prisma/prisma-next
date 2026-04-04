@@ -71,7 +71,10 @@ export interface MongoCollection<
   update(
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
-  /** Non-atomic: updates matching docs then re-reads them. Concurrent writes may cause stale results. */
+  /**
+   * Non-atomic: updates matching docs then re-reads them with the original filter.
+   * If the update modifies fields used in the filter, the re-read may return fewer or different documents.
+   */
   updateAll(
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;

@@ -37,7 +37,7 @@ function createMockExecutor(...responses: unknown[][]): MongoQueryExecutor & {
     execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {
       mock.lastPlan = plan as MongoQueryPlan;
       const data = responses[callIndex] ?? [];
-      if (callIndex < responses.length - 1) callIndex++;
+      callIndex++;
       async function* gen(): AsyncGenerator<Row> {
         for (const row of data) yield row as Row;
       }
