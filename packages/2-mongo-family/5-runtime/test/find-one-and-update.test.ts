@@ -1,4 +1,5 @@
-import { FindOneAndUpdateCommand, MongoParamRef } from '@prisma-next/mongo-core';
+import { MongoParamRef } from '@prisma-next/mongo-core';
+import { FindOneAndUpdateCommand, MongoFieldFilter } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 
@@ -12,7 +13,7 @@ describe('findOneAndUpdate integration', () => {
 
       const command = new FindOneAndUpdateCommand(
         collectionName,
-        { name: new MongoParamRef('Grace') },
+        MongoFieldFilter.eq('name', new MongoParamRef('Grace')),
         { $set: { age: 31 } },
         false,
       );
@@ -26,7 +27,7 @@ describe('findOneAndUpdate integration', () => {
     await withMongod(async (ctx) => {
       const command = new FindOneAndUpdateCommand(
         collectionName,
-        { name: new MongoParamRef('NewUser') },
+        MongoFieldFilter.eq('name', new MongoParamRef('NewUser')),
         { $set: { age: 20 } },
         true,
       );

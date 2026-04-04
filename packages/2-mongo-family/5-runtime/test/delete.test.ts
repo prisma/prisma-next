@@ -1,4 +1,5 @@
-import { DeleteOneCommand, MongoParamRef } from '@prisma-next/mongo-core';
+import { MongoParamRef } from '@prisma-next/mongo-core';
+import { DeleteOneCommand, MongoFieldFilter } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 
@@ -13,9 +14,10 @@ describe('deleteOne integration', () => {
         { name: 'Bob', age: 25 },
       ]);
 
-      const command = new DeleteOneCommand(collectionName, {
-        name: new MongoParamRef('Bob'),
-      });
+      const command = new DeleteOneCommand(
+        collectionName,
+        MongoFieldFilter.eq('name', new MongoParamRef('Bob')),
+      );
       const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ deletedCount: 1 });

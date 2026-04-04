@@ -1,4 +1,5 @@
 import type { AnyMongoWireCommand, MongoContract } from '@prisma-next/mongo-core';
+import { MongoParamRef } from '@prisma-next/mongo-core';
 import {
   AggregateCommand,
   DeleteManyCommand,
@@ -7,11 +8,12 @@ import {
   FindOneAndUpdateCommand,
   InsertManyCommand,
   InsertOneCommand,
-  MongoParamRef,
+  MongoFieldFilter,
+  MongoMatchStage,
+  MongoProjectStage,
   UpdateManyCommand,
   UpdateOneCommand,
-} from '@prisma-next/mongo-core';
-import { MongoFieldFilter, MongoMatchStage, MongoProjectStage } from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { createMongoAdapter } from '../src/mongo-adapter';
 
@@ -41,25 +43,26 @@ describe('MongoAdapter', () => {
   });
 
   describe('lowerCommand UpdateOneCommand', () => {
-    it('resolves param refs in filter and update', () => {
+    it('resolves filter expression and update', () => {
       const command = new UpdateOneCommand(
         'users',
-        { _id: new MongoParamRef('id-123') },
+        MongoFieldFilter.eq('_id', new MongoParamRef('id-123')),
         { $set: { name: new MongoParamRef('Charlie') } },
       );
       const wire = narrowWire(adapter.lowerCommand(command, stubContext), 'updateOne');
-      expect(wire.filter).toEqual({ _id: 'id-123' });
+      expect(wire.filter).toEqual({ _id: { $eq: 'id-123' } });
       expect(wire.update).toEqual({ $set: { name: 'Charlie' } });
     });
   });
 
   describe('lowerCommand DeleteOneCommand', () => {
-    it('resolves param refs in filter', () => {
-      const command = new DeleteOneCommand('users', {
-        _id: new MongoParamRef('id-456'),
-      });
+    it('resolves filter expression', () => {
+      const command = new DeleteOneCommand(
+        'users',
+        MongoFieldFilter.eq('_id', new MongoParamRef('id-456')),
+      );
       const wire = narrowWire(adapter.lowerCommand(command, stubContext), 'deleteOne');
-      expect(wire.filter).toEqual({ _id: 'id-456' });
+      expect(wire.filter).toEqual({ _id: { $eq: 'id-456' } });
     });
   });
 
@@ -90,25 +93,26 @@ describe('MongoAdapter', () => {
   });
 
   describe('lowerCommand UpdateManyCommand', () => {
-    it('resolves param refs in filter and update', () => {
+    it('resolves filter expression and update', () => {
       const command = new UpdateManyCommand(
         'users',
-        { status: new MongoParamRef('inactive') },
+        MongoFieldFilter.eq('status', new MongoParamRef('inactive')),
         { $set: { status: new MongoParamRef('archived') } },
       );
       const wire = narrowWire(adapter.lowerCommand(command, stubContext), 'updateMany');
-      expect(wire.filter).toEqual({ status: 'inactive' });
+      expect(wire.filter).toEqual({ status: { $eq: 'inactive' } });
       expect(wire.update).toEqual({ $set: { status: 'archived' } });
     });
   });
 
   describe('lowerCommand DeleteManyCommand', () => {
-    it('resolves param refs in filter', () => {
-      const command = new DeleteManyCommand('users', {
-        status: new MongoParamRef('archived'),
-      });
+    it('resolves filter expression', () => {
+      const command = new DeleteManyCommand(
+        'users',
+        MongoFieldFilter.eq('status', new MongoParamRef('archived')),
+      );
       const wire = narrowWire(adapter.lowerCommand(command, stubContext), 'deleteMany');
-      expect(wire.filter).toEqual({ status: 'archived' });
+      expect(wire.filter).toEqual({ status: { $eq: 'archived' } });
     });
   });
 
@@ -116,12 +120,12 @@ describe('MongoAdapter', () => {
     it('resolves filter and update with upsert false', () => {
       const command = new FindOneAndUpdateCommand(
         'users',
-        { _id: new MongoParamRef('id-789') },
+        MongoFieldFilter.eq('_id', new MongoParamRef('id-789')),
         { $set: { name: new MongoParamRef('Updated') } },
         false,
       );
       const wire = narrowWire(adapter.lowerCommand(command, stubContext), 'findOneAndUpdate');
-      expect(wire.filter).toEqual({ _id: 'id-789' });
+      expect(wire.filter).toEqual({ _id: { $eq: 'id-789' } });
       expect(wire.update).toEqual({ $set: { name: 'Updated' } });
       expect(wire.upsert).toBe(false);
     });
@@ -129,22 +133,34 @@ describe('MongoAdapter', () => {
     it('preserves upsert true', () => {
       const command = new FindOneAndUpdateCommand(
         'users',
-        { email: 'test@test.com' },
+        MongoFieldFilter.eq('email', 'test@test.com'),
         { $set: { name: 'Upserted' }, $setOnInsert: { createdAt: 'now' } },
         true,
       );
       const wire = narrowWire(adapter.lowerCommand(command, stubContext), 'findOneAndUpdate');
       expect(wire.upsert).toBe(true);
     });
+
+    it('uses empty filter when null', () => {
+      const command = new FindOneAndUpdateCommand(
+        'users',
+        null,
+        { $set: { name: 'Upserted' } },
+        true,
+      );
+      const wire = narrowWire(adapter.lowerCommand(command, stubContext), 'findOneAndUpdate');
+      expect(wire.filter).toEqual({});
+    });
   });
 
   describe('lowerCommand FindOneAndDeleteCommand', () => {
-    it('resolves param refs in filter', () => {
-      const command = new FindOneAndDeleteCommand('users', {
-        _id: new MongoParamRef('id-delete'),
-      });
+    it('resolves filter expression', () => {
+      const command = new FindOneAndDeleteCommand(
+        'users',
+        MongoFieldFilter.eq('_id', new MongoParamRef('id-delete')),
+      );
       const wire = narrowWire(adapter.lowerCommand(command, stubContext), 'findOneAndDelete');
-      expect(wire.filter).toEqual({ _id: 'id-delete' });
+      expect(wire.filter).toEqual({ _id: { $eq: 'id-delete' } });
     });
   });
 

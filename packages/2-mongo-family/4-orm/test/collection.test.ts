@@ -1,6 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { AnyMongoCommand } from '@prisma-next/mongo-core';
-import type { MongoReadPlan } from '@prisma-next/mongo-query-ast';
+import type { AnyMongoCommand, MongoReadPlan } from '@prisma-next/mongo-query-ast';
 import {
   MongoFieldFilter,
   type MongoLimitStage,
@@ -282,6 +281,18 @@ describe('MongoCollection write methods', () => {
       expect(executor.lastCommand!.kind).toBe('findOneAndUpdate');
     });
 
+    it('passes MongoFilterExpr to command', async () => {
+      const executor = createMockExecutor([], [{ _id: 'id-1', name: 'Updated', email: 'a@b.c' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update({ name: 'Updated' });
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('findOneAndUpdate');
+      if (command.kind === 'findOneAndUpdate') {
+        expect(command.filter).not.toBeNull();
+        expect(command.filter!.kind).toBe('field');
+      }
+    });
+
     it('returns null when no match', async () => {
       const executor = createMockExecutor([], []);
       const col = createMongoCollection(contract, 'User', executor);
@@ -320,6 +331,17 @@ describe('MongoCollection write methods', () => {
       expect(executor.lastCommand!.kind).toBe('findOneAndDelete');
     });
 
+    it('passes MongoFilterExpr to command', async () => {
+      const executor = createMockExecutor([], [{ _id: 'id-1', name: 'Alice', email: 'a@b.c' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).delete();
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('findOneAndDelete');
+      if (command.kind === 'findOneAndDelete') {
+        expect(command.filter.kind).toBe('field');
+      }
+    });
+
     it('returns null when no match', async () => {
       const executor = createMockExecutor([], []);
       const col = createMongoCollection(contract, 'User', executor);
@@ -353,6 +375,20 @@ describe('MongoCollection write methods', () => {
       });
       expect(result).toEqual({ _id: 'new-id', name: 'Alice', email: 'a@b.c' });
       expect(executor.lastCommand!.kind).toBe('findOneAndUpdate');
+    });
+
+    it('passes null filter when no where clause', async () => {
+      const executor = createMockExecutor([], [{ _id: 'id', name: 'A', email: 'a@b.c' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.upsert({
+        create: { name: 'A', email: 'a@b.c' },
+        update: { name: 'B' },
+      });
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('findOneAndUpdate');
+      if (command.kind === 'findOneAndUpdate') {
+        expect(command.filter).toBeNull();
+      }
     });
   });
 

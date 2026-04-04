@@ -1,8 +1,8 @@
 import type {
-  AnyMongoCommand,
   AnyMongoWireCommand,
   Document,
   MongoAdapter,
+  MongoCommandLike,
   MongoExpr,
   MongoLoweringContext,
   MongoReadPlanLike,
@@ -18,8 +18,8 @@ import {
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
-import type { MongoReadStage } from '@prisma-next/mongo-query-ast';
-import { lowerPipeline } from './lowering';
+import type { AnyMongoCommand, MongoReadStage } from '@prisma-next/mongo-query-ast';
+import { lowerFilter, lowerPipeline } from './lowering';
 import { resolveValue } from './resolve-value';
 
 function resolveDocument(expr: MongoExpr): Document {
@@ -36,14 +36,15 @@ class MongoAdapterImpl implements MongoAdapter {
     return new AggregateWireCommand(plan.collection, rawPipeline);
   }
 
-  lowerCommand(command: AnyMongoCommand, _context: MongoLoweringContext): AnyMongoWireCommand {
+  lowerCommand(commandLike: MongoCommandLike, _context: MongoLoweringContext): AnyMongoWireCommand {
+    const command = commandLike as AnyMongoCommand;
     switch (command.kind) {
       case 'insertOne':
         return new InsertOneWireCommand(command.collection, resolveDocument(command.document));
       case 'updateOne':
         return new UpdateOneWireCommand(
           command.collection,
-          resolveDocument(command.filter),
+          lowerFilter(command.filter),
           resolveDocument(command.update),
         );
       case 'insertMany':
@@ -54,22 +55,22 @@ class MongoAdapterImpl implements MongoAdapter {
       case 'updateMany':
         return new UpdateManyWireCommand(
           command.collection,
-          resolveDocument(command.filter),
+          lowerFilter(command.filter),
           resolveDocument(command.update),
         );
       case 'deleteOne':
-        return new DeleteOneWireCommand(command.collection, resolveDocument(command.filter));
+        return new DeleteOneWireCommand(command.collection, lowerFilter(command.filter));
       case 'deleteMany':
-        return new DeleteManyWireCommand(command.collection, resolveDocument(command.filter));
+        return new DeleteManyWireCommand(command.collection, lowerFilter(command.filter));
       case 'findOneAndUpdate':
         return new FindOneAndUpdateWireCommand(
           command.collection,
-          resolveDocument(command.filter),
+          command.filter ? lowerFilter(command.filter) : {},
           resolveDocument(command.update),
           command.upsert,
         );
       case 'findOneAndDelete':
-        return new FindOneAndDeleteWireCommand(command.collection, resolveDocument(command.filter));
+        return new FindOneAndDeleteWireCommand(command.collection, lowerFilter(command.filter));
       case 'aggregate':
         return new AggregateWireCommand(
           command.collection,

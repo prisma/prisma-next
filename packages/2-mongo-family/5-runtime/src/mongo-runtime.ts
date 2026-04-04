@@ -1,7 +1,7 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type {
-  AnyMongoCommand,
   MongoAdapter,
+  MongoCommandLike,
   MongoDriver,
   MongoLoweringContext,
   MongoReadPlanLike,
@@ -16,7 +16,7 @@ export interface MongoRuntimeOptions {
 
 export interface MongoRuntime {
   execute<Row>(plan: MongoReadPlanLike): AsyncIterableResult<Row>;
-  executeCommand<Row>(command: AnyMongoCommand, meta: PlanMeta): AsyncIterableResult<Row>;
+  executeCommand<Row>(command: MongoCommandLike, meta: PlanMeta): AsyncIterableResult<Row>;
   close(): Promise<void>;
 }
 
@@ -36,7 +36,7 @@ class MongoRuntimeImpl implements MongoRuntime {
     return this.#wrapIterable(this.#driver.execute<Row>(wireCommand));
   }
 
-  executeCommand<Row>(command: AnyMongoCommand, _meta: PlanMeta): AsyncIterableResult<Row> {
+  executeCommand<Row>(command: MongoCommandLike, _meta: PlanMeta): AsyncIterableResult<Row> {
     const wireCommand = this.#adapter.lowerCommand(command, this.#loweringContext);
     return this.#wrapIterable(this.#driver.execute<Row>(wireCommand));
   }

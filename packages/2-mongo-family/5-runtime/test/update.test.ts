@@ -1,4 +1,5 @@
-import { MongoParamRef, UpdateOneCommand } from '@prisma-next/mongo-core';
+import { MongoParamRef } from '@prisma-next/mongo-core';
+import { MongoFieldFilter, UpdateOneCommand } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 
@@ -15,7 +16,7 @@ describe('updateOne integration', () => {
 
       const command = new UpdateOneCommand(
         collectionName,
-        { name: new MongoParamRef('Alice') },
+        MongoFieldFilter.eq('name', new MongoParamRef('Alice')),
         { $set: { age: new MongoParamRef(31) } },
       );
       const rows = await ctx.runtime.executeCommand(command, ctx.stubMeta);

@@ -1,3 +1,15 @@
+export type { AnyMongoCommand } from '../commands';
+export {
+  AggregateCommand,
+  DeleteManyCommand,
+  DeleteOneCommand,
+  FindOneAndDeleteCommand,
+  FindOneAndUpdateCommand,
+  InsertManyCommand,
+  InsertOneCommand,
+  UpdateManyCommand,
+  UpdateOneCommand,
+} from '../commands';
 export type { MongoFilterExpr } from '../filter-expressions';
 export {
   MongoAndExpr,
