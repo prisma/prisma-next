@@ -1,10 +1,10 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { type } from 'arktype';
 import type {
   ForeignKey,
   ForeignKeyReferences,
   PrimaryKey,
   ReferentialAction,
-  SqlContract,
   SqlStorage,
   StorageTypeInstance,
   UniqueConstraint,
@@ -231,7 +231,7 @@ export function validateModel(value: unknown): unknown {
  * @returns The validated contract if structure is valid
  * @throws Error if the contract structure is invalid
  */
-export function validateSqlContract<T extends SqlContract<SqlStorage>>(value: unknown): T {
+export function validateSqlContract<T extends Contract<SqlStorage>>(value: unknown): T {
   if (typeof value !== 'object' || value === null) {
     throw new Error('Contract structural validation failed: value must be an object');
   }

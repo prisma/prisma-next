@@ -1,17 +1,11 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
-import type {
-  ExecutionHashBase,
-  ExecutionSection,
-  ProfileHashBase,
-  StorageHashBase,
-} from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   ForeignKey,
   ForeignKeyOptions,
   ForeignKeyReferences,
   Index,
   PrimaryKey,
-  SqlContract,
   SqlModelFieldStorage,
   SqlModelStorage,
   SqlStorage,
@@ -125,29 +119,20 @@ export function storage(
   };
 }
 
-export function contract<
-  TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
-  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
->(opts: {
+export function contract(opts: {
   target: string;
-  storageHash: TStorageHash;
+  storageHash: string;
   storage: SqlStorage;
   models?: Record<string, unknown>;
   schemaVersion?: '1';
   targetFamily?: 'sql';
-  profileHash?: TProfileHash;
+  profileHash?: string;
   capabilities?: Record<string, Record<string, boolean>>;
   extensionPacks?: Record<string, unknown>;
   meta?: Record<string, unknown>;
   sources?: Record<string, unknown>;
-  execution?: ExecutionSection;
-}): SqlContract<
-  SqlStorage,
-  Record<string, unknown>,
-  TStorageHash,
-  ExecutionHashBase<string>,
-  TProfileHash
-> {
+  execution?: Record<string, unknown>;
+}): Contract<SqlStorage> {
   return {
     schemaVersion: opts.schemaVersion ?? '1',
     target: opts.target,
@@ -162,11 +147,5 @@ export function contract<
     ...(opts.extensionPacks !== undefined && { extensionPacks: opts.extensionPacks }),
     ...(opts.meta !== undefined && { meta: opts.meta }),
     ...(opts.sources !== undefined && { sources: opts.sources as Record<string, unknown> }),
-  } as SqlContract<
-    SqlStorage,
-    Record<string, unknown>,
-    TStorageHash,
-    ExecutionHashBase<string>,
-    TProfileHash
-  >;
+  } as unknown as Contract<SqlStorage>;
 }

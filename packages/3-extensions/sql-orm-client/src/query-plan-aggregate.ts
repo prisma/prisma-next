@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
   AndExpr,
@@ -104,7 +105,7 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
 }
 
 export function compileAggregate(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   filters: readonly AnyExpression[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
@@ -128,7 +129,7 @@ export function compileAggregate(
 }
 
 export function compileGroupedAggregate(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   filters: readonly AnyExpression[],
   groupByColumns: readonly string[],

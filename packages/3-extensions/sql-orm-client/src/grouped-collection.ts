@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
   type AnyExpression,
@@ -32,12 +33,12 @@ interface GroupedCollectionInit {
 }
 
 type GroupByFieldName<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
 > = keyof DefaultModelRow<TContract, ModelName> & string;
 
 export class GroupedCollection<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
   GroupFields extends readonly GroupByFieldName<TContract, ModelName>[],
 > {
@@ -122,7 +123,7 @@ export class GroupedCollection<
   }
 }
 
-function createHavingBuilder<TContract extends SqlContract<SqlStorage>, ModelName extends string>(
+function createHavingBuilder<TContract extends Contract<SqlStorage>, ModelName extends string>(
   contract: TContract,
   modelName: ModelName,
   tableName: string,

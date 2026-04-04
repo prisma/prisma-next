@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyExpression } from '@prisma-next/sql-relational-core/ast';
 import type { Collection } from './collection';
 import type {
@@ -15,14 +16,14 @@ import type {
   ShorthandWhereFilter,
 } from './types';
 
-export interface CollectionInit<TContract extends SqlContract<SqlStorage>> {
+export interface CollectionInit<TContract extends Contract<SqlStorage>> {
   readonly tableName?: string | undefined;
   readonly state?: import('./types').CollectionState | undefined;
   readonly registry?: ReadonlyMap<string, CollectionConstructor<TContract>> | undefined;
   readonly includeRefinementMode?: boolean | undefined;
 }
 
-export type CollectionConstructor<TContract extends SqlContract<SqlStorage>> = new (
+export type CollectionConstructor<TContract extends Contract<SqlStorage>> = new (
   ctx: CollectionContext<TContract>,
   modelName: string,
   options?: CollectionInit<TContract>,
@@ -37,7 +38,7 @@ export type WithOrderByState<State extends CollectionTypeState> = Omit<State, 'h
 };
 
 export type IncludedRelationsForRow<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
   Row,
 > = Omit<Row, keyof DefaultModelRow<TContract, ModelName>>;
@@ -61,7 +62,7 @@ export type IncludeRefinementTerminals =
 export type IncludeRefinementScalarMethods = 'count' | 'sum' | 'avg' | 'min' | 'max' | 'combine';
 
 export type IncludeRefinementCollection<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
   Row,
   State extends CollectionTypeState,
@@ -72,13 +73,13 @@ export type IncludeRefinementCollection<
 >;
 
 export type IsToManyRelation<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
 > = RelationCardinality<TContract, ModelName, RelName> extends '1:N' | 'M:N' ? true : false;
 
 export type IncludeRefinementResult<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   RelatedName extends string,
   IsToMany extends boolean,
 > =
@@ -96,7 +97,7 @@ export interface RowSelection<T> {
 export type StripRowType<T> = Omit<T, typeof RowType>;
 
 export type IncludeRefinementValue<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ParentModelName extends string,
   RelName extends string,
   DefaultIncludedRow,
@@ -109,7 +110,7 @@ export type IncludeRefinementValue<
     : IncludeRelationValue<TContract, ParentModelName, RelName, V>
   : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow>;
 
-export type WhereInput<TContract extends SqlContract<SqlStorage>, ModelName extends string> =
+export type WhereInput<TContract extends Contract<SqlStorage>, ModelName extends string> =
   | ((model: ModelAccessor<TContract, ModelName>) => AnyExpression)
   | ShorthandWhereFilter<TContract, ModelName>;
 
@@ -120,7 +121,7 @@ export interface IncludeRefinementEvaluation {
 }
 
 export type IncludeRefinementHandler<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   RelatedName extends string,
   IsToMany extends boolean,
 > = (

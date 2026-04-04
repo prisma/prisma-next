@@ -1,10 +1,9 @@
-import type { ColumnDefault, StorageHashBase } from '@prisma-next/contract/types';
+import type { ColumnDefault, Contract, StorageHashBase } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ContractWithTypeMaps,
   Index,
   ReferentialAction,
-  SqlContract,
   StorageTypeInstance,
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
@@ -473,7 +472,8 @@ type StagedBuiltStorage<Definition> = {
 };
 
 export type SqlContractResult<Definition> = ContractWithTypeMaps<
-  SqlContract<StagedBuiltStorage<Definition>, StagedBuiltModels<Definition>> & {
+  Contract<StagedBuiltStorage<Definition>> & {
+    readonly models: StagedBuiltModels<Definition>;
     readonly schemaVersion: '1';
     readonly target: StagedDefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';

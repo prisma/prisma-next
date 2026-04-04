@@ -170,7 +170,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       targetId: 'postgres',
       origin: null,
       destination: {
-        storageHash: options.contract.storageHash,
+        storageHash: options.contract.storage.storageHash,
         ...ifDefined('profileHash', options.contract.profileHash),
       },
       operations,

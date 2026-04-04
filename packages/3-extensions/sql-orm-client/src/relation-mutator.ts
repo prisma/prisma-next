@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   MutationCreateInput,
   RelationMutation,
@@ -9,7 +10,7 @@ import type {
 } from './types';
 
 export function createRelationMutator<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
 >(): RelationMutator<TContract, ModelName> {
   return {
@@ -48,7 +49,7 @@ export function createRelationMutator<
 
 export function isRelationMutationDescriptor(
   value: unknown,
-): value is RelationMutation<SqlContract<SqlStorage>, string> {
+): value is RelationMutation<Contract<SqlStorage>, string> {
   if (!value || typeof value !== 'object') {
     return false;
   }
@@ -68,7 +69,7 @@ export function isRelationMutationDescriptor(
 export function isRelationMutationCallback(
   value: unknown,
 ): value is (
-  mutator: RelationMutator<SqlContract<SqlStorage>, string>,
-) => RelationMutation<SqlContract<SqlStorage>, string> {
+  mutator: RelationMutator<Contract<SqlStorage>, string>,
+) => RelationMutation<Contract<SqlStorage>, string> {
   return typeof value === 'function';
 }

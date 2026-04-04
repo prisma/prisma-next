@@ -1,14 +1,15 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Db } from '../types/db';
 import type { BuilderContext } from './builder-base';
 import { TableProxyImpl } from './table-proxy-impl';
 
-export interface SqlOptions<C extends SqlContract<SqlStorage>> {
+export interface SqlOptions<C extends Contract<SqlStorage>> {
   readonly context: ExecutionContext<C>;
 }
 
-export function sql<C extends SqlContract<SqlStorage>>(options: SqlOptions<C>): Db<C> {
+export function sql<C extends Contract<SqlStorage>>(options: SqlOptions<C>): Db<C> {
   const { context } = options;
   const ctx: BuilderContext = {
     capabilities: context.contract.capabilities,

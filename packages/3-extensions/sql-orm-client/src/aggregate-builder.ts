@@ -1,9 +1,10 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { getFieldToColumnMap } from './collection-contract';
 import type { AggregateBuilder, AggregateSelector, NumericFieldNames } from './types';
 
 export function createAggregateBuilder<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
 >(contract: TContract, modelName: ModelName): AggregateBuilder<TContract, ModelName> {
   const fieldToColumn = getFieldToColumnMap(contract, modelName);
@@ -50,7 +51,7 @@ export function isAggregateSelector(value: unknown): value is AggregateSelector<
 }
 
 function createFieldAggregateSelector<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
 >(
   fieldToColumn: Record<string, string>,

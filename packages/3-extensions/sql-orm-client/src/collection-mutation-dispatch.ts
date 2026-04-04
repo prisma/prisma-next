@@ -1,5 +1,6 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { stitchIncludes } from './collection-dispatch';
 import {
@@ -13,8 +14,8 @@ import { executeQueryPlan } from './execute-query-plan';
 import type { CollectionContext, IncludeExpr } from './types';
 
 interface DispatchMutationRowsOptions<Row> {
-  readonly contract: SqlContract<SqlStorage>;
-  readonly runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
+  readonly contract: Contract<SqlStorage>;
+  readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
   readonly tableName: string;
   readonly includes: readonly IncludeExpr[];
@@ -67,8 +68,8 @@ export function dispatchMutationRows<Row>(
 }
 
 interface ExecuteSingleMutationOptions<Row> {
-  readonly contract: SqlContract<SqlStorage>;
-  readonly runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
+  readonly contract: Contract<SqlStorage>;
+  readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
   readonly tableName: string;
   readonly includes: readonly IncludeExpr[];

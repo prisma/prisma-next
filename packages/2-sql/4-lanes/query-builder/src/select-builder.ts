@@ -1,4 +1,5 @@
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Asterisk, TableAsterisk } from './column-reference';
 import type { Selection, TableToSelection } from './selection';
 import type { ExactlyOneProperty, IsNever, MergeObjects, Simplify } from './type-atoms';
@@ -12,8 +13,8 @@ import type { PreviousFunctionReceivedBadInputError } from './type-errors';
  * @template TSelection The current selection of the `select` query.
  */
 export class SelectBuilder<
-  TContract extends SqlContract,
-  TTables extends SqlContract['storage']['tables'],
+  TContract extends Contract<SqlStorage>,
+  TTables extends Contract<SqlStorage>['storage']['tables'],
   TSelection extends Selection = never,
 > {
   // @ts-expect-error
@@ -34,7 +35,7 @@ export class SelectBuilder<
       >
     : PreviousFunctionReceivedBadInputError<'[error] selecting all columns via `*` results in ambiguity when multiple tables are involved in the query'>;
   select<TTableName extends keyof TTables & string>(
-    asterisk: TableAsterisk<TTableName, TContract['storageHash']>,
+    asterisk: TableAsterisk<TTableName, TContract['storage']['storageHash']>,
   ): SelectBuilder<
     TContract,
     TTables,

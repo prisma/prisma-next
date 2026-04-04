@@ -1,5 +1,6 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { isWhereExpr, type ToWhereExpr, type WhereArg } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
@@ -92,7 +93,7 @@ import { emptyState } from './types';
 import { normalizeWhereArg } from './where-interop';
 
 function applyCreateDefaults(
-  ctx: CollectionContext<SqlContract<SqlStorage>>,
+  ctx: CollectionContext<Contract<SqlStorage>>,
   tableName: string,
   rows: Record<string, unknown>[],
 ): void {
@@ -127,7 +128,7 @@ function isWhereDirectInput(value: unknown): value is WhereDirectInput {
 }
 
 export class Collection<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
   Row = DefaultModelRow<TContract, ModelName>,
   State extends CollectionTypeState = DefaultCollectionTypeState,
@@ -596,7 +597,7 @@ export class Collection<
         context: this.ctx.context,
         runtime: this.ctx.runtime,
         modelName: this.modelName,
-        data: data as MutationCreateInput<SqlContract<SqlStorage>, string>,
+        data: data as MutationCreateInput<Contract<SqlStorage>, string>,
       });
 
       const pkCriterion = buildPrimaryKeyFilterFromRow(this.contract, this.modelName, createdRow);
@@ -743,7 +744,7 @@ export class Collection<
         runtime: this.ctx.runtime,
         modelName: this.modelName,
         filters: this.state.filters,
-        data: data as MutationUpdateInput<SqlContract<SqlStorage>, string>,
+        data: data as MutationUpdateInput<Contract<SqlStorage>, string>,
       });
       if (!updatedRow) {
         return null;

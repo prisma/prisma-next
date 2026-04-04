@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   type AnyExpression,
@@ -31,7 +32,7 @@ type CursorOrderEntry = OrderExpr & {
 };
 
 function buildProjection(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   selectedFields: readonly string[] | undefined,
   tableRef = tableName,
@@ -144,7 +145,7 @@ function createTableRefRemapper(fromTable: string, toTable: string): AstRewriter
 }
 
 function buildStateWhere(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   state: CollectionState,
   options?: {
@@ -207,7 +208,7 @@ function buildIncludeOrderArtifacts(
 }
 
 function buildIncludeChildRowsSelect(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   parentTableName: string,
   include: IncludeExpr,
 ): {
@@ -272,7 +273,7 @@ function buildIncludeChildRowsSelect(
 }
 
 function buildLateralIncludeArtifacts(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   parentTableName: string,
   include: IncludeExpr,
 ): {
@@ -310,7 +311,7 @@ function buildLateralIncludeArtifacts(
 }
 
 function buildCorrelatedIncludeProjection(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   parentTableName: string,
   include: IncludeExpr,
 ): {
@@ -341,7 +342,7 @@ function buildCorrelatedIncludeProjection(
 }
 
 function buildSelectAst(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   state: CollectionState,
   options: {
@@ -384,7 +385,7 @@ function buildSelectAst(
 }
 
 export function compileSelect(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   state: CollectionState,
 ): SqlQueryPlan<Record<string, unknown>> {
@@ -398,7 +399,7 @@ export function compileSelect(
 }
 
 export function compileRelationSelect(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   relatedTableName: string,
   targetColumn: string,
   parentPks: readonly unknown[],
@@ -419,7 +420,7 @@ export function compileRelationSelect(
 }
 
 export function compileSelectWithIncludeStrategy(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   state: CollectionState,
   strategy: 'lateral' | 'correlated',

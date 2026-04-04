@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression,
   ColumnRef,
@@ -15,7 +16,7 @@ import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './q
 import { combineWhereExprs } from './where-utils';
 
 function buildReturningColumns(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   returningColumns: readonly string[] | undefined,
 ) {
@@ -28,7 +29,7 @@ function buildReturningColumns(
 }
 
 function toParamAssignments(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   values: Record<string, unknown>,
 ): {
@@ -53,7 +54,7 @@ function toParamAssignments(
 }
 
 function normalizeInsertRows(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   rows: readonly Record<string, unknown>[],
 ): {
@@ -104,7 +105,7 @@ function normalizeInsertRows(
 }
 
 export function compileInsertReturning(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   rows: readonly Record<string, unknown>[],
   returningColumns: readonly string[] | undefined,
@@ -118,7 +119,7 @@ export function compileInsertReturning(
 }
 
 export function compileInsertCount(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   rows: readonly Record<string, unknown>[],
 ): SqlQueryPlan<Record<string, unknown>> {
@@ -129,7 +130,7 @@ export function compileInsertCount(
 }
 
 export function compileUpsertReturning(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   createValues: Record<string, unknown>,
   updateValues: Record<string, unknown>,
@@ -159,7 +160,7 @@ export function compileUpsertReturning(
 }
 
 export function compileUpdateReturning(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
   filters: readonly AnyExpression[],
@@ -178,7 +179,7 @@ export function compileUpdateReturning(
 }
 
 export function compileUpdateCount(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
   filters: readonly AnyExpression[],
@@ -194,7 +195,7 @@ export function compileUpdateCount(
 }
 
 export function compileDeleteReturning(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   filters: readonly AnyExpression[],
   returningColumns: readonly string[] | undefined,
@@ -211,7 +212,7 @@ export function compileDeleteReturning(
 }
 
 export function compileDeleteCount(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   filters: readonly AnyExpression[],
 ): SqlQueryPlan<Record<string, unknown>> {

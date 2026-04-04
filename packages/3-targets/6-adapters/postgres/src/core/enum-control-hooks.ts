@@ -1,6 +1,7 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
-import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { escapeLiteral, qualifyName, quoteIdentifier, validateEnumValueLength } from './sql-utils';
@@ -348,7 +349,7 @@ function buildAddValueOperations(options: {
  * Used for type-safe reference tracking.
  */
 function collectEnumColumnsFromContract(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   typeName: string,
   nativeType: string,
 ): ReadonlyArray<{ table: string; column: string }> {
@@ -396,7 +397,7 @@ function collectEnumColumnsFromSchema(
  * still migrate it to avoid DROP TYPE failures.
  */
 function collectAllEnumColumns(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   schema: SqlSchemaIR,
   typeName: string,
   nativeType: string,
@@ -508,7 +509,7 @@ function buildRecreateEnumOperation(options: {
   schemaName: string;
   values: readonly string[];
   removedValues: readonly string[];
-  contract: SqlContract<SqlStorage>;
+  contract: Contract<SqlStorage>;
   schema: SqlSchemaIR;
 }): SqlMigrationPlanOperation<unknown> {
   const tempTypeName = `${options.nativeType}${REBUILD_SUFFIX}`;

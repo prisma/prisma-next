@@ -1,4 +1,5 @@
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Asterisk,
   ColumnReference,
@@ -12,18 +13,18 @@ import type { TableReference, TableReferenceOutOfContractError } from './table-r
  *
  * @template TContract The contract that describes the database.
  */
-export type Ref<TContract extends SqlContract> = {
+export type Ref<TContract extends Contract<SqlStorage>> = {
   readonly [TableName in keyof TContract['storage']['tables'] & string]: TableReference<
     TableName,
-    TContract['storageHash']
+    TContract['storage']['storageHash']
   > & {
     readonly [ColumnName in Exclude<
       keyof TContract['storage']['tables'][TableName]['columns'],
       keyof TableReference
     > &
-      string]: ColumnReference<ColumnName, TableName, TContract['storageHash']>;
+      string]: ColumnReference<ColumnName, TableName, TContract['storage']['storageHash']>;
   } & {
-    readonly ['*']: TableAsterisk<TableName, TContract['storageHash']>;
+    readonly ['*']: TableAsterisk<TableName, TContract['storage']['storageHash']>;
   } & Record<
       PropertyKey,
       ColumnReferenceOutOfContractError<`[error] reference to a non-existing column in the '${TableName}' table`>
@@ -40,7 +41,9 @@ export type Ref<TContract extends SqlContract> = {
  *
  * @template TContract The contract that describes the database.
  */
-export function createRef<TContract extends SqlContract>(_contract: TContract): Ref<TContract> {
+export function createRef<TContract extends Contract<SqlStorage>>(
+  _contract: TContract,
+): Ref<TContract> {
   return new Proxy({} as Ref<TContract>, {
     get(_target, tableName) {
       if (tableName === '*') {

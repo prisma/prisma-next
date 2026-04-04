@@ -1,4 +1,4 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
 import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
 import type { RuntimeDriverInstance } from '@prisma-next/core-execution-plane/types';
 import type { OperationRegistry } from '@prisma-next/operations';
@@ -12,7 +12,7 @@ import type {
   TelemetryOutcome,
 } from '@prisma-next/runtime-executor';
 import { AsyncIterableResult, createRuntimeCore } from '@prisma-next/runtime-executor';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   AnyQueryAst,
@@ -35,16 +35,14 @@ import type {
 } from './sql-context';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
-export interface RuntimeOptions<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-> {
+export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
-  readonly adapter: Adapter<AnyQueryAst, SqlContract<SqlStorage>, LoweredStatement>;
+  readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
   readonly plugins?: readonly Plugin<
     TContract,
-    Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+    Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
     SqlDriver<unknown>
   >[];
   readonly mode?: 'strict' | 'permissive';
@@ -52,7 +50,7 @@ export interface RuntimeOptions<
 }
 
 export interface CreateRuntimeOptions<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
   TTargetId extends string = string,
 > {
   readonly stackInstance: ExecutionStackInstance<
@@ -67,7 +65,7 @@ export interface CreateRuntimeOptions<
   readonly verify: RuntimeVerifyOptions;
   readonly plugins?: readonly Plugin<
     TContract,
-    Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+    Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
     SqlDriver<unknown>
   >[];
   readonly mode?: 'strict' | 'permissive';
@@ -103,16 +101,16 @@ interface CoreQueryable {
 
 export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
 
-class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
+class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   implements Runtime
 {
   private readonly core: RuntimeCore<
     TContract,
-    Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+    Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
     SqlDriver<unknown>
   >;
   private readonly contract: TContract;
-  private readonly adapter: Adapter<AnyQueryAst, SqlContract<SqlStorage>, LoweredStatement>;
+  private readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   private readonly codecRegistry: CodecRegistry;
   private readonly jsonSchemaValidators: JsonSchemaValidatorRegistry | undefined;
   private codecRegistryValidated: boolean;
@@ -129,7 +127,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
 
     const coreOptions: RuntimeCoreOptions<
       TContract,
-      Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+      Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
       SqlDriver<unknown>
     > = {
       familyAdapter,
@@ -137,7 +135,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
       verify,
       plugins: plugins as readonly Plugin<
         TContract,
-        Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+        Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
         SqlDriver<unknown>
       >[],
       ...ifDefined('mode', mode),
@@ -153,7 +151,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     }
   }
 
-  private ensureCodecRegistryValidated(contract: SqlContract<SqlStorage>): void {
+  private ensureCodecRegistryValidated(contract: Contract<SqlStorage>): void {
     if (!this.codecRegistryValidated) {
       validateCodecRegistryCompleteness(this.codecRegistry, contract);
       this.codecRegistryValidated = true;
@@ -245,7 +243,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
   }
 }
 
-export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
+export function createRuntime<TContract extends Contract<SqlStorage>, TTargetId extends string>(
   options: CreateRuntimeOptions<TContract, TTargetId>,
 ): Runtime {
   const { stackInstance, context, driver, verify, plugins, mode, log } = options;

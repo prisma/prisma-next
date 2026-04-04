@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   type AnyExpression,
@@ -33,12 +34,12 @@ interface RelationMeta {
   };
 }
 
-type RelationPredicateInput<TContract extends SqlContract<SqlStorage>, ModelName extends string> =
+type RelationPredicateInput<TContract extends Contract<SqlStorage>, ModelName extends string> =
   | ((model: ModelAccessor<TContract, ModelName>) => AnyExpression)
   | Record<string, unknown>;
 
 export function createModelAccessor<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
 >(context: ExecutionContext<TContract>, modelName: ModelName): ModelAccessor<TContract, ModelName> {
   const contract = context.contract;
@@ -68,7 +69,7 @@ export function createModelAccessor<
 }
 
 function resolveFieldTraits(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   fieldName: string,
   context: ExecutionContext,
@@ -97,7 +98,7 @@ function createScalarFieldAccessor(
 }
 
 function createRelationFilterAccessor<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ParentModelName extends string,
 >(
   context: ExecutionContext<TContract>,
@@ -128,7 +129,7 @@ function createRelationFilterAccessor<
   return relationAccessor;
 }
 
-function buildExistsExpr<TContract extends SqlContract<SqlStorage>>(
+function buildExistsExpr<TContract extends Contract<SqlStorage>>(
   context: ExecutionContext<TContract>,
   parentModelName: string,
   parentTableName: string,
@@ -176,7 +177,7 @@ function buildExistsExpr<TContract extends SqlContract<SqlStorage>>(
   return existsNot ? ExistsExpr.notExists(subquery) : ExistsExpr.exists(subquery);
 }
 
-function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
+function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
   context: ExecutionContext<TContract>,
   relatedModelName: string,
   predicate: RelationPredicateInput<TContract, string> | undefined,
@@ -231,7 +232,7 @@ function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
   return exprs.length === 1 ? exprs[0] : and(...exprs);
 }
 
-function buildJoinWhere<TContract extends SqlContract<SqlStorage>>(
+function buildJoinWhere<TContract extends Contract<SqlStorage>>(
   contract: TContract,
   parentModelName: string,
   parentTableName: string,
@@ -274,7 +275,7 @@ function buildJoinWhere<TContract extends SqlContract<SqlStorage>>(
   return and(...joinExprs);
 }
 
-function firstTargetColumn<TContract extends SqlContract<SqlStorage>>(
+function firstTargetColumn<TContract extends Contract<SqlStorage>>(
   contract: TContract,
   relation: RelationMeta,
 ): string | undefined {

@@ -1,21 +1,21 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
-import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
+import type { ColumnDefaultLiteralInputValue, Contract } from '@prisma-next/contract/types';
 import { isTaggedBigInt, isTaggedRaw } from '@prisma-next/contract/types';
 import type { DomainContractShape, DomainModelShape } from '@prisma-next/contract/validate-domain';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { constructContract } from './construct';
-import type { SqlContract, SqlStorage, StorageColumn, StorageTable } from './types';
+import type { SqlStorage, StorageColumn, StorageTable } from './types';
 import { applyFkDefaults } from './types';
 import { validateSqlContract, validateStorageSemantics } from './validators';
 
-function extractDomainShape(contract: SqlContract<SqlStorage>): DomainContractShape {
+function extractDomainShape(contract: Contract<SqlStorage>): DomainContractShape {
   return {
     roots: contract.roots,
     models: contract.models as Record<string, DomainModelShape>,
   };
 }
 
-function validateModelStorageReferences(contract: SqlContract<SqlStorage>): void {
+function validateModelStorageReferences(contract: Contract<SqlStorage>): void {
   const models = contract.models as Record<
     string,
     { storage?: { table?: string; fields?: Record<string, { column?: string }> } }
@@ -47,7 +47,7 @@ function validateModelStorageReferences(contract: SqlContract<SqlStorage>): void
   }
 }
 
-function validateContractLogic(contract: SqlContract<SqlStorage>): void {
+function validateContractLogic(contract: Contract<SqlStorage>): void {
   const tableNames = new Set(Object.keys(contract.storage.tables));
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
@@ -161,7 +161,7 @@ export function decodeDefaultLiteralValue(
   return value;
 }
 
-export function decodeContractDefaults<T extends SqlContract<SqlStorage>>(contract: T): T {
+export function decodeContractDefaults<T extends Contract<SqlStorage>>(contract: T): T {
   const tables = contract.storage.tables;
   let tablesChanged = false;
   const decodedTables: Record<string, StorageTable> = {};
@@ -272,9 +272,9 @@ function normalizeModels(
   return normalized;
 }
 
-export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
+export function normalizeContract(contract: unknown): Contract<SqlStorage> {
   if (typeof contract !== 'object' || contract === null) {
-    return contract as SqlContract<SqlStorage>;
+    return contract as Contract<SqlStorage>;
   }
 
   const contractObj = contract as Record<string, unknown>;
@@ -323,15 +323,15 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
     meta: contractObj['meta'] ?? {},
     sources: contractObj['sources'] ?? {},
     ...(normalizedExecution ? { execution: normalizedExecution } : {}),
-  } as SqlContract<SqlStorage>;
+  } as unknown as Contract<SqlStorage>;
 }
 
-export function validateContract<TContract extends SqlContract<SqlStorage>>(
+export function validateContract<TContract extends Contract<SqlStorage>>(
   value: unknown,
 ): TContract {
   const normalized = normalizeContract(value);
 
-  const structurallyValid = validateSqlContract<SqlContract<SqlStorage>>(normalized);
+  const structurallyValid = validateSqlContract<Contract<SqlStorage>>(normalized);
 
   validateContractDomain(extractDomainShape(structurallyValid));
 
