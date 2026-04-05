@@ -79,7 +79,7 @@ export async function emit(
     profileHash: contract.profileHash,
     roots: contract.roots,
     models: contract.models as Record<string, unknown>,
-    storage: contract.storage as Record<string, unknown>,
+    storage: contract.storage as unknown as Record<string, unknown>,
     ...ifDefined('execution', contract.execution as Record<string, unknown> | undefined),
     extensionPacks: contract.extensionPacks,
     capabilities: contract.capabilities,
