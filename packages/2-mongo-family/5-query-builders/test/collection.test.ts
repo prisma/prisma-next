@@ -11,8 +11,8 @@ import {
 } from '@prisma-next/mongo-query-ast';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../../1-core/test/fixtures/orm-contract';
-import ormContractJson from '../../1-core/test/fixtures/orm-contract.json';
+import type { Contract } from '../../1-foundation/mongo-contract/test/fixtures/orm-contract';
+import ormContractJson from '../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { createMongoCollection } from '../src/collection';
 import type { MongoQueryExecutor } from '../src/executor';
 

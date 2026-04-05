@@ -1,5 +1,5 @@
+import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { describe, expect, it } from 'vitest';
-import { validateContractDomain } from '../src/validate-domain';
 
 function makeMinimalModel(overrides: Record<string, unknown> = {}) {
   return {
