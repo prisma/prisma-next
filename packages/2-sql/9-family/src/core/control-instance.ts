@@ -332,11 +332,18 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         throw new Error('Contract is missing required fields: storage or target');
       }
 
-      if (!('storageHash' in contract) || typeof contract.storageHash !== 'string') {
+      const storage = 'storage' in contract ? (contract.storage as Record<string, unknown>) : null;
+      const storageHash =
+        storage && typeof storage['storageHash'] === 'string'
+          ? storage['storageHash']
+          : 'storageHash' in contract && typeof contract.storageHash === 'string'
+            ? contract.storageHash
+            : undefined;
+      if (!storageHash) {
         throw new Error('Contract is missing required field: storageHash');
       }
 
-      const contractStorageHash = contract.storageHash;
+      const contractStorageHash = storageHash;
       const contractProfileHash =
         'profileHash' in contract && typeof contract.profileHash === 'string'
           ? contract.profileHash
