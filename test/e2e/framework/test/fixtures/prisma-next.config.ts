@@ -13,8 +13,5 @@ export default defineConfig({
   adapter: postgresAdapter,
   driver: postgresDriver,
   extensionPacks: [],
-  contract: typescriptContract(
-    contract as unknown as Contract,
-    'test/fixtures/generated/contract.json',
-  ),
+  contract: typescriptContract(contract as unknown as Contract, 'generated/contract.json'),
 });
