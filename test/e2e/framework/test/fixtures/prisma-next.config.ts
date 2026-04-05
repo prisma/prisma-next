@@ -1,6 +1,5 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
-import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
@@ -13,5 +12,5 @@ export default defineConfig({
   adapter: postgresAdapter,
   driver: postgresDriver,
   extensionPacks: [],
-  contract: typescriptContract(contract as unknown as Contract, 'generated/contract.json'),
+  contract: typescriptContract(contract, 'generated/contract.json'),
 });

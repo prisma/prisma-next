@@ -971,7 +971,7 @@ withTempDir(({ createTempDir }) => {
             adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             // driver is missing - this is what we're testing
             extensionPacks: [],
-            contract: typescriptContract(contract as unknown as Contract, 'output/contract.json'),
+            contract: typescriptContract(contract, 'output/contract.json'),
             db: {
               connection: connectionString,
             },
