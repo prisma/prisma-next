@@ -15,7 +15,6 @@ import { checkContractComponentRequirements } from '@prisma-next/framework-compo
 import { createOperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type {
   Adapter,
   AnyQueryAst,
