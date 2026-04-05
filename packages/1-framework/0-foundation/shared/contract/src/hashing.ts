@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { canonicalizeContract } from './canonicalization';
+import type { Contract } from './contract-types';
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from './types';
 
 const SCHEMA_VERSION = '1';
@@ -10,23 +11,29 @@ function sha256(content: string): string {
   return `sha256:${hash.digest('hex')}`;
 }
 
+function hashContract(section: Record<string, unknown>): string {
+  const contract = {
+    targetFamily: section['targetFamily'],
+    target: section['target'],
+    roots: {},
+    models: {},
+    storage: section['storage'] ?? {},
+    execution: section['execution'],
+    extensionPacks: {},
+    capabilities: section['capabilities'] ?? {},
+    meta: {},
+    profileHash: '',
+    ...section,
+  } as Contract;
+  return canonicalizeContract(contract, { schemaVersion: SCHEMA_VERSION });
+}
+
 export function computeStorageHash(args: {
   target: string;
   targetFamily: string;
   storage: Record<string, unknown>;
 }): StorageHashBase<string> {
-  const canonical = canonicalizeContract({
-    schemaVersion: SCHEMA_VERSION,
-    targetFamily: args.targetFamily,
-    target: args.target,
-    storage: args.storage,
-    roots: {},
-    models: {},
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-  });
-  return sha256(canonical) as StorageHashBase<string>;
+  return sha256(hashContract(args)) as StorageHashBase<string>;
 }
 
 export function computeExecutionHash(args: {
@@ -34,19 +41,7 @@ export function computeExecutionHash(args: {
   targetFamily: string;
   execution: Record<string, unknown>;
 }): ExecutionHashBase<string> {
-  const canonical = canonicalizeContract({
-    schemaVersion: SCHEMA_VERSION,
-    targetFamily: args.targetFamily,
-    target: args.target,
-    execution: args.execution,
-    roots: {},
-    models: {},
-    storage: {},
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-  });
-  return sha256(canonical) as ExecutionHashBase<string>;
+  return sha256(hashContract(args)) as ExecutionHashBase<string>;
 }
 
 export function computeProfileHash(args: {
@@ -54,16 +49,5 @@ export function computeProfileHash(args: {
   targetFamily: string;
   capabilities: Record<string, Record<string, boolean>>;
 }): ProfileHashBase<string> {
-  const canonical = canonicalizeContract({
-    schemaVersion: SCHEMA_VERSION,
-    targetFamily: args.targetFamily,
-    target: args.target,
-    capabilities: args.capabilities,
-    roots: {},
-    models: {},
-    storage: {},
-    extensionPacks: {},
-    meta: {},
-  });
-  return sha256(canonical) as ProfileHashBase<string>;
+  return sha256(hashContract(args)) as ProfileHashBase<string>;
 }

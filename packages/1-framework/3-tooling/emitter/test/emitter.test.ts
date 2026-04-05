@@ -1,4 +1,3 @@
-import type { Contract } from '@prisma-next/contract/types';
 import type { EmitStackInput } from '@prisma-next/core-control-plane/emission';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type {
@@ -11,26 +10,6 @@ import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createTestContract } from './utils';
-
-const EMIT_TEST_STORAGE_HASH =
-  'sha256:0000000000000000000000000000000000000000000000000000000000000000';
-
-function emitTestContract(patch: Record<string, unknown>): Contract {
-  const base = {
-    targetFamily: 'sql',
-    target: 'postgres',
-    roots: {},
-    models: {},
-    storage: {
-      tables: {},
-      storageHash: EMIT_TEST_STORAGE_HASH,
-    },
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-  };
-  return { ...base, ...patch } as unknown as Contract;
-}
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
@@ -77,13 +56,6 @@ export type LaneCodecTypes = CodecTypes;
 export type Contract = unknown;
 `;
   },
-};
-
-const mockSqlHookSkipStructureValidation: TargetFamilyHook = {
-  id: 'sql',
-  validateTypes: mockSqlHook.validateTypes,
-  validateStructure: () => {},
-  generateContractTypes: mockSqlHook.generateContractTypes,
 };
 
 describe('emitter', () => {
@@ -208,38 +180,6 @@ describe('emitter', () => {
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('invalid codecId format');
   });
 
-  it('throws error when targetFamily is missing', async () => {
-    const contract = emitTestContract({ targetFamily: undefined });
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(contract, options, mockSqlHookSkipStructureValidation)).rejects.toThrow(
-      'Contract canonical artifact validation failed',
-    );
-  });
-
-  it('throws error when target is missing', async () => {
-    const contract = emitTestContract({ target: undefined });
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(contract, options, mockSqlHook)).rejects.toThrow(
-      'Contract canonical artifact validation failed',
-    );
-  });
-
   it('emits contract even when extension pack namespace does not match extensionIds', async () => {
     // Adapter-provided codecs (pg/int4@1) don't need to be in contract.extensionPacks
     const ir = createTestContract({
@@ -331,108 +271,6 @@ describe('emitter', () => {
     const result = await emit(ir, options, mockSqlHook);
     expect(result.contractJson).toBeDefined();
     expect(result.contractDts).toBeDefined();
-  });
-
-  it('throws error when extension packs are missing', async () => {
-    const contract = emitTestContract({ extensionPacks: undefined });
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(contract, options, mockSqlHook)).rejects.toThrow(
-      'Contract canonical artifact validation failed',
-    );
-  });
-
-  it('throws error when extension packs are not an object', async () => {
-    const ir = createTestContract({
-      extensionPacks: 'not-an-object' as unknown as Record<string, unknown>,
-    });
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'Contract canonical artifact validation failed',
-    );
-  });
-
-  it('throws error when capabilities is missing', async () => {
-    const contract = emitTestContract({ capabilities: undefined });
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(contract, options, mockSqlHook)).rejects.toThrow(
-      'Contract canonical artifact validation failed',
-    );
-  });
-
-  it('throws error when capabilities is not an object', async () => {
-    const ir = createTestContract({
-      capabilities: 'not-an-object' as unknown as Record<string, Record<string, boolean>>,
-    });
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'Contract canonical artifact validation failed',
-    );
-  });
-
-  it('throws error when meta is missing', async () => {
-    const contract = emitTestContract({ meta: undefined });
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(contract, options, mockSqlHook)).rejects.toThrow(
-      'Contract canonical artifact validation failed',
-    );
-  });
-
-  it('throws error when meta is not an object', async () => {
-    const ir = createTestContract({
-      meta: 'not-an-object' as unknown as Record<string, unknown>,
-    });
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
-      'Contract canonical artifact validation failed',
-    );
   });
 
   it('omits sources from emitted contract artifact', async () => {

@@ -4,48 +4,11 @@ import type {
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { type } from 'arktype';
 import { format } from 'prettier';
 import { canonicalizeContractToObject } from './canonicalization';
 import type { EmitResult, EmitStackInput } from './types';
 
 const SCHEMA_VERSION = '1';
-
-const CanonicalMetaSchema = type({
-  '[string]': 'unknown',
-});
-
-const ContractJsonSchema = type({
-  '+': 'reject',
-  schemaVersion: 'string',
-  targetFamily: 'string',
-  target: 'string',
-  profileHash: 'string',
-  models: type({ '[string]': 'unknown' }),
-  roots: 'Record<string, string>',
-  storage: type({ '[string]': 'unknown' }),
-  'execution?': type({ '[string]': 'unknown' }),
-  extensionPacks: type({ '[string]': 'unknown' }),
-  capabilities: type({
-    '[string]': type({
-      '[string]': 'boolean',
-    }),
-  }),
-  meta: CanonicalMetaSchema,
-});
-
-function assertCanonicalArtifactShape(value: unknown): void {
-  const result = ContractJsonSchema(value);
-  if (result instanceof type.errors) {
-    const issues = result
-      .map((error) => {
-        const path = error.path?.toString() ?? '<root>';
-        return `${path}: ${error.message}`;
-      })
-      .join('; ');
-    throw new Error(`Contract canonical artifact validation failed: ${issues}`);
-  }
-}
 
 export async function emit(
   contract: Contract,
@@ -72,26 +35,13 @@ export async function emit(
 
   targetFamily.validateStructure(contract);
 
-  const canonicalContract = {
-    schemaVersion: SCHEMA_VERSION,
-    targetFamily: contract.targetFamily,
-    target: contract.target,
-    profileHash: contract.profileHash,
-    roots: contract.roots,
-    models: contract.models as Record<string, unknown>,
-    storage: contract.storage as unknown as Record<string, unknown>,
-    ...ifDefined('execution', contract.execution as Record<string, unknown> | undefined),
-    extensionPacks: contract.extensionPacks,
-    capabilities: contract.capabilities,
-    meta: contract.meta,
-  };
-  assertCanonicalArtifactShape(canonicalContract);
-
   const { storageHash } = contract.storage;
   const executionHash = contract.execution?.executionHash;
   const { profileHash } = contract;
 
-  const canonicalized = canonicalizeContractToObject(canonicalContract);
+  const canonicalized = canonicalizeContractToObject(contract, {
+    schemaVersion: SCHEMA_VERSION,
+  });
   const contractJsonString = JSON.stringify(
     {
       ...canonicalized,
