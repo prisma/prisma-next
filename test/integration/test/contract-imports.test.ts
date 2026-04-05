@@ -172,7 +172,7 @@ describe('contract.d.ts imports resolution', () => {
 
       // Create a test TypeScript file that imports the generated contract.d.ts
       const testFileContent = `import type { Contract, CodecTypes } from './contract';
-import type { Contract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 
 // Verify we can use the Contract type
 // biome-ignore lint/suspicious/noExplicitAny: test code with type assertions
@@ -182,6 +182,9 @@ const _tables: Contract['storage']['tables'] = _storage.tables;
 
 // Verify we can access CodecTypes
 const _codecTypes: CodecTypes = {} as any;
+
+// Verify SqlStorage is importable from @prisma-next/sql-contract/types
+const _sqlStorage: SqlStorage = _contract.storage;
 
 // Verify the contract type is correctly structured
 type UserTable = Contract['storage']['tables']['user'];
