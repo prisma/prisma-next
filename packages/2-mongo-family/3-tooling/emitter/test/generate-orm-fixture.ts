@@ -6,7 +6,7 @@ import { mongoTargetFamilyHook } from '../src/index';
 
 const codecImports = [
   {
-    package: '@prisma-next/mongo-core/codec-types',
+    package: '@prisma-next/adapter-mongo/codec-types',
     named: 'CodecTypes',
     alias: 'MongoCodecTypes',
   },
