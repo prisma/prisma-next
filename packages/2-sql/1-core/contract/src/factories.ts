@@ -1,5 +1,3 @@
-import { computeStorageHash } from '@prisma-next/contract/hashing';
-import type { Contract } from '@prisma-next/contract/types';
 import type {
   ForeignKey,
   ForeignKeyOptions,
@@ -8,7 +6,6 @@ import type {
   PrimaryKey,
   SqlModelFieldStorage,
   SqlModelStorage,
-  SqlStorage,
   StorageColumn,
   StorageTable,
   UniqueConstraint,
@@ -104,43 +101,4 @@ export function model(
     fields: domainFields,
     relations,
   };
-}
-
-export function storage(
-  tables: Record<string, StorageTable>,
-  opts?: { target?: string; targetFamily?: string },
-): SqlStorage {
-  const target = opts?.target ?? 'postgres';
-  const targetFamily = opts?.targetFamily ?? 'sql';
-  const storageObj = { tables };
-  return {
-    ...storageObj,
-    storageHash: computeStorageHash({ target, targetFamily, storage: storageObj }),
-  };
-}
-
-export function contract(opts: {
-  target: string;
-  storage: SqlStorage;
-  profileHash: string;
-  models?: Record<string, unknown>;
-  roots?: Record<string, string>;
-  targetFamily?: 'sql';
-  capabilities?: Record<string, Record<string, boolean>>;
-  extensionPacks?: Record<string, unknown>;
-  meta?: Record<string, unknown>;
-  execution?: Record<string, unknown>;
-}): Contract<SqlStorage> {
-  return {
-    target: opts.target,
-    targetFamily: opts.targetFamily ?? 'sql',
-    profileHash: opts.profileHash,
-    storage: opts.storage,
-    models: opts.models ?? {},
-    roots: opts.roots ?? {},
-    capabilities: opts.capabilities ?? {},
-    extensionPacks: opts.extensionPacks ?? {},
-    meta: opts.meta ?? {},
-    ...(opts.execution !== undefined && { execution: opts.execution }),
-  } as Contract<SqlStorage>;
 }
