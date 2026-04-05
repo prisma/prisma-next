@@ -34,7 +34,6 @@ describe('validateContract', () => {
     const result = validateContract<Contract>(minimalContract(), noopValidator);
     expect(result.target).toBe('postgres');
     expect(result.roots['users']).toBe('User');
-    expect(result.warnings).toEqual([]);
   });
 
   it('strips schemaVersion from the result', () => {
@@ -116,7 +115,7 @@ describe('validateContract', () => {
     }
   });
 
-  it('returns domain validation warnings', () => {
+  it('does not reject orphaned models (advisory, not a load-time error)', () => {
     const raw = minimalContract({
       models: {
         User: {
@@ -131,9 +130,6 @@ describe('validateContract', () => {
         },
       },
     });
-    const result = validateContract<Contract>(raw, noopValidator);
-    expect(result.warnings).toEqual(
-      expect.arrayContaining([expect.stringContaining('Orphaned model')]),
-    );
+    expect(() => validateContract<Contract>(raw, noopValidator)).not.toThrow();
   });
 });
