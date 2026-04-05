@@ -252,6 +252,7 @@ class MongoCollectionImpl<
   }
 
   async createCount(data: ReadonlyArray<CreateInput<TContract, ModelName>>): Promise<number> {
+    this.#rejectIncludes('createCount');
     const documents = data.map((d) => this.#toDocument(d as Record<string, unknown>));
     const command = new InsertManyCommand(this.#collectionName, documents);
     const results = await this.#drainPlan(command);
@@ -298,6 +299,7 @@ class MongoCollectionImpl<
   async updateCount(data: Partial<DefaultModelRow<TContract, ModelName>>): Promise<number> {
     this.#requireFilters('updateCount');
     this.#rejectWindowing('updateCount');
+    this.#rejectIncludes('updateCount');
     const filter = this.#mergeFilters();
     const updateDoc = this.#toUpdateDocument(data as Record<string, unknown>);
     const command = new UpdateManyCommand(this.#collectionName, filter, updateDoc);
@@ -335,6 +337,7 @@ class MongoCollectionImpl<
   async deleteCount(): Promise<number> {
     this.#requireFilters('deleteCount');
     this.#rejectWindowing('deleteCount');
+    this.#rejectIncludes('deleteCount');
     const filter = this.#mergeFilters();
     const command = new DeleteManyCommand(this.#collectionName, filter);
     const results = await this.#drainPlan(command);
