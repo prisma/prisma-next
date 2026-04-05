@@ -52,10 +52,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       continue;
     }
 
-    if (key === 'nullable' && value === false) {
-      continue;
-    }
-
     if (key === 'generated' && value === false) {
       continue;
     }
@@ -113,6 +109,8 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         currentPath[3] === 'foreignKeys' &&
         (key === 'constraint' || key === 'index');
 
+      const isNullableField = key === 'nullable';
+
       if (
         !isRequiredModels &&
         !isRequiredTables &&
@@ -129,7 +127,8 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isTableUniques &&
         !isTableIndexes &&
         !isTableForeignKeys &&
-        !isFkBooleanField
+        !isFkBooleanField &&
+        !isNullableField
       ) {
         continue;
       }

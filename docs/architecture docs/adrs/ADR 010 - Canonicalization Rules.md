@@ -62,7 +62,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 
 - Omit fields that are equal to their canonical defaults
 - **Canonical defaults**:
-  - `nullable: false` on columns omitted unless true
+  - `nullable` is always explicit (never omitted) — see ADR 172
   - `generated: false` omitted
   - Empty arrays and empty objects omitted unless required for schema readability (tables and models must be present, even if empty)
   - Capability flags omitted when false and recorded only when true
