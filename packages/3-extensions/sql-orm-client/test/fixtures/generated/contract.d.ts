@@ -235,9 +235,9 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly title: CodecTypes['pg/text@1']['output'];
-        readonly reviewerId: CodecTypes['pg/int4@1']['output'];
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly reviewerId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
       };
       readonly relations: {
         readonly reviewer: {
@@ -260,9 +260,9 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly body: CodecTypes['pg/text@1']['output'];
-        readonly postId: CodecTypes['pg/int4@1']['output'];
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly body: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly postId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
       };
       readonly relations: {};
     };
@@ -277,10 +277,10 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly title: CodecTypes['pg/text@1']['output'];
-        readonly userId: CodecTypes['pg/int4@1']['output'];
-        readonly views: CodecTypes['pg/int4@1']['output'];
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly userId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly views: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
       };
       readonly relations: {
         readonly comments: {
@@ -311,9 +311,9 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly userId: CodecTypes['pg/int4@1']['output'];
-        readonly bio: CodecTypes['pg/text@1']['output'];
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly userId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly bio: { readonly codecId: 'pg/text@1'; readonly nullable: false };
       };
       readonly relations: {
         readonly user: {
@@ -335,8 +335,8 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: CodecTypes['pg/text@1']['output'];
-        readonly name: CodecTypes['pg/text@1']['output'];
+        readonly id: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly name: { readonly codecId: 'pg/text@1'; readonly nullable: false };
       };
       readonly relations: {};
     };
@@ -351,10 +351,10 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly name: CodecTypes['pg/text@1']['output'];
-        readonly email: CodecTypes['pg/text@1']['output'];
-        readonly invitedById: CodecTypes['pg/int4@1']['output'] | null;
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly name: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly invitedById: { readonly codecId: 'pg/int4@1'; readonly nullable: true };
       };
       readonly relations: {
         readonly invitedUsers: {
