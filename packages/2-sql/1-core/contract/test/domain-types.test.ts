@@ -1,6 +1,6 @@
-import type { Contract, ContractRelation } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import type { SqlContract, SqlRelation, SqlStorage } from '../src/types';
+import type { SqlStorage } from '../src/types';
 
 type AssertExtends<T, U> = T extends U ? true : never;
 
@@ -33,13 +33,6 @@ describe('domain type compatibility', () => {
     });
   });
 
-  describe('SqlRelation extends ContractRelation', () => {
-    it('type-level assertion', () => {
-      const _proof: AssertExtends<SqlRelation, ContractRelation> = true;
-      expect(_proof).toBe(true);
-    });
-  });
-
   describe('concrete typed contract preserves literal types', () => {
     it('literal types flow through the intersection', () => {
       type ExampleModels = {
@@ -58,7 +51,7 @@ describe('domain type compatibility', () => {
         };
       };
 
-      type ExampleContract = SqlContract<SqlStorage, ExampleModels>;
+      type ExampleContract = Contract<SqlStorage, ExampleModels>;
 
       type NameField = ExampleContract['models']['User']['fields']['name'];
 

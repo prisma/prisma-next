@@ -4,12 +4,13 @@ import {
   ContractValidationError,
   validateContract as frameworkValidateContract,
 } from '@prisma-next/contract/validate-contract';
-import type { SqlContract, SqlStorage, StorageColumn, StorageTable } from './types';
+import type { SqlModelStorage, SqlStorage, StorageColumn, StorageTable } from './types';
 import { validateSqlContract, validateStorageSemantics } from './validators';
 
-function validateModelStorageReferences(contract: SqlContract<SqlStorage>): void {
+function validateModelStorageReferences(contract: Contract<SqlStorage>): void {
   for (const [modelName, model] of Object.entries(contract.models)) {
-    const storageTable = model.storage.table;
+    const modelStorage = model.storage as SqlModelStorage;
+    const storageTable = modelStorage.table;
 
     const table = contract.storage.tables[storageTable] as
       | (typeof contract.storage.tables)[string]
@@ -22,7 +23,7 @@ function validateModelStorageReferences(contract: SqlContract<SqlStorage>): void
     }
 
     const columnNames = new Set(Object.keys(table.columns));
-    for (const [fieldName, field] of Object.entries(model.storage.fields)) {
+    for (const [fieldName, field] of Object.entries(modelStorage.fields)) {
       if (!columnNames.has(field.column)) {
         throw new ContractValidationError(
           `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${storageTable}"`,
@@ -33,7 +34,7 @@ function validateModelStorageReferences(contract: SqlContract<SqlStorage>): void
   }
 }
 
-function validateContractLogic(contract: SqlContract<SqlStorage>): void {
+function validateContractLogic(contract: Contract<SqlStorage>): void {
   const tableNames = new Set(Object.keys(contract.storage.tables));
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
@@ -126,7 +127,7 @@ function validateSqlStorage(contract: Contract): void {
   // catch unknown fields. The overlap is small and ensures SQL-specific
   // constraints (e.g. storage table schema) are enforced.
   validateSqlContract(contract);
-  const sqlContract = contract as SqlContract<SqlStorage>;
+  const sqlContract = contract as Contract<SqlStorage>;
   validateContractLogic(sqlContract);
   validateModelStorageReferences(sqlContract);
   const semanticErrors = validateStorageSemantics(sqlContract.storage);

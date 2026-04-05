@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { col, contract, fk, index, model, pk, storage, table, unique } from '../src/factories';
+import { col, fk, index, model, pk, table, unique } from '../src/factories';
 
 describe('SQL contract factories', () => {
   describe('col', () => {
@@ -333,122 +333,6 @@ describe('SQL contract factories', () => {
       expect(userModel.relations).toEqual({
         posts: { kind: 'oneToMany', model: 'Post', foreignKey: 'userId' },
       });
-    });
-  });
-
-  describe('storage', () => {
-    it('creates SqlStorage from tables', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-        email: col('text', 'pg/text@1'),
-      });
-      const s = storage({ user: userTable });
-      expect(s.tables).toEqual({
-        user: userTable,
-      });
-    });
-  });
-
-  describe('contract', () => {
-    it('creates a Contract with minimal options', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        profileHash: 'sha256:profile',
-        storage: s,
-      });
-      expect(c.target).toBe('postgres');
-      expect(c.targetFamily).toBe('sql');
-      expect(c.profileHash).toBe('sha256:profile');
-      expect(c.storage).toEqual(s);
-      expect(c.models).toEqual({});
-      expect(c.roots).toEqual({});
-      expect(c.capabilities).toEqual({});
-      expect(c.extensionPacks).toEqual({});
-      expect(c.meta).toEqual({});
-    });
-
-    it('creates contract with models', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-        email: col('text', 'pg/text@1'),
-      });
-      const s = storage({ user: userTable });
-      const m = {
-        User: model('user', {
-          id: { column: 'id' },
-          email: { column: 'email' },
-        }),
-      };
-      const c = contract({
-        target: 'postgres',
-        profileHash: 'sha256:profile',
-        storage: s,
-        models: m,
-      });
-      expect(c.models).toEqual(m);
-    });
-
-    it('creates contract with capabilities', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const capabilities = {
-        postgres: {
-          returning: true,
-          lateral: true,
-          jsonAgg: true,
-        },
-      };
-      const c = contract({
-        target: 'postgres',
-        profileHash: 'sha256:profile',
-        storage: s,
-        capabilities,
-      });
-      expect(c.capabilities).toEqual(capabilities);
-    });
-
-    it('creates contract with extension packs', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const extensionPacks = {
-        postgres: {
-          id: 'postgres',
-          version: '0.0.1',
-        },
-      };
-      const c = contract({
-        target: 'postgres',
-        profileHash: 'sha256:profile',
-        storage: s,
-        extensionPacks,
-      });
-      expect(c.extensionPacks).toEqual(extensionPacks);
-    });
-
-    it('creates contract with meta', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const meta = {
-        generated: true,
-        timestamp: '2024-01-01T00:00:00Z',
-      };
-      const c = contract({
-        target: 'postgres',
-        profileHash: 'sha256:profile',
-        storage: s,
-        meta,
-      });
-      expect(c.meta).toEqual(meta);
     });
   });
 });

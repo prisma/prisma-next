@@ -1,11 +1,1 @@
-export {
-  col,
-  contract,
-  fk,
-  index,
-  model,
-  pk,
-  storage,
-  table,
-  unique,
-} from '../factories';
+export { col, fk, index, model, pk, table, unique } from '../factories';
