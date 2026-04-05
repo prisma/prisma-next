@@ -1,4 +1,12 @@
 export type {
+  MongoCodec,
+  MongoCodecJsType,
+  MongoCodecRegistry,
+  MongoCodecTrait,
+  MongoCodecTraits,
+} from '@prisma-next/mongo-codec';
+export { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+export type {
   Document,
   LiteralValue,
   MongoArray,
@@ -10,10 +18,6 @@ export type {
 } from '@prisma-next/mongo-value';
 export { MongoParamRef } from '@prisma-next/mongo-value';
 export type { MongoAdapter, MongoQueryPlanLike } from '../adapter-types';
-export type { MongoCodecRegistry } from '../codec-registry';
-export { createMongoCodecRegistry } from '../codec-registry';
-export type { MongoCodec, MongoCodecJsType, MongoCodecTrait, MongoCodecTraits } from '../codecs';
-export { mongoCodec } from '../codecs';
 export type {
   ExtractMongoCodecTypes,
   ExtractMongoTypeMaps,
