@@ -1,5 +1,5 @@
-import type { MongoAdapter, MongoQueryPlanLike } from '@prisma-next/mongo-lowering';
-import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast';
+import type { MongoAdapter } from '@prisma-next/mongo-lowering';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
 import type { Document, MongoExpr } from '@prisma-next/mongo-value';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import {
@@ -25,8 +25,8 @@ function resolveDocument(expr: MongoExpr): Document {
 }
 
 class MongoAdapterImpl implements MongoAdapter {
-  lower(plan: MongoQueryPlanLike): AnyMongoWireCommand {
-    const command = plan.command as AnyMongoCommand;
+  lower(plan: MongoQueryPlan): AnyMongoWireCommand {
+    const { command } = plan;
     switch (command.kind) {
       case 'insertOne':
         return new InsertOneWireCommand(command.collection, resolveDocument(command.document));

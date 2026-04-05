@@ -1112,6 +1112,9 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../1-foundation/mongo-contract
+      '@prisma-next/mongo-value':
+        specifier: workspace:*
+        version: link:../1-foundation/mongo-value
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
@@ -1139,9 +1142,9 @@ importers:
 
   packages/2-mongo-family/6-transport/mongo-lowering:
     dependencies:
-      '@prisma-next/contract':
+      '@prisma-next/mongo-query-ast':
         specifier: workspace:*
-        version: link:../../../1-framework/0-foundation/shared/contract
+        version: link:../../2-query/query-ast
       '@prisma-next/mongo-wire':
         specifier: workspace:*
         version: link:../mongo-wire
