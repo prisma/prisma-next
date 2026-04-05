@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { type } from 'arktype';
 import type {
   ForeignKey,
@@ -228,24 +229,32 @@ export function validateModel(value: unknown): unknown {
  *
  * @param value - The contract value to validate (typically from a JSON import)
  * @returns The validated contract if structure is valid
- * @throws Error if the contract structure is invalid
+ * @throws ContractValidationError if the contract structure is invalid
  */
 export function validateSqlContract<T extends Contract<SqlStorage>>(value: unknown): T {
   if (typeof value !== 'object' || value === null) {
-    throw new Error('Contract structural validation failed: value must be an object');
+    throw new ContractValidationError(
+      'Contract structural validation failed: value must be an object',
+      'structural',
+    );
   }
 
-  // Check targetFamily first to provide a clear error message for unsupported target families
   const rawValue = value as { targetFamily?: string };
   if (rawValue.targetFamily !== undefined && rawValue.targetFamily !== 'sql') {
-    throw new Error(`Unsupported target family: ${rawValue.targetFamily}`);
+    throw new ContractValidationError(
+      `Unsupported target family: ${rawValue.targetFamily}`,
+      'structural',
+    );
   }
 
   const contractResult = SqlContractSchema(value);
 
   if (contractResult instanceof type.errors) {
     const messages = contractResult.map((p: { message: string }) => p.message).join('; ');
-    throw new Error(`Contract structural validation failed: ${messages}`);
+    throw new ContractValidationError(
+      `Contract structural validation failed: ${messages}`,
+      'structural',
+    );
   }
 
   // Arktype's inferred output type differs from T due to exactOptionalPropertyTypes

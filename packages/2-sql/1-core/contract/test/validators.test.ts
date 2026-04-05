@@ -1,4 +1,5 @@
 import { createContract } from '@prisma-next/contract/testing';
+import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { describe, expect, it } from 'vitest';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
 import type { ReferentialAction, SqlStorage } from '../src/types';
@@ -129,8 +130,16 @@ describe('SQL contract validators', () => {
   });
 
   describe('validateSqlContract', () => {
-    it('throws when contract value is not an object', () => {
-      expect(() => validateSqlContract(null)).toThrow(/value must be an object/);
+    it('throws ContractValidationError when contract value is not an object', () => {
+      try {
+        validateSqlContract(null);
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(ContractValidationError);
+        expect((e as ContractValidationError).phase).toBe('structural');
+        expect((e as ContractValidationError).code).toBe('CONTRACT.VALIDATION_FAILED');
+        expect((e as ContractValidationError).message).toMatch(/value must be an object/);
+      }
     });
 
     it('validates valid contract', () => {
@@ -161,7 +170,7 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContract(invalid)).toThrow(/targetFamily/);
     });
 
-    it('throws on wrong targetFamily', () => {
+    it('throws ContractValidationError on wrong targetFamily', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
@@ -169,10 +178,17 @@ describe('SQL contract validators', () => {
         storage: { tables: { user: userTable } },
       });
       const invalid = { ...c, targetFamily: 'document' } as unknown;
-      expect(() => validateSqlContract(invalid)).toThrow(/Unsupported target family/);
+      try {
+        validateSqlContract(invalid);
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(ContractValidationError);
+        expect((e as ContractValidationError).phase).toBe('structural');
+        expect((e as ContractValidationError).message).toMatch(/Unsupported target family/);
+      }
     });
 
-    it('throws on missing target', () => {
+    it('throws ContractValidationError on missing target', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
@@ -180,7 +196,14 @@ describe('SQL contract validators', () => {
         storage: { tables: { user: userTable } },
       });
       const invalid = { ...c, target: undefined } as unknown;
-      expect(() => validateSqlContract(invalid)).toThrow(/target/);
+      try {
+        validateSqlContract(invalid);
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(ContractValidationError);
+        expect((e as ContractValidationError).phase).toBe('structural');
+        expect((e as ContractValidationError).message).toMatch(/target/);
+      }
     });
 
     it('throws on missing storage.storageHash', () => {
