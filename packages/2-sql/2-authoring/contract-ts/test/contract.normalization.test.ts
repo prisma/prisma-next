@@ -35,7 +35,7 @@ describe('validateContract normalization', () => {
     expect(contract.storage.tables['User']?.columns['id']?.nullable).toBe(false);
   });
 
-  it('rejects missing uniques array', () => {
+  it('normalizes missing uniques array to empty', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',
@@ -61,10 +61,11 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow(/uniques/);
+    const result = validateContract<Contract<SqlStorage>>(contractInput);
+    expect(result.storage.tables['User']?.uniques).toEqual([]);
   });
 
-  it('rejects missing indexes array', () => {
+  it('normalizes missing indexes array to empty', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',
@@ -90,10 +91,11 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow(/indexes/);
+    const result = validateContract<Contract<SqlStorage>>(contractInput);
+    expect(result.storage.tables['User']?.indexes).toEqual([]);
   });
 
-  it('rejects missing foreignKeys array', () => {
+  it('normalizes missing foreignKeys array to empty', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',
@@ -119,7 +121,8 @@ describe('validateContract normalization', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow(/foreignKeys/);
+    const result = validateContract<Contract<SqlStorage>>(contractInput);
+    expect(result.storage.tables['User']?.foreignKeys).toEqual([]);
   });
 
   it('normalizes missing columns in table', () => {

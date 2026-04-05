@@ -5,7 +5,87 @@ import {
   validateContract as frameworkValidateContract,
 } from '@prisma-next/contract/validate-contract';
 import type { SqlModelStorage, SqlStorage, StorageColumn, StorageTable } from './types';
+import { applyFkDefaults } from './types';
 import { validateSqlContract, validateStorageSemantics } from './validators';
+
+/**
+ * Normalizes raw contract JSON before validation. The emitter may omit fields
+ * that have well-known defaults (e.g. `nullable: false` on columns,
+ * `roots: {}` at top level). This function fills them in so the strict
+ * structural schemas pass.
+ */
+function normalizeRawContract(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value;
+  const obj = { ...(value as Record<string, unknown>) };
+
+  if (!('roots' in obj)) obj['roots'] = {};
+  delete obj['warnings'];
+
+  const topStorageHash = obj['storageHash'] as string | undefined;
+
+  const storage = obj['storage'];
+  if (storage && typeof storage === 'object') {
+    const s = { ...(storage as Record<string, unknown>) };
+
+    if (!('storageHash' in s) && topStorageHash) {
+      s['storageHash'] = topStorageHash;
+    }
+
+    const tables = s['tables'];
+    if (tables && typeof tables === 'object') {
+      const normalizedTables: Record<string, unknown> = {};
+      for (const [tableName, table] of Object.entries(tables as Record<string, unknown>)) {
+        if (!table || typeof table !== 'object') {
+          normalizedTables[tableName] = table;
+          continue;
+        }
+        const t = { ...(table as Record<string, unknown>) };
+
+        const columns = t['columns'];
+        if (columns && typeof columns === 'object') {
+          const normalizedColumns: Record<string, unknown> = {};
+          for (const [colName, col] of Object.entries(columns as Record<string, unknown>)) {
+            if (!col || typeof col !== 'object') {
+              normalizedColumns[colName] = col;
+              continue;
+            }
+            const c = col as Record<string, unknown>;
+            normalizedColumns[colName] = 'nullable' in c ? c : { ...c, nullable: false };
+          }
+          t['columns'] = normalizedColumns;
+        }
+
+        const rawForeignKeys = (t['foreignKeys'] ?? []) as Array<Record<string, unknown>>;
+        t['foreignKeys'] = rawForeignKeys.map((fk) => ({
+          ...fk,
+          ...applyFkDefaults({
+            constraint: typeof fk['constraint'] === 'boolean' ? fk['constraint'] : undefined,
+            index: typeof fk['index'] === 'boolean' ? fk['index'] : undefined,
+          }),
+        }));
+
+        if (!('uniques' in t)) t['uniques'] = [];
+        if (!('indexes' in t)) t['indexes'] = [];
+
+        normalizedTables[tableName] = t;
+      }
+      s['tables'] = normalizedTables;
+    }
+    obj['storage'] = s;
+  }
+
+  const topExecutionHash = obj['executionHash'] as string | undefined;
+  const execution = obj['execution'];
+  if (execution && typeof execution === 'object') {
+    const e = execution as Record<string, unknown>;
+    if (!('executionHash' in e) && topExecutionHash) {
+      obj['execution'] = { ...e, executionHash: topExecutionHash };
+    }
+  }
+  delete obj['executionHash'];
+
+  return obj;
+}
 
 function validateModelStorageReferences(contract: Contract<SqlStorage>): void {
   for (const [modelName, model] of Object.entries(contract.models)) {
@@ -228,6 +308,7 @@ export function decodeContractDefaults<T extends Contract<SqlStorage>>(contract:
 export function validateContract<TContract extends Contract<SqlStorage>>(
   value: unknown,
 ): TContract {
-  const validated = frameworkValidateContract<TContract>(value, validateSqlStorage);
+  const normalized = normalizeRawContract(value);
+  const validated = frameworkValidateContract<TContract>(normalized, validateSqlStorage);
   return decodeContractDefaults(validated);
 }
