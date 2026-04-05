@@ -16,10 +16,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/mongo-codec": "workspace:*",
-    "@prisma-next/mongo-contract": "workspace:*",
-    "@prisma-next/mongo-value": "workspace:*",
-    "arktype": "catalog:"
+    "@prisma-next/mongo-value": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
