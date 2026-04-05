@@ -1,9 +1,9 @@
 {
-  "name": "@prisma-next/driver-mongo",
+  "name": "@prisma-next/mongo-lowering",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "MongoDB driver for Prisma Next",
+  "description": "Adapter and driver interfaces for Prisma Next MongoDB lowering",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",
@@ -15,16 +15,12 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/mongo-core": "workspace:*",
-    "@prisma-next/mongo-lowering": "workspace:*",
-    "@prisma-next/mongo-wire": "workspace:*",
-    "mongodb": "catalog:"
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/mongo-wire": "workspace:*"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
-    "mongodb-memory-server": "^10.4.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
@@ -43,6 +39,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/3-mongo-target/3-mongo-driver"
+    "directory": "packages/2-mongo-family/6-transport/mongo-lowering"
   }
 }
