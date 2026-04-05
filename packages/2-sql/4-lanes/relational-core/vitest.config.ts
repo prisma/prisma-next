@@ -15,7 +15,6 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
-        '**/errors.ts', // Re-export file
         '**/index.ts', // Re-export file
         '**/types.ts', // Types-only file
         'src/utils/guards.ts', // Type guards tested indirectly through integration tests
