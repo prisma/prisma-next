@@ -859,18 +859,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
-      '@prisma-next/mongo-codec':
-        specifier: workspace:*
-        version: link:../1-foundation/mongo-codec
-      '@prisma-next/mongo-contract':
-        specifier: workspace:*
-        version: link:../1-foundation/mongo-contract
       '@prisma-next/mongo-value':
         specifier: workspace:*
         version: link:../1-foundation/mongo-value
-      arktype:
-        specifier: 'catalog:'
-        version: 2.1.29
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
