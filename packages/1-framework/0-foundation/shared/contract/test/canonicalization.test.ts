@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest';
-
 import {
-  type CanonicalContractInput,
   canonicalizeContract,
   canonicalizeContractToObject,
   orderTopLevel,
 } from '../src/canonicalization';
+import type { Contract } from '../src/contract-types';
 
-function minimal(overrides?: Partial<CanonicalContractInput>): CanonicalContractInput {
+function minimal(overrides?: Record<string, unknown>): Contract {
   return {
     targetFamily: 'sql',
     target: 'postgres',
     roots: {},
     models: {},
-    storage: { tables: {} },
+    storage: { storageHash: 'sha256:stub' },
     extensionPacks: {},
     capabilities: {},
     meta: {},
+    profileHash: 'sha256:stub',
     ...overrides,
-  };
+  } as Contract;
 }
 
 function drill(obj: Record<string, unknown>, ...keys: string[]): Record<string, unknown> {
@@ -36,6 +36,7 @@ describe('canonicalizeContractToObject', () => {
     expect(keys).toEqual([
       'targetFamily',
       'target',
+      'profileHash',
       'roots',
       'models',
       'storage',
@@ -46,7 +47,7 @@ describe('canonicalizeContractToObject', () => {
   });
 
   it('includes schemaVersion when provided', () => {
-    const result = canonicalizeContractToObject(minimal({ schemaVersion: '1.0' }));
+    const result = canonicalizeContractToObject(minimal(), { schemaVersion: '1.0' });
     expect(result['schemaVersion']).toBe('1.0');
     expect(Object.keys(result)[0]).toBe('schemaVersion');
   });
@@ -58,60 +59,53 @@ describe('canonicalizeContractToObject', () => {
 
   it('includes execution when provided', () => {
     const input = minimal({
-      execution: { mutations: { defaults: [] } },
+      execution: { executionHash: 'sha256:exec', mutations: { defaults: [] } },
     });
     const result = canonicalizeContractToObject(input);
-    expect(result['execution']).toEqual({ mutations: { defaults: [] } });
+    expect(result['execution']).toEqual({
+      executionHash: 'sha256:exec',
+      mutations: { defaults: [] },
+    });
   });
 
   it('includes storageHash when provided inside storage', () => {
     const result = canonicalizeContractToObject(
-      minimal({ storage: { tables: {}, storageHash: 'sha256:abc' } }),
+      minimal({ storage: { storageHash: 'sha256:abc' } }),
     );
     expect(drill(result, 'storage')['storageHash']).toBe('sha256:abc');
   });
 
-  it('includes profileHash when provided', () => {
+  it('includes profileHash', () => {
     const result = canonicalizeContractToObject(minimal({ profileHash: 'sha256:def' }));
     expect(result['profileHash']).toBe('sha256:def');
   });
 
-  it('omits profileHash when undefined', () => {
-    const result = canonicalizeContractToObject(minimal());
-    expect(result).not.toHaveProperty('profileHash');
-  });
-
   it('keeps storageHash inside storage', () => {
-    const result = canonicalizeContractToObject(
-      minimal({ storage: { tables: {}, storageHash: 'sha256:s' } }),
-    );
+    const result = canonicalizeContractToObject(minimal({ storage: { storageHash: 'sha256:s' } }));
     expect(result).not.toHaveProperty('storageHash');
     expect(drill(result, 'storage')['storageHash']).toBe('sha256:s');
   });
 
   it('keeps executionHash inside execution', () => {
     const result = canonicalizeContractToObject(
-      minimal({ execution: { executionHash: 'sha256:e', mutations: { defaults: [] } } }),
+      minimal({
+        execution: { executionHash: 'sha256:e', mutations: { defaults: [] } },
+      }),
     );
     expect(result).not.toHaveProperty('executionHash');
     expect(drill(result, 'execution')['executionHash']).toBe('sha256:e');
   });
 
   it('places profileHash in canonical top-level order', () => {
-    const result = canonicalizeContractToObject(
-      minimal({
-        profileHash: 'sha256:p',
-      }),
-    );
+    const result = canonicalizeContractToObject(minimal({ profileHash: 'sha256:p' }));
     const keys = Object.keys(result);
     const ordered = keys.filter((k) => ['profileHash', 'roots'].includes(k));
     expect(ordered).toEqual(['profileHash', 'roots']);
   });
 
-  it('excludes keys not in the CanonicalContractInput schema', () => {
-    const input = minimal() as Record<string, unknown>;
-    input['zebra'] = 'z';
-    const result = canonicalizeContractToObject(input as CanonicalContractInput);
+  it('excludes keys not in the Contract schema', () => {
+    const input = minimal({ zebra: 'z' });
+    const result = canonicalizeContractToObject(input);
     expect(result).not.toHaveProperty('zebra');
   });
 
@@ -120,7 +114,10 @@ describe('canonicalizeContractToObject', () => {
       minimal({
         models: {
           User: {
-            fields: { name: { codecId: 'text' }, age: { codecId: 'int' } },
+            fields: {
+              name: { codecId: 'text', nullable: false },
+              age: { codecId: 'int', nullable: false },
+            },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -165,7 +162,7 @@ describe('default omission', () => {
       minimal({
         models: {
           User: {
-            fields: { id: { codecId: 'int', generated: false } },
+            fields: { id: { codecId: 'int', nullable: false, generated: false } },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -180,6 +177,7 @@ describe('default omission', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
+          storageHash: 'sha256:stub',
           tables: {
             posts: {
               foreignKeys: {
@@ -204,7 +202,9 @@ describe('default omission', () => {
   });
 
   it('preserves empty storage.tables', () => {
-    const result = canonicalizeContractToObject(minimal({ storage: { tables: {} } }));
+    const result = canonicalizeContractToObject(
+      minimal({ storage: { storageHash: 'sha256:stub', tables: {} } }),
+    );
     expect(drill(result, 'storage')['tables']).toEqual({});
   });
 
@@ -218,7 +218,7 @@ describe('default omission', () => {
       minimal({
         models: {
           User: {
-            fields: { id: { codecId: 'int' } },
+            fields: { id: { codecId: 'int', nullable: false } },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -233,6 +233,7 @@ describe('default omission', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
+          storageHash: 'sha256:stub',
           tables: {
             users: { columns: {}, uniques: [], indexes: [], foreignKeys: {} },
           },
@@ -249,6 +250,7 @@ describe('default omission', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
+          storageHash: 'sha256:stub',
           tables: {
             posts: {
               foreignKeys: {
@@ -266,7 +268,9 @@ describe('default omission', () => {
 
   it('preserves empty execution.mutations.defaults', () => {
     const result = canonicalizeContractToObject(
-      minimal({ execution: { mutations: { defaults: [] } } }),
+      minimal({
+        execution: { executionHash: 'sha256:exec', mutations: { defaults: [] } },
+      }),
     );
     const mutations = drill(result, 'execution', 'mutations');
     expect(mutations['defaults']).toEqual([]);
@@ -279,7 +283,9 @@ describe('default omission', () => {
 
   it('preserves empty storage.collections and collection entries', () => {
     const result = canonicalizeContractToObject(
-      minimal({ storage: { collections: { tasks: {} } } }),
+      minimal({
+        storage: { storageHash: 'sha256:stub', collections: { tasks: {} } },
+      }),
     );
     const storage = drill(result, 'storage');
     expect(storage['collections']).toEqual({ tasks: {} });
@@ -290,7 +296,7 @@ describe('default omission', () => {
       minimal({
         models: {
           Address: {
-            fields: { street: { codecId: 'string' } },
+            fields: { street: { codecId: 'string', nullable: false } },
             storage: {},
             relations: {},
             owner: 'User',
@@ -307,7 +313,7 @@ describe('default omission', () => {
       minimal({
         models: {
           User: {
-            fields: { id: { codecId: 'int', extra: {} } },
+            fields: { id: { codecId: 'int', nullable: false, extra: {} } },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -333,7 +339,7 @@ describe('default omission', () => {
       minimal({
         models: {
           User: {
-            fields: { id: { codecId: 'int', default: null } },
+            fields: { id: { codecId: 'int', nullable: false, default: null } },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -350,6 +356,7 @@ describe('index and unique sorting', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
+          storageHash: 'sha256:stub',
           tables: {
             users: {
               columns: {},
@@ -368,6 +375,7 @@ describe('index and unique sorting', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
+          storageHash: 'sha256:stub',
           tables: {
             users: {
               columns: {},
@@ -384,7 +392,9 @@ describe('index and unique sorting', () => {
 
   it('handles storage without tables (no-op)', () => {
     const result = canonicalizeContractToObject(
-      minimal({ storage: { collections: { tasks: {} } } }),
+      minimal({
+        storage: { storageHash: 'sha256:stub', collections: { tasks: {} } },
+      }),
     );
     expect(result['storage']).toBeDefined();
   });
@@ -395,7 +405,7 @@ describe('index and unique sorting', () => {
       minimal({
         models: {
           User: {
-            fields: { createdAt: { codecId: 'timestamp', default: date } },
+            fields: { createdAt: { codecId: 'timestamp', nullable: false, default: date } },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -410,6 +420,7 @@ describe('index and unique sorting', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
+          storageHash: 'sha256:stub',
           tables: {
             users: {
               columns: {},
@@ -429,6 +440,7 @@ describe('index and unique sorting', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
+          storageHash: 'sha256:stub',
           tables: {
             users: {
               columns: {},
@@ -448,6 +460,7 @@ describe('index and unique sorting', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
+          storageHash: 'sha256:stub',
           tables: { bad: null as unknown as Record<string, unknown> },
         },
       }),
@@ -475,7 +488,7 @@ describe('canonicalizeContract', () => {
 
   it('produces identical output as JSON.stringify of canonicalizeContractToObject', () => {
     const input = minimal({
-      storage: { tables: {}, storageHash: 'sha256:test' },
+      storage: { storageHash: 'sha256:test' },
       profileHash: 'sha256:profile',
     });
     const objResult = canonicalizeContractToObject(input);

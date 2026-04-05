@@ -1,5 +1,1 @@
-export {
-  type CanonicalContractInput,
-  canonicalizeContract,
-  canonicalizeContractToObject,
-} from '@prisma-next/contract/hashing';
+export { canonicalizeContract, canonicalizeContractToObject } from '@prisma-next/contract/hashing';
