@@ -107,8 +107,8 @@ describe('validateContract model validation', () => {
     expect(() => validateContract<Contract<SqlStorage>>(invalid)).not.toThrow();
   });
 
-  it('accepts model field with empty column string', () => {
-    const valid = {
+  it('rejects model field with empty column string', () => {
+    const invalid = {
       ...baseContract,
       models: {
         User: {
@@ -117,7 +117,9 @@ describe('validateContract model validation', () => {
         },
       },
     };
-    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+      /references non-existent column/,
+    );
   });
 
   it('rejects model field referencing non-existent column', () => {

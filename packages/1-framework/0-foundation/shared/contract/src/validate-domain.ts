@@ -1,3 +1,5 @@
+import { ContractValidationError } from './validate-contract';
+
 export interface DomainModelShape {
   readonly fields: Record<string, unknown>;
   readonly relations?: Record<string, { readonly to: string }>;
@@ -29,7 +31,10 @@ export function validateContractDomain(contract: DomainContractShape): DomainVal
   detectOrphanedModels(contract, modelNames, warnings);
 
   if (errors.length > 0) {
-    throw new Error(`Contract domain validation failed:\n- ${errors.join('\n- ')}`);
+    throw new ContractValidationError(
+      `Contract domain validation failed:\n- ${errors.join('\n- ')}`,
+      'domain',
+    );
   }
 
   return { warnings };

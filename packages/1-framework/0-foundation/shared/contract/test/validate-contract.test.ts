@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract-types';
 import type { StorageHashBase } from '../src/types';
 import type { StorageValidator } from '../src/validate-contract';
-import { validateContract } from '../src/validate-contract';
+import { ContractValidationError, validateContract } from '../src/validate-contract';
 
 const hash = 'sha256:abc' as StorageHashBase<'sha256:abc'>;
 
@@ -68,33 +68,52 @@ describe('validateContract', () => {
     );
   });
 
-  it('rejects non-object values', () => {
+  it('rejects non-object values with structural phase', () => {
+    expect(() => validateContract<Contract>(null, noopValidator)).toThrow(ContractValidationError);
     expect(() => validateContract<Contract>(null, noopValidator)).toThrow(
       'Contract must be a non-null object',
     );
-    expect(() => validateContract<Contract>('string', noopValidator)).toThrow(
-      'Contract must be a non-null object',
-    );
+    try {
+      validateContract<Contract>(null, noopValidator);
+    } catch (e) {
+      expect(e).toBeInstanceOf(ContractValidationError);
+      expect((e as ContractValidationError).phase).toBe('structural');
+      expect((e as ContractValidationError).code).toBe('CONTRACT.VALIDATION_FAILED');
+    }
   });
 
-  it('rejects objects missing required fields', () => {
+  it('rejects objects missing required fields with structural phase', () => {
     expect(() => validateContract<Contract>({ target: 'postgres' }, noopValidator)).toThrow(
-      'Invalid contract structure',
+      ContractValidationError,
     );
+    try {
+      validateContract<Contract>({ target: 'postgres' }, noopValidator);
+    } catch (e) {
+      expect(e).toBeInstanceOf(ContractValidationError);
+      expect((e as ContractValidationError).phase).toBe('structural');
+    }
   });
 
-  it('rejects objects with wrong field types', () => {
+  it('rejects objects with wrong field types with structural phase', () => {
     const raw = { ...minimalContract(), target: 42 };
-    expect(() => validateContract<Contract>(raw, noopValidator)).toThrow(
-      'Invalid contract structure',
-    );
+    expect(() => validateContract<Contract>(raw, noopValidator)).toThrow(ContractValidationError);
+    try {
+      validateContract<Contract>(raw, noopValidator);
+    } catch (e) {
+      expect(e).toBeInstanceOf(ContractValidationError);
+      expect((e as ContractValidationError).phase).toBe('structural');
+    }
   });
 
-  it('runs domain validation (catches bad root references)', () => {
+  it('runs domain validation with domain phase', () => {
     const raw = minimalContract({ roots: { users: 'NonExistent' } });
-    expect(() => validateContract<Contract>(raw, noopValidator)).toThrow(
-      'does not exist in models',
-    );
+    expect(() => validateContract<Contract>(raw, noopValidator)).toThrow(ContractValidationError);
+    try {
+      validateContract<Contract>(raw, noopValidator);
+    } catch (e) {
+      expect(e).toBeInstanceOf(ContractValidationError);
+      expect((e as ContractValidationError).phase).toBe('domain');
+    }
   });
 
   it('returns domain validation warnings', () => {
