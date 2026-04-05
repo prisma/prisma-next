@@ -31,7 +31,6 @@ packages/2-mongo-family/
   │  │  contract-schema.ts                  Arktype structural schemas
   │  │  validate-mongo-contract.ts          Validation entry point + indices
   │  │  validate-storage.ts                 Storage-specific validation rules
-  │  │  validate-domain.ts                  Re-export of framework domain validation
   │  │
   │  mongo-codec/                         @prisma-next/mongo-codec
   │  │  codecs.ts                           MongoCodec interface, mongoCodec() factory, trait types
