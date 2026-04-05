@@ -1,9 +1,9 @@
-import type { Document } from '@prisma-next/mongo-core';
 import type {
   AggregatePipelineEntry,
   MongoFilterExpr,
   MongoReadStage,
 } from '@prisma-next/mongo-query-ast';
+import type { Document } from '@prisma-next/mongo-value';
 import { resolveValue } from './resolve-value';
 
 export function lowerFilter(filter: MongoFilterExpr): Document {

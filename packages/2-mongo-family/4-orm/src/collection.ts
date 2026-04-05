@@ -4,9 +4,7 @@ import type {
   MongoContractWithTypeMaps,
   MongoModelDefinition,
   MongoTypeMaps,
-  MongoValue,
 } from '@prisma-next/mongo-core';
-import { MongoParamRef } from '@prisma-next/mongo-core';
 import type {
   AnyMongoCommand,
   MongoFilterExpr,
@@ -22,6 +20,8 @@ import {
   MongoFieldFilter,
   UpdateManyCommand,
 } from '@prisma-next/mongo-query-ast';
+import type { MongoValue } from '@prisma-next/mongo-value';
+import { MongoParamRef } from '@prisma-next/mongo-value';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';

@@ -1,3 +1,14 @@
+export type {
+  Document,
+  LiteralValue,
+  MongoArray,
+  MongoDocument,
+  MongoExpr,
+  MongoUpdateDocument,
+  MongoValue,
+  RawPipeline,
+} from '@prisma-next/mongo-value';
+export { MongoParamRef } from '@prisma-next/mongo-value';
 export type { MongoAdapter, MongoQueryPlanLike } from '../adapter-types';
 export type { MongoCodecRegistry } from '../codec-registry';
 export { createMongoCodecRegistry } from '../codec-registry';
@@ -17,7 +28,6 @@ export type {
   MongoTypeMapsPhantomKey,
 } from '../contract-types';
 export type { MongoDriver } from '../driver-types';
-export { MongoParamRef } from '../param-ref';
 export type {
   DeleteManyResult,
   DeleteOneResult,
@@ -34,16 +44,6 @@ export { validateContractDomain } from '../validate-domain';
 export type { MongoContractIndices, ValidatedMongoContract } from '../validate-mongo-contract';
 export { validateMongoContract } from '../validate-mongo-contract';
 export { validateMongoStorage } from '../validate-storage';
-export type {
-  Document,
-  LiteralValue,
-  MongoArray,
-  MongoDocument,
-  MongoExpr,
-  MongoUpdateDocument,
-  MongoValue,
-  RawPipeline,
-} from '../values';
 export type { AnyMongoWireCommand } from '../wire-commands';
 export {
   AggregateWireCommand,

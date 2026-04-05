@@ -1,8 +1,6 @@
 import type {
   AnyMongoWireCommand,
-  Document,
   MongoAdapter,
-  MongoExpr,
   MongoQueryPlanLike,
 } from '@prisma-next/mongo-core';
 import {
@@ -17,6 +15,7 @@ import {
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-core';
 import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast';
+import type { Document, MongoExpr } from '@prisma-next/mongo-value';
 import { lowerFilter, lowerPipeline } from './lowering';
 import { resolveValue } from './resolve-value';
 
