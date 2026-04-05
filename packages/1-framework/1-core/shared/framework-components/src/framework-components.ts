@@ -69,12 +69,6 @@ export interface ComponentMetadata {
    * project them into concrete helper functions for TS-first workflows.
    */
   readonly authoring?: AuthoringContributions;
-
-  /**
-   * Operation signatures contributed by this component.
-   * Used to build the framework-level operation registry during stack assembly.
-   */
-  readonly operationSignatures?: () => ReadonlyArray<OperationSignature>;
 }
 
 /**
@@ -102,6 +96,16 @@ export interface ComponentDescriptor<Kind extends string> extends ComponentMetad
 
   /** Unique identifier for this component (e.g., 'sql', 'postgres', 'pgvector') */
   readonly id: string;
+
+  /**
+   * Operation signatures contributed by this component.
+   * Used to build the framework-level operation registry during stack assembly.
+   *
+   * Lives on ComponentDescriptor (not ComponentMetadata) because it's an
+   * executable hook that only live descriptors should expose — PackRefBase
+   * extends ComponentMetadata and must remain JSON-serializable.
+   */
+  readonly operationSignatures?: () => ReadonlyArray<OperationSignature>;
 }
 
 export interface ContractComponentRequirementsCheckInput {
