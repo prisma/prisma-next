@@ -269,6 +269,10 @@ function buildSqlTypeMetadataRegistry(options: {
 export function createSqlFamilyInstance<TTargetId extends string>(
   stack: ControlStack<'sql', TTargetId>,
 ): SqlFamilyInstance {
+  if (!stack.adapter) {
+    throw new Error('SQL family requires an adapter descriptor in ControlStack');
+  }
+
   const target = stack.target as unknown as TargetDescriptor<'sql', TTargetId> &
     SqlControlDescriptorWithContributions &
     DescriptorWithStorageTypes;
