@@ -144,7 +144,7 @@ describe('default omission', () => {
     expect(meta['kept']).toBe('yes');
   });
 
-  it('strips nullable: false from fields', () => {
+  it('preserves nullable: false on fields (ADR 172: always explicit)', () => {
     const result = canonicalizeContractToObject(
       minimal({
         models: {
@@ -157,7 +157,7 @@ describe('default omission', () => {
       }),
     );
     const idField = drill(result, 'models', 'User', 'fields', 'id');
-    expect(idField).not.toHaveProperty('nullable');
+    expect(idField['nullable']).toBe(false);
   });
 
   it('strips generated: false', () => {
