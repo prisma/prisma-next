@@ -13,7 +13,7 @@
 
 Since the initial review, 15 of 26 findings have been resolved and 2 partially resolved. The most impactful fixes: demo contract now uses typed refs (F01), `any` type aliases replaced with safe wide types (F02), field preset types and runtime logic deduplicated (F05, F10), `as unknown as` casts documented (F06), `applyNaming` edge-case tests added (F07), `BuiltStagedContract` renamed to `SqlContractResult` (F14), emitter output deterministically sorted (F17), JSDoc restored on framework component interfaces (F20), self-referential/circular relation tests added (F25), and several nits cleaned up (F11, F12, F22, F23, F24).
 
-**Remaining**: 1 blocking issue (F13 — field preset layer/composition bypass), 2 partially resolved blockers (F16, F18 — no-emit flow), and 6 non-blocking concerns. The no-emit flow (F16) remains the most significant gap: it still depends on emitted `.d.ts` types and bracket access, with no ORM coverage (F26).
+**Remaining**: 1 deferred finding (F15 — contract representation convergence, deferred to contract-domain-extraction M5). All blocking and non-blocking concerns have been resolved.
 
 ## What Looks Solid
 
@@ -37,87 +37,11 @@ Since the initial review, 15 of 26 findings have been resolved and 2 partially r
 
 ## Blocking Issues
 
-### F13 — Field presets bypass pack composition and are misplaced in the layer hierarchy
-
-**Status**: UNRESOLVED
-
-**Location**: [packages/2-sql/2-authoring/contract-ts/src/staged-contract-dsl.ts](packages/2-sql/2-authoring/contract-ts/src/staged-contract-dsl.ts) — `field` export; [packages/2-sql/1-core/contract/src/authoring.ts](packages/2-sql/1-core/contract/src/authoring.ts) — preset definitions
-
-**Progress**: The presets are now *derived from* the shared registry via `createFieldHelpersFromNamespace(portableSqlAuthoringFieldPresets, ...)`, which is a meaningful step toward registry-driven composition. However, the structural problem remains:
-
-**Problem A — Presets hardcoded onto `field`**: The `field` object exported from `staged-contract-dsl.ts` still spreads `portableFieldHelpers` at module initialization (lines 1380–1384). `field.text`, `field.uuid`, `field.createdAt`, etc. are available before any `defineContract()` call and outside any pack context. They skip the composition seam.
-
-**Problem B — Presets live at the wrong layer**: No `packages/2-sql/9-family/` or similar higher-layer package was created. The concrete preset definitions still live in `packages/2-sql/1-core/contract/src/authoring.ts` (layer 1), importable by everything above, which structurally permits the bypass in Problem A.
-
-**Suggestion**: Unchanged from initial review — extract the SQL family descriptor to a high-layer SQL family package to structurally prevent the authoring DSL from directly importing presets. The bare `field` export should only contain structural helpers (`column`, `generated`, `namedType`); all presets should come through the composed helpers the factory callback receives.
-
-See [wip/system-design-review-findings.md](wip/system-design-review-findings.md) — Finding 2 for the full analysis.
-
----
-
-### F16 — No-emit flow has regressed: requires emitted types and bracket access
-
-**Status**: PARTIALLY RESOLVED
-
-**Location**: [examples/prisma-next-demo/src/prisma-no-emit/context.ts](examples/prisma-next-demo/src/prisma-no-emit/context.ts); [examples/prisma-next-demo/src/queries/get-user-by-id-no-emit.ts](examples/prisma-next-demo/src/queries/get-user-by-id-no-emit.ts)
-
-**What improved**: pgvector extension pack added to no-emit execution stack for parity with the emit workflow.
-
-**What remains**:
-
-1. **Imports emitted types**: The no-emit context still imports `type { Contract } from '../prisma/contract.d'` and passes it as `validateContract<Contract>(contract)`. The no-emit flow should work with `typeof contract` alone.
-
-2. **Bracket access with null guards**: Query files still use `const userTable = sql['user']; if (!userTable) throw ...` instead of `sql.user.select(...)`.
-
-3. **No ORM coverage**: The no-emit context only exports `schema`, `tables`, and `sql`. See F26.
-
-**Suggestion**: Unchanged — the no-emit path should derive types from the TS-authored contract directly. Investigate why table name literals don't propagate through `createExecutionContext` → `sqlBuilder`.
+All resolved.
 
 ---
 
 ## Non-Blocking Concerns
-
-### F03 — `contract-builder.ts` is 1,890 lines and growing
-
-**Status**: UNRESOLVED (non-blocking)
-
-**Location**: [packages/2-sql/2-authoring/contract-ts/src/contract-builder.ts](packages/2-sql/2-authoring/contract-ts/src/contract-builder.ts) — entire file
-
-**Issue**: Still 1,890 lines containing the old chain builder, staged type computation, `defineContract` overloads, and `SemanticContractBuilder` protocol. Some extractions happened (lowering to `staged-contract-lowering.ts`, warnings to `staged-contract-warnings.ts`, type utils to `authoring-type-utils.ts`), but the core module remains large.
-
-**Suggestion**: Extract staged type computation (`StagedDefinitionModels` through `SqlContractResult`) into a dedicated `staged-contract-types.ts`.
-
----
-
-### F04 — `SemanticContractBuilder` type erasure loses type-level safety
-
-**Status**: UNRESOLVED (non-blocking)
-
-**Location**: [packages/2-sql/2-authoring/contract-ts/src/contract-builder.ts](packages/2-sql/2-authoring/contract-ts/src/contract-builder.ts) — lines 849–866, 937
-
-**Issue**: `SemanticContractBuilder` protocol type erases all generics from `SqlContractBuilder`, then casts `new SqlContractBuilder() as unknown as SemanticContractBuilder`. The commit "Inline semantic builder logic and strip builder-like interfaces" addressed the semantic builder, and the cast now has a justification comment (F06 resolved), but the protocol type pattern remains.
-
-**Suggestion**: Consider converging the two lowering paths so the protocol becomes unnecessary.
-
----
-
-### F08 — PSL interpreter changes are large and inline
-
-**Status**: UNRESOLVED (non-blocking)
-
-**Location**: [packages/2-sql/2-authoring/contract-psl/src/interpreter.ts](packages/2-sql/2-authoring/contract-psl/src/interpreter.ts)
-
-**Issue**: Unchanged from initial review. The interpreter's growing responsibilities suggest extraction of semantic-mapping logic into a helper module.
-
----
-
-### F09 — No ADR for the staged DSL design decision
-
-**Status**: UNRESOLVED (non-blocking)
-
-**Location**: N/A — missing artifact
-
-**Issue**: Unchanged. The staged contract DSL introduces a new semantic IR, a new authoring surface, and a composition model. This should be captured in a durable ADR under `docs/architecture docs/adrs/`.
 
 ---
 
@@ -133,46 +57,6 @@ See [wip/system-design-review-findings.md](wip/system-design-review-findings.md)
 
 ---
 
-### F18 — Demo uses N+1 query pattern instead of ORM
-
-**Status**: PARTIALLY RESOLVED
-
-**Location**: [examples/prisma-next-demo/src/queries/get-users-with-posts-no-emit.ts](examples/prisma-next-demo/src/queries/get-users-with-posts-no-emit.ts) — entire file
-
-**What improved**: The file now has a block comment (lines 4–6) explaining that the no-emit path only wires the SQL builder, not the ORM, and pointing to `get-dashboard-users.ts` for the `include`-style approach.
-
-**What remains**: The N+1 pattern itself is still present. The root cause is that the no-emit path doesn't wire up `orm()` at all (see F16, F26). Once the ORM is wired up in the no-emit path, this file should be replaced with an ORM-based equivalent.
-
----
-
-### F19 — Authoring types and functions should be extracted from `framework-components.ts`
-
-**Status**: UNRESOLVED (non-blocking)
-
-**Location**: [packages/1-framework/1-core/shared/contract/src/framework-components.ts](packages/1-framework/1-core/shared/contract/src/framework-components.ts)
-
-**Issue**: Unchanged. The file still serves two purposes: defining the component framework and defining the authoring contribution system.
-
----
-
-### F21 — Test timeout increases may signal type performance regression
-
-**Status**: UNRESOLVED (non-blocking)
-
-**Location**: [test/utils/src/timeouts.ts](test/utils/src/timeouts.ts) — lines 3–6
-
-**Issue**: Timeouts remain at 12s (typeScriptCompilation, +50%) and 500ms (default, +400%). No investigation into whether these increases are caused by the staged DSL's type-level machinery.
-
----
-
-### F26 — No ORM client coverage in the no-emit path
-
-**Status**: UNRESOLVED (non-blocking)
-
-**Location**: [examples/prisma-next-demo/src/prisma-no-emit/context.ts](examples/prisma-next-demo/src/prisma-no-emit/context.ts); [examples/prisma-next-demo/src/orm-client/client.ts](examples/prisma-next-demo/src/orm-client/client.ts)
-
-**Issue**: Unchanged. The emit-based demo has 15+ ORM integration tests, but the no-emit path has zero ORM coverage. The ORM client has the deepest type dependencies and is the most important surface to prove works from a no-emit contract. Related to F16 and F18.
-
 ---
 
 ## Resolved Findings
@@ -183,19 +67,29 @@ The following findings have been fully addressed since the initial review.
 |----|-------|------------|
 | F01 | Demo contract uses string-based `namedType` refs | Now uses typed refs: `field.namedType(types.user_type)`, `field.namedType(types.Embedding1536)` |
 | F02 | `any` type aliases in test files | Replaced with concrete wide types: `StagedModelBuilder<string \| undefined, Record<...>, ...>` |
+| F03 | `contract-builder.ts` is 1,890 lines and growing | Reduced to 782 lines after extractions |
+| F04 | `SemanticContractBuilder` type erasure | `SemanticContractBuilder` no longer exists |
 | F05 | Duplicated `FieldBuilderFromPresetDescriptor` types | Extracted to shared `authoring-type-utils.ts` |
 | F06 | `as unknown as` casts lack justification comments | Block comment in `build()` preamble covers the cluster; `SemanticContractBuilder` cast already had one |
 | F07 | `applyNaming` lacks dedicated unit tests | `describe('applyNaming')` block added with edge cases: all-uppercase, single char, empty string, digit boundaries, etc. |
+| F08 | PSL interpreter changes are large and inline | Extracted `processEnumDeclarations`, `resolveNamedTypeDeclarations`, and `buildSemanticModelFromPsl` helper functions; main function reduced from ~587 to ~90 lines |
+| F09 | No ADR for the staged DSL design decision | ADR 181 documents the staged contract DSL |
 | F10 | Duplicated `buildFieldPreset` logic | Unified — `composed-authoring-helpers.ts` now imports `buildFieldPreset` from `staged-contract-dsl.ts` |
 | F11 | `Defined<T> = Present<T>` unnecessary alias | `Defined<T>` removed; `Present<T>` used consistently |
 | F12 | `typecheckOnly` variable unused | Now used in conditional guards for type-only test cases |
+| F13 | Field presets bypass pack composition | Presets now live in `packages/2-sql/9-family/src/core/authoring-field-presets.ts`; bare `field` export in `staged-contract-dsl.ts` contains only structural helpers (`column`, `generated`, `namedType`) |
 | F14 | `BuiltStagedContract` leaks authoring-surface identity | Renamed to `SqlContractResult<Definition>`; `isStagedContractInput` removed from public exports |
+| F16 | No-emit flow regressed: bracket access and emitted types | No-emit context uses `typeof contract`; query files use `sql.post` dot access; ORM wired via `createOrmClient` |
 | F17 | Model ordering changed in emitted `contract.d.ts` | Emitter now sorts model/table entries with `localeCompare` for deterministic output |
+| F18 | Demo uses N+1 query pattern instead of ORM | ORM wired in no-emit path via `createOrmClient`; `users-with-posts` command uses `include` pattern |
+| F19 | Authoring types in `framework-components.ts` | `AuthoringContributions` extracted to `framework-authoring.ts`; remaining `authoring?` field on `ComponentMetadata`/`PackRefBase` is integral to the interface |
 | F20 | Doc comments removed from public framework component interfaces | JSDoc restored on `ComponentDescriptor`, `FamilyDescriptor`, `TargetDescriptor`, and other descriptor interfaces |
+| F21 | Test timeout increases may signal type regression | Timeouts at standard values: default 100ms, typeScriptCompilation 8s; `TEST_TIMEOUT_MULTIPLIER` env var available for scaling |
 | F22 | Redundant `collect()` helper | Removed; demo uses `Promise.all` with `await` directly |
 | F23 | Use `ifDefined()` utility for conditional spread | `ifDefined()` now used in both `instantiateAuthoringFieldPreset` and `buildFieldPreset` |
 | F24 | pgvector parity fixture split is unclear | Comment added explaining `embedding1536Type` vs `embedding1536Column` split |
 | F25 | Self-referential and circular model relations untested | Tests added: self-referential Category (parent/children) and circular Employee ↔ Department |
+| F26 | No ORM client coverage in the no-emit path | `users-with-posts` command added to `main-no-emit.ts` exercising ORM via `createOrmClient` + `include` |
 
 ---
 
@@ -211,7 +105,7 @@ The following findings have been fully addressed since the initial review.
 | 6 | Literal defaults, SQL defaults, generated defaults, named storage types | `field.column(...).default(value)`, `.defaultSql('now()')`, `field.generated(...)`, `field.namedType(...)` in [staged-contract-dsl.ts](packages/2-sql/2-authoring/contract-ts/src/staged-contract-dsl.ts) lines 274–426 | [staged-contract-dsl.runtime.test.ts](packages/2-sql/2-authoring/contract-ts/test/staged-contract-dsl.runtime.test.ts) lines 29–44 — literal, function, generated defaults; [staged-contract-lowering.runtime.test.ts](packages/2-sql/2-authoring/contract-ts/test/staged-contract-lowering.runtime.test.ts) lines 29–67 — named type resolution |
 | 7 | Explicit reverse/query-surface relations with singular owning-side FK | `rel.belongsTo()` owns FK, `rel.hasMany()`/`rel.hasOne()` are reverse-side in [staged-contract-dsl.ts](packages/2-sql/2-authoring/contract-ts/src/staged-contract-dsl.ts) lines 1304–1427; FK only generated from `belongsTo` `.sql({ fk })`. Self-referential and circular relations tested. | [contract-builder.staged-contract-dsl.test.ts](packages/2-sql/2-authoring/contract-ts/test/contract-builder.staged-contract-dsl.test.ts) — ownership relation tests, self-referential Category, circular Employee ↔ Department |
 | 8 | Postgres→SQLite portability within ~10% changes | Target-specific code isolated to import and `.sql()` blocks | [contract-builder.staged-contract-dsl.portability.test.ts](packages/2-sql/2-authoring/contract-ts/test/contract-builder.staged-contract-dsl.portability.test.ts) — explicit portability test comparing Postgres and SQLite contracts |
-| 9 | Downstream `schema()`/`sql()`/`orm()` inference works from no-emit | `SqlContractResult<Definition>` computes full contract type from definition generic in [contract-builder.ts](packages/2-sql/2-authoring/contract-ts/src/contract-builder.ts) lines 662–687 | Integration type tests (`contract-builder.types.test-d.ts`); `expectTypeOf` assertions in staged DSL tests. **⚠ Partially regressed (F16)**: demo no-emit flow still requires emitted `contract.d.ts` import and bracket access with null guards. **⚠ Gap (F26)**: ORM client has zero coverage in the no-emit path |
+| 9 | Downstream `schema()`/`sql()`/`orm()` inference works from no-emit | `SqlContractResult<Definition>` computes full contract type from definition generic in [contract-builder.ts](packages/2-sql/2-authoring/contract-ts/src/contract-builder.ts) lines 662–687 | Integration type tests (`contract-builder.types.test-d.ts`); `expectTypeOf` assertions in staged DSL tests. No-emit demo uses dot access (`sql.post`), `typeof contract`, and `createOrmClient` with `include` patterns |
 | 10 | Lowering pipeline can derive model/client helper types | `SqlSemanticContractDefinition` captures all model/field/relation data needed for type derivation in [semantic-contract.ts](packages/2-sql/2-authoring/contract-ts/src/semantic-contract.ts) | Structural coverage via [contract-builder.semantic-contract.test.ts](packages/2-sql/2-authoring/contract-ts/test/contract-builder.semantic-contract.test.ts); type inference proven in staged DSL type tests |
 
 ---
@@ -220,29 +114,29 @@ The following findings have been fully addressed since the initial review.
 
 | ID | Severity | Status | Title |
 |----|----------|--------|-------|
-| F13 | **Blocking** | Unresolved | Field presets bypass pack composition and are misplaced in the layer hierarchy |
-| F16 | **Blocking** | Partially resolved | No-emit flow regressed: requires emitted types and bracket access |
-| F03 | Non-blocking | Unresolved | `contract-builder.ts` is 1,890 lines |
-| F04 | Non-blocking | Unresolved | `SemanticContractBuilder` type erasure pattern |
-| F08 | Non-blocking | Unresolved | PSL interpreter changes are large and inline |
-| F09 | Non-blocking | Unresolved | No ADR for the staged DSL design decision |
 | F15 | Non-blocking | Deferred | Contract representations converging (deferred to contract-domain-extraction M5) |
-| F18 | Non-blocking | Partially resolved | Demo uses N+1 query pattern instead of ORM (documented, not replaced) |
-| F19 | Non-blocking | Unresolved | Authoring types should be extracted from `framework-components.ts` |
-| F21 | Non-blocking | Unresolved | Test timeout increases may signal type performance regression |
-| F26 | Non-blocking | Unresolved | No ORM client coverage in the no-emit path |
 | F01 | ~~Blocking~~ | **Resolved** | Demo contract uses typed `namedType` refs |
 | F02 | ~~Blocking~~ | **Resolved** | `any` type aliases replaced with safe wide types |
+| F03 | ~~Non-blocking~~ | **Resolved** | `contract-builder.ts` reduced to 782 lines (from 1,890) |
+| F04 | ~~Non-blocking~~ | **Resolved** | `SemanticContractBuilder` no longer exists |
 | F05 | ~~Non-blocking~~ | **Resolved** | `FieldBuilderFromPresetDescriptor` types deduplicated |
 | F06 | ~~Non-blocking~~ | **Resolved** | `as unknown as` casts have justification comments |
 | F07 | ~~Non-blocking~~ | **Resolved** | `applyNaming` has dedicated edge-case tests |
+| F08 | ~~Non-blocking~~ | **Resolved** | PSL interpreter semantic mapping extracted into helper functions |
+| F09 | ~~Non-blocking~~ | **Resolved** | ADR 181 documents the staged DSL design decision |
 | F10 | ~~Non-blocking~~ | **Resolved** | `buildFieldPreset` logic deduplicated |
 | F11 | ~~Nit~~ | **Resolved** | `Defined<T>` alias removed |
 | F12 | ~~Nit~~ | **Resolved** | `typecheckOnly` now used |
+| F13 | ~~Blocking~~ | **Resolved** | Presets live in `9-family`; bare `field` export is structural-only |
 | F14 | ~~Non-blocking~~ | **Resolved** | Renamed to `SqlContractResult`; `isStagedContractInput` internal |
+| F16 | ~~Blocking~~ | **Resolved** | No-emit flow uses dot access and `typeof contract` |
 | F17 | ~~Non-blocking~~ | **Resolved** | Emitter sorts entries deterministically |
+| F18 | ~~Non-blocking~~ | **Resolved** | ORM wired in no-emit path; N+1 pattern replaced |
+| F19 | ~~Non-blocking~~ | **Resolved** | `AuthoringContributions` extracted to `framework-authoring.ts` |
 | F20 | ~~Non-blocking~~ | **Resolved** | JSDoc restored on framework component interfaces |
+| F21 | ~~Non-blocking~~ | **Resolved** | Timeouts at standard values (default: 100ms, TS compilation: 8s) |
 | F22 | ~~Nit~~ | **Resolved** | `collect()` helper removed |
 | F23 | ~~Nit~~ | **Resolved** | `ifDefined()` utility used |
 | F24 | ~~Nit~~ | **Resolved** | pgvector fixture split documented |
 | F25 | ~~Non-blocking~~ | **Resolved** | Self-referential and circular relation tests added |
+| F26 | ~~Non-blocking~~ | **Resolved** | ORM command wired in no-emit CLI |
