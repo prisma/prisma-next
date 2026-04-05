@@ -10,7 +10,7 @@ import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
 } from '@prisma-next/core-execution-plane/types';
-import type { ComponentMetadata } from '@prisma-next/framework-components/components';
+import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from '@prisma-next/runtime-executor';
@@ -455,8 +455,11 @@ export function createExecutionContext<
   const codecRegistry = createCodecRegistry();
   const operationRegistry = createOperationRegistry();
 
-  const contributors: Array<SqlStaticContributions & ComponentMetadata & { readonly id: string }> =
-    [stack.target, stack.adapter, ...stack.extensionPacks];
+  const contributors: Array<SqlStaticContributions & ComponentDescriptor<string>> = [
+    stack.target,
+    stack.adapter,
+    ...stack.extensionPacks,
+  ];
 
   for (const contributor of contributors) {
     for (const c of contributor.codecs().values()) {

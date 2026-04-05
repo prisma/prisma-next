@@ -8,7 +8,7 @@ import type {
   SqlControlExtensionDescriptor,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
-import type { ComponentMetadata } from '@prisma-next/framework-components/components';
+import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 import postgresTarget from '@prisma-next/target-postgres/control';
@@ -47,7 +47,8 @@ export function assembleOperationRegistry(
 ): OperationRegistry {
   const registry = createOperationRegistry();
   for (const descriptor of descriptors) {
-    const withMeta = descriptor as SqlControlDescriptorWithContributions & ComponentMetadata;
+    const withMeta = descriptor as SqlControlDescriptorWithContributions &
+      ComponentDescriptor<string>;
     for (const signature of withMeta.operationSignatures?.() ?? []) {
       registry.register(signature);
     }
