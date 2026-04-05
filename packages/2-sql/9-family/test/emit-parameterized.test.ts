@@ -2,7 +2,10 @@ import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { EmitResult, EmitStackInput } from '@prisma-next/core-control-plane/emission';
 import { emit } from '@prisma-next/core-control-plane/emission';
-import type { TargetDescriptor } from '@prisma-next/framework-components/components';
+import type {
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/framework-components/components';
 import {
   extractCodecTypeImports,
   extractComponentIds,
@@ -27,16 +30,31 @@ import type {
 } from '../src/core/migrations/types';
 
 interface EmitTestDescriptors {
+  readonly family: FamilyDescriptor<'sql'>;
   readonly target: TargetDescriptor<'sql', 'postgres'> & SqlControlDescriptorWithContributions;
   readonly adapter: SqlControlAdapterDescriptor<'postgres'>;
   readonly extensionPacks: readonly SqlControlExtensionDescriptor<'postgres'>[];
+}
+
+function createMockFamily(): FamilyDescriptor<'sql'> {
+  return {
+    kind: 'family',
+    id: 'sql',
+    version: '0.0.1',
+    familyId: 'sql',
+  };
 }
 
 async function emitWithDescriptors(
   contract: Record<string, unknown>,
   descriptors: EmitTestDescriptors,
 ): Promise<EmitResult> {
-  const allDescs = [descriptors.target, descriptors.adapter, ...descriptors.extensionPacks];
+  const allDescs = [
+    descriptors.family,
+    descriptors.target,
+    descriptors.adapter,
+    ...descriptors.extensionPacks,
+  ];
   const operationRegistry = createOperationRegistry();
   for (const desc of allDescs) {
     for (const sig of desc.operationSignatures?.() ?? []) {
@@ -48,7 +66,7 @@ async function emitWithDescriptors(
     operationTypeImports: extractOperationTypeImports(allDescs),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescs),
     extensionIds: extractComponentIds(
-      { id: 'sql' },
+      descriptors.family,
       descriptors.target,
       descriptors.adapter,
       descriptors.extensionPacks,
@@ -227,6 +245,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     const result = await emitWithDescriptors(contract, {
+      family: createMockFamily(),
       target,
       adapter,
       extensionPacks: [extension],
@@ -300,6 +319,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     const result = await emitWithDescriptors(contract, {
+      family: createMockFamily(),
       target,
       adapter,
       extensionPacks: [extension],
@@ -351,6 +371,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     const result = await emitWithDescriptors(contract, {
+      family: createMockFamily(),
       target,
       adapter,
       extensionPacks: [extension],
@@ -405,6 +426,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     const result = await emitWithDescriptors(contract, {
+      family: createMockFamily(),
       target,
       adapter,
       extensionPacks: [extension],
@@ -496,6 +518,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     const result = await emitWithDescriptors(contract, {
+      family: createMockFamily(),
       target,
       adapter,
       extensionPacks: [extension],
@@ -588,6 +611,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     const result = await emitWithDescriptors(contract, {
+      family: createMockFamily(),
       target,
       adapter,
       extensionPacks: [extension],
@@ -673,6 +697,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     const result = await emitWithDescriptors(contract, {
+      family: createMockFamily(),
       target,
       adapter,
       extensionPacks: [],
