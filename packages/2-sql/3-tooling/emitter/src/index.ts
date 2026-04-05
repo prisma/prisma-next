@@ -1,17 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   GenerateContractTypesOptions,
-  RenderTypeContext,
-  TypeRenderEntry,
   TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
-import type {
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-  StorageTypeInstance,
-} from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 
 type IRModelField = { readonly column: string };
 type IRModelStorage = {
@@ -26,28 +19,6 @@ type IRModelDefinition = {
 };
 
 import { assertDefined } from '@prisma-next/utils/assertions';
-
-/**
- * Resolves the typeParams for a column, either from inline typeParams or from typeRef.
- * Returns undefined if no typeParams are available.
- */
-function resolveColumnTypeParams(
-  column: StorageColumn,
-  storage: SqlStorage,
-): Record<string, unknown> | undefined {
-  // Inline typeParams take precedence
-  if (column.typeParams && Object.keys(column.typeParams).length > 0) {
-    return column.typeParams;
-  }
-  // Check typeRef
-  if (column.typeRef && storage.types) {
-    const typeInstance = storage.types[column.typeRef] as StorageTypeInstance | undefined;
-    if (typeInstance?.typeParams) {
-      return typeInstance.typeParams;
-    }
-  }
-  return undefined;
-}
 
 export const sqlTargetFamilyHook = {
   id: 'sql',
@@ -244,7 +215,6 @@ export const sqlTargetFamilyHook = {
     },
     options?: GenerateContractTypesOptions,
   ): string {
-    const parameterizedRenderers = options?.parameterizedRenderers;
     const parameterizedTypeImports = options?.parameterizedTypeImports;
     const storage = contract.storage as unknown as SqlStorage;
     const models = contract.models as Record<string, IRModelDefinition>;
@@ -304,9 +274,8 @@ export const sqlTargetFamilyHook = {
       .map((imp) => imp.alias)
       .join(' & ');
 
-    const renderCtx: RenderTypeContext = { codecTypesName: 'CodecTypes' };
     const storageType = this.generateStorageType(storage, 'StorageHash');
-    const modelsType = this.generateModelsType(models, storage, parameterizedRenderers, renderCtx);
+    const modelsType = this.generateModelsType(models, storage);
     const rootsType = this.generateRootsType(contract.roots);
 
     const executionHashType = hashes.executionHash
@@ -534,8 +503,6 @@ export const sqlTargetFamilyHook = {
   generateModelsType(
     models: Record<string, IRModelDefinition> | undefined,
     storage: SqlStorage,
-    parameterizedRenderers: Map<string, TypeRenderEntry> | undefined,
-    renderCtx: RenderTypeContext,
   ): string {
     if (!models) {
       return 'Record<string, never>';
@@ -555,23 +522,24 @@ export const sqlTargetFamilyHook = {
         for (const [fieldName, field] of Object.entries(storageFields)) {
           const column = table.columns[field.column];
           if (!column) {
-            fields.push(`readonly ${fieldName}: unknown`);
+            fields.push(
+              `readonly ${fieldName}: { readonly codecId: 'unknown'; readonly nullable: false }`,
+            );
             storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
             continue;
           }
 
-          const jsType = this.generateColumnType(
-            column,
-            storage,
-            parameterizedRenderers,
-            renderCtx,
+          const nullable = column.nullable ?? false;
+          fields.push(
+            `readonly ${fieldName}: { readonly codecId: '${column.codecId}'; readonly nullable: ${nullable} }`,
           );
-          fields.push(`readonly ${fieldName}: ${jsType}`);
           storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
         }
       } else {
         for (const [fieldName, field] of Object.entries(storageFields)) {
-          fields.push(`readonly ${fieldName}: unknown`);
+          fields.push(
+            `readonly ${fieldName}: { readonly codecId: 'unknown'; readonly nullable: false }`,
+          );
           storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
         }
       }
@@ -617,25 +585,5 @@ export const sqlTargetFamilyHook = {
     }
 
     return `{ ${modelTypes.join('; ')} }`;
-  },
-
-  /**
-   * Generates the TypeScript type expression for a column.
-   * Uses parameterized renderer if the column has typeParams and a matching renderer exists,
-   * otherwise falls back to CodecTypes[codecId]['output'].
-   */
-  generateColumnType(
-    column: StorageColumn,
-    storage: SqlStorage,
-    parameterizedRenderers: Map<string, TypeRenderEntry> | undefined,
-    renderCtx: RenderTypeContext,
-  ): string {
-    const typeParams = resolveColumnTypeParams(column, storage);
-    const nullable = column.nullable ?? false;
-    const fallbackType = `CodecTypes['${column.codecId}']['output']`;
-    const renderer = typeParams && parameterizedRenderers?.get(column.codecId);
-    const baseType = renderer ? renderer.render(typeParams, renderCtx) : fallbackType;
-
-    return nullable ? `${baseType} | null` : baseType;
   },
 } as const;

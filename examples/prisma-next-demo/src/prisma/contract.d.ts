@@ -151,11 +151,11 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: Char<36>;
-        readonly title: CodecTypes['pg/text@1']['output'];
-        readonly userId: CodecTypes['pg/text@1']['output'];
-        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-        readonly embedding: Vector<1536> | null;
+        readonly id: { readonly codecId: 'sql/char@1'; readonly nullable: false };
+        readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly userId: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: true };
       };
       readonly relations: {
         readonly user: {
@@ -179,10 +179,10 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: Char<36>;
-        readonly email: CodecTypes['pg/text@1']['output'];
-        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-        readonly kind: 'admin' | 'user';
+        readonly id: { readonly codecId: 'sql/char@1'; readonly nullable: false };
+        readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly kind: { readonly codecId: 'pg/enum@1'; readonly nullable: false };
       };
       readonly relations: {
         readonly posts: {

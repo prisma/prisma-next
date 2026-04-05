@@ -343,11 +343,11 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly postId: CodecTypes['pg/int4@1']['output'];
-        readonly content: CodecTypes['pg/text@1']['output'];
-        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-        readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly postId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly content: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly updatedAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: true };
       };
       readonly relations: {};
     };
@@ -362,10 +362,10 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: Char<36>;
-        readonly name: CodecTypes['pg/text@1']['output'];
-        readonly scheduledAt: CodecTypes['pg/timestamptz@1']['output'];
-        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly id: { readonly codecId: 'sql/char@1'; readonly nullable: false };
+        readonly name: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly scheduledAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
       };
       readonly relations: {};
     };
@@ -384,14 +384,14 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly label: CodecTypes['pg/text@1']['output'];
-        readonly score: CodecTypes['pg/int4@1']['output'];
-        readonly rating: CodecTypes['pg/float8@1']['output'];
-        readonly active: CodecTypes['pg/bool@1']['output'];
-        readonly bigCount: CodecTypes['pg/int8@1']['output'];
-        readonly metadata: CodecTypes['pg/jsonb@1']['output'];
-        readonly tags: CodecTypes['pg/jsonb@1']['output'];
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly label: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly score: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly rating: { readonly codecId: 'pg/float8@1'; readonly nullable: false };
+        readonly active: { readonly codecId: 'pg/bool@1'; readonly nullable: false };
+        readonly bigCount: { readonly codecId: 'pg/int8@1'; readonly nullable: false };
+        readonly metadata: { readonly codecId: 'pg/jsonb@1'; readonly nullable: false };
+        readonly tags: { readonly codecId: 'pg/jsonb@1'; readonly nullable: false };
       };
       readonly relations: {};
     };
@@ -407,11 +407,11 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly userId: CodecTypes['pg/int4@1']['output'];
-        readonly title: CodecTypes['pg/text@1']['output'];
-        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-        readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly userId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly updatedAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: true };
       };
       readonly relations: {};
     };
@@ -426,10 +426,10 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly email: Varchar<255>;
-        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-        readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly email: { readonly codecId: 'sql/varchar@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly updatedAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: true };
       };
       readonly relations: {};
     };
