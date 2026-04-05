@@ -19,7 +19,8 @@ packages/2-mongo-family/
 
 | File(s) | Responsibility | Target package |
 |---|---|---|
-| `contract-types.ts`, `contract-schema.ts`, `validate-*.ts` | Contract shape + validation | `mongo-contract` (foundation) |
+| `contract-types.ts`, `contract-schema.ts`, `validate-mongo-contract.ts`, `validate-storage.ts` | Contract shape + validation | `mongo-contract` (foundation) |
+| `validate-domain.ts` | Re-export of framework validation | **deleted** (import directly from `@prisma-next/contract`) |
 | `codecs.ts`, `codec-registry.ts` | Codec interface + registry | `mongo-codec` (foundation) |
 | `values.ts`, `param-ref.ts` | Value types | `mongo-value` (foundation) |
 | `wire-commands.ts`, `results.ts` | Wire command classes + result types | `mongo-wire` (transport) |
@@ -34,7 +35,7 @@ The design doc proposed moving `MongoQueryExecutor` from `4-orm` to `4-query/mon
 
 - The interface is not related to query AST — it's the execution boundary contract.
 - It follows dependency inversion: the consumer (ORM) defines the interface, the runtime structurally satisfies it.
-- The SQL side has no explicit `QueryExecutor` interface; the ORM produces plans, the runtime exposes `execute()`, and they're wired at the composition root.
+- The SQL ORM client (`sql-orm-client`) defines its own `RuntimeQueryable` in `src/types.ts` — the consumer owns the interface, same pattern.
 - If a future query-builder also needs an executor, we can extract it then.
 
 ### `codec-types.ts` in `1-core` gets deleted
@@ -49,6 +50,10 @@ Fix:
 - Remove `types.codecTypes.import` from `mongoTargetDescriptor` in `9-family`.
 - Add `types.codecTypes.import` to the adapter descriptor in `adapter-mongo`, pointing to `@prisma-next/adapter-mongo/codec-types`.
 - Update emitter tests and fixture `contract.d.ts` files to import from the adapter path.
+
+### `validate-domain.ts` re-export gets deleted
+
+`1-core/src/validate-domain.ts` is a pure re-export of `validateContractDomain` from `@prisma-next/contract/validate-domain`. The only internal consumer (`validate-mongo-contract.ts`) should import directly from the framework package. The re-export file is deleted, not moved to `mongo-contract`.
 
 ### `mongo-codec` has no `codec-types` entrypoint
 
