@@ -514,6 +514,74 @@ describe('MongoCollection write methods', () => {
     });
   });
 
+  describe('undefined normalization on create paths', () => {
+    it('create() strips undefined from fabricated row', async () => {
+      const executor = createMockExecutor([{ insertedId: 'new-id' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      const input = { name: 'Alice', email: 'a@b.c', extra: undefined } as Record<string, unknown>;
+      const result = await col.create(input as never);
+      expect(result).toEqual({ _id: 'new-id', name: 'Alice', email: 'a@b.c' });
+      expect('extra' in (result as Record<string, unknown>)).toBe(false);
+    });
+
+    it('createAll() strips undefined from fabricated rows', async () => {
+      const executor = createMockExecutor([{ insertedIds: ['id-1'], insertedCount: 1 }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      const input = [{ name: 'Alice', email: 'a@b.c', extra: undefined }] as Record<
+        string,
+        unknown
+      >[];
+      const rows: unknown[] = [];
+      for await (const row of col.createAll(input as never)) {
+        rows.push(row);
+      }
+      expect(rows).toEqual([{ _id: 'id-1', name: 'Alice', email: 'a@b.c' }]);
+      expect('extra' in (rows[0] as Record<string, unknown>)).toBe(false);
+    });
+  });
+
+  describe('_id rejection on update paths', () => {
+    it('update() throws when _id is in update data', async () => {
+      const executor = createMockExecutor();
+      const col = createMongoCollection(contract, 'User', executor);
+      await expect(
+        col.where(MongoFieldFilter.eq('_id', 'id-1')).update({ _id: 'new-id', name: 'X' }),
+      ).rejects.toThrow('_id');
+    });
+
+    it('updateCount() throws when _id is in update data', async () => {
+      const executor = createMockExecutor();
+      const col = createMongoCollection(contract, 'User', executor);
+      await expect(
+        col.where(MongoFieldFilter.eq('_id', 'id-1')).updateCount({ _id: 'new-id' }),
+      ).rejects.toThrow('_id');
+    });
+
+    it('updateAll() throws when _id is in update data', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      const result = col
+        .where(MongoFieldFilter.eq('_id', 'id-1'))
+        .updateAll({ _id: 'new-id', name: 'X' });
+      await expect(async () => {
+        for await (const _ of result) {
+          /* drain */
+        }
+      }).rejects.toThrow('_id');
+    });
+
+    it('upsert() throws when _id is in update data', async () => {
+      const executor = createMockExecutor();
+      const col = createMongoCollection(contract, 'User', executor);
+      await expect(
+        col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
+          create: { name: 'Alice', email: 'a@b.c' },
+          update: { _id: 'new-id', name: 'B' },
+        }),
+      ).rejects.toThrow('_id');
+    });
+  });
+
   describe('immutability', () => {
     it('write methods do not mutate collection state', async () => {
       const executor = createMockExecutor([{ insertedId: 'x' }]);
