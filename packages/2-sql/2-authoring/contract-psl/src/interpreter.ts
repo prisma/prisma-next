@@ -4,13 +4,19 @@ import type {
   ContractSourceDiagnostics,
 } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
-import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type {
+  AuthoringContributions,
+  AuthoringTypeConstructorDescriptor,
+} from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringTypeConstructor } from '@prisma-next/framework-components/authoring';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ParsePslDocumentResult,
   PslAttribute,
+  PslEnum,
   PslField,
+  PslModel,
+  PslNamedTypeDeclaration,
   PslSpan,
 } from '@prisma-next/psl-parser';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
@@ -24,6 +30,7 @@ import {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import type {
+  ControlMutationDefaultRegistry,
   ControlMutationDefaults,
   MutationDefaultGeneratorDescriptor,
 } from './default-function-registry';
@@ -41,7 +48,11 @@ import {
   resolveDbNativeTypeAttribute,
   toNamedTypeFieldDescriptor,
 } from './psl-column-resolution';
-import { buildModelMappings, collectResolvedFields } from './psl-field-resolution';
+import {
+  buildModelMappings,
+  collectResolvedFields,
+  type ModelNameMapping,
+} from './psl-field-resolution';
 import {
   applyBackrelationCandidates,
   type FkRelationMetadata,
@@ -116,6 +127,553 @@ function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceD
   }));
 }
 
+interface ProcessEnumDeclarationsInput {
+  readonly enums: readonly PslEnum[];
+  readonly sourceId: string;
+  readonly enumTypeConstructor: AuthoringTypeConstructorDescriptor | undefined;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}
+
+function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
+  readonly storageTypes: Record<string, StorageTypeInstance>;
+  readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
+} {
+  const storageTypes: Record<string, StorageTypeInstance> = {};
+  const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
+
+  for (const enumDeclaration of input.enums) {
+    const nativeType = parseMapName({
+      attribute: getAttribute(enumDeclaration.attributes, 'map'),
+      defaultValue: enumDeclaration.name,
+      sourceId: input.sourceId,
+      diagnostics: input.diagnostics,
+      entityLabel: `Enum "${enumDeclaration.name}"`,
+      span: enumDeclaration.span,
+    });
+    const enumStorageType = input.enumTypeConstructor
+      ? instantiateAuthoringTypeConstructor(input.enumTypeConstructor, [
+          nativeType,
+          enumDeclaration.values.map((value) => value.name),
+        ])
+      : {
+          codecId: 'pg/enum@1',
+          nativeType,
+          typeParams: { values: enumDeclaration.values.map((value) => value.name) },
+        };
+    const descriptor: ColumnDescriptor = {
+      codecId: enumStorageType.codecId,
+      nativeType: enumStorageType.nativeType,
+      typeRef: enumDeclaration.name,
+    };
+    enumTypeDescriptors.set(enumDeclaration.name, descriptor);
+    storageTypes[enumDeclaration.name] = {
+      codecId: enumStorageType.codecId,
+      nativeType: enumStorageType.nativeType,
+      typeParams: enumStorageType.typeParams ?? {
+        values: enumDeclaration.values.map((value) => value.name),
+      },
+    };
+  }
+
+  return { storageTypes, enumTypeDescriptors };
+}
+
+interface ResolveNamedTypeDeclarationsInput {
+  readonly declarations: readonly PslNamedTypeDeclaration[];
+  readonly sourceId: string;
+  readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly pgvectorVectorConstructor: AuthoringTypeConstructorDescriptor | undefined;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}
+
+function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput): {
+  readonly storageTypes: Record<string, StorageTypeInstance>;
+  readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
+  readonly namedTypeBaseTypes: Map<string, string>;
+} {
+  const storageTypes: Record<string, StorageTypeInstance> = {};
+  const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
+  const namedTypeBaseTypes = new Map<string, string>();
+
+  for (const declaration of input.declarations) {
+    const baseDescriptor =
+      input.enumTypeDescriptors.get(declaration.baseType) ??
+      input.scalarTypeDescriptors.get(declaration.baseType);
+    if (!baseDescriptor) {
+      input.diagnostics.push({
+        code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
+        message: `Named type "${declaration.name}" references unsupported base type "${declaration.baseType}"`,
+        sourceId: input.sourceId,
+        span: declaration.span,
+      });
+      continue;
+    }
+    namedTypeBaseTypes.set(declaration.name, declaration.baseType);
+
+    const pgvectorAttribute = getAttribute(declaration.attributes, 'pgvector.column');
+    const dbNativeTypeAttribute = declaration.attributes.find((attribute) =>
+      attribute.name.startsWith('db.'),
+    );
+    const unsupportedNamedTypeAttribute = declaration.attributes.find(
+      (attribute) => attribute.name !== 'pgvector.column' && !attribute.name.startsWith('db.'),
+    );
+    if (unsupportedNamedTypeAttribute) {
+      input.diagnostics.push({
+        code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
+        message: `Named type "${declaration.name}" uses unsupported attribute "${unsupportedNamedTypeAttribute.name}"`,
+        sourceId: input.sourceId,
+        span: unsupportedNamedTypeAttribute.span,
+      });
+      continue;
+    }
+
+    if (pgvectorAttribute && dbNativeTypeAttribute) {
+      input.diagnostics.push({
+        code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
+        message: `Named type "${declaration.name}" cannot combine @pgvector.column with @${dbNativeTypeAttribute.name}.`,
+        sourceId: input.sourceId,
+        span: dbNativeTypeAttribute.span,
+      });
+      continue;
+    }
+
+    if (pgvectorAttribute) {
+      if (!input.composedExtensions.has('pgvector')) {
+        input.diagnostics.push({
+          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+          message:
+            'Attribute "@pgvector.column" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.',
+          sourceId: input.sourceId,
+          span: pgvectorAttribute.span,
+        });
+        continue;
+      }
+      if (declaration.baseType !== 'Bytes') {
+        input.diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `Named type "${declaration.name}" uses @pgvector.column on unsupported base type "${declaration.baseType}"`,
+          sourceId: input.sourceId,
+          span: pgvectorAttribute.span,
+        });
+        continue;
+      }
+      const length = parsePgvectorLength({
+        attribute: pgvectorAttribute,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+      });
+      if (length === undefined) {
+        continue;
+      }
+      const pgvectorStorageType = input.pgvectorVectorConstructor
+        ? instantiateAuthoringTypeConstructor(input.pgvectorVectorConstructor, [length])
+        : {
+            codecId: 'pg/vector@1',
+            nativeType: 'vector',
+            typeParams: { length },
+          };
+      namedTypeDescriptors.set(
+        declaration.name,
+        toNamedTypeFieldDescriptor(declaration.name, pgvectorStorageType),
+      );
+      storageTypes[declaration.name] = {
+        codecId: pgvectorStorageType.codecId,
+        nativeType: pgvectorStorageType.nativeType,
+        typeParams: pgvectorStorageType.typeParams ?? { length },
+      };
+      continue;
+    }
+
+    if (dbNativeTypeAttribute) {
+      const descriptor = resolveDbNativeTypeAttribute({
+        attribute: dbNativeTypeAttribute,
+        baseType: declaration.baseType,
+        baseDescriptor,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        entityLabel: `Named type "${declaration.name}"`,
+      });
+      if (!descriptor) {
+        continue;
+      }
+      namedTypeDescriptors.set(
+        declaration.name,
+        toNamedTypeFieldDescriptor(declaration.name, descriptor),
+      );
+      storageTypes[declaration.name] = {
+        codecId: descriptor.codecId,
+        nativeType: descriptor.nativeType,
+        typeParams: descriptor.typeParams ?? {},
+      };
+      continue;
+    }
+
+    const descriptor = toNamedTypeFieldDescriptor(declaration.name, baseDescriptor);
+    namedTypeDescriptors.set(declaration.name, descriptor);
+    storageTypes[declaration.name] = {
+      codecId: baseDescriptor.codecId,
+      nativeType: baseDescriptor.nativeType,
+      typeParams: {},
+    };
+  }
+
+  return { storageTypes, namedTypeDescriptors, namedTypeBaseTypes };
+}
+
+interface BuildSemanticModelInput {
+  readonly model: PslModel;
+  readonly mapping: ModelNameMapping;
+  readonly modelMappings: ReadonlyMap<string, ModelNameMapping>;
+  readonly modelNames: Set<string>;
+  readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
+  readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
+  readonly namedTypeBaseTypes: Map<string, string>;
+  readonly composedExtensions: Set<string>;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
+  readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}
+
+interface BuildSemanticModelResult {
+  readonly semanticModel: SqlSemanticModelNode;
+  readonly fkRelationMetadata: FkRelationMetadata[];
+  readonly backrelationCandidates: ModelBackrelationCandidate[];
+}
+
+function buildSemanticModelFromPsl(input: BuildSemanticModelInput): BuildSemanticModelResult {
+  const { model, mapping, sourceId, diagnostics } = input;
+  const tableName = mapping.tableName;
+
+  const resolvedFields = collectResolvedFields(
+    model,
+    mapping,
+    input.enumTypeDescriptors,
+    input.namedTypeDescriptors,
+    input.namedTypeBaseTypes,
+    input.modelNames,
+    input.composedExtensions,
+    input.authoringContributions,
+    input.defaultFunctionRegistry,
+    input.generatorDescriptorById,
+    diagnostics,
+    sourceId,
+    input.scalarTypeDescriptors,
+  );
+
+  const primaryKeyFields = resolvedFields.filter((field) => field.isId);
+  const primaryKeyColumns = primaryKeyFields.map((field) => field.columnName);
+  const primaryKeyName = primaryKeyFields.length === 1 ? primaryKeyFields[0]?.idName : undefined;
+  if (primaryKeyColumns.length === 0) {
+    diagnostics.push({
+      code: 'PSL_MISSING_PRIMARY_KEY',
+      message: `Model "${model.name}" must declare at least one @id field for SQL provider`,
+      sourceId,
+      span: model.span,
+    });
+  }
+
+  const resultBackrelationCandidates: ModelBackrelationCandidate[] = [];
+  for (const field of model.fields) {
+    if (!field.list || !input.modelNames.has(field.typeName)) {
+      continue;
+    }
+    const attributesValid = validateNavigationListFieldAttributes({
+      modelName: model.name,
+      field,
+      sourceId,
+      composedExtensions: input.composedExtensions,
+      diagnostics,
+    });
+    const relationAttribute = getAttribute(field.attributes, 'relation');
+    let relationName: string | undefined;
+    if (relationAttribute) {
+      const parsedRelation = parseRelationAttribute({
+        attribute: relationAttribute,
+        modelName: model.name,
+        fieldName: field.name,
+        sourceId,
+        diagnostics,
+      });
+      if (!parsedRelation) {
+        continue;
+      }
+      if (parsedRelation.fields || parsedRelation.references) {
+        diagnostics.push({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: `Backrelation list field "${model.name}.${field.name}" cannot declare fields/references; define them on the FK-side relation field`,
+          sourceId,
+          span: relationAttribute.span,
+        });
+        continue;
+      }
+      if (parsedRelation.onDelete || parsedRelation.onUpdate) {
+        diagnostics.push({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: `Backrelation list field "${model.name}.${field.name}" cannot declare onDelete/onUpdate; define referential actions on the FK-side relation field`,
+          sourceId,
+          span: relationAttribute.span,
+        });
+        continue;
+      }
+      relationName = parsedRelation.relationName;
+    }
+    if (!attributesValid) {
+      continue;
+    }
+
+    resultBackrelationCandidates.push({
+      modelName: model.name,
+      tableName,
+      field,
+      targetModelName: field.typeName,
+      ...ifDefined('relationName', relationName),
+    });
+  }
+
+  const relationAttributes = model.fields
+    .map((field) => ({
+      field,
+      relation: getAttribute(field.attributes, 'relation'),
+    }))
+    .filter((entry): entry is { field: PslField; relation: PslAttribute } =>
+      Boolean(entry.relation),
+    );
+  const uniqueConstraints: SqlSemanticUniqueConstraintNode[] = resolvedFields
+    .filter((field) => field.isUnique)
+    .map((field) => ({
+      columns: [field.columnName],
+      ...ifDefined('name', field.uniqueName),
+    }));
+  const indexNodes: SqlSemanticIndexNode[] = [];
+  const foreignKeyNodes: SqlSemanticForeignKeyNode[] = [];
+
+  for (const modelAttribute of model.attributes) {
+    if (modelAttribute.name === 'map') {
+      continue;
+    }
+    if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
+      const fieldNames = parseAttributeFieldList({
+        attribute: modelAttribute,
+        sourceId,
+        diagnostics,
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        messagePrefix: `Model "${model.name}" @@${modelAttribute.name}`,
+      });
+      if (!fieldNames) {
+        continue;
+      }
+      const columnNames = mapFieldNamesToColumns({
+        modelName: model.name,
+        fieldNames,
+        mapping,
+        sourceId,
+        diagnostics,
+        span: modelAttribute.span,
+        contextLabel: `Model "${model.name}" @@${modelAttribute.name}`,
+      });
+      if (!columnNames) {
+        continue;
+      }
+      const constraintName = parseConstraintMapArgument({
+        attribute: modelAttribute,
+        sourceId,
+        diagnostics,
+        entityLabel: `Model "${model.name}" @@${modelAttribute.name}`,
+        span: modelAttribute.span,
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      });
+      if (modelAttribute.name === 'unique') {
+        uniqueConstraints.push({
+          columns: columnNames,
+          ...ifDefined('name', constraintName),
+        });
+      } else {
+        indexNodes.push({
+          columns: columnNames,
+          ...ifDefined('name', constraintName),
+        });
+      }
+      continue;
+    }
+    if (modelAttribute.name.startsWith('pgvector.') && !input.composedExtensions.has('pgvector')) {
+      diagnostics.push({
+        code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+        message: `Attribute "@@${modelAttribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
+        sourceId,
+        span: modelAttribute.span,
+      });
+      continue;
+    }
+    diagnostics.push({
+      code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
+      message: `Model "${model.name}" uses unsupported attribute "@@${modelAttribute.name}"`,
+      sourceId,
+      span: modelAttribute.span,
+    });
+  }
+
+  const resultFkRelationMetadata: FkRelationMetadata[] = [];
+  for (const relationAttribute of relationAttributes) {
+    if (relationAttribute.field.list) {
+      continue;
+    }
+
+    if (!input.modelNames.has(relationAttribute.field.typeName)) {
+      diagnostics.push({
+        code: 'PSL_INVALID_RELATION_TARGET',
+        message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
+        sourceId,
+        span: relationAttribute.field.span,
+      });
+      continue;
+    }
+
+    const parsedRelation = parseRelationAttribute({
+      attribute: relationAttribute.relation,
+      modelName: model.name,
+      fieldName: relationAttribute.field.name,
+      sourceId,
+      diagnostics,
+    });
+    if (!parsedRelation) {
+      continue;
+    }
+    if (!parsedRelation.fields || !parsedRelation.references) {
+      diagnostics.push({
+        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+        message: `Relation field "${model.name}.${relationAttribute.field.name}" requires fields and references arguments`,
+        sourceId,
+        span: relationAttribute.relation.span,
+      });
+      continue;
+    }
+
+    const targetMapping = input.modelMappings.get(relationAttribute.field.typeName);
+    if (!targetMapping) {
+      diagnostics.push({
+        code: 'PSL_INVALID_RELATION_TARGET',
+        message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
+        sourceId,
+        span: relationAttribute.field.span,
+      });
+      continue;
+    }
+
+    const localColumns = mapFieldNamesToColumns({
+      modelName: model.name,
+      fieldNames: parsedRelation.fields,
+      mapping,
+      sourceId,
+      diagnostics,
+      span: relationAttribute.relation.span,
+      contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+    });
+    if (!localColumns) {
+      continue;
+    }
+    const referencedColumns = mapFieldNamesToColumns({
+      modelName: targetMapping.model.name,
+      fieldNames: parsedRelation.references,
+      mapping: targetMapping,
+      sourceId,
+      diagnostics,
+      span: relationAttribute.relation.span,
+      contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+    });
+    if (!referencedColumns) {
+      continue;
+    }
+    if (localColumns.length !== referencedColumns.length) {
+      diagnostics.push({
+        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+        message: `Relation field "${model.name}.${relationAttribute.field.name}" must provide the same number of fields and references`,
+        sourceId,
+        span: relationAttribute.relation.span,
+      });
+      continue;
+    }
+
+    const onDelete = parsedRelation.onDelete
+      ? normalizeReferentialAction({
+          modelName: model.name,
+          fieldName: relationAttribute.field.name,
+          actionName: 'onDelete',
+          actionToken: parsedRelation.onDelete,
+          sourceId,
+          span: relationAttribute.field.span,
+          diagnostics,
+        })
+      : undefined;
+    const onUpdate = parsedRelation.onUpdate
+      ? normalizeReferentialAction({
+          modelName: model.name,
+          fieldName: relationAttribute.field.name,
+          actionName: 'onUpdate',
+          actionToken: parsedRelation.onUpdate,
+          sourceId,
+          span: relationAttribute.field.span,
+          diagnostics,
+        })
+      : undefined;
+
+    foreignKeyNodes.push({
+      columns: localColumns,
+      references: {
+        model: targetMapping.model.name,
+        table: targetMapping.tableName,
+        columns: referencedColumns,
+      },
+      ...ifDefined('name', parsedRelation.constraintName),
+      ...ifDefined('onDelete', onDelete),
+      ...ifDefined('onUpdate', onUpdate),
+    });
+
+    resultFkRelationMetadata.push({
+      declaringModelName: model.name,
+      declaringFieldName: relationAttribute.field.name,
+      declaringTableName: tableName,
+      targetModelName: targetMapping.model.name,
+      targetTableName: targetMapping.tableName,
+      ...ifDefined('relationName', parsedRelation.relationName),
+      localColumns,
+      referencedColumns,
+    });
+  }
+
+  return {
+    semanticModel: {
+      modelName: model.name,
+      tableName,
+      fields: resolvedFields.map((resolvedField) => ({
+        fieldName: resolvedField.field.name,
+        columnName: resolvedField.columnName,
+        descriptor: resolvedField.descriptor,
+        nullable: resolvedField.field.optional,
+        ...ifDefined('default', resolvedField.defaultValue),
+        ...ifDefined('executionDefault', resolvedField.executionDefault),
+      })),
+      ...(primaryKeyColumns.length > 0
+        ? {
+            id: {
+              columns: primaryKeyColumns,
+              ...ifDefined('name', primaryKeyName),
+            },
+          }
+        : {}),
+      ...(uniqueConstraints.length > 0 ? { uniques: uniqueConstraints } : {}),
+      ...(indexNodes.length > 0 ? { indexes: indexNodes } : {}),
+      ...(foreignKeyNodes.length > 0 ? { foreignKeys: foreignKeyNodes } : {}),
+    },
+    fkRelationMetadata: resultFkRelationMetadata,
+    backrelationCandidates: resultBackrelationCandidates,
+  };
+}
+
 export function interpretPslDocumentToSqlContract(
   input: InterpretPslDocumentToSqlContractInput,
 ): Result<Contract, ContractSourceDiagnostics> {
@@ -156,171 +714,27 @@ export function interpretPslDocumentToSqlContract(
     generatorDescriptorById.set(descriptor.id, descriptor);
   }
 
-  const storageTypes: Record<string, StorageTypeInstance> = {};
-  const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
-  const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
-  const namedTypeBaseTypes = new Map<string, string>();
-  const enumTypeConstructor = getAuthoringTypeConstructor(input.authoringContributions, ['enum']);
-  const pgvectorVectorConstructor = getAuthoringTypeConstructor(input.authoringContributions, [
-    'pgvector',
-    'vector',
-  ]);
+  const enumResult = processEnumDeclarations({
+    enums: input.document.ast.enums,
+    sourceId,
+    enumTypeConstructor: getAuthoringTypeConstructor(input.authoringContributions, ['enum']),
+    diagnostics,
+  });
 
-  for (const enumDeclaration of input.document.ast.enums) {
-    const nativeType = parseMapName({
-      attribute: getAttribute(enumDeclaration.attributes, 'map'),
-      defaultValue: enumDeclaration.name,
-      sourceId,
-      diagnostics,
-      entityLabel: `Enum "${enumDeclaration.name}"`,
-      span: enumDeclaration.span,
-    });
-    const enumStorageType = enumTypeConstructor
-      ? instantiateAuthoringTypeConstructor(enumTypeConstructor, [
-          nativeType,
-          enumDeclaration.values.map((value) => value.name),
-        ])
-      : {
-          codecId: 'pg/enum@1',
-          nativeType,
-          typeParams: { values: enumDeclaration.values.map((value) => value.name) },
-        };
-    const descriptor: ColumnDescriptor = {
-      codecId: enumStorageType.codecId,
-      nativeType: enumStorageType.nativeType,
-      typeRef: enumDeclaration.name,
-    };
-    enumTypeDescriptors.set(enumDeclaration.name, descriptor);
-    storageTypes[enumDeclaration.name] = {
-      codecId: enumStorageType.codecId,
-      nativeType: enumStorageType.nativeType,
-      typeParams: enumStorageType.typeParams ?? {
-        values: enumDeclaration.values.map((value) => value.name),
-      },
-    };
-  }
+  const namedTypeResult = resolveNamedTypeDeclarations({
+    declarations: input.document.ast.types?.declarations ?? [],
+    sourceId,
+    enumTypeDescriptors: enumResult.enumTypeDescriptors,
+    scalarTypeDescriptors: input.scalarTypeDescriptors,
+    composedExtensions,
+    pgvectorVectorConstructor: getAuthoringTypeConstructor(input.authoringContributions, [
+      'pgvector',
+      'vector',
+    ]),
+    diagnostics,
+  });
 
-  for (const declaration of input.document.ast.types?.declarations ?? []) {
-    const baseDescriptor =
-      enumTypeDescriptors.get(declaration.baseType) ??
-      input.scalarTypeDescriptors.get(declaration.baseType);
-    if (!baseDescriptor) {
-      diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        message: `Named type "${declaration.name}" references unsupported base type "${declaration.baseType}"`,
-        sourceId,
-        span: declaration.span,
-      });
-      continue;
-    }
-    namedTypeBaseTypes.set(declaration.name, declaration.baseType);
-
-    const pgvectorAttribute = getAttribute(declaration.attributes, 'pgvector.column');
-    const dbNativeTypeAttribute = declaration.attributes.find((attribute) =>
-      attribute.name.startsWith('db.'),
-    );
-    const unsupportedNamedTypeAttribute = declaration.attributes.find(
-      (attribute) => attribute.name !== 'pgvector.column' && !attribute.name.startsWith('db.'),
-    );
-    if (unsupportedNamedTypeAttribute) {
-      diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
-        message: `Named type "${declaration.name}" uses unsupported attribute "${unsupportedNamedTypeAttribute.name}"`,
-        sourceId,
-        span: unsupportedNamedTypeAttribute.span,
-      });
-      continue;
-    }
-
-    if (pgvectorAttribute && dbNativeTypeAttribute) {
-      diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
-        message: `Named type "${declaration.name}" cannot combine @pgvector.column with @${dbNativeTypeAttribute.name}.`,
-        sourceId,
-        span: dbNativeTypeAttribute.span,
-      });
-      continue;
-    }
-
-    if (pgvectorAttribute) {
-      if (!composedExtensions.has('pgvector')) {
-        diagnostics.push({
-          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-          message:
-            'Attribute "@pgvector.column" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.',
-          sourceId,
-          span: pgvectorAttribute.span,
-        });
-        continue;
-      }
-      if (declaration.baseType !== 'Bytes') {
-        diagnostics.push({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: `Named type "${declaration.name}" uses @pgvector.column on unsupported base type "${declaration.baseType}"`,
-          sourceId,
-          span: pgvectorAttribute.span,
-        });
-        continue;
-      }
-      const length = parsePgvectorLength({
-        attribute: pgvectorAttribute,
-        diagnostics,
-        sourceId,
-      });
-      if (length === undefined) {
-        continue;
-      }
-      const pgvectorStorageType = pgvectorVectorConstructor
-        ? instantiateAuthoringTypeConstructor(pgvectorVectorConstructor, [length])
-        : {
-            codecId: 'pg/vector@1',
-            nativeType: 'vector',
-            typeParams: { length },
-          };
-      namedTypeDescriptors.set(
-        declaration.name,
-        toNamedTypeFieldDescriptor(declaration.name, pgvectorStorageType),
-      );
-      storageTypes[declaration.name] = {
-        codecId: pgvectorStorageType.codecId,
-        nativeType: pgvectorStorageType.nativeType,
-        typeParams: pgvectorStorageType.typeParams ?? { length },
-      };
-      continue;
-    }
-
-    if (dbNativeTypeAttribute) {
-      const descriptor = resolveDbNativeTypeAttribute({
-        attribute: dbNativeTypeAttribute,
-        baseType: declaration.baseType,
-        baseDescriptor,
-        diagnostics,
-        sourceId,
-        entityLabel: `Named type "${declaration.name}"`,
-      });
-      if (!descriptor) {
-        continue;
-      }
-      namedTypeDescriptors.set(
-        declaration.name,
-        toNamedTypeFieldDescriptor(declaration.name, descriptor),
-      );
-      storageTypes[declaration.name] = {
-        codecId: descriptor.codecId,
-        nativeType: descriptor.nativeType,
-        typeParams: descriptor.typeParams ?? {},
-      };
-      continue;
-    }
-
-    const descriptor = toNamedTypeFieldDescriptor(declaration.name, baseDescriptor);
-    namedTypeDescriptors.set(declaration.name, descriptor);
-    storageTypes[declaration.name] = {
-      codecId: baseDescriptor.codecId,
-      nativeType: baseDescriptor.nativeType,
-      typeParams: {},
-    };
-  }
+  const storageTypes = { ...enumResult.storageTypes, ...namedTypeResult.storageTypes };
 
   const modelMappings = buildModelMappings(input.document.ast.models, diagnostics, sourceId);
   const semanticModels: SqlSemanticModelNode[] = [];
@@ -332,324 +746,25 @@ export function interpretPslDocumentToSqlContract(
     if (!mapping) {
       continue;
     }
-    const tableName = mapping.tableName;
-    const resolvedFields = collectResolvedFields(
+    const result = buildSemanticModelFromPsl({
       model,
       mapping,
-      enumTypeDescriptors,
-      namedTypeDescriptors,
-      namedTypeBaseTypes,
+      modelMappings,
       modelNames,
+      enumTypeDescriptors: enumResult.enumTypeDescriptors,
+      namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
+      namedTypeBaseTypes: namedTypeResult.namedTypeBaseTypes,
       composedExtensions,
-      input.authoringContributions,
+      authoringContributions: input.authoringContributions,
       defaultFunctionRegistry,
       generatorDescriptorById,
-      diagnostics,
+      scalarTypeDescriptors: input.scalarTypeDescriptors,
       sourceId,
-      input.scalarTypeDescriptors,
-    );
-
-    const primaryKeyFields = resolvedFields.filter((field) => field.isId);
-    const primaryKeyColumns = primaryKeyFields.map((field) => field.columnName);
-    const primaryKeyName = primaryKeyFields.length === 1 ? primaryKeyFields[0]?.idName : undefined;
-    if (primaryKeyColumns.length === 0) {
-      diagnostics.push({
-        code: 'PSL_MISSING_PRIMARY_KEY',
-        message: `Model "${model.name}" must declare at least one @id field for SQL provider`,
-        sourceId,
-        span: model.span,
-      });
-    }
-
-    for (const field of model.fields) {
-      if (!field.list || !modelNames.has(field.typeName)) {
-        continue;
-      }
-      const attributesValid = validateNavigationListFieldAttributes({
-        modelName: model.name,
-        field,
-        sourceId,
-        composedExtensions,
-        diagnostics,
-      });
-      const relationAttribute = getAttribute(field.attributes, 'relation');
-      let relationName: string | undefined;
-      if (relationAttribute) {
-        const parsedRelation = parseRelationAttribute({
-          attribute: relationAttribute,
-          modelName: model.name,
-          fieldName: field.name,
-          sourceId,
-          diagnostics,
-        });
-        if (!parsedRelation) {
-          continue;
-        }
-        if (parsedRelation.fields || parsedRelation.references) {
-          diagnostics.push({
-            code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-            message: `Backrelation list field "${model.name}.${field.name}" cannot declare fields/references; define them on the FK-side relation field`,
-            sourceId,
-            span: relationAttribute.span,
-          });
-          continue;
-        }
-        if (parsedRelation.onDelete || parsedRelation.onUpdate) {
-          diagnostics.push({
-            code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-            message: `Backrelation list field "${model.name}.${field.name}" cannot declare onDelete/onUpdate; define referential actions on the FK-side relation field`,
-            sourceId,
-            span: relationAttribute.span,
-          });
-          continue;
-        }
-        relationName = parsedRelation.relationName;
-      }
-      if (!attributesValid) {
-        continue;
-      }
-
-      backrelationCandidates.push({
-        modelName: model.name,
-        tableName,
-        field,
-        targetModelName: field.typeName,
-        ...ifDefined('relationName', relationName),
-      });
-    }
-
-    const relationAttributes = model.fields
-      .map((field) => ({
-        field,
-        relation: getAttribute(field.attributes, 'relation'),
-      }))
-      .filter((entry): entry is { field: PslField; relation: PslAttribute } =>
-        Boolean(entry.relation),
-      );
-    const uniqueConstraints: SqlSemanticUniqueConstraintNode[] = resolvedFields
-      .filter((field) => field.isUnique)
-      .map((field) => ({
-        columns: [field.columnName],
-        ...ifDefined('name', field.uniqueName),
-      }));
-    const indexNodes: SqlSemanticIndexNode[] = [];
-    const foreignKeyNodes: SqlSemanticForeignKeyNode[] = [];
-
-    for (const modelAttribute of model.attributes) {
-      if (modelAttribute.name === 'map') {
-        continue;
-      }
-      if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
-        const fieldNames = parseAttributeFieldList({
-          attribute: modelAttribute,
-          sourceId,
-          diagnostics,
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          messagePrefix: `Model "${model.name}" @@${modelAttribute.name}`,
-        });
-        if (!fieldNames) {
-          continue;
-        }
-        const columnNames = mapFieldNamesToColumns({
-          modelName: model.name,
-          fieldNames,
-          mapping,
-          sourceId,
-          diagnostics,
-          span: modelAttribute.span,
-          contextLabel: `Model "${model.name}" @@${modelAttribute.name}`,
-        });
-        if (!columnNames) {
-          continue;
-        }
-        const constraintName = parseConstraintMapArgument({
-          attribute: modelAttribute,
-          sourceId,
-          diagnostics,
-          entityLabel: `Model "${model.name}" @@${modelAttribute.name}`,
-          span: modelAttribute.span,
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        });
-        if (modelAttribute.name === 'unique') {
-          uniqueConstraints.push({
-            columns: columnNames,
-            ...ifDefined('name', constraintName),
-          });
-        } else {
-          indexNodes.push({
-            columns: columnNames,
-            ...ifDefined('name', constraintName),
-          });
-        }
-        continue;
-      }
-      if (modelAttribute.name.startsWith('pgvector.') && !composedExtensions.has('pgvector')) {
-        diagnostics.push({
-          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-          message: `Attribute "@@${modelAttribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
-          sourceId,
-          span: modelAttribute.span,
-        });
-        continue;
-      }
-      diagnostics.push({
-        code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
-        message: `Model "${model.name}" uses unsupported attribute "@@${modelAttribute.name}"`,
-        sourceId,
-        span: modelAttribute.span,
-      });
-    }
-
-    for (const relationAttribute of relationAttributes) {
-      if (relationAttribute.field.list) {
-        continue;
-      }
-
-      if (!modelNames.has(relationAttribute.field.typeName)) {
-        diagnostics.push({
-          code: 'PSL_INVALID_RELATION_TARGET',
-          message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
-          sourceId,
-          span: relationAttribute.field.span,
-        });
-        continue;
-      }
-
-      const parsedRelation = parseRelationAttribute({
-        attribute: relationAttribute.relation,
-        modelName: model.name,
-        fieldName: relationAttribute.field.name,
-        sourceId,
-        diagnostics,
-      });
-      if (!parsedRelation) {
-        continue;
-      }
-      if (!parsedRelation.fields || !parsedRelation.references) {
-        diagnostics.push({
-          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-          message: `Relation field "${model.name}.${relationAttribute.field.name}" requires fields and references arguments`,
-          sourceId,
-          span: relationAttribute.relation.span,
-        });
-        continue;
-      }
-
-      const targetMapping = modelMappings.get(relationAttribute.field.typeName);
-      if (!targetMapping) {
-        diagnostics.push({
-          code: 'PSL_INVALID_RELATION_TARGET',
-          message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
-          sourceId,
-          span: relationAttribute.field.span,
-        });
-        continue;
-      }
-
-      const localColumns = mapFieldNamesToColumns({
-        modelName: model.name,
-        fieldNames: parsedRelation.fields,
-        mapping,
-        sourceId,
-        diagnostics,
-        span: relationAttribute.relation.span,
-        contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
-      });
-      if (!localColumns) {
-        continue;
-      }
-      const referencedColumns = mapFieldNamesToColumns({
-        modelName: targetMapping.model.name,
-        fieldNames: parsedRelation.references,
-        mapping: targetMapping,
-        sourceId,
-        diagnostics,
-        span: relationAttribute.relation.span,
-        contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
-      });
-      if (!referencedColumns) {
-        continue;
-      }
-      if (localColumns.length !== referencedColumns.length) {
-        diagnostics.push({
-          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-          message: `Relation field "${model.name}.${relationAttribute.field.name}" must provide the same number of fields and references`,
-          sourceId,
-          span: relationAttribute.relation.span,
-        });
-        continue;
-      }
-
-      const onDelete = parsedRelation.onDelete
-        ? normalizeReferentialAction({
-            modelName: model.name,
-            fieldName: relationAttribute.field.name,
-            actionName: 'onDelete',
-            actionToken: parsedRelation.onDelete,
-            sourceId,
-            span: relationAttribute.field.span,
-            diagnostics,
-          })
-        : undefined;
-      const onUpdate = parsedRelation.onUpdate
-        ? normalizeReferentialAction({
-            modelName: model.name,
-            fieldName: relationAttribute.field.name,
-            actionName: 'onUpdate',
-            actionToken: parsedRelation.onUpdate,
-            sourceId,
-            span: relationAttribute.field.span,
-            diagnostics,
-          })
-        : undefined;
-
-      foreignKeyNodes.push({
-        columns: localColumns,
-        references: {
-          model: targetMapping.model.name,
-          table: targetMapping.tableName,
-          columns: referencedColumns,
-        },
-        ...ifDefined('name', parsedRelation.constraintName),
-        ...ifDefined('onDelete', onDelete),
-        ...ifDefined('onUpdate', onUpdate),
-      });
-
-      fkRelationMetadata.push({
-        declaringModelName: model.name,
-        declaringFieldName: relationAttribute.field.name,
-        declaringTableName: tableName,
-        targetModelName: targetMapping.model.name,
-        targetTableName: targetMapping.tableName,
-        ...ifDefined('relationName', parsedRelation.relationName),
-        localColumns,
-        referencedColumns,
-      });
-    }
-
-    semanticModels.push({
-      modelName: model.name,
-      tableName,
-      fields: resolvedFields.map((resolvedField) => ({
-        fieldName: resolvedField.field.name,
-        columnName: resolvedField.columnName,
-        descriptor: resolvedField.descriptor,
-        nullable: resolvedField.field.optional,
-        ...ifDefined('default', resolvedField.defaultValue),
-        ...ifDefined('executionDefault', resolvedField.executionDefault),
-      })),
-      ...(primaryKeyColumns.length > 0
-        ? {
-            id: {
-              columns: primaryKeyColumns,
-              ...ifDefined('name', primaryKeyName),
-            },
-          }
-        : {}),
-      ...(uniqueConstraints.length > 0 ? { uniques: uniqueConstraints } : {}),
-      ...(indexNodes.length > 0 ? { indexes: indexNodes } : {}),
-      ...(foreignKeyNodes.length > 0 ? { foreignKeys: foreignKeyNodes } : {}),
+      diagnostics,
     });
+    semanticModels.push(result.semanticModel);
+    fkRelationMetadata.push(...result.fkRelationMetadata);
+    backrelationCandidates.push(...result.backrelationCandidates);
   }
 
   const { modelRelations, fkRelationsByPair } = indexFkRelations({ fkRelationMetadata });
