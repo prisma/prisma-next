@@ -3,7 +3,7 @@
 // To regenerate, run: prisma-next contract emit
 import type { CodecTypes as MongoCodecTypes } from '@prisma-next/mongo-core/codec-types';
 
-import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-core';
+import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-contract';
 import type {
   ExecutionHashBase,
   ProfileHashBase,

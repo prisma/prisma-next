@@ -14,7 +14,7 @@ import type {
   TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
-import type { MongoStorage } from '@prisma-next/mongo-core';
+import type { MongoStorage } from '@prisma-next/mongo-contract';
 
 interface MongoModelIR {
   readonly fields: Record<string, { readonly codecId: string; readonly nullable: boolean }>;
@@ -270,7 +270,7 @@ ${importLines.join('\n')}
 import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
-} from '@prisma-next/mongo-core';
+} from '@prisma-next/mongo-contract';
 import type {
   ExecutionHashBase,
   ProfileHashBase,

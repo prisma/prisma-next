@@ -4,7 +4,7 @@ import type {
   MongoContractWithTypeMaps,
   MongoModelDefinition,
   MongoTypeMaps,
-} from '@prisma-next/mongo-core';
+} from '@prisma-next/mongo-contract';
 import type {
   AnyMongoCommand,
   MongoFilterExpr,
