@@ -82,6 +82,8 @@ Resolved during Phase 1.5. Legacy `FindCommand`, `MongoQueryPlan`, and the adapt
 
 ### Mongo family layering reorganization
 
+**Linear:** [TML-2201](https://linear.app/prisma-company/issue/TML-2201/mongo-family-layering-reorganization)
+
 The current Mongo family has two related structural problems:
 
 1. **Over-burdened `1-core`**: contains contract types, codecs, values, wire commands, adapter/driver interfaces, and result types — responsibilities that belong at different layers.
