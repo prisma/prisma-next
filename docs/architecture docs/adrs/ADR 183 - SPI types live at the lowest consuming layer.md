@@ -7,7 +7,7 @@ customize. The interface between them — `TargetFamilyHook` — is an SPI
 (Service Provider Interface): defined once, consumed by the orchestration
 layer, implemented by each family.
 
-```
+```text
   @prisma-next/core-control-plane (core layer — calls the hook)
         ↓ imports
   @prisma-next/framework-components/emission (core layer — defines the SPI)
@@ -26,7 +26,7 @@ reference `OperationRegistry` and other core-layer types.
 Prisma Next's packages are organized into layers with a strict import rule:
 a package may only import from its own layer or lower layers.
 
-```
+```text
 foundation → core → authoring → tooling → runtime
 ```
 
