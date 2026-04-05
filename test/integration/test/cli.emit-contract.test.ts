@@ -21,13 +21,22 @@ const resolveContract = async (
   return sourceResult.value;
 };
 
+function buildControlStack(config: Awaited<ReturnType<typeof loadConfig>>) {
+  return createControlStack({
+    family: config.family,
+    target: config.target,
+    adapter: config.adapter,
+    driver: config.driver,
+    extensionPacks: config.extensionPacks ?? [],
+  });
+}
+
 describe('emitContract API', () => {
   let testDir: string;
   let configPath: string;
   let cleanupDir: () => void;
 
   beforeEach(() => {
-    // Set up test directory from fixtures
     const testSetup = setupIntegrationTestDirectoryFromFixtures(fixtureSubdir);
     testDir = testSetup.testDir;
     configPath = testSetup.configPath;
@@ -41,7 +50,6 @@ describe('emitContract API', () => {
   it(
     'emits contract.json and contract.d.ts with resolved values',
     async () => {
-      // Load config and resolve values
       const config = await loadConfig(configPath);
       if (!config.contract) {
         throw new Error('Config.contract is required');
@@ -54,14 +62,7 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      const stack = createControlStack({
-        family: config.family,
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
-
+      const stack = buildControlStack(config);
       const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
       expect(result).toBeDefined();
@@ -70,7 +71,6 @@ describe('emitContract API', () => {
       expect(result.contractJson).toBeDefined();
       expect(result.contractDts).toBeDefined();
 
-      // Write the returned strings to files (dts is colocated with json)
       const contractJsonPath = resolve(testDir, contractConfig.output);
       const contractDtsPath = contractJsonPath.replace(/\.json$/, '.d.ts');
       mkdirSync(dirname(contractJsonPath), { recursive: true });
@@ -96,7 +96,6 @@ describe('emitContract API', () => {
   it(
     'uses config paths for output',
     async () => {
-      // Load config and resolve values
       const config = await loadConfig(configPath);
       if (!config.contract) {
         throw new Error('Config.contract is required');
@@ -109,17 +108,9 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      const stack = createControlStack({
-        family: config.family,
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
-
+      const stack = buildControlStack(config);
       const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
-      // Write files and verify paths (dts is colocated with json)
       const contractJsonPath = resolve(testDir, contractConfig.output);
       const contractDtsPath = contractJsonPath.replace(/\.json$/, '.d.ts');
       mkdirSync(dirname(contractJsonPath), { recursive: true });
@@ -135,7 +126,6 @@ describe('emitContract API', () => {
     'creates output directory if it does not exist',
     async () => {
       const newOutputDir = join(testDir, 'new-output');
-      // Set up test directory with custom output config
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
         fixtureSubdir,
         'prisma-next.config.custom-output.ts',
@@ -146,7 +136,6 @@ describe('emitContract API', () => {
       const customCleanup = testSetup.cleanup;
 
       try {
-        // Load config and resolve values
         const config = await loadConfig(customConfigPath);
         if (!config.contract) {
           throw new Error('Config.contract is required');
@@ -159,17 +148,9 @@ describe('emitContract API', () => {
           throw new Error('Contract config must have output path');
         }
 
-        const stack = createControlStack({
-          family: config.family,
-          target: config.target,
-          adapter: config.adapter,
-          driver: config.driver,
-          extensionPacks: config.extensionPacks ?? [],
-        });
-
+        const stack = buildControlStack(config);
         const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
-        // Write files (dts is colocated with json)
         const contractJsonPath = resolve(customTestDir, contractConfig.output);
         const contractDtsPath = contractJsonPath.replace(/\.json$/, '.d.ts');
         mkdirSync(dirname(contractJsonPath), { recursive: true });
@@ -188,7 +169,6 @@ describe('emitContract API', () => {
   it(
     'includes profileHash when present',
     async () => {
-      // Load config and resolve values
       const config = await loadConfig(configPath);
       if (!config.contract) {
         throw new Error('Config.contract is required');
@@ -201,17 +181,9 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      const stack = createControlStack({
-        family: config.family,
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
-
+      const stack = buildControlStack(config);
       const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
-      // profileHash is always present
       expect(typeof result.profileHash).toBe('string');
       expect(result.profileHash.length).toBeGreaterThan(0);
     },
@@ -219,9 +191,8 @@ describe('emitContract API', () => {
   );
 
   it(
-    'returns timings information',
+    'returns a complete result object',
     async () => {
-      // Load config and resolve values
       const config = await loadConfig(configPath);
       if (!config.contract) {
         throw new Error('Config.contract is required');
@@ -234,50 +205,12 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      const stack = createControlStack({
-        family: config.family,
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
-
+      const stack = buildControlStack(config);
       const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
 
-      // Timings are no longer returned in the result
-      expect(result).toBeDefined();
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
-    'handles non-Error exceptions',
-    async () => {
-      // This test verifies the error handling path for non-Error exceptions
-      // We can't easily trigger this in a real scenario, but the code path exists
-      const config = await loadConfig(configPath);
-      if (!config.contract) {
-        throw new Error('Config.contract is required');
-      }
-
-      const contractConfig = config.contract;
-      const contractRaw = await resolveContract(contractConfig.source);
-
-      if (!contractConfig.output) {
-        throw new Error('Contract config must have output path');
-      }
-
-      const stack = createControlStack({
-        family: config.family,
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks ?? [],
-      });
-
-      const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
-
-      expect(result).toBeDefined();
+      expect(result.storageHash).toBeDefined();
+      expect(result.contractJson).toBeDefined();
+      expect(result.contractDts).toBeDefined();
     },
     timeouts.typeScriptCompilation,
   );
