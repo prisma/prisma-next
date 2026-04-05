@@ -1,4 +1,4 @@
-import { mongoCodec } from '@prisma-next/mongo-core';
+import { mongoCodec } from '@prisma-next/mongo-codec';
 import { ObjectId } from 'mongodb';
 import {
   MONGO_BOOLEAN_CODEC_ID,
