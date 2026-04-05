@@ -3,8 +3,8 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as coreValidateContract } from '@prisma-next/sql-contract/validate';
 
 /**
- * Validates that a JSON import conforms to the SqlContract structure
- * and returns a fully typed SqlContract.
+ * Validates that a JSON import conforms to the Contract structure
+ * and returns a fully typed Contract.
  *
  * Delegates to the core SQL `validateContract`, which in turn delegates to the
  * framework `validateContract` with a SQL-specific `StorageValidator`. The
@@ -27,7 +27,8 @@ import { validateContract as coreValidateContract } from '@prisma-next/sql-contr
  *
  * **Incorrect:**
  * ```typescript
- * import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+ * import type { Contract } from '@prisma-next/contract/types';
+ * import type { SqlStorage } from '@prisma-next/sql-contract/types';
  * const contract = validateContract<Contract<SqlStorage>>(contractJson);
  * // Types will be inferred as 'unknown' - this won't work!
  * ```

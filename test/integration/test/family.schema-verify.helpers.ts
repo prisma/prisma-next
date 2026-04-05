@@ -2,12 +2,13 @@
  * Shared helpers for family.schema-verify tests.
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import type { Contract } from '@prisma-next/contract/types';
 import type { ControlExtensionDescriptor } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { type SqlControlFamilyInstance } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
@@ -18,7 +19,7 @@ export type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 export { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 export { postgresAdapter, postgresDriver, sql, postgres };
 export { validateContract };
-export type { SqlContract, SqlStorage };
+export type { Contract, SqlStorage };
 export { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 export { default as postgresPack } from '@prisma-next/target-postgres/pack';
 export { timeouts, withClient };
@@ -96,7 +97,7 @@ export async function runSchemaVerify(
 ) {
   return withDriver(connectionString, async (driver) => {
     const familyInstance = createFamilyInstance(options.extensions);
-    const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+    const validatedContract = validateContract<Contract<SqlStorage>>(contract);
     const frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>> = [
       postgres,
       postgresAdapter,

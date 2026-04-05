@@ -1,5 +1,4 @@
-import type { StorageHashBase } from '@prisma-next/contract/types';
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   int4Column as int4ColumnType,
@@ -12,7 +11,7 @@ import { schema } from '../../src/schema';
 import { createStubAdapter, createTestContext } from '../utils';
 import { col, simpleSelect, table } from './test-helpers';
 
-type TestContract = SqlContract<
+type TestContract = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {

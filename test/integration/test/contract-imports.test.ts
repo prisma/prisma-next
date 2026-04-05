@@ -166,13 +166,13 @@ describe('contract.d.ts imports resolution', () => {
       // Verify the generated contract.d.ts contains the correct import
       const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
       expect(contractDtsContent).toContain("from '@prisma-next/sql-contract/types'");
-      expect(contractDtsContent).toContain('SqlContract');
+      expect(contractDtsContent).toContain('Contract');
       expect(contractDtsContent).toContain('ContractWithTypeMaps');
       expect(contractDtsContent).not.toContain("from './contract-types'");
 
       // Create a test TypeScript file that imports the generated contract.d.ts
       const testFileContent = `import type { Contract, CodecTypes } from './contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract, SqlStorage } from '@prisma-next/sql-contract/types';
 
 // Verify we can use the Contract type
 // biome-ignore lint/suspicious/noExplicitAny: test code with type assertions

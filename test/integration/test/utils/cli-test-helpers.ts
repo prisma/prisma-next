@@ -9,7 +9,8 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { afterEach, beforeEach } from 'vitest';
 // Note: executeCommand and other test helpers are re-exported at the bottom of this file
@@ -204,9 +205,9 @@ export function setupIntegrationTestDirectoryFromFixtures(
  * This helper DRYs up the common pattern of loading contracts in e2e tests.
  * The contract type should be specified from the emitted contract.d.ts file.
  */
-export function loadContractFromDisk<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
->(contractJsonPath: string): TContract {
+export function loadContractFromDisk<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>(
+  contractJsonPath: string,
+): TContract {
   if (!existsSync(contractJsonPath)) {
     throw new Error(`Contract file not found: ${contractJsonPath}`);
   }

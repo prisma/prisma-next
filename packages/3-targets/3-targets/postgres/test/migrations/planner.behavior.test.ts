@@ -1,9 +1,13 @@
-import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  type ColumnDefaultLiteralInputValue,
+  type Contract,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
@@ -507,10 +511,10 @@ describe('buildBuiltinIdentityValue (built-in fallback)', () => {
 });
 
 function createTestContract(
-  overrides?: Partial<Omit<SqlContract<SqlStorage>, 'storage'>> & {
+  overrides?: Partial<Omit<Contract<SqlStorage>, 'storage'>> & {
     storage?: Omit<SqlStorage, 'storageHash'>;
   },
-): SqlContract<SqlStorage> {
+): Contract<SqlStorage> {
   const storageHashValue = coreHash('sha256:contract');
   const storage = overrides?.storage ?? {
     tables: {
@@ -589,7 +593,7 @@ function planAddColumn(
   },
   options?: {
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
-    extraStorageTypes?: SqlContract<SqlStorage>['storage']['types'];
+    extraStorageTypes?: Contract<SqlStorage>['storage']['types'];
   },
 ) {
   const operations = planUserTableOperations(
@@ -636,8 +640,8 @@ function planUserTableOperations(
   schemaUserTable: SqlSchemaIR['tables'][string],
   options?: {
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
-    extraStorageTypes?: SqlContract<SqlStorage>['storage']['types'];
-    extraContractTables?: SqlContract<SqlStorage>['storage']['tables'];
+    extraStorageTypes?: Contract<SqlStorage>['storage']['types'];
+    extraContractTables?: Contract<SqlStorage>['storage']['tables'];
     extraSchemaTables?: SqlSchemaIR['tables'];
   },
 ) {

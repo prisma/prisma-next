@@ -1,7 +1,6 @@
-import type { StorageHashBase } from '@prisma-next/contract/types';
+import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import type {
   ContractWithTypeMaps,
-  SqlContract,
   StorageColumn,
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
@@ -18,7 +17,7 @@ import { ColumnBuilderImpl, schema } from '../src/schema';
 import type { ColumnBuilder } from '../src/types';
 import { createStubAdapter, createTestContext } from './utils';
 
-type TestContract = SqlContract<
+type TestContract = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {
@@ -45,7 +44,7 @@ type TestContract = SqlContract<
   Record<string, never>
 >;
 
-type TestContractWithIdOnly = SqlContract<
+type TestContractWithIdOnly = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {

@@ -215,7 +215,7 @@ export function validateModel(value: unknown): unknown {
 }
 
 /**
- * Validates the structural shape of a SqlContract using Arktype.
+ * Validates the structural shape of a Contract using Arktype.
  *
  * **Responsibility: Validation Only**
  * This function validates that the contract has the correct structure and types.

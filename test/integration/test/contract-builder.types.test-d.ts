@@ -457,7 +457,7 @@ test('codec type inference via type option', () => {
   expectTypeOf(_testRow).toEqualTypeOf<Row>();
 });
 
-test('contract structure type matches SqlContract', () => {
+test('contract structure type matches Contract', () => {
   const contract = defineContract<CodecTypes>()
     .target(postgresPack)
     .table('user', (t) =>

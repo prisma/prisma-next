@@ -2,7 +2,7 @@
  * Pure SQL schema verification function.
  *
  * This module provides a pure function that verifies a SqlSchemaIR against
- * a SqlContract without requiring a database connection. It can be reused
+ * a Contract without requiring a database connection. It can be reused
  * by migration planners and other tools that need to compare schema states.
  */
 
@@ -84,7 +84,7 @@ export interface VerifySqlSchemaOptions {
 }
 
 /**
- * Verifies that a SqlSchemaIR matches a SqlContract.
+ * Verifies that a SqlSchemaIR matches a Contract.
  *
  * This is a pure function that does NOT perform any database I/O.
  * It takes an already-introspected schema IR and compares it against

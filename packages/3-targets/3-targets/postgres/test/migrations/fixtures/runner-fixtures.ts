@@ -1,19 +1,19 @@
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor, {
   createMigrationPlan,
   type SqlMigrationRunnerFailure,
 } from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import type { PostgresPlanTargetDetails } from '../../../src/core/migrations/planner-target-details';
 import type { SqlStatement } from '../../../src/core/migrations/statement-builders';
 import postgresTargetDescriptor from '../../../src/exports/control';
 
-export const contract: SqlContract<SqlStorage> = {
+export const contract: Contract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
   profileHash: profileHash('sha256:test'),
@@ -102,7 +102,7 @@ export function createFailingPlan() {
   });
 }
 
-export function toPlanContractInfo(c: SqlContract<SqlStorage>) {
+export function toPlanContractInfo(c: Contract<SqlStorage>) {
   return { storageHash: c.storage.storageHash, profileHash: c.profileHash };
 }
 
