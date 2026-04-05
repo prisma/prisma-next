@@ -5,7 +5,7 @@ import type {
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
-} from '@prisma-next/mongo-core';
+} from '@prisma-next/mongo-contract';
 
 type Simplify<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 

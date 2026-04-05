@@ -103,6 +103,9 @@ importers:
       '@prisma-next/driver-mongo':
         specifier: workspace:*
         version: link:../../packages/3-mongo-target/3-mongo-driver
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/1-core
@@ -859,6 +862,9 @@ importers:
       '@prisma-next/mongo-codec':
         specifier: workspace:*
         version: link:../1-foundation/mongo-codec
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../1-foundation/mongo-contract
       '@prisma-next/mongo-value':
         specifier: workspace:*
         version: link:../1-foundation/mongo-value
@@ -886,6 +892,34 @@ importers:
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
   packages/2-mongo-family/1-foundation/mongo-codec:
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../../test/utils
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/2-mongo-family/1-foundation/mongo-contract:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../../1-framework/0-foundation/contract
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -1000,6 +1034,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/framework-components
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../../1-foundation/mongo-contract
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../../1-core
@@ -1028,6 +1065,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../1-foundation/mongo-contract
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../1-core
@@ -1081,6 +1121,9 @@ importers:
       '@prisma-next/driver-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/3-mongo-driver
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../1-foundation/mongo-contract
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
@@ -1117,6 +1160,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../1-foundation/mongo-contract
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../1-core
@@ -2291,6 +2337,9 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/migration
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
       '@prisma-next/mongo-core':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/1-core

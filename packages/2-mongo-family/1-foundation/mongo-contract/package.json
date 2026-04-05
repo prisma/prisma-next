@@ -1,9 +1,9 @@
 {
-  "name": "@prisma-next/mongo-core",
+  "name": "@prisma-next/mongo-contract",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Core types for Prisma Next MongoDB support",
+  "description": "Contract types and validation for Prisma Next MongoDB support",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",
@@ -16,9 +16,6 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/mongo-codec": "workspace:*",
-    "@prisma-next/mongo-contract": "workspace:*",
-    "@prisma-next/mongo-value": "workspace:*",
     "arktype": "catalog:"
   },
   "devDependencies": {
@@ -35,7 +32,6 @@
   ],
   "exports": {
     ".": "./dist/index.mjs",
-    "./codec-types": "./dist/codec-types.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",
@@ -44,6 +40,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/2-mongo-family/1-core"
+    "directory": "packages/2-mongo-family/1-foundation/mongo-contract"
   }
 }

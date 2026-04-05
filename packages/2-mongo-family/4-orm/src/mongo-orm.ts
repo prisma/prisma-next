@@ -2,7 +2,7 @@ import type {
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
-} from '@prisma-next/mongo-core';
+} from '@prisma-next/mongo-contract';
 import type { MongoCollection } from './collection';
 import { createMongoCollection } from './collection';
 import type { MongoQueryExecutor } from './executor';
