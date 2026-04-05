@@ -190,7 +190,7 @@ export interface ContractToSchemaIROptions {
 }
 
 /**
- * Converts an `SqlContract` to `SqlSchemaIR`.
+ * Converts a `Contract` to `SqlSchemaIR`.
  *
  * Reads `contract.storage` for tables, `contract.storage.types` for type
  * annotations, and derives database dependencies from `frameworkComponents`

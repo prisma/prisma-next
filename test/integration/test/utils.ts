@@ -1,11 +1,12 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import type { Contract } from '@prisma-next/contract/types';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
   PostgresBinding,
   PostgresDriverCreateOptions,
 } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Log, Plugin, Runtime, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import {
   createExecutionContext,
@@ -37,7 +38,7 @@ interface IntegrationDriverOptions {
  * This helper DRYs up the common pattern of runtime creation in tests.
  */
 export async function createTestRuntime(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   driverOptions: IntegrationDriverOptions,
   options?: CreateTestRuntimeOptions,
 ): Promise<Runtime> {
@@ -103,7 +104,7 @@ export async function createTestRuntime(
  * This helper DRYs up the common pattern of runtime creation in e2e tests.
  */
 export async function createTestRuntimeFromClient(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   client: Client,
   options?: CreateTestRuntimeOptions,
 ): Promise<Runtime> {
@@ -126,7 +127,7 @@ export async function createTestRuntimeFromClient(
  */
 export async function setupE2EDatabase(
   client: Client,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   setupFn: (client: Client) => Promise<void>,
 ): Promise<void> {
   await setupTestDatabase(client, contract, setupFn);

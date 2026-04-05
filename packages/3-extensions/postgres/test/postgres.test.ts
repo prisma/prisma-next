@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -76,7 +77,7 @@ const contract = {
   extensionPacks: {},
   capabilities: {},
   meta: {},
-} as SqlContract<SqlStorage>;
+} as Contract<SqlStorage>;
 
 describe('postgres', () => {
   beforeEach(() => {

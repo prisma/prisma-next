@@ -1,6 +1,6 @@
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
@@ -9,7 +9,7 @@ function createFkTestContract(fkConfig: {
   constraint: boolean;
   index: boolean;
   includeUserIndex?: boolean;
-}): SqlContract<SqlStorage> {
+}): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',

@@ -1,7 +1,7 @@
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MigrationOperationPolicy } from '@prisma-next/core-control-plane/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -24,7 +24,7 @@ const RECONCILIATION_POLICY: MigrationOperationPolicy = {
 function makeContract(
   tables: Record<string, StorageTable>,
   hashSuffix = 'default',
-): SqlContract<SqlStorage> {
+): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
@@ -50,7 +50,7 @@ function makeTable(columns: Record<string, StorageTable['columns'][string]>): St
 
 async function applyBaseline(
   driver: PostgresControlDriver,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
 ): Promise<void> {
   const planner = postgresTargetDescriptor.createPlanner(familyInstance);
   const runner = postgresTargetDescriptor.createRunner(familyInstance);
@@ -81,7 +81,7 @@ async function introspectSchema(driver: PostgresControlDriver): Promise<SqlSchem
 
 async function planAndExecute(
   driver: PostgresControlDriver,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
 ): Promise<void> {
   const schema = await introspectSchema(driver);
   const planner = postgresTargetDescriptor.createPlanner(familyInstance);
@@ -966,7 +966,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     );
     await applyBaseline(driver!, baselineContract);
 
-    const updatedContract: SqlContract<SqlStorage> = {
+    const updatedContract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
@@ -1244,7 +1244,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       );
       await applyBaseline(driver!, baselineContract);
 
-      const updatedContract: SqlContract<SqlStorage> = {
+      const updatedContract: Contract<SqlStorage> = {
         target: 'postgres',
         targetFamily: 'sql',
         profileHash: profileHash('sha256:test'),

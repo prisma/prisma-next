@@ -1,12 +1,12 @@
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import type {
   ComponentDatabaseDependency,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
@@ -31,7 +31,7 @@ function createFrameworkComponentWithDependencies(
   };
 }
 
-function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlContract<SqlStorage> {
+function createTestContract(overrides?: Partial<Contract<SqlStorage>>): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
@@ -188,7 +188,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('renders parameterized column types in DDL', () => {
     const planner = createPostgresMigrationPlanner();
-    const contract: SqlContract<SqlStorage> = {
+    const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
@@ -279,7 +279,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('renders pgvector vector(N) column types in DDL', () => {
     const planner = createPostgresMigrationPlanner();
-    const contract: SqlContract<SqlStorage> = {
+    const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
@@ -494,7 +494,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 describe('PostgresMigrationPlanner - composite unique constraint DDL', () => {
   it('generates correct ALTER TABLE SQL for composite unique constraint', () => {
     const planner = createPostgresMigrationPlanner();
-    const compositeContract: SqlContract<SqlStorage> = {
+    const compositeContract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
@@ -519,7 +519,7 @@ describe('PostgresMigrationPlanner - composite unique constraint DDL', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-    } as SqlContract<SqlStorage>;
+    } as Contract<SqlStorage>;
 
     const result = planner.plan({
       contract: compositeContract,
@@ -559,7 +559,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
   function contractWithTable(
     tableName: string,
     columns: Record<string, ColumnDef>,
-  ): SqlContract<SqlStorage> {
+  ): Contract<SqlStorage> {
     return {
       target: 'postgres',
       targetFamily: 'sql',
@@ -581,7 +581,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-    } as SqlContract<SqlStorage>;
+    } as Contract<SqlStorage>;
   }
 
   function planTableSql(tableName: string, columns: Record<string, ColumnDef>): string {

@@ -1,11 +1,12 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
@@ -249,7 +250,7 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+            const validatedContract = validateContract<Contract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
               driver,
               contract: validatedContract,
@@ -338,7 +339,7 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+            const validatedContract = validateContract<Contract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
               driver,
               contract: validatedContract,
@@ -405,7 +406,7 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+            const validatedContract = validateContract<Contract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
               driver,
               contract: validatedContract,
@@ -492,7 +493,7 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+            const validatedContract = validateContract<Contract<SqlStorage>>(contract);
             const result = await familyInstance.schemaVerify({
               driver,
               contract: validatedContract,
@@ -554,7 +555,7 @@ describe('referential actions integration', () => {
           .foreignKeyDefaults({ constraint: true, index: true })
           .build();
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+        const validatedContract = validateContract<Contract<SqlStorage>>(contract);
         const familyInstance = sql.create(
           createControlStack({
             family: sql,

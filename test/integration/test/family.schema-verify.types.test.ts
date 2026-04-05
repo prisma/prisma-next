@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   type CodecTypes,
+  type Contract,
   createFamilyInstance,
   defineContract,
   findNodeByStatusAndCode,
@@ -13,7 +14,6 @@ import {
   postgresAdapter,
   postgresPack,
   runSchemaVerify,
-  type SqlContract,
   type SqlStorage,
   textColumn,
   timeouts,
@@ -226,8 +226,7 @@ describe('family instance schemaVerify - types', () => {
 
         await withDriver(getConnectionString(), async (driver) => {
           const familyInstance = createFamilyInstance();
-          const validatedContract =
-            validateContract<SqlContract<SqlStorage>>(contractWithUnknownType);
+          const validatedContract = validateContract<Contract<SqlStorage>>(contractWithUnknownType);
           const result = await familyInstance.schemaVerify({
             driver,
             contract: validatedContract,

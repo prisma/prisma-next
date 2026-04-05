@@ -1,12 +1,13 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import type { Contract } from '@prisma-next/contract/types';
 import type { SignDatabaseResult } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { readMarker } from '@prisma-next/family-sql/verify';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
@@ -24,7 +25,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 /**
  * Creates a test contract for testing.
  */
-function createTestContract(): SqlContract<SqlStorage> {
+function createTestContract(): Contract<SqlStorage> {
   const contractObj = defineContract<CodecTypes>()
     .target(postgresPack)
     .table('user', (t) =>
@@ -94,7 +95,7 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+        const validatedContract = validateContract<Contract<SqlStorage>>(contract);
 
         const driver = await postgresDriver.create(connectionString);
         try {
@@ -179,7 +180,7 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+        const validatedContract = validateContract<Contract<SqlStorage>>(contract);
 
         const driver = await postgresDriver.create(connectionString);
         try {
@@ -261,7 +262,7 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+        const validatedContract = validateContract<Contract<SqlStorage>>(contract);
 
         const driver = await postgresDriver.create(connectionString);
         try {
