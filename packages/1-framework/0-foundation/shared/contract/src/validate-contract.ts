@@ -1,6 +1,6 @@
 import { type } from 'arktype';
 import type { Contract } from './contract-types';
-import type { DomainContractShape, DomainValidationResult } from './validate-domain';
+import type { DomainContractShape } from './validate-domain';
 import { validateContractDomain } from './validate-domain';
 
 export type ContractValidationPhase = 'structural' | 'domain' | 'storage';
@@ -21,10 +21,6 @@ export class ContractValidationError extends Error {
  * SQL validates tables/columns/FKs; Mongo validates collections/embedding.
  */
 export type StorageValidator = (contract: Contract) => void;
-
-export interface ValidateContractResult {
-  readonly warnings: string[];
-}
 
 const ContractSchema = type({
   target: 'string',
@@ -79,7 +75,7 @@ function extractDomainShape(contract: Contract): DomainContractShape {
 export function validateContract<TContract extends Contract>(
   value: unknown,
   storageValidator: StorageValidator,
-): TContract & ValidateContractResult {
+): TContract {
   if (typeof value !== 'object' || value === null) {
     throw new ContractValidationError('Contract must be a non-null object', 'structural');
   }
@@ -94,17 +90,11 @@ export function validateContract<TContract extends Contract>(
     );
   }
 
-  // Arktype verified the structural shape; Contract adds branded hash types and
-  // ContractModel generics that can't be expressed in the schema.
   const contract = parsed as unknown as Contract;
 
-  const domainResult: DomainValidationResult = validateContractDomain(extractDomainShape(contract));
+  validateContractDomain(extractDomainShape(contract));
 
   storageValidator(contract);
 
-  // TContract narrows Contract with literal types from the caller's contract.d.ts;
-  // the runtime object is the same — the cast preserves the caller's type parameter.
-  return Object.assign(contract as unknown as TContract, {
-    warnings: domainResult.warnings,
-  });
+  return contract as unknown as TContract;
 }
