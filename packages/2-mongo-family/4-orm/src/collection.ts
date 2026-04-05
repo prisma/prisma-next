@@ -46,19 +46,27 @@ export interface MongoCollection<
   ModelName extends string & keyof TContract['models'],
   TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
 > {
+  /** Appends a filter condition. Returns a new immutable collection. */
   where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes>;
+  /** Restricts returned fields to the given subset. Returns a new immutable collection. */
   select(
     ...fields: ModelFieldKeys<TContract, ModelName>[]
   ): MongoCollection<TContract, ModelName, TIncludes>;
+  /** Adds a `$lookup` for a reference relation. Returns a new immutable collection. */
   include<K extends ReferenceRelationKeys<TContract, ModelName> & string>(
     relationName: K,
   ): MongoCollection<TContract, ModelName, TIncludes & Record<K, true>>;
+  /** Sets sort order. Returns a new immutable collection. */
   orderBy(
     spec: Partial<Record<ModelFieldKeys<TContract, ModelName>, 1 | -1>>,
   ): MongoCollection<TContract, ModelName, TIncludes>;
+  /** Limits the number of results. Returns a new immutable collection. */
   take(n: number): MongoCollection<TContract, ModelName, TIncludes>;
+  /** Skips the first `n` results. Returns a new immutable collection. */
   skip(n: number): MongoCollection<TContract, ModelName, TIncludes>;
+  /** Executes the query and returns all matching rows as an async iterable. */
   all(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
+  /** Executes the query with limit 1. Returns the first matching row or `null`. */
   first(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
   /** Returns the input data with the server-assigned `_id`. Does not re-read the stored document. */
   create(
@@ -68,22 +76,28 @@ export interface MongoCollection<
   createAll(
     data: ReadonlyArray<CreateInput<TContract, ModelName>>,
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
+  /** Inserts multiple documents and returns the number inserted. */
   createCount(data: ReadonlyArray<CreateInput<TContract, ModelName>>): Promise<number>;
+  /** Updates one matching document via `findOneAndUpdate`. Returns the updated document or `null`. Requires `.where()`. */
   update(
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
-  /** Non-atomic: captures matching `_id`s, updates, then re-reads by `_id`. */
+  /** Non-atomic: captures matching `_id`s, updates, then re-reads by `_id`. Requires `.where()`. */
   updateAll(
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
+  /** Updates all matching documents and returns the number modified. Requires `.where()`. */
   updateCount(data: Partial<DefaultModelRow<TContract, ModelName>>): Promise<number>;
+  /** Deletes one matching document via `findOneAndDelete`. Returns the deleted document or `null`. Requires `.where()`. */
   delete(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
-  /** Non-atomic: reads matching docs then deletes them. Concurrent writes may cause stale results. */
+  /** Non-atomic: reads matching docs then deletes them. Concurrent writes may cause stale results. Requires `.where()`. */
   deleteAll(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
+  /** Deletes all matching documents and returns the number deleted. Requires `.where()`. */
   deleteCount(): Promise<number>;
   /**
    * On insert: `update` fields are applied via `$set`, remaining `create` fields via `$setOnInsert`.
    * This means `update` values take precedence over `create` for overlapping fields on insert.
+   * Requires `.where()`.
    */
   upsert(input: {
     create: CreateInput<TContract, ModelName>;
