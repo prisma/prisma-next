@@ -1,4 +1,4 @@
-import { bigintJsonReplacer, type Contract, type StorageBase } from '@prisma-next/contract/types';
+import { bigintJsonReplacer, type Contract } from '@prisma-next/contract/types';
 import type {
   TargetFamilyHook,
   ValidationContext,
@@ -33,21 +33,6 @@ const ContractJsonSchema = type({
   }),
   meta: CanonicalMetaSchema,
 });
-
-function stripStorageHash(storage: StorageBase): Record<string, unknown> {
-  const { storageHash: _, ...rest } = storage as Record<string, unknown> & {
-    storageHash: unknown;
-  };
-  return rest;
-}
-
-function stripExecutionHash(
-  execution: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
-  if (!execution) return undefined;
-  const { executionHash: _, ...rest } = execution;
-  return rest;
-}
 
 function assertCanonicalArtifactShape(value: unknown): void {
   const result = ContractJsonSchema(value);
@@ -94,11 +79,8 @@ export async function emit(
     profileHash: contract.profileHash,
     roots: contract.roots,
     models: contract.models as Record<string, unknown>,
-    storage: stripStorageHash(contract.storage),
-    ...ifDefined(
-      'execution',
-      stripExecutionHash(contract.execution as Record<string, unknown> | undefined),
-    ),
+    storage: contract.storage as Record<string, unknown>,
+    ...ifDefined('execution', contract.execution as Record<string, unknown> | undefined),
     extensionPacks: contract.extensionPacks,
     capabilities: contract.capabilities,
     meta: contract.meta,
@@ -109,14 +91,7 @@ export async function emit(
   const executionHash = contract.execution?.executionHash;
   const { profileHash } = contract;
 
-  const contractWithHashes = {
-    ...canonicalContract,
-    storageHash,
-    ...ifDefined('executionHash', executionHash),
-    profileHash,
-  };
-
-  const canonicalized = canonicalizeContractToObject(contractWithHashes);
+  const canonicalized = canonicalizeContractToObject(canonicalContract);
   const contractJsonString = JSON.stringify(
     {
       ...canonicalized,
