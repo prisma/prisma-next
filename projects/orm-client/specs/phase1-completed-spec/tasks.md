@@ -574,7 +574,7 @@ Depends on: All previous groups
 Depends on: None (can start immediately). Required for spec-compliant `all()` / `*All()` streaming terminal behavior.
 
 - [x] **16.1 Make AsyncIterableResult thenable with toArray-equivalent semantics**
-  - Update `packages/1-framework/4-runtime-executor/src/async-iterable-result.ts` so `AsyncIterableResult<Row>` also implements thenable behavior (`PromiseLike<Row[]>`)
+  - Update `packages/1-framework/4-runtime/runtime-executor/src/async-iterable-result.ts` so `AsyncIterableResult<Row>` also implements thenable behavior (`PromiseLike<Row[]>`)
   - Add `then(...)` that is behaviorally equivalent to `toArray()` for fulfillment/rejection source, while allowing tailored error copy/suggestions if needed
   - Ensure `await result` and `result.toArray()` read from the same buffered-array pipeline (not separate executions)
   - Keep iterator exclusivity semantics: once consumed by `for await`, `then()` / `toArray()` remain disallowed
@@ -589,7 +589,7 @@ Depends on: None (can start immediately). Required for spec-compliant `all()` / 
     - `toArray()`/`then()` first -> iterator access fails with consumed error
 
 - [x] **16.3 Expand runtime-executor tests for mixed consumption modes**
-  - Update `packages/1-framework/4-runtime-executor/test/async-iterable-result.test.ts`
+  - Update `packages/1-framework/4-runtime/runtime-executor/test/async-iterable-result.test.ts`
   - Add tests for:
     - `await result` parity with `await result.toArray()`
     - repeated `toArray()` returns the same promise instance
@@ -676,7 +676,7 @@ Groups that share the same dependency level can be parallelized. For example, af
 | `packages/3-extensions/sql-orm-client/src/exports/index.ts` | Public API surface |
 | `packages/3-extensions/sql-orm-client/test/helpers.ts` | Test contract and mock runtime |
 | `packages/3-extensions/sql-orm-client/test/collection.test.ts` | Main test file for Collection |
-| `packages/1-framework/4-runtime-executor/src/async-iterable-result.ts` | `AsyncIterableResult` implementation (`toArray`, thenable behavior, iteration guards) |
-| `packages/1-framework/4-runtime-executor/test/async-iterable-result.test.ts` | Runtime-executor tests for async iteration, thenable parity, and consumption invariants |
+| `packages/1-framework/4-runtime/runtime-executor/src/async-iterable-result.ts` | `AsyncIterableResult` implementation (`toArray`, thenable behavior, iteration guards) |
+| `packages/1-framework/4-runtime/runtime-executor/test/async-iterable-result.test.ts` | Runtime-executor tests for async iteration, thenable parity, and consumption invariants |
 | `packages/2-sql/4-lanes/relational-core/src/ast/types.ts` | PN AST types (WhereExpr, BinaryExpr, etc.) |
 | `examples/prisma-next-demo/src/orm-client/` | Demo app integration |

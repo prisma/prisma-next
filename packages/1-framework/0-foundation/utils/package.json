@@ -1,22 +1,18 @@
 {
-  "name": "@prisma-next/operations",
+  "name": "@prisma-next/utils",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Target-neutral operation registry and capability helpers for Prisma Next",
+  "description": "Shared utility functions for Prisma Next",
   "scripts": {
     "build": "tsdown",
-    "test": "vitest run --passWithNoTests",
-    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
-    "lint:fix": "biome check --write .",
-    "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
-  "dependencies": {},
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",
@@ -31,15 +27,17 @@
     "node": ">=20"
   },
   "exports": {
-    ".": "./dist/index.mjs",
+    "./abortable": "./dist/abortable.mjs",
+    "./array-equal": "./dist/array-equal.mjs",
+    "./assertions": "./dist/assertions.mjs",
+    "./defined": "./dist/defined.mjs",
+    "./redact-db-url": "./dist/redact-db-url.mjs",
+    "./result": "./dist/result.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/1-framework/1-core/shared/operations"
+    "directory": "packages/1-framework/0-foundation/utils"
   }
 }

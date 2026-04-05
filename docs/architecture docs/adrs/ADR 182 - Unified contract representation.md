@@ -150,7 +150,7 @@ This is a minimal change for Mongo — `MongoContract` is already model-first wi
 
 The framework provides a `validateContract` function that orchestrates two passes:
 
-1. **Domain validation** (framework-owned): validates roots, relation targets, variant/base consistency, discriminators, ownership, and orphaned models. This already exists as `validateContractDomain()` in `packages/1-framework/1-core/shared/contract/src/validate-domain.ts`.
+1. **Domain validation** (framework-owned): validates roots, relation targets, variant/base consistency, discriminators, ownership, and orphaned models. This already exists as `validateContractDomain()` in `packages/1-framework/0-foundation/contract/src/validate-domain.ts`.
 2. **Storage validation** (family-provided): the family passes a storage validator function that checks family-specific invariants. For Mongo this is `validateMongoStorage()`. SQL will provide an equivalent.
 
 This pattern is already established in the Mongo family. `validateMongoContract()` follows exactly this sequence: structural parse → `validateContractDomain()` → `validateMongoStorage()` → build indices. The unified `validateContract` generalizes this into a framework-level function that accepts the family's storage validator as a parameter.

@@ -1,25 +1,37 @@
 {
   "packages": [
     {
-      "glob": "packages/1-framework/0-foundation/shared/**",
+      "glob": "packages/1-framework/0-foundation/**",
       "domain": "framework",
       "layer": "foundation",
       "plane": "shared"
     },
     {
-      "glob": "packages/1-framework/1-core/shared/**",
+      "glob": "packages/1-framework/1-core/config/**",
       "domain": "framework",
       "layer": "core",
       "plane": "shared"
     },
     {
-      "glob": "packages/1-framework/1-core/migration/**",
+      "glob": "packages/1-framework/1-core/operations/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/1-framework/1-core/control-plane/**",
       "domain": "framework",
       "layer": "core",
       "plane": "migration"
     },
     {
-      "glob": "packages/1-framework/1-core/runtime/**",
+      "glob": "packages/1-framework/1-core/execution-plane/**",
       "domain": "framework",
       "layer": "core",
       "plane": "runtime"
@@ -49,7 +61,7 @@
       "plane": "migration"
     },
     {
-      "glob": "packages/1-framework/4-runtime-executor/**",
+      "glob": "packages/1-framework/4-runtime/**",
       "domain": "framework",
       "layer": "runtime-executor",
       "plane": "runtime"
