@@ -1,25 +1,26 @@
 {
-  "name": "@prisma-next/contract",
+  "name": "@prisma-next/config",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Data contract type definitions and JSON schema for Prisma Next",
+  "description": "Prisma Next config authoring types and validation",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "arktype": "catalog:"
+    "arktype": "^2.1.26"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",
@@ -28,23 +29,20 @@
   },
   "files": [
     "dist",
-    "src",
-    "schemas"
+    "src"
   ],
   "engines": {
     "node": ">=20"
   },
   "exports": {
-    "./hashing": "./dist/hashing.mjs",
-    "./testing": "./dist/testing.mjs",
+    "./config-types": "./dist/config-types.mjs",
+    "./config-validation": "./dist/config-validation.mjs",
     "./types": "./dist/types.mjs",
-    "./validate-contract": "./dist/validate-contract.mjs",
-    "./validate-domain": "./dist/validate-domain.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/1-framework/0-foundation/shared/contract"
+    "directory": "packages/1-framework/1-core/config"
   }
 }

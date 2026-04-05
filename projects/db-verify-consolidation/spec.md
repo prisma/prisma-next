@@ -229,8 +229,8 @@ No new telemetry is required for this project. If adoption of verification modes
 - `packages/1-framework/3-tooling/cli/tsdown.config.ts`
 - `packages/1-framework/3-tooling/cli/vitest.config.ts`
 - `packages/1-framework/3-tooling/cli/recordings/config.ts`
-- `packages/1-framework/1-core/migration/control-plane/src/errors.ts`
-- `packages/1-framework/1-core/migration/control-plane/test/errors.test.ts`
+- `packages/1-framework/1-core/control-plane/src/errors.ts`
+- `packages/1-framework/1-core/control-plane/test/errors.test.ts`
 - `test/integration/test/utils/journey-test-helpers.ts`
 - `test/integration/test/cli.db-verify.e2e.test.ts`
 - `test/integration/test/cli.db-schema-verify.e2e.test.ts`

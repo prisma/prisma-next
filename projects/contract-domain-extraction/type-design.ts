@@ -45,7 +45,7 @@ import type {
 // §1  New framework-level domain types
 // ============================================================================
 //
-// Package: @prisma-next/contract (packages/1-framework/1-core/shared/contract/src/)
+// Package: @prisma-next/contract (packages/1-framework/0-foundation/contract/src/)
 
 export type DomainField = {
   readonly nullable: boolean;

@@ -45,7 +45,7 @@ The contract should have a `roots` section that maps ORM accessor names to model
 - The root name controls the ORM accessor name (pluralization, casing — the emitter decides).
 - Models not in `roots` are accessed through relations (embedded models) or via variant relationships (polymorphic models).
 
-**Where to apply**: Contract type system (`packages/1-framework/1-core/shared/contract/`), emitter, ORM client for both families.
+**Where to apply**: Contract type system (`packages/1-framework/0-foundation/contract/`), emitter, ORM client for both families.
 
 ---
 
@@ -79,7 +79,7 @@ Mongo needs only the collection name (no field mappings — the domain fields ma
 
 The co-location of table name with field-to-column mappings in SQL is intentional — separating them would leave column references dangling.
 
-**Where to apply**: `packages/1-framework/1-core/shared/contract/`, both family contract types, emitter. See [contract-symmetry.md](1-design-docs/contract-symmetry.md) for the convergence/divergence analysis.
+**Where to apply**: `packages/1-framework/0-foundation/contract/`, both family contract types, emitter. See [contract-symmetry.md](1-design-docs/contract-symmetry.md) for the convergence/divergence analysis.
 
 ---
 

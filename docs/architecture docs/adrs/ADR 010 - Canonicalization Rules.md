@@ -48,7 +48,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
   - It only makes reviews easier by keeping “header” fields (identity + hashes) grouped, followed by the large semantic sections, with `meta` last.
   - Within each section (and for any non-top-level object), standard lexicographic sort applies, except where domain-specific ordering rules are defined below.
 
-**Source of truth:** the exact top-level ordering is defined by the emitter implementation (see `TOP_LEVEL_ORDER` in `packages/1-framework/1-core/migration/control-plane/src/emission/canonicalization.ts`). Any new top-level section that becomes part of the canonical artifact must be added there (and covered by tests) to keep diffs stable.
+**Source of truth:** the exact top-level ordering is defined by the emitter implementation (see `TOP_LEVEL_ORDER` in `packages/1-framework/1-core/control-plane/src/emission/canonicalization.ts`). Any new top-level section that becomes part of the canonical artifact must be added there (and covered by tests) to keep diffs stable.
 
 ### Arrays
 

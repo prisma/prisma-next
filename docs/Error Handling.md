@@ -113,14 +113,14 @@ if (result.ok) {
 - For streaming APIs (use AsyncIterable that throws on error)
 
 See:
-- `packages/1-framework/1-core/shared/utils/src/result.ts`
+- `packages/1-framework/0-foundation/utils/src/result.ts`
 
 ### CLI boundary: structured errors + Result conversion
 
 CLI commands use structured errors and convert them to a `Result` at the command boundary. Non-structured errors propagate (fail fast) to preserve stack traces.
 
 See:
-- `packages/1-framework/1-core/migration/control-plane/src/errors.ts` (`CliStructuredError`)
+- `packages/1-framework/1-core/control-plane/src/errors.ts` (`CliStructuredError`)
 - `packages/1-framework/3-tooling/cli/src/utils/result.ts` (`performAction`)
 - `docs/CLI Style Guide.md` ("Errors", exit codes)
 
@@ -131,7 +131,6 @@ Plan-building failures are represented as `RuntimeError` with stable codes like 
 Migration runner failures use stable `MigrationRunnerErrorCode` values (e.g., `EXECUTION_FAILED`, `SCHEMA_VERIFY_FAILED`, `PRECHECK_FAILED`, `POSTCHECK_FAILED`) returned as part of `Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>`. This follows the pattern described in "Provide stable codes for 'expected failures'" (see Guidelines section below) where stable codes enable deterministic error handling at system boundaries.
 
 See:
-- `packages/1-framework/1-core/shared/plan/src/errors.ts` (`planInvalid`, `planUnsupported`)
 - `packages/2-sql/3-tooling/family/src/core/migrations/types.ts` (`MigrationRunnerErrorCode`, `MigrationRunnerFailure`)
 - SQL lane helpers that throw these for invalid builder usage/capability gating.
 
@@ -142,8 +141,8 @@ Runtime execution is modeled as an `AsyncIterable` that throws on error. This is
 Guardrails (budgets/lints) may block execution by throwing a structured runtime error (a failure) in strict mode.
 
 See:
-- `packages/1-framework/4-runtime-executor/src/runtime-core.ts`
-- `packages/1-framework/4-runtime-executor/src/plugins/budgets.ts`
+- `packages/1-framework/4-runtime/runtime-executor/src/runtime-core.ts`
+- `packages/1-framework/4-runtime/runtime-executor/src/plugins/budgets.ts`
 
 ## Guidelines
 
