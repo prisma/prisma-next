@@ -35,7 +35,8 @@ export const contract = defineContract()
       })
       .column('update_at', { type: timestamptzColumn, nullable: true })
       .column('profile', { type: jsonb(), nullable: true })
-      .primaryKey(['id']),
+      .primaryKey(['id'])
+      .unique(['email'], 'user_email_key'),
   )
   .table('post', (t) =>
     t
