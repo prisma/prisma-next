@@ -81,29 +81,31 @@ describe('canonicalizeContractToObject', () => {
     expect(result).not.toHaveProperty('profileHash');
   });
 
-  it('includes top-level storageHash when provided', () => {
-    const result = canonicalizeContractToObject(minimal({ storageHash: 'sha256:storage' }));
-    expect(result['storageHash']).toBe('sha256:storage');
+  it('keeps storageHash inside storage', () => {
+    const result = canonicalizeContractToObject(
+      minimal({ storage: { tables: {}, storageHash: 'sha256:s' } }),
+    );
+    expect(result).not.toHaveProperty('storageHash');
+    expect(drill(result, 'storage')['storageHash']).toBe('sha256:s');
   });
 
-  it('includes top-level executionHash when provided', () => {
-    const result = canonicalizeContractToObject(minimal({ executionHash: 'sha256:exec' }));
-    expect(result['executionHash']).toBe('sha256:exec');
+  it('keeps executionHash inside execution', () => {
+    const result = canonicalizeContractToObject(
+      minimal({ execution: { executionHash: 'sha256:e', mutations: { defaults: [] } } }),
+    );
+    expect(result).not.toHaveProperty('executionHash');
+    expect(drill(result, 'execution')['executionHash']).toBe('sha256:e');
   });
 
-  it('places hashes in canonical top-level order', () => {
+  it('places profileHash in canonical top-level order', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storageHash: 'sha256:s',
-        executionHash: 'sha256:e',
         profileHash: 'sha256:p',
       }),
     );
     const keys = Object.keys(result);
-    const ordered = keys.filter((k) =>
-      ['storageHash', 'executionHash', 'profileHash', 'roots'].includes(k),
-    );
-    expect(ordered).toEqual(['storageHash', 'executionHash', 'profileHash', 'roots']);
+    const ordered = keys.filter((k) => ['profileHash', 'roots'].includes(k));
+    expect(ordered).toEqual(['profileHash', 'roots']);
   });
 
   it('excludes keys not in the CanonicalContractInput schema', () => {
