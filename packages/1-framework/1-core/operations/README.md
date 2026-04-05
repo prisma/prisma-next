@@ -19,8 +19,7 @@ This package provides target-neutral operation registry types and capability che
 
 ## Dependencies
 
-- **Depends on**: `@prisma-next/plan` (for plan error types)
-- **Note**: This package does not depend on `@prisma-next/contract` despite being in the same layer. `OperationRegistry` is used by contract types, but operations package itself has no contract dependencies.
+- **Note**: This package has no runtime dependencies. `OperationRegistry` is used by contract types, but operations package itself has no contract dependencies.
 - **Depended on by**:
   - `@prisma-next/sql-operations` (extends with SQL-specific lowering specs)
   - `@prisma-next/sql-relational-core` (uses for capability checking)
@@ -94,7 +93,7 @@ This package is part of the **framework domain**, **core layer**, **shared plane
 - **Domain**: framework (target-agnostic)
 - **Layer**: core
 - **Plane**: shared
-- **Path**: `packages/1-framework/1-core/shared/operations`
+- **Path**: `packages/1-framework/1-core/operations`
 
 ## Related Documentation
 

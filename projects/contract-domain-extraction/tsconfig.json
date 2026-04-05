@@ -11,20 +11,16 @@
     "skipLibCheck": true,
     "paths": {
       "@prisma-next/contract/types": [
-        "../../packages/1-framework/1-core/shared/contract/src/exports/types.ts"
+        "../../packages/1-framework/0-foundation/contract/src/exports/types.ts"
       ],
       "@prisma-next/contract/validate-domain": [
-        "../../packages/1-framework/1-core/shared/contract/src/exports/validate-domain.ts"
+        "../../packages/1-framework/0-foundation/contract/src/exports/validate-domain.ts"
       ],
       "@prisma-next/sql-contract/types": [
         "../../packages/2-sql/1-core/contract/src/exports/types.ts"
       ],
-      "@prisma-next/mongo-core": [
-        "../../packages/2-mongo-family/1-core/src/exports/index.ts"
-      ],
-      "@prisma-next/operations": [
-        "../../packages/1-framework/1-core/shared/operations/src/index.ts"
-      ]
+      "@prisma-next/mongo-core": ["../../packages/2-mongo-family/1-core/src/exports/index.ts"],
+      "@prisma-next/operations": ["../../packages/1-framework/1-core/operations/src/index.ts"]
     }
   },
   "include": ["unified-type-design.ts", "emitted-contract.ts"],

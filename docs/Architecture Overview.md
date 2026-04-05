@@ -277,21 +277,19 @@ Example layout (with numbered prefixes for visual hierarchy):
 ```
 packages/
   1-framework/           # Domain 1: Framework (target-agnostic)
+    0-foundation/
+      contract/          # contract types + plan metadata
     1-core/
-      shared/
-        contract/        # contract types + plan metadata
-        plan/            # diagnostics, shared errors
-        operations/      # target-neutral operation registry + helpers
-      migration/
-        control-plane/   # control plane domain actions
-      runtime/
-        execution-plane/ # execution plane types
+      control-plane/     # control plane domain actions
+      execution-plane/   # execution plane types
+      operations/        # target-neutral operation registry + helpers
     2-authoring/
       contract/          # TS builders, canonicalization, schema DSL
     3-tooling/
       cli/               # framework CLI (config-only, family-agnostic)
       emitter/           # contract emitter with family hooks
-    4-runtime-executor/  # target-agnostic runtime kernel (verification, plugins, SPI)
+    4-runtime/
+      runtime-executor/  # target-agnostic runtime kernel (verification, plugins, SPI)
   2-sql/                 # Domain 2: SQL family
     1-core/
       contract/          # SQL contract types (shared plane)

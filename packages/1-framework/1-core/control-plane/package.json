@@ -1,14 +1,14 @@
 {
-  "name": "@prisma-next/runtime-executor",
+  "name": "@prisma-next/core-control-plane",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Target-agnostic execution engine for Prisma Next",
+  "description": "Control-plane migration/emission primitives and structured error utilities",
   "scripts": {
     "build": "tsdown",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -16,13 +16,15 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/operations": "workspace:*",
-    "arktype": "^2.1.25"
+    "@prisma-next/utils": "workspace:*",
+    "arktype": "^2.1.26",
+    "prettier": "^3.3.3"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "@prisma/dev": "catalog:",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
@@ -32,16 +34,21 @@
     "dist",
     "src"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "exports": {
-    ".": "./dist/index.mjs",
+    "./constants": "./dist/constants.mjs",
+    "./emission": "./dist/emission.mjs",
+    "./errors": "./dist/errors.mjs",
+    "./schema-view": "./dist/schema-view.mjs",
+    "./stack": "./dist/stack.mjs",
+    "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/1-framework/4-runtime-executor"
+    "directory": "packages/1-framework/1-core/control-plane"
   }
 }

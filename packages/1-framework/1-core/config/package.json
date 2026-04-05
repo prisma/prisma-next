@@ -43,6 +43,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/1-framework/1-core/shared/config"
+    "directory": "packages/1-framework/1-core/config"
   }
 }

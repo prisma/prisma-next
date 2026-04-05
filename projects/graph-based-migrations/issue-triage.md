@@ -107,7 +107,7 @@ These are also architecture violations: adapters/targets/extensions should not d
 - `packages/3-targets/3-targets/postgres/src/core/migrations/statement-builders.ts` — ledger table DDL, insert statement
 - `packages/3-targets/3-targets/postgres/src/core/migrations/runner.ts` — `recordLedgerEntry()`, execute options
 - `packages/2-sql/3-tooling/family/src/core/` — new `readLedger()` function
-- `packages/1-framework/1-core/migration/control-plane/src/types.ts` — `ControlFamilyInstance` interface
+- `packages/1-framework/1-core/control-plane/src/types.ts` — `ControlFamilyInstance` interface
 - `cli/src/control-api/types.ts` — `ControlClient` interface
 - `cli/src/control-api/client.ts` — `readLedger()` implementation
 - `cli/src/commands/migration-status.ts` — `deriveEdgeStatuses`

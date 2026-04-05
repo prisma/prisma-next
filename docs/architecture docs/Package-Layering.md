@@ -19,13 +19,12 @@ The repository uses numbered prefixes in directory names to make the hierarchy e
 ```
 packages/
   1-framework/           # Domain 1: Framework (target-agnostic)
+    0-foundation/        # Layer 0: Foundation
     1-core/              # Layer 1: Core
-      shared/            # Plane: Shared
-      migration/         # Plane: Migration
-      runtime/           # Plane: Runtime
     2-authoring/         # Layer 2: Authoring
     3-tooling/           # Layer 3: Tooling
-    4-runtime-executor/  # Layer 4: Runtime Executor
+    4-runtime/           # Layer 4: Runtime
+      runtime-executor/
   2-document/            # Domain 2: Document (placeholder)
   2-sql/                 # Domain 2: SQL family
     1-core/              # Layer 1: Core
@@ -44,7 +43,7 @@ The numbered prefixes serve two purposes:
 1. **Visual hierarchy**: Makes domain/layer relationships clear at a glance
 2. **Dependency direction**: Lower numbers can be imported by higher numbers, never the reverse
 
-Planes (shared, migration, runtime) appear as subdirectories only when a layer contains packages in multiple planes.
+Planes are a conceptual grouping recorded in `architecture.config.json` but do not appear as intermediate subdirectories.
 
 ## Domain and Layer Structure
 
@@ -54,14 +53,12 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 
 ```
 * 1-framework
-|-- 1-core/shared (shared plane)
+|-- 0-foundation
 |   |-- contract/      → @prisma-next/contract
-|   |-- plan/          → @prisma-next/plan
-|   |-- operations/    → @prisma-next/operations
-|-- 1-core/migration (migration plane)
+|-- 1-core
 |   |-- control-plane/ → @prisma-next/core-control-plane
-|-- 1-core/runtime (runtime plane)
 |   |-- execution-plane/ → @prisma-next/core-execution-plane
+|   |-- operations/    → @prisma-next/operations
 |-- 2-authoring (migration plane)
 |   |-- contract/      → @prisma-next/contract-authoring
 |   |-- contract-ts/   → @prisma-next/contract-ts (future)
@@ -69,8 +66,8 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 |-- 3-tooling (migration plane)
 |   |-- cli/           → @prisma-next/cli
 |   |-- emitter/       → @prisma-next/emitter
-|-- 4-runtime-executor (runtime plane)
-    |-- → @prisma-next/runtime-executor
+|-- 4-runtime (runtime plane)
+    |-- runtime-executor/ → @prisma-next/runtime-executor
 ```
 
 ### SQL Family Domain
@@ -193,16 +190,10 @@ Plane import constraints are enforced declaratively via `planeRules` in `archite
 
 The innermost layer containing target-family agnostic types and utilities.
 
-**Shared Plane:**
-- `packages/1-framework/1-core/shared/plan/` → `@prisma-next/plan` - Plan helpers, diagnostics, shared errors
-- `packages/1-framework/1-core/shared/operations/` → `@prisma-next/operations` - Target-neutral operation registry + capability helpers
-- `packages/1-framework/1-core/shared/contract/` → `@prisma-next/contract` - Core contract types + plan metadata
-
-**Migration Plane:**
-- `packages/1-framework/1-core/migration/control-plane/` → `@prisma-next/core-control-plane` - Control plane domain actions (contract emission, database verification), config types, validation, error factories (no file I/O or CLI awareness)
-
-**Runtime Plane:**
-- `packages/1-framework/1-core/runtime/execution-plane/` → `@prisma-next/core-execution-plane` - Execution plane descriptor and instance types
+- `packages/1-framework/0-foundation/contract/` → `@prisma-next/contract` - Core contract types + plan metadata
+- `packages/1-framework/1-core/operations/` → `@prisma-next/operations` - Target-neutral operation registry + capability helpers
+- `packages/1-framework/1-core/control-plane/` → `@prisma-next/core-control-plane` - Control plane domain actions (contract emission, database verification), config types, validation, error factories (no file I/O or CLI awareness)
+- `packages/1-framework/1-core/execution-plane/` → `@prisma-next/core-execution-plane` - Execution plane descriptor and instance types
 
 **Dependency Rules:** Cannot import from any other layer.
 
@@ -245,7 +236,7 @@ Lanes consume targets and relational-core helpers to produce AST plans. Packages
 Target-agnostic runtime kernel plus per-family runtime implementations.
 
 **Framework Domain (Runtime Plane):**
-- `packages/1-framework/4-runtime-executor/` → `@prisma-next/runtime-executor` – verification, marker checks, plugin SPI
+- `packages/1-framework/4-runtime/runtime-executor/` → `@prisma-next/runtime-executor` – verification, marker checks, plugin SPI
 
 **SQL Domain (Runtime Plane):**
 - `packages/2-sql/5-runtime/` → `@prisma-next/sql-runtime` – SQL family runtime that composes runtime-executor with SQL adapters (future document runtimes will mirror this)
@@ -284,17 +275,16 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 
 | Directory | Published Package Name |
 |-----------|------------------------|
-| `packages/1-framework/1-core/shared/contract/` | `@prisma-next/contract` |
-| `packages/1-framework/1-core/shared/plan/` | `@prisma-next/plan` |
-| `packages/1-framework/1-core/shared/operations/` | `@prisma-next/operations` |
-| `packages/1-framework/1-core/migration/control-plane/` | `@prisma-next/core-control-plane` |
-| `packages/1-framework/1-core/runtime/execution-plane/` | `@prisma-next/core-execution-plane` |
+| `packages/1-framework/0-foundation/contract/` | `@prisma-next/contract` |
+| `packages/1-framework/1-core/operations/` | `@prisma-next/operations` |
+| `packages/1-framework/1-core/control-plane/` | `@prisma-next/core-control-plane` |
+| `packages/1-framework/1-core/execution-plane/` | `@prisma-next/core-execution-plane` |
 | `packages/1-framework/2-authoring/contract/` | `@prisma-next/contract-authoring` |
 | `packages/1-framework/2-authoring/contract-ts/` | `@prisma-next/contract-ts` |
 | `packages/1-framework/2-authoring/psl-parser/` | `@prisma-next/psl-parser` |
 | `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |
 | `packages/1-framework/3-tooling/emitter/` | `@prisma-next/emitter` |
-| `packages/1-framework/4-runtime-executor/` | `@prisma-next/runtime-executor` |
+| `packages/1-framework/4-runtime/runtime-executor/` | `@prisma-next/runtime-executor` |
 | `packages/2-sql/1-core/contract/` | `@prisma-next/sql-contract` |
 | `packages/2-sql/1-core/operations/` | `@prisma-next/sql-operations` |
 | `packages/2-sql/1-core/schema-ir/` | `@prisma-next/sql-schema-ir` |
@@ -328,8 +318,8 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 - **`authoring/*`** → can import from `core/*` only
 - **`2-sql/3-tooling/*`** → can import from `1-core/*` and `2-authoring/*` only
 - **`2-sql/4-lanes/*`** → can import from `1-core/*`, `2-authoring/*`, `2-sql/3-tooling/*` only
-- **`1-framework/4-runtime-executor`** → can import from `1-core/*`, `2-authoring/*`, `3-tooling/*` only (no direct imports from `3-targets/*`)
-- **`2-sql/5-runtime`** → can import from `4-runtime-executor` and `2-sql/3-tooling/*` and `3-targets/6-adapters/*` only
+- **`1-framework/4-runtime/runtime-executor`** → can import from `1-core/*`, `2-authoring/*`, `3-tooling/*` only (no direct imports from `3-targets/*`)
+- **`2-sql/5-runtime`** → can import from `4-runtime/runtime-executor` and `2-sql/3-tooling/*` and `3-targets/6-adapters/*` only
 - **`3-targets/6-adapters/*`** → can import from `2-sql/3-tooling/*` and `2-sql/5-runtime` only
 
 ### Domain Rules
@@ -451,7 +441,7 @@ This structure allows the same package to provide both control plane configurati
 The package layering structure uses numbered directory prefixes for visual hierarchy:
 - All domain directories created with numbered prefixes (`1-framework/`, `2-sql/`, `2-document/`, `3-targets/`, `3-extensions/`)
 - All layer directories created with numbered prefixes (e.g., `1-core/`, `2-authoring/`, `3-tooling/`, `4-lanes/`, `5-runtime/`)
-- Plane subdirectories added where needed (`shared/`, `migration/`, `runtime/`)
+- Plane subdirectories removed (`shared/`, `migration/`, `runtime/` intermediate directories flattened)
 - Workspace configuration updated (`pnpm-workspace.yaml`)
 - TypeScript project references updated (`tsconfig.base.json`)
 - Import validation configured (Dependency Cruiser with `dependency-cruiser.config.mjs`)
