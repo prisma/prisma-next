@@ -1,5 +1,5 @@
-import type { MongoValue } from '@prisma-next/mongo-core';
-import { MongoParamRef } from '@prisma-next/mongo-core';
+import type { MongoValue } from '@prisma-next/mongo-value';
+import { MongoParamRef } from '@prisma-next/mongo-value';
 
 export function resolveValue(value: MongoValue): unknown {
   if (value instanceof MongoParamRef) {

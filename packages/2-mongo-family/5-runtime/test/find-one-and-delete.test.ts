@@ -1,5 +1,5 @@
-import { MongoParamRef } from '@prisma-next/mongo-core';
 import { FindOneAndDeleteCommand, MongoFieldFilter } from '@prisma-next/mongo-query-ast';
+import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 
