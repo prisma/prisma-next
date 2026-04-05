@@ -37,7 +37,8 @@ async function main() {
   const runtime = await getRuntime(databaseUrl);
   try {
     if (cmd === 'users') {
-      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const parsedLimit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10;
       const users = await getUsers(runtime, limit);
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'user') {
@@ -57,7 +58,8 @@ async function main() {
       const posts = await getUserPosts(userIdStr, runtime);
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'users-with-posts') {
-      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const parsedLimit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10;
       const usersWithPosts = await getUsersWithPosts(runtime, limit);
       console.log(JSON.stringify(usersWithPosts, null, 2));
     } else {
