@@ -219,11 +219,12 @@ class MongoCollectionImpl<
     data: CreateInput<TContract, ModelName>,
   ): Promise<IncludedRow<TContract, ModelName, TIncludes>> {
     this.#rejectIncludes('create');
-    const document = this.#toDocument(data as Record<string, unknown>);
+    const normalized = this.#stripUndefined(data as Record<string, unknown>);
+    const document = this.#toDocument(normalized);
     const command = new InsertOneCommand(this.#collectionName, document);
     const results = await this.#drainPlan(command);
     const insertedId = (results[0] as { insertedId: unknown }).insertedId;
-    return { _id: insertedId, ...(data as object) } as unknown as IncludedRow<
+    return { _id: insertedId, ...normalized } as unknown as IncludedRow<
       TContract,
       ModelName,
       TIncludes
@@ -236,12 +237,13 @@ class MongoCollectionImpl<
     this.#rejectIncludes('createAll');
     const self = this;
     async function* gen(): AsyncGenerator<IncludedRow<TContract, ModelName, TIncludes>> {
-      const documents = data.map((d) => self.#toDocument(d as Record<string, unknown>));
+      const normalizedRows = data.map((d) => self.#stripUndefined(d as Record<string, unknown>));
+      const documents = normalizedRows.map((d) => self.#toDocument(d));
       const command = new InsertManyCommand(self.#collectionName, documents);
       const results = await self.#drainPlan(command);
       const insertedIds = (results[0] as { insertedIds: readonly unknown[] }).insertedIds;
-      for (let i = 0; i < data.length; i++) {
-        yield { _id: insertedIds[i], ...(data[i] as object) } as unknown as IncludedRow<
+      for (let i = 0; i < normalizedRows.length; i++) {
+        yield { _id: insertedIds[i], ...normalizedRows[i] } as unknown as IncludedRow<
           TContract,
           ModelName,
           TIncludes
@@ -418,7 +420,9 @@ class MongoCollectionImpl<
   #toDocument(data: Record<string, unknown>): Record<string, MongoValue> {
     const doc: Record<string, MongoValue> = {};
     for (const [key, value] of Object.entries(data)) {
-      doc[key] = new MongoParamRef(value);
+      if (value !== undefined) {
+        doc[key] = new MongoParamRef(value);
+      }
     }
     return doc;
   }
@@ -426,11 +430,24 @@ class MongoCollectionImpl<
   #toSetFields(data: Record<string, unknown>): Record<string, MongoValue> {
     const fields: Record<string, MongoValue> = {};
     for (const [key, value] of Object.entries(data)) {
+      if (key === '_id' && value !== undefined) {
+        throw new Error('Mutation payloads cannot modify `_id`');
+      }
       if (value !== undefined) {
         fields[key] = new MongoParamRef(value);
       }
     }
     return fields;
+  }
+
+  #stripUndefined(data: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        result[key] = value;
+      }
+    }
+    return result;
   }
 
   #toUpdateDocument(data: Record<string, unknown>): Record<string, MongoValue> {
