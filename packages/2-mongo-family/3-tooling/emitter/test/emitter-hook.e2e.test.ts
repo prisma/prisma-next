@@ -7,7 +7,7 @@ const testHashes = { storageHash: 'sha256:blog-test', profileHash: 'sha256:blog-
 
 const mongoCodecImports: TypesImportSpec[] = [
   {
-    package: '@prisma-next/mongo-core/codec-types',
+    package: '@prisma-next/adapter-mongo/codec-types',
     named: 'CodecTypes',
     alias: 'MongoCodecTypes',
   },
