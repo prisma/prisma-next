@@ -40,7 +40,7 @@ describe('mongoTargetFamilyHook.generateContractTypes', () => {
   it('includes framework imports', () => {
     const contract = createMongoContract();
     const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
-    expect(types).toContain("from '@prisma-next/mongo-core'");
+    expect(types).toContain("from '@prisma-next/mongo-contract'");
     expect(types).toContain("from '@prisma-next/contract/types'");
     expect(types).toContain('MongoContractWithTypeMaps');
     expect(types).toContain('MongoTypeMaps');
