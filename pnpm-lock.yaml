@@ -1743,6 +1743,9 @@ importers:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../../3-targets/6-adapters/postgres
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/shared/contract
       '@prisma-next/core-execution-plane':
         specifier: workspace:*
         version: link:../../1-framework/1-core/runtime/execution-plane
