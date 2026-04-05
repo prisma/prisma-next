@@ -73,7 +73,6 @@ describe('schema', () => {
   const contract = validateContract<TestContract>({
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'test-hash',
     profileHash: 'sha256:test',
     roots: {},
     capabilities: {},
@@ -186,7 +185,6 @@ describe('schema', () => {
     const contractWithUndefinedColumn = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       capabilities: {},

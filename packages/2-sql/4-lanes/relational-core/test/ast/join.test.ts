@@ -60,7 +60,6 @@ describe('ast/join', () => {
   const contract = validateContract<TestContract>({
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'test-hash',
     profileHash: 'sha256:test',
     roots: {},
     capabilities: {},

@@ -81,7 +81,6 @@ describe('operations-registry', () => {
   const contract = validateContract<TestContract>({
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'test-hash',
     profileHash: 'sha256:test',
     roots: {},
     extensionPacks: {},
@@ -162,7 +161,6 @@ describe('operations-registry', () => {
     const contractWithoutCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -189,7 +187,6 @@ describe('operations-registry', () => {
     const contractWithCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -272,7 +269,6 @@ describe('operations-registry', () => {
     const contractWithFalseCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -333,7 +329,6 @@ describe('operations-registry', () => {
     const contractWithPartialCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -365,7 +360,6 @@ describe('operations-registry', () => {
     const contractWithAllCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -478,7 +472,6 @@ describe('operations-registry', () => {
     const contractWithoutCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -633,7 +626,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -708,7 +700,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -789,7 +780,6 @@ describe('operations-registry', () => {
     const contractWithoutCaps = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -874,7 +864,6 @@ describe('operations-registry', () => {
     const contractWithFalseCaps = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -948,7 +937,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1012,7 +1000,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1088,7 +1075,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1169,7 +1155,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1224,7 +1209,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1267,7 +1251,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1346,7 +1329,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1392,7 +1374,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1461,7 +1442,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1511,7 +1491,6 @@ describe('operations-registry', () => {
       contractInput: {
         target: 'postgres',
         targetFamily: 'sql',
-        storageHash: 'test-hash',
         profileHash: 'sha256:test',
         roots: {},
         capabilities: {},
@@ -1541,7 +1520,6 @@ describe('operations-registry', () => {
       contractInput: {
         target: 'postgres',
         targetFamily: 'sql',
-        storageHash: 'test-hash',
         profileHash: 'sha256:test',
         roots: {},
         extensionPacks: {},
@@ -1575,7 +1553,6 @@ describe('operations-registry', () => {
       contractInput: {
         target: 'postgres',
         targetFamily: 'sql',
-        storageHash: 'test-hash',
         profileHash: 'sha256:test',
         roots: {},
         extensionPacks: {},
@@ -1656,7 +1633,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1710,7 +1686,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},
@@ -1777,7 +1752,6 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
       profileHash: 'sha256:test',
       roots: {},
       extensionPacks: {},

@@ -7,7 +7,6 @@ const baseContract = {
   target: 'postgres',
   targetFamily: 'sql',
   profileHash: 'sha256:test',
-  storageHash: 'sha256:test-storage',
   roots: { User: 'User' },
   capabilities: {},
   extensionPacks: {},
