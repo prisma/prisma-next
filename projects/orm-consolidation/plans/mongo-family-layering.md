@@ -97,16 +97,15 @@ The transport layer splits into two packages, separating data structures from be
 
 ## What moves from `1-core`
 
+> **Migration required.** Wire command classes, result types, and the `MongoAdapter`/`MongoDriver` interfaces currently live in `1-core` (`@prisma-next/mongo-core`). They are misplaced there — nothing above the transport boundary needs wire-level types, and the adapter interface can't meaningfully reference query-layer AST types from layer 1 (which is why the `MongoQueryPlanLike` structural shim exists). These items must be migrated to the `transport` layer as part of the layering reorganization.
+
 | Item | From | To | Rationale |
 |---|---|---|---|
 | `MongoAdapter` interface | `1-core` | `6-transport/mongo-lowering` | Needs to reference AST types (layer 4); can't do that from layer 1 |
 | `MongoDriver` interface | `1-core` | `6-transport/mongo-lowering` | Behavioral contract co-located with adapter |
-| `MongoLoweringContext` | `1-core` | `6-transport/mongo-lowering` | Part of the adapter interface |
 | Wire command classes | `1-core` | `6-transport/mongo-wire` | Adapter output / driver input — belongs at the transport boundary |
 | Result types | `1-core` | `6-transport/mongo-wire` | Driver output types |
-| `MongoExecutionPlan` | `1-core` | **deleted** | Post-lowering plan holding wire commands; unused |
-| `MongoCommandLike` shim | `1-core` | **deleted** | Existed only because adapter couldn't see real AST types |
-| `MongoReadPlanLike` shim | `1-core` | **deleted** | Same — adapter can now reference `MongoReadPlan` directly |
+| `MongoQueryPlanLike` shim | `1-core` | **deleted** | Exists only because adapter can't see real AST types from layer 1; once the adapter interface moves to `transport` (above `query`), it can import `MongoQueryPlan` directly |
 
 ## What moves from ORM
 
