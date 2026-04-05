@@ -259,7 +259,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:da977bf4c475303b2a1699542df0e905fe9c29e9f928e7965ee45a29a01a15f4",
+    "storageHash": "sha256:9a2e401594554ab0789d0a857f55f2d8a2b1bc51930b5863cf507ca569c21d13",
     "tables": {
       "comment": {
         "columns": {
@@ -636,7 +636,14 @@
             "id"
           ]
         },
-        "uniques": []
+        "uniques": [
+          {
+            "columns": [
+              "email"
+            ],
+            "name": "user_email_key"
+          }
+        ]
       }
     }
   },
