@@ -8,7 +8,6 @@ describe('validateContract structure validation', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'sha256:test',
     profileHash: 'sha256:test',
     capabilities: {},
     extensionPacks: {},

@@ -3,50 +3,43 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 
-describe('validateContract normalization', () => {
-  it('normalizes missing nullable in columns', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
+function validContractInput(overrides?: Record<string, unknown>) {
+  return {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: 'sha256:test',
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    roots: {},
+    models: {},
+    storage: {
       storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+      tables: {
+        User: {
+          columns: {
+            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
-    };
-    const contract = validateContract<Contract<SqlStorage>>(contractInput);
+    },
+    ...overrides,
+  };
+}
+
+describe('validateContract validation', () => {
+  it('accepts a valid contract with explicit nullable', () => {
+    const contract = validateContract<Contract<SqlStorage>>(validContractInput());
     expect(contract.storage.tables['User']?.columns['id']?.nullable).toBe(false);
   });
 
-  it('normalizes missing uniques array to empty', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+  it('rejects missing uniques array', () => {
+    const input = validContractInput({
       storage: {
         storageHash: 'sha256:test',
         tables: {
@@ -60,23 +53,12 @@ describe('validateContract normalization', () => {
           },
         },
       },
-    };
-    const result = validateContract<Contract<SqlStorage>>(contractInput);
-    expect(result.storage.tables['User']?.uniques).toEqual([]);
+    });
+    expect(() => validateContract<Contract<SqlStorage>>(input)).toThrow();
   });
 
-  it('normalizes missing indexes array to empty', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+  it('rejects missing indexes array', () => {
+    const input = validContractInput({
       storage: {
         storageHash: 'sha256:test',
         tables: {
@@ -90,23 +72,12 @@ describe('validateContract normalization', () => {
           },
         },
       },
-    };
-    const result = validateContract<Contract<SqlStorage>>(contractInput);
-    expect(result.storage.tables['User']?.indexes).toEqual([]);
+    });
+    expect(() => validateContract<Contract<SqlStorage>>(input)).toThrow();
   });
 
-  it('normalizes missing foreignKeys array to empty', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+  it('rejects missing foreignKeys array', () => {
+    const input = validContractInput({
       storage: {
         storageHash: 'sha256:test',
         tables: {
@@ -120,54 +91,17 @@ describe('validateContract normalization', () => {
           },
         },
       },
-    };
-    const result = validateContract<Contract<SqlStorage>>(contractInput);
-    expect(result.storage.tables['User']?.foreignKeys).toEqual([]);
+    });
+    expect(() => validateContract<Contract<SqlStorage>>(input)).toThrow();
   });
 
-  it('normalizes missing columns in table', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-    const contract = validateContract<Contract<SqlStorage>>(contractInput);
+  it('accepts table with columns present', () => {
+    const contract = validateContract<Contract<SqlStorage>>(validContractInput());
     expect(contract.storage.tables['User']).toBeDefined();
   });
 
-  it('normalizes table without columns property', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+  it('rejects table without columns property', () => {
+    const input = validContractInput({
       storage: {
         storageHash: 'sha256:test',
         tables: {
@@ -179,23 +113,13 @@ describe('validateContract normalization', () => {
           },
         },
       },
-    };
-    // This will fail validation because columns are required, but normalization should handle it
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
+    });
+    expect(() => validateContract<Contract<SqlStorage>>(input)).toThrow();
   });
 
-  it('normalizes table with null columns', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+  it('rejects table with null columns', () => {
+    const input = {
+      ...validContractInput(),
       storage: {
         storageHash: 'sha256:test',
         tables: {
@@ -210,22 +134,11 @@ describe('validateContract normalization', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    // This will fail validation because columns are required, but normalization should handle it
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('accepts table with empty columns object', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+    const input = validContractInput({
       storage: {
         storageHash: 'sha256:test',
         tables: {
@@ -237,22 +150,13 @@ describe('validateContract normalization', () => {
           },
         },
       },
-    };
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
+    });
+    expect(() => validateContract<Contract<SqlStorage>>(input)).not.toThrow();
   });
 
-  it('normalizes multiple tables where some have columns and some do not', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+  it('rejects table missing columns in multi-table contract', () => {
+    const input = {
+      ...validContractInput(),
       storage: {
         storageHash: 'sha256:test',
         tables: {
@@ -266,7 +170,6 @@ describe('validateContract normalization', () => {
             foreignKeys: [],
           },
           Post: {
-            // No columns property - should hit else branch
             primaryKey: { columns: ['id'] },
             uniques: [],
             indexes: [],
@@ -276,21 +179,11 @@ describe('validateContract normalization', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    // This will fail validation because Post table is missing columns, but normalization should handle it
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('accepts model without relations (optional field)', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
+    const input = validContractInput({
       models: {
         User: {
           storage: { table: 'User', fields: { id: { column: 'id' } } },
@@ -299,158 +192,49 @@ describe('validateContract normalization', () => {
           },
         },
       },
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
+    });
+    expect(() => validateContract<Contract<SqlStorage>>(input)).not.toThrow();
   });
 
-  it('normalizes missing extensionPacks', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-    const contract = validateContract<Contract<SqlStorage>>(contractInput);
+  it('accepts contract with extensionPacks', () => {
+    const contract = validateContract<Contract<SqlStorage>>(validContractInput());
     expect(contract.extensionPacks).toEqual({});
   });
 
-  it('normalizes missing capabilities', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-    const contract = validateContract<Contract<SqlStorage>>(contractInput);
+  it('accepts contract with capabilities', () => {
+    const contract = validateContract<Contract<SqlStorage>>(validContractInput());
     expect(contract.capabilities).toEqual({});
   });
 
-  it('normalizes missing meta', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    };
-    const contract = validateContract<Contract<SqlStorage>>(contractInput);
+  it('accepts contract with meta', () => {
+    const contract = validateContract<Contract<SqlStorage>>(validContractInput());
     expect(contract.meta).toEqual({});
   });
 
   it('accepts multiple models without relations', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
+    const input = validContractInput({
       models: {
         User: {
           storage: { table: 'user', fields: { id: { column: 'id' } } },
-          fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
-          },
+          fields: { id: { codecId: 'pg/text@1', nullable: false } },
         },
         Post: {
           storage: { table: 'post', fields: { id: { column: 'id' } } },
-          fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
-          },
+          fields: { id: { codecId: 'pg/text@1', nullable: false } },
         },
       },
       storage: {
         storageHash: 'sha256:test',
         tables: {
           user: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
+            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
             primaryKey: { columns: ['id'] },
             uniques: [],
             indexes: [],
             foreignKeys: [],
           },
           post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
+            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
             primaryKey: { columns: ['id'] },
             uniques: [],
             indexes: [],
@@ -458,27 +242,16 @@ describe('validateContract normalization', () => {
           },
         },
       },
-    };
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput)).not.toThrow();
+    });
+    expect(() => validateContract<Contract<SqlStorage>>(input)).not.toThrow();
   });
 
-  it('normalizes models with existing relations', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
+  it('validates models with relations', () => {
+    const input = validContractInput({
       models: {
         User: {
           storage: { table: 'User', fields: { id: { column: 'id' } } },
-          fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
-          },
+          fields: { id: { codecId: 'pg/text@1', nullable: false } },
           relations: {
             posts: {
               to: 'Post',
@@ -509,9 +282,7 @@ describe('validateContract normalization', () => {
         storageHash: 'sha256:test',
         tables: {
           User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
+            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
             primaryKey: { columns: ['id'] },
             uniques: [],
             indexes: [],
@@ -536,8 +307,8 @@ describe('validateContract normalization', () => {
           },
         },
       },
-    };
-    const contract = validateContract<Contract<SqlStorage>>(contractInput);
+    });
+    const contract = validateContract<Contract<SqlStorage>>(input);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
@@ -545,32 +316,14 @@ describe('validateContract normalization', () => {
         cardinality: '1:N',
       },
     });
-    expect((contract.models['Post'] as { relations?: unknown })['relations']).toEqual({
-      user: {
-        to: 'User',
-        on: { localFields: ['userId'], targetFields: ['id'] },
-        cardinality: 'N:1',
-      },
-    });
   });
 
   it('preserves existing relations and accepts missing relations', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
+    const input = validContractInput({
       models: {
         User: {
           storage: { table: 'User', fields: { id: { column: 'id' } } },
-          fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
-          },
+          fields: { id: { codecId: 'pg/text@1', nullable: false } },
           relations: {
             posts: {
               to: 'Post',
@@ -594,9 +347,7 @@ describe('validateContract normalization', () => {
         storageHash: 'sha256:test',
         tables: {
           User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
+            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
             primaryKey: { columns: ['id'] },
             uniques: [],
             indexes: [],
@@ -621,8 +372,8 @@ describe('validateContract normalization', () => {
           },
         },
       },
-    };
-    const contract = validateContract<Contract<SqlStorage>>(contractInput);
+    });
+    const contract = validateContract<Contract<SqlStorage>>(input);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
@@ -632,25 +383,13 @@ describe('validateContract normalization', () => {
     });
   });
 
-  it('normalizes FK entries with missing constraint/index to defaults', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+  it('validates FK entries with explicit constraint/index', () => {
+    const input = validContractInput({
       storage: {
         storageHash: 'sha256:test',
         tables: {
           user: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
+            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
             primaryKey: { columns: ['id'] },
             uniques: [],
             indexes: [],
@@ -675,32 +414,20 @@ describe('validateContract normalization', () => {
           },
         },
       },
-    };
-    const contract = validateContract<Contract<SqlStorage>>(contractInput);
+    });
+    const contract = validateContract<Contract<SqlStorage>>(input);
     const fk = contract.storage.tables['post']?.foreignKeys[0];
     expect(fk?.constraint).toBe(true);
     expect(fk?.index).toBe(true);
   });
 
   it('preserves explicit per-FK constraint/index fields', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+    const input = validContractInput({
       storage: {
         storageHash: 'sha256:test',
         tables: {
           user: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
+            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
             primaryKey: { columns: ['id'] },
             uniques: [],
             indexes: [],
@@ -725,8 +452,8 @@ describe('validateContract normalization', () => {
           },
         },
       },
-    };
-    const contract = validateContract<Contract<SqlStorage>>(contractInput);
+    });
+    const contract = validateContract<Contract<SqlStorage>>(input);
     const fk = contract.storage.tables['post']?.foreignKeys[0];
     expect(fk?.constraint).toBe(false);
     expect(fk?.index).toBe(true);

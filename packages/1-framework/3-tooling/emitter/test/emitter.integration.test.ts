@@ -136,10 +136,10 @@ describe('emitter integration', () => {
         schemaVersion: '1',
         targetFamily: 'sql',
         target: 'postgres',
-        storageHash: result.storageHash,
         profileHash: expect.stringMatching(/^sha256:/),
         roots: {},
         storage: {
+          storageHash: result.storageHash,
           tables: {
             user: expect.anything(),
           },
