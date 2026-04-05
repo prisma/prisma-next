@@ -2,7 +2,6 @@
   "schemaVersion": "1",
   "target": "postgres",
   "targetFamily": "sql",
-  "storageHash": "sha256:test-core",
   "profileHash": "sha256:test-profile",
   "models": {
     "User": {
@@ -23,6 +22,7 @@
     }
   },
   "storage": {
+    "storageHash": "sha256:test-core",
     "tables": {
       "user": {
         "columns": {

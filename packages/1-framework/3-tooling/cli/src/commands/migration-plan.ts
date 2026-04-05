@@ -144,7 +144,9 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  const rawStorageHash = (toContractJson as { readonly storageHash?: unknown }).storageHash;
+  const rawStorage = (toContractJson as { readonly storage?: { readonly storageHash?: unknown } })
+    .storage;
+  const rawStorageHash = rawStorage?.storageHash;
   if (typeof rawStorageHash !== 'string') {
     return notOk(
       errorContractValidationFailed('Contract is missing storageHash', {

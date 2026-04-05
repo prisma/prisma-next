@@ -25,24 +25,34 @@ export type StorageValidator = (contract: Contract) => void;
 const ContractSchema = type({
   target: 'string',
   targetFamily: 'string',
-  roots: 'Record<string, string>',
+  'roots?': 'Record<string, string>',
   models: 'Record<string, unknown>',
   storage: 'Record<string, unknown>',
-  capabilities: 'Record<string, Record<string, boolean>>',
-  extensionPacks: 'Record<string, unknown>',
-  meta: 'Record<string, unknown>',
+  'capabilities?': 'Record<string, Record<string, boolean>>',
+  'extensionPacks?': 'Record<string, unknown>',
+  'meta?': 'Record<string, unknown>',
   'execution?': {
     'executionHash?': 'string',
     mutations: {
       defaults: 'unknown[]',
     },
   },
-  profileHash: 'string',
+  'profileHash?': 'string',
 });
 
 function stripPersistenceFields(raw: Record<string, unknown>): Record<string, unknown> {
   const { schemaVersion: _, sources: _s, _generated: _g, ...rest } = raw;
   return rest;
+}
+
+function applyDefaults(contract: Record<string, unknown>): Record<string, unknown> {
+  return {
+    roots: {},
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    ...contract,
+  };
 }
 
 function extractDomainShape(contract: Contract): DomainContractShape {
@@ -90,7 +100,7 @@ export function validateContract<TContract extends Contract>(
     );
   }
 
-  const contract = parsed as unknown as Contract;
+  const contract = applyDefaults(parsed as Record<string, unknown>) as unknown as Contract;
 
   validateContractDomain(extractDomainShape(contract));
 

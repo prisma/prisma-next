@@ -2,9 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:a8e346a1ffdc9dd12a1ba3d608b937211020d653d63303406ea6a12ed10bbf0b",
-  "executionHash": "sha256:23bba103a8fb84e1d1a1268044dff596d77f98ca17cd6d076a7ee64eee818462",
-  "profileHash": "sha256:dac42ff24bf5238eef80f2fd845d34eab8e6381ddafc571bed5e4af1ea61b9b8",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
     "user": "User"
   },
@@ -12,7 +10,8 @@
     "User": {
       "fields": {
         "id": {
-          "codecId": "sql/char@1"
+          "codecId": "sql/char@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -27,12 +26,14 @@
     }
   },
   "storage": {
+    "storageHash": "sha256:0acd0f5d8fc3ab17ba6af57ac1bb623275b40a7dbb40caecf6536cdedef51ee0",
     "tables": {
       "user": {
         "columns": {
           "id": {
             "codecId": "sql/char@1",
             "nativeType": "character",
+            "nullable": false,
             "typeParams": {
               "length": 24
             }
@@ -48,6 +49,7 @@
     }
   },
   "execution": {
+    "executionHash": "sha256:e5986419d0cb43d7ff5fcd302ff1eec9953be526fe5b7cb7d19d57e463d77be4",
     "mutations": {
       "defaults": [
         {

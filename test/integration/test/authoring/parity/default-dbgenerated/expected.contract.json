@@ -2,8 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:aa58034fd4afc7dc8adcec9ed0e87c02bd890455e9e9b9634b37c085539a4c8c",
-  "profileHash": "sha256:dac42ff24bf5238eef80f2fd845d34eab8e6381ddafc571bed5e4af1ea61b9b8",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
     "user": "User"
   },
@@ -11,7 +10,8 @@
     "User": {
       "fields": {
         "id": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -26,6 +26,7 @@
     }
   },
   "storage": {
+    "storageHash": "sha256:d8a431ca5d4e2d1dc2f339fb4f1712889bd6a65cb59a500a217dea2bf548cf37",
     "tables": {
       "user": {
         "columns": {
@@ -35,7 +36,8 @@
               "expression": "gen_random_uuid()",
               "kind": "function"
             },
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           }
         },
         "foreignKeys": [],
