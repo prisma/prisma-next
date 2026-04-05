@@ -111,13 +111,10 @@ flowchart TD
 
 - **`@prisma-next/contract`**: Core contract types
 - **`@prisma-next/operations`**: Operation registry used by schema builders
-- **`@prisma-next/plan`**: Plan error helpers (`planInvalid`, `planUnsupported`) and `RuntimeError` type
 - **`@prisma-next/sql-contract`**: SQL contract types (via `@prisma-next/sql-contract/types`)
 - **`arktype`**: Parameter schema typing for codec definitions
 
 **Note**: This package does not depend on specific adapters (e.g., `@prisma-next/adapter-postgres`). Test fixtures define `CodecTypes` inline to remain adapter-agnostic and avoid cyclic dependencies.
-
-**Note**: Error helpers (`planInvalid`, `planUnsupported`) and the `RuntimeError` type are imported from `@prisma-next/plan` (core ring) rather than being defined locally. This ensures target-agnostic error handling.
 
 ## Package Structure
 
@@ -129,7 +126,7 @@ This package follows the standard `exports/` directory pattern:
 - `src/exports/operations-registry.ts` - Re-exports operations registry
 - `src/exports/plan.ts` - Re-exports plan types and helpers
 - `src/exports/ast.ts` - Re-exports SQL AST types
-- `src/exports/errors.ts` - Re-exports error helpers (from `@prisma-next/plan`)
+- `src/exports/errors.ts` - Re-exports error helpers (`planInvalid`, `planUnsupported`)
 - `src/index.ts` - Main entry point that re-exports from `exports/`
 
 This enables subpath imports like `@prisma-next/sql-relational-core/schema`, `@prisma-next/sql-relational-core/param`, `@prisma-next/sql-relational-core/plan`, etc.

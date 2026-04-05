@@ -1,4 +1,4 @@
-import { planInvalid } from '@prisma-next/plan';
+import { planInvalid } from '../errors';
 import type { AnyColumnBuilder, JoinOnBuilder, JoinOnPredicate } from '../types';
 import { isColumnBuilder } from '../types';
 import { EqColJoinOn, JoinAst } from './types';
