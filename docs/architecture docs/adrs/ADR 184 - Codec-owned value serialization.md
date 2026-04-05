@@ -1,112 +1,84 @@
 # ADR 184 — Codec-owned value serialization
 
-## At a glance
+## The problem
 
-Typed values appear throughout the contract in several places: column defaults, discriminator values, type parameters. Each value has a codec ID available from context — the column's `codecId`, the discriminator field's `codecId`, etc. The codec that owns that ID is responsible for converting the value between every representation the system uses.
+A Postgres column with type `int8` stores 64-bit integers. In JavaScript, these are `bigint` values. But JSON has no `bigint` type — so when a `bigint` value appears in the contract (as a column default, say), the system must convert it to something JSON-safe, and convert it back when the contract is loaded.
 
-Today, the system hardcodes conversion logic for `bigint` and `Date` across five pipeline stages. This ADR replaces those hardcoded branches with codec-dispatched serialization: the codec owns all representations of its values.
+Today, adding support for one non-JSON-safe type means touching six places:
 
-```ts
-// Column default for a bigint column — the codec ID is on the column
-{
-  "codecId": "pg/int8@1",
-  "default": { "kind": "literal", "value": "42" }
-}
-// The pg/int8@1 codec knows:
-//   "42" (JSON string) ↔ 42n (runtime bigint) ↔ 42 (DDL literal) ↔ 42 (PSL literal)
-
-// Discriminator value — the codec ID is on the discriminator field
-{
-  "discriminator": { "field": "type" },
-  "variants": { "Bug": { "value": "bug" } }
-}
-// The pg/text@1 codec knows:
-//   "bug" (JSON string) ↔ "bug" (runtime string) ↔ 'bug' (DDL literal) ↔ "bug" (PSL literal)
+```
+Authoring:    encodeDefaultLiteralValue()   — if bigint, wrap in { $type: 'bigint', value: '42' }
+Emission:     bigintJsonReplacer()          — if bigint, convert to tagged object
+Validation:   decodeContractDefaults()      — if tagged bigint on bigint column, BigInt(value)
+.d.ts gen:    serializeValue()              — if bigint, emit ${value}n
+              DefaultLiteralValue<>         — if output extends Date | bigint, use output type
+Migration:    renderDefaultLiteral()        — if bigint, render as numeric literal
 ```
 
-No tags. No `$type` wrappers. The codec ID from context tells you which codec to ask; the codec handles the rest.
+Every branch says "if bigint" or "if Date." To add a third type (binary data, a custom decimal, an extension type with non-JSON-safe precision), you'd copy the same pattern across all six places.
 
-## Context
+This problem isn't limited to column defaults. Discriminator values (the `"value": "bug"` in a polymorphic model's `variants` section) are the same problem: a typed value in the contract JSON that needs to be converted to a runtime value, rendered to DDL, and parsed from PSL. So are temporary defaults that the migration planner generates for NOT NULL columns. Any place a typed value appears in the contract hits the same boundary.
 
-The contract is a JSON artifact. JSON natively represents strings, numbers, booleans, null, objects, and arrays. Some runtime types used in the system — `bigint`, `Date`, binary data — have no JSON representation.
-
-When these values appear in the contract (as column defaults, discriminator values, or type parameters), they must be encoded into JSON for the contract artifact and decoded back to runtime values when the contract is loaded. They must also be rendered to DDL for migration planning, and parsed/rendered in PSL for schema authoring.
-
-ADR 167 introduced a typed default literal pipeline for column defaults, handling `bigint` and `Date` as hardcoded special cases with a tagged type system (`{ $type: 'bigint', value: '42' }`). It outlined a deferred "v2" codec-keyed SPI for extensibility.
-
-Since then, two things have changed:
-
-1. **Discriminator values** need the same treatment. The contract stores discriminator values as JSON strings, but the discriminator field has a `codecId` that determines the runtime type. This is the second instance of the problem, and it blocks polymorphism support in the emitter (Phase 1.75 of the ORM consolidation plan).
-
-2. **The tagged type system is unnecessary.** Values in the contract always appear in a context that supplies the codec ID — columns have `codecId`, discriminator fields have `codecId`. The consumer doesn't need self-describing tags on the values; it can ask the codec identified by context to decode the value. This eliminates the entire tag protocol (`TaggedBigInt`, `isTaggedBigInt`, `TaggedRaw`, `bigintJsonReplacer`) and the `$type` collision guard.
-
-## Problem
-
-Typed literal values must survive four serialization boundaries:
-
-| Boundary | Used by | Example: `pg/int8@1`, value `42n` |
-|---|---|---|
-| **Wire** (DB protocol) | Runtime | `42n` ↔ Postgres int8 wire bytes |
-| **Contract JSON** | Emitter, validator, contract consumers | `42n` ↔ `"42"` (JSON string) |
-| **DDL** | Migration planner | `42n` → `42` (SQL numeric literal in `DEFAULT 42`) |
-| **PSL** | PSL parser/printer | `42n` ↔ `42` (PSL source literal) |
-
-Today, wire encoding/decoding is codec-dispatched (the `encode`/`decode` methods on the `Codec` interface). The other three boundaries use hardcoded branches that check for `bigint` and `Date` across multiple pipeline stages:
-
-- `encodeDefaultLiteralValue` (authoring) — hardcoded `bigint` → tagged object, `Date` → ISO string
-- `bigintJsonReplacer` (emission) — hardcoded `bigint` → tagged JSON
-- `decodeContractDefaults` (validation) — hardcoded tagged bigint → `BigInt()`, gated by `isBigIntColumn`
-- `renderDefaultLiteral` (migration) — hardcoded branches for bigint, Date, JSON
-- `serializeValue` (emitter `.d.ts` generation) — hardcoded `bigint` → `${value}n`
-- `DefaultLiteralValue` (emitted `.d.ts`) — hardcoded `O extends Date | bigint ? O : Encoded`
-
-Every new non-JSON-safe type would require changes across all of these. Discriminator values add a second instance of the problem that cannot reuse the column-default pipeline because it's specifically about column defaults, not about "typed values in the contract."
-
-## Constraints
-
-1. **The codec ID is always available from context.** Column defaults have the column's `codecId`. Discriminator values have the discriminator field's `codecId`. Type parameters have the column's `codecId`. There is no case where a typed value appears in the contract without a codec ID in scope.
-
-2. **Contract JSON must be valid JSON.** Values that aren't natively JSON-representable (bigint, Date, binary) must be encoded to JSON-safe representations. The codec decides the encoding.
-
-3. **Most codecs don't need custom serialization.** String, number, boolean, and null are already JSON-safe, DDL-safe, and PSL-safe. Only codecs for non-JSON-safe types need to implement custom methods. The default behavior is identity/passthrough.
-
-4. **DDL and PSL are target-specific and authoring-specific respectively.** Wire and contract JSON are universal (every codec needs them). DDL rendering is a migration concern. PSL parsing/rendering is an authoring concern. These should not all live on a single interface.
-
-5. **The stack provides codecs.** Contract decoding needs the full composition stack (family + target + extension packs) to resolve codec IDs to implementations. Literal values in the contract are a black box without the stack.
+The system already has a mechanism for type-specific behavior: **codecs**. Each codec has an ID (like `pg/int8@1`) and owns encode/decode methods for the database wire protocol. But today, codecs only handle one serialization boundary (wire). The other boundaries are handled by hardcoded branches in unrelated code.
 
 ## Decision
 
-### Codec-dispatched serialization replaces hardcoded branches
+**The codec that owns a type is responsible for converting its values across all serialization boundaries.** Instead of scattering "if bigint" checks across the codebase, each boundary asks the codec: "serialize this value for your medium."
 
-The codec that owns a type ID is responsible for converting values between all representations. Instead of the system hardcoding "if bigint, do X; if Date, do Y" across five stages, each stage asks the codec: "encode this value for your medium."
+### The key insight: codec ID is always available from context
 
-### Three interfaces at different layers
+Every place a typed value appears in the contract, a codec ID is in scope:
 
-The four serialization boundaries split into three interfaces, because wire and contract JSON are universal while DDL and PSL are layer-specific:
+- A column default? The column has `codecId: 'pg/int8@1'`.
+- A discriminator value? The discriminator field has a `codecId`.
+- A type parameter? The column has `codecId`.
+- A migration temporary default? The planner knows the column's `codecId`.
 
-**1. Core codec interface (wire + contract JSON) — universal**
+The consumer doesn't need the value to be self-describing (no `$type` tags). It looks up the codec by ID and asks it to decode the value. This eliminates the entire tagged type system.
 
-Every codec already has `encode`/`decode` for wire serialization. Two new methods handle contract JSON:
+### Four boundaries, three interfaces
+
+A typed value passes through up to four serialization boundaries during its lifetime:
+
+| Boundary | When | Example: `pg/int8@1`, value `42n` |
+|---|---|---|
+| **Contract JSON** | Emitting and loading the contract artifact | `42n` ↔ `"42"` (JSON string) |
+| **Wire** (DB protocol) | Query execution | `42n` ↔ Postgres int8 wire bytes |
+| **DDL** | Migration planning and schema verification | `42n` → `42` (SQL literal in `DEFAULT 42`) |
+| **PSL** | Schema authoring in Prisma Schema Language | `42n` ↔ `42` (PSL source text) |
+
+These four boundaries split into three interfaces because they have different scope:
+
+**1. Core codec interface — extended with contract JSON methods**
+
+Wire and contract JSON are universal: every codec must handle both. Two optional methods are added to the existing `Codec` interface:
 
 ```ts
 interface Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
-  // ... existing wire methods ...
+  // existing wire methods
   encode?(value: TJs): TWire;
   decode?(wire: TWire): TJs;
 
-  // Contract JSON serialization
+  // new: contract JSON serialization
   toContractJson?(value: TJs): JsonValue;
   fromContractJson?(json: JsonValue): TJs;
 }
 ```
 
-When `toContractJson`/`fromContractJson` are not provided, the value is assumed to be JSON-safe and passes through unchanged. Only codecs for non-JSON-safe types (`bigint`, `Date`, binary, etc.) need to implement these.
+When omitted, values pass through unchanged — which is correct for JSON-safe types (strings, numbers, booleans). Only codecs for non-JSON-safe types need to implement these:
 
-Example: `pg/int8@1` would provide `toContractJson: (v: bigint) => v.toString()` and `fromContractJson: (j: JsonValue) => BigInt(j as string)`.
+```ts
+const pgInt8Codec = codec({
+  typeId: 'pg/int8@1',
+  // ...existing wire encode/decode...
+  toContractJson: (value: bigint) => value.toString(),
+  fromContractJson: (json: JsonValue) => BigInt(json as string),
+});
+```
 
 **2. DDL literal interface — migration layer**
 
-Codecs that can appear as DDL literals (column defaults, partial index conditions) contribute a rendering function. This is target-specific — Postgres DDL syntax differs from MongoDB command syntax.
+DDL rendering is a migration-specific, target-specific concern. Not every codec needs it (only those whose values appear in column defaults, partial index conditions, or migration operations). Contributed through the target or adapter descriptor, keyed by codec ID:
 
 ```ts
 interface DdlLiteralCodec<TJs = unknown> {
@@ -115,11 +87,11 @@ interface DdlLiteralCodec<TJs = unknown> {
 }
 ```
 
-Contributed through the target or adapter descriptor, keyed by codec ID. The migration planner looks up the DDL codec for a column's `codecId` and calls `renderDdl` to produce the DDL literal. `parseDdl` supports schema verification — parsing a raw database default string back to a runtime value for comparison.
+The migration planner calls `renderDdl` to produce DDL literals (`DEFAULT 42`). `parseDdl` supports schema verification — parsing a raw database default string back to a runtime value for comparison.
 
 **3. PSL literal interface — authoring layer**
 
-Codecs that support PSL literal syntax contribute parse/render functions. PSL's grammar constrains what literal syntax is possible — not every codec can have a PSL literal representation.
+PSL is an authoring-specific concern. PSL's grammar constrains what literal syntax is possible — not every codec can have a PSL literal representation. Contributed through the authoring layer, keyed by codec ID:
 
 ```ts
 interface PslLiteralCodec<TJs = unknown> {
@@ -128,70 +100,80 @@ interface PslLiteralCodec<TJs = unknown> {
 }
 ```
 
-Contributed through the authoring layer, keyed by codec ID. The PSL printer calls `renderPsl` to emit a literal; the PSL parser calls `parsePsl` to interpret one.
+### End-to-end: a bigint column default
 
-### Dispatch by codec ID from context
+Here's how a bigint column default flows through the system after this change:
 
-Every place a typed value appears in the contract, the codec ID is available from context:
+1. **TS authoring**: The developer writes `default: { kind: 'literal', value: 42n }`. The authoring layer looks up the `pg/int8@1` codec and calls `codec.toContractJson(42n)` → `"42"`.
 
-| Value location | Codec ID source |
-|---|---|
-| Column default | `column.codecId` |
-| Discriminator value | `model.fields[discriminator.field].codecId` |
-| Type parameters | `column.codecId` |
+2. **Contract JSON**: The emitted `contract.json` contains `{ "kind": "literal", "value": "42" }`. No tags, no `$type` — just a plain JSON string.
 
-The pipeline stages become codec-dispatched:
+3. **Contract loading**: The validator looks up `pg/int8@1` from the stack and calls `codec.fromContractJson("42")` → `42n`. The runtime now has a proper `bigint`.
 
-1. **Authoring**: `codec.toContractJson(runtimeValue)` → JSON-safe value for the contract
-2. **Emission**: values are already JSON-safe; no special handling needed
-3. **Validation/loading**: `codec.fromContractJson(jsonValue)` → runtime value, using the codec ID from context
-4. **Migration rendering**: `ddlCodec.renderDdl(runtimeValue)` → DDL literal
-5. **PSL**: `pslCodec.renderPsl(runtimeValue)` / `pslCodec.parsePsl(text)` → runtime value
+4. **DDL rendering**: The migration planner needs `DEFAULT 42` in a `CREATE TABLE` statement. It looks up the DDL codec for `pg/int8@1` and calls `ddlCodec.renderDdl(42n)` → `"42"`.
 
-### No tags in contract JSON
+5. **PSL rendering**: The PSL printer needs to emit `@default(42)`. It looks up the PSL codec for `pg/int8@1` and calls `pslCodec.renderPsl(42n)` → `"42"`.
 
-Values in the contract are plain JSON. No `$type` wrappers, no `TaggedBigInt`, no collision guards. A bigint column default is stored as:
+For a string value (`pg/text@1`), none of this is needed — strings are JSON-safe, DDL-safe, and PSL-safe. The codec omits `toContractJson`/`fromContractJson`, and the value passes through unchanged.
 
-```json
-{ "kind": "literal", "value": "42" }
-```
+### Migration operations
 
-The consumer knows this is a bigint because the column's `codecId` is `pg/int8@1`, and that codec's `fromContractJson` converts `"42"` to `42n`. The value doesn't need to be self-describing.
+Migration operations (in `ops.json`) also contain typed values — for example, a `SetColumnDefault` operation carries a literal value, and the planner generates temporary defaults for NOT NULL columns. These values need the same treatment. Whether the serialization boundary for `ops.json` is contract JSON (the operations are JSON artifacts) or DDL (the values are rendered into target-specific commands) depends on how the runner processes them. Either way, the codec provides the conversion — the dispatch mechanism is the same.
 
-### What gets deleted
+### What this eliminates
 
-- `TaggedBigInt`, `isTaggedBigInt`, `bigintJsonReplacer` — replaced by `codec.toContractJson`
-- `TaggedRaw`, `isTaggedRaw` — no longer needed (no tags to collide with)
-- `TaggedLiteralValue`, `ColumnDefaultLiteralValue` type — replaced by `JsonValue`
-- `encodeDefaultLiteralValue` — replaced by `codec.toContractJson`
-- `decodeContractDefaults` with `isBigIntColumn` heuristic — replaced by `codec.fromContractJson`
-- `DefaultLiteralValue<CodecId, Encoded>` in emitted `.d.ts` — the codec type map already knows the output type
-- Hardcoded bigint/Date branches in `renderDefaultLiteral`, `serializeValue`, `normalizeLiteralValue`
+Today's hardcoded infrastructure collapses into codec methods:
+
+- `TaggedBigInt`, `isTaggedBigInt`, `bigintJsonReplacer`, `TaggedRaw`, `isTaggedRaw` → gone (no tags)
+- `encodeDefaultLiteralValue` → `codec.toContractJson()`
+- `decodeContractDefaults` with `isBigIntColumn` heuristic → `codec.fromContractJson()`
+- `DefaultLiteralValue<CodecId, Encoded>` in emitted `.d.ts` → the codec type map already knows the output type
+- Hardcoded bigint/Date branches in `renderDefaultLiteral`, `serializeValue`, `normalizeLiteralValue` → `ddlCodec.renderDdl()`
 
 ## Consequences
 
 ### Benefits
 
-- **Extensible without core changes.** A new extension codec (e.g., pgvector with non-JSON-safe precision, a binary codec, a custom decimal type) provides its own `toContractJson`/`fromContractJson` and optionally DDL/PSL methods. No changes to shared types, validation, or rendering logic.
-- **Discriminator values work naturally.** A discriminator value is just a value of the discriminator field's codec type — no special encoding logic. The emitter calls `codec.toContractJson(discriminatorValue)` and the runtime calls `codec.fromContractJson(jsonValue)`.
-- **Simpler contract JSON.** No `$type` tags, no collision guards, no special JSON replacer. Values are plain JSON, interpreted through context.
-- **Separation of concerns.** Wire serialization, contract JSON serialization, DDL rendering, and PSL handling are separate interfaces at appropriate layers. A codec can participate in some without implementing all.
+- **Extensible without core changes.** A new codec provides `toContractJson`/`fromContractJson` and optionally DDL/PSL methods. No changes to shared types, validation, or rendering logic.
+- **Discriminator values work naturally.** A discriminator value is just a value of the discriminator field's codec type. The emitter calls `codec.toContractJson()`; the runtime calls `codec.fromContractJson()`. No special "discriminator value encoding" logic.
+- **Simpler contract JSON.** No `$type` tags, no collision guards, no special JSON replacer. Values are plain JSON, interpreted through the codec ID from context.
+- **Separation of concerns.** Each interface lives at the layer that needs it. A codec can ship with just wire + contract JSON support, and DDL/PSL support can be added later.
 
 ### Costs
 
-- **Contract decoding requires the stack.** You cannot decode typed literal values from a contract without the codec implementations from the stack. This is already true in practice — the validator needs the stack to interpret codec IDs — but it becomes explicit.
-- **Migration from tagged values.** Existing contracts with `{ $type: 'bigint', value: '42' }` need a migration path. The validator can accept both the old tagged format and the new untagged format during a transition period.
+- **Contract decoding requires the stack.** Typed literal values in the contract are a black box without codec implementations from the composition stack (family + target + extension packs). This is already true — the validator needs the stack to interpret codec IDs — but it becomes explicit.
+- **Migration from tagged values.** Existing contracts with `{ $type: 'bigint', value: '42' }` need a transition path. The validator can accept both formats during the transition.
 
-### Supersedes
+## Alternatives considered
 
-- **ADR 167 v2 (deferred codec-keyed SPI)** — this ADR implements and generalizes the outline from ADR 167. The v1 hardcoded pipeline from ADR 167 is replaced.
+### Keep tags, make them extensible
 
-### Resolves
+ADR 167 outlined a "v2" design where extension packs register namespaced `$type` tags (e.g., `{ $type: 'pgvector/vector', value: [1.0, 2.0] }`). Values would be self-describing, and a tag registry would handle encode/decode.
 
-- **ADR 173 open question: "Discriminator values are untyped strings."** Discriminator values are encoded/decoded through the discriminator field's codec, using the same mechanism as column defaults. The open question is resolved.
+Rejected because the codec ID is always available from context. Tags duplicate information that's already in scope, and they complicate the contract JSON with a tag protocol (collision guards, the `$type: 'raw'` escape hatch) that serves no purpose when the consumer can just ask the codec.
+
+### Single codec interface with all four boundaries
+
+Put `toContractJson`, `fromContractJson`, `renderDdl`, `parseDdl`, `renderPsl`, `parsePsl` all on the `Codec` interface.
+
+Rejected because DDL and PSL are layer-specific concerns. DDL rendering is target-specific (Postgres vs MongoDB syntax) and only needed in the migration layer. PSL handling is authoring-specific and constrained by PSL's grammar. Forcing every codec to implement all six methods mixes concerns from different layers and creates dependencies between layers that should be independent. A codec can ship without DDL or PSL support; those can be added by the target or authoring layer as needed.
+
+### Separate `DefaultLiteralCodec` interface (ADR 167 v2 outline)
+
+ADR 167 proposed a standalone `DefaultLiteralCodec` interface, separate from the `Codec` interface, with `encode`, `decode`, `render`, and `normalize` methods.
+
+Rejected because this is not a separate kind of codec — it's an extension of codec responsibilities. The codec already owns the type; value serialization is part of what owning a type means. Creating a parallel interface keyed by the same codec ID adds indirection without benefit.
+
+## Supersedes
+
+- **ADR 167 v2** (deferred codec-keyed `DefaultLiteralCodec` SPI) — this ADR implements and generalizes the concept. The v1 hardcoded pipeline is replaced.
+
+## Resolves
+
+- **ADR 173 open question: "Discriminator values are untyped strings."** Discriminator values are encoded/decoded through the discriminator field's codec. The open question is resolved.
 
 ## Related
 
-- [ADR 167 — Typed default literal pipeline and extensibility](ADR%20167%20-%20Typed%20default%20literal%20pipeline%20and%20extensibility.md) — the v1 design this ADR supersedes
-- [ADR 170 — Codec trait system](ADR%20170%20-%20Codec%20trait%20system.md) — the trait system on the `Codec` interface that this extends
+- [ADR 167 — Typed default literal pipeline and extensibility](ADR%20167%20-%20Typed%20default%20literal%20pipeline%20and%20extensibility.md) — the v1 design this supersedes
+- [ADR 170 — Codec trait system](ADR%20170%20-%20Codec%20trait%20system.md) — the trait system on the `Codec` interface
 - [ADR 173 — Polymorphism via discriminator and variants](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) — discriminator values are a motivating instance of this problem
