@@ -1,4 +1,4 @@
-import { validateMongoContract } from '@prisma-next/mongo-core';
+import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { MongoFieldFilter } from '@prisma-next/mongo-query-ast';
 import { expect, expectTypeOf, it } from 'vitest';
