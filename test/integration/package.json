@@ -42,7 +42,7 @@
     "@prisma-next/adapter-mongo": "workspace:*",
     "@prisma-next/driver-mongo": "workspace:*",
     "@prisma-next/family-mongo": "workspace:*",
-    "@prisma-next/mongo-core": "workspace:*",
+    "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-orm": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/mongo-runtime": "workspace:*",

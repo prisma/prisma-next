@@ -36,11 +36,6 @@ describe('mongoTargetDescriptor', () => {
     expect(mongoTargetDescriptor.id).toBe('mongo');
     expect(mongoTargetDescriptor.familyId).toBe('mongo');
     expect(mongoTargetDescriptor.targetId).toBe('mongo');
-    expect(mongoTargetDescriptor.types.codecTypes.import).toEqual({
-      package: '@prisma-next/mongo-core/codec-types',
-      named: 'CodecTypes',
-      alias: 'MongoCodecTypes',
-    });
   });
 });
 

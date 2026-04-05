@@ -31,7 +31,6 @@ packages/2-mongo-family/
   │  │  contract-schema.ts                  Arktype structural schemas
   │  │  validate-mongo-contract.ts          Validation entry point + indices
   │  │  validate-storage.ts                 Storage-specific validation rules
-  │  │  validate-domain.ts                  Re-export of framework domain validation
   │  │
   │  mongo-codec/                         @prisma-next/mongo-codec
   │  │  codecs.ts                           MongoCodec interface, mongoCodec() factory, trait types
@@ -52,7 +51,7 @@ packages/2-mongo-family/
   │  mongo-query-ast/                     @prisma-next/mongo-query-ast
   │                                       AST nodes, filter expressions, read stages,
   │                                       command classes, visitors, MongoReadPlan,
-  │                                       MongoQueryPlan (unified), MongoQueryExecutor i/f
+  │                                       MongoQueryPlan (unified)
 
   5-query-builders/                     LAYER: query-builders
   │  mongo-orm/                           @prisma-next/mongo-orm
@@ -107,11 +106,9 @@ The transport layer splits into two packages, separating data structures from be
 | Result types | `1-core` | `6-transport/mongo-wire` | Driver output types |
 | `MongoQueryPlanLike` shim | `1-core` | **deleted** | Exists only because adapter can't see real AST types from layer 1; once the adapter interface moves to `transport` (above `query`), it can import `MongoQueryPlan` directly |
 
-## What moves from ORM
+## What stays in ORM
 
-| Item | From | To | Rationale |
-|---|---|---|---|
-| `MongoQueryExecutor` interface | `5-query-builders/mongo-orm` | `4-query/mongo-query-ast` | ORM consumes it, runtime implements it; defined in terms of plan types |
+`MongoQueryExecutor` stays in `mongo-orm` (query-builders layer). The ORM defines the interface it depends on; the runtime structurally satisfies it. This follows dependency inversion — no move needed.
 
 ## Unified query plan
 

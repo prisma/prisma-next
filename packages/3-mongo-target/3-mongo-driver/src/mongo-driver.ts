@@ -1,3 +1,4 @@
+import type { MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
   AggregateWireCommand,
   AnyMongoWireCommand,
@@ -11,12 +12,11 @@ import type {
   InsertManyWireCommand,
   InsertOneResult,
   InsertOneWireCommand,
-  MongoDriver,
   UpdateManyResult,
   UpdateManyWireCommand,
   UpdateOneResult,
   UpdateOneWireCommand,
-} from '@prisma-next/mongo-core';
+} from '@prisma-next/mongo-wire';
 import { type Db, MongoClient } from 'mongodb';
 
 class MongoDriverImpl implements MongoDriver {

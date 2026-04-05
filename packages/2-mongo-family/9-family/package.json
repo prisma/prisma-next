@@ -15,7 +15,7 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
-    "@prisma-next/mongo-core": "workspace:*",
+    "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/target-mongo": "workspace:*",
     "@prisma-next/mongo-emitter": "workspace:*"
   },

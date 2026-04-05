@@ -103,18 +103,18 @@ importers:
       '@prisma-next/driver-mongo':
         specifier: workspace:*
         version: link:../../packages/3-mongo-target/3-mongo-driver
-      '@prisma-next/mongo-core':
+      '@prisma-next/mongo-contract':
         specifier: workspace:*
-        version: link:../../packages/2-mongo-family/1-core
+        version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
       '@prisma-next/mongo-orm':
         specifier: workspace:*
-        version: link:../../packages/2-mongo-family/4-orm
+        version: link:../../packages/2-mongo-family/5-query-builders
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
-        version: link:../../packages/2-mongo-family/2-query/query-ast
+        version: link:../../packages/2-mongo-family/4-query/query-ast
       '@prisma-next/mongo-runtime':
         specifier: workspace:*
-        version: link:../../packages/2-mongo-family/5-runtime
+        version: link:../../packages/2-mongo-family/7-runtime
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
@@ -888,24 +888,63 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/2-mongo-family/1-core:
+  packages/2-mongo-family/1-foundation/mongo-codec:
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../../test/utils
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/2-mongo-family/1-foundation/mongo-contract:
     dependencies:
       '@prisma-next/contract':
         specifier: workspace:*
-        version: link:../../1-framework/0-foundation/shared/contract
+        version: link:../../../1-framework/0-foundation/shared/contract
       arktype:
         specifier: 'catalog:'
         version: 2.1.29
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
-        version: link:../../../test/utils
+        version: link:../../../../test/utils
       '@prisma-next/tsconfig':
         specifier: workspace:*
-        version: link:../../0-config/tsconfig
+        version: link:../../../0-config/tsconfig
       '@prisma-next/tsdown':
         specifier: workspace:*
-        version: link:../../0-config/tsdown
+        version: link:../../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/2-mongo-family/1-foundation/mongo-value:
+    devDependencies:
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
@@ -950,34 +989,6 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/2-mongo-family/2-query/query-ast:
-    dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../../1-framework/0-foundation/shared/contract
-      '@prisma-next/mongo-core':
-        specifier: workspace:*
-        version: link:../../1-core
-    devDependencies:
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../../../../test/utils
-      '@prisma-next/tsconfig':
-        specifier: workspace:*
-        version: link:../../../0-config/tsconfig
-      '@prisma-next/tsdown':
-        specifier: workspace:*
-        version: link:../../../0-config/tsdown
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.18.4(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
-
   packages/2-mongo-family/3-tooling/emitter:
     dependencies:
       '@prisma-next/contract':
@@ -989,9 +1000,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/shared/framework-components
-      '@prisma-next/mongo-core':
+      '@prisma-next/mongo-contract':
         specifier: workspace:*
-        version: link:../../1-core
+        version: link:../../1-foundation/mongo-contract
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -1012,17 +1023,48 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/2-mongo-family/4-orm:
+  packages/2-mongo-family/4-query/query-ast:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../../1-framework/0-foundation/shared/contract
+      '@prisma-next/mongo-value':
+        specifier: workspace:*
+        version: link:../../1-foundation/mongo-value
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../../test/utils
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/2-mongo-family/5-query-builders:
     dependencies:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/shared/contract
-      '@prisma-next/mongo-core':
+      '@prisma-next/mongo-contract':
         specifier: workspace:*
-        version: link:../1-core
+        version: link:../1-foundation/mongo-contract
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
-        version: link:../2-query/query-ast
+        version: link:../4-query/query-ast
+      '@prisma-next/mongo-value':
+        specifier: workspace:*
+        version: link:../1-foundation/mongo-value
       '@prisma-next/runtime-executor':
         specifier: workspace:*
         version: link:../../1-framework/4-runtime-executor
@@ -1046,17 +1088,64 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/2-mongo-family/5-runtime:
+  packages/2-mongo-family/6-transport/mongo-lowering:
+    dependencies:
+      '@prisma-next/mongo-query-ast':
+        specifier: workspace:*
+        version: link:../../4-query/query-ast
+      '@prisma-next/mongo-wire':
+        specifier: workspace:*
+        version: link:../mongo-wire
+    devDependencies:
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/2-mongo-family/6-transport/mongo-wire:
+    dependencies:
+      '@prisma-next/mongo-value':
+        specifier: workspace:*
+        version: link:../../1-foundation/mongo-value
+    devDependencies:
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/2-mongo-family/7-runtime:
     dependencies:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/shared/contract
-      '@prisma-next/mongo-core':
+      '@prisma-next/mongo-lowering':
         specifier: workspace:*
-        version: link:../1-core
+        version: link:../6-transport/mongo-lowering
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
-        version: link:../2-query/query-ast
+        version: link:../4-query/query-ast
       '@prisma-next/runtime-executor':
         specifier: workspace:*
         version: link:../../1-framework/4-runtime-executor
@@ -1067,6 +1156,12 @@ importers:
       '@prisma-next/driver-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/3-mongo-driver
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../1-foundation/mongo-contract
+      '@prisma-next/mongo-value':
+        specifier: workspace:*
+        version: link:../1-foundation/mongo-value
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
@@ -1103,9 +1198,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/framework-components
-      '@prisma-next/mongo-core':
+      '@prisma-next/mongo-contract':
         specifier: workspace:*
-        version: link:../1-core
+        version: link:../1-foundation/mongo-contract
       '@prisma-next/mongo-emitter':
         specifier: workspace:*
         version: link:../3-tooling/emitter
@@ -1855,10 +1950,6 @@ importers:
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
   packages/3-mongo-target/1-mongo-target:
-    dependencies:
-      '@prisma-next/mongo-core':
-        specifier: workspace:*
-        version: link:../../2-mongo-family/1-core
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
@@ -1881,12 +1972,21 @@ importers:
       '@prisma-next/config':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/config
-      '@prisma-next/mongo-core':
+      '@prisma-next/mongo-codec':
         specifier: workspace:*
-        version: link:../../2-mongo-family/1-core
+        version: link:../../2-mongo-family/1-foundation/mongo-codec
+      '@prisma-next/mongo-lowering':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/6-transport/mongo-lowering
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
-        version: link:../../2-mongo-family/2-query/query-ast
+        version: link:../../2-mongo-family/4-query/query-ast
+      '@prisma-next/mongo-value':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/1-foundation/mongo-value
+      '@prisma-next/mongo-wire':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/6-transport/mongo-wire
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/operations
@@ -1918,9 +2018,12 @@ importers:
 
   packages/3-mongo-target/3-mongo-driver:
     dependencies:
-      '@prisma-next/mongo-core':
+      '@prisma-next/mongo-lowering':
         specifier: workspace:*
-        version: link:../../2-mongo-family/1-core
+        version: link:../../2-mongo-family/6-transport/mongo-lowering
+      '@prisma-next/mongo-wire':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/6-transport/mongo-wire
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
@@ -2271,18 +2374,18 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/migration
-      '@prisma-next/mongo-core':
+      '@prisma-next/mongo-contract':
         specifier: workspace:*
-        version: link:../../packages/2-mongo-family/1-core
+        version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
       '@prisma-next/mongo-orm':
         specifier: workspace:*
-        version: link:../../packages/2-mongo-family/4-orm
+        version: link:../../packages/2-mongo-family/5-query-builders
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
-        version: link:../../packages/2-mongo-family/2-query/query-ast
+        version: link:../../packages/2-mongo-family/4-query/query-ast
       '@prisma-next/mongo-runtime':
         specifier: workspace:*
-        version: link:../../packages/2-mongo-family/5-runtime
+        version: link:../../packages/2-mongo-family/7-runtime
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/shared/operations

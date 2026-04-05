@@ -1,12 +1,12 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Contract } from '@prisma-next/contract/types';
-import ormContractJson from '../../../1-core/test/fixtures/orm-contract.json';
+import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { mongoTargetFamilyHook } from '../src/index';
 
 const codecImports = [
   {
-    package: '@prisma-next/mongo-core/codec-types',
+    package: '@prisma-next/adapter-mongo/codec-types',
     named: 'CodecTypes',
     alias: 'MongoCodecTypes',
   },
@@ -33,7 +33,10 @@ const hashes = {
 const output = mongoTargetFamilyHook.generateContractTypes(contract, codecImports, [], hashes);
 
 const targets = [
-  resolve(import.meta.dirname, '../../../1-core/test/fixtures/orm-contract.d.ts'),
+  resolve(
+    import.meta.dirname,
+    '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.d.ts',
+  ),
   resolve(
     import.meta.dirname,
     '../../../../../test/integration/test/mongo/fixtures/generated/contract.d.ts',

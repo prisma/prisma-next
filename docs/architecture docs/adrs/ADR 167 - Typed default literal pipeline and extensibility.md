@@ -1,5 +1,7 @@
 # ADR 167 — Typed default literal pipeline and extensibility
 
+> **Superseded by [ADR 184 — Codec-owned value serialization](ADR%20184%20-%20Codec-owned%20value%20serialization.md).** ADR 184 generalizes the deferred v2 design from this ADR: codecs own all value representations (contract JSON, DDL, PSL), eliminating the hardcoded bigint/Date branches and the tagged type system. This ADR remains as historical context for the v1 design.
+
 ## Context
 PR #167 introduced strictly-typed literal defaults for SQL columns, replacing opaque `expression` strings with typed `value` payloads. The pipeline now encodes, serializes, validates, verifies, and renders literal defaults as typed values end-to-end.
 

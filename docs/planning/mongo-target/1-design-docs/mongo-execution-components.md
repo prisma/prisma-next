@@ -42,7 +42,7 @@ What's shared across families: `PlanMeta` (operation name, model, lane, target, 
 
 ## MongoQueryPlan
 
-**Status: re-unified.** The original `MongoQueryPlan` was deleted during the typed-pipeline refactor, then re-introduced as a unified plan type. Both reads and writes now flow through `MongoQueryPlan { collection, command: AnyMongoCommand, meta }` in `@prisma-next/mongo-query-ast`, executed via a single `MongoRuntime.execute(plan)`. The adapter has a single `lower(plan: MongoQueryPlanLike): AnyMongoWireCommand` method. Reads use `AggregateCommand` (pipeline of typed stages), writes use the other command AST nodes. Command filter fields accept `MongoFilterExpr` (typed AST); the adapter lowers filters via `lowerFilter()`.
+**Status: re-unified.** The original `MongoQueryPlan` was deleted during the typed-pipeline refactor, then re-introduced as a unified plan type. Both reads and writes now flow through `MongoQueryPlan { collection, command: AnyMongoCommand, meta }` in `@prisma-next/mongo-query-ast`, executed via a single `MongoRuntime.execute(plan)`. The adapter has a single `lower(plan: MongoQueryPlan): AnyMongoWireCommand` method. Reads use `AggregateCommand` (pipeline of typed stages), writes use the other command AST nodes. Command filter fields accept `MongoFilterExpr` (typed AST); the adapter lowers filters via `lowerFilter()`.
 
 The original design (retained for historical context):
 

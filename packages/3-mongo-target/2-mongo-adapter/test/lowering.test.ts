@@ -1,4 +1,3 @@
-import { MongoParamRef } from '@prisma-next/mongo-core';
 import {
   MongoAndExpr,
   MongoExistsExpr,
@@ -13,6 +12,7 @@ import {
   MongoSortStage,
   MongoUnwindStage,
 } from '@prisma-next/mongo-query-ast';
+import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { lowerFilter, lowerPipeline, lowerStage } from '../src/lowering';
 

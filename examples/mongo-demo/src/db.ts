@@ -1,6 +1,6 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import { validateMongoContract } from '@prisma-next/mongo-core';
+import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtime';
 import type { Contract } from './contract';

@@ -42,7 +42,7 @@ describe('extractCodecTypeImports', () => {
         types: {
           codecTypes: {
             import: {
-              package: '@prisma-next/mongo-core/codec-types',
+              package: '@prisma-next/adapter-mongo/codec-types',
               named: 'CodecTypes',
               alias: 'MongoCodecTypes',
             },
@@ -52,7 +52,7 @@ describe('extractCodecTypeImports', () => {
     ]);
     expect(result).toEqual([
       {
-        package: '@prisma-next/mongo-core/codec-types',
+        package: '@prisma-next/adapter-mongo/codec-types',
         named: 'CodecTypes',
         alias: 'MongoCodecTypes',
       },
@@ -456,7 +456,7 @@ describe('createControlStack', () => {
           types: {
             codecTypes: {
               import: {
-                package: '@prisma-next/mongo-core/codec-types',
+                package: '@prisma-next/adapter-mongo/codec-types',
                 named: 'CodecTypes',
                 alias: 'MongoCodecTypes',
               },
