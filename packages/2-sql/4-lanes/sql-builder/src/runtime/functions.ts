@@ -4,6 +4,7 @@ import {
   type AnyExpression as AstExpression,
   BinaryExpr,
   type BinaryOp,
+  CastExpr,
   ExistsExpr,
   ListExpression,
   LiteralExpr,
@@ -76,6 +77,24 @@ function inOrNotIn(
   return boolExpr(binaryFn(left, SubqueryExpr.of(valuesOrSubquery.buildAst())));
 }
 
+function arithmetic<T extends ScopeField>(
+  a: ExpressionOrValue<T, CodecTypes>,
+  b: ExpressionOrValue<T, CodecTypes>,
+  op: BinaryOp,
+): ExpressionImpl<T> {
+  const field = (
+    a instanceof ExpressionImpl
+      ? a.field
+      : b instanceof ExpressionImpl
+        ? b.field
+        : { codecId: 'unknown', nullable: false }
+  ) as T;
+  return new ExpressionImpl(
+    new BinaryExpr(op, resolve(a as ExprOrVal), resolve(b as ExprOrVal)),
+    field,
+  );
+}
+
 function numericAgg(
   fn: 'sum' | 'avg' | 'min' | 'max',
   expr: Expression<ScopeField>,
@@ -96,6 +115,32 @@ function createBuiltinFunctions() {
     lte: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'lte'),
     and: (...exprs: ExprOrVal<BooleanCodecType>[]) => boolExpr(AndExpr.of(exprs.map(resolveToAst))),
     or: (...exprs: ExprOrVal<BooleanCodecType>[]) => boolExpr(OrExpr.of(exprs.map(resolveToAst))),
+    add: <T extends ScopeField>(
+      a: ExpressionOrValue<T, CodecTypes>,
+      b: ExpressionOrValue<T, CodecTypes>,
+    ) => arithmetic(a, b, 'add'),
+    sub: <T extends ScopeField>(
+      a: ExpressionOrValue<T, CodecTypes>,
+      b: ExpressionOrValue<T, CodecTypes>,
+    ) => arithmetic(a, b, 'sub'),
+    mul: <T extends ScopeField>(
+      a: ExpressionOrValue<T, CodecTypes>,
+      b: ExpressionOrValue<T, CodecTypes>,
+    ) => arithmetic(a, b, 'mul'),
+    div: <T extends ScopeField>(
+      a: ExpressionOrValue<T, CodecTypes>,
+      b: ExpressionOrValue<T, CodecTypes>,
+    ) => arithmetic(a, b, 'div'),
+    mod: <T extends ScopeField>(
+      a: ExpressionOrValue<T, CodecTypes>,
+      b: ExpressionOrValue<T, CodecTypes>,
+    ) => arithmetic(a, b, 'mod'),
+    cast: <TargetCodecId extends string, Nullable extends boolean>(
+      expr: Expression<ScopeField>,
+      target: { codecId: TargetCodecId; nullable: Nullable },
+    ) => {
+      return new ExpressionImpl(CastExpr.of(expr.buildAst(), target.codecId), target);
+    },
     exists: (subquery: Subquery<Record<string, ScopeField>>) =>
       boolExpr(ExistsExpr.exists(subquery.buildAst())),
     notExists: (subquery: Subquery<Record<string, ScopeField>>) =>

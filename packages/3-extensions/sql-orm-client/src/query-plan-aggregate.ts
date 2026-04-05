@@ -93,6 +93,7 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
     not(expr) {
       return new NotExpr(validateGroupedHavingExpr(expr.expr));
     },
+    cast: rejectHavingExpr,
     binary(expr) {
       return new BinaryExpr(
         expr.op,

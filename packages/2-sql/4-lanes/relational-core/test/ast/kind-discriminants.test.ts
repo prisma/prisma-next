@@ -3,6 +3,7 @@ import {
   AggregateExpr,
   AndExpr,
   BinaryExpr,
+  CastExpr,
   DefaultValueExpr,
   DeleteAst,
   DerivedTableSource,
@@ -58,6 +59,7 @@ const allKindEntries: Array<[string, { kind: string }]> = [
   ['InsertOnConflict', InsertOnConflict.on([col('t', 'id')])],
   ['DoNothingConflictAction', new DoNothingConflictAction()],
   ['DoUpdateSetConflictAction', new DoUpdateSetConflictAction({ id: col('t', 'id') })],
+  ['CastExpr', CastExpr.of(col('t', 'id'), 'pg/text@1')],
 ];
 
 describe('AST kind discriminants', () => {
@@ -90,6 +92,7 @@ describe('AST kind discriminants', () => {
     ['InsertOnConflict', 'insert-on-conflict'],
     ['DoNothingConflictAction', 'do-nothing'],
     ['DoUpdateSetConflictAction', 'do-update-set'],
+    ['CastExpr', 'cast'],
   ])('%s has kind "%s"', (className, expectedKind) => {
     const entry = allKindEntries.find(([name]) => name === className);
     expect(entry).toBeDefined();
