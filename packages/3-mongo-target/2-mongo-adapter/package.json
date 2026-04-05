@@ -20,6 +20,7 @@
     "@prisma-next/mongo-core": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/mongo-value": "workspace:*",
+    "@prisma-next/mongo-wire": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "mongodb": "catalog:"
   },
