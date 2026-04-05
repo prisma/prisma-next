@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:0b6fb8c199c3ab3194b21465ad98b1f7a94f670148495aed19ad782c8cd8277d",
+  "profileHash": "sha256:29a17a141f69a59f39e6e5ce56adda9719ab0899a8af17bc6e4db2c4e866a182",
   "roots": {
     "comment": "Comment",
     "event": "Event",
@@ -170,6 +170,10 @@
           "codecId": "pg/int4@1",
           "nullable": false
         },
+        "meta": {
+          "codecId": "pg/json@1",
+          "nullable": true
+        },
         "title": {
           "codecId": "pg/text@1",
           "nullable": false
@@ -191,6 +195,9 @@
           },
           "id": {
             "column": "id"
+          },
+          "meta": {
+            "column": "meta"
           },
           "title": {
             "column": "title"
@@ -219,6 +226,10 @@
           "codecId": "pg/int4@1",
           "nullable": false
         },
+        "profile": {
+          "codecId": "pg/jsonb@1",
+          "nullable": true
+        },
         "updatedAt": {
           "codecId": "pg/timestamptz@1",
           "nullable": true
@@ -236,6 +247,9 @@
           "id": {
             "column": "id"
           },
+          "profile": {
+            "column": "profile"
+          },
           "updatedAt": {
             "column": "update_at"
           }
@@ -245,7 +259,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:568a1cf290adc63b7e6648236dd091c99d33f2fb7cce299c7c3396a280a03145",
+    "storageHash": "sha256:da977bf4c475303b2a1699542df0e905fe9c29e9f928e7965ee45a29a01a15f4",
     "tables": {
       "comment": {
         "columns": {
@@ -541,6 +555,11 @@
             "nativeType": "int4",
             "nullable": false
           },
+          "meta": {
+            "codecId": "pg/json@1",
+            "nativeType": "json",
+            "nullable": true
+          },
           "published": {
             "codecId": "pg/bool@1",
             "nativeType": "bool",
@@ -599,6 +618,11 @@
             "nativeType": "int4",
             "nullable": false
           },
+          "profile": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": true
+          },
           "update_at": {
             "codecId": "pg/timestamptz@1",
             "nativeType": "timestamptz",
@@ -617,7 +641,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:57e1579353e97e340281f44e85b97044d4bf127fd11f5ce5eecdd92c6bab9daa",
+    "executionHash": "sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27",
     "mutations": {
       "defaults": [
         {

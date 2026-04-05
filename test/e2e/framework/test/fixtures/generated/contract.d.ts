@@ -26,11 +26,11 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:568a1cf290adc63b7e6648236dd091c99d33f2fb7cce299c7c3396a280a03145'>;
+  StorageHashBase<'sha256:da977bf4c475303b2a1699542df0e905fe9c29e9f928e7965ee45a29a01a15f4'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:57e1579353e97e340281f44e85b97044d4bf127fd11f5ce5eecdd92c6bab9daa'>;
+  ExecutionHashBase<'sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:0b6fb8c199c3ab3194b21465ad98b1f7a94f670148495aed19ad782c8cd8277d'>;
+  ProfileHashBase<'sha256:29a17a141f69a59f39e6e5ce56adda9719ab0899a8af17bc6e4db2c4e866a182'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -290,6 +290,11 @@ type ContractBase = ContractShape<
             readonly codecId: 'pg/bool@1';
             readonly nullable: false;
           };
+          readonly meta: {
+            readonly nativeType: 'json';
+            readonly codecId: 'pg/json@1';
+            readonly nullable: true;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
@@ -318,6 +323,11 @@ type ContractBase = ContractShape<
           readonly update_at: {
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: true;
+          };
+          readonly profile: {
+            readonly nativeType: 'jsonb';
+            readonly codecId: 'pg/jsonb@1';
             readonly nullable: true;
           };
         };
@@ -404,6 +414,7 @@ type ContractBase = ContractShape<
           readonly title: { readonly column: 'title' };
           readonly createdAt: { readonly column: 'created_at' };
           readonly updatedAt: { readonly column: 'update_at' };
+          readonly meta: { readonly column: 'meta' };
         };
       };
       readonly fields: {
@@ -412,6 +423,7 @@ type ContractBase = ContractShape<
         readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
         readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
         readonly updatedAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: true };
+        readonly meta: { readonly codecId: 'pg/json@1'; readonly nullable: true };
       };
       readonly relations: {};
     };
@@ -423,6 +435,7 @@ type ContractBase = ContractShape<
           readonly email: { readonly column: 'email' };
           readonly createdAt: { readonly column: 'created_at' };
           readonly updatedAt: { readonly column: 'update_at' };
+          readonly profile: { readonly column: 'profile' };
         };
       };
       readonly fields: {
@@ -430,6 +443,7 @@ type ContractBase = ContractShape<
         readonly email: { readonly codecId: 'sql/varchar@1'; readonly nullable: false };
         readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
         readonly updatedAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: true };
+        readonly profile: { readonly codecId: 'pg/jsonb@1'; readonly nullable: true };
       };
       readonly relations: {};
     };
@@ -465,7 +479,7 @@ type ContractBase = ContractShape<
         },
       ];
     };
-    readonly executionHash: 'sha256:57e1579353e97e340281f44e85b97044d4bf127fd11f5ce5eecdd92c6bab9daa';
+    readonly executionHash: 'sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27';
   };
   readonly profileHash: ProfileHash;
 };
