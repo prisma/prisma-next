@@ -17,7 +17,6 @@
   "dependencies": {
     "@prisma-next/config": "workspace:*",
     "@prisma-next/mongo-codec": "workspace:*",
-    "@prisma-next/mongo-core": "workspace:*",
     "@prisma-next/mongo-lowering": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/mongo-value": "workspace:*",
