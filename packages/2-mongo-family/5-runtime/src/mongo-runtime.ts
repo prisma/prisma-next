@@ -1,4 +1,4 @@
-import type { MongoAdapter, MongoDriver, MongoQueryPlanLike } from '@prisma-next/mongo-core';
+import type { MongoAdapter, MongoDriver, MongoQueryPlanLike } from '@prisma-next/mongo-lowering';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 
 export interface MongoRuntimeOptions {

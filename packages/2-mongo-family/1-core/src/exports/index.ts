@@ -1,3 +1,4 @@
+export type { MongoAdapter, MongoDriver, MongoQueryPlanLike } from '@prisma-next/mongo-lowering';
 export type {
   AnyMongoWireCommand,
   DeleteManyResult,
@@ -18,5 +19,3 @@ export {
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
-export type { MongoAdapter, MongoQueryPlanLike } from '../adapter-types';
-export type { MongoDriver } from '../driver-types';

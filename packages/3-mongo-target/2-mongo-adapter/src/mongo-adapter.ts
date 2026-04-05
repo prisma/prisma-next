@@ -1,4 +1,4 @@
-import type { MongoAdapter, MongoQueryPlanLike } from '@prisma-next/mongo-core';
+import type { MongoAdapter, MongoQueryPlanLike } from '@prisma-next/mongo-lowering';
 import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast';
 import type { Document, MongoExpr } from '@prisma-next/mongo-value';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';

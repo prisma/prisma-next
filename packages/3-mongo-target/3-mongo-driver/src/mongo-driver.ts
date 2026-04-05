@@ -1,4 +1,4 @@
-import type { MongoDriver } from '@prisma-next/mongo-core';
+import type { MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
   AggregateWireCommand,
   AnyMongoWireCommand,
