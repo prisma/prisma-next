@@ -23,8 +23,9 @@ describe('pgvector operations', () => {
   });
 
   it('descriptor provides operation signatures', () => {
-    const operations = pgvectorDescriptor.operationSignatures!() as SqlOperationSignature[];
-    expect(operations).toBeDefined();
+    expect(pgvectorDescriptor.operationSignatures).toBeDefined();
+    const operations = (pgvectorDescriptor.operationSignatures?.() ??
+      []) as SqlOperationSignature[];
     expect(operations.length).toBe(2);
 
     const cosineDistanceOp = operations.find((op) => op.method === 'cosineDistance');
@@ -51,8 +52,8 @@ describe('pgvector operations', () => {
   });
 
   it('operations can be registered in operation registry', () => {
-    const operations = pgvectorDescriptor.operationSignatures!();
-    expect(operations).toBeDefined();
+    expect(pgvectorDescriptor.operationSignatures).toBeDefined();
+    const operations = pgvectorDescriptor.operationSignatures?.() ?? [];
 
     const registry = createOperationRegistry();
     for (const op of operations) {
