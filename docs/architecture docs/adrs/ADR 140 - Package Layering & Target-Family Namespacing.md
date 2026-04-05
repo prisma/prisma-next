@@ -15,7 +15,7 @@ Adopt a package layout that encodes Domains → Layers → Planes:
 - **Layers**: Clean Architecture layers (`core/`, `authoring/`, `targets/`, `lanes/`, `runtime/`, `adapters/`). Within a domain, layers may depend laterally (same layer) and downward (toward core), never upward.
 - **Planes**: Migration (authoring, tooling, targets) vs runtime (lanes, runtime, adapters). Migration plane must not import runtime plane code; runtime plane may consume artifacts (JSON/manifests) from migration, but not code imports.
 - Group SQL-specific packages under a dedicated namespace (`packages/2-sql/**`) for family cohesion (contract types/emitter/ops, lanes, runtime, and adapters).
-- Extract a target-agnostic runtime core (`packages/1-framework/4-runtime-executor`) that owns plan verification, plugin lifecycle, and the runtime SPI. Family-specific runtimes (e.g., `packages/2-sql/5-runtime`) implement the SPI and plug into core via context.
+- Extract a target-agnostic runtime core (`packages/1-framework/4-runtime/runtime-executor`) that owns plan verification, plugin lifecycle, and the runtime SPI. Family-specific runtimes (e.g., `packages/2-sql/5-runtime`) implement the SPI and plug into core via context.
 - Keep the emitter core target-agnostic with family hooks; SQL-specific validation and `.d.ts` generation live in the SQL family hook.
 - Avoid transitional shims unless required internally; there are no external consumers.
 
@@ -80,7 +80,7 @@ packages/
 
 ### Runtime Separation
 
-- `packages/1-framework/4-runtime-executor` exposes a target-agnostic SPI (verification, plugin lifecycle, telemetry), no direct imports from `targets/*`.
+- `packages/1-framework/4-runtime/runtime-executor` exposes a target-agnostic SPI (verification, plugin lifecycle, telemetry), no direct imports from `targets/*`.
 - `packages/2-sql/5-runtime` implements the SPI using SQL adapters and codecs from `packages/2-sql/1-core/contract/*`, `packages/2-sql/1-core/operations/*`, and `packages/3-targets/6-adapters/postgres/*`.
 - This enables booting the runtime with a non-SQL family by swapping in another family-runtime package that implements the same SPI.
 

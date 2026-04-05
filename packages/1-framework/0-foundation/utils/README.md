@@ -76,11 +76,10 @@ See `docs/Error Handling.md` for the full error taxonomy.
 
 ## Package Location
 
-This package is part of the **framework domain**, **core layer**, **shared plane**:
+This package is part of the **framework domain**, **foundation layer**:
 - **Domain**: framework (target-agnostic)
-- **Layer**: core
-- **Plane**: shared
-- **Path**: `packages/1-framework/1-core/shared/utils`
+- **Layer**: foundation
+- **Path**: `packages/1-framework/0-foundation/utils`
 
 ## Dependencies
 

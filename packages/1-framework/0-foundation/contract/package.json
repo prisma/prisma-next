@@ -1,26 +1,22 @@
 {
-  "name": "@prisma-next/core-control-plane",
+  "name": "@prisma-next/contract",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Control-plane migration/emission primitives and structured error utilities",
+  "description": "Data contract type definitions and JSON schema for Prisma Next",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:*",
-    "@prisma-next/framework-components": "workspace:*",
-    "@prisma-next/operations": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "arktype": "^2.1.26",
-    "prettier": "^3.3.3"
+    "arktype": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
@@ -32,23 +28,23 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "schemas"
   ],
   "engines": {
     "node": ">=20"
   },
   "exports": {
-    "./constants": "./dist/constants.mjs",
-    "./emission": "./dist/emission.mjs",
-    "./errors": "./dist/errors.mjs",
-    "./schema-view": "./dist/schema-view.mjs",
-    "./stack": "./dist/stack.mjs",
+    "./hashing": "./dist/hashing.mjs",
+    "./testing": "./dist/testing.mjs",
     "./types": "./dist/types.mjs",
+    "./validate-contract": "./dist/validate-contract.mjs",
+    "./validate-domain": "./dist/validate-domain.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/1-framework/1-core/migration/control-plane"
+    "directory": "packages/1-framework/0-foundation/contract"
   }
 }

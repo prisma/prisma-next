@@ -1,6 +1,6 @@
 # Summary
 
-Create a dedicated config package (`@prisma-next/config`) and move the `prisma-next.config.ts` authoring surface (types + validation + provider interfaces) out of `packages/1-framework/1-core/migration/control-plane`. This reduces coupling to migration-plane concerns and keeps the provider-based authoring work (PSL/TS sources) easier to evolve.
+Create a dedicated config package (`@prisma-next/config`) and move the `prisma-next.config.ts` authoring surface (types + validation + provider interfaces) out of `packages/1-framework/1-core/control-plane`. This reduces coupling to migration-plane concerns and keeps the provider-based authoring work (PSL/TS sources) easier to evolve.
 
 # Description
 
@@ -9,20 +9,20 @@ Linear issue `TML-2018` calls out that the “core migration/control-plane” ar
 This refactor is **optional** and intended to improve maintainability for the PSL Contract Authoring project:
 
 - The provider-based authoring pipeline needs stable, reusable config types and validation (`PrismaNextConfig`, `ContractConfig`, `ContractSourceProvider`, diagnostics types, `defineConfig()`, `validateConfig()`).
-- Those config concerns are currently implemented in `packages/1-framework/1-core/migration/control-plane/src/*` (e.g. `config-types.ts`, `config-validation.ts`, `contract-source-types.ts`) and consumed by the CLI and authoring packages.
+- Those config concerns are currently implemented in `packages/1-framework/1-core/control-plane/src/*` (e.g. `config-types.ts`, `config-validation.ts`, `contract-source-types.ts`) and consumed by the CLI and authoring packages.
 - The migration-plane location and broader package scope create unnecessary coupling and review surface for authoring evolution.
 
 References:
 
 - Linear: `https://linear.app/prisma-company/issue/TML-2018/optional-split-up-1-coremigration`
-- Current implementation touchpoint: `packages/1-framework/1-core/migration/control-plane/src/config-types.ts`
+- Current implementation touchpoint: `packages/1-framework/1-core/control-plane/src/config-types.ts`
 
 ## Proposed Package (exactly what we’re creating)
 
 Create a new **framework core / shared plane** package:
 
 - **Name**: `@prisma-next/config`
-- **Location**: `packages/1-framework/1-core/shared/config`
+- **Location**: `packages/1-framework/1-core/config`
 - **Architecture coordinates**: framework domain, **layer 1 (core)**, **shared plane**
 - **Primary audience**: authors of `prisma-next.config.ts` (and tooling that loads/validates it)
 - **What it exports (high-level)**:
@@ -112,7 +112,7 @@ Not applicable.
 # References
 
 - Linear: `https://linear.app/prisma-company/issue/TML-2018/optional-split-up-1-coremigration`
-- `packages/1-framework/1-core/migration/control-plane/src/config-types.ts`
+- `packages/1-framework/1-core/control-plane/src/config-types.ts`
 - `packages/1-framework/3-tooling/cli/src/config-loader.ts`
 - `packages/2-sql/2-authoring/contract-ts/src/config-types.ts`
 

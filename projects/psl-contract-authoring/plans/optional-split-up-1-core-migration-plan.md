@@ -12,8 +12,8 @@ Create `@prisma-next/config` as a **framework / layer 1 (core) / shared plane** 
 
 **Tasks:**
 
-- [ ] Create package at `packages/1-framework/1-core/shared/config` named `@prisma-next/config` with:
-  - `tsdown` build, `vitest`, `typecheck`, `lint` scripts consistent with other `1-core/shared/*` packages
+- [ ] Create package at `packages/1-framework/1-core/config` named `@prisma-next/config` with:
+  - `tsdown` build, `vitest`, `typecheck`, `lint` scripts consistent with other `1-core/*` packages
   - curated `exports` subpaths for config entrypoints (avoid “everything from root”)
 - [ ] Add package mapping in `architecture.config.json` (domain: framework, layer: core, plane: shared).
 

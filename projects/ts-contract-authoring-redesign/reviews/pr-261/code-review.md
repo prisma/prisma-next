@@ -49,13 +49,53 @@ All resolved.
 
 **Status**: DEFERRED (by design — to contract-domain-extraction project, Milestone 5)
 
-**Location**: [packages/2-sql/2-authoring/contract-ts/src/semantic-contract.ts](packages/2-sql/2-authoring/contract-ts/src/semantic-contract.ts); [packages/1-framework/1-core/shared/contract/src/domain-types.ts](packages/1-framework/1-core/shared/contract/src/domain-types.ts)
+**Location**: [packages/2-sql/2-authoring/contract-ts/src/semantic-contract.ts](packages/2-sql/2-authoring/contract-ts/src/semantic-contract.ts); [packages/1-framework/0-foundation/contract/src/domain-types.ts](packages/1-framework/0-foundation/contract/src/domain-types.ts)
 
 **Issue**: Unchanged. `SqlSemanticContractDefinition` is acceptable as a stepping stone.
 
 See [wip/system-design-review-findings.md](wip/system-design-review-findings.md) — Findings 3 & 4.
 
 ---
+
+### F18 — Demo uses N+1 query pattern instead of ORM
+
+**Status**: PARTIALLY RESOLVED
+
+**Location**: [examples/prisma-next-demo/src/queries/get-users-with-posts-no-emit.ts](examples/prisma-next-demo/src/queries/get-users-with-posts-no-emit.ts) — entire file
+
+**What improved**: The file now has a block comment (lines 4–6) explaining that the no-emit path only wires the SQL builder, not the ORM, and pointing to `get-dashboard-users.ts` for the `include`-style approach.
+
+**What remains**: The N+1 pattern itself is still present. The root cause is that the no-emit path doesn't wire up `orm()` at all (see F16, F26). Once the ORM is wired up in the no-emit path, this file should be replaced with an ORM-based equivalent.
+
+---
+
+### F19 — Authoring types and functions should be extracted from `framework-components.ts`
+
+**Status**: UNRESOLVED (non-blocking)
+
+**Location**: [packages/1-framework/0-foundation/contract/src/framework-components.ts](packages/1-framework/0-foundation/contract/src/framework-components.ts)
+
+**Issue**: Unchanged. The file still serves two purposes: defining the component framework and defining the authoring contribution system.
+
+---
+
+### F21 — Test timeout increases may signal type performance regression
+
+**Status**: UNRESOLVED (non-blocking)
+
+**Location**: [test/utils/src/timeouts.ts](test/utils/src/timeouts.ts) — lines 3–6
+
+**Issue**: Timeouts remain at 12s (typeScriptCompilation, +50%) and 500ms (default, +400%). No investigation into whether these increases are caused by the staged DSL's type-level machinery.
+
+---
+
+### F26 — No ORM client coverage in the no-emit path
+
+**Status**: UNRESOLVED (non-blocking)
+
+**Location**: [examples/prisma-next-demo/src/prisma-no-emit/context.ts](examples/prisma-next-demo/src/prisma-no-emit/context.ts); [examples/prisma-next-demo/src/orm-client/client.ts](examples/prisma-next-demo/src/orm-client/client.ts)
+
+**Issue**: Unchanged. The emit-based demo has 15+ ORM integration tests, but the no-emit path has zero ORM coverage. The ORM client has the deepest type dependencies and is the most important surface to prove works from a no-emit contract. Related to F16 and F18.
 
 ---
 

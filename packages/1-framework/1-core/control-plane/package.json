@@ -1,9 +1,9 @@
 {
-  "name": "@prisma-next/core-execution-plane",
+  "name": "@prisma-next/core-control-plane",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Execution/runtime plane descriptor and instance types for Prisma Next",
+  "description": "Control-plane migration/emission primitives and structured error utilities",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",
@@ -15,7 +15,12 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/framework-components": "workspace:*"
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/operations": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
+    "arktype": "^2.1.26",
+    "prettier": "^3.3.3"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
@@ -33,7 +38,10 @@
     "node": ">=20"
   },
   "exports": {
-    "./framework-components": "./dist/framework-components.mjs",
+    "./constants": "./dist/constants.mjs",
+    "./emission": "./dist/emission.mjs",
+    "./errors": "./dist/errors.mjs",
+    "./schema-view": "./dist/schema-view.mjs",
     "./stack": "./dist/stack.mjs",
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
@@ -41,6 +49,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/1-framework/1-core/runtime/execution-plane"
+    "directory": "packages/1-framework/1-core/control-plane"
   }
 }

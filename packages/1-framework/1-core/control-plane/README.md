@@ -68,7 +68,7 @@ This package is part of the **framework domain**, **core layer**, **migration pl
 - **Domain**: framework (target-agnostic)
 - **Layer**: core
 - **Plane**: migration (control plane operations)
-- **Path**: `packages/1-framework/1-core/migration/control-plane`
+- **Path**: `packages/1-framework/1-core/control-plane`
 
 ## Related Documentation
 

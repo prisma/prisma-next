@@ -403,7 +403,7 @@ No observability changes needed. The contract structure is a build-time artifact
 - [10. MongoDB Family](../../docs/architecture%20docs/subsystems/10.%20MongoDB%20Family.md) — design principles, contract examples
 - [cross-cutting-learnings.md](../../docs/planning/mongo-target/cross-cutting-learnings.md) — domain model design principles
 - [contract-symmetry.md](../../docs/planning/mongo-target/1-design-docs/contract-symmetry.md) — Mongo/SQL convergence analysis
-- Current `ContractBase`: `packages/1-framework/1-core/shared/contract/src/types.ts`
+- Current `ContractBase`: `packages/1-framework/0-foundation/contract/src/types.ts`
 - Current `SqlContract`: `packages/2-sql/1-core/contract/src/types.ts`
 - Current SQL `validateContract()`: `packages/2-sql/1-core/contract/src/validate.ts`
 - Extractable domain validation: `packages/2-mongo-family/1-core/src/validate-domain.ts`

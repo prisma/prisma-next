@@ -105,12 +105,12 @@ This package is part of the **framework domain**, **core layer**, **runtime plan
 - **Domain**: framework (target-agnostic)
 - **Layer**: core
 - **Plane**: runtime
-- **Path**: `packages/1-framework/1-core/runtime/execution-plane`
+- **Path**: `packages/1-framework/1-core/execution-plane`
 
 ## Related Documentation
 
 - [ADR 152 — Execution Plane Descriptors and Instances](../../../../docs/architecture%20docs/adrs/ADR%20152%20-%20Execution%20Plane%20Descriptors%20and%20Instances.md)
 - [ADR 159 — Driver Terminology and Lifecycle](../../../../docs/architecture%20docs/adrs/ADR%20159%20-%20Driver%20Terminology%20and%20Lifecycle.md): Driver instantiation vs connection binding
 - `.cursor/rules/multi-plane-packages.mdc`: Multi-plane package structure
-- `packages/1-framework/1-core/migration/control-plane/README.md`: Control plane counterpart
+- `packages/1-framework/1-core/control-plane/README.md`: Control plane counterpart
 

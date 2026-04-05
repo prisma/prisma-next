@@ -1,14 +1,14 @@
 {
-  "name": "@prisma-next/config",
+  "name": "@prisma-next/runtime-executor",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Prisma Next config authoring types and validation",
+  "description": "Target-agnostic execution engine for Prisma Next",
   "scripts": {
     "build": "tsdown",
-    "test": "vitest run --passWithNoTests",
-    "test:coverage": "vitest run --coverage --passWithNoTests",
-    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -16,12 +16,13 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/framework-components": "workspace:*",
-    "@prisma-next/utils": "workspace:*",
-    "arktype": "^2.1.26"
+    "@prisma-next/operations": "workspace:*",
+    "arktype": "^2.1.25"
   },
   "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
+    "@prisma/dev": "catalog:",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
@@ -31,18 +32,16 @@
     "dist",
     "src"
   ],
-  "engines": {
-    "node": ">=20"
-  },
   "exports": {
-    "./config-types": "./dist/config-types.mjs",
-    "./config-validation": "./dist/config-validation.mjs",
-    "./types": "./dist/types.mjs",
+    ".": "./dist/index.mjs",
     "./package.json": "./package.json"
   },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/1-framework/1-core/shared/config"
+    "directory": "packages/1-framework/4-runtime/runtime-executor"
   }
 }

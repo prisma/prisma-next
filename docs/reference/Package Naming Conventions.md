@@ -9,13 +9,12 @@ The repository uses numbered prefixes in directory names to reflect the architec
 ```
 packages/
   1-framework/           # Domain 1: Framework (target-agnostic)
+    0-foundation/        # Layer 0: Foundation
     1-core/              # Layer 1: Core
-      shared/            # Plane: Shared
-      migration/         # Plane: Migration
-      runtime/           # Plane: Runtime
     2-authoring/         # Layer 2: Authoring
     3-tooling/           # Layer 3: Tooling
-    4-runtime-executor/  # Layer 4: Runtime Executor
+    4-runtime/           # Layer 4: Runtime
+      runtime-executor/
   2-document/            # Domain 2: Document (placeholder)
   2-sql/                 # Domain 2: SQL family
     1-core/              # Layer 1: Core
@@ -34,7 +33,7 @@ The numbered prefixes serve two purposes:
 1. **Visual hierarchy**: Makes domain/layer relationships clear at a glance
 2. **Dependency direction**: Lower numbers can be imported by higher numbers, never the reverse
 
-Planes (shared, migration, runtime) appear as subdirectories only when a layer contains packages in multiple planes.
+Planes are a conceptual grouping recorded in `architecture.config.json` but do not appear as intermediate subdirectories.
 
 ## Naming Rules
 
@@ -50,16 +49,16 @@ Planes (shared, migration, runtime) appear as subdirectories only when a layer c
 
 | Directory | Package Name |
 |-----------|--------------|
-| `packages/1-framework/1-core/shared/contract/` | `@prisma-next/contract` |
-| `packages/1-framework/1-core/shared/operations/` | `@prisma-next/operations` |
-| `packages/1-framework/1-core/migration/control-plane/` | `@prisma-next/core-control-plane` |
-| `packages/1-framework/1-core/runtime/execution-plane/` | `@prisma-next/core-execution-plane` |
+| `packages/1-framework/0-foundation/contract/` | `@prisma-next/contract` |
+| `packages/1-framework/1-core/operations/` | `@prisma-next/operations` |
+| `packages/1-framework/1-core/control-plane/` | `@prisma-next/core-control-plane` |
+| `packages/1-framework/1-core/execution-plane/` | `@prisma-next/core-execution-plane` |
 | `packages/1-framework/2-authoring/contract/` | `@prisma-next/contract-authoring` |
 | `packages/1-framework/2-authoring/contract-ts/` | `@prisma-next/contract-ts` |
 | `packages/1-framework/2-authoring/psl-parser/` | `@prisma-next/psl-parser` |
 | `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |
 | `packages/1-framework/3-tooling/emitter/` | `@prisma-next/emitter` |
-| `packages/1-framework/4-runtime-executor/` | `@prisma-next/runtime-executor` |
+| `packages/1-framework/4-runtime/runtime-executor/` | `@prisma-next/runtime-executor` |
 
 **SQL Domain:**
 
