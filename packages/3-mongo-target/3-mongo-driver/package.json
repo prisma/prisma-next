@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@prisma-next/mongo-core": "workspace:*",
+    "@prisma-next/mongo-wire": "workspace:*",
     "mongodb": "catalog:"
   },
   "devDependencies": {

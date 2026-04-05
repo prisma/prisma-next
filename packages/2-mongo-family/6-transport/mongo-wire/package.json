@@ -1,9 +1,9 @@
 {
-  "name": "@prisma-next/mongo-core",
+  "name": "@prisma-next/mongo-wire",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Core types for Prisma Next MongoDB support",
+  "description": "Wire command types and result types for Prisma Next MongoDB support",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",
@@ -15,12 +15,9 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:*",
-    "@prisma-next/mongo-value": "workspace:*",
-    "@prisma-next/mongo-wire": "workspace:*"
+    "@prisma-next/mongo-value": "workspace:*"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",
@@ -41,6 +38,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/2-mongo-family/1-core"
+    "directory": "packages/2-mongo-family/6-transport/mongo-wire"
   }
 }
