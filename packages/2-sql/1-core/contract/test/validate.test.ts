@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { describe, expect, it } from 'vitest';
 import type { SqlStorage } from '../src/types';
 import { validateContract } from '../src/validate';
@@ -109,13 +110,18 @@ describe('validateContract', () => {
     );
   });
 
-  it('throws when primary key references missing column', () => {
+  it('throws ContractValidationError with storage phase when primary key references missing column', () => {
     const invalid = makeContract();
     invalid.storage.tables.User.primaryKey = { columns: ['missing'] };
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
-      /primaryKey references non-existent column/,
-    );
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(ContractValidationError);
+    try {
+      validateContract<Contract<SqlStorage>>(invalid);
+    } catch (e) {
+      expect(e).toBeInstanceOf(ContractValidationError);
+      expect((e as ContractValidationError).phase).toBe('storage');
+      expect((e as ContractValidationError).code).toBe('CONTRACT.VALIDATION_FAILED');
+    }
   });
 
   it('throws when unique references missing column', () => {
@@ -288,10 +294,14 @@ describe('validateContract', () => {
     expect(result.storage.tables.User.indexes).toHaveLength(1);
   });
 
-  it('throws structural error for non-object values', () => {
-    expect(() => validateContract<Contract<SqlStorage>>(null)).toThrow(
-      /Contract must be a non-null object/,
-    );
+  it('throws ContractValidationError with structural phase for non-object values', () => {
+    expect(() => validateContract<Contract<SqlStorage>>(null)).toThrow(ContractValidationError);
+    try {
+      validateContract<Contract<SqlStorage>>(null);
+    } catch (e) {
+      expect(e).toBeInstanceOf(ContractValidationError);
+      expect((e as ContractValidationError).phase).toBe('structural');
+    }
   });
 
   it('throws structural error when storage is non-object', () => {
@@ -666,7 +676,7 @@ describe('validateContract', () => {
   });
 
   describe('model-to-storage cross-validation', () => {
-    it('rejects model whose storage.table does not exist in storage.tables', () => {
+    it('rejects model whose storage.table does not exist in storage.tables with storage phase', () => {
       const contract = structuredClone(baseContract);
       (contract as Record<string, unknown>).models = {
         User: {
@@ -675,9 +685,16 @@ describe('validateContract', () => {
           relations: {},
         },
       };
-      expect(() => validateContract(contract)).toThrow(
-        'Model "User" references non-existent table "nonexistent"',
-      );
+      expect(() => validateContract(contract)).toThrow(ContractValidationError);
+      try {
+        validateContract(contract);
+      } catch (e) {
+        expect(e).toBeInstanceOf(ContractValidationError);
+        expect((e as ContractValidationError).phase).toBe('storage');
+        expect((e as ContractValidationError).message).toContain(
+          'Model "User" references non-existent table "nonexistent"',
+        );
+      }
     });
 
     it('rejects model whose storage.fields reference a non-existent column', () => {

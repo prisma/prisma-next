@@ -3,6 +3,19 @@ import type { Contract } from './contract-types';
 import type { DomainContractShape, DomainValidationResult } from './validate-domain';
 import { validateContractDomain } from './validate-domain';
 
+export type ContractValidationPhase = 'structural' | 'domain' | 'storage';
+
+export class ContractValidationError extends Error {
+  readonly code = 'CONTRACT.VALIDATION_FAILED';
+  readonly phase: ContractValidationPhase;
+
+  constructor(message: string, phase: ContractValidationPhase) {
+    super(message);
+    this.name = 'ContractValidationError';
+    this.phase = phase;
+  }
+}
+
 /**
  * Family-provided storage validator.
  * SQL validates tables/columns/FKs; Mongo validates collections/embedding.
@@ -68,14 +81,17 @@ export function validateContract<TContract extends Contract>(
   storageValidator: StorageValidator,
 ): TContract & ValidateContractResult {
   if (typeof value !== 'object' || value === null) {
-    throw new Error('Contract must be a non-null object');
+    throw new ContractValidationError('Contract must be a non-null object', 'structural');
   }
 
   const stripped = stripPersistenceFields(value as Record<string, unknown>);
 
   const parsed = ContractSchema(stripped);
   if (parsed instanceof type.errors) {
-    throw new Error(`Invalid contract structure: ${parsed.summary}`);
+    throw new ContractValidationError(
+      `Invalid contract structure: ${parsed.summary}`,
+      'structural',
+    );
   }
 
   // Arktype verified the structural shape; Contract adds branded hash types and

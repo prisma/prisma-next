@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ContractValidationError } from '../src/validate-contract';
 import { validateContractDomain } from '../src/validate-domain';
 
 function makeMinimalModel(overrides: Record<string, unknown> = {}) {
@@ -27,11 +28,18 @@ describe('validateContractDomain()', () => {
       expect(() => validateContractDomain(makeValidContract())).not.toThrow();
     });
 
-    it('rejects duplicate root values', () => {
+    it('rejects duplicate root values with domain phase', () => {
       const contract = makeValidContract({
         roots: { items: 'Item', things: 'Item' },
       });
+      expect(() => validateContractDomain(contract)).toThrow(ContractValidationError);
       expect(() => validateContractDomain(contract)).toThrow(/duplicate root.*Item/i);
+      try {
+        validateContractDomain(contract);
+      } catch (e) {
+        expect((e as ContractValidationError).phase).toBe('domain');
+        expect((e as ContractValidationError).code).toBe('CONTRACT.VALIDATION_FAILED');
+      }
     });
 
     it('rejects root referencing non-existent model', () => {
