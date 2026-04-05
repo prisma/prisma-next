@@ -1,4 +1,5 @@
-import type { MongoAdapter, MongoDriver, MongoQueryPlanLike } from '@prisma-next/mongo-lowering';
+import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 
 export interface MongoRuntimeOptions {
@@ -7,7 +8,7 @@ export interface MongoRuntimeOptions {
 }
 
 export interface MongoRuntime {
-  execute<Row>(plan: MongoQueryPlanLike): AsyncIterableResult<Row>;
+  execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row>;
   close(): Promise<void>;
 }
 
@@ -20,7 +21,7 @@ class MongoRuntimeImpl implements MongoRuntime {
     this.#driver = options.driver;
   }
 
-  execute<Row>(plan: MongoQueryPlanLike): AsyncIterableResult<Row> {
+  execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {
     const wireCommand = this.#adapter.lower(plan);
     return this.#wrapIterable(this.#driver.execute<Row>(wireCommand));
   }
