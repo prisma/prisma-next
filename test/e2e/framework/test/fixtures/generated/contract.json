@@ -2,9 +2,14 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:065e445e4b728f3825cd85e4a492e187aef68f257eaec630d0170e27eb41b313",
-  "executionHash": "sha256:0d75086cec931f0f10206995ebf8b463195be5630e546061d54d17cfc6cd2ba4",
-  "profileHash": "sha256:81fc13e821d3b7ae2947058ca08ba6786b4121d1b06a4710368c1458252a04e4",
+  "profileHash": "sha256:0b6fb8c199c3ab3194b21465ad98b1f7a94f670148495aed19ad782c8cd8277d",
+  "roots": {
+    "comment": "Comment",
+    "event": "Event",
+    "literal_defaults": "LiteralDefaults",
+    "post": "Post",
+    "user": "User"
+  },
   "models": {
     "Comment": {
       "fields": {
@@ -31,7 +36,6 @@
       },
       "relations": {},
       "storage": {
-        "table": "comment",
         "fields": {
           "content": {
             "column": "content"
@@ -48,7 +52,8 @@
           "updatedAt": {
             "column": "update_at"
           }
-        }
+        },
+        "table": "comment"
       }
     },
     "Event": {
@@ -72,7 +77,6 @@
       },
       "relations": {},
       "storage": {
-        "table": "event",
         "fields": {
           "createdAt": {
             "column": "created_at"
@@ -86,7 +90,8 @@
           "scheduledAt": {
             "column": "scheduled_at"
           }
-        }
+        },
+        "table": "event"
       }
     },
     "LiteralDefaults": {
@@ -126,7 +131,6 @@
       },
       "relations": {},
       "storage": {
-        "table": "literal_defaults",
         "fields": {
           "active": {
             "column": "active"
@@ -152,7 +156,8 @@
           "tags": {
             "column": "tags"
           }
-        }
+        },
+        "table": "literal_defaults"
       }
     },
     "Post": {
@@ -164,10 +169,6 @@
         "id": {
           "codecId": "pg/int4@1",
           "nullable": false
-        },
-        "meta": {
-          "codecId": "pg/json@1",
-          "nullable": true
         },
         "title": {
           "codecId": "pg/text@1",
@@ -184,16 +185,12 @@
       },
       "relations": {},
       "storage": {
-        "table": "post",
         "fields": {
           "createdAt": {
             "column": "created_at"
           },
           "id": {
             "column": "id"
-          },
-          "meta": {
-            "column": "meta"
           },
           "title": {
             "column": "title"
@@ -204,7 +201,8 @@
           "userId": {
             "column": "userId"
           }
-        }
+        },
+        "table": "post"
       }
     },
     "User": {
@@ -221,10 +219,6 @@
           "codecId": "pg/int4@1",
           "nullable": false
         },
-        "profile": {
-          "codecId": "pg/jsonb@1",
-          "nullable": true
-        },
         "updatedAt": {
           "codecId": "pg/timestamptz@1",
           "nullable": true
@@ -232,7 +226,6 @@
       },
       "relations": {},
       "storage": {
-        "table": "user",
         "fields": {
           "createdAt": {
             "column": "created_at"
@@ -243,23 +236,23 @@
           "id": {
             "column": "id"
           },
-          "profile": {
-            "column": "profile"
-          },
           "updatedAt": {
             "column": "update_at"
           }
-        }
+        },
+        "table": "user"
       }
     }
   },
   "storage": {
+    "storageHash": "sha256:568a1cf290adc63b7e6648236dd091c99d33f2fb7cce299c7c3396a280a03145",
     "tables": {
       "comment": {
         "columns": {
           "content": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "created_at": {
             "codecId": "pg/timestamptz@1",
@@ -267,7 +260,8 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz"
+            "nativeType": "timestamptz",
+            "nullable": false
           },
           "id": {
             "codecId": "pg/int4@1",
@@ -275,11 +269,13 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "postId": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "update_at": {
             "codecId": "pg/timestamptz@1",
@@ -304,18 +300,21 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz"
+            "nativeType": "timestamptz",
+            "nullable": false
           },
           "id": {
             "codecId": "sql/char@1",
             "nativeType": "character",
+            "nullable": false,
             "typeParams": {
               "length": 36
             }
           },
           "name": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "scheduled_at": {
             "codecId": "pg/timestamptz@1",
@@ -323,7 +322,8 @@
               "kind": "literal",
               "value": "2024-01-15T10:30:00.000Z"
             },
-            "nativeType": "timestamptz"
+            "nativeType": "timestamptz",
+            "nullable": false
           }
         },
         "foreignKeys": [],
@@ -343,7 +343,8 @@
               "kind": "literal",
               "value": true
             },
-            "nativeType": "bool"
+            "nativeType": "bool",
+            "nullable": false
           },
           "big_count": {
             "codecId": "pg/int8@1",
@@ -354,7 +355,8 @@
                 "value": "9007199254740993"
               }
             },
-            "nativeType": "int8"
+            "nativeType": "int8",
+            "nullable": false
           },
           "id": {
             "codecId": "pg/int4@1",
@@ -362,7 +364,8 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "label": {
             "codecId": "pg/text@1",
@@ -370,7 +373,8 @@
               "kind": "literal",
               "value": "draft"
             },
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "metadata": {
             "codecId": "pg/jsonb@1",
@@ -380,7 +384,8 @@
                 "key": "default"
               }
             },
-            "nativeType": "jsonb"
+            "nativeType": "jsonb",
+            "nullable": false
           },
           "rating": {
             "codecId": "pg/float8@1",
@@ -388,7 +393,8 @@
               "kind": "literal",
               "value": 3.14
             },
-            "nativeType": "float8"
+            "nativeType": "float8",
+            "nullable": false
           },
           "score": {
             "codecId": "pg/int4@1",
@@ -396,7 +402,8 @@
               "kind": "literal",
               "value": 0
             },
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "tags": {
             "codecId": "pg/jsonb@1",
@@ -407,7 +414,8 @@
                 "beta"
               ]
             },
-            "nativeType": "jsonb"
+            "nativeType": "jsonb",
+            "nullable": false
           }
         },
         "foreignKeys": [],
@@ -467,7 +475,8 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "name": {
             "codecId": "sql/varchar@1",
@@ -520,7 +529,8 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz"
+            "nativeType": "timestamptz",
+            "nullable": false
           },
           "id": {
             "codecId": "pg/int4@1",
@@ -528,43 +538,18 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4"
-          },
-          "meta": {
-            "codecId": "pg/json@1",
-            "nativeType": "json",
-            "nullable": true,
-            "typeParams": {
-              "schemaJson": {
-                "$schema": "http://json-schema.org/draft-07/schema#",
-                "properties": {
-                  "rank": {
-                    "type": "number"
-                  },
-                  "source": {
-                    "type": "string"
-                  },
-                  "verified": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "rank",
-                  "source",
-                  "verified"
-                ],
-                "type": "object"
-              },
-              "type": "{ rank: number, source: string, verified: boolean }"
-            }
+            "nativeType": "int4",
+            "nullable": false
           },
           "published": {
             "codecId": "pg/bool@1",
-            "nativeType": "bool"
+            "nativeType": "bool",
+            "nullable": false
           },
           "title": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "update_at": {
             "codecId": "pg/timestamptz@1",
@@ -573,7 +558,8 @@
           },
           "userId": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           }
         },
         "foreignKeys": [],
@@ -593,11 +579,13 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz"
+            "nativeType": "timestamptz",
+            "nullable": false
           },
           "email": {
             "codecId": "sql/varchar@1",
             "nativeType": "character varying",
+            "nullable": false,
             "typeParams": {
               "length": 255
             }
@@ -608,38 +596,8 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4"
-          },
-          "profile": {
-            "codecId": "pg/jsonb@1",
-            "nativeType": "jsonb",
-            "nullable": true,
-            "typeParams": {
-              "schemaJson": {
-                "$schema": "http://json-schema.org/draft-07/schema#",
-                "properties": {
-                  "active": {
-                    "type": "boolean"
-                  },
-                  "displayName": {
-                    "type": "string"
-                  },
-                  "tags": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "type": "array"
-                  }
-                },
-                "required": [
-                  "active",
-                  "displayName",
-                  "tags"
-                ],
-                "type": "object"
-              },
-              "type": "{ active: boolean, displayName: string, tags: string[] }"
-            }
+            "nativeType": "int4",
+            "nullable": false
           },
           "update_at": {
             "codecId": "pg/timestamptz@1",
@@ -654,17 +612,12 @@
             "id"
           ]
         },
-        "uniques": [
-          {
-            "columns": [
-              "email"
-            ]
-          }
-        ]
+        "uniques": []
       }
     }
   },
   "execution": {
+    "executionHash": "sha256:57e1579353e97e340281f44e85b97044d4bf127fd11f5ce5eecdd92c6bab9daa",
     "mutations": {
       "defaults": [
         {
@@ -686,13 +639,19 @@
       "defaults.now": true,
       "jsonAgg": true,
       "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "enums": true,
       "returning": true
     }
   },
   "extensionPacks": {},
   "meta": {},
   "_generated": {
-    "warning": "\u26a0\ufe0f  GENERATED FILE - DO NOT EDIT",
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
     "message": "This file is automatically generated by \"prisma-next contract emit\".",
     "regenerate": "To regenerate, run: prisma-next contract emit"
   }

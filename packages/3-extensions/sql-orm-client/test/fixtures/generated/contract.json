@@ -2,7 +2,6 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:eeb580eceaaaa9e750d705b6422798ea4c4a8e907205f22b816ae2dd8f7ef78c",
   "profileHash": "sha256:dac42ff24bf5238eef80f2fd845d34eab8e6381ddafc571bed5e4af1ea61b9b8",
   "roots": {
     "articles": "Article",
@@ -16,13 +15,16 @@
     "Article": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "reviewerId": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "title": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -57,13 +59,16 @@
     "Comment": {
       "fields": {
         "body": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "postId": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -85,16 +90,20 @@
     "Post": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "title": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "userId": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "views": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -144,13 +153,16 @@
     "Profile": {
       "fields": {
         "bio": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "userId": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -185,10 +197,12 @@
     "Tag": {
       "fields": {
         "id": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "name": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -207,17 +221,20 @@
     "User": {
       "fields": {
         "email": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "invitedById": {
           "codecId": "pg/int4@1",
           "nullable": true
         },
         "name": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -290,7 +307,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:eeb580eceaaaa9e750d705b6422798ea4c4a8e907205f22b816ae2dd8f7ef78c",
+    "storageHash": "sha256:55749a216f77c045caa2dd3419c2129b4b74841fdb4bf2c5ab521e9d14c19c19",
     "tables": {
       "articles": {
         "columns": {

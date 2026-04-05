@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:a22c4aae2f66256a0ae9f420ba7df8279400ef1ba48cea0d5c8108fe75add1a5'>;
+  StorageHashBase<'sha256:99a82b11f6eec3a625667433233f1a8fa2cf42a8b09b972f60698f876531ac61'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:ffb5695057210e1ee881df6416346aaecf70da6d20a560e9d5cbd7fe723ff342'>;
 export type ProfileHash =
@@ -151,11 +151,11 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: { readonly nullable: false; readonly codecId: 'sql/char@1' };
-        readonly title: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        readonly userId: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        readonly createdAt: { readonly nullable: false; readonly codecId: 'pg/timestamptz@1' };
-        readonly embedding: { readonly nullable: true; readonly codecId: 'pg/vector@1' };
+        readonly id: Char<36>;
+        readonly title: CodecTypes['pg/text@1']['output'];
+        readonly userId: CodecTypes['pg/text@1']['output'];
+        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly embedding: Vector<1536> | null;
       };
       readonly relations: {
         readonly user: {
@@ -179,10 +179,10 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: { readonly nullable: false; readonly codecId: 'sql/char@1' };
-        readonly email: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        readonly createdAt: { readonly nullable: false; readonly codecId: 'pg/timestamptz@1' };
-        readonly kind: { readonly nullable: false; readonly codecId: 'pg/enum@1' };
+        readonly id: Char<36>;
+        readonly email: CodecTypes['pg/text@1']['output'];
+        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly kind: 'admin' | 'user';
       };
       readonly relations: {
         readonly posts: {
@@ -198,9 +198,6 @@ type ContractBase = ContractShape<
   }
 > & {
   readonly target: 'postgres';
-  readonly targetFamily: 'sql';
-  readonly profileHash: ProfileHash;
-  readonly meta: Record<string, never>;
   readonly roots: { readonly user: 'User'; readonly post: 'Post' };
   readonly capabilities: {
     readonly postgres: {
@@ -275,8 +272,9 @@ type ContractBase = ContractShape<
         },
       ];
     };
-    readonly executionHash: ExecutionHash;
+    readonly executionHash: 'sha256:ffb5695057210e1ee881df6416346aaecf70da6d20a560e9d5cbd7fe723ff342';
   };
+  readonly profileHash: ProfileHash;
 };
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
