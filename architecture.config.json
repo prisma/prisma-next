@@ -247,9 +247,9 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/2-mongo-family/1-core/**",
+      "glob": "packages/2-mongo-family/1-foundation/**",
       "domain": "mongo",
-      "layer": "core",
+      "layer": "foundation",
       "plane": "shared"
     },
     {
@@ -259,34 +259,40 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/2-mongo-family/2-query/**",
-      "domain": "mongo",
-      "layer": "query",
-      "plane": "shared"
-    },
-    {
       "glob": "packages/2-mongo-family/3-tooling/emitter/**",
       "domain": "mongo",
       "layer": "tooling",
       "plane": "migration"
     },
     {
+      "glob": "packages/2-mongo-family/4-query/**",
+      "domain": "mongo",
+      "layer": "query",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/2-mongo-family/5-query-builders/**",
+      "domain": "mongo",
+      "layer": "query-builders",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/2-mongo-family/6-transport/**",
+      "domain": "mongo",
+      "layer": "transport",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/2-mongo-family/7-runtime/**",
+      "domain": "mongo",
+      "layer": "runtime",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/2-mongo-family/9-family/**",
       "domain": "mongo",
       "layer": "family",
       "plane": "migration"
-    },
-    {
-      "glob": "packages/2-mongo-family/4-orm/**",
-      "domain": "mongo",
-      "layer": "orm",
-      "plane": "runtime"
-    },
-    {
-      "glob": "packages/2-mongo-family/5-runtime/**",
-      "domain": "mongo",
-      "layer": "runtime",
-      "plane": "runtime"
     },
     {
       "glob": "packages/3-mongo-target/1-mongo-target/src/exports/pack.ts",
@@ -364,6 +370,15 @@
   "layerOrder": {
     "framework": ["foundation", "core", "authoring", "tooling", "runtime-executor"],
     "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers", "family"],
-    "mongo": ["core", "authoring", "query", "tooling", "lanes", "orm", "runtime", "family"]
+    "mongo": [
+      "foundation",
+      "authoring",
+      "tooling",
+      "query",
+      "query-builders",
+      "transport",
+      "runtime",
+      "family"
+    ]
   }
 }
