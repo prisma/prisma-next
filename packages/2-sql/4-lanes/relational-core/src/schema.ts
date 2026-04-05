@@ -1,6 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
-import { planInvalid } from '@prisma-next/plan';
 import type {
   ExtractTypeMapsFromContract,
   ResolveCodecTypes,
@@ -9,6 +8,7 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
 import { type BinaryOp, ColumnRef, type ExpressionSource, type TableRef } from './ast/types';
+import { planInvalid } from './errors';
 import { attachOperationsToColumnBuilder } from './operations-registry';
 import type { ExecutionContext } from './query-lane-context';
 import type {

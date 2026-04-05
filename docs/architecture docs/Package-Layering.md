@@ -56,7 +56,6 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 * 1-framework
 |-- 1-core/shared (shared plane)
 |   |-- contract/      → @prisma-next/contract
-|   |-- plan/          → @prisma-next/plan
 |   |-- operations/    → @prisma-next/operations
 |-- 1-core/migration (migration plane)
 |   |-- control-plane/ → @prisma-next/core-control-plane
@@ -194,7 +193,6 @@ Plane import constraints are enforced declaratively via `planeRules` in `archite
 The innermost layer containing target-family agnostic types and utilities.
 
 **Shared Plane:**
-- `packages/1-framework/1-core/shared/plan/` → `@prisma-next/plan` - Plan helpers, diagnostics, shared errors
 - `packages/1-framework/1-core/shared/operations/` → `@prisma-next/operations` - Target-neutral operation registry + capability helpers
 - `packages/1-framework/1-core/shared/contract/` → `@prisma-next/contract` - Core contract types + plan metadata
 
@@ -285,7 +283,6 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | Directory | Published Package Name |
 |-----------|------------------------|
 | `packages/1-framework/1-core/shared/contract/` | `@prisma-next/contract` |
-| `packages/1-framework/1-core/shared/plan/` | `@prisma-next/plan` |
 | `packages/1-framework/1-core/shared/operations/` | `@prisma-next/operations` |
 | `packages/1-framework/1-core/migration/control-plane/` | `@prisma-next/core-control-plane` |
 | `packages/1-framework/1-core/runtime/execution-plane/` | `@prisma-next/core-execution-plane` |

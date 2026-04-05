@@ -230,7 +230,7 @@ const includeForMeta: IncludeState = compact({
 import type { ParamDescriptor, Plan } from '@prisma-next/contract/types';
 
 // 2. External value imports
-import { planInvalid } from '@prisma-next/plan';
+import { planInvalid } from '@prisma-next/sql-relational-core/errors';
 
 // 3. Internal type imports
 import type { OrmContext } from '../orm/context';

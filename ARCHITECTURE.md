@@ -86,7 +86,6 @@ See [`architecture.config.json`](./architecture.config.json) for the complete do
 ### Framework Domain (Target-Agnostic)
 
 - **`@prisma-next/contract`** — Core contract types (`ContractBase`, `Source`)
-- **`@prisma-next/plan`** — Plan helpers, diagnostics, and shared errors
 - **`@prisma-next/operations`** — Target-neutral operation registry and capability helpers
 - **`@prisma-next/contract-authoring`** — TS builders, canonicalization, schema DSL
 - **`@prisma-next/cli`** — CLI tooling for contract emission
