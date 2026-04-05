@@ -1,12 +1,12 @@
 export type {
-  AnyMongoWireCommand,
   DeleteManyResult,
   DeleteOneResult,
   InsertManyResult,
   InsertOneResult,
   UpdateManyResult,
   UpdateOneResult,
-} from '@prisma-next/mongo-wire';
+} from '../results';
+export type { AnyMongoWireCommand } from '../wire-commands';
 export {
   AggregateWireCommand,
   DeleteManyWireCommand,
@@ -17,6 +17,4 @@ export {
   InsertOneWireCommand,
   UpdateManyWireCommand,
   UpdateOneWireCommand,
-} from '@prisma-next/mongo-wire';
-export type { MongoAdapter, MongoQueryPlanLike } from '../adapter-types';
-export type { MongoDriver } from '../driver-types';
+} from '../wire-commands';

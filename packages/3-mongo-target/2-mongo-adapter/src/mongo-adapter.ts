@@ -1,8 +1,7 @@
-import type {
-  AnyMongoWireCommand,
-  MongoAdapter,
-  MongoQueryPlanLike,
-} from '@prisma-next/mongo-core';
+import type { MongoAdapter, MongoQueryPlanLike } from '@prisma-next/mongo-core';
+import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast';
+import type { Document, MongoExpr } from '@prisma-next/mongo-value';
+import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import {
   AggregateWireCommand,
   DeleteManyWireCommand,
@@ -13,9 +12,7 @@ import {
   InsertOneWireCommand,
   UpdateManyWireCommand,
   UpdateOneWireCommand,
-} from '@prisma-next/mongo-core';
-import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast';
-import type { Document, MongoExpr } from '@prisma-next/mongo-value';
+} from '@prisma-next/mongo-wire';
 import { lowerFilter, lowerPipeline } from './lowering';
 import { resolveValue } from './resolve-value';
 

@@ -1,4 +1,3 @@
-import type { AnyMongoWireCommand } from '@prisma-next/mongo-core';
 import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast';
 import {
   AggregateCommand,
@@ -15,6 +14,7 @@ import {
   UpdateOneCommand,
 } from '@prisma-next/mongo-query-ast';
 import { MongoParamRef } from '@prisma-next/mongo-value';
+import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import { describe, expect, it } from 'vitest';
 import { createMongoAdapter } from '../src/mongo-adapter';
 
