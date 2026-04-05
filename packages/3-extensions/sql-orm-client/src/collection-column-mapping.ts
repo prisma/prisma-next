@@ -1,8 +1,9 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { getFieldToColumnMap } from './collection-contract';
 
 export function mapFieldsToColumns(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   fieldNames: readonly string[],
 ): string[] {
@@ -11,7 +12,7 @@ export function mapFieldsToColumns(
 }
 
 export function mapCursorValuesToColumns(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   cursorValues: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {

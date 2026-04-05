@@ -1,9 +1,5 @@
-import type {
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   BinaryExpr,
@@ -25,7 +21,7 @@ export interface PostgresAdapterOptions {
   readonly profileId?: string;
 }
 
-export type PostgresContract = SqlContract<SqlStorage> & { readonly target: 'postgres' };
+export type PostgresContract = Contract<SqlStorage> & { readonly target: 'postgres' };
 
 export type Expr = ColumnRef | ParamRef | DefaultValueExpr;
 

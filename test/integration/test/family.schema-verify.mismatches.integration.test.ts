@@ -1,11 +1,12 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
@@ -69,7 +70,7 @@ describe('family instance schemaVerify', () => {
             }),
           );
 
-          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const validatedContract = validateContract<Contract<SqlStorage>>(contract);
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
           > = [postgres, postgresAdapter];
@@ -140,7 +141,7 @@ describe('family instance schemaVerify', () => {
             }),
           );
 
-          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const validatedContract = validateContract<Contract<SqlStorage>>(contract);
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
           > = [postgres, postgresAdapter];
@@ -214,7 +215,7 @@ describe('family instance schemaVerify', () => {
             }),
           );
 
-          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const validatedContract = validateContract<Contract<SqlStorage>>(contract);
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
           > = [postgres, postgresAdapter];
@@ -303,7 +304,7 @@ describe('family instance schemaVerify', () => {
             }),
           );
 
-          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const validatedContract = validateContract<Contract<SqlStorage>>(contract);
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
           > = [postgres, postgresAdapter];

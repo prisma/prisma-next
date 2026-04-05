@@ -1,5 +1,5 @@
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   ComponentDatabaseDependency,
@@ -13,12 +13,7 @@ import {
   extractCodecControlHooks,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type {
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 import { postgresRenderDefault } from '../../src/exports/control';
@@ -51,28 +46,25 @@ function table(
 
 function createTestContract(
   storage: Omit<SqlStorage, 'storageHash'>,
-  overrides?: Partial<SqlContract<SqlStorage>>,
-): SqlContract<SqlStorage> {
+  overrides?: Partial<Contract<SqlStorage>>,
+): Contract<SqlStorage> {
   const storageHashValue = coreHash('sha256:test');
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: storageHashValue,
-    profileHash: profileHash('sha256:profile'),
+    profileHash: profileHash('sha256:test'),
     storage: { ...storage, storageHash: storageHashValue },
     roots: {},
     models: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
     ...overrides,
   };
 }
 
 function contractToSchemaIR(
-  contract: SqlContract<SqlStorage> | null,
+  contract: Contract<SqlStorage> | null,
   options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,
 ) {
   return contractToSchemaIRImpl(contract, { annotationNamespace: 'pg', ...options });
@@ -801,22 +793,19 @@ const DEMO_BASE_STORAGE: SqlStorage = {
 
 function createDemoContract(
   storage: Omit<SqlStorage, 'storageHash'>,
-  overrides?: Partial<SqlContract<SqlStorage>>,
-): SqlContract<SqlStorage> {
+  overrides?: Partial<Contract<SqlStorage>>,
+): Contract<SqlStorage> {
   const storageHashValue = coreHash('sha256:demo');
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: storageHashValue,
-    profileHash: profileHash('sha256:demo-profile'),
+    profileHash: profileHash('sha256:test'),
     storage: { ...storage, storageHash: storageHashValue },
     roots: {},
     models: {},
     capabilities: {},
     extensionPacks: { pgvector: {} },
     meta: {},
-    sources: {},
     ...overrides,
   };
 }

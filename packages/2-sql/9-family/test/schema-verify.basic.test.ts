@@ -1,5 +1,5 @@
-import { coreHash, type StorageHashBase } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { type Contract, profileHash, type StorageHashBase } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
@@ -41,11 +41,10 @@ describe('verifySqlSchema - basic', () => {
     });
 
     it('treats parameterized native types as matching when expanded', () => {
-      const contract: SqlContract<SqlStorage> = {
-        schemaVersion: '1',
+      const contract: Contract<SqlStorage> = {
         target: 'postgres',
         targetFamily: 'sql',
-        storageHash: coreHash('sha256:test'),
+        profileHash: profileHash('sha256:test'),
         storage: {
           storageHash: 'sha256:test' as StorageHashBase<string>,
           tables: {
@@ -70,7 +69,6 @@ describe('verifySqlSchema - basic', () => {
         capabilities: {},
         extensionPacks: {},
         meta: {},
-        sources: {},
       };
 
       const schema = createTestSchemaIR({
@@ -194,11 +192,10 @@ describe('verifySqlSchema - basic', () => {
     });
 
     it('reports type mismatch when schema omits parameters', () => {
-      const contract: SqlContract<SqlStorage> = {
-        schemaVersion: '1',
+      const contract: Contract<SqlStorage> = {
         target: 'postgres',
         targetFamily: 'sql',
-        storageHash: coreHash('sha256:test'),
+        profileHash: profileHash('sha256:test'),
         storage: {
           storageHash: 'sha256:test' as StorageHashBase<string>,
           tables: {
@@ -223,7 +220,6 @@ describe('verifySqlSchema - basic', () => {
         capabilities: {},
         extensionPacks: {},
         meta: {},
-        sources: {},
       };
 
       const schema = createTestSchemaIR({

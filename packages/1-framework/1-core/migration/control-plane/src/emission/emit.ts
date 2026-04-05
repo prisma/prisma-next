@@ -1,66 +1,14 @@
-import { bigintJsonReplacer, type Contract, type StorageBase } from '@prisma-next/contract/types';
+import { bigintJsonReplacer, type Contract } from '@prisma-next/contract/types';
 import type {
   TargetFamilyHook,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { type } from 'arktype';
 import { format } from 'prettier';
 import { canonicalizeContractToObject } from './canonicalization';
 import type { EmitResult, EmitStackInput } from './types';
 
 const SCHEMA_VERSION = '1';
-
-const CanonicalMetaSchema = type({
-  '[string]': 'unknown',
-});
-
-const ContractJsonSchema = type({
-  '+': 'reject',
-  schemaVersion: 'string',
-  targetFamily: 'string',
-  target: 'string',
-  profileHash: 'string',
-  models: type({ '[string]': 'unknown' }),
-  roots: 'Record<string, string>',
-  storage: type({ '[string]': 'unknown' }),
-  'execution?': type({ '[string]': 'unknown' }),
-  extensionPacks: type({ '[string]': 'unknown' }),
-  capabilities: type({
-    '[string]': type({
-      '[string]': 'boolean',
-    }),
-  }),
-  meta: CanonicalMetaSchema,
-});
-
-function stripStorageHash(storage: StorageBase): Record<string, unknown> {
-  const { storageHash: _, ...rest } = storage as Record<string, unknown> & {
-    storageHash: unknown;
-  };
-  return rest;
-}
-
-function stripExecutionHash(
-  execution: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
-  if (!execution) return undefined;
-  const { executionHash: _, ...rest } = execution;
-  return rest;
-}
-
-function assertCanonicalArtifactShape(value: unknown): void {
-  const result = ContractJsonSchema(value);
-  if (result instanceof type.errors) {
-    const issues = result
-      .map((error) => {
-        const path = error.path?.toString() ?? '<root>';
-        return `${path}: ${error.message}`;
-      })
-      .join('; ');
-    throw new Error(`Contract canonical artifact validation failed: ${issues}`);
-  }
-}
 
 export async function emit(
   contract: Contract,
@@ -87,36 +35,13 @@ export async function emit(
 
   targetFamily.validateStructure(contract);
 
-  const canonicalContract = {
-    schemaVersion: SCHEMA_VERSION,
-    targetFamily: contract.targetFamily,
-    target: contract.target,
-    profileHash: contract.profileHash,
-    roots: contract.roots,
-    models: contract.models as Record<string, unknown>,
-    storage: stripStorageHash(contract.storage),
-    ...ifDefined(
-      'execution',
-      stripExecutionHash(contract.execution as Record<string, unknown> | undefined),
-    ),
-    extensionPacks: contract.extensionPacks,
-    capabilities: contract.capabilities,
-    meta: contract.meta,
-  };
-  assertCanonicalArtifactShape(canonicalContract);
-
   const { storageHash } = contract.storage;
   const executionHash = contract.execution?.executionHash;
   const { profileHash } = contract;
 
-  const contractWithHashes = {
-    ...canonicalContract,
-    storageHash,
-    ...ifDefined('executionHash', executionHash),
-    profileHash,
-  };
-
-  const canonicalized = canonicalizeContractToObject(contractWithHashes);
+  const canonicalized = canonicalizeContractToObject(contract, {
+    schemaVersion: SCHEMA_VERSION,
+  });
   const contractJsonString = JSON.stringify(
     {
       ...canonicalized,

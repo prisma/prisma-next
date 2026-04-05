@@ -1,24 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../src/contract-types';
-import type {
-  ContractDiscriminator,
-  ContractEmbedRelation,
-  ContractField,
-  ContractModel,
-  ContractReferenceRelation,
-  ContractRelation,
-  ContractRelationOn,
-  ContractVariantEntry,
-  DomainDiscriminator,
-  DomainEmbedRelation,
-  DomainField,
-  DomainModel,
-  DomainReferenceRelation,
-  DomainRelation,
-  DomainRelationOn,
-  DomainVariantEntry,
-  ModelStorageBase,
-} from '../src/domain-types';
+import type { ContractModel, ModelStorageBase } from '../src/domain-types';
 import type { StorageBase, StorageHashBase } from '../src/types';
 
 // ── Example literal types for proofs ─────────────────────────────────────────
@@ -63,40 +45,6 @@ type ExampleStorage = StorageBase<'sha256:abc123'> & {
 };
 
 type ExampleContract = Contract<ExampleStorage, ExampleModels>;
-
-// ── Contract* and Domain* alias equivalence ──────────────────────────────────
-
-test('ContractField equals DomainField', () => {
-  expectTypeOf<ContractField>().toEqualTypeOf<DomainField>();
-});
-
-test('ContractRelationOn equals DomainRelationOn', () => {
-  expectTypeOf<ContractRelationOn>().toEqualTypeOf<DomainRelationOn>();
-});
-
-test('ContractReferenceRelation equals DomainReferenceRelation', () => {
-  expectTypeOf<ContractReferenceRelation>().toEqualTypeOf<DomainReferenceRelation>();
-});
-
-test('ContractEmbedRelation equals DomainEmbedRelation', () => {
-  expectTypeOf<ContractEmbedRelation>().toEqualTypeOf<DomainEmbedRelation>();
-});
-
-test('ContractRelation equals DomainRelation', () => {
-  expectTypeOf<ContractRelation>().toEqualTypeOf<DomainRelation>();
-});
-
-test('ContractDiscriminator equals DomainDiscriminator', () => {
-  expectTypeOf<ContractDiscriminator>().toEqualTypeOf<DomainDiscriminator>();
-});
-
-test('ContractVariantEntry equals DomainVariantEntry', () => {
-  expectTypeOf<ContractVariantEntry>().toEqualTypeOf<DomainVariantEntry>();
-});
-
-test('ContractModel equals DomainModel', () => {
-  expectTypeOf<ContractModel>().toEqualTypeOf<DomainModel>();
-});
 
 // ── ContractModel generic storage ────────────────────────────────────────────
 

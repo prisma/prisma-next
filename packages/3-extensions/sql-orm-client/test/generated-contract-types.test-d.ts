@@ -1,10 +1,5 @@
-import type { StorageHashBase } from '@prisma-next/contract/types';
-import type {
-  ContractWithTypeMaps,
-  SqlContract,
-  SqlStorage,
-  TypeMaps,
-} from '@prisma-next/sql-contract/types';
+import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
+import type { ContractWithTypeMaps, SqlStorage, TypeMaps } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
 
@@ -27,7 +22,7 @@ type GeneratedLikeCodecTypes = {
 
 type GeneratedLikeTypeMaps = TypeMaps<GeneratedLikeCodecTypes>;
 
-type GeneratedLikeContractBase = SqlContract<
+type GeneratedLikeContractBase = Contract<
   {
     storageHash: StorageHashBase<string>;
     tables: {
@@ -70,11 +65,11 @@ type GeneratedLikeContractBase = SqlContract<
         };
       };
       fields: {
-        id: string;
-        name: string;
-        email: string;
-        active: boolean;
-        metadata: unknown;
+        id: { readonly nullable: false; readonly codecId: 'pg/text@1' };
+        name: { readonly nullable: false; readonly codecId: 'pg/text@1' };
+        email: { readonly nullable: false; readonly codecId: 'pg/text@1' };
+        active: { readonly nullable: false; readonly codecId: 'pg/bool@1' };
+        metadata: { readonly nullable: false; readonly codecId: 'pg/jsonb@1' };
       };
       relations: {
         posts: {
@@ -97,9 +92,9 @@ type GeneratedLikeContractBase = SqlContract<
         };
       };
       fields: {
-        id: string;
-        userId: string;
-        title: string;
+        id: { readonly nullable: false; readonly codecId: 'pg/text@1' };
+        userId: { readonly nullable: false; readonly codecId: 'pg/text@1' };
+        title: { readonly nullable: false; readonly codecId: 'pg/text@1' };
       };
       relations: Record<string, never>;
     };
@@ -116,7 +111,7 @@ class PostCollection extends Collection<GeneratedLikeContract, 'Post'> {
 
 type RowOf<TCollection> =
   TCollection extends Collection<
-    infer _Contract extends SqlContract<SqlStorage>,
+    infer _Contract extends Contract<SqlStorage>,
     infer _ModelName extends string,
     infer Row,
     infer _State
@@ -126,7 +121,7 @@ type RowOf<TCollection> =
 
 type StateOf<TCollection> =
   TCollection extends Collection<
-    infer _Contract extends SqlContract<SqlStorage>,
+    infer _Contract extends Contract<SqlStorage>,
     infer _ModelName extends string,
     infer _Row,
     infer State

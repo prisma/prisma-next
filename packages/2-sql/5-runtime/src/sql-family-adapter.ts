@@ -1,11 +1,11 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
 import type {
   MarkerReader,
   MarkerStatement,
   RuntimeFamilyAdapter,
 } from '@prisma-next/runtime-executor';
 import { runtimeError } from '@prisma-next/runtime-executor';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { readContractMarker } from './sql-marker';
 
 class SqlMarkerReader implements MarkerReader {
@@ -14,7 +14,7 @@ class SqlMarkerReader implements MarkerReader {
   }
 }
 
-export class SqlFamilyAdapter<TContract extends SqlContract<SqlStorage>>
+export class SqlFamilyAdapter<TContract extends Contract<SqlStorage>>
   implements RuntimeFamilyAdapter<TContract>
 {
   readonly contract: TContract;
@@ -33,13 +33,13 @@ export class SqlFamilyAdapter<TContract extends SqlContract<SqlStorage>>
       });
     }
 
-    if (plan.meta.storageHash !== contract.storageHash) {
+    if (plan.meta.storageHash !== contract.storage.storageHash) {
       throw runtimeError(
         'PLAN.HASH_MISMATCH',
         'Plan storage hash does not match runtime contract',
         {
           planStorageHash: plan.meta.storageHash,
-          runtimeStorageHash: contract.storageHash,
+          runtimeStorageHash: contract.storage.storageHash,
         },
       );
     }

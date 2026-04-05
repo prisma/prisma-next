@@ -1,9 +1,9 @@
-import { coreHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
@@ -50,11 +50,10 @@ describe('PostgresMigrationPlanner - storage types', () => {
       },
     ];
 
-    const contract: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
+    const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: coreHash('sha256:contract'),
+      profileHash: profileHash('sha256:test'),
       storage: {
         storageHash: coreHash('sha256:test'),
         tables: {
@@ -87,7 +86,6 @@ describe('PostgresMigrationPlanner - storage types', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-      sources: {},
     };
 
     const result = planner.plan({
@@ -136,11 +134,10 @@ describe('PostgresMigrationPlanner - storage types', () => {
       },
     ];
 
-    const contract: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
+    const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: coreHash('sha256:contract'),
+      profileHash: profileHash('sha256:test'),
       storage: {
         storageHash: coreHash('sha256:test'),
         tables: {},
@@ -157,7 +154,6 @@ describe('PostgresMigrationPlanner - storage types', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-      sources: {},
     };
 
     const result = planner.plan({
@@ -214,11 +210,10 @@ describe('PostgresMigrationPlanner - storage types', () => {
       },
     ];
 
-    const contract: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
+    const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: coreHash('sha256:contract'),
+      profileHash: profileHash('sha256:test'),
       storage: {
         storageHash: coreHash('sha256:test'),
         tables: {
@@ -251,7 +246,6 @@ describe('PostgresMigrationPlanner - storage types', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-      sources: {},
     };
 
     const result = planner.plan({
@@ -275,11 +269,10 @@ describe('PostgresMigrationPlanner - storage types', () => {
 
   it('expands parameterized storage type refs when creating tables', () => {
     const planner = createPostgresMigrationPlanner();
-    const contract: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
+    const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: coreHash('sha256:contract'),
+      profileHash: profileHash('sha256:test'),
       storage: {
         storageHash: coreHash('sha256:test'),
         tables: {
@@ -312,7 +305,6 @@ describe('PostgresMigrationPlanner - storage types', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-      sources: {},
     };
 
     const result = planner.plan({
@@ -334,11 +326,10 @@ describe('PostgresMigrationPlanner - storage types', () => {
 
   it('fails when parameterized storage type refs cannot expand without codec hooks', () => {
     const planner = createPostgresMigrationPlanner();
-    const contract: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
+    const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: coreHash('sha256:contract'),
+      profileHash: profileHash('sha256:test'),
       storage: {
         storageHash: coreHash('sha256:test'),
         tables: {
@@ -371,7 +362,6 @@ describe('PostgresMigrationPlanner - storage types', () => {
       capabilities: {},
       extensionPacks: {},
       meta: {},
-      sources: {},
     };
 
     expect(() =>

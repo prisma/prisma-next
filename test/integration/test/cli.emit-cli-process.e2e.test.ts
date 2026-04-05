@@ -4,8 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
-import type { StorageHashBase } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract, ContractRelation, StorageHashBase } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFile);
 // Fixture subdirectory for emit-command tests
 const fixtureSubdir = 'emit-command';
 
-type EmittedContract = SqlContract<
+type EmittedContract = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {
@@ -43,12 +43,18 @@ type EmittedContract = SqlContract<
   },
   {
     readonly User: {
-      readonly storage: { readonly table: 'user' };
       readonly fields: {
-        readonly id: { readonly column: 'id' };
-        readonly email: { readonly column: 'email' };
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
       };
-      readonly relations: Record<string, never>;
+      readonly storage: {
+        readonly table: 'user';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly email: { readonly column: 'email' };
+        };
+      };
+      readonly relations: Record<string, ContractRelation>;
     };
   }
 >;

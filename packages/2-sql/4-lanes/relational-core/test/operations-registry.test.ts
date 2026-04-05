@@ -1,7 +1,6 @@
-import type { StorageHashBase } from '@prisma-next/contract/types';
+import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import type {
   ContractWithTypeMaps,
-  SqlContract,
   StorageColumn,
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
@@ -18,7 +17,7 @@ import { ColumnBuilderImpl, schema } from '../src/schema';
 import type { ColumnBuilder } from '../src/types';
 import { createStubAdapter, createTestContext } from './utils';
 
-type TestContract = SqlContract<
+type TestContract = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {
@@ -45,7 +44,7 @@ type TestContract = SqlContract<
   Record<string, never>
 >;
 
-type TestContractWithIdOnly = SqlContract<
+type TestContractWithIdOnly = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {
@@ -82,8 +81,12 @@ describe('operations-registry', () => {
   const contract = validateContract<TestContract>({
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'test-hash',
+    profileHash: 'sha256:test',
+    roots: {},
+    extensionPacks: {},
+    meta: {},
     storage: {
+      storageHash: 'test-hash',
       tables: {
         user: {
           columns: {
@@ -98,6 +101,7 @@ describe('operations-registry', () => {
       },
     },
     models: {},
+    capabilities: {},
   });
 
   it('attaches operations when registry is provided', () => {
@@ -157,8 +161,12 @@ describe('operations-registry', () => {
     const contractWithoutCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -173,13 +181,18 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const contractWithCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -256,8 +269,12 @@ describe('operations-registry', () => {
     const contractWithFalseCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -312,8 +329,12 @@ describe('operations-registry', () => {
     const contractWithPartialCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -339,8 +360,12 @@ describe('operations-registry', () => {
     const contractWithAllCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -447,8 +472,12 @@ describe('operations-registry', () => {
     const contractWithoutCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -463,6 +492,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -596,8 +626,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -611,6 +645,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -665,8 +700,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -680,6 +719,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -740,8 +780,12 @@ describe('operations-registry', () => {
     const contractWithoutCaps = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -755,6 +799,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -819,8 +864,12 @@ describe('operations-registry', () => {
     const contractWithFalseCaps = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -888,8 +937,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -903,6 +956,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -946,8 +1000,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -961,6 +1019,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1016,8 +1075,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1031,6 +1094,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1091,8 +1155,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1106,6 +1174,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1140,8 +1209,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1155,6 +1228,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1177,8 +1251,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1192,6 +1270,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1250,8 +1329,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1265,6 +1348,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1290,8 +1374,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1305,6 +1393,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1353,8 +1442,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1368,6 +1461,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1397,8 +1491,13 @@ describe('operations-registry', () => {
       contractInput: {
         target: 'postgres',
         targetFamily: 'sql',
-        storageHash: 'test-hash',
+        profileHash: 'sha256:test',
+        roots: {},
+        capabilities: {},
+        extensionPacks: {},
+        meta: {},
         storage: {
+          storageHash: 'test-hash',
           tables: {
             user: {
               columns: {
@@ -1421,8 +1520,12 @@ describe('operations-registry', () => {
       contractInput: {
         target: 'postgres',
         targetFamily: 'sql',
-        storageHash: 'test-hash',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
         storage: {
+          storageHash: 'test-hash',
           tables: {
             user: {
               columns: {
@@ -1450,8 +1553,12 @@ describe('operations-registry', () => {
       contractInput: {
         target: 'postgres',
         targetFamily: 'sql',
-        storageHash: 'test-hash',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
         storage: {
+          storageHash: 'test-hash',
           tables: {
             user: {
               columns: {
@@ -1526,8 +1633,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1541,6 +1652,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1574,8 +1686,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1589,6 +1705,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();
@@ -1635,8 +1752,12 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'test-hash',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
       storage: {
+        storageHash: 'test-hash',
         tables: {
           user: {
             columns: {
@@ -1650,6 +1771,7 @@ describe('operations-registry', () => {
         },
       },
       models: {},
+      capabilities: {},
     });
 
     const adapter = createStubAdapter();

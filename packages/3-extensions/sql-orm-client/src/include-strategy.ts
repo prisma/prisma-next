@@ -1,8 +1,9 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 
 export type IncludeStrategy = 'lateral' | 'correlated' | 'multiQuery';
 
-export function selectIncludeStrategy(contract: SqlContract<SqlStorage>): IncludeStrategy {
+export function selectIncludeStrategy(contract: Contract<SqlStorage>): IncludeStrategy {
   const capabilities = contract.capabilities as Record<string, unknown> | undefined;
   const hasLateral = hasCapability(capabilities?.['lateral']);
   const hasJsonAgg = hasCapability(capabilities?.['jsonAgg']);

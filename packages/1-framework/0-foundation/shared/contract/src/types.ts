@@ -1,5 +1,3 @@
-import type { DomainModel } from './domain-types';
-
 /**
  * Unique symbol used as the key for branding types.
  */
@@ -57,26 +55,6 @@ export function profileHash<const T extends string>(value: T): ProfileHashBase<T
  */
 export interface StorageBase<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
-}
-
-export interface ContractBase<
-  TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
-  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
-  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> {
-  readonly schemaVersion: string;
-  readonly target: string;
-  readonly targetFamily: string;
-  readonly storageHash: TStorageHash;
-  readonly executionHash?: TExecutionHash;
-  readonly profileHash?: TProfileHash;
-  readonly capabilities: Record<string, Record<string, boolean>>;
-  readonly extensionPacks: Record<string, unknown>;
-  readonly meta: Record<string, unknown>;
-  readonly sources: Record<string, Source>;
-  readonly execution?: ExecutionSection;
-  readonly roots: Record<string, string>;
-  readonly models: Record<string, DomainModel>;
 }
 
 export interface FieldType {
@@ -188,22 +166,6 @@ export interface DocCollection {
   readonly readOnly?: boolean;
 }
 
-export interface DocumentStorage {
-  readonly document: {
-    readonly collections: Record<string, DocCollection>;
-  };
-}
-
-export interface DocumentContract<
-  TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
-  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
-  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> extends ContractBase<TStorageHash, TExecutionHash, TProfileHash> {
-  // Accept string to work with JSON imports; runtime validation ensures 'document'
-  readonly targetFamily: string;
-  readonly storage: DocumentStorage;
-}
-
 // Plan types - target-family agnostic execution types
 export interface ParamDescriptor {
   readonly index?: number;
@@ -276,18 +238,6 @@ export interface ExecutionPlan<Row = unknown, Ast = unknown> {
  */
 export type ResultType<P> =
   P extends ExecutionPlan<infer R, unknown> ? R : P extends { readonly _Row?: infer R } ? R : never;
-
-/**
- * Type guard to check if a contract is a Document contract
- */
-export function isDocumentContract(contract: unknown): contract is DocumentContract {
-  return (
-    typeof contract === 'object' &&
-    contract !== null &&
-    'targetFamily' in contract &&
-    contract.targetFamily === 'document'
-  );
-}
 
 /**
  * Contract marker record stored in the database.

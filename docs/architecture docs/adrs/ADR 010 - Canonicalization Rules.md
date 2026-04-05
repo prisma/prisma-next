@@ -62,7 +62,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 
 - Omit fields that are equal to their canonical defaults
 - **Canonical defaults**:
-  - `nullable: false` on columns omitted unless true
+  - `nullable` is always explicit (never omitted) — see ADR 172
   - `generated: false` omitted
   - Empty arrays and empty objects omitted unless required for schema readability (tables and models must be present, even if empty)
   - Capability flags omitted when false and recorded only when true
@@ -115,7 +115,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 ### Minimal canonical object
 
 ```json
-{"schemaVersion":"1","canonicalVersion":1,"targetFamily":"sql","target":"postgres","storageHash":"sha256:...","models":{},"storage":{"tables":{}}}
+{"schemaVersion":"1","targetFamily":"sql","target":"postgres","profileHash":"sha256:...","models":{},"storage":{"storageHash":"sha256:...","tables":{}}}
 ```
 
 ### With capabilities
@@ -123,7 +123,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 `capabilities` records contract requirements. Adapters still negotiate and verify support at connect time; this example only shows required keys captured in the contract.
 
 ```json
-{"schemaVersion":"1","canonicalVersion":1,"targetFamily":"sql","target":"postgres","storageHash":"sha256:...","profileHash":"sha256:...","models":{"User":{"storage":{"table":"user"},"fields":{"id":{"column":"id"},"email":{"column":"email"}}}},"storage":{"tables":{"user":{"columns":{"email":{"type":"text"},"id":{"type":"int4"}},"primaryKey":{"columns":["id"],"name":"user_pkey"}}}},"capabilities":{"sql":{"jsonAgg":true,"lateral":true}},"codecs":{"int4":{"ts":"number"},"text":{"ts":"string"}}}
+{"schemaVersion":"1","targetFamily":"sql","target":"postgres","profileHash":"sha256:...","models":{"User":{"fields":{"email":{"codecId":"text","nullable":false},"id":{"codecId":"int4","nullable":false}},"storage":{"table":"user"}}},"storage":{"storageHash":"sha256:...","tables":{"user":{"columns":{"email":{"type":"text"},"id":{"type":"int4"}},"primaryKey":{"columns":["id"],"name":"user_pkey"}}}},"capabilities":{"sql":{"jsonAgg":true,"lateral":true}},"codecs":{"int4":{"ts":"number"},"text":{"ts":"string"}}}
 ```
 
 ## Alternatives considered

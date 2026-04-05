@@ -43,23 +43,6 @@ export interface ContractModel<TModelStorage extends ModelStorageBase = ModelSto
 
 // ── Backward-compatible aliases ──────────────────────────────────────────────
 
-/** @deprecated Use {@link ContractField} */
-export type DomainField = ContractField;
-/** @deprecated Use {@link ContractRelationOn} */
-export type DomainRelationOn = ContractRelationOn;
-/** @deprecated Use {@link ContractReferenceRelation} */
-export type DomainReferenceRelation = ContractReferenceRelation;
-/** @deprecated Use {@link ContractEmbedRelation} */
-export type DomainEmbedRelation = ContractEmbedRelation;
-/** @deprecated Use {@link ContractRelation} */
-export type DomainRelation = ContractRelation;
-/** @deprecated Use {@link ContractDiscriminator} */
-export type DomainDiscriminator = ContractDiscriminator;
-/** @deprecated Use {@link ContractVariantEntry} */
-export type DomainVariantEntry = ContractVariantEntry;
-/** @deprecated Use {@link ContractModel} */
-export type DomainModel = ContractModel;
-
 // ── Relation key helpers ─────────────────────────────────────────────────────
 
 type HasModelsWithRelations = {

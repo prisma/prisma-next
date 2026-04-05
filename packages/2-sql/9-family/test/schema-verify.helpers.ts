@@ -2,12 +2,16 @@
  * Shared test helpers for schema verification tests.
  */
 
-import type { ColumnDefault, StorageHashBase } from '@prisma-next/contract/types';
+import {
+  type ColumnDefault,
+  type Contract,
+  profileHash,
+  type StorageHashBase,
+} from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import {
   applyFkDefaults,
   type ReferentialAction,
-  type SqlContract,
   type SqlStorage,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
@@ -26,18 +30,18 @@ import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migra
 export const emptyTypeMetadataRegistry = new Map<string, { nativeType?: string }>();
 
 /**
- * Creates a minimal valid SqlContract for testing.
+ * Creates a minimal valid contract for testing.
  */
 export function createTestContract(
   tables: Record<string, StorageTable>,
   extensionPacks: Record<string, unknown> = {},
   storageTypes?: SqlStorage['types'],
-): SqlContract<SqlStorage> {
+): Contract<SqlStorage> {
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'sha256:test',
+    roots: {},
+    profileHash: profileHash('sha256:test'),
     storage: {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables,
@@ -46,9 +50,8 @@ export function createTestContract(
     models: {},
     capabilities: {},
     meta: {},
-    sources: {},
     extensionPacks,
-  } as SqlContract<SqlStorage>;
+  };
 }
 
 /**

@@ -1,19 +1,24 @@
-// Contract type definitions
-// Example: This pattern allows multiple contracts (e.g., authDataContract.d.ts, salesDataContract.d.ts)
-// without namespace collisions. Each contract can have its own namespace name.
+import type {
+  Contract as ContractShape,
+  ProfileHashBase,
+  StorageHashBase,
+} from '@prisma-next/contract/types';
+import type {
+  ContractWithTypeMaps,
+  TypeMaps as TypeMapsType,
+} from '@prisma-next/sql-contract/types';
 
-import type { StorageHashBase } from '@prisma-next/contract/types';
-import type { ContractWithTypeMaps, SqlContract } from '@prisma-next/sql-contract/types';
-// Minimal CodecTypes for testing - matches adapter-postgres structure
 type CodecTypes = {
   readonly 'pg/int4@1': { output: number };
   readonly 'pg/text@1': { output: string };
   readonly 'pg/timestamptz@1': { output: string };
 };
 
-// Contract type representing the contract data structure
-// This type matches the structure of contract.json and can be used as a return type
-export type Contract = ContractWithTypeMaps<SqlContract<
+export type OperationTypes = Record<string, never>;
+export type QueryOperationTypes = Record<string, never>;
+export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
+
+type ContractBase = ContractShape<
   {
     readonly tables: {
       readonly user: {
@@ -41,6 +46,7 @@ export type Contract = ContractWithTypeMaps<SqlContract<
       };
     };
     readonly storageHash: StorageHashBase<string>;
+    readonly types: Record<string, never>;
   },
   {
     readonly User: {
@@ -60,15 +66,18 @@ export type Contract = ContractWithTypeMaps<SqlContract<
       readonly relations: Record<string, never>;
     };
   }
->, TypeMaps>;
+> & {
+  readonly target: 'postgres';
+  readonly targetFamily: 'sql';
+  readonly profileHash: ProfileHashBase<string>;
+  readonly meta: Record<string, never>;
+  readonly roots: Record<string, string>;
+  readonly capabilities: Record<string, Record<string, boolean>>;
+  readonly extensionPacks: {};
+};
 
-// Codec type map and scalar mapping imported from adapter - used for type inference in lanes
+export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
+
 export type { CodecTypes };
 
-// Operation types (empty for now, can be extended by extension packs)
-export type OperationTypes = Record<string, never>;
-
-export type TypeMaps = { readonly codecTypes: CodecTypes; readonly operationTypes: OperationTypes };
-
-// Direct model exports for easy importing: import type { User } from './contract.d'
 export type User = Contract['models']['User'];

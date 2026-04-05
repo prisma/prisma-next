@@ -1,5 +1,5 @@
-import { coreHash, executionHash } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -15,18 +15,16 @@ import {
   createTestTargetDescriptor,
 } from './utils';
 
-const testContract: SqlContract<SqlStorage> = {
-  schemaVersion: '1',
+const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  storageHash: coreHash('sha256:test'),
+  profileHash: profileHash('sha256:test'),
   models: {},
   roots: {},
   storage: { storageHash: coreHash('sha256:test'), tables: {} },
   extensionPacks: {},
   capabilities: {},
   meta: {},
-  sources: {},
 };
 
 function createTestExtensionDescriptor(options?: {
@@ -230,7 +228,7 @@ describe('contract/stack validation errors', () => {
     const mismatchedFamilyContract = {
       ...testContract,
       targetFamily: 'document',
-    } as unknown as SqlContract<SqlStorage>;
+    } as unknown as Contract<SqlStorage>;
 
     expect(() =>
       createExecutionContext({ contract: mismatchedFamilyContract, stack: createStack() }),
@@ -248,7 +246,7 @@ describe('contract/stack validation errors', () => {
   });
 
   it('throws RUNTIME.CONTRACT_TARGET_MISMATCH when contract target differs from stack', () => {
-    const mismatchedContract: SqlContract<SqlStorage> = {
+    const mismatchedContract: Contract<SqlStorage> = {
       ...testContract,
       target: 'mysql',
     };
@@ -269,7 +267,7 @@ describe('contract/stack validation errors', () => {
   });
 
   it('throws RUNTIME.MISSING_EXTENSION_PACK when contract requires extension not in stack', () => {
-    const contractWithExtension: SqlContract<SqlStorage> = {
+    const contractWithExtension: Contract<SqlStorage> = {
       ...testContract,
       extensionPacks: {
         'required-extension': { id: 'required-extension', version: '1.0.0', capabilities: {} },
@@ -291,7 +289,7 @@ describe('contract/stack validation errors', () => {
   });
 
   it('lists all missing extension packs in a single error', () => {
-    const contractWithExtensions: SqlContract<SqlStorage> = {
+    const contractWithExtensions: Contract<SqlStorage> = {
       ...testContract,
       extensionPacks: {
         'ext-a': { id: 'ext-a', version: '1.0.0', capabilities: {} },
@@ -313,7 +311,7 @@ describe('contract/stack validation errors', () => {
 });
 
 describe('applyMutationDefaults', () => {
-  const contractWithDefaults: SqlContract<SqlStorage> = {
+  const contractWithDefaults: Contract<SqlStorage> = {
     ...testContract,
     storage: {
       storageHash: coreHash('sha256:test'),

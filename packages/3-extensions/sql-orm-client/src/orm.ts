@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from './collection';
 import type {
@@ -10,7 +11,7 @@ import type {
 } from './types';
 
 export interface OrmOptions<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
 > {
   readonly runtime: RuntimeQueryable;
@@ -18,7 +19,7 @@ export interface OrmOptions<
   readonly context: ExecutionContext<TContract>;
 }
 
-type ModelNames<TContract extends SqlContract<SqlStorage>> = CollectionModelName<TContract>;
+type ModelNames<TContract extends Contract<SqlStorage>> = CollectionModelName<TContract>;
 
 type AnyCollectionClass = new (...args: never[]) => object;
 
@@ -32,7 +33,7 @@ type CustomCollectionForKey<
   : never;
 
 type ModelCollection<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
   ModelName extends ModelNames<TContract>,
 > = [CustomCollectionForKey<Collections, ModelName>] extends [never]
@@ -40,19 +41,19 @@ type ModelCollection<
   : CustomCollectionForKey<Collections, ModelName>;
 
 type ModelCollectionMap<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
 > = {
   [K in ModelNames<TContract>]: ModelCollection<TContract, Collections, K>;
 };
 
 type OrmClient<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
 > = ModelCollectionMap<TContract, Collections>;
 
 export function orm<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>> = Record<never, never>,
 >(options: OrmOptions<TContract, Collections>): OrmClient<TContract, Collections> {
   const { runtime, collections, context } = options;
@@ -104,7 +105,7 @@ export function orm<
 }
 
 function createCollectionRegistry<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
 >(
   contract: TContract,

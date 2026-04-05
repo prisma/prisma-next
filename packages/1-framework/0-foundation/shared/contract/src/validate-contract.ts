@@ -1,7 +1,20 @@
 import { type } from 'arktype';
 import type { Contract } from './contract-types';
-import type { DomainContractShape, DomainValidationResult } from './validate-domain';
+import type { DomainContractShape } from './validate-domain';
 import { validateContractDomain } from './validate-domain';
+
+export type ContractValidationPhase = 'structural' | 'domain' | 'storage';
+
+export class ContractValidationError extends Error {
+  readonly code = 'CONTRACT.VALIDATION_FAILED';
+  readonly phase: ContractValidationPhase;
+
+  constructor(message: string, phase: ContractValidationPhase) {
+    super(message);
+    this.name = 'ContractValidationError';
+    this.phase = phase;
+  }
+}
 
 /**
  * Family-provided storage validator.
@@ -9,19 +22,15 @@ import { validateContractDomain } from './validate-domain';
  */
 export type StorageValidator = (contract: Contract) => void;
 
-export interface ValidateContractResult {
-  readonly warnings: string[];
-}
-
 const ContractSchema = type({
   target: 'string',
   targetFamily: 'string',
-  roots: 'Record<string, string>',
+  'roots?': 'Record<string, string>',
   models: 'Record<string, unknown>',
   storage: 'Record<string, unknown>',
-  capabilities: 'Record<string, Record<string, boolean>>',
-  extensionPacks: 'Record<string, unknown>',
-  meta: 'Record<string, unknown>',
+  'capabilities?': 'Record<string, Record<string, boolean>>',
+  'extensionPacks?': 'Record<string, unknown>',
+  'meta?': 'Record<string, unknown>',
   'execution?': {
     'executionHash?': 'string',
     mutations: {
@@ -32,8 +41,18 @@ const ContractSchema = type({
 });
 
 function stripPersistenceFields(raw: Record<string, unknown>): Record<string, unknown> {
-  const { schemaVersion: _, sources: _s, ...rest } = raw;
+  const { schemaVersion: _, sources: _s, _generated: _g, ...rest } = raw;
   return rest;
+}
+
+function applyDefaults(contract: Record<string, unknown>): Record<string, unknown> {
+  return {
+    roots: {},
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    ...contract,
+  };
 }
 
 function extractDomainShape(contract: Contract): DomainContractShape {
@@ -54,8 +73,9 @@ function extractDomainShape(contract: Contract): DomainContractShape {
  * 3. **Storage validation** (family-provided): SQL validates tables/columns/FKs;
  *    Mongo validates collections/embedding.
  *
- * JSON persistence fields (`schemaVersion`, `sources`) are stripped before
- * validation — they are not part of the in-memory contract representation.
+ * JSON persistence fields (`schemaVersion`, `sources`, `_generated`) are
+ * stripped before validation — they are not part of the in-memory contract
+ * representation.
  *
  * @template TContract  The fully-typed contract type (preserves literal types).
  * @param value           Raw contract value (e.g. parsed from JSON).
@@ -65,29 +85,26 @@ function extractDomainShape(contract: Contract): DomainContractShape {
 export function validateContract<TContract extends Contract>(
   value: unknown,
   storageValidator: StorageValidator,
-): TContract & ValidateContractResult {
+): TContract {
   if (typeof value !== 'object' || value === null) {
-    throw new Error('Contract must be a non-null object');
+    throw new ContractValidationError('Contract must be a non-null object', 'structural');
   }
 
   const stripped = stripPersistenceFields(value as Record<string, unknown>);
 
   const parsed = ContractSchema(stripped);
   if (parsed instanceof type.errors) {
-    throw new Error(`Invalid contract structure: ${parsed.summary}`);
+    throw new ContractValidationError(
+      `Invalid contract structure: ${parsed.summary}`,
+      'structural',
+    );
   }
 
-  // Arktype verified the structural shape; Contract adds branded hash types and
-  // ContractModel generics that can't be expressed in the schema.
-  const contract = parsed as unknown as Contract;
+  const contract = applyDefaults(parsed as Record<string, unknown>) as unknown as Contract;
 
-  const domainResult: DomainValidationResult = validateContractDomain(extractDomainShape(contract));
+  validateContractDomain(extractDomainShape(contract));
 
   storageValidator(contract);
 
-  // TContract narrows Contract with literal types from the caller's contract.d.ts;
-  // the runtime object is the same — the cast preserves the caller's type parameter.
-  return Object.assign(contract as unknown as TContract, {
-    warnings: domainResult.warnings,
-  });
+  return contract as unknown as TContract;
 }

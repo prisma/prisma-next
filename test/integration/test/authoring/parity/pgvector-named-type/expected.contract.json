@@ -2,8 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:b2ebe614b4dd858b83770dec78fbcb187e5aac60ce3cf4099a26b4ee48b79507",
-  "profileHash": "sha256:dac42ff24bf5238eef80f2fd845d34eab8e6381ddafc571bed5e4af1ea61b9b8",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
     "document": "Document"
   },
@@ -11,10 +10,12 @@
     "Document": {
       "fields": {
         "embedding": {
-          "codecId": "pg/vector@1"
+          "codecId": "pg/vector@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -32,12 +33,14 @@
     }
   },
   "storage": {
+    "storageHash": "sha256:23709f06204f520006fb124e3202134ce2c179e45290d9459147e71e17398ba7",
     "tables": {
       "document": {
         "columns": {
           "embedding": {
             "codecId": "pg/vector@1",
             "nativeType": "vector",
+            "nullable": false,
             "typeRef": "Embedding1536"
           },
           "id": {
@@ -46,7 +49,8 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           }
         },
         "foreignKeys": [],

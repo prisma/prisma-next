@@ -1,6 +1,7 @@
 // Contract type definitions for contract-with-relations.json
 
-import type { ContractWithTypeMaps, SqlContract, TypeMaps as TypeMapsType } from '@prisma-next/sql-contract/types';
+import type { Contract as BaseContract } from '@prisma-next/contract/types';
+import type { ContractWithTypeMaps, TypeMaps as TypeMapsType } from '@prisma-next/sql-contract/types';
 // Minimal CodecTypes for testing - matches adapter-postgres structure
 type CodecTypes = {
   readonly 'pg/int4@1': { output: number };
@@ -9,7 +10,7 @@ type CodecTypes = {
 };
 
 // Contract type representing the contract data structure with relations
-export type Contract = ContractWithTypeMaps<SqlContract<
+export type Contract = ContractWithTypeMaps<BaseContract<
   {
     readonly tables: {
       readonly user: {

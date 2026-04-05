@@ -1,4 +1,8 @@
-import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  Contract,
+  ExecutionMutationDefaultValue,
+} from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverInstance,
@@ -17,7 +21,7 @@ import type {
   SchemaIssue,
 } from '@prisma-next/core-control-plane/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../control-instance';
@@ -178,7 +182,7 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
   planTypeOperations?: (options: {
     readonly typeName: string;
     readonly typeInstance: StorageTypeInstance;
-    readonly contract: SqlContract<SqlStorage>;
+    readonly contract: Contract<SqlStorage>;
     readonly schema: SqlSchemaIR;
     readonly schemaName?: string;
     readonly policy: MigrationOperationPolicy;
@@ -303,7 +307,7 @@ export type SqlPlannerResult<TTargetDetails> =
   | SqlPlannerFailureResult;
 
 export interface SqlMigrationPlannerPlanOptions {
-  readonly contract: SqlContract<SqlStorage>;
+  readonly contract: Contract<SqlStorage>;
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
@@ -331,7 +335,7 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
    * Destination contract IR.
    * Must correspond to `plan.destination` and is used for schema verification and marker/ledger writes.
    */
-  readonly destinationContract: SqlContract<SqlStorage>;
+  readonly destinationContract: Contract<SqlStorage>;
   /**
    * Execution-time policy that defines which operation classes are allowed.
    * The runner validates each operation against this policy before execution.

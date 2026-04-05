@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression,
   BinaryExpr,
@@ -54,7 +55,7 @@ interface RelationDefinition {
 
 interface ParsedRelationMutation {
   readonly relation: RelationDefinition;
-  readonly mutation: RelationMutation<SqlContract<SqlStorage>, string>;
+  readonly mutation: RelationMutation<Contract<SqlStorage>, string>;
 }
 
 interface ParsedMutationInput {
@@ -63,7 +64,7 @@ interface ParsedMutationInput {
 }
 
 export function hasNestedMutationCallbacks(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   data: Record<string, unknown>,
 ): boolean {
@@ -86,7 +87,7 @@ export async function executeNestedCreateMutation(options: {
   context: ExecutionContext;
   runtime: RuntimeQueryable;
   modelName: string;
-  data: MutationCreateInput<SqlContract<SqlStorage>, string>;
+  data: MutationCreateInput<Contract<SqlStorage>, string>;
 }): Promise<Record<string, unknown>> {
   return withMutationScope(options.runtime, async (scope) =>
     createGraph(scope, options.context, options.modelName, options.data),
@@ -98,7 +99,7 @@ export async function executeNestedUpdateMutation(options: {
   runtime: RuntimeQueryable;
   modelName: string;
   filters: readonly AnyExpression[];
-  data: MutationUpdateInput<SqlContract<SqlStorage>, string>;
+  data: MutationUpdateInput<Contract<SqlStorage>, string>;
 }): Promise<Record<string, unknown> | null> {
   return withMutationScope(options.runtime, async (scope) =>
     updateFirstGraph(scope, options.context, options.modelName, options.filters, options.data),
@@ -106,7 +107,7 @@ export async function executeNestedUpdateMutation(options: {
 }
 
 export function buildPrimaryKeyFilterFromRow(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -159,7 +160,7 @@ async function createGraph(
   scope: RuntimeScope,
   context: ExecutionContext,
   modelName: string,
-  input: MutationCreateInput<SqlContract<SqlStorage>, string>,
+  input: MutationCreateInput<Contract<SqlStorage>, string>,
 ): Promise<Record<string, unknown>> {
   const contract = context.contract;
   const parsed = parseMutationInput(contract, modelName, input);
@@ -207,7 +208,7 @@ async function updateFirstGraph(
   context: ExecutionContext,
   modelName: string,
   filters: readonly AnyExpression[],
-  input: MutationUpdateInput<SqlContract<SqlStorage>, string>,
+  input: MutationUpdateInput<Contract<SqlStorage>, string>,
 ): Promise<Record<string, unknown> | null> {
   const contract = context.contract;
   const existingRow = await findFirstByFilters(scope, contract, modelName, filters);
@@ -239,7 +240,7 @@ async function updateFirstGraph(
     const pkWhere = shorthandToWhereExpr(
       context,
       modelName,
-      pkFilter as MutationUpdateInput<SqlContract<SqlStorage>, string>,
+      pkFilter as MutationUpdateInput<Contract<SqlStorage>, string>,
     );
     if (!pkWhere) {
       throw new Error(`Failed to build primary key filter for model "${modelName}"`);
@@ -279,7 +280,7 @@ async function updateFirstGraph(
 }
 
 function parseMutationInput(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   input: Record<string, unknown>,
 ): ParsedMutationInput {
@@ -306,8 +307,8 @@ function parseMutationInput(
       );
     }
 
-    const mutator = createRelationMutator<SqlContract<SqlStorage>, string>();
-    const mutation = value(mutator as RelationMutator<SqlContract<SqlStorage>, string>);
+    const mutator = createRelationMutator<Contract<SqlStorage>, string>();
+    const mutation = value(mutator as RelationMutator<Contract<SqlStorage>, string>);
     if (!isRelationMutationDescriptor(mutation)) {
       throw new Error(
         `Relation field "${fieldName}" on model "${modelName}" returned an invalid mutation descriptor`,
@@ -358,7 +359,7 @@ async function applyParentOwnedMutation(
   parentModelName: string,
   scalarData: Record<string, unknown>,
   relation: RelationDefinition,
-  mutation: RelationMutation<SqlContract<SqlStorage>, string>,
+  mutation: RelationMutation<Contract<SqlStorage>, string>,
 ): Promise<void> {
   const contract = context.contract;
   if (mutation.kind === 'disconnect') {
@@ -381,7 +382,7 @@ async function applyParentOwnedMutation(
       scope,
       context,
       relation.relatedModelName,
-      row as MutationCreateInput<SqlContract<SqlStorage>, string>,
+      row as MutationCreateInput<Contract<SqlStorage>, string>,
     );
     copyRelatedValuesToParent(contract, parentModelName, relation, scalarData, relatedRow);
     return;
@@ -410,7 +411,7 @@ async function applyParentOwnedMutation(
 }
 
 function copyRelatedValuesToParent(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   parentModelName: string,
   relation: RelationDefinition,
   scalarData: Record<string, unknown>,
@@ -435,7 +436,7 @@ async function applyChildOwnedMutation(
   parentModelName: string,
   parentRow: Record<string, unknown>,
   relation: RelationDefinition,
-  mutation: RelationMutation<SqlContract<SqlStorage>, string>,
+  mutation: RelationMutation<Contract<SqlStorage>, string>,
 ): Promise<void> {
   const contract = context.contract;
   const parentValues = readParentColumnValues(contract, parentModelName, relation, parentRow);
@@ -455,7 +456,7 @@ async function applyChildOwnedMutation(
         scope,
         context,
         relation.relatedModelName,
-        payload as MutationCreateInput<SqlContract<SqlStorage>, string>,
+        payload as MutationCreateInput<Contract<SqlStorage>, string>,
       );
     }
     return;
@@ -466,7 +467,7 @@ async function applyChildOwnedMutation(
       const criterionWhere = shorthandToWhereExpr(
         context,
         relation.relatedModelName,
-        criterion as MutationUpdateInput<SqlContract<SqlStorage>, string>,
+        criterion as MutationUpdateInput<Contract<SqlStorage>, string>,
       );
       if (!criterionWhere) {
         throw new Error(
@@ -503,7 +504,7 @@ async function applyChildOwnedMutation(
     const criterionWhere = shorthandToWhereExpr(
       context,
       relation.relatedModelName,
-      criterion as MutationUpdateInput<SqlContract<SqlStorage>, string>,
+      criterion as MutationUpdateInput<Contract<SqlStorage>, string>,
     );
     if (!criterionWhere) {
       throw new Error(
@@ -519,7 +520,7 @@ async function applyChildOwnedMutation(
 }
 
 function readParentColumnValues(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   parentModelName: string,
   relation: RelationDefinition,
   parentRow: Record<string, unknown>,
@@ -611,7 +612,7 @@ async function findRowByCriterion(
   const whereExpr = shorthandToWhereExpr(
     context,
     modelName,
-    criterion as MutationUpdateInput<SqlContract<SqlStorage>, string>,
+    criterion as MutationUpdateInput<Contract<SqlStorage>, string>,
   );
   if (!whereExpr) {
     throw new Error(`Nested connect for model "${modelName}" requires non-empty criterion`);
@@ -636,7 +637,7 @@ async function findRowByCriterion(
 
 async function findFirstByFilters(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   filters: readonly AnyExpression[],
 ): Promise<Record<string, unknown> | null> {
@@ -659,7 +660,7 @@ async function findFirstByFilters(
 
 async function executeUpdateCount(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   tableName: string,
   setValues: Record<string, unknown>,
   filters: readonly AnyExpression[],
@@ -671,7 +672,7 @@ async function executeUpdateCount(
 const relationDefsCache = new WeakMap<object, Map<string, RelationDefinition[]>>();
 
 function getRelationDefinitions(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
 ): RelationDefinition[] {
   let perContract = relationDefsCache.get(contract);
@@ -699,7 +700,7 @@ function getRelationDefinitions(
 }
 
 function toFieldName(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   modelName: string,
   columnName: string,
 ): string {

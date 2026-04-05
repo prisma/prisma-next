@@ -18,13 +18,12 @@ describe('query plan meta', () => {
     );
   });
 
-  it('omits profileHash when the contract does not declare one', () => {
-    const { profileHash: _, ...contractWithoutProfile } = baseContract;
-
-    expect(buildOrmPlanMeta(contractWithoutProfile)).toEqual({
-      target: contractWithoutProfile.target,
-      targetFamily: contractWithoutProfile.targetFamily,
-      storageHash: contractWithoutProfile.storageHash,
+  it('includes profileHash in plan meta', () => {
+    expect(buildOrmPlanMeta(baseContract)).toEqual({
+      target: baseContract.target,
+      targetFamily: baseContract.targetFamily,
+      storageHash: baseContract.storage.storageHash,
+      profileHash: baseContract.profileHash,
       lane: 'orm-client',
       paramDescriptors: [],
     });

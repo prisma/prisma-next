@@ -6,6 +6,7 @@ import {
   int4Column,
   int8Column,
   intervalColumn,
+  json,
   jsonb,
   numericColumn,
   textColumn,
@@ -33,7 +34,9 @@ export const contract = defineContract()
         default: { kind: 'function', expression: 'now()' },
       })
       .column('update_at', { type: timestamptzColumn, nullable: true })
-      .primaryKey(['id']),
+      .column('profile', { type: jsonb(), nullable: true })
+      .primaryKey(['id'])
+      .unique(['email'], 'user_email_key'),
   )
   .table('post', (t) =>
     t
@@ -49,6 +52,7 @@ export const contract = defineContract()
       })
       .column('update_at', { type: timestamptzColumn, nullable: true })
       .column('published', { type: boolColumn, nullable: false })
+      .column('meta', { type: json(), nullable: true })
       .primaryKey(['id']),
   )
   .table('comment', (t) =>
@@ -142,7 +146,8 @@ export const contract = defineContract()
       .field('id', 'id')
       .field('email', 'email')
       .field('createdAt', 'created_at')
-      .field('updatedAt', 'update_at'),
+      .field('updatedAt', 'update_at')
+      .field('profile', 'profile'),
   )
   .model('Post', 'post', (m) =>
     m
@@ -150,7 +155,8 @@ export const contract = defineContract()
       .field('userId', 'userId')
       .field('title', 'title')
       .field('createdAt', 'created_at')
-      .field('updatedAt', 'update_at'),
+      .field('updatedAt', 'update_at')
+      .field('meta', 'meta'),
   )
   .model('Comment', 'comment', (m) =>
     m

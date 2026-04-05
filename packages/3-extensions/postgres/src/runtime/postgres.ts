@@ -1,4 +1,5 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import type { Contract } from '@prisma-next/contract/types';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
@@ -7,7 +8,6 @@ import type {
   ExtractTypeMapsFromContract,
   ResolveCodecTypes,
   ResolveOperationTypes,
-  SqlContract,
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
@@ -51,12 +51,10 @@ type NormalizeOperationTypes<T> = {
 type ToSchemaOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationTypes<T>;
 
 export type PostgresTargetId = 'postgres';
-type OrmClient<TContract extends SqlContract<SqlStorage>> = ReturnType<
-  typeof ormBuilder<TContract>
->;
+type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
 export interface PostgresClient<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 > {
   readonly sql: Db<TContract>;
@@ -72,7 +70,7 @@ export interface PostgresClient<
   runtime(): Runtime;
 }
 
-export interface PostgresOptionsBase<TContract extends SqlContract<SqlStorage>> {
+export interface PostgresOptionsBase<TContract extends Contract<SqlStorage>> {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
   readonly plugins?: readonly Plugin<TContract>[];
   readonly verify?: RuntimeVerifyOptions;
@@ -88,38 +86,38 @@ export interface PostgresBindingOptions {
   readonly pg?: Pool | Client;
 }
 
-export type PostgresOptionsWithContract<TContract extends SqlContract<SqlStorage>> =
+export type PostgresOptionsWithContract<TContract extends Contract<SqlStorage>> =
   PostgresBindingOptions &
     PostgresOptionsBase<TContract> & {
       readonly contract: TContract;
       readonly contractJson?: never;
     };
 
-export type PostgresOptionsWithContractJson<TContract extends SqlContract<SqlStorage>> =
+export type PostgresOptionsWithContractJson<TContract extends Contract<SqlStorage>> =
   PostgresBindingOptions &
     PostgresOptionsBase<TContract> & {
       readonly contractJson: unknown;
       readonly contract?: never;
     };
 
-export type PostgresOptions<TContract extends SqlContract<SqlStorage>> =
+export type PostgresOptions<TContract extends Contract<SqlStorage>> =
   | PostgresOptionsWithContract<TContract>
   | PostgresOptionsWithContractJson<TContract>;
 
-function hasContractJson<TContract extends SqlContract<SqlStorage>>(
+function hasContractJson<TContract extends Contract<SqlStorage>>(
   options: PostgresOptions<TContract>,
 ): options is PostgresOptionsWithContractJson<TContract> {
   return 'contractJson' in options;
 }
 
-function resolveContract<TContract extends SqlContract<SqlStorage>>(
+function resolveContract<TContract extends Contract<SqlStorage>>(
   options: PostgresOptions<TContract>,
 ): TContract {
   const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
   return validateContract<TContract>(contractInput);
 }
 
-function toRuntimeBinding<TContract extends SqlContract<SqlStorage>>(
+function toRuntimeBinding<TContract extends Contract<SqlStorage>>(
   binding: PostgresBinding,
   options: PostgresOptions<TContract>,
 ) {
@@ -145,15 +143,15 @@ function toRuntimeBinding<TContract extends SqlContract<SqlStorage>>(
  * - Emitted: pass TypeMaps explicitly. Example: postgres<Contract, TypeMaps>({ contractJson, url })
  */
 export default function postgres<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 >(options: PostgresOptionsWithContract<TContract>): PostgresClient<TContract, TTypeMaps>;
 export default function postgres<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 >(options: PostgresOptionsWithContractJson<TContract>): PostgresClient<TContract, TTypeMaps>;
 export default function postgres<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 >(options: PostgresOptions<TContract>): PostgresClient<TContract, TTypeMaps> {
   const contract = resolveContract(options);

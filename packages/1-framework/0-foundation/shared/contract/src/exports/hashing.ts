@@ -1,6 +1,2 @@
-export {
-  type CanonicalContractInput,
-  canonicalizeContract,
-  canonicalizeContractToObject,
-} from '../canonicalization';
+export { canonicalizeContract, canonicalizeContractToObject } from '../canonicalization';
 export { computeExecutionHash, computeProfileHash, computeStorageHash } from '../hashing';

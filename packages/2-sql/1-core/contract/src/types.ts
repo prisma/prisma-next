@@ -1,13 +1,4 @@
-import type {
-  ColumnDefault,
-  ContractBase,
-  DomainRelationOn,
-  ExecutionHashBase,
-  ExecutionSection,
-  ProfileHashBase,
-  StorageBase,
-  StorageHashBase,
-} from '@prisma-next/contract/types';
+import type { ColumnDefault, StorageBase } from '@prisma-next/contract/types';
 
 /**
  * A column definition in storage.
@@ -132,12 +123,6 @@ export type SqlModelStorage = {
   readonly fields: Record<string, SqlModelFieldStorage>;
 };
 
-export type SqlRelation = {
-  readonly to: string;
-  readonly cardinality: '1:1' | '1:N' | 'N:1';
-  readonly on: DomainRelationOn;
-};
-
 export const DEFAULT_FK_CONSTRAINT = true;
 export const DEFAULT_FK_INDEX = true;
 
@@ -200,31 +185,15 @@ export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
   readonly [K in TypeMapsPhantomKey]?: TTypeMaps;
 };
 
-export type SqlContract<
-  S extends SqlStorage = SqlStorage,
-  TModels extends Record<string, unknown> = Record<string, unknown>,
-  TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
-  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
-  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> = Omit<ContractBase<TStorageHash, TExecutionHash, TProfileHash>, 'models'> & {
-  readonly targetFamily: string;
-  readonly storage: S;
-  readonly models: TModels;
-  readonly execution?: ExecutionSection;
-};
-
 export type ExtractTypeMapsFromContract<T> = TypeMapsPhantomKey extends keyof T
   ? NonNullable<T[TypeMapsPhantomKey & keyof T]>
   : never;
 
 export type ExtractCodecTypes<T> = CodecTypesOf<ExtractTypeMapsFromContract<T>>;
-export type ExtractOperationTypes<T> = OperationTypesOf<ExtractTypeMapsFromContract<T>>;
 export type ExtractQueryOperationTypes<T> = QueryOperationTypesOf<ExtractTypeMapsFromContract<T>>;
 
 export type ResolveCodecTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
   ? ExtractCodecTypes<TContract>
   : CodecTypesOf<TTypeMaps>;
 
-export type ResolveOperationTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
-  ? ExtractOperationTypes<TContract>
-  : OperationTypesOf<TTypeMaps>;
+export type ResolveOperationTypes<_TContract, TTypeMaps> = OperationTypesOf<TTypeMaps>;

@@ -1,12 +1,16 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import type { SqlContract, SqlStorage } from '../src/types';
+import type { SqlStorage } from '../src/types';
 import { validateContract } from '../src/validate';
 
 const baseContract = {
-  schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  storageHash: 'sha256:test-storage',
+  profileHash: 'sha256:test',
+  roots: { User: 'User' },
+  capabilities: {},
+  extensionPacks: {},
+  meta: {},
   models: {
     User: {
       storage: {
@@ -24,6 +28,7 @@ const baseContract = {
     },
   },
   storage: {
+    storageHash: 'sha256:test-storage',
     tables: {
       User: {
         columns: {
@@ -50,14 +55,14 @@ describe('contract construction', () => {
         },
       };
 
-      const result = validateContract<SqlContract<SqlStorage>>(contractWithGenerated);
+      const result = validateContract<Contract<SqlStorage>>(contractWithGenerated);
 
       expect(result).not.toHaveProperty('_generated');
       expect(Object.hasOwn(result, '_generated')).toBe(false);
     });
 
     it('omits _generated when input has no _generated', () => {
-      const result = validateContract<SqlContract<SqlStorage>>(baseContract);
+      const result = validateContract<Contract<SqlStorage>>(baseContract);
 
       expect(result).not.toHaveProperty('_generated');
     });
@@ -65,7 +70,7 @@ describe('contract construction', () => {
 
   describe('constructContract via validateContract', () => {
     it('returns contract suitable for traversal without mutating storage shape', () => {
-      const result = validateContract<SqlContract<SqlStorage>>(baseContract);
+      const result = validateContract<Contract<SqlStorage>>(baseContract);
 
       const tableNames = Object.keys(result.storage.tables);
       expect(tableNames).toContain('User');

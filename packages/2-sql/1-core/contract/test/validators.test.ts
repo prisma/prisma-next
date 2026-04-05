@@ -1,6 +1,8 @@
+import { createContract } from '@prisma-next/contract/testing';
+import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { describe, expect, it } from 'vitest';
-import { col, contract, fk, index, model, pk, storage, table, unique } from '../src/factories';
-import type { ReferentialAction } from '../src/types';
+import { col, fk, index, model, pk, table, unique } from '../src/factories';
+import type { ReferentialAction, SqlStorage } from '../src/types';
 import {
   validateModel,
   validateSqlContract,
@@ -15,7 +17,9 @@ describe('SQL contract validators', () => {
         id: col('int4', 'pg/int4@1'),
         email: col('text', 'pg/text@1'),
       });
-      const s = storage({ user: userTable });
+      const s = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
+      }).storage;
       expect(() => validateStorage(s)).not.toThrow();
     });
 
@@ -126,8 +130,16 @@ describe('SQL contract validators', () => {
   });
 
   describe('validateSqlContract', () => {
-    it('throws when contract value is not an object', () => {
-      expect(() => validateSqlContract(null)).toThrow(/value must be an object/);
+    it('throws ContractValidationError when contract value is not an object', () => {
+      try {
+        validateSqlContract(null);
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(ContractValidationError);
+        expect((e as ContractValidationError).phase).toBe('structural');
+        expect((e as ContractValidationError).code).toBe('CONTRACT.VALIDATION_FAILED');
+        expect((e as ContractValidationError).message).toMatch(/value must be an object/);
+      }
     });
 
     it('validates valid contract', () => {
@@ -135,18 +147,14 @@ describe('SQL contract validators', () => {
         id: col('int4', 'pg/int4@1'),
         email: col('text', 'pg/text@1'),
       });
-      const s = storage({ user: userTable });
-      const m = {
-        User: model('user', {
-          id: { column: 'id' },
-          email: { column: 'email' },
-        }),
-      };
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
-        models: m,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
+        models: {
+          User: model('user', {
+            id: { column: 'id' },
+            email: { column: 'email' },
+          }),
+        },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
     });
@@ -155,55 +163,57 @@ describe('SQL contract validators', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
       });
       const invalid = { ...c, targetFamily: undefined } as unknown;
       expect(() => validateSqlContract(invalid)).toThrow(/targetFamily/);
     });
 
-    it('throws on wrong targetFamily', () => {
+    it('throws ContractValidationError on wrong targetFamily', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
       });
       const invalid = { ...c, targetFamily: 'document' } as unknown;
-      expect(() => validateSqlContract(invalid)).toThrow(/Unsupported target family/);
+      try {
+        validateSqlContract(invalid);
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(ContractValidationError);
+        expect((e as ContractValidationError).phase).toBe('structural');
+        expect((e as ContractValidationError).message).toMatch(/Unsupported target family/);
+      }
     });
 
-    it('throws on missing target', () => {
+    it('throws ContractValidationError on missing target', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
       });
       const invalid = { ...c, target: undefined } as unknown;
-      expect(() => validateSqlContract(invalid)).toThrow(/target/);
+      try {
+        validateSqlContract(invalid);
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(ContractValidationError);
+        expect((e as ContractValidationError).phase).toBe('structural');
+        expect((e as ContractValidationError).message).toMatch(/target/);
+      }
     });
 
-    it('throws on missing storageHash', () => {
+    it('throws on missing storage.storageHash', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
       });
-      const invalid = { ...c, storageHash: undefined } as unknown;
+      const invalid = { ...c, storage: { ...c.storage, storageHash: undefined } } as unknown;
       expect(() => validateSqlContract(invalid)).toThrow(/storageHash/);
     });
 
@@ -211,11 +221,8 @@ describe('SQL contract validators', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
       });
       const invalid = { ...c, storage: undefined } as unknown;
       expect(() => validateSqlContract(invalid)).toThrow(/storage/);
@@ -225,11 +232,8 @@ describe('SQL contract validators', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
       });
       const invalid = { ...c, models: undefined } as unknown;
       expect(() => validateSqlContract(invalid)).toThrow(/models/);
@@ -239,12 +243,8 @@ describe('SQL contract validators', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        profileHash: 'sha256:def456',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
     });
@@ -253,11 +253,8 @@ describe('SQL contract validators', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
         capabilities: {
           postgres: {
             returning: true,
@@ -271,11 +268,8 @@ describe('SQL contract validators', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
         extensionPacks: {
           postgres: {
             id: 'postgres',
@@ -290,11 +284,8 @@ describe('SQL contract validators', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
         meta: {
           generated: true,
         },
@@ -302,32 +293,10 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContract(c)).not.toThrow();
     });
 
-    it('accepts optional sources', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
-        sources: {
-          userView: {
-            kind: 'view',
-            sql: 'SELECT * FROM "user"',
-          },
-        },
-      });
-      expect(() => validateSqlContract(c)).not.toThrow();
-    });
-
     it('rejects unknown top-level keys', () => {
       const userTable = table({ id: col('int4', 'pg/int4@1') });
-      const s = storage({ user: userTable });
-      const base = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const base = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
       });
       const c = {
         ...base,
@@ -345,11 +314,8 @@ describe('SQL contract validators', () => {
           fks: [fk(['userId'], 'user', ['id'], { constraint: true, index: true })],
         },
       );
-      const s = storage({ user: userTable, post: postTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable, post: postTable } },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
     });
@@ -363,32 +329,27 @@ describe('SQL contract validators', () => {
           fks: [fk(['userId'], 'user', ['id'], { constraint: false, index: true })],
         },
       );
-      const s = storage({ user: userTable, post: postTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable, post: postTable } },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
     });
 
     it('rejects FK missing constraint field', () => {
       const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
-      const s = storage({
-        user: userTable,
-        post: table(
-          { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
-          {
-            pk: pk('id'),
-            fks: [fk(['userId'], 'user', ['id'])],
+      const rawContract = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: userTable,
+            post: table(
+              { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+              {
+                pk: pk('id'),
+                fks: [fk(['userId'], 'user', ['id'])],
+              },
+            ),
           },
-        ),
-      });
-      // Remove constraint field to simulate non-normalized FK
-      const rawContract = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+        },
       });
       const postFk = rawContract.storage.tables['post']?.foreignKeys[0] as Record<string, unknown>;
       delete postFk['constraint'];
@@ -397,21 +358,19 @@ describe('SQL contract validators', () => {
 
     it('rejects FK missing index field', () => {
       const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
-      const s = storage({
-        user: userTable,
-        post: table(
-          { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
-          {
-            pk: pk('id'),
-            fks: [fk(['userId'], 'user', ['id'])],
+      const rawContract = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: userTable,
+            post: table(
+              { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+              {
+                pk: pk('id'),
+                fks: [fk(['userId'], 'user', ['id'])],
+              },
+            ),
           },
-        ),
-      });
-      // Remove index field to simulate non-normalized FK
-      const rawContract = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+        },
       });
       const postFk = rawContract.storage.tables['post']?.foreignKeys[0] as Record<string, unknown>;
       delete postFk['index'];
@@ -434,7 +393,9 @@ describe('SQL contract validators', () => {
           },
           { fks: [fk(['userId'], 'user', ['id'], { onDelete: action })] },
         );
-        const s = storage({ post: postTable });
+        const s = createContract<SqlStorage>({
+          storage: { tables: { post: postTable } },
+        }).storage;
         expect(() => validateStorage(s)).not.toThrow();
       }
     });
@@ -447,7 +408,9 @@ describe('SQL contract validators', () => {
         },
         { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'cascade', onUpdate: 'noAction' })] },
       );
-      const s = storage({ post: postTable });
+      const s = createContract<SqlStorage>({
+        storage: { tables: { post: postTable } },
+      }).storage;
       expect(() => validateStorage(s)).not.toThrow();
     });
 
@@ -483,11 +446,8 @@ describe('SQL contract validators', () => {
           fks: [fk(['userId'], 'user', ['id'], { constraint: false, index: false })],
         },
       );
-      const s = storage({ user: userTable, post: postTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable, post: postTable } },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
     });
@@ -495,16 +455,20 @@ describe('SQL contract validators', () => {
 
   describe('validateStorageSemantics', () => {
     it('rejects setNull on non-nullable FK column', () => {
-      const s = storage({
-        user: table({ id: col('int4', 'pg/int4@1') }),
-        post: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            userId: col('int4', 'pg/int4@1', false),
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table({ id: col('int4', 'pg/int4@1') }),
+            post: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                userId: col('int4', 'pg/int4@1', false),
+              },
+              { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
+            ),
           },
-          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
-        ),
-      });
+        },
+      }).storage;
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(1);
       expect(errors[0]).toContain('setNull');
@@ -512,62 +476,78 @@ describe('SQL contract validators', () => {
     });
 
     it('allows setNull on nullable FK column', () => {
-      const s = storage({
-        user: table({ id: col('int4', 'pg/int4@1') }),
-        post: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            userId: col('int4', 'pg/int4@1', true),
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table({ id: col('int4', 'pg/int4@1') }),
+            post: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                userId: col('int4', 'pg/int4@1', true),
+              },
+              { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
+            ),
           },
-          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
-        ),
-      });
+        },
+      }).storage;
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(0);
     });
 
     it('allows cascade on non-nullable FK column', () => {
-      const s = storage({
-        user: table({ id: col('int4', 'pg/int4@1') }),
-        post: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            userId: col('int4', 'pg/int4@1', false),
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table({ id: col('int4', 'pg/int4@1') }),
+            post: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                userId: col('int4', 'pg/int4@1', false),
+              },
+              { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'cascade' })] },
+            ),
           },
-          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'cascade' })] },
-        ),
-      });
+        },
+      }).storage;
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(0);
     });
 
     it('rejects setNull on onUpdate for non-nullable FK column', () => {
-      const s = storage({
-        user: table({ id: col('int4', 'pg/int4@1') }),
-        post: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            userId: col('int4', 'pg/int4@1', false),
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table({ id: col('int4', 'pg/int4@1') }),
+            post: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                userId: col('int4', 'pg/int4@1', false),
+              },
+              { fks: [fk(['userId'], 'user', ['id'], { onUpdate: 'setNull' })] },
+            ),
           },
-          { fks: [fk(['userId'], 'user', ['id'], { onUpdate: 'setNull' })] },
-        ),
-      });
+        },
+      }).storage;
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(1);
       expect(errors[0]).toContain('setNull');
     });
 
     it('rejects setDefault on non-nullable FK column without DEFAULT', () => {
-      const s = storage({
-        user: table({ id: col('int4', 'pg/int4@1') }),
-        post: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            userId: col('int4', 'pg/int4@1', false),
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table({ id: col('int4', 'pg/int4@1') }),
+            post: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                userId: col('int4', 'pg/int4@1', false),
+              },
+              { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+            ),
           },
-          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
-        ),
-      });
+        },
+      }).storage;
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(1);
       expect(errors[0]).toContain('setDefault');
@@ -577,69 +557,85 @@ describe('SQL contract validators', () => {
     });
 
     it('allows setDefault on non-nullable FK column with DEFAULT', () => {
-      const s = storage({
-        user: table({ id: col('int4', 'pg/int4@1') }),
-        post: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            userId: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-              default: { kind: 'literal', expression: '0' },
-            },
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table({ id: col('int4', 'pg/int4@1') }),
+            post: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                userId: {
+                  nativeType: 'int4',
+                  codecId: 'pg/int4@1',
+                  nullable: false,
+                  default: { kind: 'literal', expression: '0' },
+                },
+              },
+              { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+            ),
           },
-          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
-        ),
-      });
+        },
+      }).storage;
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(0);
     });
 
     it('allows setDefault on nullable FK column without DEFAULT', () => {
-      const s = storage({
-        user: table({ id: col('int4', 'pg/int4@1') }),
-        post: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            userId: col('int4', 'pg/int4@1', true),
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table({ id: col('int4', 'pg/int4@1') }),
+            post: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                userId: col('int4', 'pg/int4@1', true),
+              },
+              { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+            ),
           },
-          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
-        ),
-      });
+        },
+      }).storage;
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(0);
     });
 
     it('rejects setDefault on onUpdate for non-nullable FK column without DEFAULT', () => {
-      const s = storage({
-        user: table({ id: col('int4', 'pg/int4@1') }),
-        post: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            userId: col('int4', 'pg/int4@1', false),
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table({ id: col('int4', 'pg/int4@1') }),
+            post: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                userId: col('int4', 'pg/int4@1', false),
+              },
+              { fks: [fk(['userId'], 'user', ['id'], { onUpdate: 'setDefault' })] },
+            ),
           },
-          { fks: [fk(['userId'], 'user', ['id'], { onUpdate: 'setDefault' })] },
-        ),
-      });
+        },
+      }).storage;
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(1);
       expect(errors[0]).toContain('setDefault');
     });
 
     it('rejects duplicate named objects within the same table', () => {
-      const s = storage({
-        user: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            email: col('text', 'pg/text@1'),
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                email: col('text', 'pg/text@1'),
+              },
+              {
+                pk: { columns: ['id'], name: 'user_pkey' },
+                indexes: [{ columns: ['id'], name: 'user_pkey' }],
+              },
+            ),
           },
-          {
-            pk: { columns: ['id'], name: 'user_pkey' },
-            indexes: [{ columns: ['id'], name: 'user_pkey' }],
-          },
-        ),
-      });
+        },
+      }).storage;
 
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(1);
@@ -649,18 +645,22 @@ describe('SQL contract validators', () => {
     });
 
     it('rejects duplicate unique and index definitions within the same table', () => {
-      const s = storage({
-        user: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            email: col('text', 'pg/text@1'),
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                email: col('text', 'pg/text@1'),
+              },
+              {
+                uniques: [unique('email'), unique('email')],
+                indexes: [index('email'), index('email')],
+              },
+            ),
           },
-          {
-            uniques: [unique('email'), unique('email')],
-            indexes: [index('email'), index('email')],
-          },
-        ),
-      });
+        },
+      }).storage;
 
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(2);
@@ -669,23 +669,27 @@ describe('SQL contract validators', () => {
     });
 
     it('rejects duplicate foreign key definitions within the same table', () => {
-      const s = storage({
-        user: table(
-          {
-            id: col('int4', 'pg/int4@1'),
-            orgId: col('int4', 'pg/int4@1'),
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                orgId: col('int4', 'pg/int4@1'),
+              },
+              {
+                fks: [
+                  fk(['orgId'], 'org', ['id'], { onDelete: 'cascade' }),
+                  fk(['orgId'], 'org', ['id'], { onDelete: 'cascade' }),
+                ],
+              },
+            ),
+            org: table({
+              id: col('int4', 'pg/int4@1'),
+            }),
           },
-          {
-            fks: [
-              fk(['orgId'], 'org', ['id'], { onDelete: 'cascade' }),
-              fk(['orgId'], 'org', ['id'], { onDelete: 'cascade' }),
-            ],
-          },
-        ),
-        org: table({
-          id: col('int4', 'pg/int4@1'),
-        }),
-      });
+        },
+      }).storage;
 
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(1);
@@ -693,9 +697,13 @@ describe('SQL contract validators', () => {
     });
 
     it('returns no errors for storage without FKs', () => {
-      const s = storage({
-        user: table({ id: col('int4', 'pg/int4@1') }),
-      });
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table({ id: col('int4', 'pg/int4@1') }),
+          },
+        },
+      }).storage;
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(0);
     });
@@ -703,22 +711,18 @@ describe('SQL contract validators', () => {
 
   describe('validateSqlContract strict mode', () => {
     it('rejects unknown top-level properties', () => {
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:test',
+      const c = createContract<SqlStorage>({
+        storage: { tables: { users: table({ id: col('int4', 'pg/int4@1') }) } },
         models: { User: model('users', { id: { column: 'id' } }) },
-        storage: storage({ users: table({ id: col('int4', 'pg/int4@1') }) }),
       });
       const withUnknown = { ...c, bogusField: 'unexpected' };
       expect(() => validateSqlContract(withUnknown)).toThrow();
     });
 
     it('accepts valid contracts without unknown properties', () => {
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:test',
+      const c = createContract<SqlStorage>({
+        storage: { tables: { users: table({ id: col('int4', 'pg/int4@1') }) } },
         models: { User: model('users', { id: { column: 'id' } }) },
-        storage: storage({ users: table({ id: col('int4', 'pg/int4@1') }) }),
       });
       expect(() => validateSqlContract(c)).not.toThrow();
     });

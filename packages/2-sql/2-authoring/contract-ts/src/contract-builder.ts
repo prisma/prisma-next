@@ -1,4 +1,8 @@
-import type { ExecutionMutationDefaultValue, StorageHashBase } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ExecutionMutationDefaultValue,
+  StorageHashBase,
+} from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
@@ -27,7 +31,6 @@ import type {
   ContractWithTypeMaps,
   Index,
   ReferentialAction,
-  SqlContract,
   StorageTypeInstance,
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
@@ -275,11 +278,11 @@ class SqlContractBuilder<
    * **Required**: Use column type descriptors (e.g., `int4Column`, `textColumn`) when defining columns.
    * This ensures `nativeType` is set correctly at build time.
    *
-   * @returns A normalized SqlContract with all required fields present
+   * @returns A normalized Contract with all required fields present
    */
   build(): Target extends string
     ? ContractWithTypeMaps<
-        SqlContract<BuildStorage<Tables, Types>, BuildModels<Models>> & {
+        Contract<BuildStorage<Tables, Types>, BuildModels<Models>> & {
           readonly schemaVersion: '1';
           readonly target: Target;
           readonly targetFamily: 'sql';

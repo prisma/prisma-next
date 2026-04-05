@@ -157,10 +157,10 @@ Type bridge: make `SqlContract`/`MongoContract` aliases for `Contract<S,M>` so t
 
 Wire SQL validation through the framework's `validateContract`, update runtime consumers to accept `Contract` instead of `ContractBase`, and remove `ContractBase`.
 
-- **5.B1** Wire SQL `validateContract` through the framework's `validateContract` with a SQL-specific `StorageValidator`. Refactor existing SQL `validate.ts`. (Deferred from 5.6.)
-- **5.B2** Update runtime consumers (execution context, query builder, ORM client, adapters) to accept `Contract` instead of `ContractBase`/`SqlContract`. The ORM client read from `contract.roots` instead of deriving collection accessors from storage table names.
-- **5.B3** Remove `ContractBase`. Remove remaining deprecated `Domain*` type aliases. (Read-side portion of previously 5.7.)
-- **5.B4** Update all runtime tests, fixtures, and type tests. Run full test suite and typecheck.
+- **5.B1** ✅ Wire SQL `validateContract` through the framework's `validateContract` with a SQL-specific `StorageValidator`. Refactor existing SQL `validate.ts`. (Deferred from 5.6.)
+- **5.B2** ✅ Update runtime consumers (execution context, query builder, ORM client, adapters) to accept `Contract` instead of `ContractBase`/`SqlContract`. The ORM client read from `contract.roots` instead of deriving collection accessors from storage table names. Also: fixed the SQL emitter to emit `ContractField` format (`{ codecId, nullable }`) in model fields instead of TypeMaps-resolved types; removed unnecessary `as unknown as Contract` casts across integration/e2e tests and production code; replaced `CanonicalContractInput` with `Contract` in the canonicalization pipeline.
+- **5.B3** ✅ Remove `ContractBase`. Remove remaining deprecated `Domain*` type aliases. (Read-side portion of previously 5.7.)
+- **5.B4** ✅ Update all runtime tests, fixtures, and type tests. Run full test suite and typecheck.
 
 #### Orthogonal tasks (can run in parallel with Phase A/B)
 

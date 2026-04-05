@@ -11,20 +11,24 @@
     "Post": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "embedding": {
           "codecId": "pg/vector@1",
           "nullable": true
         },
         "id": {
-          "codecId": "sql/char@1"
+          "codecId": "sql/char@1",
+          "nullable": false
         },
         "title": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "userId": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -65,16 +69,20 @@
     "User": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "email": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "sql/char@1"
+          "codecId": "sql/char@1",
+          "nullable": false
         },
         "kind": {
-          "codecId": "pg/enum@1"
+          "codecId": "pg/enum@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -111,7 +119,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:a22c4aae2f66256a0ae9f420ba7df8279400ef1ba48cea0d5c8108fe75add1a5",
+    "storageHash": "sha256:99a82b11f6eec3a625667433233f1a8fa2cf42a8b09b972f60698f876531ac61",
     "tables": {
       "post": {
         "columns": {
@@ -121,7 +129,8 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz"
+            "nativeType": "timestamptz",
+            "nullable": false
           },
           "embedding": {
             "codecId": "pg/vector@1",
@@ -132,17 +141,20 @@
           "id": {
             "codecId": "sql/char@1",
             "nativeType": "character",
+            "nullable": false,
             "typeParams": {
               "length": 36
             }
           },
           "title": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "userId": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           }
         },
         "foreignKeys": [
@@ -176,15 +188,18 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz"
+            "nativeType": "timestamptz",
+            "nullable": false
           },
           "email": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "id": {
             "codecId": "sql/char@1",
             "nativeType": "character",
+            "nullable": false,
             "typeParams": {
               "length": 36
             }
@@ -192,6 +207,7 @@
           "kind": {
             "codecId": "pg/enum@1",
             "nativeType": "user_type",
+            "nullable": false,
             "typeRef": "user_type"
           }
         },

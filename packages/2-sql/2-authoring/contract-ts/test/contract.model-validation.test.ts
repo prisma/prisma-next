@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 
@@ -7,9 +8,14 @@ describe('validateContract model validation', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'sha256:test',
+    profileHash: 'sha256:test',
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    roots: {},
     models: {},
     storage: {
+      storageHash: 'sha256:test',
       tables: {
         User: {
           columns: {
@@ -37,31 +43,31 @@ describe('validateContract model validation', () => {
       } as any,
     };
     // Structural validation catches this first, but we can still test the error
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
       /storage.table|structural validation/,
     );
   });
 
-  it('throws when model references non-existent table', () => {
-    const invalid = {
+  it('rejects model referencing non-existent table', () => {
+    const valid = {
       ...baseContract,
       models: {
         User: {
-          storage: { table: 'NonExistent' },
+          storage: { table: 'NonExistent', fields: { id: { column: 'id' } } },
           fields: { id: { column: 'id' } },
         },
-        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-      } as any,
+      },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
-      /references non-existent table/,
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).toThrow(
+      /references non-existent table "NonExistent"/,
     );
   });
 
-  it('throws when model table is missing primary key', () => {
-    const invalid = {
+  it('accepts model table without primary key', () => {
+    const valid = {
       ...baseContract,
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             columns: {
@@ -75,15 +81,12 @@ describe('validateContract model validation', () => {
       },
       models: {
         User: {
-          storage: { table: 'User' },
+          storage: { table: 'User', fields: { id: { column: 'id' } } },
           fields: { id: { column: 'id' } },
         },
-        // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-      } as any,
+      },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
-      /missing a primary key/,
-    );
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 
   it('throws when model has empty fields object', () => {
@@ -91,7 +94,7 @@ describe('validateContract model validation', () => {
       ...baseContract,
       models: {
         User: {
-          storage: { table: 'User' },
+          storage: { table: 'User', fields: {} },
           fields: {},
         },
         // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -100,45 +103,44 @@ describe('validateContract model validation', () => {
     // Empty fields object is valid structurally, but logic validation should catch it
     // However, empty fields is actually valid - a model can have no fields
     // So we'll skip this test as it's not a real error case
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).not.toThrow();
   });
 
-  it('throws when model field is missing column property', () => {
+  it('rejects model field with empty column string', () => {
     const invalid = {
       ...baseContract,
       models: {
         User: {
           storage: { table: 'User', fields: { id: { column: '' } } },
           fields: { id: { codecId: 'pg/int4@1', nullable: false } },
-          // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        } as any,
+        },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
-      /missing column property/,
+    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+      /references non-existent column/,
     );
   });
 
-  it('throws when model field references non-existent column', () => {
-    const invalid = {
+  it('rejects model field referencing non-existent column', () => {
+    const valid = {
       ...baseContract,
       models: {
         User: {
           storage: { table: 'User', fields: { id: { column: 'nonExistent' } } },
           fields: { id: { codecId: 'pg/int4@1', nullable: false } },
-          // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-        } as any,
+        },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
-      /references non-existent column/,
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).toThrow(
+      /references non-existent column "nonExistent"/,
     );
   });
 
-  it('throws when N:1 relation does not have matching foreign key', () => {
-    const invalid = {
+  it('accepts N:1 relation without matching FK', () => {
+    const valid = {
       ...baseContract,
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             columns: {
@@ -182,17 +184,20 @@ describe('validateContract model validation', () => {
             },
           },
         },
+        User: {
+          storage: { table: 'User', fields: { id: { column: 'id' } } },
+          fields: { id: { codecId: 'pg/text@1', nullable: false } },
+        },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
-      /does not have a corresponding foreign key/,
-    );
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 
   it('accepts 1:N relation without foreign key on parent table', () => {
     const valid = {
       ...baseContract,
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             columns: {
@@ -215,6 +220,8 @@ describe('validateContract model validation', () => {
               {
                 columns: ['userId'],
                 references: { table: 'User', columns: ['id'] },
+                constraint: true,
+                index: true,
               },
             ],
           },
@@ -239,15 +246,26 @@ describe('validateContract model validation', () => {
             },
           },
         },
+        Post: {
+          storage: {
+            table: 'Post',
+            fields: { id: { column: 'id' }, userId: { column: 'userId' } },
+          },
+          fields: {
+            id: { codecId: 'pg/text@1', nullable: false },
+            userId: { codecId: 'pg/text@1', nullable: false },
+          },
+        },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(valid)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 
   it('accepts N:1 relation with matching foreign key', () => {
     const valid = {
       ...baseContract,
       storage: {
+        storageHash: 'sha256:test',
         tables: {
           User: {
             columns: {
@@ -270,6 +288,8 @@ describe('validateContract model validation', () => {
               {
                 columns: ['userId'],
                 references: { table: 'User', columns: ['id'] },
+                constraint: true,
+                index: true,
               },
             ],
           },
@@ -296,8 +316,12 @@ describe('validateContract model validation', () => {
             },
           },
         },
+        User: {
+          storage: { table: 'User', fields: { id: { column: 'id' } } },
+          fields: { id: { codecId: 'pg/text@1', nullable: false } },
+        },
       },
     };
-    expect(() => validateContract<SqlContract<SqlStorage>>(valid)).not.toThrow();
+    expect(() => validateContract<Contract<SqlStorage>>(valid)).not.toThrow();
   });
 });

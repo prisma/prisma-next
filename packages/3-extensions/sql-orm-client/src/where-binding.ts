@@ -1,4 +1,5 @@
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   type AnyExpression,
@@ -20,14 +21,11 @@ import {
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
 
-export function bindWhereExpr(
-  contract: SqlContract<SqlStorage>,
-  expr: AnyExpression,
-): AnyExpression {
+export function bindWhereExpr(contract: Contract<SqlStorage>, expr: AnyExpression): AnyExpression {
   return bindWhereExprNode(contract, expr);
 }
 
-function bindWhereExprNode(contract: SqlContract<SqlStorage>, expr: AnyExpression): AnyExpression {
+function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression): AnyExpression {
   return expr.accept<AnyExpression>({
     columnRef(expr) {
       return bindExpression(contract, expr);
@@ -88,7 +86,7 @@ function bindWhereExprNode(contract: SqlContract<SqlStorage>, expr: AnyExpressio
 }
 
 function bindComparable(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   comparable: AnyExpression,
   bindingColumn: ColumnRef | undefined,
 ): AnyExpression {
@@ -116,7 +114,7 @@ function bindComparable(
 }
 
 function createParamRef(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   columnRef: ColumnRef,
   value: unknown,
 ): ParamRef {
@@ -127,28 +125,25 @@ function createParamRef(
   return ParamRef.of(value, { name: columnRef.column, codecId });
 }
 
-function createExpressionBinder(contract: SqlContract<SqlStorage>): ExpressionRewriter {
+function createExpressionBinder(contract: Contract<SqlStorage>): ExpressionRewriter {
   return {
     select: (ast) => bindSelectAst(contract, ast),
   };
 }
 
-function bindExpression(contract: SqlContract<SqlStorage>, expr: AnyExpression): AnyExpression {
+function bindExpression(contract: Contract<SqlStorage>, expr: AnyExpression): AnyExpression {
   return expr.rewrite(createExpressionBinder(contract));
 }
 
-function bindProjectionExpr(
-  contract: SqlContract<SqlStorage>,
-  expr: ProjectionExpr,
-): ProjectionExpr {
+function bindProjectionExpr(contract: Contract<SqlStorage>, expr: ProjectionExpr): ProjectionExpr {
   return expr.kind === 'literal' ? expr : bindExpression(contract, expr);
 }
 
-function bindOrderByItem(contract: SqlContract<SqlStorage>, orderItem: OrderByItem): OrderByItem {
+function bindOrderByItem(contract: Contract<SqlStorage>, orderItem: OrderByItem): OrderByItem {
   return new OrderByItem(bindExpression(contract, orderItem.expr), orderItem.dir);
 }
 
-function bindJoin(contract: SqlContract<SqlStorage>, join: JoinAst): JoinAst {
+function bindJoin(contract: Contract<SqlStorage>, join: JoinAst): JoinAst {
   return new JoinAst(
     join.joinType,
     bindFromSource(contract, join.source),
@@ -157,7 +152,7 @@ function bindJoin(contract: SqlContract<SqlStorage>, join: JoinAst): JoinAst {
   );
 }
 
-function bindFromSource(contract: SqlContract<SqlStorage>, source: AnyFromSource): AnyFromSource {
+function bindFromSource(contract: Contract<SqlStorage>, source: AnyFromSource): AnyFromSource {
   if (source.kind === 'table-source') {
     return source;
   }
@@ -169,7 +164,7 @@ function bindFromSource(contract: SqlContract<SqlStorage>, source: AnyFromSource
   return source;
 }
 
-function bindSelectAst(contract: SqlContract<SqlStorage>, ast: SelectAst): SelectAst {
+function bindSelectAst(contract: Contract<SqlStorage>, ast: SelectAst): SelectAst {
   return new SelectAst({
     from: bindFromSource(contract, ast.from),
     joins: ast.joins?.map((join) => bindJoin(contract, join)),

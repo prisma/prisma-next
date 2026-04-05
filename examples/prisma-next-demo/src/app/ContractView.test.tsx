@@ -6,7 +6,6 @@ import { ContractView } from './ContractView';
 
 function buildContract(overrides?: Partial<Contract>): Contract {
   const base = {
-    storageHash: 'storage_hash',
     target: 'postgres',
     targetFamily: 'sql',
     models: {
@@ -26,6 +25,7 @@ function buildContract(overrides?: Partial<Contract>): Contract {
       },
     },
     storage: {
+      storageHash: 'storage_hash',
       tables: {
         users: {
           primaryKey: { columns: ['id'] },

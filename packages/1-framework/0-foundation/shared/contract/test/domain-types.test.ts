@@ -1,41 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import type {
-  DomainEmbedRelation,
-  DomainField,
-  DomainModel,
-  DomainReferenceRelation,
-  DomainRelation,
+  ContractEmbedRelation,
+  ContractField,
+  ContractModel,
+  ContractReferenceRelation,
+  ContractRelation,
 } from '../src/domain-types';
-import type { ContractBase } from '../src/types';
 
 type AssertExtends<T, U> = T extends U ? true : never;
 
-describe('domain types', () => {
-  it('ContractBase includes roots and models', () => {
-    type Roots = ContractBase['roots'];
-    type Models = ContractBase['models'];
-
-    const roots: Roots = { users: 'User' };
-    const models: Models = {
-      User: {
-        fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
-        relations: {},
-        storage: { table: 'user' },
-      },
-    };
-
-    expect(roots).toEqual({ users: 'User' });
-    expect(models['User']?.fields['id']?.nullable).toBe(false);
-  });
-
-  it('DomainField carries nullable and codecId', () => {
-    const field: DomainField = { nullable: true, codecId: 'pg/text@1' };
+describe('contract types', () => {
+  it('ContractField carries nullable and codecId', () => {
+    const field: ContractField = { nullable: true, codecId: 'pg/text@1' };
     expect(field.nullable).toBe(true);
     expect(field.codecId).toBe('pg/text@1');
   });
 
-  it('DomainReferenceRelation requires on and allows all cardinalities', () => {
-    const relation: DomainReferenceRelation = {
+  it('ContractReferenceRelation requires on and allows all cardinalities', () => {
+    const relation: ContractReferenceRelation = {
       to: 'Post',
       cardinality: '1:N',
       on: { localFields: ['id'], targetFields: ['userId'] },
@@ -43,34 +25,34 @@ describe('domain types', () => {
     expect(relation.to).toBe('Post');
     expect(relation.on.localFields).toEqual(['id']);
 
-    const _extendsRelation: AssertExtends<DomainReferenceRelation, DomainRelation> = true;
+    const _extendsRelation: AssertExtends<ContractReferenceRelation, ContractRelation> = true;
     expect(_extendsRelation).toBe(true);
   });
 
-  it('DomainEmbedRelation has no on and excludes N:1 cardinality', () => {
-    const relation: DomainEmbedRelation = {
+  it('ContractEmbedRelation has no on and excludes N:1 cardinality', () => {
+    const relation: ContractEmbedRelation = {
       to: 'Address',
       cardinality: '1:N',
     };
     expect(relation.to).toBe('Address');
     expect('on' in relation).toBe(false);
 
-    const _extendsRelation: AssertExtends<DomainEmbedRelation, DomainRelation> = true;
+    const _extendsRelation: AssertExtends<ContractEmbedRelation, ContractRelation> = true;
     expect(_extendsRelation).toBe(true);
 
-    // @ts-expect-error — N:1 is reference-only, not assignable to DomainEmbedRelation
-    const _n1NotEmbed: AssertExtends<{ to: string; cardinality: 'N:1' }, DomainEmbedRelation> =
+    // @ts-expect-error — N:1 is reference-only, not assignable to ContractEmbedRelation
+    const _n1NotEmbed: AssertExtends<{ to: string; cardinality: 'N:1' }, ContractEmbedRelation> =
       true;
-    expect(_n1NotEmbed).toBe(true);
+    void _n1NotEmbed;
   });
 
-  it('DomainRelation is a union of reference and embed', () => {
-    const ref: DomainRelation = {
+  it('ContractRelation is a union of reference and embed', () => {
+    const ref: ContractRelation = {
       to: 'Post',
       cardinality: 'N:1',
       on: { localFields: ['postId'], targetFields: ['id'] },
     };
-    const embed: DomainRelation = {
+    const embed: ContractRelation = {
       to: 'Address',
       cardinality: '1:1',
     };
@@ -78,8 +60,8 @@ describe('domain types', () => {
     expect(embed.to).toBe('Address');
   });
 
-  it('DomainModel supports polymorphism fields', () => {
-    const model: DomainModel = {
+  it('ContractModel supports polymorphism fields', () => {
+    const model: ContractModel = {
       fields: { type: { nullable: false, codecId: 'pg/text@1' } },
       relations: {},
       storage: {},
@@ -90,8 +72,8 @@ describe('domain types', () => {
     expect(model.variants).toBeDefined();
   });
 
-  it('DomainModel supports base for variant models', () => {
-    const model: DomainModel = {
+  it('ContractModel supports base for variant models', () => {
+    const model: ContractModel = {
       fields: {},
       relations: {},
       storage: {},
@@ -100,8 +82,8 @@ describe('domain types', () => {
     expect(model.base).toBe('Parent');
   });
 
-  it('DomainModel supports owner for component membership', () => {
-    const model: DomainModel = {
+  it('ContractModel supports owner for component membership', () => {
+    const model: ContractModel = {
       fields: {
         street: { nullable: false, codecId: 'pg/text@1' },
       },

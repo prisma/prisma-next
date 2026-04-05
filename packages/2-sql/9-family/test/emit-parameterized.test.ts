@@ -46,7 +46,7 @@ function createMockFamily(): FamilyDescriptor<'sql'> {
 }
 
 async function emitWithDescriptors(
-  contract: Record<string, unknown>,
+  contract: Contract,
   descriptors: EmitTestDescriptors,
 ): Promise<EmitResult> {
   const allDescs = [
@@ -75,7 +75,7 @@ async function emitWithDescriptors(
     parameterizedTypeImports: extractParameterizedTypeImports(allDescs),
     operationRegistry,
   };
-  return emit(contract as unknown as Contract, stackInput, sqlTargetFamilyHook);
+  return emit(contract, stackInput, sqlTargetFamilyHook);
 }
 
 /**
@@ -188,13 +188,8 @@ function createMockExtensionWithParameterizedRenderer(
   };
 }
 
-function createTestContract(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  const base = createSqlContract(overrides);
-  return {
-    schemaVersion: '1',
-    ...base,
-    storageHash: base.storage.storageHash,
-  };
+function createTestContract(overrides: Record<string, unknown> = {}): Contract {
+  return createSqlContract(overrides);
 }
 
 describe('emit parameterized codecs integration', () => {
@@ -252,7 +247,9 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Verify the parameterized renderer produces the correct type
-    expect(result.contractDts).toContain('readonly vector: Vector<1536>');
+    expect(result.contractDts).toContain(
+      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+    );
 
     // Verify the emitted contract imports the type used by the renderer
     expect(result.contractDts).toContain(
@@ -377,9 +374,13 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [extension],
     });
 
-    // Standard columns should use CodecTypes lookup
-    expect(result.contractDts).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
-    expect(result.contractDts).toContain("readonly name: CodecTypes['pg/text@1']['output']");
+    // Standard columns should use ContractField format
+    expect(result.contractDts).toContain(
+      "readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false }",
+    );
+    expect(result.contractDts).toContain(
+      "readonly name: { readonly codecId: 'pg/text@1'; readonly nullable: false }",
+    );
   });
 
   it('falls back to CodecTypes when no renderer exists for codecId', async () => {
@@ -432,8 +433,10 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [extension],
     });
 
-    // Should fall back to standard CodecTypes lookup
-    expect(result.contractDts).toContain("readonly value: CodecTypes['custom/type@1']['output']");
+    // Should fall back to ContractField format
+    expect(result.contractDts).toContain(
+      "readonly value: { readonly codecId: 'custom/type@1'; readonly nullable: false }",
+    );
   });
 
   it('collects typesImport from multiple parameterized codecs', async () => {
@@ -703,7 +706,11 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [],
     });
 
-    expect(result.contractDts).toContain('readonly payload: AuditPayload');
-    expect(result.contractDts).toContain("readonly metadata: CodecTypes['pg/jsonb@1']['output']");
+    expect(result.contractDts).toContain(
+      "readonly payload: { readonly codecId: 'pg/jsonb@1'; readonly nullable: false }",
+    );
+    expect(result.contractDts).toContain(
+      "readonly metadata: { readonly codecId: 'pg/jsonb@1'; readonly nullable: false }",
+    );
   });
 });

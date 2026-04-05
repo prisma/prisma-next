@@ -1,10 +1,10 @@
-import type { StorageHashBase } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type { ExecutionContext, TypeHelperRegistry } from '../src/sql-context';
 
 // Contract type with storage.types using literal types (matching emission output)
-type TestContract = SqlContract<
+type TestContract = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {
@@ -60,9 +60,9 @@ test('ExecutionContext preserves contract type parameter', () => {
   >();
 });
 
-test('ExecutionContext accepts generic SqlContract', () => {
+test('ExecutionContext accepts generic Contract', () => {
   // Verify ExecutionContext defaults work
   type DefaultContext = ExecutionContext;
-  expectTypeOf<DefaultContext['contract']>().toExtend<SqlContract<SqlStorage>>();
+  expectTypeOf<DefaultContext['contract']>().toExtend<Contract<SqlStorage>>();
   expectTypeOf<DefaultContext['types']>().toEqualTypeOf<TypeHelperRegistry>();
 });

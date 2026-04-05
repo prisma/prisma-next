@@ -10,6 +10,7 @@
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "emit": "prisma-next contract emit --config test/fixtures/prisma-next.config.ts",
+    "emit:check": "pnpm emit && git diff --exit-code test/fixtures/generated/",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "devDependencies": {

@@ -6,9 +6,9 @@
  * - Unique indexes/constraints can satisfy non-unique index requirements
  * - Name differences do not cause operations to be emitted
  */
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
@@ -231,15 +231,13 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
   });
 });
 
-function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlContract<SqlStorage> {
+function createTestContract(overrides?: Partial<Contract<SqlStorage>>): Contract<SqlStorage> {
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:contract'),
-    profileHash: profileHash('sha256:profile'),
+    profileHash: profileHash('sha256:test'),
     storage: {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('sha256:contract'),
       tables: {},
     },
     roots: {},
@@ -247,7 +245,6 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
     ...overrides,
   };
 }

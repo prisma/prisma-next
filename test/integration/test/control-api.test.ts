@@ -9,7 +9,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import { emit } from '@prisma-next/emitter';
 import sql from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
@@ -25,7 +25,7 @@ import { createIntegrationTestDir } from './utils/cli-test-helpers';
 /**
  * Creates a test contract for testing.
  */
-function createTestContract(): SqlContract<SqlStorage> {
+function createTestContract(): Contract<SqlStorage> {
   return defineContract<CodecTypes>()
     .target(postgresPack)
     .table('user', (t) =>
@@ -43,7 +43,7 @@ function createTestContract(): SqlContract<SqlStorage> {
  * Returns the contract JSON for use in tests.
  */
 async function emitContract(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   testDir: string,
 ): Promise<Record<string, unknown>> {
   const stack = createControlStack({
@@ -54,7 +54,7 @@ async function emitContract(
     extensionPacks: [],
   });
 
-  const emitResult = await emit(contract as unknown as Contract, stack, sqlTargetFamilyHook);
+  const emitResult = await emit(contract, stack, sqlTargetFamilyHook);
 
   // Write contract files
   const contractJsonPath = resolve(testDir, 'output/contract.json');

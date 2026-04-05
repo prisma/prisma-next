@@ -9,7 +9,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import { emit } from '@prisma-next/emitter';
 import sql from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -28,7 +28,7 @@ import { createIntegrationTestDir } from './utils/cli-test-helpers';
 /**
  * Creates a test contract for testing.
  */
-function createTestContract(): SqlContract<SqlStorage> {
+function createTestContract(): Contract<SqlStorage> {
   const contractObj = defineContract<CodecTypes>()
     .target(postgresPack)
     .table('user', (t) =>
@@ -56,9 +56,9 @@ function createTestContract(): SqlContract<SqlStorage> {
  * Returns the validated contract for use in tests.
  */
 async function emitContract(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   testDir: string,
-): Promise<SqlContract<SqlStorage>> {
+): Promise<Contract<SqlStorage>> {
   const stack = createControlStack({
     family: sql,
     target: postgres,
@@ -67,7 +67,7 @@ async function emitContract(
     extensionPacks: [],
   });
 
-  const emitResult = await emit(contract as unknown as Contract, stack, sqlTargetFamilyHook);
+  const emitResult = await emit(contract, stack, sqlTargetFamilyHook);
 
   // Write contract files
   const contractJsonPath = resolve(testDir, 'output/contract.json');
@@ -78,7 +78,7 @@ async function emitContract(
   writeFileSync(contractDtsPath, emitResult.contractDts, 'utf-8');
 
   const contractJson = JSON.parse(emitResult.contractJson) as Record<string, unknown>;
-  return validateContract<SqlContract<SqlStorage>>(contractJson);
+  return validateContract<Contract<SqlStorage>>(contractJson);
 }
 
 /**
@@ -99,7 +99,7 @@ function loadContract(testDir: string): { contract: Contract; contractPath: stri
       extensionPacks: [],
     }),
   );
-  const contract = familyInstance.validateContract(contractJson) as Contract;
+  const contract = familyInstance.validateContract(contractJson);
   return { contract, contractPath };
 }
 
@@ -166,7 +166,7 @@ describe('family instance verify - errors', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            storageHash: contractWithDb.storageHash,
+            storageHash: contractWithDb.storage.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -208,7 +208,7 @@ describe('family instance verify - errors', () => {
             // Write marker with different hash
             const write = writeContractMarker({
               storageHash: 'sha256:different-hash',
-              profileHash: contractWithDb.profileHash ?? contractWithDb.storageHash,
+              profileHash: contractWithDb.profileHash ?? contractWithDb.storage.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -224,7 +224,7 @@ describe('family instance verify - errors', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            storageHash: contractWithDb.storageHash,
+            storageHash: contractWithDb.storage.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -265,7 +265,7 @@ describe('family instance verify - errors', () => {
 
             // Write marker with different profileHash
             const write = writeContractMarker({
-              storageHash: contractWithDb.storageHash,
+              storageHash: contractWithDb.storage.storageHash,
               profileHash: 'sha256:different-profile-hash',
               contractJson: contractWithDb,
               canonicalVersion: 1,
@@ -282,7 +282,7 @@ describe('family instance verify - errors', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            storageHash: contractWithDb.storageHash,
+            storageHash: contractWithDb.storage.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -361,8 +361,8 @@ describe('family instance verify - errors', () => {
             await executeStatement(client, ensureTableStatement);
 
             const write = writeContractMarker({
-              storageHash: contractWithDb.storageHash,
-              profileHash: contractWithDb.profileHash ?? contractWithDb.storageHash,
+              storageHash: contractWithDb.storage.storageHash,
+              profileHash: contractWithDb.profileHash ?? contractWithDb.storage.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -379,7 +379,7 @@ describe('family instance verify - errors', () => {
 
           // Should succeed but report missing codecs if contract uses types not in supported list
           const expectedContract: Record<string, unknown> = {
-            storageHash: contractWithDb.storageHash,
+            storageHash: contractWithDb.storage.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;

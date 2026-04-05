@@ -1,4 +1,4 @@
-import type { DomainField, DomainReferenceRelation } from '@prisma-next/contract/types';
+import type { ContractField, ContractReferenceRelation } from '@prisma-next/contract/types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
@@ -8,8 +8,8 @@ import {
 import { createMongoScalarTypeDescriptors } from '../src/scalar-type-descriptors';
 
 interface MongoModel {
-  readonly fields: Record<string, DomainField>;
-  readonly relations: Record<string, DomainReferenceRelation>;
+  readonly fields: Record<string, ContractField>;
+  readonly relations: Record<string, ContractReferenceRelation>;
   readonly storage: Record<string, unknown>;
 }
 

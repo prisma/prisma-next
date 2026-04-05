@@ -3,7 +3,7 @@ import { access } from 'node:fs/promises';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import {
   ensureSchemaStatement,
@@ -39,8 +39,8 @@ function createTestContract(
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'sha256:test',
     storage: {
+      storageHash: 'sha256:test',
       tables: Object.fromEntries(
         Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
           name,
@@ -78,15 +78,15 @@ function extractJson(lines: string[]): unknown {
 
 async function writeMatchingMarker(
   connectionString: string,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
 ): Promise<void> {
   await withClient(connectionString, async (client) => {
     await executeStatement(client, ensureSchemaStatement);
     await executeStatement(client, ensureTableStatement);
 
     const write = writeContractMarker({
-      storageHash: contract.storageHash,
-      profileHash: contract.profileHash ?? contract.storageHash,
+      storageHash: contract.storage.storageHash,
+      profileHash: contract.profileHash ?? contract.storage.storageHash,
       contractJson: contract,
       canonicalVersion: 1,
     });
@@ -96,7 +96,7 @@ async function writeMatchingMarker(
 
 async function createMatchingSchemaAndMarker(
   connectionString: string,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
 ): Promise<void> {
   await withClient(connectionString, async (client) => {
     await client.query(`
@@ -154,7 +154,7 @@ withTempDir(({ createTempDir }) => {
 
             // Load precomputed contract from disk
             const contractJsonPath = join(testDir, 'output', 'contract.json');
-            const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+            const contract = loadContractFromDisk<Contract<SqlStorage>>(contractJsonPath);
 
             await createMatchingSchemaAndMarker(connectionString, contract);
 
@@ -207,10 +207,10 @@ withTempDir(({ createTempDir }) => {
 
             // Verify storageHash matches
             expect((parsed['contract'] as { storageHash: string }).storageHash).toBe(
-              contract.storageHash,
+              contract.storage.storageHash,
             );
             expect((parsed['marker'] as { storageHash: string }).storageHash).toBe(
-              contract.storageHash,
+              contract.storage.storageHash,
             );
           },
           // Use random ports to avoid conflicts in CI (no options = random ports)
@@ -243,7 +243,7 @@ withTempDir(({ createTempDir }) => {
           }
 
           const contractJsonPath = join(testDir, 'output', 'contract.json');
-          const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+          const contract = loadContractFromDisk<Contract<SqlStorage>>(contractJsonPath);
           await writeMatchingMarker(connectionString, contract);
 
           const outputStartIndex = consoleOutput.length;
@@ -308,7 +308,7 @@ withTempDir(({ createTempDir }) => {
 
           // Load precomputed contract from disk
           const contractJsonPath = join(testDir, 'output', 'contract.json');
-          loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+          loadContractFromDisk<Contract<SqlStorage>>(contractJsonPath);
 
           // Clear console output before running the command we want to test
           // (previous commands like 'contract emit' may have added output)
@@ -623,7 +623,7 @@ withTempDir(({ createTempDir }) => {
           }
 
           const contractJsonPath = join(testDir, 'output', 'contract.json');
-          const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+          const contract = loadContractFromDisk<Contract<SqlStorage>>(contractJsonPath);
 
           await withClient(connectionString, async (client) => {
             await client.query(`
@@ -693,7 +693,7 @@ withTempDir(({ createTempDir }) => {
 
           // Load precomputed contract from disk
           const contractJsonPath = join(testDir, 'output', 'contract.json');
-          const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+          const contract = loadContractFromDisk<Contract<SqlStorage>>(contractJsonPath);
 
           await writeMatchingMarker(connectionString, contract);
 
@@ -862,9 +862,9 @@ withTempDir(({ createTempDir }) => {
 
           // Load precomputed contract from disk
           const contractJsonPath = join(testDir, 'output', 'contract.json');
-          const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+          const contract = loadContractFromDisk<Contract<SqlStorage>>(contractJsonPath);
           expect(contract).toBeDefined();
-          expect(contract.storageHash).toBeDefined();
+          expect(contract.storage.storageHash).toBeDefined();
 
           const command = createDbVerifyCommand();
           const verifyCwd4 = process.cwd();
@@ -928,7 +928,7 @@ withTempDir(({ createTempDir }) => {
           }
 
           const contractJsonPath = join(emitTestSetup.testDir, 'output', 'contract.json');
-          const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
+          const contract = loadContractFromDisk<Contract<SqlStorage>>(contractJsonPath);
 
           // Copy contract file to the test directory so the command can read it
           const testContractJsonPath = join(testDir, 'output', 'contract.json');
@@ -950,8 +950,8 @@ withTempDir(({ createTempDir }) => {
 
             // Write marker matching contract
             const write = writeContractMarker({
-              storageHash: contract.storageHash,
-              profileHash: contract.profileHash ?? contract.storageHash,
+              storageHash: contract.storage.storageHash,
+              profileHash: contract.profileHash ?? contract.storage.storageHash,
               contractJson: contract,
               canonicalVersion: 1,
             });
@@ -971,7 +971,7 @@ withTempDir(({ createTempDir }) => {
             adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             // driver is missing - this is what we're testing
             extensionPacks: [],
-            contract: typescriptContract(contract as unknown as Contract, 'output/contract.json'),
+            contract: typescriptContract(contract, 'output/contract.json'),
             db: {
               connection: connectionString,
             },

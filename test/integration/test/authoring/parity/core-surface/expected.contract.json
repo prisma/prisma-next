@@ -2,8 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:2cb78b9b8977b11888c5c10af73359cad6e7829e2792f5c73ea0ae8c78f615f1",
-  "profileHash": "sha256:dac42ff24bf5238eef80f2fd845d34eab8e6381ddafc571bed5e4af1ea61b9b8",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
     "post": "Post",
     "user": "User"
@@ -12,17 +11,20 @@
     "Post": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "rating": {
           "codecId": "pg/float8@1",
           "nullable": true
         },
         "title": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "userId": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -56,23 +58,28 @@
     "User": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1"
+          "codecId": "pg/timestamptz@1",
+          "nullable": false
         },
         "email": {
-          "codecId": "pg/text@1"
+          "codecId": "pg/text@1",
+          "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "isActive": {
-          "codecId": "pg/bool@1"
+          "codecId": "pg/bool@1",
+          "nullable": false
         },
         "profile": {
           "codecId": "pg/jsonb@1",
           "nullable": true
         },
         "role": {
-          "codecId": "pg/enum@1"
+          "codecId": "pg/enum@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -102,6 +109,7 @@
     }
   },
   "storage": {
+    "storageHash": "sha256:469b9315e8d9fe03f253c634111c363ad6b0d72bb234fe0d0f4c44e795d649ab",
     "tables": {
       "post": {
         "columns": {
@@ -111,7 +119,8 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "rating": {
             "codecId": "pg/float8@1",
@@ -120,11 +129,13 @@
           },
           "title": {
             "codecId": "pg/text@1",
-            "nativeType": "text"
+            "nativeType": "text",
+            "nullable": false
           },
           "userId": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           }
         },
         "foreignKeys": [
@@ -162,11 +173,13 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz"
+            "nativeType": "timestamptz",
+            "nullable": false
           },
           "email": {
             "codecId": "pg/text@1",
             "nativeType": "text",
+            "nullable": false,
             "typeRef": "Email"
           },
           "id": {
@@ -175,7 +188,8 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "isActive": {
             "codecId": "pg/bool@1",
@@ -183,7 +197,8 @@
               "kind": "literal",
               "value": true
             },
-            "nativeType": "bool"
+            "nativeType": "bool",
+            "nullable": false
           },
           "profile": {
             "codecId": "pg/jsonb@1",
@@ -193,6 +208,7 @@
           "role": {
             "codecId": "pg/enum@1",
             "nativeType": "Role",
+            "nullable": false,
             "typeRef": "Role"
           }
         },

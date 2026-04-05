@@ -289,9 +289,9 @@ describe('emitter round-trip', () => {
     const id = columns['id'] as Record<string, unknown>;
     const email = columns['email'] as Record<string, unknown>;
     const name = columns['name'] as Record<string, unknown>;
-    expect(id['nullable']).toBeUndefined();
+    expect(id['nullable']).toBe(false);
     expect(email['nullable']).toBe(true);
-    expect(name['nullable']).toBeUndefined();
+    expect(name['nullable']).toBe(false);
   });
 
   it('round-trip with capabilities', async () => {

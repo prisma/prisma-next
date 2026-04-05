@@ -367,9 +367,15 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('export type Contract');
     expect(types).toContain('readonly User: {');
     expect(types).toContain("storage: { readonly table: 'user'");
-    expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
-    expect(types).toContain("readonly email: CodecTypes['pg/text@1']['output']");
-    expect(types).toContain("readonly name: CodecTypes['pg/text@1']['output']");
+    expect(types).toContain(
+      "readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false }",
+    );
+    expect(types).toContain(
+      "readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false }",
+    );
+    expect(types).toContain(
+      "readonly name: { readonly codecId: 'pg/text@1'; readonly nullable: false }",
+    );
     expect(types).not.toContain('modelToTable');
     expect(types).not.toContain('fieldToColumn');
   });
@@ -452,7 +458,7 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).not.toContain('SqlMappings');
-    expect(types).toContain('\n  Record<string, never>,\n  StorageHash,\n');
+    expect(types).toContain('storageHash: StorageHash');
   });
 
   it('generates models type with relations missing on/cols properties', () => {
@@ -665,7 +671,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(types).toContain(
-      "readonly vector: CodecTypes['pg/vector@1']['output'] & { length: 1536 }",
+      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
     );
   });
 
@@ -723,7 +729,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(types).toContain(
-      "readonly vector: CodecTypes['pg/vector@1']['output'] & { length: 1536 }",
+      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
     );
   });
 });

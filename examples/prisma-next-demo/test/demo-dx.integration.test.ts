@@ -17,7 +17,7 @@ describe('demo contract visualization DX', () => {
 
     expect(contract.target).toBeDefined();
     expect(typeof contract.target).toBe('string');
-    expect(contract.storageHash).toBeDefined();
+    expect(contract.storage.storageHash).toBeDefined();
     expect(contract.models).toBeDefined();
     expect(typeof contract.models).toBe('object');
     expect(contract.storage).toBeDefined();

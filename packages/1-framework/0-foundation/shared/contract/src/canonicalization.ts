@@ -1,6 +1,6 @@
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
 
-import type { StorageBase } from './types';
+import type { Contract } from './contract-types';
 import { bigintJsonReplacer } from './types';
 
 const TOP_LEVEL_ORDER = [
@@ -8,8 +8,6 @@ const TOP_LEVEL_ORDER = [
   'canonicalVersion',
   'targetFamily',
   'target',
-  'storageHash',
-  'executionHash',
   'profileHash',
   'roots',
   'models',
@@ -51,10 +49,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
     const currentPath = [...path, key];
 
     if (key === '_generated') {
-      continue;
-    }
-
-    if (key === 'nullable' && value === false) {
       continue;
     }
 
@@ -115,6 +109,8 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         currentPath[3] === 'foreignKeys' &&
         (key === 'constraint' || key === 'index');
 
+      const isNullableField = key === 'nullable';
+
       if (
         !isRequiredModels &&
         !isRequiredTables &&
@@ -131,7 +127,8 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isTableUniques &&
         !isTableIndexes &&
         !isTableForeignKeys &&
-        !isFkBooleanField
+        !isFkBooleanField &&
+        !isNullableField
       ) {
         continue;
       }
@@ -241,49 +238,23 @@ export function orderTopLevel(obj: Record<string, unknown>): Record<string, unkn
   return ordered;
 }
 
-export type CanonicalContractInput = {
-  readonly schemaVersion?: string | undefined;
-  readonly targetFamily: string;
-  readonly target: string;
-  readonly roots: Record<string, string>;
-  readonly models: Record<string, unknown>;
-  readonly storage: StorageBase | Record<string, unknown>;
-  readonly execution?: Record<string, unknown> | undefined;
-  readonly extensionPacks: Record<string, unknown>;
-  readonly capabilities: Record<string, Record<string, boolean>>;
-  readonly meta: Record<string, unknown>;
-  readonly storageHash?: string | undefined;
-  readonly executionHash?: string | undefined;
-  readonly profileHash?: string | undefined;
-};
-
 export function canonicalizeContractToObject(
-  input: CanonicalContractInput,
+  contract: Contract,
+  options?: { schemaVersion?: string },
 ): Record<string, unknown> {
-  const i = input as Record<string, unknown>;
   const normalized: Record<string, unknown> = {
-    ...(i['schemaVersion'] !== undefined ? { schemaVersion: i['schemaVersion'] } : {}),
-    targetFamily: i['targetFamily'],
-    target: i['target'],
-    ...(i['profileHash'] !== undefined ? { profileHash: i['profileHash'] } : {}),
-    roots: i['roots'],
-    models: i['models'],
-    storage: i['storage'],
-    ...(i['execution'] !== undefined ? { execution: i['execution'] } : {}),
-    extensionPacks: i['extensionPacks'],
-    capabilities: i['capabilities'],
-    meta: i['meta'],
+    ...(options?.schemaVersion !== undefined ? { schemaVersion: options.schemaVersion } : {}),
+    targetFamily: contract.targetFamily,
+    target: contract.target,
+    profileHash: contract.profileHash,
+    roots: contract.roots,
+    models: contract.models,
+    storage: contract.storage,
+    ...(contract.execution !== undefined ? { execution: contract.execution } : {}),
+    extensionPacks: contract.extensionPacks,
+    capabilities: contract.capabilities,
+    meta: contract.meta,
   };
-  if (i['storageHash'] !== undefined) {
-    normalized['storageHash'] = i['storageHash'];
-  }
-  if (i['executionHash'] !== undefined) {
-    normalized['executionHash'] = i['executionHash'];
-  }
-  if (i['profileHash'] !== undefined) {
-    normalized['profileHash'] = i['profileHash'];
-  }
-
   const withDefaultsOmitted = omitDefaults(normalized, []) as Record<string, unknown>;
   const withSortedIndexes = sortIndexesAndUniques(withDefaultsOmitted['storage']);
   const withSortedStorage = { ...withDefaultsOmitted, storage: withSortedIndexes };
@@ -291,6 +262,9 @@ export function canonicalizeContractToObject(
   return orderTopLevel(withSortedKeys);
 }
 
-export function canonicalizeContract(input: CanonicalContractInput): string {
-  return JSON.stringify(canonicalizeContractToObject(input), bigintJsonReplacer, 2);
+export function canonicalizeContract(
+  contract: Contract,
+  options?: { schemaVersion?: string },
+): string {
+  return JSON.stringify(canonicalizeContractToObject(contract, options), bigintJsonReplacer, 2);
 }

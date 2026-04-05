@@ -1,11 +1,6 @@
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type {
-  ForeignKey,
-  ReferentialAction,
-  SqlContract,
-  SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { ForeignKey, ReferentialAction, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
@@ -13,7 +8,7 @@ import { createPostgresMigrationPlanner } from '../../src/core/migrations/planne
 function createRefActionContract(
   onDelete?: ReferentialAction,
   onUpdate?: ReferentialAction,
-): SqlContract<SqlStorage> {
+): Contract<SqlStorage> {
   const fk: ForeignKey = {
     columns: ['userId'],
     references: { table: 'user', columns: ['id'] },
@@ -24,11 +19,9 @@ function createRefActionContract(
   };
 
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:contract'),
-    profileHash: profileHash('sha256:profile'),
+    profileHash: profileHash('sha256:test'),
     storage: {
       storageHash: coreHash('sha256:contract'),
       tables: {
@@ -58,7 +51,6 @@ function createRefActionContract(
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
   };
 }
 

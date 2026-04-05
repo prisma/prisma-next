@@ -1,7 +1,11 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  type ColumnDefault,
+  type Contract,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import type { MigrationOperationPolicy, SchemaIssue } from '@prisma-next/core-control-plane/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildReconciliationPlan } from '../../src/core/migrations/planner-reconciliation';
 import {
@@ -48,12 +52,10 @@ function issue(
   return overrides as SchemaIssue;
 }
 
-function emptyContract(): SqlContract<SqlStorage> {
+function emptyContract(): Contract<SqlStorage> {
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:test'),
     profileHash: profileHash('sha256:test'),
     storage: { storageHash: coreHash('sha256:test'), tables: {} },
     roots: {},
@@ -61,7 +63,6 @@ function emptyContract(): SqlContract<SqlStorage> {
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
   };
 }
 
@@ -70,7 +71,7 @@ function contractWithColumn(
   column: string,
   nativeType: string,
   nullable = false,
-): SqlContract<SqlStorage> {
+): Contract<SqlStorage> {
   const contract = emptyContract();
   return {
     ...contract,
@@ -97,7 +98,7 @@ function contractWithColumnDefault(
   nativeType: string,
   columnDefault: ColumnDefault,
   nullable = false,
-): SqlContract<SqlStorage> {
+): Contract<SqlStorage> {
   const contract = emptyContract();
   return {
     ...contract,
@@ -128,7 +129,7 @@ function contractWithTypeRef(
   column: string,
   nativeType: string,
   typeRef: string,
-): SqlContract<SqlStorage> {
+): Contract<SqlStorage> {
   const contract = emptyContract();
   return {
     ...contract,
@@ -152,7 +153,7 @@ function contractWithTypeRef(
 function plan(
   issues: SchemaIssue[],
   options?: {
-    contract?: SqlContract<SqlStorage>;
+    contract?: Contract<SqlStorage>;
     mode?: PlanningMode;
     policy?: MigrationOperationPolicy;
     schemaName?: string;

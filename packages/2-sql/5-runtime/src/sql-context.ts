@@ -1,4 +1,4 @@
-import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type { Contract, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { createExecutionStack, type ExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeAdapterDescriptor,
@@ -14,7 +14,7 @@ import type { ComponentDescriptor } from '@prisma-next/framework-components/comp
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from '@prisma-next/runtime-executor';
-import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   AnyQueryAst,
@@ -117,7 +117,7 @@ export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = Runti
   'sql',
   TTargetId
 > &
-  Adapter<AnyQueryAst, SqlContract<SqlStorage>, LoweredStatement>;
+  Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
 
 /**
  * NOTE: Binding type is intentionally erased to unknown at this shared runtime layer.
@@ -150,7 +150,7 @@ export function createSqlExecutionStack<TTargetId extends string>(options: {
 export type { ExecutionContext, JsonSchemaValidatorRegistry, TypeHelperRegistry };
 
 export function assertExecutionStackContractRequirements(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   stack: SqlExecutionStack,
 ): void {
   const providedComponentIds = new Set<string>([
@@ -296,7 +296,7 @@ function validateColumnTypeParams(
  * - `typeRef` → `storage.types[ref]` with init hook results already in `types` registry
  */
 function buildJsonSchemaValidatorRegistry(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   types: TypeHelperRegistry,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): JsonSchemaValidatorRegistry | undefined {
@@ -403,7 +403,7 @@ function computeExecutionDefaultValue(
 }
 
 function applyMutationDefaults(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   generatorRegistry: ReadonlyMap<string, RuntimeMutationDefaultGenerator>,
   options: MutationDefaultsOptions,
 ): ReadonlyArray<AppliedMutationDefault> {
@@ -442,7 +442,7 @@ function applyMutationDefaults(
 }
 
 export function createExecutionContext<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
   TTargetId extends string = string,
 >(options: {
   readonly contract: TContract;

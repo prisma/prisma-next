@@ -1,6 +1,6 @@
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MigrationOperationPolicy } from '@prisma-next/core-control-plane/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
@@ -165,21 +165,16 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
   });
 });
 
-function createContract(
-  tables: SqlContract<SqlStorage>['storage']['tables'],
-): SqlContract<SqlStorage> {
+function createContract(tables: Contract<SqlStorage>['storage']['tables']): Contract<SqlStorage> {
   return {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:reconciliation-contract'),
-    profileHash: profileHash('sha256:reconciliation-profile'),
+    profileHash: profileHash('sha256:test'),
     storage: { storageHash: coreHash('sha256:reconciliation-contract'), tables },
     roots: {},
     models: {},
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    sources: {},
   };
 }

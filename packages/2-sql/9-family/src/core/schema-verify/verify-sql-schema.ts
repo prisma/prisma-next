@@ -2,11 +2,11 @@
  * Pure SQL schema verification function.
  *
  * This module provides a pure function that verifies a SqlSchemaIR against
- * a SqlContract without requiring a database connection. It can be reused
+ * a Contract without requiring a database connection. It can be reused
  * by migration planners and other tools that need to compare schema states.
  */
 
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type {
   OperationContext,
@@ -16,7 +16,6 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
-  SqlContract,
   SqlStorage,
   StorageColumn,
   StorageTypeInstance,
@@ -56,7 +55,7 @@ export type NativeTypeNormalizer = (nativeType: string) => string;
  */
 export interface VerifySqlSchemaOptions {
   /** The validated SQL contract to verify against */
-  readonly contract: SqlContract<SqlStorage>;
+  readonly contract: Contract<SqlStorage>;
   /** The schema IR from introspection (or another source) */
   readonly schema: SqlSchemaIR;
   /** Whether to run in strict mode (detects extra tables/columns) */
@@ -85,7 +84,7 @@ export interface VerifySqlSchemaOptions {
 }
 
 /**
- * Verifies that a SqlSchemaIR matches a SqlContract.
+ * Verifies that a SqlSchemaIR matches a Contract.
  *
  * This is a pure function that does NOT perform any database I/O.
  * It takes an already-introspected schema IR and compares it against
@@ -220,13 +219,13 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
 type VerificationStatus = 'pass' | 'warn' | 'fail';
 
-function extractContractMetadata(contract: SqlContract<SqlStorage>): {
-  contractStorageHash: SqlContract<SqlStorage>['storageHash'];
-  contractProfileHash?: SqlContract<SqlStorage>['profileHash'];
-  contractTarget: SqlContract<SqlStorage>['target'];
+function extractContractMetadata(contract: Contract<SqlStorage>): {
+  contractStorageHash: SqlStorage['storageHash'];
+  contractProfileHash?: Contract<SqlStorage>['profileHash'] | undefined;
+  contractTarget: Contract<SqlStorage>['target'];
 } {
   return {
-    contractStorageHash: contract.storageHash,
+    contractStorageHash: contract.storage.storageHash,
     contractProfileHash:
       'profileHash' in contract && typeof contract.profileHash === 'string'
         ? contract.profileHash
@@ -236,7 +235,7 @@ function extractContractMetadata(contract: SqlContract<SqlStorage>): {
 }
 
 function verifySchemaTables(options: {
-  contract: SqlContract<SqlStorage>;
+  contract: Contract<SqlStorage>;
   schema: SqlSchemaIR;
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
@@ -327,7 +326,7 @@ function verifySchemaTables(options: {
 }
 
 function verifyTableChildren(options: {
-  contractTable: SqlContract<SqlStorage>['storage']['tables'][string];
+  contractTable: Contract<SqlStorage>['storage']['tables'][string];
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
   tablePath: string;
@@ -485,7 +484,7 @@ function verifyTableChildren(options: {
 }
 
 function collectContractColumnNodes(options: {
-  contractTable: SqlContract<SqlStorage>['storage']['tables'][string];
+  contractTable: Contract<SqlStorage>['storage']['tables'][string];
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
   tablePath: string;
@@ -559,7 +558,7 @@ function collectContractColumnNodes(options: {
 }
 
 function appendExtraColumnNodes(options: {
-  contractTable: SqlContract<SqlStorage>['storage']['tables'][string];
+  contractTable: Contract<SqlStorage>['storage']['tables'][string];
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
   tablePath: string;
@@ -593,7 +592,7 @@ function appendExtraColumnNodes(options: {
 function verifyColumn(options: {
   tableName: string;
   columnName: string;
-  contractColumn: SqlContract<SqlStorage>['storage']['tables'][string]['columns'][string];
+  contractColumn: Contract<SqlStorage>['storage']['tables'][string]['columns'][string];
   schemaColumn: SqlSchemaIR['tables'][string]['columns'][string];
   columnPath: string;
   issues: SchemaIssue[];
@@ -911,7 +910,7 @@ function aggregateChildState(
 }
 
 function validateFrameworkComponentsForExtensions(
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
 ): void {
   const contractExtensionPacks = contract.extensionPacks ?? {};
@@ -942,7 +941,7 @@ function validateFrameworkComponentsForExtensions(
  * target-specific adapters (like Postgres) to provide their own expansion logic.
  */
 function renderExpectedNativeType(
-  contractColumn: SqlContract<SqlStorage>['storage']['tables'][string]['columns'][string],
+  contractColumn: Contract<SqlStorage>['storage']['tables'][string]['columns'][string],
   storageTypes: Record<string, StorageTypeInstance>,
   codecHooks: Map<string, CodecControlHooks>,
   context?: {

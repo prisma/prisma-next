@@ -1,10 +1,11 @@
 import type {
+  Contract,
   ResultType as CoreResultType,
   ExecutionPlan,
   PlanRefs,
 } from '@prisma-next/contract/types';
 import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
-import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type { ExtractCodecTypes, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import type {
   AnyExpression,
@@ -267,9 +268,9 @@ type ExtractCodecOutputType<
  * whose `storage.table` matches.
  */
 type ExtractTableToModel<
-  Contract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TableName extends string,
-> = Contract['models'] extends infer Models extends Record<string, unknown>
+> = TContract['models'] extends infer Models extends Record<string, unknown>
   ? {
       [M in keyof Models & string]: Models[M] extends {
         readonly storage: { readonly table: TableName };
@@ -284,11 +285,11 @@ type ExtractTableToModel<
  * `model.storage.fields` whose `column` matches.
  */
 type ExtractColumnToField<
-  Contract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TableName extends string,
   ColumnName extends string,
-> = ExtractTableToModel<Contract, TableName> extends infer ModelName extends string
-  ? Contract['models'] extends infer Models extends Record<string, unknown>
+> = ExtractTableToModel<TContract, TableName> extends infer ModelName extends string
+  ? TContract['models'] extends infer Models extends Record<string, unknown>
     ? ModelName & keyof Models extends infer MKey extends string
       ? Models[MKey] extends {
           readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
@@ -303,14 +304,11 @@ type ExtractColumnToField<
     : never
   : never;
 
-/**
- * Extracts the field value type from a model's fields.
- */
 type ExtractFieldValue<
-  Contract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
-> = Contract['models'] extends infer Models
+> = TContract['models'] extends infer Models
   ? Models extends Record<string, unknown>
     ? ModelName extends keyof Models
       ? Models[ModelName] extends { readonly fields: infer Fields }
@@ -324,19 +322,28 @@ type ExtractFieldValue<
     : never
   : never;
 
-/**
- * Extracts the JavaScript type for a column from model fields if available.
- * Model fields in the .d.ts carry concrete JS types (e.g. `string`, `Char<36>`).
- */
+type ResolveModelFieldToJsType<
+  TContract extends Contract<SqlStorage>,
+  FieldValue,
+> = FieldValue extends { readonly codecId: infer Id extends string }
+  ? Id extends keyof ExtractCodecTypes<TContract>
+    ? ExtractCodecTypes<TContract>[Id] extends { readonly output: infer O }
+      ? FieldValue extends { readonly nullable: true }
+        ? O | null
+        : O
+      : never
+    : never
+  : FieldValue;
+
 type ExtractColumnJsTypeFromModels<
-  Contract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TableName extends string,
   ColumnName extends string,
-> = ExtractTableToModel<Contract, TableName> extends infer ModelName
+> = ExtractTableToModel<TContract, TableName> extends infer ModelName
   ? ModelName extends string
-    ? ExtractColumnToField<Contract, TableName, ColumnName> extends infer FieldName
+    ? ExtractColumnToField<TContract, TableName, ColumnName> extends infer FieldName
       ? FieldName extends string
-        ? ExtractFieldValue<Contract, ModelName, FieldName>
+        ? ResolveModelFieldToJsType<TContract, ExtractFieldValue<TContract, ModelName, FieldName>>
         : never
       : never
     : never
@@ -348,14 +355,14 @@ type ExtractColumnJsTypeFromModels<
  * - `columnMeta.typeRef` (resolving into `contract.storage.types[typeRef].typeParams`).
  */
 type ResolveColumnTypeParams<
-  Contract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   ColumnMeta extends StorageColumn,
 > = ColumnMeta extends { typeParams: infer Params }
   ? Params extends object
     ? Params
     : undefined
   : ColumnMeta extends { typeRef: infer TypeRef extends string }
-    ? Contract['storage'] extends { types: infer Types }
+    ? TContract['storage'] extends { types: infer Types }
       ? Types extends Record<string, unknown>
         ? TypeRef extends keyof Types
           ? Types[TypeRef] extends { typeParams: infer Params }
@@ -524,17 +531,17 @@ type ColumnMetaTypeId<ColumnMeta> = ColumnMeta extends { codecId: infer CodecId 
     : never;
 
 export type ComputeColumnJsType<
-  Contract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TableName extends string,
   ColumnName extends string,
   ColumnMeta extends StorageColumn,
   CodecTypes extends Record<string, { readonly output: unknown }>,
-> = ExtractColumnJsTypeFromModels<Contract, TableName, ColumnName> extends infer FromModels
+> = ExtractColumnJsTypeFromModels<TContract, TableName, ColumnName> extends infer FromModels
   ? [FromModels] extends [never]
     ? ColumnMeta extends { nullable: infer Nullable }
       ? ColumnMetaTypeId<ColumnMeta> extends infer TypeId
         ? TypeId extends string
-          ? ResolveColumnTypeParams<Contract, ColumnMeta> extends infer Params
+          ? ResolveColumnTypeParams<TContract, ColumnMeta> extends infer Params
             ? Params extends object
               ? ExtractParameterizedCodecOutputType<
                   TypeId,
@@ -665,18 +672,20 @@ export type InferReturningRow<Columns extends readonly AnyColumnBuilder[]> =
  * Requires both `lateral` and `jsonAgg` to be `true` in the contract's capabilities for the target.
  * Capabilities are nested by target: `{ [target]: { lateral: true, jsonAgg: true } }`
  */
-export type HasIncludeManyCapabilities<TContract extends SqlContract<SqlStorage>> =
-  TContract extends { capabilities: infer C; target: infer T }
-    ? T extends string
-      ? C extends Record<string, Record<string, boolean>>
-        ? C extends { [K in T]: infer TargetCaps }
-          ? TargetCaps extends { lateral: true; jsonAgg: true }
-            ? true
-            : false
+export type HasIncludeManyCapabilities<TContract extends Contract<SqlStorage>> = TContract extends {
+  capabilities: infer C;
+  target: infer T;
+}
+  ? T extends string
+    ? C extends Record<string, Record<string, boolean>>
+      ? C extends { [K in T]: infer TargetCaps }
+        ? TargetCaps extends { lateral: true; jsonAgg: true }
+          ? true
           : false
         : false
       : false
-    : false;
+    : false
+  : false;
 
 /**
  * SQL-specific Plan type that refines the ast field to use AnyQueryAst.
@@ -777,9 +786,7 @@ export interface BuildOptions {
   readonly params?: BuildParamsMap;
 }
 
-export interface SqlBuilderOptions<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-> {
+export interface SqlBuilderOptions<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
 }
 

@@ -1,6 +1,5 @@
-import type { StorageHashBase } from '@prisma-next/contract/types';
-import { coreHash } from '@prisma-next/contract/types';
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { Contract as FrameworkContract, StorageHashBase } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { expectTypeOf, test } from 'vitest';
 import { schema } from '../src/schema';
@@ -13,7 +12,7 @@ const context = createTestContext(contract);
 const schemaHandle = schema(context);
 
 // Contract type with storage.types using literal types (matching emission output)
-type ContractWithTypes = SqlContract<
+type ContractWithTypes = FrameworkContract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {
@@ -119,10 +118,9 @@ test('schema extracts CodecTypes automatically from contract', () => {
 
 // Create typed schema for contracts with storage.types
 const contractWithTypes: ContractWithTypes = {
-  schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  storageHash: coreHash('sha256:test'),
+  profileHash: profileHash('sha256:test'),
   storage: {
     storageHash: coreHash('sha256:test'),
     tables: {
@@ -154,7 +152,6 @@ const contractWithTypes: ContractWithTypes = {
   extensionPacks: {},
   capabilities: {},
   meta: {},
-  sources: {},
 };
 
 const typesContext = createTestContext(contractWithTypes);
@@ -251,7 +248,7 @@ test('schema.types has literal keys from the fixture contract', () => {
 
 test('schema.types is generic record when contract does not specify types', () => {
   // Contract type without explicit storage.types - typing is generic
-  type ContractWithoutTypes = SqlContract<
+  type ContractWithoutTypes = FrameworkContract<
     {
       readonly storageHash: StorageHashBase<string>;
       readonly tables: {
@@ -274,10 +271,9 @@ test('schema.types is generic record when contract does not specify types', () =
   >;
 
   const noTypesContract: ContractWithoutTypes = {
-    schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:test'),
+    profileHash: profileHash('sha256:test'),
     storage: {
       storageHash: coreHash('sha256:test'),
       tables: {
@@ -295,7 +291,6 @@ test('schema.types is generic record when contract does not specify types', () =
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    sources: {},
   };
 
   const noTypesContext = createTestContext(noTypesContract);

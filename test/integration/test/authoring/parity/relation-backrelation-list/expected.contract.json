@@ -2,8 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:1901095b241c5386f7a7a60b06df1f471cc2b4d853acce384c7b2de8fd03c06b",
-  "profileHash": "sha256:dac42ff24bf5238eef80f2fd845d34eab8e6381ddafc571bed5e4af1ea61b9b8",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
     "post": "Post",
     "user": "User"
@@ -12,10 +11,12 @@
     "Post": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "userId": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -43,7 +44,8 @@
     "User": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -67,16 +69,19 @@
     }
   },
   "storage": {
+    "storageHash": "sha256:3121f1d380be89bc151a9eab8b5da6f68a9d649c1059b5da72ed8304a8082f2a",
     "tables": {
       "post": {
         "columns": {
           "id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "userId": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           }
         },
         "foreignKeys": [
@@ -102,7 +107,8 @@
         "columns": {
           "id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           }
         },
         "foreignKeys": [],

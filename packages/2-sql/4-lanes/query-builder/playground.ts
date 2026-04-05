@@ -1,60 +1,48 @@
-import type { StorageHashBase } from '@prisma-next/contract/types';
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { createRef, createRoot, type SelectBuilder, type TableReference } from './src';
 
 type StorageHash = StorageHashBase<'storage-hash-example'>;
 type AnotherStorageHash = StorageHashBase<'another-storage-hash-example'>;
 
-declare const contract: SqlContract<
-  {
-    readonly tables: {
-      readonly users: {
-        readonly columns: {
-          readonly id: {
-            readonly codecId: 'pg/int8@1';
-            readonly nativeType: 'serial';
-            nullable: false;
-          };
-          readonly email: {
-            readonly codecId: 'pg/varchar@1';
-            readonly nativeType: 'varchar';
-            nullable: true;
-          };
+declare const contract: Contract<{
+  readonly storageHash: StorageHash;
+  readonly tables: {
+    readonly users: {
+      readonly columns: {
+        readonly id: {
+          readonly codecId: 'pg/int8@1';
+          readonly nativeType: 'serial';
+          nullable: false;
         };
-        readonly foreignKeys: [];
-        readonly indexes: [];
-        readonly uniques: [];
-      };
-      readonly posts: {
-        readonly columns: {
-          readonly id: {
-            readonly codecId: 'pg/int8@1';
-            readonly nativeType: 'serial';
-            nullable: false;
-          };
-          readonly authorId: {
-            readonly codecId: 'pg/int8@1';
-            readonly nativeType: 'int8';
-            nullable: true;
-          };
+        readonly email: {
+          readonly codecId: 'pg/varchar@1';
+          readonly nativeType: 'varchar';
+          nullable: true;
         };
-        readonly foreignKeys: [];
-        readonly indexes: [];
-        readonly uniques: [];
       };
+      readonly foreignKeys: [];
+      readonly indexes: [];
+      readonly uniques: [];
     };
-  },
-  Record<string, unknown>,
-  Record<string, unknown>,
-  {
-    readonly codecTypes: {
-      'pg/int8@1': { output: number };
-      'pg/varchar@1': { output: string };
+    readonly posts: {
+      readonly columns: {
+        readonly id: {
+          readonly codecId: 'pg/int8@1';
+          readonly nativeType: 'serial';
+          nullable: false;
+        };
+        readonly authorId: {
+          readonly codecId: 'pg/int8@1';
+          readonly nativeType: 'int8';
+          nullable: true;
+        };
+      };
+      readonly foreignKeys: [];
+      readonly indexes: [];
+      readonly uniques: [];
     };
-    readonly operationTypes: Record<string, Record<string, unknown>>;
-  },
-  StorageHash
->;
+  };
+}>;
 
 declare const wrongTable: TableReference<'comments', StorageHash>;
 declare const allTable: TableReference<string, StorageHash>;

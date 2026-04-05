@@ -2,8 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:a7784c99f6fed5fc3ffd035e249cfc81633f22996e7d8a79e4afd9ec5d90aa0a",
-  "profileHash": "sha256:dac42ff24bf5238eef80f2fd845d34eab8e6381ddafc571bed5e4af1ea61b9b8",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
     "org_team": "Team",
     "team_member": "Member"
@@ -12,10 +11,12 @@
     "Member": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         },
         "teamId": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -43,7 +44,8 @@
     "Team": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1"
+          "codecId": "pg/int4@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -58,12 +60,14 @@
     }
   },
   "storage": {
+    "storageHash": "sha256:7af8c43bca40e86cd9fdde3d70bd51e8c9ef4b7425ad1d8f9912ee1a0be46fb0",
     "tables": {
       "org_team": {
         "columns": {
           "team_id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           }
         },
         "foreignKeys": [],
@@ -77,11 +81,13 @@
         "columns": {
           "member_id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "team_ref": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           }
         },
         "foreignKeys": [

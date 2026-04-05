@@ -3,13 +3,14 @@ import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
+import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -46,7 +47,7 @@ function createControlClientForTests(connectionString: string): ControlClient {
  * The contract type should be specified from the emitted contract.d.ts file.
  */
 export async function loadContractFromDisk<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
 >(contractJsonPath: string): Promise<TContract> {
   const contractJson = await loadRawContractFromDisk(contractJsonPath);
   return validateContract<TContract>(contractJson);
@@ -75,7 +76,7 @@ export async function emitAndVerifyContract(
   cliPath: string,
   configPath: string,
   expectedContractJsonPath: string,
-): Promise<SqlContract<SqlStorage>> {
+): Promise<Contract<SqlStorage>> {
   await execFileAsync('node', [cliPath, 'contract', 'emit', '--config', configPath]);
 
   // Read the emitted contract from the path specified in config.contract.output
@@ -93,7 +94,7 @@ export async function emitAndVerifyContract(
     );
   }
 
-  return validateContract<SqlContract<SqlStorage>>(emittedContract);
+  return validateContract<Contract<SqlStorage>>(emittedContract);
 }
 
 export async function runDbInit(options: {
@@ -144,7 +145,7 @@ async function getPlannedDdlSql(options: {
  * Test context provided to test callbacks by `withTestRuntime`.
  * Contains all the setup needed for e2e tests against a real database.
  */
-export interface TestRuntimeContext<TContract extends SqlContract<SqlStorage>> {
+export interface TestRuntimeContext<TContract extends Contract<SqlStorage>> {
   /** The validated contract loaded from disk */
   readonly contract: TContract;
   /** The SQL query context for building queries */
@@ -182,7 +183,7 @@ export interface TestRuntimeContext<TContract extends SqlContract<SqlStorage>> {
  * });
  * ```
  */
-export async function withTestRuntime<TContract extends SqlContract<SqlStorage>>(
+export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
   contractJsonPath: string,
   callback: (ctx: TestRuntimeContext<TContract>) => Promise<void>,
 ): Promise<void> {

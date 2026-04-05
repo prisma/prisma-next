@@ -1,5 +1,6 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { isToOneCardinality } from './collection-contract';
 import {
   acquireRuntimeScope,
@@ -27,8 +28,8 @@ import type {
 } from './types';
 
 export function dispatchCollectionRows<Row>(options: {
-  contract: SqlContract<SqlStorage>;
-  runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
+  contract: Contract<SqlStorage>;
+  runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
 }): AsyncIterableResult<Row> {
@@ -47,8 +48,8 @@ export function dispatchCollectionRows<Row>(options: {
 }
 
 function dispatchWithIncludeStrategy<Row>(options: {
-  contract: SqlContract<SqlStorage>;
-  runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
+  contract: Contract<SqlStorage>;
+  runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
 }): AsyncIterableResult<Row> {
@@ -79,8 +80,8 @@ function dispatchWithIncludeStrategy<Row>(options: {
 
 function dispatchWithSingleQueryIncludes<Row>(options: {
   strategy: 'lateral' | 'correlated';
-  contract: SqlContract<SqlStorage>;
-  runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
+  contract: Contract<SqlStorage>;
+  runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
 }): AsyncIterableResult<Row> {
@@ -147,8 +148,8 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
 }
 
 function dispatchWithMultiQueryIncludes<Row>(options: {
-  contract: SqlContract<SqlStorage>;
-  runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
+  contract: Contract<SqlStorage>;
+  runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
 }): AsyncIterableResult<Row> {
@@ -196,7 +197,7 @@ function dispatchWithMultiQueryIncludes<Row>(options: {
 
 export async function stitchIncludes(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   parentRows: RowEnvelope[],
   includes: readonly IncludeExpr[],
 ): Promise<void> {
@@ -233,7 +234,7 @@ export async function stitchIncludes(
 
 async function stitchCombinedInclude(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   parentRows: RowEnvelope[],
   include: IncludeExpr,
   parentJoinValues: readonly unknown[],
@@ -280,7 +281,7 @@ async function stitchCombinedInclude(
 
 async function stitchScalarInclude(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   parentRows: RowEnvelope[],
   include: IncludeExpr,
   selector: IncludeScalar<unknown>,
@@ -303,7 +304,7 @@ async function stitchScalarInclude(
 
 async function stitchRowInclude(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   parentRows: RowEnvelope[],
   include: IncludeExpr,
   state: CollectionState,
@@ -324,7 +325,7 @@ async function stitchRowInclude(
 
 async function resolveRowsByParent(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   include: IncludeExpr,
   state: CollectionState,
   parentJoinValues: readonly unknown[],
@@ -375,7 +376,7 @@ async function resolveRowsByParent(
 
 async function resolveScalarByParent(
   scope: RuntimeScope,
-  contract: SqlContract<SqlStorage>,
+  contract: Contract<SqlStorage>,
   include: IncludeExpr,
   selector: IncludeScalar<unknown>,
   parentJoinValues: readonly unknown[],

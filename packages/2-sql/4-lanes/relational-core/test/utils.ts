@@ -1,5 +1,6 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { createOperationRegistry } from '@prisma-next/operations';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { Adapter, CodecRegistry, LoweredStatement, SelectAst } from '../src/exports/ast';
 import { createCodecRegistry } from '../src/exports/ast';
@@ -10,7 +11,7 @@ import { createQueryOperationRegistry } from '../src/query-operation-registry';
  * Creates a stub adapter for testing.
  * This helper DRYs up the common pattern of adapter creation in tests.
  */
-export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
+export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> {
   return {
     profile: {
       id: 'stub-profile',
@@ -20,7 +21,7 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
         return createCodecRegistry();
       },
     },
-    lower(ast: SelectAst, ctx: { contract: SqlContract<SqlStorage>; params?: readonly unknown[] }) {
+    lower(ast: SelectAst, ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
       return {
         profileId: this.profile.id,
@@ -44,9 +45,9 @@ export interface Extension {
  * @param adapter - Optional adapter (for backward compatibility with old test code, but not used)
  * @param options - Optional extensions to register operations and codecs
  */
-export function createTestContext<TContract extends SqlContract<SqlStorage>>(
+export function createTestContext<TContract extends Contract<SqlStorage>>(
   contract: TContract,
-  _adapter?: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+  _adapter?: Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
   options?: {
     extensions?: ReadonlyArray<Extension>;
   },

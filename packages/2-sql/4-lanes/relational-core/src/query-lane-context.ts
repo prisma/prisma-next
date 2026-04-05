@@ -1,5 +1,6 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from './ast/codec-types';
 import type { QueryOperationRegistry } from './query-operation-registry';
 
@@ -71,9 +72,7 @@ export type MutationDefaultsOptions = {
  * operation builders. This interface explicitly excludes runtime concerns like
  * adapters, connection management, and transaction state.
  */
-export interface ExecutionContext<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-> {
+export interface ExecutionContext<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly contract: TContract;
   readonly operations: OperationRegistry;
   readonly codecs: CodecRegistry;

@@ -69,7 +69,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain('readonly embedding: Vector<1536>');
+      expect(types).toContain(
+        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+      );
     });
 
     it('falls back to CodecTypes[codecId].output for columns without typeParams', () => {
@@ -112,7 +114,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
+      expect(types).toContain(
+        "readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false }",
+      );
     });
 
     it('emits nullable parameterized type with | null suffix', () => {
@@ -160,7 +164,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain('readonly embedding: Vector<1536> | null');
+      expect(types).toContain(
+        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: true }",
+      );
     });
 
     it('uses custom renderer logic for complex type generation', () => {
@@ -212,7 +218,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain('readonly value: Decimal<10, 2>');
+      expect(types).toContain(
+        "readonly value: { readonly codecId: 'pg/decimal@1'; readonly nullable: false }",
+      );
     });
   });
 
@@ -269,7 +277,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain("readonly role: 'USER' | 'ADMIN' | 'MODERATOR'");
+      expect(types).toContain(
+        "readonly role: { readonly codecId: 'pg/enum@1'; readonly nullable: false }",
+      );
     });
   });
 
@@ -326,7 +336,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain('readonly embedding: Vector<1536>');
+      expect(types).toContain(
+        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+      );
     });
   });
 
@@ -397,9 +409,15 @@ describe('sql-target-family-hook parameterized type emission', () => {
       // Output should be identical
       expect(types1).toBe(types2);
 
-      expect(types1).toContain('readonly embedding1: Vector<1536>');
-      expect(types1).toContain('readonly embedding2: Vector<384>');
-      expect(types1).toContain('readonly embedding3: Vector<768>');
+      expect(types1).toContain(
+        "readonly embedding1: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+      );
+      expect(types1).toContain(
+        "readonly embedding2: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+      );
+      expect(types1).toContain(
+        "readonly embedding3: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+      );
     });
   });
 
@@ -444,7 +462,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain("readonly value: CodecTypes['custom/type@1']['output']");
+      expect(types).toContain(
+        "readonly value: { readonly codecId: 'custom/type@1'; readonly nullable: false }",
+      );
     });
 
     it('handles typeRef pointing to non-existent storage.types entry gracefully', () => {
@@ -493,7 +513,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain("readonly value: CodecTypes['pg/vector@1']['output']");
+      expect(types).toContain(
+        "readonly value: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+      );
     });
 
     it('handles empty typeParams object by falling back to standard lookup', () => {
@@ -541,7 +563,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain("readonly value: CodecTypes['pg/vector@1']['output']");
+      expect(types).toContain(
+        "readonly value: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+      );
     });
 
     it('works without options parameter (backwards compatibility)', () => {
@@ -575,7 +599,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
       // Call without options (4th parameter)
       const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
-      expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
+      expect(types).toContain(
+        "readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false }",
+      );
     });
   });
 
