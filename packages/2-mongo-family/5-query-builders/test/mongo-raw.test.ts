@@ -4,18 +4,8 @@ import type { Contract } from '../../1-foundation/mongo-contract/test/fixtures/o
 import ormContractJson from '../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { mongoRaw } from '../src/mongo-raw';
 
+// JSON import loses literal types; typed Contract .d.ts is the source of truth
 const contract = ormContractJson as unknown as Contract;
-
-function commandKind(raw: ReturnType<typeof mongoRaw>) {
-  return (
-    rootName: string,
-    fn: (col: ReturnType<ReturnType<typeof raw.collection>['aggregate']>) => void,
-  ) => {
-    void rootName;
-    void fn;
-  };
-}
-void commandKind;
 
 describe('mongoRaw', () => {
   const raw = mongoRaw({ contract });
