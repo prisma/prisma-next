@@ -763,8 +763,12 @@ model Document {
       ],
     });
 
-    expect(result.contractDts).toContain('readonly typeParams: { readonly length: 1536 }');
+    expect(result.contractDts).toMatch(
+      /readonly fields:\s*\{[\s\S]*?readonly embedding:\s*\{[\s\S]*?readonly typeParams: \{ readonly length: 1536 \}/,
+    );
     expect(result.contractDts).toContain("readonly typeRef: 'Embedding1536'");
-    expect(result.contractDts).not.toMatch(/readonly embedding:.*typeRef/);
+    expect(result.contractDts).not.toMatch(
+      /readonly fields:\s*\{[\s\S]*?readonly embedding:\s*\{[\s\S]*?readonly typeRef:/,
+    );
   });
 });
