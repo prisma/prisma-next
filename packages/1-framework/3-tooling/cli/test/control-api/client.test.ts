@@ -86,7 +86,16 @@ function createMockComponents() {
     id: 'sql',
     validateTypes: () => {},
     validateStructure: () => {},
-    generateContractTypes: () => 'export type Contract = unknown;\n',
+    generateStorageType: () =>
+      '{ readonly tables: Record<string, never>; readonly types: Record<string, never>; readonly storageHash: StorageHash }',
+    generateModelStorageType: () => 'Record<string, never>',
+    getFamilyImports: () => [
+      "import type { ContractWithTypeMaps, TypeMaps as TypeMapsType } from '@prisma-next/sql-contract/types';",
+    ],
+    getFamilyTypeAliases: () => '',
+    getTypeMapsExpression: () => 'TypeMapsType<CodecTypes, OperationTypes>',
+    getContractWrapper: (base: string, tm: string) =>
+      `export type Contract = ContractWithTypeMaps<${base}, ${tm}>;`,
   };
 
   const mockFamily = {

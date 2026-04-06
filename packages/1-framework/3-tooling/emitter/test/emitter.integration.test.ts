@@ -1,79 +1,13 @@
-import type {
-  EmissionSpi,
-  TypesImportSpec,
-  ValidationContext,
-} from '@prisma-next/framework-components/emission';
+import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
 import { emit } from '../src/exports';
+import { createMockSpi } from './mock-spi';
 import { createTestContract } from './utils';
 
-const mockSqlHook: EmissionSpi = {
-  id: 'sql',
-  validateTypes: (ir, _ctx: ValidationContext) => {
-    const storage = ir.storage as
-      | { tables?: Record<string, { columns?: Record<string, { type?: string }> }> }
-      | undefined;
-    if (!storage?.tables) {
-      return;
-    }
-
-    const referencedNamespaces = new Set<string>();
-    const extensionPacks = ir.extensionPacks as Record<string, unknown> | undefined;
-    if (extensionPacks) {
-      for (const namespace of Object.keys(extensionPacks)) {
-        referencedNamespaces.add(namespace);
-      }
-    }
-
-    const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
-
-    for (const [tableName, table] of Object.entries(storage.tables)) {
-      if (!table.columns) continue;
-      for (const [colName, col] of Object.entries(table.columns)) {
-        const column = col as { codecId?: string };
-        if (!column.codecId) {
-          throw new Error(`Column "${colName}" in table "${tableName}" is missing codecId`);
-        }
-
-        if (!typeIdRegex.test(column.codecId)) {
-          throw new Error(
-            `Column "${colName}" in table "${tableName}" has invalid codecId format "${column.codecId}". Expected format: ns/name@version`,
-          );
-        }
-
-        const match = column.codecId.match(typeIdRegex);
-        if (match?.[1]) {
-          const namespace = match[1];
-          if (!referencedNamespaces.has(namespace)) {
-            if (namespace === 'pg' && referencedNamespaces.has('postgres')) {
-              continue;
-            }
-            throw new Error(
-              `Column "${colName}" in table "${tableName}" uses codecId "${column.codecId}" from namespace "${namespace}" which is not referenced in contract.extensionPacks`,
-            );
-          }
-        }
-      }
-    }
-  },
-  validateStructure: (ir) => {
-    if (ir.targetFamily !== 'sql') {
-      throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
-    }
-  },
-  generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports) => {
-    void _codecTypeImports;
-    void _operationTypeImports;
-    return `// Generated contract types
-export type CodecTypes = Record<string, never>;
-export type LaneCodecTypes = CodecTypes;
-export type Contract = unknown;
-`;
-  },
-};
+const mockSqlHook = createMockSpi();
 
 describe('emitter integration', () => {
   it(
@@ -112,7 +46,6 @@ describe('emitter integration', () => {
         },
       });
 
-      // Create minimal test data (emitter tests don't load packs)
       const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
@@ -181,7 +114,6 @@ describe('emitter integration', () => {
       },
     });
 
-    // Create minimal test data (emitter tests don't load packs)
     const operationRegistry = createOperationRegistry();
     const codecTypeImports: TypesImportSpec[] = [];
     const operationTypeImports: TypesImportSpec[] = [];
@@ -237,7 +169,6 @@ describe('emitter integration', () => {
         },
       });
 
-      // Create minimal test data (emitter tests don't load packs)
       const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];

@@ -4,6 +4,7 @@ import type { EmissionSpi, ValidationContext } from '@prisma-next/framework-comp
 import { ifDefined } from '@prisma-next/utils/defined';
 import { format } from 'prettier';
 import type { EmitResult, EmitStackInput } from './emit-types';
+import { generateContractDts } from './generate-contract-dts';
 
 const SCHEMA_VERSION = '1';
 
@@ -66,8 +67,9 @@ export async function emit(
     ...ifDefined('executionHash', executionHash),
     profileHash,
   };
-  const contractDtsRaw = targetFamily.generateContractTypes(
+  const contractDtsRaw = generateContractDts(
     contract,
+    targetFamily,
     codecTypeImports ?? [],
     operationTypeImports ?? [],
     contractTypeHashes,
