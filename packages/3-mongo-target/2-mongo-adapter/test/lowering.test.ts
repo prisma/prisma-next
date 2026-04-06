@@ -1,4 +1,5 @@
 import {
+  MongoAddFieldsStage,
   MongoAggAccumulator,
   MongoAggArrayFilter,
   MongoAggCond,
@@ -11,16 +12,22 @@ import {
   MongoAggReduce,
   MongoAggSwitch,
   MongoAndExpr,
+  MongoCountStage,
   MongoExistsExpr,
   MongoExprFilter,
   MongoFieldFilter,
+  MongoGroupStage,
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
   MongoNotExpr,
   MongoOrExpr,
   MongoProjectStage,
+  MongoRedactStage,
+  MongoReplaceRootStage,
+  MongoSampleStage,
   MongoSkipStage,
+  MongoSortByCountStage,
   MongoSortStage,
   MongoUnwindStage,
 } from '@prisma-next/mongo-query-ast';
@@ -190,6 +197,149 @@ describe('lowerStage', () => {
     const stage = new MongoUnwindStage('$posts', true);
     expect(lowerStage(stage)).toEqual({
       $unwind: { path: '$posts', preserveNullAndEmptyArrays: true },
+    });
+  });
+
+  it('lowers $unwind stage with includeArrayIndex', () => {
+    const stage = new MongoUnwindStage('$items', false, 'itemIndex');
+    expect(lowerStage(stage)).toEqual({
+      $unwind: {
+        path: '$items',
+        preserveNullAndEmptyArrays: false,
+        includeArrayIndex: 'itemIndex',
+      },
+    });
+  });
+
+  it('lowers $group stage with single field groupId', () => {
+    const stage = new MongoGroupStage(MongoAggFieldRef.of('department'), {
+      total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')),
+      count: MongoAggAccumulator.count(),
+    });
+    expect(lowerStage(stage)).toEqual({
+      $group: {
+        _id: '$department',
+        total: { $sum: '$amount' },
+        count: { $count: {} },
+      },
+    });
+  });
+
+  it('lowers $group stage with null groupId', () => {
+    const stage = new MongoGroupStage(null, {
+      total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')),
+    });
+    expect(lowerStage(stage)).toEqual({
+      $group: { _id: null, total: { $sum: '$amount' } },
+    });
+  });
+
+  it('lowers $group stage with compound groupId', () => {
+    const stage = new MongoGroupStage(
+      {
+        dept: MongoAggFieldRef.of('department'),
+        year: MongoAggFieldRef.of('year'),
+      },
+      { total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')) },
+    );
+    expect(lowerStage(stage)).toEqual({
+      $group: {
+        _id: { dept: '$department', year: '$year' },
+        total: { $sum: '$amount' },
+      },
+    });
+  });
+
+  it('lowers $addFields stage', () => {
+    const stage = new MongoAddFieldsStage({
+      fullName: MongoAggOperator.of('$concat', [
+        MongoAggFieldRef.of('first'),
+        MongoAggLiteral.of(' '),
+        MongoAggFieldRef.of('last'),
+      ]),
+    });
+    expect(lowerStage(stage)).toEqual({
+      $addFields: {
+        fullName: { $concat: ['$first', ' ', '$last'] },
+      },
+    });
+  });
+
+  it('lowers $replaceRoot stage', () => {
+    const stage = new MongoReplaceRootStage(MongoAggFieldRef.of('address'));
+    expect(lowerStage(stage)).toEqual({
+      $replaceRoot: { newRoot: '$address' },
+    });
+  });
+
+  it('lowers $count stage', () => {
+    const stage = new MongoCountStage('totalDocs');
+    expect(lowerStage(stage)).toEqual({ $count: 'totalDocs' });
+  });
+
+  it('lowers $sortByCount stage', () => {
+    const stage = new MongoSortByCountStage(MongoAggFieldRef.of('status'));
+    expect(lowerStage(stage)).toEqual({ $sortByCount: '$status' });
+  });
+
+  it('lowers $sample stage', () => {
+    const stage = new MongoSampleStage(10);
+    expect(lowerStage(stage)).toEqual({ $sample: { size: 10 } });
+  });
+
+  it('lowers $redact stage', () => {
+    const stage = new MongoRedactStage(
+      MongoAggCond.of(
+        MongoAggOperator.of('$eq', [MongoAggFieldRef.of('level'), MongoAggLiteral.of(5)]),
+        MongoAggLiteral.of('$$PRUNE'),
+        MongoAggLiteral.of('$$DESCEND'),
+      ),
+    );
+    const thenKey = 'then';
+    expect(lowerStage(stage)).toEqual({
+      $redact: {
+        $cond: Object.fromEntries([
+          ['if', { $eq: ['$level', 5] }],
+          [thenKey, { $literal: '$$PRUNE' }],
+          ['else', { $literal: '$$DESCEND' }],
+        ]),
+      },
+    });
+  });
+
+  it('lowers $project stage with computed projections', () => {
+    const stage = new MongoProjectStage({
+      fullName: MongoAggOperator.of('$concat', [
+        MongoAggFieldRef.of('first'),
+        MongoAggLiteral.of(' '),
+        MongoAggFieldRef.of('last'),
+      ]),
+      email: 1,
+      _id: 0,
+    });
+    expect(lowerStage(stage)).toEqual({
+      $project: {
+        fullName: { $concat: ['$first', ' ', '$last'] },
+        email: 1,
+        _id: 0,
+      },
+    });
+  });
+
+  it('lowers $lookup stage with let_ and pipeline', () => {
+    const stage = new MongoLookupStage({
+      from: 'orders',
+      as: 'matchingOrders',
+      let_: { userId: MongoAggFieldRef.of('_id') },
+      pipeline: [new MongoMatchStage(MongoFieldFilter.eq('status', 'active'))],
+    });
+    expect(lowerStage(stage)).toEqual({
+      $lookup: {
+        from: 'orders',
+        as: 'matchingOrders',
+        let: { userId: '$_id' },
+        pipeline: [{ $match: { status: { $eq: 'active' } } }],
+      },
     });
   });
 });

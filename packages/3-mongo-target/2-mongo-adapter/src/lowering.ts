@@ -3,6 +3,8 @@ import type {
   MongoAggExpr,
   MongoAggExprVisitor,
   MongoFilterExpr,
+  MongoGroupId,
+  MongoProjectionValue,
   MongoReadStage,
 } from '@prisma-next/mongo-query-ast';
 import type { Document } from '@prisma-next/mongo-value';
@@ -147,12 +149,40 @@ export function lowerFilter(filter: MongoFilterExpr): Document {
   }
 }
 
+function lowerGroupId(groupId: MongoGroupId): unknown {
+  if (groupId === null) return null;
+  if ('kind' in groupId) return lowerAggExpr(groupId as MongoAggExpr);
+  const result: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(groupId)) {
+    result[key] = lowerAggExpr(val);
+  }
+  return result;
+}
+
+function lowerExprRecord(fields: Readonly<Record<string, MongoAggExpr>>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(fields)) {
+    result[key] = lowerAggExpr(val);
+  }
+  return result;
+}
+
+function lowerProjectionValue(value: MongoProjectionValue): unknown {
+  if (typeof value === 'number') return value;
+  return lowerAggExpr(value);
+}
+
 export function lowerStage(stage: MongoReadStage): Record<string, unknown> {
   switch (stage.kind) {
     case 'match':
       return { $match: lowerFilter(stage.filter) };
-    case 'project':
-      return { $project: { ...stage.projection } };
+    case 'project': {
+      const projection: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(stage.projection)) {
+        projection[key] = lowerProjectionValue(val);
+      }
+      return { $project: projection };
+    }
     case 'sort':
       return { $sort: { ...stage.sort } };
     case 'limit':
@@ -162,22 +192,47 @@ export function lowerStage(stage: MongoReadStage): Record<string, unknown> {
     case 'lookup': {
       const lookup: Record<string, unknown> = {
         from: stage.from,
-        localField: stage.localField,
-        foreignField: stage.foreignField,
         as: stage.as,
       };
+      if (stage.localField !== undefined) lookup['localField'] = stage.localField;
+      if (stage.foreignField !== undefined) lookup['foreignField'] = stage.foreignField;
       if (stage.pipeline) {
         lookup['pipeline'] = stage.pipeline.map((s) => lowerStage(s));
       }
+      if (stage.let_) {
+        lookup['let'] = lowerExprRecord(stage.let_);
+      }
       return { $lookup: lookup };
     }
-    case 'unwind':
-      return {
-        $unwind: {
-          path: stage.path,
-          preserveNullAndEmptyArrays: stage.preserveNullAndEmptyArrays,
-        },
+    case 'unwind': {
+      const unwind: Record<string, unknown> = {
+        path: stage.path,
+        preserveNullAndEmptyArrays: stage.preserveNullAndEmptyArrays,
       };
+      if (stage.includeArrayIndex !== undefined) {
+        unwind['includeArrayIndex'] = stage.includeArrayIndex;
+      }
+      return { $unwind: unwind };
+    }
+    case 'group': {
+      const group: Record<string, unknown> = { _id: lowerGroupId(stage.groupId) };
+      for (const [key, acc] of Object.entries(stage.accumulators)) {
+        group[key] = lowerAggExpr(acc);
+      }
+      return { $group: group };
+    }
+    case 'addFields':
+      return { $addFields: lowerExprRecord(stage.fields) };
+    case 'replaceRoot':
+      return { $replaceRoot: { newRoot: lowerAggExpr(stage.newRoot) } };
+    case 'count':
+      return { $count: stage.field };
+    case 'sortByCount':
+      return { $sortByCount: lowerAggExpr(stage.expr) };
+    case 'sample':
+      return { $sample: { size: stage.size } };
+    case 'redact':
+      return { $redact: lowerAggExpr(stage.expr) };
   }
 }
 
