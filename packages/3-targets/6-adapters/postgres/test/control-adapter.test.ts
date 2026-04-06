@@ -31,7 +31,6 @@ describe('PostgresControlAdapter', () => {
     const adapter = new PostgresControlAdapter();
     expect(adapter.familyId).toBe('sql');
     expect(adapter.targetId).toBe('postgres');
-    expect(adapter.target).toBe('postgres');
   });
 
   describe('introspect', () => {

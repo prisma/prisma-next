@@ -41,8 +41,6 @@ export interface ContractModel<TModelStorage extends ModelStorageBase = ModelSto
   readonly owner?: string;
 }
 
-// ── Backward-compatible aliases ──────────────────────────────────────────────
-
 // ── Relation key helpers ─────────────────────────────────────────────────────
 
 type HasModelsWithRelations = {

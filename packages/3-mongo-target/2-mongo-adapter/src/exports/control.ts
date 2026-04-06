@@ -1,4 +1,4 @@
-import type { ControlAdapterDescriptor } from '@prisma-next/config/types';
+import type { ControlAdapterDescriptor } from '@prisma-next/framework-components/control';
 
 const mongoAdapterDescriptor: ControlAdapterDescriptor<'mongo', 'mongo'> = {
   kind: 'adapter',

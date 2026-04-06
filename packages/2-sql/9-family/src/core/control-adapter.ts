@@ -14,13 +14,6 @@ import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/ve
 export interface SqlControlAdapter<TTarget extends string = string>
   extends ControlAdapterInstance<'sql', TTarget> {
   /**
-   * The target ID this adapter implements.
-   * Used for type tracking and runtime validation.
-   * @deprecated Use targetId from ControlAdapterInstance instead
-   */
-  readonly target: TTarget;
-
-  /**
    * Introspects a database schema and returns a raw SqlSchemaIR.
    *
    * This is a pure schema discovery operation that queries the database catalog

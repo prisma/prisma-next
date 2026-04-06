@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { createJoinOnBuilder } from '../../src/ast/join';
 import { DerivedTableSource, EqColJoinOn, JoinAst } from '../../src/exports/ast';
 import { schema } from '../../src/schema';
-import { createStubAdapter, createTestContext } from '../utils';
+import { createTestContext } from '../utils';
 import { col, simpleSelect, table } from './test-helpers';
 
 type TestContract = Contract<
@@ -130,8 +130,7 @@ describe('ast/join', () => {
   });
 
   it('creates join-on predicates from valid column builders', () => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext(contract);
     const tables = schema(context).tables;
 
     const predicate = createJoinOnBuilder().eqCol(
@@ -147,8 +146,7 @@ describe('ast/join', () => {
   });
 
   it('rejects invalid join-on operands and self-joins', () => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
+    const context = createTestContext(contract);
     const tables = schema(context).tables;
     const builder = createJoinOnBuilder();
 

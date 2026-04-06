@@ -22,10 +22,6 @@ import { pgEnumControlHooks } from './enum-control-hooks';
 export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly familyId = 'sql' as const;
   readonly targetId = 'postgres' as const;
-  /**
-   * @deprecated Use targetId instead
-   */
-  readonly target = 'postgres' as const;
 
   /**
    * Target-specific normalizer for raw Postgres default expressions.

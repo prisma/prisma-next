@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { ColumnRef, type OperationExpr } from '../src/ast/types';
 import { param } from '../src/param';
 import { schema } from '../src/schema';
-import { createStubAdapter, createTestContext } from './utils';
+import { createTestContext } from './utils';
 
 describe('ColumnBuilder operations', () => {
   const contract = validateContract({
@@ -52,8 +52,7 @@ describe('ColumnBuilder operations', () => {
       },
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature],
@@ -83,8 +82,7 @@ describe('ColumnBuilder operations', () => {
       },
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature],
@@ -123,8 +121,7 @@ describe('ColumnBuilder operations', () => {
       },
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature1, signature2],
@@ -154,8 +151,7 @@ describe('ColumnBuilder operations', () => {
       },
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature],
@@ -187,8 +183,7 @@ describe('ColumnBuilder operations', () => {
       },
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature],
@@ -220,8 +215,7 @@ describe('ColumnBuilder operations', () => {
       },
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature],
@@ -254,8 +248,7 @@ describe('ColumnBuilder operations', () => {
       },
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature],
@@ -299,8 +292,7 @@ describe('ColumnBuilder operations', () => {
       },
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature1, signature2],
