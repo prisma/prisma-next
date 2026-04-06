@@ -259,7 +259,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:9a2e401594554ab0789d0a857f55f2d8a2b1bc51930b5863cf507ca569c21d13",
+    "storageHash": "sha256:6ead2fd733253cfe7ecd3c40307921dd2c237221ad11686f126bc17be4ee3990",
     "tables": {
       "comment": {
         "columns": {
@@ -333,8 +333,7 @@
           "scheduled_at": {
             "codecId": "pg/timestamptz@1",
             "default": {
-              "kind": "literal",
-              "value": "2024-01-15T10:30:00.000Z"
+              "kind": "literal"
             },
             "nativeType": "timestamptz",
             "nullable": false
@@ -364,10 +363,7 @@
             "codecId": "pg/int8@1",
             "default": {
               "kind": "literal",
-              "value": {
-                "$type": "bigint",
-                "value": "9007199254740993"
-              }
+              "value": 9007199254740991
             },
             "nativeType": "int8",
             "nullable": false

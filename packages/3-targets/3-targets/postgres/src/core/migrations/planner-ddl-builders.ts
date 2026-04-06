@@ -1,5 +1,4 @@
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/adapter-postgres/control';
-import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type {
   ForeignKey,
@@ -179,15 +178,6 @@ export function renderDefaultLiteral(value: unknown, column?: StorageColumn): st
 
   if (value instanceof Date) {
     return `'${escapeLiteral(value.toISOString())}'`;
-  }
-  if (!isJsonColumn && isTaggedBigInt(value)) {
-    if (!/^-?\d+$/.test(value.value)) {
-      throw new Error(`Invalid tagged bigint value: "${value.value}" is not a valid integer`);
-    }
-    return value.value;
-  }
-  if (typeof value === 'bigint') {
-    return value.toString();
   }
   if (typeof value === 'string') {
     return `'${escapeLiteral(value)}'`;

@@ -1,5 +1,3 @@
-import { bigintJsonReplacer } from '@prisma-next/contract/types';
-
 export interface SqlStatement {
   readonly sql: string;
   readonly params: readonly unknown[];
@@ -142,5 +140,5 @@ export function buildLedgerInsertStatement(input: LedgerInsertInput): SqlStateme
 }
 
 function jsonParam(value: unknown): string {
-  return JSON.stringify(value ?? null, bigintJsonReplacer);
+  return JSON.stringify(value ?? null);
 }

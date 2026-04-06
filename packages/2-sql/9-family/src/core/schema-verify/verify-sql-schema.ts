@@ -7,7 +7,6 @@
  */
 
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
-import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   OperationContext,
@@ -1071,21 +1070,9 @@ function isTemporalNativeType(nativeType?: string): boolean {
   return normalized.includes('timestamp') || normalized === 'date';
 }
 
-function isBigIntNativeType(nativeType?: string): boolean {
-  if (!nativeType) return false;
-  const normalized = nativeType.toLowerCase();
-  return normalized === 'bigint' || normalized === 'int8';
-}
-
 function normalizeLiteralValue(value: unknown, nativeType?: string): unknown {
   if (value instanceof Date) {
     return value.toISOString();
-  }
-  if (isTaggedBigInt(value) && isBigIntNativeType(nativeType)) {
-    return value.value;
-  }
-  if (typeof value === 'bigint') {
-    return value.toString();
   }
   if (typeof value === 'string' && isTemporalNativeType(nativeType)) {
     const parsed = new Date(value);
@@ -1139,12 +1126,6 @@ function literalValuesEqual(a: unknown, b: unknown): boolean {
 function formatLiteralValue(value: unknown): string {
   if (value instanceof Date) {
     return value.toISOString();
-  }
-  if (isTaggedBigInt(value)) {
-    return value.value;
-  }
-  if (typeof value === 'bigint') {
-    return value.toString();
   }
   if (typeof value === 'string') {
     return value;

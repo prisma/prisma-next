@@ -76,40 +76,9 @@ export type JsonValue =
   | { readonly [key: string]: JsonValue }
   | readonly JsonValue[];
 
-export type TaggedBigInt = { readonly $type: 'bigint'; readonly value: string };
+export type ColumnDefaultLiteralValue = JsonValue;
 
-export function isTaggedBigInt(value: unknown): value is TaggedBigInt {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { $type?: unknown }).$type === 'bigint' &&
-    typeof (value as { value?: unknown }).value === 'string'
-  );
-}
-
-export function bigintJsonReplacer(_key: string, value: unknown): unknown {
-  if (typeof value === 'bigint') {
-    return { $type: 'bigint', value: value.toString() } satisfies TaggedBigInt;
-  }
-  return value;
-}
-
-export type TaggedRaw = { readonly $type: 'raw'; readonly value: JsonValue };
-
-export function isTaggedRaw(value: unknown): value is TaggedRaw {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { $type?: unknown }).$type === 'raw' &&
-    'value' in (value as object)
-  );
-}
-
-export type TaggedLiteralValue = TaggedBigInt | TaggedRaw;
-
-export type ColumnDefaultLiteralValue = JsonValue | TaggedLiteralValue;
-
-export type ColumnDefaultLiteralInputValue = ColumnDefaultLiteralValue | bigint | Date;
+export type ColumnDefaultLiteralInputValue = ColumnDefaultLiteralValue | Date;
 
 export type ColumnDefault =
   | {

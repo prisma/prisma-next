@@ -88,10 +88,11 @@ describe('parseRawDefault', () => {
     expect(parseRawDefault('3.14')).toEqual({ kind: 'literal', value: 3.14 });
   });
 
-  it('preserves large integer literals as tagged bigint values', () => {
-    expect(parseRawDefault('9223372036854775807')).toEqual({
+  it('parses large integer literals as numbers (precision loss expected)', () => {
+    const result = parseRawDefault('9223372036854775807');
+    expect(result).toEqual({
       kind: 'literal',
-      value: { $type: 'bigint', value: '9223372036854775807' },
+      value: Number('9223372036854775807'),
     });
   });
 
