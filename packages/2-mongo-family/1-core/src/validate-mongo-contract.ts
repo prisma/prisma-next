@@ -12,7 +12,6 @@ export interface MongoContractIndices {
 export interface ValidatedMongoContract<TContract extends MongoContract> {
   readonly contract: TContract;
   readonly indices: MongoContractIndices;
-  readonly warnings: string[];
 }
 
 export function validateMongoContract<TContract extends MongoContract>(
@@ -25,12 +24,12 @@ export function validateMongoContract<TContract extends MongoContract>(
 
   const contract = parsed as unknown as TContract;
 
-  const { warnings } = validateContractDomain(contract);
+  validateContractDomain(contract);
   validateMongoStorage(contract);
 
   const indices = buildIndices(contract);
 
-  return { contract, indices, warnings };
+  return { contract, indices };
 }
 
 function buildIndices(contract: MongoContract): MongoContractIndices {

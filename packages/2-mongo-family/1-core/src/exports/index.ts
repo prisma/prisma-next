@@ -29,7 +29,6 @@ export type {
 export type {
   DomainContractShape,
   DomainModelShape,
-  DomainValidationResult,
 } from '../validate-domain';
 export { validateContractDomain } from '../validate-domain';
 export type { MongoContractIndices, ValidatedMongoContract } from '../validate-mongo-contract';
