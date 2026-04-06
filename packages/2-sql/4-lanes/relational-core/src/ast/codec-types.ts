@@ -1,12 +1,9 @@
+import type { Codec as BaseCodec, CodecTrait } from '@prisma-next/framework-components/codec';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
-/**
- * Semantic traits a codec declares.
- * Used by DSL surfaces to gate which operators and functions are available.
- */
-export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
+export type { CodecTrait } from '@prisma-next/framework-components/codec';
 
 /**
  * Descriptor for parameterized codecs that require type parameter validation.
@@ -48,10 +45,11 @@ export interface CodecMeta {
 }
 
 /**
- * Codec interface for encoding/decoding values between wire format and JavaScript types.
+ * SQL codec interface — extends the framework base with SQL-specific fields.
  *
  * Codecs are pure, synchronous functions with no side effects or IO.
- * They provide deterministic conversion between database wire types and JS values.
+ * They provide deterministic conversion between database wire types and JS values,
+ * and between JS values and contract JSON.
  */
 export interface Codec<
   Id extends string = string,
@@ -60,69 +58,10 @@ export interface Codec<
   TJs = unknown,
   TParams = Record<string, unknown>,
   THelper = unknown,
-> {
-  /**
-   * Namespaced codec identifier in format 'namespace/name@version'
-   * Examples: 'pg/text@1', 'pg/uuid@1', 'pg/timestamptz@1'
-   */
-  readonly id: Id;
-
-  /**
-   * Contract scalar type IDs that this codec can handle.
-   * Examples: ['text'], ['int4', 'float8'], ['timestamp', 'timestamptz']
-   */
-  readonly targetTypes: readonly string[];
-
-  /**
-   * Optional metadata for database-specific type information.
-   * Used for schema introspection and verification.
-   */
+> extends BaseCodec<Id, TTraits, TWire, TJs> {
   readonly meta?: CodecMeta;
-
-  /**
-   * Optional params schema for parameterized codecs.
-   * If provided, typeParams are validated against this schema.
-   */
   readonly paramsSchema?: Type<TParams>;
-
-  /**
-   * Optional init hook for building runtime helper state from validated params.
-   *
-   * Useful when parameterized types need derived data at runtime, for example:
-   * - normalize typeParams into a stable helper shape consumed by lanes/adapters
-   * - precompute reusable values once during context creation
-   * - avoid repeating typeParams parsing logic during query execution
-   *
-   * Example:
-   *   { length: 255 } -> { kind: 'variable', maxLength: 255 }
-   *
-   * **Convention for JSON/JSONB codecs**: When the helper includes a `validate`
-   * property of type `JsonSchemaValidateFn`, the runtime will use it to enforce
-   * JSON Schema conformance during encoding and decoding. The property is
-   * discovered via duck typing (`helper?.validate`) for flexibility across
-   * different codec types.
-   */
   readonly init?: (params: TParams) => THelper;
-
-  /**
-   * Decode a wire value (from database) to JavaScript type.
-   * Must be synchronous and pure (no side effects).
-   */
-  decode(wire: TWire): TJs;
-
-  /**
-   * Encode a JavaScript value to wire format (for database).
-   * Optional - if not provided, values pass through unchanged.
-   * Must be synchronous and pure (no side effects).
-   */
-  encode?(value: TJs): TWire;
-
-  /**
-   * Semantic traits this codec's type supports.
-   * Used by DSL surfaces to gate which operators and functions are available.
-   * When omitted, the codec is treated as having no traits.
-   */
-  readonly traits?: TTraits;
 }
 
 /**
@@ -241,6 +180,7 @@ class CodecRegistryImpl implements CodecRegistry {
 
 /**
  * Codec factory - creates a codec with typeId and encode/decode functions.
+ * Provides identity defaults for encodeJson/decodeJson when not supplied.
  */
 export function codec<
   Id extends string,
@@ -254,11 +194,14 @@ export function codec<
   targetTypes: readonly string[];
   encode: (value: TJs) => TWire;
   decode: (wire: TWire) => TJs;
+  encodeJson?: (value: TJs) => import('@prisma-next/contract/types').JsonValue;
+  decodeJson?: (json: import('@prisma-next/contract/types').JsonValue) => TJs;
   meta?: CodecMeta;
   paramsSchema?: Type<TParams>;
   init?: (params: TParams) => THelper;
   traits?: TTraits;
 }): Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
+  const identity = (v: unknown) => v;
   return {
     id: config.typeId,
     targetTypes: config.targetTypes,
@@ -271,6 +214,12 @@ export function codec<
     ),
     encode: config.encode,
     decode: config.decode,
+    encodeJson: (config.encodeJson ?? identity) as (
+      value: TJs,
+    ) => import('@prisma-next/contract/types').JsonValue,
+    decodeJson: (config.decodeJson ?? identity) as (
+      json: import('@prisma-next/contract/types').JsonValue,
+    ) => TJs,
   };
 }
 

@@ -6,7 +6,7 @@ Extract the shared `Collection` base class, `CollectionState`, `InferModelRow`, 
 
 **Spec:** [projects/orm-consolidation/spec.md](../spec.md)
 
-**Linear:** [TML-2189](https://linear.app/prisma-company/issue/TML-2189)
+**Linear:** [TML-2213](https://linear.app/prisma-company/issue/TML-2213)
 
 **Prerequisite:** [Phase 1](phase-1-mongo-collection-spike.md) complete — Mongo Collection is working independently.
 

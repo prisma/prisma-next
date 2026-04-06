@@ -812,6 +812,13 @@ importers:
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
   packages/2-mongo-family/1-foundation/mongo-codec:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/framework-components
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -1422,6 +1429,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/operations

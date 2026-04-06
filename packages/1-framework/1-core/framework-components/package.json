@@ -29,6 +29,7 @@
   ],
   "exports": {
     "./authoring": "./dist/authoring.mjs",
+    "./codec": "./dist/codec.mjs",
     "./components": "./dist/components.mjs",
     "./control": "./dist/control.mjs",
     "./emission": "./dist/emission.mjs",

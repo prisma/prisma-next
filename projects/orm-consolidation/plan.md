@@ -124,6 +124,8 @@ End-to-end value objects and embedded documents. Value objects and embedded docu
 
 ### Phase 2: Shared interface extraction (coordinate with Alexey)
 
+**Linear:** [TML-2213](https://linear.app/prisma-company/issue/TML-2213)
+
 Extract `Collection<C, M>` base class, `CollectionState`, `InferModelRow`, and include interface from the two concrete implementations into the framework layer. Both SQL and Mongo now have complete read + write + polymorphism surfaces to compare.
 
 **Detailed plan:** [plans/phase-2-shared-interface-extraction.md](plans/phase-2-shared-interface-extraction.md)
