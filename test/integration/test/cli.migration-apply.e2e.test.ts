@@ -352,6 +352,9 @@ withTempDir(({ createTempDir }) => {
             }
             expect(failed).toBe(true);
             expect(getExitCode()).toBe(1);
+            const errorOutput = stripAnsi(consoleOutput.join('\n'));
+            expect(errorOutput).toContain('failed during precheck');
+            expect(errorOutput).toContain('is empty before adding NOT NULL column');
 
             // Marker must remain at the first migration hash (resume point).
             const migrationsDir = join(testDir, 'migrations');
