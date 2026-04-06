@@ -63,20 +63,26 @@ Implement [ADR 184](../../docs/architecture%20docs/adrs/ADR%20184%20-%20Codec-ow
 
 **Proof:** Existing column default tests pass with codec dispatch instead of hardcoded branches. A non-JSON-safe type (bigint) round-trips through `contract.json` via codec methods. No `$type` tags in newly emitted contracts.
 
-### Phase 1.75: Polymorphism and embedded documents (both families)
+### Phase 1.75: Polymorphism, embedded documents, and value objects (both families)
 
-Neither ORM currently has end-to-end polymorphism or embedded document support — the Mongo ORM has type-level machinery (`InferRootRow`/`VariantRow`, `InferFullRow`/`EmbedRelationKeys`) from the PoC, but no authoring path produces contracts with these features, and the SQL ORM has no polymorphism implementation at all. The contract schema has structural slots for `discriminator`, `variants`, `base`, and `owner`, but they are exercised only by hand-crafted test fixtures.
+Neither ORM currently has end-to-end polymorphism, embedded document, or value object support — the Mongo ORM has type-level machinery (`InferRootRow`/`VariantRow`, `InferFullRow`/`EmbedRelationKeys`) from the PoC, but no authoring path produces contracts with these features, and the SQL ORM has no polymorphism implementation at all. The contract schema has structural slots for `discriminator`, `variants`, `base`, `owner`, and `valueObjects`, but they are exercised only by hand-crafted test fixtures.
 
 The same reasoning that motivated Phase 1.5 applies here: we can't extract a meaningful shared `Collection` interface until both implementations cover polymorphism and embedded documents. These are the features where the two families diverge most in query compilation (Mongo: single collection + discriminator `$match`; SQL: STI single table or MTI JOINs). Extracting the shared interface without them would produce a lowest-common-denominator base that works only for flat models — exactly the "predict from one" anti-pattern ADR 175 warns against. Both concrete implementations need polymorphism before extraction can discover the real interface design questions.
 
+This phase also includes value objects ([ADR 178](../../docs/architecture%20docs/adrs/ADR%20178%20-%20Value%20objects%20in%20the%20contract.md)) and simplification of the typed JSON column machinery. Value objects and embedded documents share the same ORM infrastructure (inlined in results, nested input types, dot-path filtering) and are best implemented together. The existing typed JSON column pipeline (`typeParams.schemaJson`, phantom `typeParams.schema`, `parameterizedRenderers`) is replaced with codec-dispatched type rendering — the same codec-dispatch pattern as ADR 184.
+
+**Spec:** [specs/embedded-documents-and-value-objects.spec.md](specs/embedded-documents-and-value-objects.spec.md)
+
 **Scope:**
 
-1. **Contract authoring** — PSL interpreter and emitter support for `discriminator`/`variants`/`base` (polymorphism) and `owner` with embed relations (embedded documents). Both families can emit contracts that exercise these features.
-2. **Mongo ORM** — end-to-end polymorphism: discriminator filter injection in read queries, variant-aware writes (auto-inject discriminator value on `create()`), discriminated union return types. Embedded document handling in reads (already implicit in MongoDB) and writes (nested create/update input types).
-3. **SQL ORM** — STI polymorphism at minimum: discriminator `WHERE` filter, variant return types with discriminated unions, variant-aware writes. Coordinate with Alexey.
-4. **Tests** — both families tested against real databases with polymorphic and embedded-document contracts.
+1. **Value object field type system** — extend `many: true` to scalar fields (scalar arrays), add `dict: true` modifier (string-keyed maps). Contract validation for value object references and field descriptor combinations.
+2. **Contract authoring** — PSL interpreter and emitter support for `discriminator`/`variants`/`base` (polymorphism), `owner` with embed relations (embedded documents), and `valueObjects` definitions with field references. Both families can emit contracts that exercise these features.
+3. **Typed JSON simplification** — replace `parameterizedRenderers` with codec-dispatched `renderType` method. Remove phantom `typeParams.schema`. The `pg/jsonb@1` codec owns its TypeScript type rendering via the same dispatch-by-`codecId` pattern as `encodeJson`/`decodeJson`.
+4. **Mongo ORM** — end-to-end polymorphism: discriminator filter injection in read queries, variant-aware writes (auto-inject discriminator value on `create()`), discriminated union return types. Value objects and embedded documents: inlined in results, dot-path filtering via MongoDB native dot notation, nested create/update input types.
+5. **SQL ORM** — STI polymorphism at minimum: discriminator `WHERE` filter, variant return types with discriminated unions, variant-aware writes. Value objects: inlined from JSONB columns, dot-path filtering via JSONB path operators. Coordinate with Alexey.
+6. **Tests** — both families tested against real databases with polymorphic, embedded-document, and value-object contracts.
 
-**Proof:** Querying a polymorphic root returns a discriminated union type that narrows correctly on the discriminator field in both SQL and Mongo ORM clients, using contracts produced by the emitter (not hand-crafted fixtures).
+**Proof:** Querying a polymorphic root returns a discriminated union type that narrows correctly on the discriminator field in both SQL and Mongo ORM clients, using contracts produced by the emitter (not hand-crafted fixtures). A model with a value object field produces a correctly nested TypeScript row type; dot-path filtering on the value object field compiles to the correct target-specific query in both families.
 
 ### Phase 2: Shared interface extraction (coordinate with Alexey)
 
