@@ -89,6 +89,7 @@ ${storageType},
 ${modelsType}
 > & {
   readonly target: ${serializeValue(contract.target)};
+  readonly targetFamily: ${serializeValue(contract.targetFamily)};
   readonly roots: ${rootsType};
   readonly capabilities: ${serializeValue(contract.capabilities)};
   readonly extensionPacks: ${serializeValue(contract.extensionPacks)};${executionClause}
