@@ -514,3 +514,33 @@ describe('parsePostgresDefault parses JSON literals for json/jsonb columns', () 
     });
   });
 });
+
+describe('parsePostgresDefault handles bigint defaults', () => {
+  it('parses bare safe integer for int8 as number', () => {
+    expect(parsePostgresDefault('42', 'int8')).toEqual({
+      kind: 'literal',
+      value: 42,
+    });
+  });
+
+  it('parses bare unsafe integer for int8 as string', () => {
+    expect(parsePostgresDefault('9999999999999999999', 'bigint')).toEqual({
+      kind: 'literal',
+      value: '9999999999999999999',
+    });
+  });
+
+  it('parses quoted safe integer for int8 as number', () => {
+    expect(parsePostgresDefault("'42'::bigint", 'bigint')).toEqual({
+      kind: 'literal',
+      value: 42,
+    });
+  });
+
+  it('parses quoted unsafe integer for int8 as string', () => {
+    expect(parsePostgresDefault("'9999999999999999999'::bigint", 'int8')).toEqual({
+      kind: 'literal',
+      value: '9999999999999999999',
+    });
+  });
+});
