@@ -6,8 +6,8 @@ import type {
 import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { emit } from '../src/emit';
-import type { EmitStackInput } from '../src/emit-types';
+import type { EmitStackInput } from '../src/exports';
+import { emit } from '../src/exports';
 import { createTestContract } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
