@@ -278,7 +278,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly role: { readonly codecId: 'pg/enum@1'; readonly nullable: false; readonly typeRef: 'Role' }",
+        "readonly role: { readonly codecId: 'pg/enum@1'; readonly nullable: false; readonly typeParams: { readonly values: readonly ['USER', 'ADMIN', 'MODERATOR'] } }",
       );
     });
   });
@@ -337,7 +337,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeRef: 'Embedding1536' }",
+        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }",
       );
     });
   });
@@ -514,7 +514,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly value: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeRef: 'NonExistent' }",
+        "readonly value: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
       );
     });
 
