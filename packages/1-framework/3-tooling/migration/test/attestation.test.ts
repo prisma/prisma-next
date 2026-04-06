@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { canonicalizeContract } from '@prisma-next/core-control-plane/emission';
+import { canonicalizeContract } from '@prisma-next/contract/hashing';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { attestMigration, computeMigrationId, verifyMigration } from '../src/attestation';

@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
+import { errorContractConfigMissing } from '@prisma-next/errors/control';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { dirname, isAbsolute, join, relative, resolve } from 'pathe';

@@ -635,6 +635,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../emitter
+      '@prisma-next/errors':
+        specifier: workspace:*
+        version: link:../../1-core/errors
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-core/framework-components
@@ -1167,6 +1170,9 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../1-framework/1-core/control-plane
+      '@prisma-next/emitter':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/emitter
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
@@ -1645,6 +1651,9 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../1-framework/1-core/control-plane
+      '@prisma-next/emitter':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/emitter
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
@@ -2164,6 +2173,9 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/control-plane
+      '@prisma-next/errors':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/errors
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/framework-components
@@ -2443,6 +2455,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../../../../packages/2-sql/9-family
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../../../../packages/1-framework/1-core/framework-components
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../../../../packages/2-sql/2-authoring/contract-ts
@@ -2479,6 +2494,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../../../../packages/2-sql/9-family
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../../../../packages/1-framework/1-core/framework-components
       '@prisma-next/mongo-contract-psl':
         specifier: workspace:*
         version: link:../../../../../../packages/2-mongo-family/2-authoring/contract-psl

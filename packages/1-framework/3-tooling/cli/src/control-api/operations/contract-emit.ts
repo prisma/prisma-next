@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
-import { emit } from '@prisma-next/core-control-plane/emission';
+import { emit } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';

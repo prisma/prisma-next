@@ -1,4 +1,4 @@
-import { canonicalizeContract } from '@prisma-next/core-control-plane/emission';
+import { canonicalizeContract } from '@prisma-next/contract/hashing';
 import { describe, expect, it } from 'vitest';
 import { createTestContract } from './utils';
 

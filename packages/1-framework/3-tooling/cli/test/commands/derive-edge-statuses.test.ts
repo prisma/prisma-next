@@ -1,4 +1,4 @@
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { describe, expect, it } from 'vitest';
 import { deriveEdgeStatuses } from '../../src/commands/migration-status';
 import { buildGraph, entry } from '../utils/graph-helpers';

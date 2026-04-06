@@ -1,5 +1,5 @@
-import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
+  CoreSchemaView,
   IntrospectSchemaResult,
   SchemaVerificationNode,
   SignDatabaseResult,

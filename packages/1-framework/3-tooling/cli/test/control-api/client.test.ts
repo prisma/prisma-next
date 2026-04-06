@@ -1,6 +1,6 @@
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
-import type { EmitResult } from '@prisma-next/core-control-plane/emission';
+import type { EmitResult } from '@prisma-next/emitter';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -16,7 +16,7 @@ import type { TargetFamilyHook } from '@prisma-next/framework-components/emissio
 import { notOk, ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@prisma-next/core-control-plane/emission', () => ({
+vi.mock('@prisma-next/emitter', () => ({
   emit: vi.fn(
     async (): Promise<EmitResult> => ({
       storageHash: 'test-core-hash',
@@ -27,7 +27,7 @@ vi.mock('@prisma-next/core-control-plane/emission', () => ({
   ),
 }));
 
-import { emit as emitFn } from '@prisma-next/core-control-plane/emission';
+import { emit as emitFn } from '@prisma-next/emitter';
 import { createControlClient } from '../../src/control-api/client';
 import type { ControlProgressEvent } from '../../src/control-api/types';
 

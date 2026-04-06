@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
-import { canonicalizeContract } from '@prisma-next/core-control-plane/emission';
+import { canonicalizeContract } from '@prisma-next/contract/hashing';
 import { join } from 'pathe';
 import { canonicalizeJson } from './canonicalize-json';
 import { readMigrationPackage } from './io';

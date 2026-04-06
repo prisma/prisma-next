@@ -1,4 +1,4 @@
-import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
+import type { CoreSchemaView } from '@prisma-next/framework-components/control';
 import {
   type PslPrintableSqlSchemaIR,
   validatePrintableSqlSchemaIR,

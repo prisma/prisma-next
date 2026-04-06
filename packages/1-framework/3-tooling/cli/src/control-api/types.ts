@@ -3,13 +3,13 @@ import type {
   ContractSourceProvider,
 } from '@prisma-next/config/config-types';
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
-import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
+  CoreSchemaView,
   MigrationPlannerConflict,
   MigrationPlanOperation,
   SignDatabaseResult,

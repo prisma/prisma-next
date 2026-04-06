@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration } from '@prisma-next/migration-tools/dag';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import { type MigrationManifest, MigrationToolsError } from '@prisma-next/migration-tools/types';

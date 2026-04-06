@@ -1,7 +1,7 @@
 /**
  * Maps MigrationGraph + status info to the generic graph renderer types.
  */
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findPath } from '@prisma-next/migration-tools/dag';
 import type { MigrationGraph } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';

@@ -1,4 +1,4 @@
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findPathWithDecision } from '@prisma-next/migration-tools/dag';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type { AttestedMigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
