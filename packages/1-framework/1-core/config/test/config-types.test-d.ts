@@ -12,8 +12,6 @@ import { defineConfig, type PrismaNextConfig } from '../src/config-types';
 
 const mockHook = {
   id: 'sql',
-  validateTypes: () => {},
-  validateStructure: () => {},
   generateStorageType: () => '{}',
   generateModelStorageType: () => '{}',
   getFamilyImports: () => [] as string[],

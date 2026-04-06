@@ -84,8 +84,6 @@ function createMockComponents() {
 
   const mockHook: EmissionSpi = {
     id: 'sql',
-    validateTypes: () => {},
-    validateStructure: () => {},
     generateStorageType: () =>
       '{ readonly tables: Record<string, never>; readonly types: Record<string, never>; readonly storageHash: StorageHash }',
     generateModelStorageType: () => 'Record<string, never>',

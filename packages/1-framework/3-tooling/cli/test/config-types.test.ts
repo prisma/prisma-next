@@ -8,8 +8,6 @@ import { describe, expect, it } from 'vitest';
 describe('defineConfig', () => {
   const mockHook = {
     id: 'sql',
-    validateTypes: () => {},
-    validateStructure: () => {},
     generateStorageType: () => '{}',
     generateModelStorageType: () => '{}',
     getFamilyImports: () => [] as string[],
