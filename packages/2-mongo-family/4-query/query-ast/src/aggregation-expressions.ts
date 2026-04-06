@@ -1,6 +1,12 @@
 import { MongoAstNode } from './ast-node';
 import type { MongoAggExprRewriter, MongoAggExprVisitor } from './visitors';
 
+function isExprArray(
+  args: MongoAggExpr | ReadonlyArray<MongoAggExpr>,
+): args is ReadonlyArray<MongoAggExpr> {
+  return Array.isArray(args);
+}
+
 abstract class MongoAggExprNode extends MongoAstNode {
   abstract accept<R>(visitor: MongoAggExprVisitor<R>): R;
   abstract rewrite(rewriter: MongoAggExprRewriter): MongoAggExpr;
@@ -105,9 +111,10 @@ export class MongoAggOperator extends MongoAggExprNode {
   }
 
   rewrite(rewriter: MongoAggExprRewriter): MongoAggExpr {
-    const rewrittenArgs = Array.isArray(this.args)
-      ? this.args.map((a) => a.rewrite(rewriter))
-      : this.args.rewrite(rewriter);
+    const { args } = this;
+    const rewrittenArgs = isExprArray(args)
+      ? args.map((a) => a.rewrite(rewriter))
+      : args.rewrite(rewriter);
     const rebuilt = new MongoAggOperator(this.op, rewrittenArgs);
     return rewriter.operator ? rewriter.operator(rebuilt) : rebuilt;
   }
