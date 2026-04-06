@@ -16,7 +16,7 @@ import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -290,10 +290,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionPacks: extensions,
   });
 
-  function normalizeProviderContract(contract: unknown): Contract {
-    return validateContract<Contract<SqlStorage>>(contract);
-  }
-
   return {
     familyId: 'sql',
     operationRegistry,
@@ -303,7 +299,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     typeMetadataRegistry,
 
     validateContract(contractJson: unknown): Contract {
-      return normalizeProviderContract(contractJson);
+      return sqlValidateContract<Contract<SqlStorage>>(contractJson);
     },
 
     async verify(verifyOptions: {
@@ -447,7 +443,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
       const { driver, contract: contractInput, strict, context, frameworkComponents } = options;
 
-      const contract = validateContract<Contract<SqlStorage>>(contractInput);
+      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput);
 
       const controlAdapter = adapter.create();
       if (!isSqlControlAdapter(controlAdapter)) {
@@ -476,7 +472,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const { driver, contract: contractInput, contractPath, configPath } = options;
       const startTime = Date.now();
 
-      const contract = validateContract<Contract<SqlStorage>>(contractInput);
+      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput);
 
       const contractStorageHash = contract.storage.storageHash;
       const contractProfileHash =
