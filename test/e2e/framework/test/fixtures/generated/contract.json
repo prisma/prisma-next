@@ -259,7 +259,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:6ead2fd733253cfe7ecd3c40307921dd2c237221ad11686f126bc17be4ee3990",
+    "storageHash": "sha256:40f5fa8a9aff79d990ef87dd76ded466b6c106288882cde04c0973ff4643575e",
     "tables": {
       "comment": {
         "columns": {
@@ -333,7 +333,8 @@
           "scheduled_at": {
             "codecId": "pg/timestamptz@1",
             "default": {
-              "kind": "literal"
+              "kind": "literal",
+              "value": "2024-01-15T10:30:00.000Z"
             },
             "nativeType": "timestamptz",
             "nullable": false
