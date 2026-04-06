@@ -299,6 +299,90 @@ describe('emitter', () => {
     expect(result.contractDts).toBeDefined();
   });
 
+  it('defaults codecTypeImports and operationTypeImports to empty arrays when undefined', async () => {
+    const ir = createTestContract({
+      storage: { tables: {} },
+    });
+
+    const options: EmitStackInput = {
+      operationRegistry: createOperationRegistry(),
+      codecTypeImports: undefined,
+      operationTypeImports: undefined,
+      extensionIds: [],
+    };
+
+    const result = await emit(ir, options, mockSqlHook);
+    expect(result.contractDts).toContain('export type CodecTypes');
+    expect(result.contractDts).toContain('export type OperationTypes');
+  });
+
+  it('passes parameterizedTypeImports and queryOperationTypeImports to generateContractDts', async () => {
+    const ir = createTestContract({
+      storage: { tables: {} },
+    });
+
+    const parameterizedTypeImports: TypesImportSpec[] = [
+      { package: '@ext/param', named: 'ParamTypes', alias: 'ExtParamTypes' },
+    ];
+    const queryOperationTypeImports: TypesImportSpec[] = [
+      { package: '@ext/query', named: 'QueryOperationTypes', alias: 'ExtQueryOpTypes' },
+    ];
+
+    const options: EmitStackInput = {
+      operationRegistry: createOperationRegistry(),
+      codecTypeImports: [],
+      operationTypeImports: [],
+      extensionIds: [],
+      parameterizedTypeImports,
+      queryOperationTypeImports,
+    };
+
+    const result = await emit(ir, options, mockSqlHook);
+    expect(result.contractDts).toContain("from '@ext/param'");
+    expect(result.contractDts).toContain("from '@ext/query'");
+  });
+
+  it('delegates to emitter.generateModelsType when provided', async () => {
+    const ir = createTestContract({
+      storage: { tables: {} },
+    });
+
+    const mockWithModelsType = createMockSpi({
+      generateModelsType: () => '{ readonly Custom: { readonly custom: true } }',
+    });
+
+    const options: EmitStackInput = {
+      operationRegistry: createOperationRegistry(),
+      codecTypeImports: [],
+      operationTypeImports: [],
+      extensionIds: [],
+    };
+
+    const result = await emit(ir, options, mockWithModelsType);
+    expect(result.contractDts).toContain('readonly Custom: { readonly custom: true }');
+  });
+
+  it('emits execution clause when contract has execution section', async () => {
+    const ir = createTestContract({
+      storage: { tables: {} },
+      execution: {
+        executionHash: 'sha256:abc123',
+        operations: {},
+      },
+    });
+
+    const options: EmitStackInput = {
+      operationRegistry: createOperationRegistry(),
+      codecTypeImports: [],
+      operationTypeImports: [],
+      extensionIds: [],
+    };
+
+    const result = await emit(ir, options, mockSqlHook);
+    expect(result.contractDts).toContain('readonly execution:');
+    expect(result.executionHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
   it('forwards parameterizedRenderers option to getFamilyTypeAliases', async () => {
     const ir = createTestContract({
       storage: {

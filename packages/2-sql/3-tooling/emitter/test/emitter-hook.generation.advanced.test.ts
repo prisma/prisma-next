@@ -735,4 +735,54 @@ describe('sql-target-family-hook', () => {
       "readonly vector: CodecTypes['pg/vector@1']['output'] & { length: 1536 }",
     );
   });
+
+  it('generates model storage type via generateModelStorageType', () => {
+    const model = {
+      storage: {
+        table: 'user',
+        fields: {
+          id: { column: 'id' },
+          email: { column: 'email' },
+        },
+      },
+      fields: {},
+      relations: {},
+    };
+
+    const result = sqlEmission.generateModelStorageType('User', model);
+    expect(result).toContain("readonly table: 'user'");
+    expect(result).toContain("readonly id: { readonly column: 'id' }");
+    expect(result).toContain("readonly email: { readonly column: 'email' }");
+  });
+
+  it('includes owner field in model type when present', () => {
+    const ir = createContract({
+      models: {
+        User: {
+          storage: {
+            table: 'user',
+            fields: { id: { column: 'id' } },
+          },
+          relations: {},
+          owner: { kind: 'system' },
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    expect(types).toContain("owner: { readonly kind: 'system' }");
+  });
 });
