@@ -1,4 +1,5 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
@@ -300,7 +301,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     typeMetadataRegistry,
 
     validateContract(contractJson: unknown): Contract {
-      return sqlValidateContract<Contract<SqlStorage>>(contractJson);
+      return sqlValidateContract<Contract<SqlStorage>>(contractJson, emptyCodecLookup);
     },
 
     async verify(verifyOptions: {
@@ -319,7 +320,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       } = verifyOptions;
       const startTime = Date.now();
 
-      const contract = sqlValidateContract<Contract<SqlStorage>>(rawContract);
+      const contract = sqlValidateContract<Contract<SqlStorage>>(rawContract, emptyCodecLookup);
 
       const contractStorageHash = contract.storage.storageHash;
       const contractProfileHash = contract.profileHash;
@@ -432,7 +433,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
       const { driver, contract: contractInput, strict, context, frameworkComponents } = options;
 
-      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput);
+      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup);
 
       const controlAdapter = adapter.create();
       if (!isSqlControlAdapter(controlAdapter)) {
@@ -461,7 +462,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const { driver, contract: contractInput, contractPath, configPath } = options;
       const startTime = Date.now();
 
-      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput);
+      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup);
 
       const contractStorageHash = contract.storage.storageHash;
       const contractProfileHash =

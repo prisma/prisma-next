@@ -1,4 +1,5 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   int4Column as int4ColumnType,
@@ -57,41 +58,44 @@ type TestContract = Contract<
 >;
 
 describe('ast/join', () => {
-  const contract = validateContract<TestContract>({
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:test',
-    roots: {},
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    storage: {
-      storageHash: 'test-hash',
-      tables: {
-        user: {
-          columns: {
-            id: { ...int4ColumnType, nullable: false },
-            email: { ...textColumnType, nullable: false },
+  const contract = validateContract<TestContract>(
+    {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: 'sha256:test',
+      roots: {},
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      storage: {
+        storageHash: 'test-hash',
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+              email: { ...textColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-        post: {
-          columns: {
-            id: { ...int4ColumnType, nullable: false },
-            userId: { ...int4ColumnType, nullable: false },
+          post: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+              userId: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
+      models: {},
     },
-    models: {},
-  });
+    emptyCodecLookup,
+  );
 
   it('creates inner, left, right, and full joins with rich classes', () => {
     const on = EqColJoinOn.of(col('user', 'id'), col('post', 'userId'));

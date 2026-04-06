@@ -1,6 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -21,7 +22,7 @@ import type { Contract } from '../fixtures/generated/contract';
 
 export { timeouts };
 
-const sqlContract = validateContract<Contract>(contract);
+const sqlContract = validateContract<Contract>(contract, emptyCodecLookup);
 
 export function setupIntegrationTest() {
   let runtime: Runtime;

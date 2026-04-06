@@ -4,6 +4,7 @@ import {
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { ExtractCodecTypes } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
@@ -326,7 +327,7 @@ describe('builder integration', () => {
       .storageHash('sha256:test-core')
       .build();
 
-    const fixtureContract = validateContract<Contract>(contractJson);
+    const fixtureContract = validateContract<Contract>(contractJson, emptyCodecLookup);
 
     // Runtime checks
     expect(builderContract.target).toBe(fixtureContract.target);

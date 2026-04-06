@@ -1,3 +1,4 @@
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
@@ -12,32 +13,35 @@ import { schema } from '../src/schema';
 import { createTestContext } from './utils';
 
 describe('ColumnBuilder operations', () => {
-  const contract = validateContract({
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:test',
-    roots: {},
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    storage: {
-      storageHash: 'test-hash',
-      tables: {
-        user: {
-          columns: {
-            id: { ...int4ColumnType, nullable: false },
-            email: { ...textColumnType, nullable: false },
-            vector: { ...vectorColumnType, nullable: false },
+  const contract = validateContract(
+    {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: 'sha256:test',
+      roots: {},
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      storage: {
+        storageHash: 'test-hash',
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+              email: { ...textColumnType, nullable: false },
+              vector: { ...vectorColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
-    },
-    models: {},
-  } as const);
+      models: {},
+    } as const,
+    emptyCodecLookup,
+  );
 
   it('exposes registered methods on columns with matching typeId', () => {
     const signature: SqlOperationSignature = {

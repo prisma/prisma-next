@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { describe, expect, it } from 'vitest';
@@ -32,20 +33,22 @@ describe('validateContract structure validation', () => {
   };
 
   it('accepts valid contract structure', () => {
-    const result = validateContract<Contract<SqlStorage>>(validContractInput);
+    const result = validateContract<Contract<SqlStorage>>(validContractInput, emptyCodecLookup);
     expect(result.storage.tables).toHaveProperty('User');
   });
 
   it('throws on missing targetFamily', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, targetFamily: undefined } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/targetFamily/);
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
+      /targetFamily/,
+    );
   });
 
   it('throws on wrong targetFamily', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, targetFamily: 'document' } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /Unsupported target family/,
     );
   });
@@ -53,24 +56,30 @@ describe('validateContract structure validation', () => {
   it('throws on missing target', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, target: undefined } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/target/);
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
+      /target/,
+    );
   });
 
   it('preserves storageHash in storage', () => {
-    const result = validateContract<Contract<SqlStorage>>(validContractInput);
+    const result = validateContract<Contract<SqlStorage>>(validContractInput, emptyCodecLookup);
     expect(result.storage.storageHash).toMatch(/^sha256:/);
   });
 
   it('throws on missing storage', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, storage: undefined } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/storage/);
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
+      /storage/,
+    );
   });
 
   it('throws on missing models', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const invalid = { ...validContractInput, models: undefined } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(/models/);
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
+      /models/,
+    );
   });
 
   it('throws on invalid column type', () => {
@@ -88,7 +97,7 @@ describe('validateContract structure validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /nativeType.*must be.*string|Column.*validation failed/,
     );
   });
@@ -112,7 +121,7 @@ describe('validateContract structure validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /Column.*validation failed|nullable.*must be.*boolean/,
     );
   });
@@ -126,7 +135,7 @@ describe('validateContract structure validation', () => {
       meta: { key: 'value' },
       roots: {},
     };
-    const result = validateContract<Contract<SqlStorage>>(withOptional);
+    const result = validateContract<Contract<SqlStorage>>(withOptional, emptyCodecLookup);
     expect(result.profileHash).toBe('sha256:profile');
     expect(result.capabilities).toEqual({ feature: { enabled: true } });
   });

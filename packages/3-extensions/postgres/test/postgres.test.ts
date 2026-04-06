@@ -259,7 +259,7 @@ describe('postgres', () => {
     });
 
     expect(mocks.validateContract).toHaveBeenCalledTimes(1);
-    expect(mocks.validateContract).toHaveBeenCalledWith(contractJson);
+    expect(mocks.validateContract).toHaveBeenCalledWith(contractJson, expect.anything());
   });
 
   it('validates direct contract input', () => {
@@ -269,7 +269,7 @@ describe('postgres', () => {
     });
 
     expect(mocks.validateContract).toHaveBeenCalledTimes(1);
-    expect(mocks.validateContract).toHaveBeenCalledWith(contract);
+    expect(mocks.validateContract).toHaveBeenCalledWith(contract, expect.anything());
   });
 
   it('creates pool from url with explicit defaults', () => {

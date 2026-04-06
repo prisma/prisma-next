@@ -1,6 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
@@ -114,7 +115,7 @@ function resolveContract<TContract extends Contract<SqlStorage>>(
   options: PostgresOptions<TContract>,
 ): TContract {
   const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
-  return validateContract<TContract>(contractInput);
+  return validateContract<TContract>(contractInput, emptyCodecLookup);
 }
 
 function toRuntimeBinding<TContract extends Contract<SqlStorage>>(

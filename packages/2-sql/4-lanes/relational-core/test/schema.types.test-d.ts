@@ -1,5 +1,6 @@
 import type { Contract as FrameworkContract, StorageHashBase } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { ContractWithTypeMaps } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { expectTypeOf, test } from 'vitest';
@@ -8,7 +9,7 @@ import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 import { createTestContext } from './utils';
 
-const contract = validateContract<Contract>(contractJson);
+const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
 const context = createTestContext(contract);
 const schemaHandle = schema(context);
 

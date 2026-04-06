@@ -10,6 +10,7 @@ import {
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { afterEach, beforeEach } from 'vitest';
@@ -228,7 +229,7 @@ export function loadContractFromDisk<TContract extends Contract<SqlStorage> = Co
     throw new Error(`Failed to parse contract JSON from ${contractJsonPath}: ${message}`);
   }
 
-  return validateContract<TContract>(contractJson);
+  return validateContract<TContract>(contractJson, emptyCodecLookup);
 }
 
 /**

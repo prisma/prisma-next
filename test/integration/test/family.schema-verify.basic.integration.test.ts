@@ -4,6 +4,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -91,7 +92,10 @@ describe('family instance schemaVerify', () => {
             }),
           );
 
-          const validatedContract = validateContract<Contract<SqlStorage>>(contract);
+          const validatedContract = validateContract<Contract<SqlStorage>>(
+            contract,
+            emptyCodecLookup,
+          );
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
           > = [postgres, postgresAdapter];
@@ -167,7 +171,10 @@ describe('family instance schemaVerify', () => {
             }),
           );
 
-          const validatedContract = validateContract<Contract<SqlStorage>>(contract);
+          const validatedContract = validateContract<Contract<SqlStorage>>(
+            contract,
+            emptyCodecLookup,
+          );
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
           > = [postgres, postgresAdapter];
@@ -237,7 +244,10 @@ describe('family instance schemaVerify', () => {
             }),
           );
 
-          const validatedContract = validateContract<Contract<SqlStorage>>(contract);
+          const validatedContract = validateContract<Contract<SqlStorage>>(
+            contract,
+            emptyCodecLookup,
+          );
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
           > = [postgres, postgresAdapter];

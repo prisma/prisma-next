@@ -1,4 +1,5 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   ContractWithTypeMaps,
   StorageColumn,
@@ -78,31 +79,34 @@ type TestContractWithIdOnlyWithTypeMaps = ContractWithTypeMaps<
 >;
 
 describe('operations-registry', () => {
-  const contract = validateContract<TestContract>({
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:test',
-    roots: {},
-    extensionPacks: {},
-    meta: {},
-    storage: {
-      storageHash: 'test-hash',
-      tables: {
-        user: {
-          columns: {
-            id: { ...int4ColumnType, nullable: false },
-            vector: { ...vectorColumnType, nullable: false },
+  const contract = validateContract<TestContract>(
+    {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: 'sha256:test',
+      roots: {},
+      extensionPacks: {},
+      meta: {},
+      storage: {
+        storageHash: 'test-hash',
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+              vector: { ...vectorColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
+      models: {},
+      capabilities: {},
     },
-    models: {},
-    capabilities: {},
-  });
+    emptyCodecLookup,
+  );
 
   it('attaches operations when registry is provided', () => {
     const signature: SqlOperationSignature = {
@@ -156,61 +160,67 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithoutCaps = validateContract<TestContract>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
-              vector: { ...vectorColumnType, nullable: false },
+    const contractWithoutCaps = validateContract<TestContract>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+                vector: { ...vectorColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
-    const contractWithCaps = validateContract<TestContract>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
-              vector: { ...vectorColumnType, nullable: false },
+    const contractWithCaps = validateContract<TestContract>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+                vector: { ...vectorColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          },
+        },
+        models: {},
+        capabilities: {
+          postgres: {
+            lateral: true,
           },
         },
       },
-      models: {},
-      capabilities: {
-        postgres: {
-          lateral: true,
-        },
-      },
-    });
+      emptyCodecLookup,
+    );
 
     const contextWithoutCapabilities = createTestContext<TestContractWithTypeMaps>(
       contractWithoutCaps,
@@ -258,35 +268,38 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithFalseCaps = validateContract<TestContract>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
-              vector: { ...vectorColumnType, nullable: false },
+    const contractWithFalseCaps = validateContract<TestContract>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+                vector: { ...vectorColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          },
+        },
+        models: {},
+        capabilities: {
+          postgres: {
+            lateral: false,
           },
         },
       },
-      models: {},
-      capabilities: {
-        postgres: {
-          lateral: false,
-        },
-      },
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithTypeMaps>(contractWithFalseCaps, {
       extensions: [
@@ -317,67 +330,73 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithPartialCaps = validateContract<TestContract>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
-              vector: { ...vectorColumnType, nullable: false },
+    const contractWithPartialCaps = validateContract<TestContract>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+                vector: { ...vectorColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          },
+        },
+        models: {},
+        capabilities: {
+          postgres: {
+            lateral: true,
+            jsonAgg: false,
           },
         },
       },
-      models: {},
-      capabilities: {
-        postgres: {
-          lateral: true,
-          jsonAgg: false,
-        },
-      },
-    });
+      emptyCodecLookup,
+    );
 
-    const contractWithAllCaps = validateContract<TestContract>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
-              vector: { ...vectorColumnType, nullable: false },
+    const contractWithAllCaps = validateContract<TestContract>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+                vector: { ...vectorColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          },
+        },
+        models: {},
+        capabilities: {
+          postgres: {
+            lateral: true,
+            jsonAgg: true,
           },
         },
       },
-      models: {},
-      capabilities: {
-        postgres: {
-          lateral: true,
-          jsonAgg: true,
-        },
-      },
-    });
+      emptyCodecLookup,
+    );
 
     const contextWithPartialCaps = createTestContext<TestContractWithTypeMaps>(
       contractWithPartialCaps,
@@ -453,31 +472,34 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithoutCaps = validateContract<TestContract>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
-              vector: { ...vectorColumnType, nullable: false },
+    const contractWithoutCaps = validateContract<TestContract>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+                vector: { ...vectorColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithTypeMaps>(contractWithoutCaps, {
       extensions: [
@@ -603,30 +625,33 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, {
       extensions: [
@@ -672,30 +697,33 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, {
       extensions: [
@@ -747,30 +775,33 @@ describe('operations-registry', () => {
     };
 
     // Contract without capabilities - chained operations with capability requirements should not be attached
-    const contractWithoutCaps = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithoutCaps = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithoutCaps, {
       extensions: [
@@ -826,34 +857,37 @@ describe('operations-registry', () => {
     };
 
     // Contract with capabilities that don't match
-    const contractWithFalseCaps = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithFalseCaps = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          },
+        },
+        models: {},
+        capabilities: {
+          postgres: {
+            lateral: false,
           },
         },
       },
-      models: {},
-      capabilities: {
-        postgres: {
-          lateral: false,
-        },
-      },
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithFalseCaps, {
       extensions: [
@@ -894,30 +928,33 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, {
       extensions: [
@@ -952,30 +989,33 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, {
       extensions: [
@@ -1022,30 +1062,33 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, {
       extensions: [
@@ -1097,30 +1140,33 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, {
       extensions: [
@@ -1146,30 +1192,33 @@ describe('operations-registry', () => {
   });
 
   it('attachOperationsToColumnBuilder returns columnBuilder when registry is undefined', () => {
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt);
     const tables = schema(context).tables;
@@ -1187,30 +1236,33 @@ describe('operations-registry', () => {
   });
 
   it('attachOperationsToColumnBuilder returns columnBuilder when codecId is undefined', () => {
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, {
       extensions: [
@@ -1260,30 +1312,33 @@ describe('operations-registry', () => {
   });
 
   it('attachOperationsToColumnBuilder returns columnBuilder when operations.length === 0', () => {
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt);
     const tables = schema(context).tables;
@@ -1303,30 +1358,33 @@ describe('operations-registry', () => {
   });
 
   it('attachOperationsToColumnBuilder skips capability-gated operations when contractCapabilities is undefined', () => {
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt);
     const tables = schema(context).tables;
@@ -1370,30 +1428,33 @@ describe('operations-registry', () => {
       },
     } as unknown as SqlOperationSignature;
 
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, {
       extensions: [
@@ -1523,6 +1584,7 @@ describe('operations-registry', () => {
 
     const contractWithMatrixCaps = validateContract<TestContract>(
       contractInput as unknown as TestContract,
+      emptyCodecLookup,
     );
     const context = createTestContext<TestContractWithTypeMaps>(contractWithMatrixCaps, {
       extensions: [
@@ -1555,30 +1617,33 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, {
       extensions: [{ operations: () => [signature] }],
@@ -1603,30 +1668,33 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt, {
       extensions: [{ operations: () => [signature] }],
@@ -1664,30 +1732,33 @@ describe('operations-registry', () => {
       },
     };
 
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
+    const contractWithInt = validateContract<TestContractWithIdOnly>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
+        capabilities: {},
       },
-      models: {},
-      capabilities: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithIdOnlyWithTypeMaps>(contractWithInt);
     context.operations.register(firstSignature);

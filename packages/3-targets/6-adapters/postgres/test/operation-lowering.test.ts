@@ -1,3 +1,4 @@
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   BinaryExpr,
@@ -14,32 +15,35 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
 
-const contract = validateContract<PostgresContract>({
-  target: 'postgres',
-  targetFamily: 'sql',
-  profileHash: 'sha256:test',
-  roots: {},
-  capabilities: {},
-  extensionPacks: {},
-  meta: {},
-  storage: {
-    storageHash: 'test-hash',
-    tables: {
-      user: {
-        columns: {
-          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-          email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
-          otherVector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+const contract = validateContract<PostgresContract>(
+  {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: 'sha256:test',
+    roots: {},
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    storage: {
+      storageHash: 'test-hash',
+      tables: {
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+            otherVector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
+    models: {},
   },
-  models: {},
-});
+  emptyCodecLookup,
+);
 
 describe('Operation lowering', () => {
   const adapter = createPostgresAdapter();

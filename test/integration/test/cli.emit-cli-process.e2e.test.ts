@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadContractFromTs } from '@prisma-next/cli';
 import type { Contract, ContractRelation, StorageHashBase } from '@prisma-next/contract/types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { timeouts } from '@prisma-next/test-utils';
@@ -126,7 +127,7 @@ describe('contract emit command (CLI process e2e)', () => {
       expect(contractDtsContent).toContain('export type Contract');
       expect(contractDtsContent).toContain('CodecTypes');
 
-      const validatedContract = validateContract<EmittedContract>(contractJson);
+      const validatedContract = validateContract<EmittedContract>(contractJson, emptyCodecLookup);
       expect(validatedContract.targetFamily).toBe('sql');
       expect(validatedContract.target).toBe('postgres');
     },
@@ -165,7 +166,7 @@ describe('contract emit command (CLI process e2e)', () => {
       const contractJsonContent = readFileSync(contractJsonPath, 'utf-8');
       const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
-      const validatedContract = validateContract<EmittedContract>(contractJson);
+      const validatedContract = validateContract<EmittedContract>(contractJson, emptyCodecLookup);
 
       expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
       expect(validatedContract.target).toBe(originalContract.target);

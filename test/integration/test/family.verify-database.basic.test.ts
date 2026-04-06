@@ -8,6 +8,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import { emit } from '@prisma-next/emitter';
 import sql from '@prisma-next/family-sql/control';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { VerifyDatabaseResult } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -79,7 +80,7 @@ async function emitContract(
   writeFileSync(contractDtsPath, emitResult.contractDts, 'utf-8');
 
   const contractJson = JSON.parse(emitResult.contractJson) as Record<string, unknown>;
-  return validateContract<Contract<SqlStorage>>(contractJson);
+  return validateContract<Contract<SqlStorage>>(contractJson, emptyCodecLookup);
 }
 
 /**
