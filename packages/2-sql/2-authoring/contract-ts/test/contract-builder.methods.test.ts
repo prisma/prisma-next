@@ -571,24 +571,24 @@ describe('column default encoding', () => {
     expect(contract.storage.tables.user.columns.nickname.nullable).toBe(true);
   });
 
-  it('encodes bigint literal defaults as tagged bigint', () => {
+  it('passes through number defaults via identity codec', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
       .table('counter', (t) =>
         t
           .column('id', { type: int4Column })
-          .column('value', { type: bigintColumn, default: { kind: 'literal', value: 42n } })
+          .column('value', { type: bigintColumn, default: { kind: 'literal', value: 9001 } })
           .primaryKey(['id']),
       )
       .build();
 
     expect(contract.storage.tables.counter.columns.value.default).toEqual({
       kind: 'literal',
-      value: { $type: 'bigint', value: '42' },
+      value: 9001,
     });
   });
 
-  it('encodes Date literal defaults as ISO strings', () => {
+  it('passes through Date literal defaults as-is without codec lookup', () => {
     const dateValue = new Date('2025-01-01T00:00:00.000Z');
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
@@ -605,29 +605,11 @@ describe('column default encoding', () => {
 
     expect(contract.storage.tables.event.columns.startsAt.default).toEqual({
       kind: 'literal',
-      value: '2025-01-01T00:00:00.000Z',
+      value: dateValue,
     });
   });
 
-  it('wraps pre-tagged bigint objects in raw tag', () => {
-    const tagged = { $type: 'bigint', value: '9007199254740993' } as const;
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('counter', (t) =>
-        t
-          .column('id', { type: int4Column })
-          .column('value', { type: bigintColumn, default: { kind: 'literal', value: tagged } })
-          .primaryKey(['id']),
-      )
-      .build();
-
-    expect(contract.storage.tables.counter.columns.value.default).toEqual({
-      kind: 'literal',
-      value: { $type: 'raw', value: tagged },
-    });
-  });
-
-  it('wraps JSON objects with $type key in raw tag', () => {
+  it('passes through JSON objects with $type key unchanged', () => {
     const jsonbColumn = columnDescriptor('pg/jsonb@1');
     const jsonDefault = { $type: 'custom', data: [1, 2, 3] } as const;
     const contract = defineContract<CodecTypes>()
@@ -645,11 +627,11 @@ describe('column default encoding', () => {
 
     expect(contract.storage.tables.event.columns.meta.default).toEqual({
       kind: 'literal',
-      value: { $type: 'raw', value: jsonDefault },
+      value: jsonDefault,
     });
   });
 
-  it('does not wrap JSON objects without $type key', () => {
+  it('passes through JSON objects without $type key unchanged', () => {
     const jsonbColumn = columnDescriptor('pg/jsonb@1');
     const jsonDefault = { role: 'admin', tags: ['a', 'b'] } as const;
     const contract = defineContract<CodecTypes>()
@@ -689,22 +671,5 @@ describe('column default encoding', () => {
       kind: 'function',
       expression: 'now()',
     });
-  });
-
-  it('throws for unsupported literal default values', () => {
-    expect(() =>
-      defineContract<CodecTypes>()
-        .target(postgresTargetPack)
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column })
-            .column('meta', {
-              type: textColumn,
-              default: { kind: 'literal', value: (() => 'nope') as unknown as never },
-            })
-            .primaryKey(['id']),
-        )
-        .build(),
-    ).toThrow(/Unsupported column default literal value/);
   });
 });

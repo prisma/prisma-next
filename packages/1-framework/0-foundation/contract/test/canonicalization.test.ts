@@ -325,14 +325,14 @@ describe('default omission', () => {
     expect(idField).not.toHaveProperty('extra');
   });
 
-  it('preserves Date values (not treated as default)', () => {
-    const date = new Date('2024-01-01');
+  it('preserves ISO date strings in meta', () => {
+    const isoString = '2024-01-01T00:00:00.000Z';
     const result = canonicalizeContractToObject(
       minimal({
-        meta: { createdAt: date } as Record<string, unknown>,
+        meta: { createdAt: isoString } as Record<string, unknown>,
       }),
     );
-    expect(drill(result, 'meta')['createdAt']).toEqual(date);
+    expect(drill(result, 'meta')['createdAt']).toBe(isoString);
   });
 
   it('preserves null values (not treated as default)', () => {
@@ -400,13 +400,13 @@ describe('index and unique sorting', () => {
     expect(result['storage']).toBeDefined();
   });
 
-  it('preserves Date values through sort', () => {
-    const date = new Date('2024-06-15');
+  it('preserves ISO date string defaults through sort', () => {
+    const isoString = '2024-06-15T00:00:00.000Z';
     const result = canonicalizeContractToObject(
       minimal({
         models: {
           User: {
-            fields: { createdAt: { codecId: 'timestamp', nullable: false, default: date } },
+            fields: { createdAt: { codecId: 'timestamp', nullable: false, default: isoString } },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -414,7 +414,7 @@ describe('index and unique sorting', () => {
       }),
     );
     const field = drill(result, 'models', 'User', 'fields', 'createdAt');
-    expect(field['default']).toEqual(date);
+    expect(field['default']).toBe(isoString);
   });
 
   it('sorts indexes without name using empty-string fallback', () => {
@@ -477,14 +477,14 @@ describe('canonicalizeContract', () => {
     expect(() => JSON.parse(result)).not.toThrow();
   });
 
-  it('serializes BigInt values via bigintJsonReplacer', () => {
+  it('serializes number values in meta', () => {
     const result = canonicalizeContract(
       minimal({
-        meta: { limit: 42n as unknown as Record<string, unknown> },
+        meta: { limit: 42 } as Record<string, unknown>,
       }),
     );
     const parsed = JSON.parse(result) as Record<string, unknown>;
-    expect(drill(parsed, 'meta')['limit']).toEqual({ $type: 'bigint', value: '42' });
+    expect(drill(parsed, 'meta')['limit']).toBe(42);
   });
 
   it('produces identical output as JSON.stringify of canonicalizeContractToObject', () => {

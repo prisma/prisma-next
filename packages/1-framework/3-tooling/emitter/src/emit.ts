@@ -1,5 +1,5 @@
 import { canonicalizeContractToObject } from '@prisma-next/contract/hashing';
-import { bigintJsonReplacer, type Contract } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   TargetFamilyHook,
   ValidationContext,
@@ -51,7 +51,7 @@ export async function emit(
         regenerate: 'To regenerate, run: prisma-next contract emit',
       },
     },
-    bigintJsonReplacer,
+    null,
     2,
   );
 

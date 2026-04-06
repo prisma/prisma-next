@@ -2,7 +2,6 @@ import { isArrayEqual } from '@prisma-next/utils/array-equal';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 import type { Contract } from './contract-types';
-import { bigintJsonReplacer } from './types';
 
 const TOP_LEVEL_ORDER = [
   'schemaVersion',
@@ -22,7 +21,6 @@ const TOP_LEVEL_ORDER = [
 function isDefaultValue(value: unknown): boolean {
   if (value === false) return true;
   if (value === null) return false;
-  if (value instanceof Date) return false;
   if (Array.isArray(value) && value.length === 0) return true;
   if (typeof value === 'object' && value !== null) {
     const keys = Object.keys(value);
@@ -33,10 +31,6 @@ function isDefaultValue(value: unknown): boolean {
 
 function omitDefaults(obj: unknown, path: readonly string[]): unknown {
   if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-
-  if (obj instanceof Date) {
     return obj;
   }
 
@@ -143,10 +137,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
 
 function sortObjectKeys(obj: unknown): unknown {
   if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-
-  if (obj instanceof Date) {
     return obj;
   }
 
@@ -267,5 +257,5 @@ export function canonicalizeContract(
   contract: Contract,
   options?: { schemaVersion?: string },
 ): string {
-  return JSON.stringify(canonicalizeContractToObject(contract, options), bigintJsonReplacer, 2);
+  return JSON.stringify(canonicalizeContractToObject(contract, options), null, 2);
 }
