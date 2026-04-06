@@ -1,5 +1,3 @@
-import { expectTypeOf, test } from 'vitest';
-import { defineConfig, type PrismaNextConfig } from '../src/config-types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -8,7 +6,9 @@ import type {
   ControlFamilyDescriptor,
   ControlFamilyInstance,
   ControlTargetDescriptor,
-} from '../src/types';
+} from '@prisma-next/framework-components/control';
+import { expectTypeOf, test } from 'vitest';
+import { defineConfig, type PrismaNextConfig } from '../src/config-types';
 
 const mockHook = {
   id: 'sql',

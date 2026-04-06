@@ -1,10 +1,13 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type {
+  ControlDriverInstance,
+  ControlFamilyInstance,
+} from '@prisma-next/framework-components/control';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 import { defineConfig, type PrismaNextConfig } from '../src/config-types';
 import { validateConfig } from '../src/config-validation';
 import { ConfigValidationError } from '../src/errors';
-import type { ControlDriverInstance, ControlFamilyInstance } from '../src/types';
 
 const mockHook = {
   id: 'sql',

@@ -4,7 +4,6 @@ export { runtimeError } from '../errors';
 export { computeSqlFingerprint } from '../fingerprint';
 export type { BudgetFinding, LintFinding, RawGuardrailResult } from '../guardrails/raw';
 export { evaluateRawGuardrails } from '../guardrails/raw';
-export type { ContractMarkerRecord } from '../marker';
 export { parseContractMarkerRow } from '../marker';
 export type {
   AfterExecuteResult,
