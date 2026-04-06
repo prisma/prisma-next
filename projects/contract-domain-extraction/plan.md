@@ -2,7 +2,7 @@
 
 ## Summary
 
-Restructure the emitted SQL contract to implement ADR 172's domain-storage separation: extract a shared domain-level representation into `ContractBase`, update the SQL emitter to produce the new JSON layout, and bridge `validateContract()` so no consumer code changes until M2. Build a Mongo emitter hook (M3) that forces out shared domain-level generation utilities, then migrate the SQL hook onto those utilities (M6). This is the foundational step toward cross-family consumer code (ORM, validation, tooling). Success means the contract carries a self-describing domain level (`roots`, `models` with typed fields and relations) distinct from family-specific storage, with all existing consumers continuing to work via a compatibility bridge.
+Restructure the emitted contract to implement ADR 172's domain-storage separation: extract a shared domain-level representation into the unified `Contract<TStorage, TModels>` type, update the SQL emitter to produce the new JSON layout, and bridge `validateContract()` so no consumer code changes until M2. Build a Mongo emitter hook (M3) that forces out shared domain-level generation utilities, unify the contract representation (M5), then migrate the SQL hook onto those shared utilities and narrow the hook interface (M6). This is the foundational step toward cross-family consumer code (ORM, validation, tooling). Success means the contract carries a self-describing domain level (`roots`, `models` with typed fields and relations) distinct from family-specific storage, with a single `Contract` type parameterized by storage that both families share.
 
 **Spec:** [projects/contract-domain-extraction/spec.md](spec.md)
 
@@ -136,22 +136,22 @@ The contract JSON format does not change between phases — it's already in the 
 
 **Tasks:**
 
-#### Foundation (complete)
+#### Foundation
 
 - **5.1** ✅ Audit current `ContractIR` structure vs the unified contract type. Document the remaining structural gaps (IR is still storage-first with tables as the primary key; the unified type is model-first). — Documented in [5.2 plan](plans/5.2-unified-contract-type-plan.md) § Structural audit.
-- **5.2** ✅ (partial) Define `Contract<TStorage, TModels>`, `StorageBase`, and `ContractModel<TModelStorage>` in the framework contract package. Renamed `Domain*` → `Contract*` with backward aliases, defined `Contract<TStorage, TModels>` in new `contract-types.ts`, `StorageBase<THash>` in `types.ts`, updated `ExecutionSection` with required `executionHash`. Framework-level `validateContract` with three-pass validation (arktype structural, domain, storage). Type-level and runtime tests. See [5.2 plan](plans/5.2-unified-contract-type-plan.md).
+- **5.2** ✅ Define `Contract<TStorage, TModels>`, `StorageBase`, and `ContractModel<TModelStorage>` in the framework contract package. Renamed `Domain*` → `Contract*` with backward aliases, defined `Contract<TStorage, TModels>` in new `contract-types.ts`, `StorageBase<THash>` in `types.ts`, updated `ExecutionSection` with required `executionHash`. Framework-level `validateContract` with three-pass validation (arktype structural, domain, storage). Type-level and runtime tests. See [5.2 plan](plans/5.2-unified-contract-type-plan.md).
 - **5.6** ✅ Define framework-level `validateContract` with three-pass validation: arktype structural validation, framework-owned domain validation (`validateContractDomain()`), and family-provided `StorageValidator`. Strips JSON persistence fields (`schemaVersion`, `sources`). Exported via `@prisma-next/contract/validate-contract`.
 
 #### Phase A: Write side — type bridge + authoring/emitter migration
 
 Type bridge: make `SqlContract`/`MongoContract` aliases for `Contract<S,M>` so the emitted `contract.d.ts` automatically satisfies the new `Contract` interface. Then update the authoring pipeline and emitter to produce `Contract` directly, eliminating `ContractIR`.
 
-- **5.A1** Make `SqlStorage` extend `StorageBase` (add `storageHash` to SQL storage blocks). Make `MongoStorage` extend `StorageBase`. Redefine `SqlContract<S, M>` = `Contract<S, M>` and `MongoContract<S, M>` = `Contract<S, M>`. Make `MongoModelDefinition` a type alias for `ContractModel<MongoModelStorage>`. Migrate `contract.storageHash` → `contract.storage.storageHash` across all consumer and fixture sites. This is the mechanical type bridge (~30+ files) that enables both phases.
-- **5.A2** Update the emitter (`emit.ts`) to accept and serialize `Contract` instead of `ContractIR`. Remove translation logic that was bridging the storage-first IR to the model-first JSON. (Previously 5.3.)
-- **5.A3** Update all contract construction sites: PSL interpreter and staged DSL lower directly to `Contract<SqlStorage, SqlModelStorage>`, eliminating `SqlSemanticContractDefinition` as an intermediate. (Previously 5.4.)
-- **5.A4** Populate `roots` in the SQL contract authoring layer. Currently the SQL contract builder hardcodes `roots: {}` and the SQL PSL interpreter omits it entirely. Derive root entries from models (e.g. `User` → `users: 'User'`) in both the chain builder and the staged DSL, matching how the Mongo stack already handles roots. (Previously 5.5.)
-- **5.A5** Remove `ContractIR` and `SqlSemanticContractDefinition`. Remove deprecated `Domain*` type aliases if no consumers remain. (Write-side portion of previously 5.7.)
-- **5.A6** Update all authoring/emitter tests, fixtures, and type tests. Run full test suite and typecheck.
+- **5.A1** ✅ Make `SqlStorage` extend `StorageBase` (add `storageHash` to SQL storage blocks). Make `MongoStorage` extend `StorageBase`. Redefine `SqlContract<S, M>` = `Contract<S, M>` and `MongoContract<S, M>` = `Contract<S, M>`. Make `MongoModelDefinition` a type alias for `ContractModel<MongoModelStorage>`. Migrate `contract.storageHash` → `contract.storage.storageHash` across all consumer and fixture sites. This is the mechanical type bridge (~30+ files) that enables both phases.
+- **5.A2** ✅ Update the emitter (`emit.ts`) to accept and serialize `Contract` instead of `ContractIR`. Remove translation logic that was bridging the storage-first IR to the model-first JSON. (Previously 5.3.)
+- **5.A3** ✅ Update all contract construction sites: PSL interpreter and staged DSL lower directly to `Contract<SqlStorage, SqlModelStorage>`, eliminating `SqlSemanticContractDefinition` as an intermediate. (Previously 5.4.)
+- **5.A4** ✅ Populate `roots` in the SQL contract authoring layer. Currently the SQL contract builder hardcodes `roots: {}` and the SQL PSL interpreter omits it entirely. Derive root entries from models (e.g. `User` → `users: 'User'`) in both the chain builder and the staged DSL, matching how the Mongo stack already handles roots. (Previously 5.5.)
+- **5.A5** ✅ Remove `ContractIR` and `SqlSemanticContractDefinition`. Remove deprecated `Domain*` type aliases if no consumers remain. (Write-side portion of previously 5.7.)
+- **5.A6** ✅ Update all authoring/emitter tests, fixtures, and type tests. Run full test suite and typecheck.
 
 #### Phase B: Read side — runtime consumer migration
 
@@ -164,34 +164,81 @@ Wire SQL validation through the framework's `validateContract`, update runtime c
 
 #### Orthogonal tasks (can run in parallel with Phase A/B)
 
-- **5.8** *(can run in parallel with Phase A/B)* Complete the control flow inversion for descriptor assembly. Tasks 3.9 and 3.10 extract assembly to the framework, rename to `createControlStack()` / `createExecutionStack()`, and build the Mongo family using the inverted pattern; this task migrates the SQL family to the same pattern. The framework orchestration layer (`ControlClient`, CLI `executeContractEmit`) calls `createControlStack()` and `emit()` directly — family instances no longer own emission. `ControlFamilyDescriptor.create()` receives the `ControlStack`. Move the SQL family package from `packages/2-sql/3-tooling/family/` to `packages/2-sql/9-family/` (layer 9, top of the import hierarchy). Update runtime assembly if applicable. See [detailed plan](plans/5.8-control-flow-inversion-plan.md).
-- **5.11** *(must run after Phase A)* Complete `@prisma-next/framework-components` extraction and introduce foundation layer. Tasks 3.10, 3.12, and 3.13 moved component types, assembly, stack creation, execution-plane types, and control-plane types into framework-components. This task finishes the extraction: move emission SPI types (`TargetFamilyHook`, `ValidationContext`, `GenerateContractTypesOptions`, `ParameterizedCodecDescriptor`, etc.) from `@prisma-next/contract` to a new `@prisma-next/framework-components/emission` subpath, consolidate duplicate `TypesImportSpec`/`RenderTypeContext` definitions, and drop the `@prisma-next/operations` dependency from contract. Introduce a `foundation` layer below `core`; move `utils` and `contract` to `0-foundation/` (the `plan` package has been deleted) — making the contract a true leaf with zero framework-domain dependencies. Shim removal (`core-execution-plane`, `core-control-plane` deprecated re-exports) is deferred to a follow-up task. See [detailed plan](plans/5.11-extract-framework-components-package-plan.md).
-- **5.11.1** *(follow-up to 5.11)* Remove backward-compat shim packages. Delete `@prisma-next/core-execution-plane` (pure re-export shim, ~20 consumers) and remove deprecated re-exports from `@prisma-next/core-control-plane` (`createControlPlaneStack`, `ControlPlaneStack`). Migrate all consumers to import directly from `@prisma-next/framework-components/{execution,control}`.
+- **5.8** ✅ Complete the control flow inversion for descriptor assembly. Tasks 3.9 and 3.10 extract assembly to the framework, rename to `createControlStack()` / `createExecutionStack()`, and build the Mongo family using the inverted pattern; this task migrates the SQL family to the same pattern. The framework orchestration layer (`ControlClient`, CLI `executeContractEmit`) calls `createControlStack()` and `emit()` directly — family instances no longer own emission. `ControlFamilyDescriptor.create()` receives the `ControlStack`. Move the SQL family package from `packages/2-sql/3-tooling/family/` to `packages/2-sql/9-family/` (layer 9, top of the import hierarchy). Update runtime assembly if applicable. See [detailed plan](plans/5.8-control-flow-inversion-plan.md).
+- **5.11** ✅ Complete `@prisma-next/framework-components` extraction and introduce foundation layer. Tasks 3.10, 3.12, and 3.13 moved component types, assembly, stack creation, execution-plane types, and control-plane types into framework-components. This task finishes the extraction: move emission SPI types (`TargetFamilyHook`, `ValidationContext`, `GenerateContractTypesOptions`, `ParameterizedCodecDescriptor`, etc.) from `@prisma-next/contract` to a new `@prisma-next/framework-components/emission` subpath, consolidate duplicate `TypesImportSpec`/`RenderTypeContext` definitions, and drop the `@prisma-next/operations` dependency from contract. Introduce a `foundation` layer below `core`; move `utils` and `contract` to `0-foundation/` (the `plan` package has been deleted) — making the contract a true leaf with zero framework-domain dependencies. Shim removal (`core-execution-plane`, `core-control-plane` deprecated re-exports) is deferred to a follow-up task. See [detailed plan](plans/5.11-extract-framework-components-package-plan.md).
+- **5.11.1** ✅ Remove backward-compat shim packages. Delete `@prisma-next/core-execution-plane` (pure re-export shim, ~20 consumers) and remove deprecated re-exports from `@prisma-next/core-control-plane` (`createControlPlaneStack`, `ControlPlaneStack`). Migrate all consumers to import directly from `@prisma-next/framework-components/{execution,control}`.
 
 ### Milestone 6: SQL emitter migration to shared generation
 
-Migrates the SQL emitter hook onto the shared domain-level generation utilities established in M3 (Mongo emitter hook). The `TargetFamilyHook` interface narrows: `generateContractTypes()` is removed, and hooks provide only storage-specific type blocks. The shared utilities are already proven by the Mongo hook — this milestone is a migration, not a design exercise.
+Migrates the SQL emitter hook onto the shared domain-level generation utilities established in M3, narrows the `TargetFamilyHook` interface, and moves `.d.ts` template ownership into the framework. Done as a single pass because M5 delivered `Contract<TStorage, TModels>` and both families now emit domain-level `{ codecId, nullable }` model fields — the model fields divergence that previously required a two-phase approach has been resolved. See [detailed plan](plans/6-sql-emitter-shared-generation-plan.md).
+
+**Context (post-M5):**
+- `Contract<TStorage, TModels>` exists at the framework level (`@prisma-next/contract/types`)
+- `ContractIR` and `ContractBase` are gone — `emit()` accepts `Contract` directly
+- Both SQL and Mongo hooks emit `{ codecId, nullable }` for model fields (M5 task 5.B2 aligned the SQL emitter)
+- `TargetFamilyHook` lives at `@prisma-next/framework-components/emission` and takes `Contract`
+- The SQL hook still has a monolithic `generateContractTypes()` with duplicated serialization, import handling, hash generation, roots, and relation generation
+- The Mongo hook already uses all shared utilities from `@prisma-next/emitter/domain-type-generation`
+
+**Design:** The framework owns a generic `.d.ts` template parameterized by `Contract<TStorage, TModels>`. Each family hook provides only storage-specific type definitions. The emitted template structure becomes:
+
+```typescript
+import type { Contract as ContractType } from '@prisma-next/contract/types';
+
+type Storage = ${hook.generateStorageType(...)};    // family-specific
+type Models = {                                     // framework-orchestrated
+  readonly User: {
+    readonly fields: ...;                            // shared: generateModelFieldsType
+    readonly relations: ...;                         // shared: generateModelRelationsType
+    readonly storage: ${hook.generateModelStorageType(...)};  // family-specific
+  };
+};
+
+export type Contract = ContractType<Storage, Models>;
+```
+
+The framework generates domain-level parts (fields, relations, roots) using shared utilities and calls the hook for storage-specific parts. Each family controls its storage type definitions, and additional type parameters can be added to `Contract<...>` without changing the hook interface.
 
 **Tasks:**
 
-#### 6.1 Migrate SQL hook to shared utilities
+#### 6.1 Extend shared domain-level generation utilities
 
-- **6.1.1** Replace SQL hook's `generateRootsType()`, model domain field generation, model relation generation, import deduplication, hash aliases, and `.d.ts` skeleton with calls to the shared framework utilities (established in M3 task 3.1).
-- **6.1.2** Implement `generateStorageType(storage)` on the SQL hook (extract from current `generateStorageType` — already a separate method, just needs to conform to the shared interface).
-- **6.1.3** Implement `generateModelStorageType(model, storage)` on the SQL hook (field-to-column mapping type generation, extracted from `generateModelsType`).
-- **6.1.4** Remove `generateContractTypes()`, `generateModelsType()`, `generateRootsType()`, `generateRelationsType()`, `generateMappingsType()` from the SQL hook (now framework-owned or obsolete after M4).
-- **6.1.5** Update `serializeValue()` / `serializeObjectKey()` — decide whether these are shared utilities (framework) or hook-specific. Likely framework.
+- **6.1.1** Extract `generateModelFieldsType()` into `@prisma-next/emitter/domain-type-generation`. Both SQL and Mongo now emit `{ codecId, nullable }` for model fields — the function currently exists only as a local helper in the Mongo hook. Move it to the shared module.
+- **6.1.2** Add `generateModelsType()` to the shared module: iterates models (sorted by name), calls `generateModelFieldsType()` for fields, `generateModelRelationsType()` for relations, and a hook-provided callback for per-model storage. Handles optional `owner`, `discriminator`, `variants`, `base` properties. This replaces the duplicated `generateModelsType()` in both hooks.
+- **6.1.3** Add `generateContractDts()` to the shared module (or `emit.ts`): assembles the full `.d.ts` template from shared parts (banner, imports, hash aliases, codec/operation type intersections) and hook-provided parts (storage type, model storage types, family-specific imports and type aliases, contract wrapper expression). This is the function that `emit()` will call instead of `targetFamily.generateContractTypes()`.
 
-#### 6.2 Narrow the hook interface
+#### 6.2 Narrow the `TargetFamilyHook` interface
 
-- **6.2.1** Update the `TargetFamilyHook` interface: remove `generateContractTypes()`, require `generateStorageType(storage)`, `generateModelStorageType(model, storage)`, and any other family-specific type generation callbacks. Keep `validateTypes()` and `validateStructure()` on the hook.
-- **6.2.2** Verify both SQL and Mongo hooks conform to the narrowed interface.
+- **6.2.1** Update `TargetFamilyHook` in `@prisma-next/framework-components/emission`: remove `generateContractTypes()`. Add family-specific generation callbacks:
+  - `generateStorageType(contract, storageHashTypeName): string` — top-level storage type definition
+  - `generateModelStorageType(modelName, model): string` — per-model storage type block
+  - `getFamilyImports(): { types: ImportSpec[]; values?: ImportSpec[] }` — family-specific import lines
+  - `getFamilyTypeAliases(codecTypes, operationTypes, queryOperationTypes): string` — family-specific type aliases (e.g., SQL's `DefaultLiteralValue`, `QueryOperationTypes`, `LaneCodecTypes`; empty for Mongo)
+  - `getContractWrapper(contractBaseName, typeMapsName): string` — the family-specific wrapper expression (e.g., `ContractWithTypeMaps<${contractBaseName}, ${typeMapsName}>` for SQL, `MongoContractWithTypeMaps<${contractBaseName}, ${typeMapsName}>` for Mongo)
+  - `getTypeMapsExpression(codecTypesName, operationTypesName, queryOperationTypesName?): string` — how the family defines `TypeMaps` (SQL: `TypeMapsType<C, O, Q>`, Mongo: `MongoTypeMaps<C, O>`)
+- **6.2.2** Keep `validateTypes()` and `validateStructure()` unchanged on the hook.
 
-#### 6.3 Regression verification
+#### 6.3 Migrate SQL hook
 
-- **6.3.1** Verify generated `contract.d.ts` is byte-identical (modulo formatting) before and after the refactor, using the demo contract and all 12 parity fixtures.
-- **6.3.2** Run full test suite and typecheck.
-- **6.3.3** Update emitter hook tests to test the new interface methods individually.
+- **6.3.1** Replace the SQL hook's `generateContractTypes()`, `generateModelsType()`, `generateRootsType()`, `serializeValue()`, `serializeObjectKey()`, `serializeTypeParamsLiteral()`, and inline import/hash/intersection logic with the shared framework utilities and the narrowed hook callbacks.
+- **6.3.2** The SQL hook retains: `generateStorageType()` (tables, columns, PKs, FKs, indexes, storage.types — SQL-specific), `generateStorageTypesType()` (SQL storage types), and the narrowed-interface callbacks (`getFamilyImports`, `getFamilyTypeAliases`, `getContractWrapper`, `getTypeMapsExpression`).
+- **6.3.3** Remove the `IRModelDefinition`, `IRModelField`, `IRModelStorage` local type aliases — the hook now works with `Contract`'s typed models and `ContractModel` directly.
+
+#### 6.4 Migrate Mongo hook
+
+- **6.4.1** Update the Mongo hook to conform to the narrowed interface. Replace its local `generateModelsType()`, `generateModelFieldsType()`, and `generateContractTypes()` with the framework-owned equivalents and narrowed-interface callbacks.
+- **6.4.2** The Mongo hook retains: `generateStorageType()` (collections — Mongo-specific), `generateModelStorageType()` (collection + storage.relations — Mongo-specific), and the narrowed-interface callbacks.
+
+#### 6.5 Update `emit()` pipeline
+
+- **6.5.1** Update `emit()` in `@prisma-next/emitter` to call the framework-owned `generateContractDts()` instead of `targetFamily.generateContractTypes()`. The `generateContractDts()` function orchestrates shared and hook-provided generation.
+
+#### 6.6 Regression verification
+
+- **6.6.1** Verify the emitted `contract.d.ts` output is identical (modulo formatting) before and after the refactor, using the demo contract and all authoring parity fixtures.
+- **6.6.2** Run full test suite (`pnpm test:all`) and typecheck (`pnpm typecheck`).
+- **6.6.3** Run `pnpm lint:deps` to verify no layering violations.
+- **6.6.4** Update emitter hook tests to test the narrowed interface methods individually.
 
 ### Close-out
 
@@ -238,21 +285,19 @@ Migrates the SQL emitter hook onto the shared domain-level generation utilities 
 | SQL validation wired through framework `validateContract` (M5)                                                         | Unit               | 5.B1           | Validation tests                                                        |
 | Runtime consumers accept `Contract` (M5)                                                                               | Unit + Integration | 5.B2           | Runtime test suites pass                                                |
 | `ContractBase` removed (M5)                                                                                           | CI                 | 5.B3           | Compile-time verification; no remaining imports                         |
-| SQL hook uses shared domain-level generation (M6)                                                                     | Unit + Regression  | 6.3.1–6.3.3    | Byte-identical `.d.ts` output; updated hook unit tests                  |
-| `TargetFamilyHook` interface narrowed (M6)                                                                            | Interface test     | 6.2.1–6.2.2    | Both hooks conform to narrowed interface                                |
 | Framework-components extracted; contract is a leaf with zero framework-domain deps (M5)                               | Lint + CI          | 5.11           | `pnpm lint:deps` clean; `pnpm typecheck`; `pnpm test:packages` pass    |
+| Shared `generateModelFieldsType` used by both hooks (M6)                                                              | Unit               | 6.1.1          | Extracted from Mongo hook; SQL hook uses same shared function           |
+| Framework owns `.d.ts` template; hooks provide only storage-specific callbacks (M6)                                   | Unit + Regression  | 6.1.3, 6.5.1  | `generateContractDts()` called from `emit()`; hook methods unit tested  |
+| `TargetFamilyHook` interface narrowed; no `generateContractTypes()` (M6)                                              | Interface test     | 6.2.1, 6.3–6.4 | Both hooks conform to narrowed interface                               |
+| SQL hook uses shared domain-level generation (M6)                                                                     | Unit + Regression  | 6.6.1–6.6.4   | Identical `.d.ts` output; updated hook unit tests                       |
 
 
 ## Open Items
 
-1. **Dual-format `normalizeContract()`.** Task 1.3.1 adds detection of old vs new JSON format in `normalizeContract()` to enable incremental fixture migration. This adds temporary complexity but significantly reduces risk — fixtures can be migrated across multiple PRs rather than atomically. The old-format path is removed in task 4.5.
-2. ~~**Spec open questions.**~~ **All resolved** (see spec § Open Questions):
-  - `model.storage.fields` shape: `{ column: string }` only. Top-level `storage.tables` is the single source of truth for column metadata.
-  - Relation join naming: `localFields`/`targetFields` (not `childCols`/`parentCols`).
-  - `roots` derivation: emitter derives for now; IR supplies in M5.
-  - `model.relations` shape: per [ADR 177](../../docs/architecture%20docs/adrs/ADR%20177%20-%20Ownership%20replaces%20relation%20strategy.md), plain graph edges — no `strategy`. Owned models declare `"owner"` on the model itself.
-3. **M2 coordination with Alexey.** The ORM client migration (tasks 2.1–2.5) touches core ORM internals. This must be sequenced to avoid conflicts with Alexey's active ORM development. The widened types from M1 allow him to migrate incrementally.
-4. `**paradedb` extension (`packages/3-extensions/paradedb/`).** Task 2.7 covers BM25 index column resolution. Confirm this extension is actively maintained and whether its owner needs notification.
-5. **M3 sequencing.** The Mongo emitter hook (M3) can run in parallel with M2 since it doesn't touch the SQL emitter. It establishes the shared domain-level generation API that M6 later migrates the SQL hook onto.
-6. **Descriptor assembly consolidation (tasks 3.9 → 3.10 → 3.12), control flow inversion (task 5.8), and full framework-components extraction (task 5.11).** ✅ Tasks 3.9, 3.10, and 3.12 are complete. The family-agnostic assembly machinery now lives in `@prisma-next/framework-components/control` (canonical), with all consumers importing directly. `@prisma-next/core-execution-plane` is a backward-compat re-export shim pointing at `@prisma-next/framework-components/execution`. The `@prisma-next/contract/framework-components` re-export module has been deleted and the dependency inversion broken — `@prisma-next/contract` no longer depends on `@prisma-next/framework-components`. The Mongo family at layer 9 uses the inverted pattern; the SQL family imports extraction functions from `@prisma-next/framework-components/control` but still owns its own assembly flow. **Next:** Task 5.8 completes the inversion (framework orchestration layer drives assembly and emission directly, SQL family moves to layer 9). Task 5.11 finishes the extraction (emission SPI types, authoring contribution types, foundation layer, remaining backward-compat re-export/shim removal). **Deferred:** F12 (PSL interpretation assembly functions are framework-common) — address during task 3.11. ~~F13 (consolidate ControlStack and ControlPlaneStack)~~ ✅ Completed in task 3.13 — `Control*Instance`, `Control*Descriptor`, result types, and `createControlStack()` moved to `@prisma-next/framework-components/control`; `core-control-plane` and `config` converted to re-export shims (removed in 5.11).
+1. ~~**Dual-format `normalizeContract()`.**~~ ✅ Resolved — removed in task 4.5.
+2. ~~**Spec open questions.**~~ ✅ All resolved (see spec § Open Questions).
+3. ~~**M2 coordination with Alexey.**~~ ✅ Resolved — M2 complete.
+4. ~~`**paradedb` extension.**~~ ✅ Resolved — N/A (task 2.7).
+5. ~~**M3 sequencing.**~~ ✅ Resolved — M3 complete.
+6. ~~**Descriptor assembly consolidation / control flow inversion / framework-components extraction.**~~ ✅ Resolved — tasks 3.9, 3.10, 3.12, 3.13, 5.8, 5.11, 5.11.1 all complete. The family-agnostic assembly machinery lives in `@prisma-next/framework-components/control` (canonical). Both families at layer 9 use the inverted pattern. Foundation layer introduced (`0-foundation/`). Shim packages removed.
 
