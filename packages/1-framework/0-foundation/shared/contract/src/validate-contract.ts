@@ -37,7 +37,7 @@ const ContractSchema = type({
       defaults: 'unknown[]',
     },
   },
-  'profileHash?': 'string',
+  profileHash: 'string',
 });
 
 function stripPersistenceFields(raw: Record<string, unknown>): Record<string, unknown> {

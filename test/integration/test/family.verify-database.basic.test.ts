@@ -200,67 +200,32 @@ describe('family instance verify - basic', () => {
   );
 
   it(
-    'handles contract without profileHash',
+    'rejects contract without profileHash',
     async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        const testDirWithDb = createIntegrationTestDir();
+      const testDirWithDb = createIntegrationTestDir();
 
-        try {
-          // Create and emit contract
-          const testContract2 = createTestContract();
-          const contractWithDb = await emitContract(testContract2, testDirWithDb);
+      try {
+        const testContract2 = createTestContract();
+        await emitContract(testContract2, testDirWithDb);
 
-          // Modify the contract JSON to remove profileHash
-          const contractJsonPath = resolve(testDirWithDb, 'output/contract.json');
-          const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-          const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-          // Remove profileHash if present
-          if (Object.hasOwn(contractJson, 'profileHash')) {
-            const { profileHash: _profileHash, ...contractWithoutProfileHash } = contractJson;
-            await writeFile(
-              contractJsonPath,
-              JSON.stringify(contractWithoutProfileHash, null, 2),
-              'utf-8',
-            );
-          }
-
-          await withClient(connectionString, async (client) => {
-            // Setup marker schema and table
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
-
-            // Write marker matching contract (using storageHash for profileHash since contract doesn't have it)
-            const write = writeContractMarker({
-              storageHash: contractWithDb.storage.storageHash,
-              profileHash: contractWithDb.storage.storageHash, // Use storageHash since contract doesn't have profileHash
-              contractJson: contractWithDb,
-              canonicalVersion: 1,
-            });
-            await executeStatement(client, write.insert);
-          });
-
-          // Load contract and verify
-          const { contract, contractPath } = loadContract(testDirWithDb);
-          const result = await verifyDatabase({
-            contract,
-            dbUrl: connectionString,
-            contractPath,
-          });
-
-          // Should succeed and contractProfileHash should be undefined
-          expect(result).toMatchObject({
-            ok: true,
-            summary: 'Database matches contract',
-            contract: { storageHash: contractWithDb.storage.storageHash },
-            meta: { contractPath: expect.any(String) },
-          });
-          expect(result.contract.profileHash).toBeUndefined();
-        } finally {
-          if (existsSync(testDirWithDb)) {
-            rmSync(testDirWithDb, { recursive: true, force: true });
-          }
+        const contractJsonPath = resolve(testDirWithDb, 'output/contract.json');
+        const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+        const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+        if (Object.hasOwn(contractJson, 'profileHash')) {
+          const { profileHash: _profileHash, ...contractWithoutProfileHash } = contractJson;
+          await writeFile(
+            contractJsonPath,
+            JSON.stringify(contractWithoutProfileHash, null, 2),
+            'utf-8',
+          );
         }
-      });
+
+        expect(() => loadContract(testDirWithDb)).toThrow('profileHash');
+      } finally {
+        if (existsSync(testDirWithDb)) {
+          rmSync(testDirWithDb, { recursive: true, force: true });
+        }
+      }
     },
     timeouts.spinUpPpgDev,
   );
