@@ -48,6 +48,18 @@ export function generateRootsType(roots: Record<string, string> | undefined): st
   return `{ ${entries} }`;
 }
 
+export function generateModelFieldsType(
+  fields: Record<string, { readonly codecId: string; readonly nullable: boolean }>,
+): string {
+  const fieldEntries: string[] = [];
+  for (const [fieldName, field] of Object.entries(fields)) {
+    fieldEntries.push(
+      `readonly ${serializeObjectKey(fieldName)}: { readonly codecId: ${serializeValue(field.codecId)}; readonly nullable: ${field.nullable} }`,
+    );
+  }
+  return fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';
+}
+
 export function generateModelRelationsType(relations: Record<string, unknown>): string {
   const relationEntries: string[] = [];
 

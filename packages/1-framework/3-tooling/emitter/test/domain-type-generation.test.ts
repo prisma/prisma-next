@@ -5,6 +5,7 @@ import {
   generateCodecTypeIntersection,
   generateHashTypeAliases,
   generateImportLines,
+  generateModelFieldsType,
   generateModelRelationsType,
   generateRootsType,
   serializeObjectKey,
@@ -73,6 +74,41 @@ describe('serializeObjectKey', () => {
     expect(serializeObjectKey('has space')).toBe("'has space'");
     expect(serializeObjectKey('has-dash')).toBe("'has-dash'");
     expect(serializeObjectKey('ns/name@1')).toBe("'ns/name@1'");
+  });
+});
+
+describe('generateModelFieldsType', () => {
+  it('returns Record<string, never> for empty fields', () => {
+    expect(generateModelFieldsType({})).toBe('Record<string, never>');
+  });
+
+  it('generates field with codecId and nullable', () => {
+    const result = generateModelFieldsType({
+      name: { codecId: 'sql/text@1', nullable: false },
+    });
+    expect(result).toBe(
+      "{ readonly name: { readonly codecId: 'sql/text@1'; readonly nullable: false } }",
+    );
+  });
+
+  it('generates multiple fields', () => {
+    const result = generateModelFieldsType({
+      id: { codecId: 'sql/int4@1', nullable: false },
+      email: { codecId: 'sql/text@1', nullable: true },
+    });
+    expect(result).toContain(
+      "readonly id: { readonly codecId: 'sql/int4@1'; readonly nullable: false }",
+    );
+    expect(result).toContain(
+      "readonly email: { readonly codecId: 'sql/text@1'; readonly nullable: true }",
+    );
+  });
+
+  it('quotes keys with special characters', () => {
+    const result = generateModelFieldsType({
+      'field-name': { codecId: 'sql/text@1', nullable: false },
+    });
+    expect(result).toContain("readonly 'field-name':");
   });
 });
 
