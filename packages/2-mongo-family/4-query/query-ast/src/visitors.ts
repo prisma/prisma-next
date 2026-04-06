@@ -22,11 +22,18 @@ import type {
   MongoOrExpr,
 } from './filter-expressions';
 import type {
+  MongoAddFieldsStage,
+  MongoCountStage,
+  MongoGroupStage,
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
   MongoProjectStage,
+  MongoRedactStage,
+  MongoReplaceRootStage,
+  MongoSampleStage,
   MongoSkipStage,
+  MongoSortByCountStage,
   MongoSortStage,
   MongoUnwindStage,
 } from './stages';
@@ -90,4 +97,11 @@ export interface MongoStageVisitor<R> {
   skip(stage: MongoSkipStage): R;
   lookup(stage: MongoLookupStage): R;
   unwind(stage: MongoUnwindStage): R;
+  group(stage: MongoGroupStage): R;
+  addFields(stage: MongoAddFieldsStage): R;
+  replaceRoot(stage: MongoReplaceRootStage): R;
+  count(stage: MongoCountStage): R;
+  sortByCount(stage: MongoSortByCountStage): R;
+  sample(stage: MongoSampleStage): R;
+  redact(stage: MongoRedactStage): R;
 }

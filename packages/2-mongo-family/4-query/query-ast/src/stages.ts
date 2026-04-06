@@ -1,6 +1,34 @@
+import type { MongoAggAccumulator, MongoAggExpr } from './aggregation-expressions';
 import { MongoAstNode } from './ast-node';
 import type { MongoFilterExpr } from './filter-expressions';
-import type { MongoStageRewriterContext, MongoStageVisitor } from './visitors';
+import type {
+  MongoAggExprRewriter,
+  MongoStageRewriterContext,
+  MongoStageVisitor,
+} from './visitors';
+
+export type MongoGroupId = null | MongoAggExpr | Readonly<Record<string, MongoAggExpr>>;
+
+function rewriteGroupId(groupId: MongoGroupId, rewriter: MongoAggExprRewriter): MongoGroupId {
+  if (groupId === null) return null;
+  if ('kind' in groupId) return (groupId as MongoAggExpr).rewrite(rewriter);
+  const result: Record<string, MongoAggExpr> = {};
+  for (const [key, val] of Object.entries(groupId)) {
+    result[key] = val.rewrite(rewriter);
+  }
+  return result;
+}
+
+function rewriteExprRecord(
+  fields: Readonly<Record<string, MongoAggExpr>>,
+  rewriter: MongoAggExprRewriter,
+): Record<string, MongoAggExpr> {
+  const result: Record<string, MongoAggExpr> = {};
+  for (const [key, val] of Object.entries(fields)) {
+    result[key] = val.rewrite(rewriter);
+  }
+  return result;
+}
 
 abstract class MongoStageNode extends MongoAstNode {
   abstract accept<R>(visitor: MongoStageVisitor<R>): R;
@@ -169,6 +197,158 @@ export class MongoUnwindStage extends MongoStageNode {
   }
 }
 
+export class MongoGroupStage extends MongoStageNode {
+  readonly kind = 'group' as const;
+  readonly groupId: MongoGroupId;
+  readonly accumulators: Readonly<Record<string, MongoAggAccumulator>>;
+
+  constructor(groupId: MongoGroupId, accumulators: Record<string, MongoAggAccumulator>) {
+    super();
+    this.groupId = groupId;
+    this.accumulators = Object.freeze({ ...accumulators });
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.group(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+    const rewriter = context.aggExpr;
+    if (!rewriter) return this;
+    const newAccumulators: Record<string, MongoAggAccumulator> = {};
+    for (const [key, acc] of Object.entries(this.accumulators)) {
+      newAccumulators[key] = acc.rewrite(rewriter) as MongoAggAccumulator;
+    }
+    return new MongoGroupStage(rewriteGroupId(this.groupId, rewriter), newAccumulators);
+  }
+}
+
+export class MongoAddFieldsStage extends MongoStageNode {
+  readonly kind = 'addFields' as const;
+  readonly fields: Readonly<Record<string, MongoAggExpr>>;
+
+  constructor(fields: Record<string, MongoAggExpr>) {
+    super();
+    this.fields = Object.freeze({ ...fields });
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.addFields(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+    const rewriter = context.aggExpr;
+    if (!rewriter) return this;
+    return new MongoAddFieldsStage(rewriteExprRecord(this.fields, rewriter));
+  }
+}
+
+export class MongoReplaceRootStage extends MongoStageNode {
+  readonly kind = 'replaceRoot' as const;
+  readonly newRoot: MongoAggExpr;
+
+  constructor(newRoot: MongoAggExpr) {
+    super();
+    this.newRoot = newRoot;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.replaceRoot(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+    const rewriter = context.aggExpr;
+    if (!rewriter) return this;
+    return new MongoReplaceRootStage(this.newRoot.rewrite(rewriter));
+  }
+}
+
+export class MongoCountStage extends MongoStageNode {
+  readonly kind = 'count' as const;
+  readonly field: string;
+
+  constructor(field: string) {
+    super();
+    this.field = field;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.count(this);
+  }
+
+  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
+    return this;
+  }
+}
+
+export class MongoSortByCountStage extends MongoStageNode {
+  readonly kind = 'sortByCount' as const;
+  readonly expr: MongoAggExpr;
+
+  constructor(expr: MongoAggExpr) {
+    super();
+    this.expr = expr;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.sortByCount(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+    const rewriter = context.aggExpr;
+    if (!rewriter) return this;
+    return new MongoSortByCountStage(this.expr.rewrite(rewriter));
+  }
+}
+
+export class MongoSampleStage extends MongoStageNode {
+  readonly kind = 'sample' as const;
+  readonly size: number;
+
+  constructor(size: number) {
+    super();
+    if (!Number.isInteger(size) || size < 0) {
+      throw new RangeError('size must be a non-negative integer');
+    }
+    this.size = size;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.sample(this);
+  }
+
+  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
+    return this;
+  }
+}
+
+export class MongoRedactStage extends MongoStageNode {
+  readonly kind = 'redact' as const;
+  readonly expr: MongoAggExpr;
+
+  constructor(expr: MongoAggExpr) {
+    super();
+    this.expr = expr;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.redact(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+    const rewriter = context.aggExpr;
+    if (!rewriter) return this;
+    return new MongoRedactStage(this.expr.rewrite(rewriter));
+  }
+}
+
 export type MongoReadStage =
   | MongoMatchStage
   | MongoProjectStage
@@ -176,4 +356,11 @@ export type MongoReadStage =
   | MongoLimitStage
   | MongoSkipStage
   | MongoLookupStage
-  | MongoUnwindStage;
+  | MongoUnwindStage
+  | MongoGroupStage
+  | MongoAddFieldsStage
+  | MongoReplaceRootStage
+  | MongoCountStage
+  | MongoSortByCountStage
+  | MongoSampleStage
+  | MongoRedactStage;
