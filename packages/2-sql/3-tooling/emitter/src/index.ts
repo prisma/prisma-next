@@ -524,22 +524,28 @@ export const sqlTargetFamilyHook = {
             fields.push(
               `readonly ${fieldName}: { readonly codecId: 'unknown'; readonly nullable: false }`,
             );
-            storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+            storageFieldParts.push(
+              `readonly ${fieldName}: { readonly column: ${this.serializeValue(field.column)} }`,
+            );
             continue;
           }
 
           const nullable = column.nullable ?? false;
           fields.push(
-            `readonly ${fieldName}: { readonly codecId: '${column.codecId}'; readonly nullable: ${nullable} }`,
+            `readonly ${fieldName}: { readonly codecId: ${this.serializeValue(column.codecId)}; readonly nullable: ${nullable} }`,
           );
-          storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+          storageFieldParts.push(
+            `readonly ${fieldName}: { readonly column: ${this.serializeValue(field.column)} }`,
+          );
         }
       } else {
         for (const [fieldName, field] of Object.entries(storageFields)) {
           fields.push(
             `readonly ${fieldName}: { readonly codecId: 'unknown'; readonly nullable: false }`,
           );
-          storageFieldParts.push(`readonly ${fieldName}: { readonly column: '${field.column}' }`);
+          storageFieldParts.push(
+            `readonly ${fieldName}: { readonly column: ${this.serializeValue(field.column)} }`,
+          );
         }
       }
 
