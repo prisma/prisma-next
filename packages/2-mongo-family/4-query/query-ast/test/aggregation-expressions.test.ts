@@ -247,7 +247,7 @@ describe('MongoAggArrayFilter', () => {
   it('constructs with input, cond, as', () => {
     const f = MongoAggArrayFilter.of(
       MongoAggFieldRef.of('scores'),
-      MongoAggOperator.of('$gte', [MongoAggFieldRef.of('score'), MongoAggLiteral.of(70)]),
+      MongoAggOperator.of('$gte', [MongoAggFieldRef.of('$score'), MongoAggLiteral.of(70)]),
       'score',
     );
     expect(f.kind).toBe('filter');
@@ -270,7 +270,10 @@ describe('MongoAggMap', () => {
   it('constructs with input, in, as', () => {
     const m = MongoAggMap.of(
       MongoAggFieldRef.of('items'),
-      MongoAggOperator.multiply(MongoAggFieldRef.of('item.price'), MongoAggFieldRef.of('item.qty')),
+      MongoAggOperator.multiply(
+        MongoAggFieldRef.of('$item.price'),
+        MongoAggFieldRef.of('$item.qty'),
+      ),
       'item',
     );
     expect(m.kind).toBe('map');
@@ -290,7 +293,7 @@ describe('MongoAggReduce', () => {
     const r = MongoAggReduce.of(
       MongoAggFieldRef.of('items'),
       MongoAggLiteral.of(0),
-      MongoAggOperator.add(MongoAggFieldRef.of('value'), MongoAggFieldRef.of('this')),
+      MongoAggOperator.add(MongoAggFieldRef.of('$value'), MongoAggFieldRef.of('$this')),
     );
     expect(r.kind).toBe('reduce');
     expect(r.input.kind).toBe('fieldRef');
@@ -316,8 +319,8 @@ describe('MongoAggLet', () => {
         discount: MongoAggFieldRef.of('discountRate'),
       },
       MongoAggOperator.multiply(
-        MongoAggFieldRef.of('total'),
-        MongoAggOperator.subtract(MongoAggLiteral.of(1), MongoAggFieldRef.of('discount')),
+        MongoAggFieldRef.of('$total'),
+        MongoAggOperator.subtract(MongoAggLiteral.of(1), MongoAggFieldRef.of('$discount')),
       ),
     );
     expect(l.kind).toBe('let');
