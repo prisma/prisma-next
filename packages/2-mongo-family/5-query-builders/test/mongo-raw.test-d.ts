@@ -11,6 +11,11 @@ test('collection accepts valid root names', () => {
   expectTypeOf<Raw['collection']>().toBeCallableWith('users');
 });
 
+test('collection rejects invalid root names', () => {
+  // @ts-expect-error - 'nonexistent' is not a valid root name
+  expectTypeOf<Raw['collection']>().toBeCallableWith('nonexistent');
+});
+
 test('collection returns RawMongoCollection', () => {
   expectTypeOf<ReturnType<Raw['collection']>>().toExtend<RawMongoCollection>();
 });

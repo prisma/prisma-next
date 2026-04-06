@@ -3,10 +3,13 @@ import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
 import {
   RawAggregateCommand,
   RawDeleteManyCommand,
+  RawDeleteOneCommand,
+  RawFindOneAndDeleteCommand,
   RawFindOneAndUpdateCommand,
   RawInsertManyCommand,
   RawInsertOneCommand,
   RawUpdateManyCommand,
+  RawUpdateOneCommand,
 } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
@@ -144,6 +147,58 @@ describe('raw command integration', () => {
       const docs = await db.collection(col).find({}).sort({ firstName: 1 }).toArray();
       expect(docs[0]).toMatchObject({ fullName: 'Alice Smith' });
       expect(docs[1]).toMatchObject({ fullName: 'Bob Jones' });
+    });
+  });
+
+  it('updateOne modifies a single document', async () => {
+    await withMongod(async (ctx) => {
+      const db = ctx.client.db(ctx.dbName);
+      await db.collection(col).insertMany([
+        { name: 'Alice', score: 10 },
+        { name: 'Bob', score: 20 },
+      ]);
+
+      const updateCmd = new RawUpdateOneCommand(col, { name: 'Alice' }, { $set: { score: 99 } });
+      const rows = await ctx.runtime.execute(rawPlan(col, updateCmd));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ matchedCount: 1, modifiedCount: 1 });
+
+      const alice = await db.collection(col).findOne({ name: 'Alice' });
+      expect(alice).toMatchObject({ name: 'Alice', score: 99 });
+    });
+  });
+
+  it('deleteOne removes a single document', async () => {
+    await withMongod(async (ctx) => {
+      const db = ctx.client.db(ctx.dbName);
+      await db.collection(col).insertMany([
+        { name: 'Alice', temp: true },
+        { name: 'Bob', temp: true },
+      ]);
+
+      const deleteCmd = new RawDeleteOneCommand(col, { name: 'Alice' });
+      const rows = await ctx.runtime.execute(rawPlan(col, deleteCmd));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ deletedCount: 1 });
+
+      const remaining = await db.collection(col).find({}).toArray();
+      expect(remaining).toHaveLength(1);
+      expect((remaining[0] as Record<string, unknown>)['name']).toBe('Bob');
+    });
+  });
+
+  it('findOneAndDelete returns deleted document and removes it', async () => {
+    await withMongod(async (ctx) => {
+      const db = ctx.client.db(ctx.dbName);
+      await db.collection(col).insertOne({ name: 'Alice', role: 'admin' });
+
+      const deleteCmd = new RawFindOneAndDeleteCommand(col, { name: 'Alice' });
+      const rows = await ctx.runtime.execute(rawPlan(col, deleteCmd));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ name: 'Alice', role: 'admin' });
+
+      const remaining = await db.collection(col).find({ name: 'Alice' }).toArray();
+      expect(remaining).toHaveLength(0);
     });
   });
 });

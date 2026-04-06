@@ -11,33 +11,32 @@ import {
   RawUpdateManyCommand,
   RawUpdateOneCommand,
 } from '@prisma-next/mongo-query-ast';
-
-type RawDocument = Record<string, unknown>;
+import type { Document } from '@prisma-next/mongo-value';
 
 interface Buildable<Row = unknown> {
   build(): MongoQueryPlan<Row>;
 }
 
 export interface RawMongoCollection {
-  aggregate<Row = Record<string, unknown>>(pipeline: ReadonlyArray<RawDocument>): Buildable<Row>;
+  aggregate<Row = Record<string, unknown>>(pipeline: ReadonlyArray<Document>): Buildable<Row>;
 
-  insertOne(document: RawDocument): Buildable;
-  insertMany(documents: ReadonlyArray<RawDocument>): Buildable;
+  insertOne(document: Document): Buildable;
+  insertMany(documents: ReadonlyArray<Document>): Buildable;
 
-  updateOne(filter: RawDocument, update: RawDocument | ReadonlyArray<RawDocument>): Buildable;
+  updateOne(filter: Document, update: Document | ReadonlyArray<Document>): Buildable;
 
-  updateMany(filter: RawDocument, update: RawDocument | ReadonlyArray<RawDocument>): Buildable;
+  updateMany(filter: Document, update: Document | ReadonlyArray<Document>): Buildable;
 
-  deleteOne(filter: RawDocument): Buildable;
-  deleteMany(filter: RawDocument): Buildable;
+  deleteOne(filter: Document): Buildable;
+  deleteMany(filter: Document): Buildable;
 
   findOneAndUpdate(
-    filter: RawDocument,
-    update: RawDocument | ReadonlyArray<RawDocument>,
+    filter: Document,
+    update: Document | ReadonlyArray<Document>,
     options?: { upsert?: boolean },
   ): Buildable;
 
-  findOneAndDelete(filter: RawDocument): Buildable;
+  findOneAndDelete(filter: Document): Buildable;
 }
 
 export function createRawMongoCollection(
@@ -51,37 +50,37 @@ export function createRawMongoCollection(
   }
 
   return {
-    aggregate<Row = Record<string, unknown>>(pipeline: ReadonlyArray<RawDocument>) {
+    aggregate<Row = Record<string, unknown>>(pipeline: ReadonlyArray<Document>) {
       return buildable<Row>(new RawAggregateCommand(collectionName, pipeline));
     },
 
-    insertOne(document: RawDocument) {
+    insertOne(document: Document) {
       return buildable(new RawInsertOneCommand(collectionName, document));
     },
 
-    insertMany(documents: ReadonlyArray<RawDocument>) {
+    insertMany(documents: ReadonlyArray<Document>) {
       return buildable(new RawInsertManyCommand(collectionName, documents));
     },
 
-    updateOne(filter: RawDocument, update: RawDocument | ReadonlyArray<RawDocument>) {
+    updateOne(filter: Document, update: Document | ReadonlyArray<Document>) {
       return buildable(new RawUpdateOneCommand(collectionName, filter, update));
     },
 
-    updateMany(filter: RawDocument, update: RawDocument | ReadonlyArray<RawDocument>) {
+    updateMany(filter: Document, update: Document | ReadonlyArray<Document>) {
       return buildable(new RawUpdateManyCommand(collectionName, filter, update));
     },
 
-    deleteOne(filter: RawDocument) {
+    deleteOne(filter: Document) {
       return buildable(new RawDeleteOneCommand(collectionName, filter));
     },
 
-    deleteMany(filter: RawDocument) {
+    deleteMany(filter: Document) {
       return buildable(new RawDeleteManyCommand(collectionName, filter));
     },
 
     findOneAndUpdate(
-      filter: RawDocument,
-      update: RawDocument | ReadonlyArray<RawDocument>,
+      filter: Document,
+      update: Document | ReadonlyArray<Document>,
       options?: { upsert?: boolean },
     ) {
       return buildable(
@@ -89,7 +88,7 @@ export function createRawMongoCollection(
       );
     },
 
-    findOneAndDelete(filter: RawDocument) {
+    findOneAndDelete(filter: Document) {
       return buildable(new RawFindOneAndDeleteCommand(collectionName, filter));
     },
   };

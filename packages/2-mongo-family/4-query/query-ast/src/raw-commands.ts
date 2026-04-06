@@ -1,13 +1,12 @@
+import type { Document } from '@prisma-next/mongo-value';
 import { MongoAstNode } from './ast-node';
-
-type RawDocument = Record<string, unknown>;
 
 export class RawAggregateCommand extends MongoAstNode {
   readonly kind = 'rawAggregate' as const;
   readonly collection: string;
-  readonly pipeline: ReadonlyArray<RawDocument>;
+  readonly pipeline: ReadonlyArray<Document>;
 
-  constructor(collection: string, pipeline: ReadonlyArray<RawDocument>) {
+  constructor(collection: string, pipeline: ReadonlyArray<Document>) {
     super();
     this.collection = collection;
     this.pipeline = pipeline;
@@ -18,9 +17,9 @@ export class RawAggregateCommand extends MongoAstNode {
 export class RawInsertOneCommand extends MongoAstNode {
   readonly kind = 'rawInsertOne' as const;
   readonly collection: string;
-  readonly document: RawDocument;
+  readonly document: Document;
 
-  constructor(collection: string, document: RawDocument) {
+  constructor(collection: string, document: Document) {
     super();
     this.collection = collection;
     this.document = document;
@@ -31,9 +30,9 @@ export class RawInsertOneCommand extends MongoAstNode {
 export class RawInsertManyCommand extends MongoAstNode {
   readonly kind = 'rawInsertMany' as const;
   readonly collection: string;
-  readonly documents: ReadonlyArray<RawDocument>;
+  readonly documents: ReadonlyArray<Document>;
 
-  constructor(collection: string, documents: ReadonlyArray<RawDocument>) {
+  constructor(collection: string, documents: ReadonlyArray<Document>) {
     super();
     this.collection = collection;
     this.documents = documents;
@@ -44,14 +43,10 @@ export class RawInsertManyCommand extends MongoAstNode {
 export class RawUpdateOneCommand extends MongoAstNode {
   readonly kind = 'rawUpdateOne' as const;
   readonly collection: string;
-  readonly filter: RawDocument;
-  readonly update: RawDocument | ReadonlyArray<RawDocument>;
+  readonly filter: Document;
+  readonly update: Document | ReadonlyArray<Document>;
 
-  constructor(
-    collection: string,
-    filter: RawDocument,
-    update: RawDocument | ReadonlyArray<RawDocument>,
-  ) {
+  constructor(collection: string, filter: Document, update: Document | ReadonlyArray<Document>) {
     super();
     this.collection = collection;
     this.filter = filter;
@@ -63,14 +58,10 @@ export class RawUpdateOneCommand extends MongoAstNode {
 export class RawUpdateManyCommand extends MongoAstNode {
   readonly kind = 'rawUpdateMany' as const;
   readonly collection: string;
-  readonly filter: RawDocument;
-  readonly update: RawDocument | ReadonlyArray<RawDocument>;
+  readonly filter: Document;
+  readonly update: Document | ReadonlyArray<Document>;
 
-  constructor(
-    collection: string,
-    filter: RawDocument,
-    update: RawDocument | ReadonlyArray<RawDocument>,
-  ) {
+  constructor(collection: string, filter: Document, update: Document | ReadonlyArray<Document>) {
     super();
     this.collection = collection;
     this.filter = filter;
@@ -82,9 +73,9 @@ export class RawUpdateManyCommand extends MongoAstNode {
 export class RawDeleteOneCommand extends MongoAstNode {
   readonly kind = 'rawDeleteOne' as const;
   readonly collection: string;
-  readonly filter: RawDocument;
+  readonly filter: Document;
 
-  constructor(collection: string, filter: RawDocument) {
+  constructor(collection: string, filter: Document) {
     super();
     this.collection = collection;
     this.filter = filter;
@@ -95,9 +86,9 @@ export class RawDeleteOneCommand extends MongoAstNode {
 export class RawDeleteManyCommand extends MongoAstNode {
   readonly kind = 'rawDeleteMany' as const;
   readonly collection: string;
-  readonly filter: RawDocument;
+  readonly filter: Document;
 
-  constructor(collection: string, filter: RawDocument) {
+  constructor(collection: string, filter: Document) {
     super();
     this.collection = collection;
     this.filter = filter;
@@ -108,14 +99,14 @@ export class RawDeleteManyCommand extends MongoAstNode {
 export class RawFindOneAndUpdateCommand extends MongoAstNode {
   readonly kind = 'rawFindOneAndUpdate' as const;
   readonly collection: string;
-  readonly filter: RawDocument;
-  readonly update: RawDocument | ReadonlyArray<RawDocument>;
+  readonly filter: Document;
+  readonly update: Document | ReadonlyArray<Document>;
   readonly upsert: boolean;
 
   constructor(
     collection: string,
-    filter: RawDocument,
-    update: RawDocument | ReadonlyArray<RawDocument>,
+    filter: Document,
+    update: Document | ReadonlyArray<Document>,
     upsert: boolean,
   ) {
     super();
@@ -130,9 +121,9 @@ export class RawFindOneAndUpdateCommand extends MongoAstNode {
 export class RawFindOneAndDeleteCommand extends MongoAstNode {
   readonly kind = 'rawFindOneAndDelete' as const;
   readonly collection: string;
-  readonly filter: RawDocument;
+  readonly filter: Document;
 
-  constructor(collection: string, filter: RawDocument) {
+  constructor(collection: string, filter: Document) {
     super();
     this.collection = collection;
     this.filter = filter;
