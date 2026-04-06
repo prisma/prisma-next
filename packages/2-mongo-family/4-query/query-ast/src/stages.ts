@@ -8,6 +8,11 @@ import type {
 } from './visitors';
 
 export type MongoGroupId = null | MongoAggExpr | Readonly<Record<string, MongoAggExpr>>;
+export type MongoProjectionValue = 0 | 1 | MongoAggExpr;
+
+function isAggExpr(value: MongoProjectionValue): value is MongoAggExpr {
+  return typeof value === 'object' && value !== null && 'kind' in value;
+}
 
 function rewriteGroupId(groupId: MongoGroupId, rewriter: MongoAggExprRewriter): MongoGroupId {
   if (groupId === null) return null;
@@ -56,9 +61,9 @@ export class MongoMatchStage extends MongoStageNode {
 
 export class MongoProjectStage extends MongoStageNode {
   readonly kind = 'project' as const;
-  readonly projection: Readonly<Record<string, 0 | 1>>;
+  readonly projection: Readonly<Record<string, MongoProjectionValue>>;
 
-  constructor(projection: Record<string, 0 | 1>) {
+  constructor(projection: Record<string, MongoProjectionValue>) {
     super();
     this.projection = Object.freeze({ ...projection });
     this.freeze();
@@ -68,8 +73,22 @@ export class MongoProjectStage extends MongoStageNode {
     return visitor.project(this);
   }
 
-  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
-    return this;
+  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+    const rewriter = context.aggExpr;
+    if (!rewriter) return this;
+    let hasExpr = false;
+    for (const val of Object.values(this.projection)) {
+      if (isAggExpr(val)) {
+        hasExpr = true;
+        break;
+      }
+    }
+    if (!hasExpr) return this;
+    const newProjection: Record<string, MongoProjectionValue> = {};
+    for (const [key, val] of Object.entries(this.projection)) {
+      newProjection[key] = isAggExpr(val) ? val.rewrite(rewriter) : val;
+    }
+    return new MongoProjectStage(newProjection);
   }
 }
 
@@ -139,17 +158,19 @@ export class MongoSkipStage extends MongoStageNode {
 export class MongoLookupStage extends MongoStageNode {
   readonly kind = 'lookup' as const;
   readonly from: string;
-  readonly localField: string;
-  readonly foreignField: string;
+  readonly localField: string | undefined;
+  readonly foreignField: string | undefined;
   readonly as: string;
   readonly pipeline: ReadonlyArray<MongoReadStage> | undefined;
+  readonly let_: Readonly<Record<string, MongoAggExpr>> | undefined;
 
   constructor(options: {
     from: string;
-    localField: string;
-    foreignField: string;
+    localField?: string;
+    foreignField?: string;
     as: string;
     pipeline?: ReadonlyArray<MongoReadStage>;
+    let_?: Record<string, MongoAggExpr>;
   }) {
     super();
     this.from = options.from;
@@ -157,6 +178,7 @@ export class MongoLookupStage extends MongoStageNode {
     this.foreignField = options.foreignField;
     this.as = options.as;
     this.pipeline = options.pipeline ? Object.freeze([...options.pipeline]) : undefined;
+    this.let_ = options.let_ ? Object.freeze({ ...options.let_ }) : undefined;
     this.freeze();
   }
 
@@ -165,14 +187,22 @@ export class MongoLookupStage extends MongoStageNode {
   }
 
   rewrite(context: MongoStageRewriterContext): MongoReadStage {
-    if (!this.pipeline) return this;
-    return new MongoLookupStage({
-      from: this.from,
-      localField: this.localField,
-      foreignField: this.foreignField,
-      as: this.as,
-      pipeline: this.pipeline.map((stage) => stage.rewrite(context)),
-    });
+    if (!this.pipeline && !this.let_) return this;
+    const rewrittenLet =
+      this.let_ && context.aggExpr ? rewriteExprRecord(this.let_, context.aggExpr) : this.let_;
+    const options: {
+      from: string;
+      localField?: string;
+      foreignField?: string;
+      as: string;
+      pipeline?: ReadonlyArray<MongoReadStage>;
+      let_?: Record<string, MongoAggExpr>;
+    } = { from: this.from, as: this.as };
+    if (this.localField !== undefined) options.localField = this.localField;
+    if (this.foreignField !== undefined) options.foreignField = this.foreignField;
+    if (this.pipeline) options.pipeline = this.pipeline.map((stage) => stage.rewrite(context));
+    if (rewrittenLet) options.let_ = { ...rewrittenLet };
+    return new MongoLookupStage(options);
   }
 }
 
@@ -180,11 +210,13 @@ export class MongoUnwindStage extends MongoStageNode {
   readonly kind = 'unwind' as const;
   readonly path: string;
   readonly preserveNullAndEmptyArrays: boolean;
+  readonly includeArrayIndex: string | undefined;
 
-  constructor(path: string, preserveNullAndEmptyArrays: boolean) {
+  constructor(path: string, preserveNullAndEmptyArrays: boolean, includeArrayIndex?: string) {
     super();
     this.path = path;
     this.preserveNullAndEmptyArrays = preserveNullAndEmptyArrays;
+    this.includeArrayIndex = includeArrayIndex;
     this.freeze();
   }
 
