@@ -335,13 +335,13 @@ describe('lowerAggExpr', () => {
   it('lowers $filter', () => {
     const expr = MongoAggArrayFilter.of(
       MongoAggFieldRef.of('scores'),
-      MongoAggOperator.of('$gte', [MongoAggFieldRef.of('score'), MongoAggLiteral.of(70)]),
+      MongoAggOperator.of('$gte', [MongoAggFieldRef.of('$score'), MongoAggLiteral.of(70)]),
       'score',
     );
     expect(lowerAggExpr(expr)).toEqual({
       $filter: {
         input: '$scores',
-        cond: { $gte: ['$score', 70] },
+        cond: { $gte: ['$$score', 70] },
         as: 'score',
       },
     });
@@ -350,13 +350,16 @@ describe('lowerAggExpr', () => {
   it('lowers $map', () => {
     const expr = MongoAggMap.of(
       MongoAggFieldRef.of('items'),
-      MongoAggOperator.multiply(MongoAggFieldRef.of('item.price'), MongoAggFieldRef.of('item.qty')),
+      MongoAggOperator.multiply(
+        MongoAggFieldRef.of('$item.price'),
+        MongoAggFieldRef.of('$item.qty'),
+      ),
       'item',
     );
     expect(lowerAggExpr(expr)).toEqual({
       $map: {
         input: '$items',
-        in: { $multiply: ['$item.price', '$item.qty'] },
+        in: { $multiply: ['$$item.price', '$$item.qty'] },
         as: 'item',
       },
     });
@@ -366,13 +369,13 @@ describe('lowerAggExpr', () => {
     const expr = MongoAggReduce.of(
       MongoAggFieldRef.of('items'),
       MongoAggLiteral.of(0),
-      MongoAggOperator.add(MongoAggFieldRef.of('value'), MongoAggFieldRef.of('this')),
+      MongoAggOperator.add(MongoAggFieldRef.of('$value'), MongoAggFieldRef.of('$this')),
     );
     expect(lowerAggExpr(expr)).toEqual({
       $reduce: {
         input: '$items',
         initialValue: 0,
-        in: { $add: ['$value', '$this'] },
+        in: { $add: ['$$value', '$$this'] },
       },
     });
   });
@@ -383,14 +386,14 @@ describe('lowerAggExpr', () => {
         total: MongoAggOperator.add(MongoAggFieldRef.of('price'), MongoAggFieldRef.of('tax')),
       },
       MongoAggOperator.multiply(
-        MongoAggFieldRef.of('total'),
+        MongoAggFieldRef.of('$total'),
         MongoAggOperator.subtract(MongoAggLiteral.of(1), MongoAggFieldRef.of('discount')),
       ),
     );
     expect(lowerAggExpr(expr)).toEqual({
       $let: {
         vars: { total: { $add: ['$price', '$tax'] } },
-        in: { $multiply: ['$total', { $subtract: [1, '$discount'] }] },
+        in: { $multiply: ['$$total', { $subtract: [1, '$discount'] }] },
       },
     });
   });
