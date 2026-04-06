@@ -56,8 +56,9 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 |-- 0-foundation
 |   |-- contract/      → @prisma-next/contract
 |-- 1-core
-|   |-- control-plane/ → @prisma-next/core-control-plane
-|   |-- execution-plane/ → @prisma-next/core-execution-plane
+|   |-- config/        → @prisma-next/config
+|   |-- errors/        → @prisma-next/errors
+|   |-- framework-components/ → @prisma-next/framework-components
 |   |-- operations/    → @prisma-next/operations
 |-- 2-authoring (migration plane)
 |   |-- contract/      → @prisma-next/contract-authoring
@@ -65,6 +66,7 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 |-- 3-tooling (migration plane)
 |   |-- cli/           → @prisma-next/cli
 |   |-- emitter/       → @prisma-next/emitter
+|   |-- migration/     → @prisma-next/migration-tools
 |-- 4-runtime (runtime plane)
     |-- runtime-executor/ → @prisma-next/runtime-executor
 ```
@@ -191,8 +193,9 @@ The innermost layer containing target-family agnostic types and utilities.
 
 - `packages/1-framework/0-foundation/contract/` → `@prisma-next/contract` - Core contract types + plan metadata
 - `packages/1-framework/1-core/operations/` → `@prisma-next/operations` - Target-neutral operation registry + capability helpers
-- `packages/1-framework/1-core/control-plane/` → `@prisma-next/core-control-plane` - Control plane domain actions (contract emission, database verification), config types, validation, error factories (no file I/O or CLI awareness)
-- `packages/1-framework/1-core/execution-plane/` → `@prisma-next/core-execution-plane` - Execution plane descriptor and instance types
+- `packages/1-framework/1-core/framework-components/` → `@prisma-next/framework-components` - Component descriptors, control-plane types (`./control`), execution-plane types (`./execution`), emission SPI types (`./emission`)
+- `packages/1-framework/1-core/errors/` → `@prisma-next/errors` - CLI/runtime error factories and error types (`./control`)
+- `packages/1-framework/1-core/config/` → `@prisma-next/config` - Config authoring types and validation
 
 **Dependency Rules:** Cannot import from any other layer.
 
@@ -275,8 +278,9 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 |-----------|------------------------|
 | `packages/1-framework/0-foundation/contract/` | `@prisma-next/contract` |
 | `packages/1-framework/1-core/operations/` | `@prisma-next/operations` |
-| `packages/1-framework/1-core/control-plane/` | `@prisma-next/core-control-plane` |
-| `packages/1-framework/1-core/execution-plane/` | `@prisma-next/core-execution-plane` |
+| `packages/1-framework/1-core/framework-components/` | `@prisma-next/framework-components` |
+| `packages/1-framework/1-core/errors/` | `@prisma-next/errors` |
+| `packages/1-framework/1-core/config/` | `@prisma-next/config` |
 | `packages/1-framework/2-authoring/contract/` | `@prisma-next/contract-authoring` |
 | `packages/1-framework/2-authoring/psl-parser/` | `@prisma-next/psl-parser` |
 | `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |

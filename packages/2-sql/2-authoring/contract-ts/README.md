@@ -287,7 +287,7 @@ export default defineConfig({
 
 - **`@prisma-next/contract-authoring`** - Target-agnostic builder core (builder state types, builder classes, type helpers)
 - **`@prisma-next/contract`** - Core contract types (`ContractBase`)
-- **`@prisma-next/core-control-plane`** - Contract config types used by `typescriptContract`
+- **`@prisma-next/framework-components`** - Contract config types used by `typescriptContract` (via `./control`)
 - **`@prisma-next/sql-contract`** - SQL contract types (`SqlContract`, `SqlStorage`, `SqlModelStorage`)
 - **`arktype`** - Runtime validation
 - **`ts-toolbelt`** - Type utilities

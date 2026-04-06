@@ -49,7 +49,7 @@ const result = await familyInstance.emitContract({ contract });
 ## Dependencies
 
 - **`@prisma-next/framework-components`**: `ControlStack`, `ControlFamilyDescriptor`, component types
-- **`@prisma-next/core-control-plane`**: `emit()` function, control-plane types (re-exported from `framework-components`)
+- **`@prisma-next/emitter`**: `emit()` function for contract emission
 - **`@prisma-next/contract`**: `Contract`, `ContractMarkerRecord`
 - **`@prisma-next/mongo-core`**: `MongoContract`, `validateMongoContract()`
 - **`@prisma-next/mongo-emitter`**: `mongoTargetFamilyHook`

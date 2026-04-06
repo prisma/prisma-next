@@ -60,8 +60,8 @@ These IDs are:
 
 We introduce plane-first, cross-family descriptor interfaces in core, under:
 
-- `@prisma-next/core-control-plane` for control-plane descriptors and base instances
-- (`@prisma-next/core-execution-plane` will mirror this for runtime in a separate ADR)
+- `@prisma-next/framework-components/control` for control-plane descriptors and base instances
+- (`@prisma-next/framework-components/execution` mirrors this for runtime — see ADR 152)
 
 Descriptors:
 
@@ -252,7 +252,7 @@ This ADR covers:
 
 - Cross-family interfaces in core for the **control plane**
 - Refactoring and naming alignment for the **SQL family + Postgres target**:
-  - **Core:** `FamilyDescriptor`, `FamilyInstance`, `ControlPlaneDriver` in `@prisma-next/core-control-plane`
+  - **Core:** `FamilyDescriptor`, `FamilyInstance`, `ControlPlaneDriver` in `@prisma-next/framework-components/control`
   - **SQL family:** `SqlControlAdapter`, SQL control family instance
   - **Postgres target pack:** Postgres control adapter descriptor and instance
   - **Postgres driver pack:** Postgres control driver descriptor and instance
@@ -283,7 +283,7 @@ Non-goals for this ADR:
 
 ### Migration plan (control plane) - COMPLETED
 
-1. ✅ Introduced the new `Control*Descriptor` and `Control*Instance` interfaces in `@prisma-next/core-control-plane`
+1. ✅ Introduced the new `Control*Descriptor` and `Control*Instance` interfaces in `@prisma-next/framework-components/control`
 2. ✅ Removed legacy types completely:
    - `DriverDescriptor` → removed (use `ControlDriverDescriptor`)
    - `FamilyDescriptor` → removed (use `ControlFamilyDescriptor`)

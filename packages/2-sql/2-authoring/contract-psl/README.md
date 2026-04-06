@@ -76,7 +76,7 @@ Supported `@default(...)` surface in v1 when composed contributors provide handl
 - **Depends on**
   - `@prisma-next/psl-parser` for parser + parser result types
   - `@prisma-next/sql-contract-ts` for SQL authoring builder composition
-  - `@prisma-next/core-control-plane` for contract source diagnostics types
+  - `@prisma-next/errors` for contract source diagnostics types
   - `pathe` for provider path resolution
   - `@prisma-next/contract` and `@prisma-next/utils`
 - **Used by**

@@ -20,7 +20,7 @@ This package owns the shared config contract used by tooling and authoring packa
 ## Non-responsibilities
 
 - Config file discovery/loading (`c12`, file I/O) - handled by `@prisma-next/cli`
-- CLI error envelope formatting and rendering - handled by CLI/core-control-plane error utilities
+- CLI error envelope formatting and rendering - handled by CLI/errors package error utilities
 - Control-plane migration operations and runtime actions
 
 ## Usage
