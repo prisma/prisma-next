@@ -49,6 +49,20 @@ Phase 1 is read-only. The SQL ORM already has `create()`, `createAll()`, `create
 
 **Proof:** Mongo demo seeds data via ORM write methods. Integration tests verify create/update/delete round-trip against `mongodb-memory-server`.
 
+### Phase 1.6: Codec-owned value serialization
+
+Implement [ADR 184](../../docs/architecture%20docs/adrs/ADR%20184%20-%20Codec-owned%20value%20serialization.md) — extend the core `Codec` interface with `encodeJson`/`decodeJson` methods so codecs own the contract JSON serialization boundary for their types. Replace the hardcoded bigint/Date branches (`encodeDefaultLiteralValue`, `bigintJsonReplacer`, `decodeContractDefaults`, `DefaultLiteralValue<>`) with codec dispatch. This is a prerequisite for Phase 1.75: the emitter needs to serialize discriminator values into `contract.json`, and the runtime needs to decode them — both via the discriminator field's codec.
+
+**Scope:**
+
+1. **Core codec interface** — add optional `encodeJson`/`decodeJson` to the `Codec` interface. Codecs for JSON-safe types omit them (passthrough). Implement on `pg/int8@1` (bigint) and `pg/timestamp@1`/`pg/date@1` (Date) to replace the existing hardcoded branches.
+2. **Emission** — replace `encodeDefaultLiteralValue` and `bigintJsonReplacer` with `codec.encodeJson()` dispatch.
+3. **Validation/loading** — replace `decodeContractDefaults` with `codec.decodeJson()` dispatch.
+4. **Type generation** — simplify `DefaultLiteralValue<>` conditional type; the codec type map already knows the output type.
+5. **DDL and PSL interfaces** — the `DdlLiteralCodec` and `PslLiteralCodec` interfaces can land incrementally with migration work and authoring work respectively; they are not required for Phase 1.75.
+
+**Proof:** Existing column default tests pass with codec dispatch instead of hardcoded branches. A non-JSON-safe type (bigint) round-trips through `contract.json` via codec methods. No `$type` tags in newly emitted contracts.
+
 ### Phase 1.75: Polymorphism and embedded documents (both families)
 
 Neither ORM currently has end-to-end polymorphism or embedded document support — the Mongo ORM has type-level machinery (`InferRootRow`/`VariantRow`, `InferFullRow`/`EmbedRelationKeys`) from the PoC, but no authoring path produces contracts with these features, and the SQL ORM has no polymorphism implementation at all. The contract schema has structural slots for `discriminator`, `variants`, `base`, and `owner`, but they are exercised only by hand-crafted test fixtures.
@@ -86,7 +100,8 @@ Extract `Collection<C, M>` base class, `CollectionState`, `InferModelRow`, and i
 
 - **No dependency on M5 (unified contract) or M6 (SQL emitter migration)** from the contract domain extraction project — the ORM query surface is independent.
 - **Phase 1.5 depends on Phase 1** — write operations build on the collection class and adapter interface established in Phase 1.
-- **Phase 1.75 depends on Phase 1.5** — polymorphism and embedded docs require write operations (variant-aware creates/updates).
+- **Phase 1.6 depends on Phase 1.5** — codec interface changes touch the same contract loading and emission code; Phase 1.5 should land first to avoid conflicts.
+- **Phase 1.75 depends on Phase 1.6** — polymorphism requires codec-owned value serialization to encode/decode discriminator values in the contract. Also depends on Phase 1.5 for write operations (variant-aware creates/updates).
 - **Phase 1.75 requires coordination with Alexey** — SQL STI polymorphism touches the SQL ORM client.
 - **Phase 2 depends on Phase 1.75** — can't extract a meaningful shared interface until both implementations cover reads, writes, polymorphism, and embedded documents. Extracting without these features would miss the divergence points between families.
 - **Phase 2 requires coordination with Alexey** — extraction changes the SQL Collection's inheritance hierarchy.
