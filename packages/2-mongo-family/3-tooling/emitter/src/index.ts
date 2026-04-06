@@ -4,6 +4,7 @@ import {
   generateCodecTypeIntersection,
   generateHashTypeAliases,
   generateImportLines,
+  generateModelFieldsType,
   generateModelRelationsType,
   generateRootsType,
   serializeObjectKey,
@@ -24,18 +25,6 @@ interface MongoModelIR {
   readonly variants?: Record<string, unknown>;
   readonly base?: string;
   readonly owner?: string;
-}
-
-function generateModelFieldsType(
-  fields: Record<string, { readonly codecId: string; readonly nullable: boolean }>,
-): string {
-  const fieldEntries: string[] = [];
-  for (const [fieldName, field] of Object.entries(fields)) {
-    fieldEntries.push(
-      `readonly ${serializeObjectKey(fieldName)}: { readonly codecId: ${serializeValue(field.codecId)}; readonly nullable: ${field.nullable} }`,
-    );
-  }
-  return fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';
 }
 
 function generateModelStorageType(model: MongoModelIR): string {
