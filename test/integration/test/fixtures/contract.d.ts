@@ -35,13 +35,10 @@ export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = Record<string, never>;
 export type QueryOperationTypes = Record<string, never>;
-type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId] extends { readonly output: infer O }
-    ? O extends Date | bigint
-      ? O
-      : Encoded
-    : Encoded
-  : Encoded;
+type DefaultLiteralValue<CodecId extends string, _Encoded> =
+  CodecId extends keyof CodecTypes
+    ? CodecTypes[CodecId]['output']
+    : _Encoded;
 
 export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
