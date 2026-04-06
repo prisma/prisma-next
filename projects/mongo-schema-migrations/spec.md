@@ -16,53 +16,83 @@ MongoDB has a meaningful set of DDL-equivalent operations that need versioning, 
 
 **Existing infrastructure:** The framework-level migration SPI (`TargetMigrationsCapability`, `MigrationPlanner`, `MigrationRunner`, `MigrationPlan`) is already family-agnostic in type terms (`contract: unknown`, `schema: unknown`). The graph infrastructure (`@prisma-next/migration-tools`) has zero SQL coupling. The `ContractMarkerRecord` is already a framework-level type. The main work is: enriching the Mongo contract, building a planner and runner, and wiring the target descriptor.
 
+**Index authoring:** Users specify indexes explicitly via authoring annotations (PSL `@@index`, `@@unique` or TS DSL equivalents). The emitter translates these into the contract's `storage.collections` section. The vertical slice (M1) uses hand-crafted contracts to avoid blocking on authoring support; emitter integration follows in M2.
+
 # Requirements
 
 ## Functional Requirements
 
-### Milestone 1: Contract schema enrichment
+Milestones are structured as vertical slices — each milestone cuts through all layers thinly, proving the end-to-end path works before extending breadth.
 
-1. **Extend `MongoStorageCollection` with index definitions.** Each collection carries an array of index definitions: fields (ordered, with key types like `1`, `-1`, `"text"`, `"2dsphere"`), options (`unique`, `sparse`, `expireAfterSeconds`, `partialFilterExpression`). Index identity follows [ADR 009](../../docs/architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md): by (collection + ordered fields with key types + semantic options), not by name.
+### Milestone 1: Family migration SPI + vertical slice (single index, end-to-end)
 
-2. **Extend `MongoStorageCollection` with validator policy.** The contract carries validation policy: `validationLevel` (`"strict"` | `"moderate"`) and `validationAction` (`"error"` | `"warn"`). The `$jsonSchema` body is auto-generated from the contract's model field definitions (types, nullability) — not stored in the contract.
+Define the SPI first, then build a thin slice through every layer proving the full path works for the simplest case: one basic index on one collection.
 
-3. **Extend `MongoStorageCollection` with collection options.** Capped collection settings, time series configuration, collation, change stream pre/post images.
+**SPI:**
 
-4. **Update `MongoContractSchema` (Arktype validation).** Currently rejects all extra keys on collection entries. Must accept the new index/validator/collection option shapes.
+1. **Define minimal family migration SPI at the framework level.** Following the M6 emitter hook pattern: define interfaces that families implement. The existing `TargetMigrationsCapability` / `MigrationPlanner` / `MigrationRunner` may already suffice, or may need a thin extension (e.g. a family-provided operation formatter for CLI display). Don't refactor SQL to use it yet.
 
-5. **Update the Mongo emitter.** Populate the enriched `storage.collections` section from the contract's model definitions. Auto-generate index definitions from model field annotations (e.g. `@unique`, `@index`). Auto-derive `$jsonSchema` validator content from model fields for runtime use by the planner.
+2. **Generalize CLI operation display.** Replace or complement `extractSqlDdl` with a family-agnostic operation display mechanism so `migration plan` can preview non-SQL operations.
 
-### Milestone 2: Schema IR + contract-to-schema
+**Contract:**
 
-6. **Define `MongoSchemaIR`.** The representation of "current database state" for diffing — what indexes, validators, and collection options exist. Analogous to `SqlSchemaIR`.
+3. **Extend `MongoStorageCollection` with index definitions.** Each collection carries an array of index definitions: fields (ordered, with key types like `1`, `-1`), options (`unique`). For the vertical slice, support a single-field ascending index. Index identity follows [ADR 009](../../docs/architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md): by (collection + ordered fields with key types + semantic options), not by name.
 
-7. **Implement `contractToSchema` for the Mongo target.** Synthesize a `MongoSchemaIR` from a prior contract for offline planning (same pattern as SQL's `contractToSchemaIR`). When the prior contract is `null` (new project), return an empty IR.
+4. **Update `MongoContractSchema` (Arktype validation).** Currently rejects all extra keys on collection entries. Must accept index definitions.
 
-### Milestone 3: MongoMigrationPlanner
+**Schema IR:**
 
-8. **Implement `MongoMigrationPlanner`.** Diff desired contract state (from target contract) against current `MongoSchemaIR` (from prior contract or introspection). Generate operations:
-   - `createIndex` / `dropIndex` for added/removed indexes
-   - `createCollection` with options for new collections
-   - `collMod` for validator policy updates
-   - Operation classification: `additive` (new index, new collection), `widening` (relaxing validator), `destructive` (dropping index, tightening validator)
+5. **Define `MongoSchemaIR`.** The representation of "current database state" for diffing — what indexes exist on which collections. Analogous to `SqlSchemaIR`. Start with indexes only.
 
-9. **Auto-derive partial indexes for polymorphic collections.** When a collection holds multiple variants (STI), variant-specific field indexes must use `partialFilterExpression` scoped to the discriminator value. The planner derives this automatically from the contract's `discriminator` + `variants` metadata — no user intervention needed. This is a cross-family concern ([ADR 173 § Indexes on variant-specific fields](../../docs/architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)).
+6. **Implement `contractToSchema` for the Mongo target.** Synthesize a `MongoSchemaIR` from a prior contract for offline planning. When the prior contract is `null` (new project), return an empty IR.
 
-10. **Define `MongoMigrationPlanOperation`.** The Mongo-specific operation shape. Analogous to `SqlMigrationPlanOperation` (which carries `precheck`/`execute`/`postcheck` as SQL strings). Mongo operations carry the MongoDB command representation (e.g. `createIndex` spec, `collMod` command).
+**Planner:**
 
-### Milestone 4: MongoMigrationRunner + target wiring
+7. **Implement `MongoMigrationPlanner`.** Diff desired contract state against current `MongoSchemaIR`. For the vertical slice: generate `createIndex` / `dropIndex` operations for added/removed indexes. Classify as `additive` or `destructive`.
 
-11. **Implement `MongoMigrationRunner`.** Execute operations against a MongoDB instance via the Mongo driver. Pre/post/idempotency checks (e.g. does the index already exist? did creation succeed?). For index builds, use the simple path: call `createIndex()` and wait for completion. Progress monitoring is deferred.
+8. **Define `MongoMigrationPlanOperation`.** The Mongo-specific operation shape. Carries the MongoDB command representation (e.g. `createIndex` spec). Analogous to `SqlMigrationPlanOperation`.
 
-12. **Implement marker read/write for MongoDB.** Store the `ContractMarkerRecord` in a dedicated MongoDB collection (e.g. `prisma_contract.marker`). Reuses the existing framework-level `ContractMarkerRecord` type. Implement `readMarker()` on the Mongo control family instance.
+**Runner + wiring:**
 
-13. **Wire the Mongo target descriptor.** Add `migrations: { createPlanner, createRunner, contractToSchema }` to `@prisma-next/target-mongo`, implementing `TargetMigrationsCapability<'mongo', 'mongo'>`.
+9. **Implement `MongoMigrationRunner`.** Execute `createIndex` / `dropIndex` against a MongoDB instance via the Mongo driver. Pre/post checks for idempotency (does the index already exist?). Simple path: `createIndex()` blocks until complete.
 
-14. **Generalize CLI operation display.** Replace or complement `extractSqlDdl` with a family-agnostic operation display mechanism so `migration plan` can preview Mongo operations.
+10. **Implement marker read/write for MongoDB.** Store the `ContractMarkerRecord` in a dedicated MongoDB collection (e.g. `prisma_contract.marker`). Reuses the existing framework-level `ContractMarkerRecord` type. Implement `readMarker()` on the Mongo control family instance.
 
-### Milestone 5: Family migration SPI
+11. **Wire the Mongo target descriptor.** Add `migrations: { createPlanner, createRunner, contractToSchema }` to `@prisma-next/target-mongo`, implementing `TargetMigrationsCapability<'mongo', 'mongo'>`.
 
-15. **Define minimal family migration SPI.** Following the M6 emitter hook pattern: define interfaces at the framework level that families implement. The existing `TargetMigrationsCapability` / `MigrationPlanner` / `MigrationRunner` may already suffice, or may need a thin extension (e.g. a family-provided operation formatter for CLI display). Don't refactor SQL to use it yet.
+**End-to-end proof:** A hand-crafted contract with one index → `migration plan` shows the createIndex operation → `migration apply` creates the index on a real MongoDB instance. A second contract removing that index → plan shows dropIndex → apply drops it.
+
+### Milestone 2: Full index vocabulary + collection options + validators
+
+Extend each layer to cover the full breadth of MongoDB server-side configuration.
+
+**Indexes — full vocabulary:**
+
+12. **Extend index definitions to all key types.** Compound indexes, descending (`-1`), text (`"text"`), geospatial (`"2dsphere"`), wildcard (`"$**"`).
+
+13. **Extend index options.** `unique`, `sparse`, `expireAfterSeconds` (TTL), `partialFilterExpression` (partial indexes).
+
+**Validators:**
+
+14. **Extend `MongoStorageCollection` with validator policy.** The contract carries validation policy: `validationLevel` (`"strict"` | `"moderate"`) and `validationAction` (`"error"` | `"warn"`). The `$jsonSchema` body is auto-generated from the contract's model field definitions (types, nullability) — not stored in the contract.
+
+15. **Planner generates `collMod` operations for validator changes.** Classify as `widening` (relaxing validation) or `destructive` (tightening validation).
+
+**Collection options:**
+
+16. **Extend `MongoStorageCollection` with collection options.** Capped collection settings, time series configuration, collation, change stream pre/post images.
+
+17. **Planner generates `createCollection` with options.** New collections are created with their configured options. Option changes on existing collections produce `collMod` operations where supported.
+
+**Emitter:**
+
+18. **Update the Mongo emitter.** Populate the enriched `storage.collections` section. Users specify indexes explicitly via authoring annotations (PSL `@@index`, `@@unique` or TS DSL equivalents). Auto-derive `$jsonSchema` validator content from model fields. Requires authoring support — coordinate with WS2 (contract authoring) or use hand-crafted contracts for initial testing.
+
+### Milestone 3: Polymorphic index generation
+
+19. **Auto-derive partial indexes for polymorphic collections.** When a collection holds multiple variants (STI), variant-specific field indexes must use `partialFilterExpression` scoped to the discriminator value. The planner derives this automatically from the contract's `discriminator` + `variants` metadata — no user intervention needed. This is a cross-family concern ([ADR 173 § Indexes on variant-specific fields](../../docs/architecture%20docs/adrs/ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md)).
+
+20. **End-to-end polymorphic proof.** A contract with a polymorphic collection (base + variants with discriminator) → planner generates partial indexes with correct `partialFilterExpression` → runner applies them → indexes exist on the MongoDB instance scoped to the correct discriminator values.
 
 ## Non-Functional Requirements
 
@@ -82,39 +112,35 @@ MongoDB has a meaningful set of DDL-equivalent operations that need versioning, 
 
 # Acceptance Criteria
 
-### Milestone 1: Contract schema enrichment
-- [ ] `MongoStorageCollection` type carries index definitions with fields, key types, and options
-- [ ] `MongoStorageCollection` type carries validator policy (level, action)
-- [ ] `MongoStorageCollection` type carries collection options (capped, time series, collation)
-- [ ] `MongoContractSchema` (Arktype) validates the enriched collection shape
-- [ ] Mongo emitter populates `storage.collections` with index and validator data from model definitions
-
-### Milestone 2: Schema IR
-- [ ] `MongoSchemaIR` type represents current database state (indexes, validators, collection options)
-- [ ] `contractToSchema(contract)` produces a `MongoSchemaIR` from a `MongoContract`
-- [ ] `contractToSchema(null)` produces an empty `MongoSchemaIR`
-
-### Milestone 3: Planner
-- [ ] `MongoMigrationPlanner.plan()` diffs two contract states and produces `MongoMigrationPlan`
-- [ ] Plan includes `createIndex` operations for new indexes
-- [ ] Plan includes `dropIndex` operations for removed indexes
-- [ ] Plan includes `createCollection` operations for new collections with options
-- [ ] Plan includes `collMod` operations for validator policy changes
-- [ ] Operations are classified as `additive`, `widening`, or `destructive`
-- [ ] Polymorphic collections generate partial indexes with `partialFilterExpression` auto-derived from discriminator/variants
-
-### Milestone 4: Runner + wiring
-- [ ] `MongoMigrationRunner.execute()` applies operations against a real MongoDB instance
-- [ ] Runner pre/post checks verify operation success and support idempotency
+### Milestone 1: SPI + vertical slice (single index, end-to-end)
+- [ ] Family migration SPI defined at framework level
+- [ ] CLI operation display is family-agnostic (not SQL-only)
+- [ ] `MongoStorageCollection` type carries index definitions
+- [ ] `MongoContractSchema` (Arktype) validates index definitions on collections
+- [ ] `MongoSchemaIR` type represents current index state
+- [ ] `contractToSchema` produces a `MongoSchemaIR` from a `MongoContract` (or empty IR from `null`)
+- [ ] `MongoMigrationPlanner.plan()` diffs two contract states and produces index operations
+- [ ] `MongoMigrationPlanOperation` carries MongoDB command representations
+- [ ] `MongoMigrationRunner.execute()` applies `createIndex`/`dropIndex` against a real MongoDB instance
+- [ ] Runner supports idempotency (pre/post checks)
 - [ ] `ContractMarkerRecord` is stored in and read from a MongoDB collection
 - [ ] Mongo target descriptor exposes `migrations` capability
-- [ ] `migration plan` CLI command works with a Mongo target (displays Mongo operations)
+- [ ] `migration plan` CLI command works with a Mongo target
 - [ ] `migration apply` CLI command works with a Mongo target
+- [ ] End-to-end: hand-crafted contract with one index → plan → apply → index exists on MongoDB
 
-### Milestone 5: SPI
-- [ ] Family migration SPI defined at framework level
-- [ ] Mongo target implements the SPI
-- [ ] CLI delegates to the SPI without SQL-specific code paths
+### Milestone 2: Full vocabulary
+- [ ] All index key types supported: ascending, descending, compound, text, geospatial, wildcard
+- [ ] All index options supported: unique, sparse, TTL, partial
+- [ ] Validator policy in contract (level, action); `$jsonSchema` auto-generated from model fields
+- [ ] Planner generates `collMod` for validator changes, classified as widening or destructive
+- [ ] Collection options in contract: capped, time series, collation, change stream pre/post images
+- [ ] Planner generates `createCollection` with options
+- [ ] Mongo emitter populates enriched `storage.collections` from authoring annotations
+
+### Milestone 3: Polymorphic indexes
+- [ ] Polymorphic collections auto-generate partial indexes with `partialFilterExpression` derived from discriminator/variants
+- [ ] End-to-end: polymorphic contract → plan → apply → partial indexes exist on MongoDB scoped to discriminator values
 
 ### End-to-end proof (from April milestone)
 - [ ] A contract diff between two Mongo contract states produces correct index creation/deletion operations
@@ -131,8 +157,8 @@ MongoDB has a meaningful set of DDL-equivalent operations that need versioning, 
 
 ## Risk
 
-- **Emitter changes may be larger than expected.** The Mongo emitter currently produces minimal `storage.collections` entries. Populating indexes, validators, and collection options requires PSL/TS authoring support for index annotations — this may need coordination with the contract authoring workstream (WS2).
-- **Polymorphic index generation depends on contract shape.** If the contract's polymorphism representation changes during ORM consolidation, the partial index derivation logic may need updating. Mitigated by testing with hand-crafted contracts first.
+- **Authoring dependency for emitter (M2).** Users specify indexes explicitly via PSL/TS authoring annotations (`@@index`, `@@unique`). The Mongo emitter needs this authoring support to populate `storage.collections`. M1 sidesteps this by using hand-crafted contracts, but M2 requires coordination with WS2 (contract authoring) or building the authoring support within this project.
+- **Polymorphic index generation depends on contract shape (M3).** If the contract's polymorphism representation changes during ORM consolidation, the partial index derivation logic may need updating. Mitigated by M3 being sequenced last and testable with hand-crafted contracts.
 
 # References
 
@@ -151,8 +177,4 @@ MongoDB has a meaningful set of DDL-equivalent operations that need versioning, 
 
 # Open Questions
 
-1. **Emitter dependency on authoring.** The Mongo emitter needs to populate `storage.collections` from model definitions. Does this require PSL/TS authoring support for index annotations (e.g. `@@index`, `@@unique` in PSL), or can the emitter derive indexes from other model metadata (e.g. `@id`, `@unique` field-level attributes that already exist)?
-
-2. **Milestone sequencing: SPI first or last?** The spec lists SPI extraction as Milestone 5, but it could also be Milestone 1 (define the interface first, then implement against it). The M6 pattern suggests defining the interface early. Which sequencing do you prefer?
-
-3. **Collection options scope.** Capped collections, time series, and collation are included in the contract schema enrichment. Are all three needed for the proof, or is indexes-only sufficient for the April milestone stop condition?
+None — all resolved during shaping. See conversation summary in commit history.
