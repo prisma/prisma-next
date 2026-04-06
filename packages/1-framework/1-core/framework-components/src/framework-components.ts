@@ -174,7 +174,7 @@ export function checkContractComponentRequirements(
  * (e.g., SQL family contains Postgres, MySQL, SQLite targets).
  *
  * Extended by plane-specific descriptors:
- * - `ControlFamilyDescriptor` - adds `hook` for CLI/tooling operations
+ * - `ControlFamilyDescriptor` - adds `emission` for CLI/tooling operations
  * - `RuntimeFamilyDescriptor` - adds runtime-specific factory methods
  *
  * @template TFamilyId - Literal type for the family identifier (e.g., 'sql', 'document')

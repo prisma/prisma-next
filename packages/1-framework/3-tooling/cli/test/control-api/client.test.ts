@@ -12,7 +12,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import type { TargetFamilyHook } from '@prisma-next/framework-components/emission';
+import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -82,7 +82,7 @@ function createMockComponents() {
     }),
   } as unknown as ControlFamilyInstance<string>;
 
-  const mockHook: TargetFamilyHook = {
+  const mockHook: EmissionSpi = {
     id: 'sql',
     validateTypes: () => {},
     validateStructure: () => {},
@@ -91,7 +91,7 @@ function createMockComponents() {
 
   const mockFamily = {
     familyId: 'sql',
-    hook: mockHook,
+    emission: mockHook,
     create: () => mockFamilyInstance,
     // biome-ignore lint/suspicious/noExplicitAny: required for mock flexibility
   } as unknown as ControlFamilyDescriptor<any, any>;

@@ -1,9 +1,6 @@
 import { canonicalizeContractToObject } from '@prisma-next/contract/hashing';
 import type { Contract } from '@prisma-next/contract/types';
-import type {
-  TargetFamilyHook,
-  ValidationContext,
-} from '@prisma-next/framework-components/emission';
+import type { EmissionSpi, ValidationContext } from '@prisma-next/framework-components/emission';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { format } from 'prettier';
 import type { EmitResult, EmitStackInput } from './emit-types';
@@ -13,7 +10,7 @@ const SCHEMA_VERSION = '1';
 export async function emit(
   contract: Contract,
   stack: EmitStackInput,
-  targetFamily: TargetFamilyHook,
+  targetFamily: EmissionSpi,
 ): Promise<EmitResult> {
   const {
     operationRegistry,

@@ -12,7 +12,7 @@ function createMockStack() {
       familyId: 'sql',
       version: '0.0.1',
       create: (() => ({})) as unknown as ControlFamilyDescriptor<'sql'>['create'],
-      hook: {
+      emission: {
         id: 'sql',
         validateTypes() {},
         validateStructure() {},

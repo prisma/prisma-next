@@ -17,7 +17,7 @@ export default defineConfig({
     id: 'document',
     familyId: 'document',
     manifest: { id: 'document', version: '0.0.1' },
-    hook: mockHook,
+    emission: mockHook,
     // Test fixture - mock family instance for testing
     create: () => ({}) as unknown as ControlFamilyInstance<string>,
   },

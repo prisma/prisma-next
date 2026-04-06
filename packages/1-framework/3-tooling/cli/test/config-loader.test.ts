@@ -33,7 +33,7 @@ describe('config loader', () => {
         familyId: 'sql',
         version: '0.0.1',
         manifest: { packageName: '@prisma-next/sql-family', version: '0.0.1' },
-        hook: mockHook,
+        emission: mockHook,
         create: () => ({
           familyId: 'sql',
           verify: async () => ({ ok: true, summary: 'test', contract: { storageHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),
@@ -81,7 +81,7 @@ describe('config loader', () => {
             familyId: 'sql',
             version: '0.0.1',
             manifest: { packageName: '@prisma-next/sql-family', version: '0.0.1' },
-            hook: mockHook,
+            emission: mockHook,
             validateContract: (contract: unknown) => contract,
             create: () => ({
               familyId: 'sql',
@@ -192,7 +192,7 @@ describe('config loader', () => {
             familyId: 'sql',
             version: '0.0.1',
             manifest: { packageName: '@prisma-next/sql-family', version: '0.0.1' },
-            hook: mockHook,
+            emission: mockHook,
             create: () => ({
               familyId: 'sql',
               verify: async () => ({ ok: true, summary: 'test', contract: { storageHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),

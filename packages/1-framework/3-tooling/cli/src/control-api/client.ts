@@ -572,7 +572,11 @@ class ControlClientImpl implements ControlClient {
         });
       }
 
-      const result = await emitContractArtifacts(enrichedIR, this.stack!, this.options.family.hook);
+      const result = await emitContractArtifacts(
+        enrichedIR,
+        this.stack!,
+        this.options.family.emission,
+      );
 
       onProgress?.({
         action: 'emit',

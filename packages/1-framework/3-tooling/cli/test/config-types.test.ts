@@ -19,7 +19,7 @@ describe('defineConfig', () => {
       id: 'sql',
       familyId: 'sql',
       version: '0.0.1',
-      hook: mockHook,
+      emission: mockHook,
       create: () => ({
         familyId: 'sql',
         validateContract: (contract: unknown) => contract as Contract,

@@ -22,7 +22,7 @@ export interface ValidationContext {
   readonly parameterizedCodecs?: Map<string, ParameterizedCodecDescriptor>;
 }
 
-export interface TargetFamilyHook {
+export interface EmissionSpi {
   readonly id: string;
 
   validateTypes(contract: Contract, ctx: ValidationContext): void;

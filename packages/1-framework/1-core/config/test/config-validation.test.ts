@@ -24,7 +24,7 @@ function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextC
       familyId: 'sql',
       version: '0.0.1',
       manifest: {},
-      hook: mockHook,
+      emission: mockHook,
       create: () => ({ familyId: 'sql' }) as unknown as ControlFamilyInstance<'sql'>,
     },
     target: {
@@ -82,7 +82,7 @@ function createValidRawConfig(overrides: RawConfigOverrides = {}) {
       familyId: 'sql',
       version: '0.0.1',
       manifest: {},
-      hook: {},
+      emission: {},
       create: vi.fn(),
       ...(family as Record<string, unknown> | undefined),
     },
@@ -152,7 +152,7 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ family: { id: 123 } }), 'family.id');
     expectFieldError(createValidRawConfig({ family: { familyId: 123 } }), 'family.familyId');
     expectFieldError(createValidRawConfig({ family: { version: 123 } }), 'family.version');
-    expectFieldError(createValidRawConfig({ family: { hook: undefined } }), 'family.hook');
+    expectFieldError(createValidRawConfig({ family: { emission: undefined } }), 'family.emission');
     expectFieldError(createValidRawConfig({ family: { create: 'invalid' } }), 'family.create');
   });
 
@@ -455,7 +455,7 @@ describe('defineConfig', () => {
         familyId: 'sql',
         version: '0.0.1',
         manifest: {},
-        hook: mockHook,
+        emission: mockHook,
         create: vi.fn(),
       },
     });

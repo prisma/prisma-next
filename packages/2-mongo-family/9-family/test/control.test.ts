@@ -26,7 +26,7 @@ describe('mongoFamilyDescriptor', () => {
     expect(mongoFamilyDescriptor.id).toBe('mongo');
     expect(mongoFamilyDescriptor.familyId).toBe('mongo');
     expect(mongoFamilyDescriptor.version).toBe('0.0.1');
-    expect(mongoFamilyDescriptor.hook).toBeDefined();
+    expect(mongoFamilyDescriptor.emission).toBeDefined();
   });
 });
 

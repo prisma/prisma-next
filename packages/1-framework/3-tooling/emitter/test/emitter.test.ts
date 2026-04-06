@@ -1,6 +1,6 @@
 import type {
+  EmissionSpi,
   GenerateContractTypesOptions,
-  TargetFamilyHook,
   TypeRenderEntry,
   TypesImportSpec,
 } from '@prisma-next/framework-components/emission';
@@ -11,7 +11,7 @@ import type { EmitStackInput } from '../src/exports';
 import { emit } from '../src/exports';
 import { createTestContract } from './utils';
 
-const mockSqlHook: TargetFamilyHook = {
+const mockSqlHook: EmissionSpi = {
   id: 'sql',
   validateTypes: (contract) => {
     const storage = contract.storage as
@@ -369,7 +369,7 @@ describe('emitter', () => {
     });
 
     // Use a mock hook that doesn't validate types to avoid type validation errors
-    const mockHookNoTypeValidation: TargetFamilyHook = {
+    const mockHookNoTypeValidation: EmissionSpi = {
       id: 'sql',
       validateTypes: () => {},
       validateStructure: (contract) => {
@@ -412,7 +412,7 @@ export type Contract = unknown;
 
     let receivedOptions: GenerateContractTypesOptions | undefined;
 
-    const mockHookCapturingOptions: TargetFamilyHook = {
+    const mockHookCapturingOptions: EmissionSpi = {
       id: 'sql',
       validateTypes: () => {},
       validateStructure: () => {},

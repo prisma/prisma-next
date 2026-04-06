@@ -1,5 +1,5 @@
 import type {
-  TargetFamilyHook,
+  EmissionSpi,
   TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
@@ -10,7 +10,7 @@ import type { EmitStackInput } from '../src/exports';
 import { emit } from '../src/exports';
 import { createTestContract } from './utils';
 
-const mockSqlHook: TargetFamilyHook = {
+const mockSqlHook: EmissionSpi = {
   id: 'sql',
   validateTypes: (ir, _ctx: ValidationContext) => {
     const storage = ir.storage as
