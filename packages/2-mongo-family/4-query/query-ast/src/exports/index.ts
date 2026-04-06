@@ -1,3 +1,17 @@
+export type { MongoAggExpr, MongoAggSwitchBranch } from '../aggregation-expressions';
+export {
+  MongoAggAccumulator,
+  MongoAggArrayFilter,
+  MongoAggCond,
+  MongoAggFieldRef,
+  MongoAggLet,
+  MongoAggLiteral,
+  MongoAggMap,
+  MongoAggMergeObjects,
+  MongoAggOperator,
+  MongoAggReduce,
+  MongoAggSwitch,
+} from '../aggregation-expressions';
 export type { AggregatePipelineEntry, AnyMongoCommand } from '../commands';
 export {
   AggregateCommand,
@@ -42,6 +56,8 @@ export {
   MongoUnwindStage,
 } from '../stages';
 export type {
+  MongoAggExprRewriter,
+  MongoAggExprVisitor,
   MongoFilterRewriter,
   MongoFilterVisitor,
   MongoStageVisitor,
