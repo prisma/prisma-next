@@ -256,6 +256,14 @@ describe('MongoAdapter', () => {
       expect(wire.filter).toEqual(filter);
       expect(wire.update).toEqual(update);
     });
+
+    it('passes pipeline-style update (array) through unchanged', () => {
+      const filter = { firstName: { $exists: true } };
+      const update = [{ $set: { fullName: { $concat: ['$firstName', ' ', '$lastName'] } } }];
+      const command = new RawUpdateOneCommand('users', filter, update);
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'updateOne');
+      expect(wire.update).toEqual(update);
+    });
   });
 
   describe('RawUpdateManyCommand', () => {

@@ -1,3 +1,4 @@
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { RawMongoCommand } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../../1-foundation/mongo-contract/test/fixtures/orm-contract';
@@ -19,6 +20,17 @@ describe('mongoRaw', () => {
     it('resolves a different root name', () => {
       const plan = raw.collection('users').aggregate([]).build();
       expect(plan.collection).toBe('users');
+    });
+
+    it('throws when root maps to a missing model', () => {
+      const badContract = {
+        ...ormContractJson,
+        roots: { ghost: 'NoSuchModel' },
+      } as unknown as MongoContract;
+      const badRaw = mongoRaw({ contract: badContract });
+      expect(() => badRaw.collection('ghost')).toThrow(
+        'Unknown model "NoSuchModel" for root "ghost"',
+      );
     });
   });
 
