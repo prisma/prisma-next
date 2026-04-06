@@ -8,6 +8,12 @@ import type {
 import type { Document } from '@prisma-next/mongo-value';
 import { resolveValue } from './resolve-value';
 
+function isExprArray(
+  args: MongoAggExpr | ReadonlyArray<MongoAggExpr>,
+): args is ReadonlyArray<MongoAggExpr> {
+  return Array.isArray(args);
+}
+
 // Biome flags `{ then: ... }` as a thenable object (noThenProperty). Build via Object.fromEntries to avoid.
 const THEN_KEY = 'then';
 
@@ -37,7 +43,7 @@ const aggExprLoweringVisitor: MongoAggExprVisitor<unknown> = {
 
   operator(expr) {
     const { args } = expr;
-    const loweredArgs = Array.isArray(args) ? args.map((a) => lowerAggExpr(a)) : lowerAggExpr(args);
+    const loweredArgs = isExprArray(args) ? args.map((a) => lowerAggExpr(a)) : lowerAggExpr(args);
     return { [expr.op]: loweredArgs };
   },
 
