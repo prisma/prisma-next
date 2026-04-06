@@ -67,96 +67,100 @@ describe('emitter round-trip', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('round-trip with complex IR', async () => {
-    const ir = createTestContract({
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'email' },
-            name: { column: 'name' },
-          },
-          relations: {},
-        },
-        Post: {
-          storage: { table: 'post' },
-          fields: {
-            id: { column: 'id' },
-            title: { column: 'title' },
-            userId: { column: 'user_id' },
-          },
-          relations: {},
-        },
-      },
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              name: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
+  it(
+    'round-trip with complex IR',
+    async () => {
+      const ir = createTestContract({
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: {
+              id: { column: 'id' },
+              email: { column: 'email' },
+              name: { column: 'name' },
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [{ columns: ['email'], name: 'user_email_key' }],
-            indexes: [{ columns: ['name'], name: 'user_name_idx' }],
-            foreignKeys: [],
+            relations: {},
           },
-          post: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              user_id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          Post: {
+            storage: { table: 'post' },
+            fields: {
+              id: { column: 'id' },
+              title: { column: 'title' },
+              userId: { column: 'user_id' },
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                columns: ['user_id'],
-                references: { table: 'user', columns: ['id'] },
-                name: 'post_user_id_fkey',
+            relations: {},
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                name: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [{ columns: ['email'], name: 'user_email_key' }],
+              indexes: [{ columns: ['name'], name: 'user_name_idx' }],
+              foreignKeys: [],
+            },
+            post: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                user_id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  columns: ['user_id'],
+                  references: { table: 'user', columns: ['id'] },
+                  name: 'post_user_id_fkey',
+                },
+              ],
+            },
           },
         },
-      },
-      extensionPacks: {
-        postgres: { version: '0.0.1' },
-      },
-    });
+        extensionPacks: {
+          postgres: { version: '0.0.1' },
+        },
+      });
 
-    const operationRegistry = createOperationRegistry();
-    const codecTypeImports: TypesImportSpec[] = [];
-    const operationTypeImports: TypesImportSpec[] = [];
-    const extensionIds = ['postgres'];
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports,
-      operationTypeImports,
-      extensionIds,
-    };
+      const operationRegistry = createOperationRegistry();
+      const codecTypeImports: TypesImportSpec[] = [];
+      const operationTypeImports: TypesImportSpec[] = [];
+      const extensionIds = ['postgres'];
+      const options: EmitStackInput = {
+        operationRegistry,
+        codecTypeImports,
+        operationTypeImports,
+        extensionIds,
+      };
 
-    const result1 = await emit(ir, options, mockSqlHook);
-    const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
+      const result1 = await emit(ir, options, mockSqlHook);
+      const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    const ir2 = createTestContract({
-      targetFamily: contractJson1['targetFamily'] as string,
-      target: contractJson1['target'] as string,
-      roots: contractJson1['roots'] as Record<string, string>,
-      models: contractJson1['models'] as Record<string, unknown>,
-      storage: contractJson1['storage'] as Record<string, unknown>,
-      extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
-      capabilities:
-        (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
-      meta: (contractJson1['meta'] as Record<string, unknown>) || {},
-    });
+      const ir2 = createTestContract({
+        targetFamily: contractJson1['targetFamily'] as string,
+        target: contractJson1['target'] as string,
+        roots: contractJson1['roots'] as Record<string, string>,
+        models: contractJson1['models'] as Record<string, unknown>,
+        storage: contractJson1['storage'] as Record<string, unknown>,
+        extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
+        capabilities:
+          (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
+        meta: (contractJson1['meta'] as Record<string, unknown>) || {},
+      });
 
-    const result2 = await emit(ir2, options, mockSqlHook);
+      const result2 = await emit(ir2, options, mockSqlHook);
 
-    expect(result1.contractJson).toBe(result2.contractJson);
-    expect(result1.storageHash).toBe(result2.storageHash);
-  });
+      expect(result1.contractJson).toBe(result2.contractJson);
+      expect(result1.storageHash).toBe(result2.storageHash);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('round-trip with nullable fields', async () => {
     const ir = createTestContract({

@@ -5,6 +5,7 @@ import type { CodecTypes as MongoCodecTypes } from '@prisma-next/adapter-mongo/c
 
 import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-contract';
 import type {
+  Contract as ContractType,
   ExecutionHashBase,
   ProfileHashBase,
   StorageHashBase,
@@ -18,17 +19,55 @@ export type ProfileHash =
 
 export type CodecTypes = MongoCodecTypes;
 export type OperationTypes = Record<string, never>;
+
 export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>;
 
-type ContractBase = {
-  readonly target: 'mongo';
-  readonly targetFamily: 'mongo';
-  readonly profileHash: ProfileHash;
-  readonly capabilities: {};
-  readonly extensionPacks: {};
-  readonly meta: {};
-  readonly roots: { readonly tasks: 'Task'; readonly users: 'User' };
-  readonly models: {
+type ContractBase = ContractType<
+  {
+    readonly collections: {
+      readonly tasks: Record<string, never>;
+      readonly users: Record<string, never>;
+    };
+    readonly storageHash: StorageHash;
+  },
+  {
+    readonly Address: {
+      readonly fields: {
+        readonly street: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly city: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly zip: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: Record<string, never>;
+      readonly owner: 'User';
+    };
+    readonly Bug: {
+      readonly fields: {
+        readonly severity: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: { readonly collection: 'tasks' };
+      readonly base: 'Task';
+    };
+    readonly Comment: {
+      readonly fields: {
+        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
+        readonly text: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: Record<string, never>;
+      readonly owner: 'Task';
+    };
+    readonly Feature: {
+      readonly fields: {
+        readonly priority: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly targetRelease: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: { readonly collection: 'tasks' };
+      readonly base: 'Task';
+    };
     readonly Task: {
       readonly fields: {
         readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
@@ -57,23 +96,6 @@ type ContractBase = {
         readonly Feature: { readonly value: 'feature' };
       };
     };
-    readonly Bug: {
-      readonly fields: {
-        readonly severity: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: { readonly collection: 'tasks' };
-      readonly base: 'Task';
-    };
-    readonly Feature: {
-      readonly fields: {
-        readonly priority: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly targetRelease: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: { readonly collection: 'tasks' };
-      readonly base: 'Task';
-    };
     readonly User: {
       readonly fields: {
         readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
@@ -88,34 +110,14 @@ type ContractBase = {
         readonly relations: { readonly addresses: { readonly field: 'addresses' } };
       };
     };
-    readonly Address: {
-      readonly fields: {
-        readonly street: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly city: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly zip: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: Record<string, never>;
-      readonly owner: 'User';
-    };
-    readonly Comment: {
-      readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly text: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: Record<string, never>;
-      readonly owner: 'Task';
-    };
-  };
-  readonly storage: {
-    readonly collections: {
-      readonly tasks: Record<string, never>;
-      readonly users: Record<string, never>;
-    };
-    readonly storageHash: StorageHash;
-  };
+  }
+> & {
+  readonly target: 'mongo';
+  readonly targetFamily: 'mongo';
+  readonly roots: { readonly tasks: 'Task'; readonly users: 'User' };
+  readonly capabilities: {};
+  readonly extensionPacks: {};
+  readonly profileHash: ProfileHash;
 };
 
 export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;
