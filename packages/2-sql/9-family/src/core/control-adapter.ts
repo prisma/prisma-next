@@ -1,7 +1,7 @@
 import type {
   ControlAdapterInstance,
   ControlDriverInstance,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
 

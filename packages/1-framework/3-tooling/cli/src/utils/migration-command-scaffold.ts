@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import { hasMigrations } from '@prisma-next/core-control-plane/types';
+import { hasMigrations } from '@prisma-next/framework-components/control';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import type { Command } from 'commander';
 import { loadConfig } from '../config-loader';

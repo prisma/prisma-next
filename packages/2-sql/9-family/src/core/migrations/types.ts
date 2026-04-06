@@ -3,6 +3,7 @@ import type {
   Contract,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlAdapterDescriptor,
   ControlDriverInstance,
@@ -19,8 +20,7 @@ import type {
   MigrationRunnerSuccessValue,
   OperationContext,
   SchemaIssue,
-} from '@prisma-next/core-control-plane/types';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';

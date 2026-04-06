@@ -3,7 +3,7 @@ import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
   ControlTargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 import {
   extractCodecTypeImports,
   extractOperationTypeImports,

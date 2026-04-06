@@ -1,4 +1,4 @@
-import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
+import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';

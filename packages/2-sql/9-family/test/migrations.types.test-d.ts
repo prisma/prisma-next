@@ -12,7 +12,7 @@ import type {
   MigrationPlanOperation,
   MigrationRunnerFailure,
   MigrationRunnerSuccessValue,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 import { expectTypeOf } from 'vitest';
 import type {
   SqlMigrationPlan,

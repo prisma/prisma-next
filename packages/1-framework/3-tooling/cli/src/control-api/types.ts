@@ -15,7 +15,7 @@ import type {
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 import type { Result } from '@prisma-next/utils/result';
 
 // ============================================================================

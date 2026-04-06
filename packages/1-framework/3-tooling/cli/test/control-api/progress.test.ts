@@ -1,10 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
   TargetMigrationsCapability,
-} from '@prisma-next/core-control-plane/types';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+} from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { executeDbInit } from '../../src/control-api/operations/db-init';
 import type { ControlProgressEvent } from '../../src/control-api/types';

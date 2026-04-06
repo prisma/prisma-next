@@ -4,7 +4,7 @@ import type {
   SchemaVerificationNode,
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import {

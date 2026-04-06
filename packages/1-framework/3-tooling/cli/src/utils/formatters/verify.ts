@@ -5,7 +5,7 @@ import type {
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { GlobalFlags } from '../global-flags';

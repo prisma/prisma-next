@@ -1,15 +1,15 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type {
-  ControlTargetInstance,
-  MigrationPlanner,
-  MigrationRunner,
-} from '@prisma-next/core-control-plane/types';
-import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR, extractCodecControlHooks } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import type {
+  ControlTargetInstance,
+  MigrationPlanner,
+  MigrationRunner,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';

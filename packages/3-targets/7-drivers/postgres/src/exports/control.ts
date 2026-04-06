@@ -2,7 +2,7 @@ import { errorRuntime } from '@prisma-next/core-control-plane/errors';
 import type {
   ControlDriverDescriptor,
   ControlDriverInstance,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';

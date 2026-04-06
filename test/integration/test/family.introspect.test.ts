@@ -1,7 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';

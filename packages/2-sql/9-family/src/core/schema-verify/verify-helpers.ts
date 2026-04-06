@@ -3,7 +3,10 @@
  * These functions verify schema IR against contract requirements.
  */
 
-import type { SchemaIssue, SchemaVerificationNode } from '@prisma-next/core-control-plane/types';
+import type {
+  SchemaIssue,
+  SchemaVerificationNode,
+} from '@prisma-next/framework-components/control';
 import type {
   ForeignKey,
   Index,

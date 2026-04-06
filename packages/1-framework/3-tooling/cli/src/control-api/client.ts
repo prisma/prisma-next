@@ -1,17 +1,20 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import { emit as emitContractArtifacts } from '@prisma-next/core-control-plane/emission';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
+  ControlStack,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
-import { hasMigrations, hasSchemaView } from '@prisma-next/core-control-plane/types';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { ControlStack } from '@prisma-next/framework-components/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+} from '@prisma-next/framework-components/control';
+import {
+  createControlStack,
+  hasMigrations,
+  hasSchemaView,
+} from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';

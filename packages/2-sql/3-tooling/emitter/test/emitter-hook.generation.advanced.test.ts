@@ -1,10 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { NormalizedTypeRenderer } from '@prisma-next/framework-components/components';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
   ControlTargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
-import type { NormalizedTypeRenderer } from '@prisma-next/framework-components/components';
+} from '@prisma-next/framework-components/control';
 import {
   extractCodecTypeImports,
   extractOperationTypeImports,

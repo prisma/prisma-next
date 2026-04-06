@@ -1,5 +1,5 @@
 import { defineConfig } from '@prisma-next/cli/config-types';
-import type { ControlFamilyInstance } from '@prisma-next/core-control-plane/types';
+import type { ControlFamilyInstance } from '@prisma-next/framework-components/control';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import { contract } from './invalid-contract-document';
 

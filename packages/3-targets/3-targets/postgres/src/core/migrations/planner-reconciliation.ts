@@ -1,12 +1,12 @@
 import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
-import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
   MigrationOperationPolicy,
   SqlMigrationPlanOperation,
   SqlPlannerConflict,
 } from '@prisma-next/family-sql/control';
+import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type {
   SqlStorage,
   StorageColumn,

@@ -1,5 +1,5 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
-import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
+import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import { type } from 'arktype';
 
 const MetaSchema = type({ '[string]': 'unknown' });

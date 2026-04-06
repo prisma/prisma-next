@@ -1,4 +1,4 @@
-import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
+import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { extractSqlDdl } from '../../src/control-api/operations/extract-sql-ddl';
 

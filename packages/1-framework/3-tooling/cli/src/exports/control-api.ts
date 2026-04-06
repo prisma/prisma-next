@@ -14,7 +14,7 @@ export type {
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 // Client factory
 export { createControlClient } from '../control-api/client';
 

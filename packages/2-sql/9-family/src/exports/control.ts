@@ -10,7 +10,7 @@ export type {
   MigrationPlannerResult,
   MigrationPlanOperation,
   TargetMigrationsCapability,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 export { assembleAuthoringContributions } from '@prisma-next/framework-components/control';
 export type { SqlControlDescriptorWithContributions } from '../core/assembly';
 export {
