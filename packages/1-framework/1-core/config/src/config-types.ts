@@ -1,5 +1,3 @@
-import { type } from 'arktype';
-import type { ContractSourceProvider } from './contract-source-types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -7,7 +5,9 @@ import type {
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
-} from './types';
+} from '@prisma-next/framework-components/control';
+import { type } from 'arktype';
+import type { ContractSourceProvider } from './contract-source-types';
 
 /**
  * Type alias for CLI driver instances.
