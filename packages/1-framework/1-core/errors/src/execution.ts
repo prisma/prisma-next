@@ -32,12 +32,14 @@ export function errorHashMismatch(options?: {
     domain: 'RUN',
     why: options?.why ?? 'Contract hash does not match database marker',
     fix: 'Migrate database or re-sign if intentional',
-    ...((options?.expected || options?.actual) && {
-      meta: {
-        ...ifDefined('expected', options?.expected),
-        ...ifDefined('actual', options?.actual),
-      },
-    }),
+    ...(options?.expected !== undefined || options?.actual !== undefined
+      ? {
+          meta: {
+            ...ifDefined('expected', options?.expected),
+            ...ifDefined('actual', options?.actual),
+          },
+        }
+      : {}),
   });
 }
 
