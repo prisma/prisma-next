@@ -1,73 +1,176 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
-import { interpretPslDocumentToSqlContract } from '../src/interpreter';
-import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
+import {
+  type InterpretPslDocumentToSqlContractInput,
+  interpretPslDocumentToSqlContract,
+} from '../src/interpreter';
+import {
+  createBuiltinLikeControlMutationDefaults,
+  postgresScalarTypeDescriptors,
+  postgresTarget,
+} from './fixtures';
 
 const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
 } as const;
 
+const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
+
 describe('interpretPslDocumentToSqlContract diagnostics', () => {
-  it('maps pgvector attributes on named types and fields to vector descriptor shape', () => {
-    const namedTypeDocument = parsePslDocument({
+  it('returns diagnostics when target context is missing', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    // Intentionally bypasses strict input typing to verify missing target diagnostics.
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    } as unknown as InterpretPslDocumentToSqlContractInput);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_TARGET_CONTEXT_REQUIRED',
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics for unsupported named types, field lists, missing keys, and invalid relation targets', () => {
+    const document = parsePslDocument({
       schema: `types {
-  Embedding1536 = Bytes @pgvector.column(length: 1536)
+  DisplayName = String @db.VarChar(191)
+  Weird = Unsupported
 }
 
-model Document {
+model Team {
+  name String
+}
+
+model User {
   id Int @id
-  embedding Embedding1536
+  tags String[]
+  ghost Ghost @relation(fields: [ghostId], references: [id])
+  ghostId Int
 }
 `,
       sourceId: 'schema.prisma',
     });
 
-    const namedTypeResult = interpretPslDocumentToSqlContract({
+    const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document: namedTypeDocument,
-      composedExtensionPacks: ['pgvector'],
-    });
-    expect(namedTypeResult.ok).toBe(true);
-    if (!namedTypeResult.ok) return;
-    expect(namedTypeResult.value.storage).toMatchObject({
-      types: {
-        Embedding1536: {
-          codecId: 'pg/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
-        },
-      },
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
     });
 
-    const fieldDocument = parsePslDocument({
-      schema: `model Document {
-  id Int @id
-  embedding Bytes @pgvector.column(length: 1536)
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+      expect.arrayContaining([
+        'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
+        'PSL_MISSING_PRIMARY_KEY',
+        'PSL_UNSUPPORTED_FIELD_LIST',
+        'PSL_UNSUPPORTED_FIELD_TYPE',
+        'PSL_INVALID_RELATION_TARGET',
+      ]),
+    );
+  });
+
+  it('returns diagnostics when @map and @@map arguments are not quoted string literals', () => {
+    const document = parsePslDocument({
+      schema: `model Team {
+  id Int @id @map(team_id)
+  @@map(org_team)
 }
 `,
       sourceId: 'schema.prisma',
     });
-    const fieldResult = interpretPslDocumentToSqlContract({
+
+    const result = interpretPslDocumentToSqlContract({
       ...baseInput,
-      document: fieldDocument,
-      composedExtensionPacks: ['pgvector'],
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
     });
-    expect(fieldResult.ok).toBe(true);
-    if (!fieldResult.ok) return;
-    expect(fieldResult.value.storage).toMatchObject({
-      tables: {
-        document: {
-          columns: {
-            embedding: {
-              codecId: 'pg/vector@1',
-              nativeType: 'vector',
-              typeParams: { length: 1536 },
-            },
-          },
-        },
-      },
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            '@map requires a positional quoted string literal argument',
+          ),
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics for unsupported model attributes', () => {
+    const document = parsePslDocument({
+      schema: `model Team {
+  id Int @id
+  @@unsupported([id])
+}
+`,
+      sourceId: 'schema.prisma',
     });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
+          message: 'Model "Team" uses unsupported attribute "@@unsupported"',
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics for model attributes with unrecognized extension namespace', () => {
+    const document = parsePslDocument({
+      schema: `model Team {
+  id Int @id
+  @@pgvector.index(length: 3)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+          message: expect.stringContaining('uses unrecognized namespace "pgvector"'),
+        }),
+      ]),
+    );
   });
 
   it('returns diagnostics when namespace is unrecognized', () => {
