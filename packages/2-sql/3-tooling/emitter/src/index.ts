@@ -353,8 +353,8 @@ export const sqlTargetFamilyHook = {
       const columns: string[] = [];
       for (const [colName, col] of Object.entries(table.columns)) {
         const nullable = col.nullable ? 'true' : 'false';
-        const nativeType = `'${col.nativeType}'`;
-        const codecId = `'${col.codecId}'`;
+        const nativeType = this.serializeValue(col.nativeType);
+        const codecId = this.serializeValue(col.codecId);
         const defaultSpec = col.default
           ? col.default.kind === 'literal'
             ? `; readonly default: { readonly kind: 'literal'; readonly value: DefaultLiteralValue<${codecId}, ${this.serializeValue(
@@ -372,15 +372,17 @@ export const sqlTargetFamilyHook = {
       const tableParts: string[] = [`columns: { ${columns.join('; ')} }`];
 
       if (table.primaryKey) {
-        const pkCols = table.primaryKey.columns.map((c) => `'${c}'`).join(', ');
-        const pkName = table.primaryKey.name ? `; readonly name: '${table.primaryKey.name}'` : '';
+        const pkCols = table.primaryKey.columns.map((c) => this.serializeValue(c)).join(', ');
+        const pkName = table.primaryKey.name
+          ? `; readonly name: ${this.serializeValue(table.primaryKey.name)}`
+          : '';
         tableParts.push(`primaryKey: { readonly columns: readonly [${pkCols}]${pkName} }`);
       }
 
       const uniques = table.uniques
         .map((u) => {
-          const cols = u.columns.map((c: string) => `'${c}'`).join(', ');
-          const name = u.name ? `; readonly name: '${u.name}'` : '';
+          const cols = u.columns.map((c: string) => this.serializeValue(c)).join(', ');
+          const name = u.name ? `; readonly name: ${this.serializeValue(u.name)}` : '';
           return `{ readonly columns: readonly [${cols}]${name} }`;
         })
         .join(', ');
@@ -388,8 +390,8 @@ export const sqlTargetFamilyHook = {
 
       const indexes = table.indexes
         .map((i) => {
-          const cols = i.columns.map((c: string) => `'${c}'`).join(', ');
-          const name = i.name ? `; readonly name: '${i.name}'` : '';
+          const cols = i.columns.map((c: string) => this.serializeValue(c)).join(', ');
+          const name = i.name ? `; readonly name: ${this.serializeValue(i.name)}` : '';
           const using =
             i.using !== undefined ? `; readonly using: ${this.serializeValue(i.using)}` : '';
           const config =
@@ -401,10 +403,12 @@ export const sqlTargetFamilyHook = {
 
       const fks = table.foreignKeys
         .map((fk) => {
-          const cols = fk.columns.map((c: string) => `'${c}'`).join(', ');
-          const refCols = fk.references.columns.map((c: string) => `'${c}'`).join(', ');
-          const name = fk.name ? `; readonly name: '${fk.name}'` : '';
-          return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: '${fk.references.table}'; readonly columns: readonly [${refCols}] }${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
+          const cols = fk.columns.map((c: string) => this.serializeValue(c)).join(', ');
+          const refCols = fk.references.columns
+            .map((c: string) => this.serializeValue(c))
+            .join(', ');
+          const name = fk.name ? `; readonly name: ${this.serializeValue(fk.name)}` : '';
+          return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: ${this.serializeValue(fk.references.table)}; readonly columns: readonly [${refCols}] }${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
         })
         .join(', ');
       tableParts.push(`foreignKeys: readonly [${fks}]`);
@@ -428,8 +432,8 @@ export const sqlTargetFamilyHook = {
 
     const typeEntries: string[] = [];
     for (const [typeName, typeInstance] of Object.entries(types)) {
-      const codecId = `'${typeInstance.codecId}'`;
-      const nativeType = `'${typeInstance.nativeType}'`;
+      const codecId = this.serializeValue(typeInstance.codecId);
+      const nativeType = this.serializeValue(typeInstance.nativeType);
       const typeParamsStr = this.serializeTypeParamsLiteral(typeInstance.typeParams);
       typeEntries.push(
         `readonly ${typeName}: { readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
