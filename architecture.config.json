@@ -289,7 +289,13 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/2-mongo-family/9-family/**",
+      "glob": "packages/2-mongo-family/9-family/src/core/**",
+      "domain": "mongo",
+      "layer": "family",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/2-mongo-family/9-family/src/exports/control.ts",
       "domain": "mongo",
       "layer": "family",
       "plane": "migration"
@@ -307,7 +313,19 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/3-mongo-target/2-mongo-adapter/src/exports/**",
+      "glob": "packages/3-mongo-target/2-mongo-adapter/src/exports/control.ts",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/3-mongo-target/2-mongo-adapter/src/exports/index.ts",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-mongo-target/2-mongo-adapter/src/exports/codec-types.ts",
       "domain": "targets",
       "layer": "adapters",
       "plane": "shared"
