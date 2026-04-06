@@ -1,12 +1,18 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
-import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
+import {
+  createBuiltinLikeControlMutationDefaults,
+  postgresScalarTypeDescriptors,
+  postgresTarget,
+} from './fixtures';
 
 const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
 } as const;
+
+const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
 
 describe('interpretPslDocumentToSqlContract relations', () => {
   it('accepts relation navigation list fields and emits relation metadata for both sides', () => {
@@ -252,5 +258,146 @@ model Member {
     const fks = memberTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({ name: 'team_member_team_ref_fkey' });
+  });
+
+  it('returns diagnostics for unsupported referential action tokens', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  author User @relation(fields: [userId], references: [id], onDelete: WeirdAction)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_REFERENTIAL_ACTION',
+          sourceId: 'schema.prisma',
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics when relation fields reference unknown local fields', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [missingUserId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            'Relation field "Post.user" references unknown field "Post.missingUserId"',
+          ),
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics when relation references target unknown fields', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [missingId])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            'Relation field "Post.user" references unknown field "User.missingId"',
+          ),
+        }),
+      ]),
+    );
+  });
+
+  it('returns diagnostics when relation omits required fields argument', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: 'Relation field "Post.user" requires fields and references arguments',
+        }),
+      ]),
+    );
   });
 });
