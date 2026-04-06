@@ -456,6 +456,7 @@ type ContractBase = ContractType<
   }
 > & {
   readonly target: 'postgres';
+  readonly targetFamily: 'sql';
   readonly roots: {
     readonly user: 'User';
     readonly post: 'Post';

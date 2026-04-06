@@ -302,7 +302,11 @@ export const sqlEmission = {
 
   generateModelsType(contract: Contract, _options?: GenerateContractTypesOptions): string {
     const storage = contract.storage as unknown as SqlStorage;
-    const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
+    const models = contract.models as Record<string, ContractModel<SqlModelStorage>> | undefined;
+
+    if (!models || Object.keys(models).length === 0) {
+      return 'Record<string, never>';
+    }
 
     const modelTypes: string[] = [];
     for (const [modelName, model] of Object.entries(models).sort(([a], [b]) =>
