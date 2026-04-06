@@ -36,7 +36,6 @@
     "arktype": "^2.0.0"
   },
   "devDependencies": {
-    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",

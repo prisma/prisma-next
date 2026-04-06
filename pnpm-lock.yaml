@@ -1503,9 +1503,6 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../9-family
-      '@prisma-next/framework-components':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/ids':
         specifier: workspace:*
         version: link:../../../1-framework/2-authoring/ids
@@ -2104,9 +2101,6 @@ importers:
         specifier: ^2.0.0
         version: 2.1.29
     devDependencies:
-      '@prisma-next/framework-components':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
