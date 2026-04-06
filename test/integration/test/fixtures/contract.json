@@ -3,6 +3,9 @@
   "target": "postgres",
   "targetFamily": "sql",
   "profileHash": "sha256:test-profile",
+  "roots": {
+    "user": "User"
+  },
   "models": {
     "User": {
       "storage": {
@@ -47,5 +50,7 @@
     "postgres": {
       "returning": true
     }
-  }
+  },
+  "extensionPacks": {},
+  "meta": {}
 }

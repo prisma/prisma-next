@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:b0044f4dd52fea13b55d243c6c3afaf04728f81d02bbadb8ae20671bbbd4fbec'>;
+  StorageHashBase<'sha256:16af8b9b7863e5312d0bea826c6e7391d5645a8a2c6a365aaf25f51fdcde7391'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:2235649761c54029958343dab7aba1b99c3105aac0fbd3a9d9ecdddf89af6ac9'>;
+  ExecutionHashBase<'sha256:4d09909b2e09a240919c201ce4a5e63c3a2ec70515932e145dccca82936d8be5'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9a0a521320d8ae0aff68ad41e0e8bad9d289f8231a0f3d79fca76cdd4051c2bf'>;
+  ProfileHashBase<'sha256:03c90a412dcfe182a475d25eae8cbf5c56fba67009defe8713eaf0b7fbd66b13'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -407,7 +407,7 @@ type ContractBase = ContractShape<
         },
       ];
     };
-    readonly executionHash: 'sha256:2235649761c54029958343dab7aba1b99c3105aac0fbd3a9d9ecdddf89af6ac9';
+    readonly executionHash: 'sha256:4d09909b2e09a240919c201ce4a5e63c3a2ec70515932e145dccca82936d8be5';
   };
   readonly profileHash: ProfileHash;
 };
