@@ -1,5 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
 import type { Runtime } from '../src/exports';

@@ -1,7 +1,9 @@
 import type { Contract, ExecutionPlan, ResultType } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
+import {
+  instantiateExecutionStack,
+  type RuntimeDriverDescriptor,
+} from '@prisma-next/framework-components/execution';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';

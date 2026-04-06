@@ -1,4 +1,4 @@
-import type { RuntimeTargetInstance } from '@prisma-next/core-execution-plane/types';
+import type { RuntimeTargetInstance } from '@prisma-next/framework-components/execution';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlRuntimeTargetDescriptor } from '@prisma-next/sql-runtime';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';

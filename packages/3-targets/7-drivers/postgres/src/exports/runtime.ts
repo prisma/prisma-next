@@ -1,7 +1,7 @@
 import type {
   RuntimeDriverDescriptor,
   RuntimeDriverInstance,
-} from '@prisma-next/core-execution-plane/types';
+} from '@prisma-next/framework-components/execution';
 import type {
   SqlConnection,
   SqlDriver,

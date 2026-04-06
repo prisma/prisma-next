@@ -1,4 +1,4 @@
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { budgets, createRuntime, type Plugin, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
 import { context, stack } from './context';

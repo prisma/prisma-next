@@ -1,7 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type {

@@ -17,7 +17,6 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
-    "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/runtime-executor": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",

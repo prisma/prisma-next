@@ -1,4 +1,4 @@
-import type { RuntimeFamilyInstance } from '@prisma-next/core-execution-plane/types';
+import type { RuntimeFamilyInstance } from '@prisma-next/framework-components/execution';
 
 /**
  * SQL execution-plane family instance interface.

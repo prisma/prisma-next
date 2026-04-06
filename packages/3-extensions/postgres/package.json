@@ -17,8 +17,8 @@
   "dependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-builder": "workspace:*",
     "@prisma-next/sql-orm-client": "workspace:*",
