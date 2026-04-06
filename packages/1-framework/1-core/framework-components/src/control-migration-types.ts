@@ -10,9 +10,9 @@
  */
 
 import type { Contract } from '@prisma-next/contract/types';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { Result } from '@prisma-next/utils/result';
 import type { ControlDriverInstance, ControlFamilyInstance } from './control-instances';
+import type { TargetBoundComponentDescriptor } from './framework-components';
 
 // ============================================================================
 // Operation Classes and Policy
