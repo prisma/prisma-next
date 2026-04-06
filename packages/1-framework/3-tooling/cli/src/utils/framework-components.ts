@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { ControlPlaneStack } from '@prisma-next/core-control-plane/types';
+import type { ControlStack } from '@prisma-next/core-control-plane/types';
 import {
   checkContractComponentRequirements,
   type TargetBoundComponentDescriptor,
@@ -142,7 +142,7 @@ export function assertContractRequirementsSatisfied<
   stack,
 }: {
   readonly contract: Pick<Contract, 'targetFamily' | 'target' | 'extensionPacks'>;
-  readonly stack: ControlPlaneStack<TFamilyId, TTargetId>;
+  readonly stack: ControlStack<TFamilyId, TTargetId>;
 }): void {
   const providedComponentIds = new Set<string>([
     stack.target.id,

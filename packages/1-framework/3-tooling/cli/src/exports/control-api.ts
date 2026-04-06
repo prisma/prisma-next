@@ -10,7 +10,7 @@
 
 // Re-export core control plane types for consumer convenience
 export type {
-  ControlPlaneStack,
+  ControlStack,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,

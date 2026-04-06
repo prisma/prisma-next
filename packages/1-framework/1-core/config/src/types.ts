@@ -7,7 +7,6 @@ export type {
   ControlExtensionInstance,
   ControlFamilyDescriptor,
   ControlFamilyInstance,
-  ControlPlaneStack,
   ControlTargetDescriptor,
   ControlTargetInstance,
   EmitContractResult,

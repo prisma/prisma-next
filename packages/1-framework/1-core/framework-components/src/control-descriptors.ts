@@ -15,15 +15,6 @@ import type {
   TargetDescriptor,
 } from './framework-components';
 
-/**
- * @deprecated Use ControlStack from './control-stack' instead.
- * Retained as a backward-compat alias — structurally a subset of ControlStack.
- */
-export type ControlPlaneStack<TFamilyId extends string, TTargetId extends string> = Pick<
-  ControlStack<TFamilyId, TTargetId>,
-  'target' | 'adapter' | 'driver' | 'extensionPacks'
->;
-
 export interface ControlFamilyDescriptor<
   TFamilyId extends string,
   TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,

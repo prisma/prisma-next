@@ -1,11 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/core-control-plane/errors';
-import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
-import type {
-  ControlAdapterDescriptor,
-  ControlExtensionDescriptor,
-  ControlTargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
+import {
+  type ControlAdapterDescriptor,
+  type ControlExtensionDescriptor,
+  type ControlFamilyDescriptor,
+  type ControlTargetDescriptor,
+  createControlStack,
+} from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import {
   assertContractRequirementsSatisfied,
@@ -149,6 +150,13 @@ describe('assertContractRequirementsSatisfied', () => {
     },
   };
 
+  const family = {
+    kind: 'family',
+    id: 'sql',
+    version: '0.0.1',
+    familyId: 'sql',
+  } as unknown as ControlFamilyDescriptor<'sql'>;
+
   const target = {
     kind: 'target',
     id: 'postgres',
@@ -175,7 +183,7 @@ describe('assertContractRequirementsSatisfied', () => {
 
   const createStack = (
     extensionPacks: readonly ControlExtensionDescriptor<'sql', 'postgres'>[] = [],
-  ) => createControlPlaneStack({ target, adapter, extensionPacks });
+  ) => createControlStack({ family, target, adapter, extensionPacks });
 
   it('passes when target and extension packs are satisfied', () => {
     expect(() =>
