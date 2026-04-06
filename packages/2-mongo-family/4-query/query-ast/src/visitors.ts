@@ -1,4 +1,18 @@
 import type {
+  MongoAggAccumulator,
+  MongoAggArrayFilter,
+  MongoAggCond,
+  MongoAggExpr,
+  MongoAggFieldRef,
+  MongoAggLet,
+  MongoAggLiteral,
+  MongoAggMap,
+  MongoAggMergeObjects,
+  MongoAggOperator,
+  MongoAggReduce,
+  MongoAggSwitch,
+} from './aggregation-expressions';
+import type {
   MongoAndExpr,
   MongoExistsExpr,
   MongoFieldFilter,
@@ -15,6 +29,34 @@ import type {
   MongoSortStage,
   MongoUnwindStage,
 } from './stages';
+
+export interface MongoAggExprVisitor<R> {
+  fieldRef(expr: MongoAggFieldRef): R;
+  literal(expr: MongoAggLiteral): R;
+  operator(expr: MongoAggOperator): R;
+  accumulator(expr: MongoAggAccumulator): R;
+  cond(expr: MongoAggCond): R;
+  switch_(expr: MongoAggSwitch): R;
+  filter(expr: MongoAggArrayFilter): R;
+  map(expr: MongoAggMap): R;
+  reduce(expr: MongoAggReduce): R;
+  let_(expr: MongoAggLet): R;
+  mergeObjects(expr: MongoAggMergeObjects): R;
+}
+
+export interface MongoAggExprRewriter {
+  fieldRef?(expr: MongoAggFieldRef): MongoAggExpr;
+  literal?(expr: MongoAggLiteral): MongoAggExpr;
+  operator?(expr: MongoAggOperator): MongoAggExpr;
+  accumulator?(expr: MongoAggAccumulator): MongoAggExpr;
+  cond?(expr: MongoAggCond): MongoAggExpr;
+  switch_?(expr: MongoAggSwitch): MongoAggExpr;
+  filter?(expr: MongoAggArrayFilter): MongoAggExpr;
+  map?(expr: MongoAggMap): MongoAggExpr;
+  reduce?(expr: MongoAggReduce): MongoAggExpr;
+  let_?(expr: MongoAggLet): MongoAggExpr;
+  mergeObjects?(expr: MongoAggMergeObjects): MongoAggExpr;
+}
 
 export interface MongoFilterVisitor<R> {
   field(expr: MongoFieldFilter): R;
