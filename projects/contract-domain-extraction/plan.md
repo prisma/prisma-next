@@ -2,7 +2,7 @@
 
 ## Summary
 
-Restructure the emitted contract to implement ADR 172's domain-storage separation: extract a shared domain-level representation into the unified `Contract<TStorage, TModels>` type, update the SQL emitter to produce the new JSON layout, and bridge `validateContract()` so no consumer code changes until M2. Build a Mongo emitter hook (M3) that forces out shared domain-level generation utilities, unify the contract representation (M5), then migrate the SQL hook onto those shared utilities and narrow the hook interface (M6). This is the foundational step toward cross-family consumer code (ORM, validation, tooling). Success means the contract carries a self-describing domain level (`roots`, `models` with typed fields and relations) distinct from family-specific storage, with a single `Contract` type parameterized by storage that both families share.
+Restructure the emitted contract to implement ADR 172's domain-storage separation: extract a shared domain-level representation into the unified `Contract<TStorage, TModels>` type, update the SQL emitter to produce the new JSON layout, and bridge `validateContract()` so no consumer code changes until M2. Build a Mongo emitter (M3) that forces out shared domain-level generation utilities, unify the contract representation (M5), then migrate the SQL emitter onto those shared utilities and replace the monolithic `TargetFamilyHook` with a focused `EmissionSpi` on the family descriptor (M6). This is the foundational step toward cross-family consumer code (ORM, validation, tooling). Success means the contract carries a self-describing domain level (`roots`, `models` with typed fields and relations) distinct from family-specific storage, with a single `Contract` type parameterized by storage that both families share.
 
 **Spec:** [projects/contract-domain-extraction/spec.md](spec.md)
 
@@ -170,75 +170,64 @@ Wire SQL validation through the framework's `validateContract`, update runtime c
 
 ### Milestone 6: SQL emitter migration to shared generation
 
-Migrates the SQL emitter hook onto the shared domain-level generation utilities established in M3, narrows the `TargetFamilyHook` interface, and moves `.d.ts` template ownership into the framework. Done as a single pass because M5 delivered `Contract<TStorage, TModels>` and both families now emit domain-level `{ codecId, nullable }` model fields — the model fields divergence that previously required a two-phase approach has been resolved. See [detailed plan](plans/6-sql-emitter-shared-generation-plan.md).
+Migrates the SQL emitter onto the shared domain-level generation utilities established in M3, replaces the monolithic `TargetFamilyHook` with a focused `EmissionSpi` on the family descriptor, and moves `.d.ts` template ownership into the framework. Done as a single pass because M5 delivered `Contract<TStorage, TModels>` and both families now emit domain-level `{ codecId, nullable }` model fields. See [detailed plan](plans/6-sql-emitter-shared-generation-plan.md).
 
 **Context (post-M5):**
 - `Contract<TStorage, TModels>` exists at the framework level (`@prisma-next/contract/types`)
 - `ContractIR` and `ContractBase` are gone — `emit()` accepts `Contract` directly
-- Both SQL and Mongo hooks emit `{ codecId, nullable }` for model fields (M5 task 5.B2 aligned the SQL emitter)
-- `TargetFamilyHook` lives at `@prisma-next/framework-components/emission` and takes `Contract`
-- The SQL hook still has a monolithic `generateContractTypes()` with duplicated serialization, import handling, hash generation, roots, and relation generation
+- Both families emit `{ codecId, nullable }` for model fields (M5 task 5.B2 aligned the SQL emitter)
+- `TargetFamilyHook` lives at `@prisma-next/framework-components/emission` — bundles validation and type generation behind a vague "hook" name
+- The SQL hook has a monolithic `generateContractTypes()` with duplicated serialization, import handling, hash generation, roots, and relation generation
 - The Mongo hook already uses all shared utilities from `@prisma-next/emitter/domain-type-generation`
 
-**Design:** The framework owns a generic `.d.ts` template parameterized by `Contract<TStorage, TModels>`. Each family hook provides only storage-specific type definitions. The emitted template structure becomes:
-
-```typescript
-import type { Contract as ContractType } from '@prisma-next/contract/types';
-
-type Storage = ${hook.generateStorageType(...)};    // family-specific
-type Models = {                                     // framework-orchestrated
-  readonly User: {
-    readonly fields: ...;                            // shared: generateModelFieldsType
-    readonly relations: ...;                         // shared: generateModelRelationsType
-    readonly storage: ${hook.generateModelStorageType(...)};  // family-specific
-  };
-};
-
-export type Contract = ContractType<Storage, Models>;
-```
-
-The framework generates domain-level parts (fields, relations, roots) using shared utilities and calls the hook for storage-specific parts. Each family controls its storage type definitions, and additional type parameters can be added to `Contract<...>` without changing the hook interface.
+**Design:**
+- **`TargetFamilyHook` → `EmissionSpi`**: A focused interface for family-specific emission, without validation methods. Composed as `readonly emission: EmissionSpi` on `ControlFamilyDescriptor` (namespaced, extensible for future SPIs).
+- **Framework owns the template**: `generateContractDts()` assembles the full `.d.ts` from shared utilities and `EmissionSpi` callbacks. Each family provides only storage-specific type fragments.
+- **Validation removed from emission**: `emit()` receives a trusted `Contract`. Validation belongs upstream at contract construction, not in the emission pipeline.
 
 **Tasks:**
 
 #### 6.1 Extend shared domain-level generation utilities
 
 - **6.1.1** Extract `generateModelFieldsType()` into `@prisma-next/emitter/domain-type-generation`. Both SQL and Mongo now emit `{ codecId, nullable }` for model fields — the function currently exists only as a local helper in the Mongo hook. Move it to the shared module.
-- **6.1.2** Add `generateModelsType()` to the shared module: iterates models (sorted by name), calls `generateModelFieldsType()` for fields, `generateModelRelationsType()` for relations, and a hook-provided callback for per-model storage. Handles optional `owner`, `discriminator`, `variants`, `base` properties. This replaces the duplicated `generateModelsType()` in both hooks.
-- **6.1.3** Add `generateContractDts()` to the shared module (or `emit.ts`): assembles the full `.d.ts` template from shared parts (banner, imports, hash aliases, codec/operation type intersections) and hook-provided parts (storage type, model storage types, family-specific imports and type aliases, contract wrapper expression). This is the function that `emit()` will call instead of `targetFamily.generateContractTypes()`.
+- **6.1.2** Add `generateModelsType()` to the shared module: iterates models (sorted by name), calls `generateModelFieldsType()` for fields, `generateModelRelationsType()` for relations, and a family-provided callback for per-model storage. Handles optional `owner`, `discriminator`, `variants`, `base` properties. Replaces the duplicated `generateModelsType()` in both emitters.
 
-#### 6.2 Narrow the `TargetFamilyHook` interface
+#### 6.2 Define `EmissionSpi` and update `ControlFamilyDescriptor`
 
-- **6.2.1** Update `TargetFamilyHook` in `@prisma-next/framework-components/emission`: remove `generateContractTypes()`. Add family-specific generation callbacks:
-  - `generateStorageType(contract, storageHashTypeName): string` — top-level storage type definition
-  - `generateModelStorageType(modelName, model): string` — per-model storage type block
-  - `getFamilyImports(): { types: ImportSpec[]; values?: ImportSpec[] }` — family-specific import lines
-  - `getFamilyTypeAliases(codecTypes, operationTypes, queryOperationTypes): string` — family-specific type aliases (e.g., SQL's `DefaultLiteralValue`, `QueryOperationTypes`, `LaneCodecTypes`; empty for Mongo)
-  - `getContractWrapper(contractBaseName, typeMapsName): string` — the family-specific wrapper expression (e.g., `ContractWithTypeMaps<${contractBaseName}, ${typeMapsName}>` for SQL, `MongoContractWithTypeMaps<${contractBaseName}, ${typeMapsName}>` for Mongo)
-  - `getTypeMapsExpression(codecTypesName, operationTypesName, queryOperationTypesName?): string` — how the family defines `TypeMaps` (SQL: `TypeMapsType<C, O, Q>`, Mongo: `MongoTypeMaps<C, O>`)
-- **6.2.2** Keep `validateTypes()` and `validateStructure()` unchanged on the hook.
+- **6.2.1** Define `EmissionSpi` in `@prisma-next/framework-components/emission`. Initially carries the same `generateContractTypes()` signature as the old `TargetFamilyHook` — extract the SPI, don't restructure yet.
+- **6.2.2** Update `ControlFamilyDescriptor`: replace `readonly hook: TargetFamilyHook` with `readonly emission: EmissionSpi`. Update all call sites (`family.hook` → `family.emission`).
+- **6.2.3** Remove `TargetFamilyHook`. Remove `validateTypes` and `validateStructure` from the emission SPI (validation is not an emission concern).
+- **6.2.4** Update `emit()` to accept `EmissionSpi` instead of `TargetFamilyHook`.
 
-#### 6.3 Migrate SQL hook
+#### 6.3 Framework takes over template — narrow `EmissionSpi`
 
-- **6.3.1** Replace the SQL hook's `generateContractTypes()`, `generateModelsType()`, `generateRootsType()`, `serializeValue()`, `serializeObjectKey()`, `serializeTypeParamsLiteral()`, and inline import/hash/intersection logic with the shared framework utilities and the narrowed hook callbacks.
-- **6.3.2** The SQL hook retains: `generateStorageType()` (tables, columns, PKs, FKs, indexes, storage.types — SQL-specific), `generateStorageTypesType()` (SQL storage types), and the narrowed-interface callbacks (`getFamilyImports`, `getFamilyTypeAliases`, `getContractWrapper`, `getTypeMapsExpression`).
-- **6.3.3** Remove the `IRModelDefinition`, `IRModelField`, `IRModelStorage` local type aliases — the hook now works with `Contract`'s typed models and `ContractModel` directly.
+- **6.3.1** Add framework-owned `generateContractDts()` to `@prisma-next/emitter`. Initially delegates to `emitter.generateContractTypes()` — establishes the call site without changing behavior.
+- **6.3.2** Replace `generateContractTypes()` on `EmissionSpi` with focused callbacks: `generateStorageType()`, `generateModelStorageType()`, `getFamilyImports()`, `getFamilyTypeAliases()`, `getTypeMapsExpression()`, `getContractWrapper()`.
+- **6.3.3** Move template assembly logic into `generateContractDts()`: imports, hash aliases, codec/operation type intersections, roots, models (via shared `generateModelsType`), storage (via SPI), contract metadata, wrapper.
 
-#### 6.4 Migrate Mongo hook
+#### 6.4 Migrate SQL emitter to narrowed `EmissionSpi`
 
-- **6.4.1** Update the Mongo hook to conform to the narrowed interface. Replace its local `generateModelsType()`, `generateModelFieldsType()`, and `generateContractTypes()` with the framework-owned equivalents and narrowed-interface callbacks.
-- **6.4.2** The Mongo hook retains: `generateStorageType()` (collections — Mongo-specific), `generateModelStorageType()` (collection + storage.relations — Mongo-specific), and the narrowed-interface callbacks.
+- **6.4.1** Replace the SQL emitter's `generateContractTypes()`, `generateModelsType()`, `generateRootsType()`, `serializeValue()`, `serializeObjectKey()`, `serializeTypeParamsLiteral()`, and inline import/hash logic with the shared utilities and the new SPI callbacks.
+- **6.4.2** Keep: `generateStorageType()` (tables, columns, PKs, FKs, indexes — SQL-specific), `generateStorageTypesType()` (private helper).
+- **6.4.3** Add: `generateModelStorageType()`, `getFamilyImports()`, `getFamilyTypeAliases()`, `getTypeMapsExpression()`, `getContractWrapper()`.
+- **6.4.4** Remove `IRModelDefinition`, `IRModelField`, `IRModelStorage` local types — use `ContractModel`, `ContractField`, `SqlModelStorage` directly.
 
-#### 6.5 Update `emit()` pipeline
+#### 6.5 Migrate Mongo emitter to narrowed `EmissionSpi`
 
-- **6.5.1** Update `emit()` in `@prisma-next/emitter` to call the framework-owned `generateContractDts()` instead of `targetFamily.generateContractTypes()`. The `generateContractDts()` function orchestrates shared and hook-provided generation.
+- **6.5.1** Update the Mongo emitter to conform to the narrowed `EmissionSpi`. Replace its local `generateModelsType()`, `generateModelFieldsType()`, and `generateContractTypes()` with the framework equivalents and SPI callbacks.
+- **6.5.2** Keep: `generateStorageType()` (collections — Mongo-specific), `generateModelStorageType()` (collection + storage.relations — Mongo-specific).
+- **6.5.3** Add: `getFamilyImports()`, `getFamilyTypeAliases()`, `getTypeMapsExpression()`, `getContractWrapper()`.
 
-#### 6.6 Regression verification
+#### 6.6 Update `emit()` pipeline
 
-- **6.6.1** Verify the emitted `contract.d.ts` output is identical (modulo formatting) before and after the refactor, using the demo contract and all authoring parity fixtures.
-- **6.6.2** Run full test suite (`pnpm test:all`) and typecheck (`pnpm typecheck`).
-- **6.6.3** Run `pnpm lint:deps` to verify no layering violations.
-- **6.6.4** Update emitter hook tests to test the narrowed interface methods individually.
+- **6.6.1** Update `emit()` to call `generateContractDts()` instead of `emitter.generateContractTypes()`. Clean up `GenerateContractTypesOptions`, `ValidationContext`, and any remaining `TargetFamilyHook` references.
+
+#### 6.7 Regression verification
+
+- **6.7.1** Verify the emitted `contract.d.ts` output is identical (modulo formatting) before and after the refactor, using the demo contract and all authoring parity fixtures.
+- **6.7.2** Run full test suite (`pnpm test:all`) and typecheck (`pnpm typecheck`).
+- **6.7.3** Run `pnpm lint:deps` to verify no layering violations.
+- **6.7.4** Update emitter tests to test the narrowed `EmissionSpi` methods individually.
 
 ### Close-out
 
@@ -286,10 +275,10 @@ The framework generates domain-level parts (fields, relations, roots) using shar
 | Runtime consumers accept `Contract` (M5)                                                                               | Unit + Integration | 5.B2           | Runtime test suites pass                                                |
 | `ContractBase` removed (M5)                                                                                           | CI                 | 5.B3           | Compile-time verification; no remaining imports                         |
 | Framework-components extracted; contract is a leaf with zero framework-domain deps (M5)                               | Lint + CI          | 5.11           | `pnpm lint:deps` clean; `pnpm typecheck`; `pnpm test:packages` pass    |
-| Shared `generateModelFieldsType` used by both hooks (M6)                                                              | Unit               | 6.1.1          | Extracted from Mongo hook; SQL hook uses same shared function           |
-| Framework owns `.d.ts` template; hooks provide only storage-specific callbacks (M6)                                   | Unit + Regression  | 6.1.3, 6.5.1  | `generateContractDts()` called from `emit()`; hook methods unit tested  |
-| `TargetFamilyHook` interface narrowed; no `generateContractTypes()` (M6)                                              | Interface test     | 6.2.1, 6.3–6.4 | Both hooks conform to narrowed interface                               |
-| SQL hook uses shared domain-level generation (M6)                                                                     | Unit + Regression  | 6.6.1–6.6.4   | Identical `.d.ts` output; updated hook unit tests                       |
+| Shared `generateModelFieldsType` used by both emitters (M6)                                                           | Unit               | 6.1.1          | Extracted from Mongo emitter; SQL emitter uses same shared function    |
+| Framework owns `.d.ts` template; `EmissionSpi` provides only storage-specific callbacks (M6)                          | Unit + Regression  | 6.3, 6.6.1    | `generateContractDts()` called from `emit()`; SPI methods unit tested  |
+| `TargetFamilyHook` replaced by `EmissionSpi`; validation removed; no `generateContractTypes()` (M6)                  | Interface test     | 6.2, 6.4–6.5  | Both emitters conform to narrowed SPI; descriptor uses `emission.*`    |
+| SQL emitter uses shared domain-level generation (M6)                                                                  | Unit + Regression  | 6.7.1–6.7.4   | Identical `.d.ts` output; updated emitter unit tests                   |
 
 
 ## Open Items
