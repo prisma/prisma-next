@@ -1165,6 +1165,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/framework-components
       arktype:
         specifier: ^2.1.25
         version: 2.1.29
@@ -1500,6 +1503,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../9-family
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/ids':
         specifier: workspace:*
         version: link:../../../1-framework/2-authoring/ids

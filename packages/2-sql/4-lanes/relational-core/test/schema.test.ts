@@ -1,4 +1,5 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   ContractWithTypeMaps,
   ExtractCodecTypes,
@@ -70,32 +71,35 @@ type MutableStorage = {
 };
 
 describe('schema', () => {
-  const contract = validateContract<TestContract>({
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:test',
-    roots: {},
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    storage: {
-      storageHash: 'test-hash',
-      tables: {
-        user: {
-          columns: {
-            id: { ...int4ColumnType, nullable: false },
-            email: { ...textColumnType, nullable: false },
-            bio: { ...textColumnType, nullable: true },
+  const contract = validateContract<TestContract>(
+    {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: 'sha256:test',
+      roots: {},
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      storage: {
+        storageHash: 'test-hash',
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+              email: { ...textColumnType, nullable: false },
+              bio: { ...textColumnType, nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
+      models: {},
     },
-    models: {},
-  });
+    emptyCodecLookup,
+  );
 
   it('creates schema with tables', () => {
     const context = createTestContext<TestContractWithTypeMaps>(contract);
@@ -177,31 +181,34 @@ describe('schema', () => {
   });
 
   it('handles undefined column definitions gracefully', () => {
-    const contractWithUndefinedColumn = validateContract<TestContract>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      roots: {},
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      storage: {
-        storageHash: 'test-hash',
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+    const contractWithUndefinedColumn = validateContract<TestContract>(
+      {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: 'sha256:test',
+        roots: {},
+        capabilities: {},
+        extensionPacks: {},
+        meta: {},
+        storage: {
+          storageHash: 'test-hash',
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
+        models: {},
       },
-      models: {},
-    });
+      emptyCodecLookup,
+    );
 
     const context = createTestContext<TestContractWithTypeMaps>(contractWithUndefinedColumn);
     // Manually manipulate storage to have undefined column to test continue branch

@@ -5,6 +5,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { readMarker } from '@prisma-next/family-sql/verify';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SignDatabaseResult } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -95,7 +96,10 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = validateContract<Contract<SqlStorage>>(contract);
+        const validatedContract = validateContract<Contract<SqlStorage>>(
+          contract,
+          emptyCodecLookup,
+        );
 
         const driver = await postgresDriver.create(connectionString);
         try {
@@ -180,7 +184,10 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = validateContract<Contract<SqlStorage>>(contract);
+        const validatedContract = validateContract<Contract<SqlStorage>>(
+          contract,
+          emptyCodecLookup,
+        );
 
         const driver = await postgresDriver.create(connectionString);
         try {
@@ -262,7 +269,10 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = validateContract<Contract<SqlStorage>>(contract);
+        const validatedContract = validateContract<Contract<SqlStorage>>(
+          contract,
+          emptyCodecLookup,
+        );
 
         const driver = await postgresDriver.create(connectionString);
         try {

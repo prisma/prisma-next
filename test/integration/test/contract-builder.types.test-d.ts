@@ -6,6 +6,7 @@ import {
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
@@ -63,8 +64,11 @@ test('builder contract types match fixture contract types', () => {
     .storageHash('sha256:test-core')
     .build();
 
-  const _validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
-  const _fixtureContract = validateContract<Contract>(contractJson);
+  const _validatedBuilderContract = validateContract<typeof builderContract>(
+    builderContract,
+    emptyCodecLookup,
+  );
+  const _fixtureContract = validateContract<Contract>(contractJson, emptyCodecLookup);
 
   type BuilderUserTable = NonNullable<(typeof _validatedBuilderContract.storage.tables)['user']>;
   type FixtureUserTable = NonNullable<(typeof _fixtureContract.storage.tables)['user']>;
@@ -89,7 +93,10 @@ test('ResultType inference works identically to fixture contract', () => {
     .storageHash('sha256:test-core')
     .build();
 
-  const validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
+  const validatedBuilderContract = validateContract<typeof builderContract>(
+    builderContract,
+    emptyCodecLookup,
+  );
   const adapter = createStubAdapter();
   const context = createTestContext(validatedBuilderContract, adapter);
   const tables = schema(context).tables;
@@ -101,7 +108,7 @@ test('ResultType inference works identically to fixture contract', () => {
 
   type BuilderRow = ResultType<typeof _plan>;
 
-  const _fixtureContract = validateContract<Contract>(contractJson);
+  const _fixtureContract = validateContract<Contract>(contractJson, emptyCodecLookup);
   const fixtureContext = createTestContext(_fixtureContract, adapter);
   const fixtureTables = schema(fixtureContext).tables;
   const fixtureUserTable = fixtureTables['user'];
@@ -159,7 +166,7 @@ test('refined object contract preserves downstream schema and model token infere
     },
   });
 
-  const validated = validateContract<typeof contract>(contract);
+  const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
   const adapter = createStubAdapter();
   const context = createTestContext(validated, adapter);
   const tables = schema(context).tables;
@@ -400,7 +407,7 @@ test('composed field helpers preserve downstream schema inference', () => {
     },
   );
 
-  const validated = validateContract<typeof contract>(contract);
+  const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
   const adapter = createStubAdapter();
   const context = createTestContext(validated, adapter);
   const tables = schema(context).tables;
@@ -432,7 +439,7 @@ test('codec type inference via type option', () => {
     )
     .build();
 
-  const validated = validateContract<typeof contract>(contract);
+  const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
   const adapter = createStubAdapter();
   const context = createTestContext(validated, adapter);
   const tables = schema(context).tables;
@@ -497,7 +504,7 @@ test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
     )
     .build();
 
-  const validated = validateContract<typeof contract>(contract);
+  const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
   const context = createTestContext(validated, createStubAdapter());
   const table = schema(context).tables['event'];
   if (!table) throw new Error('event table not found');

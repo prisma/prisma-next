@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { ContractValidationError } from '@prisma-next/contract/validate-contract';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
 import type { SqlStorage } from '../src/types';
 import { validateContract } from '../src/validate';
@@ -79,7 +80,7 @@ describe('validateContract', () => {
       },
     } as const;
 
-    const result = validateContract<Contract<SqlStorage>>(contract);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     expect(result.execution?.mutations.defaults).toEqual([
       {
         ref: { table: 'User', column: 'id' },
@@ -104,7 +105,7 @@ describe('validateContract', () => {
       },
     } as const;
 
-    expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup)).toThrow(
       /Contract structural validation failed/,
     );
   });
@@ -113,9 +114,11 @@ describe('validateContract', () => {
     const invalid = makeContract();
     invalid.storage.tables.User.primaryKey = { columns: ['missing'] };
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(ContractValidationError);
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
+      ContractValidationError,
+    );
     try {
-      validateContract<Contract<SqlStorage>>(invalid);
+      validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup);
     } catch (e) {
       expect(e).toBeInstanceOf(ContractValidationError);
       expect((e as ContractValidationError).phase).toBe('storage');
@@ -127,7 +130,7 @@ describe('validateContract', () => {
     const invalid = makeContract();
     invalid.storage.tables.User.uniques = [{ columns: ['missing'] }];
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /unique constraint references non-existent column/,
     );
   });
@@ -136,7 +139,7 @@ describe('validateContract', () => {
     const invalid = makeContract();
     invalid.storage.tables.User.indexes = [{ columns: ['missing'] }];
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /index references non-existent column/,
     );
   });
@@ -152,7 +155,7 @@ describe('validateContract', () => {
       },
     ];
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /foreignKey references non-existent column "missing"/,
     );
   });
@@ -168,7 +171,7 @@ describe('validateContract', () => {
       },
     ];
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /references non-existent column "missing" in table "User"/,
     );
   });
@@ -189,7 +192,7 @@ describe('validateContract', () => {
       },
     ];
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /foreignKey column count \(2\) does not match referenced column count \(1\)/,
     );
   });
@@ -214,7 +217,7 @@ describe('validateContract', () => {
       ],
     };
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /foreignKey references non-existent table/,
     );
   });
@@ -237,7 +240,7 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup)).toThrow(
       /NOT NULL but has a literal null default/,
     );
   });
@@ -277,7 +280,7 @@ describe('validateContract', () => {
       relations: {},
     };
 
-    const result = validateContract<Contract<SqlStorage>>(valid);
+    const result = validateContract<Contract<SqlStorage>>(valid, emptyCodecLookup);
     expect(result.storage.tables.Post.foreignKeys).toHaveLength(1);
     expect(result.storage.tables.User.indexes).toHaveLength(1);
   });
@@ -287,16 +290,18 @@ describe('validateContract', () => {
     valid.storage.tables.User.uniques = [{ columns: ['email'] }];
     valid.storage.tables.User.indexes = [{ columns: ['id'] }];
 
-    const result = validateContract<Contract<SqlStorage>>(valid);
+    const result = validateContract<Contract<SqlStorage>>(valid, emptyCodecLookup);
     expect(result.storage.tables.User.primaryKey).toEqual({ columns: ['id'] });
     expect(result.storage.tables.User.uniques).toHaveLength(1);
     expect(result.storage.tables.User.indexes).toHaveLength(1);
   });
 
   it('throws ContractValidationError with structural phase for non-object values', () => {
-    expect(() => validateContract<Contract<SqlStorage>>(null)).toThrow(ContractValidationError);
+    expect(() => validateContract<Contract<SqlStorage>>(null, emptyCodecLookup)).toThrow(
+      ContractValidationError,
+    );
     try {
-      validateContract<Contract<SqlStorage>>(null);
+      validateContract<Contract<SqlStorage>>(null, emptyCodecLookup);
     } catch (e) {
       expect(e).toBeInstanceOf(ContractValidationError);
       expect((e as ContractValidationError).phase).toBe('structural');
@@ -309,7 +314,7 @@ describe('validateContract', () => {
       storage: 'invalid',
     } as unknown as Contract<SqlStorage>;
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /Invalid contract structure/,
     );
   });
@@ -320,7 +325,7 @@ describe('validateContract', () => {
       models: 'invalid',
     } as unknown as Contract<SqlStorage>;
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /Invalid contract structure/,
     );
   });
@@ -334,7 +339,7 @@ describe('validateContract', () => {
       foreignKeys: [],
     } as unknown as Mutable<Contract<SqlStorage>['storage']['tables']['User']>;
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /Contract structural validation failed/,
     );
   });
@@ -345,12 +350,13 @@ describe('validateContract', () => {
       storage: {},
     } as unknown as Contract<SqlStorage>;
 
-    expect(() => validateContract<Contract<SqlStorage>>(invalid)).toThrow(
+    expect(() => validateContract<Contract<SqlStorage>>(invalid, emptyCodecLookup)).toThrow(
       /Contract structural validation failed/,
     );
   });
 
-  it('decodes tagged bigint default to native BigInt', () => {
+  it('keeps tagged bigint default unchanged when codec lookup is empty', () => {
+    const tagged = { $type: 'bigint', value: '9007199254740993' } as const;
     const contract = makeContract({
       User: {
         columns: {
@@ -359,7 +365,7 @@ describe('validateContract', () => {
             codecId: 'pg/int8@1',
             nativeType: 'bigint',
             nullable: false,
-            default: { kind: 'literal', value: { $type: 'bigint', value: '9007199254740993' } },
+            default: { kind: 'literal', value: tagged },
           },
         },
         primaryKey: { columns: ['id'] },
@@ -368,9 +374,9 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    const result = validateContract<Contract<SqlStorage>>(contract);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     const col = result.storage.tables.User.columns.count;
-    expect(col.default).toEqual({ kind: 'literal', value: 9007199254740993n });
+    expect(col.default).toEqual({ kind: 'literal', value: tagged });
   });
 
   it('keeps ISO date string defaults unchanged on temporal column', () => {
@@ -391,7 +397,7 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    const result = validateContract<Contract<SqlStorage>>(contract);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     const col = result.storage.tables.User.columns.created_at;
     expect(col.default).toEqual({ kind: 'literal', value: '2025-01-01T00:00:00.000Z' });
   });
@@ -414,7 +420,7 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    const result = validateContract<Contract<SqlStorage>>(contract);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     const col = result.storage.tables.User.columns.created_at;
     expect(col.default).toEqual({ kind: 'literal', value: '2025-02-03T10:20:30.000Z' });
   });
@@ -438,7 +444,7 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    const result = validateContract<Contract<SqlStorage>>(contract);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     const col = result.storage.tables.User.columns.created_at;
     expect(col.default).toEqual({ kind: 'literal', value: dateValue });
     expect(col.default?.kind).toBe('literal');
@@ -465,12 +471,13 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    const result = validateContract<Contract<SqlStorage>>(contract);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     const col = result.storage.tables.User.columns.status;
     expect(col.default).toEqual({ kind: 'literal', value: 'draft' });
   });
 
-  it('throws on invalid tagged bigint value', () => {
+  it('keeps invalid tagged bigint literal when codec lookup is empty', () => {
+    const tagged = { $type: 'bigint', value: 'not-a-number' } as const;
     const contract = makeContract({
       User: {
         columns: {
@@ -479,7 +486,7 @@ describe('validateContract', () => {
             codecId: 'pg/int8@1',
             nativeType: 'bigint',
             nullable: false,
-            default: { kind: 'literal', value: { $type: 'bigint', value: 'not-a-number' } },
+            default: { kind: 'literal', value: tagged },
           },
         },
         primaryKey: { columns: ['id'] },
@@ -488,7 +495,11 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(/Invalid tagged bigint/);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
+    expect(result.storage.tables.User.columns.count.default).toEqual({
+      kind: 'literal',
+      value: tagged,
+    });
   });
 
   it('keeps invalid temporal-like strings unchanged', () => {
@@ -509,7 +520,7 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    const result = validateContract<Contract<SqlStorage>>(contract);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     expect(result.storage.tables.User.columns.created_at.default).toEqual({
       kind: 'literal',
       value: 'not-a-date',
@@ -535,14 +546,14 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    const result = validateContract<Contract<SqlStorage>>(contract);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     expect(result.storage.tables.User.columns.payload.default).toEqual({
       kind: 'literal',
       value: tagged,
     });
   });
 
-  it('unwraps raw-tagged default to plain JSON value', () => {
+  it('keeps raw-tagged default unchanged when codec lookup is empty', () => {
     const rawWrapped = { $type: 'raw', value: { $type: 'bigint', value: '42' } } as const;
     const contract = makeContract({
       User: {
@@ -561,14 +572,14 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    const result = validateContract<Contract<SqlStorage>>(contract);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     expect(result.storage.tables.User.columns.payload.default).toEqual({
       kind: 'literal',
-      value: { $type: 'bigint', value: '42' },
+      value: rawWrapped,
     });
   });
 
-  it('unwraps raw-tagged default with nested $type key', () => {
+  it('keeps nested raw-tagged default unchanged when codec lookup is empty', () => {
     const rawWrapped = { $type: 'raw', value: { $type: 'custom', data: [1, 2, 3] } } as const;
     const contract = makeContract({
       User: {
@@ -587,10 +598,10 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    const result = validateContract<Contract<SqlStorage>>(contract);
+    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     expect(result.storage.tables.User.columns.meta.default).toEqual({
       kind: 'literal',
-      value: { $type: 'custom', data: [1, 2, 3] },
+      value: rawWrapped,
     });
   });
 
@@ -667,7 +678,7 @@ describe('validateContract', () => {
           },
         },
       };
-      expect(() => validateContract<Contract<SqlStorage>>(contract)).toThrow(
+      expect(() => validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup)).toThrow(
         /semantic.*setNull.*user_id.*NOT NULL/i,
       );
     });
@@ -683,9 +694,9 @@ describe('validateContract', () => {
           relations: {},
         },
       };
-      expect(() => validateContract(contract)).toThrow(ContractValidationError);
+      expect(() => validateContract(contract, emptyCodecLookup)).toThrow(ContractValidationError);
       try {
-        validateContract(contract);
+        validateContract(contract, emptyCodecLookup);
       } catch (e) {
         expect(e).toBeInstanceOf(ContractValidationError);
         expect((e as ContractValidationError).phase).toBe('storage');
@@ -707,13 +718,13 @@ describe('validateContract', () => {
           relations: {},
         },
       };
-      expect(() => validateContract(contract)).toThrow(
+      expect(() => validateContract(contract, emptyCodecLookup)).toThrow(
         'Model "User" field "email" references non-existent column "no_such_column" in table "User"',
       );
     });
 
     it('accepts a valid model-to-storage mapping', () => {
-      expect(() => validateContract(structuredClone(baseContract))).not.toThrow();
+      expect(() => validateContract(structuredClone(baseContract), emptyCodecLookup)).not.toThrow();
     });
   });
 });

@@ -1,6 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm } from '@prisma-next/sql-orm-client';
@@ -18,7 +19,7 @@ export const stack = createSqlExecutionStack({
   extensionPacks: [pgvector],
 });
 
-const validatedContract = validateContract<typeof contract>(contract);
+const validatedContract = validateContract<typeof contract>(contract, emptyCodecLookup);
 
 export const context = createExecutionContext({
   contract: validatedContract,

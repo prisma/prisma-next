@@ -6,6 +6,8 @@
  *
  * Spec: agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md
  */
+
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
@@ -13,7 +15,7 @@ import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 
 describe('demo contract visualization DX', () => {
   it('validated contract has runtime shape needed for visualization', () => {
-    const contract = validateContract<Contract>(contractJson);
+    const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
 
     expect(contract.target).toBeDefined();
     expect(typeof contract.target).toBe('string');
@@ -29,7 +31,7 @@ describe('demo contract visualization DX', () => {
   });
 
   it('validated contract exposes model storage field mappings', () => {
-    const contract = validateContract<Contract>(contractJson);
+    const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
 
     expect(contract.models.User.storage.table).toBe('user');
     expect(contract.models.User.storage.fields.email.column).toBe('email');
@@ -41,14 +43,14 @@ describe('demo contract visualization DX', () => {
       ...contractJson,
       _generated: { emittedAt: '2026-02-15T12:00:00Z' },
     };
-    const contract = validateContract<Contract>(contractWithGenerated);
+    const contract = validateContract<Contract>(contractWithGenerated, emptyCodecLookup);
 
     expect(contract).not.toHaveProperty('_generated');
     expect(Object.hasOwn(contract as object, '_generated')).toBe(false);
   });
 
   it('validated contract is traversable for render use-case', () => {
-    const contract = validateContract<Contract>(contractJson);
+    const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
 
     for (const [, model] of Object.entries(contract.models)) {
       expect(model.storage).toBeDefined();

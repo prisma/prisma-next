@@ -1,6 +1,8 @@
 /**
  * Type verification tests: type mismatch, nullability, type metadata registry.
  */
+
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   type CodecTypes,
@@ -226,7 +228,10 @@ describe('family instance schemaVerify - types', () => {
 
         await withDriver(getConnectionString(), async (driver) => {
           const familyInstance = createFamilyInstance();
-          const validatedContract = validateContract<Contract<SqlStorage>>(contractWithUnknownType);
+          const validatedContract = validateContract<Contract<SqlStorage>>(
+            contractWithUnknownType,
+            emptyCodecLookup,
+          );
           const result = await familyInstance.schemaVerify({
             driver,
             contract: validatedContract,

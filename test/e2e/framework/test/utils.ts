@@ -7,6 +7,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
@@ -50,7 +51,7 @@ export async function loadContractFromDisk<
   TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
 >(contractJsonPath: string): Promise<TContract> {
   const contractJson = await loadRawContractFromDisk(contractJsonPath);
-  return validateContract<TContract>(contractJson);
+  return validateContract<TContract>(contractJson, emptyCodecLookup);
 }
 
 async function loadRawContractFromDisk(contractJsonPath: string): Promise<Record<string, unknown>> {
@@ -94,7 +95,7 @@ export async function emitAndVerifyContract(
     );
   }
 
-  return validateContract<Contract<SqlStorage>>(emittedContract);
+  return validateContract<Contract<SqlStorage>>(emittedContract, emptyCodecLookup);
 }
 
 export async function runDbInit(options: {
@@ -188,7 +189,7 @@ export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
   callback: (ctx: TestRuntimeContext<TContract>) => Promise<void>,
 ): Promise<void> {
   const contractJson = await loadRawContractFromDisk(contractJsonPath);
-  const contract = validateContract<TContract>(contractJson);
+  const contract = validateContract<TContract>(contractJson, emptyCodecLookup);
 
   await withDevDatabase(async ({ connectionString }) => {
     const sql = await getPlannedDdlSql({ connectionString, contract: contractJson });

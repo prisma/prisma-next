@@ -5,6 +5,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { type SqlControlFamilyInstance } from '@prisma-next/family-sql/control';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
@@ -97,7 +98,7 @@ export async function runSchemaVerify(
 ) {
   return withDriver(connectionString, async (driver) => {
     const familyInstance = createFamilyInstance(options.extensions);
-    const validatedContract = validateContract<Contract<SqlStorage>>(contract);
+    const validatedContract = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     const frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>> = [
       postgres,
       postgresAdapter,

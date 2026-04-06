@@ -1,3 +1,4 @@
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   AggregateExpr,
@@ -25,42 +26,45 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
 
-const contract = validateContract<PostgresContract>({
-  target: 'postgres',
-  targetFamily: 'sql',
-  profileHash: 'sha256:test-profile',
-  roots: {},
-  capabilities: {},
-  extensionPacks: {},
-  meta: {},
-  storage: {
-    storageHash: 'sha256:test-core',
-    tables: {
-      user: {
-        columns: {
-          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-          email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          createdAt: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz', nullable: false },
-          vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+const contract = validateContract<PostgresContract>(
+  {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: 'sha256:test-profile',
+    roots: {},
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    storage: {
+      storageHash: 'sha256:test-core',
+      tables: {
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            createdAt: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz', nullable: false },
+            vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      },
-      post: {
-        columns: {
-          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-          user_id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-          title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+        post: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            user_id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
+    models: {},
   },
-  models: {},
-});
+  emptyCodecLookup,
+);
 
 describe('Postgres rich AST lowering', () => {
   const adapter = createPostgresAdapter();

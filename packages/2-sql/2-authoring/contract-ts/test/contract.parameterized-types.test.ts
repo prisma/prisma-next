@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { describe, expect, it } from 'vitest';
@@ -63,7 +64,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<TestContract>(input);
+      const result = validateContract<TestContract>(input, emptyCodecLookup);
       const vectorCol = result.storage.tables['Embedding']?.columns['vector'];
       expect(vectorCol?.typeParams).toEqual({ length: 1536 });
     });
@@ -92,12 +93,12 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<TestContract>(input);
+      const result = validateContract<TestContract>(input, emptyCodecLookup);
       expect(result.storage.tables['User']?.columns['id']?.typeParams).toEqual({});
     });
 
     it('accepts column without typeParams (optional field)', () => {
-      const result = validateContract<TestContract>(baseContractInput);
+      const result = validateContract<TestContract>(baseContractInput, emptyCodecLookup);
       expect(result.storage.tables['User']?.columns['id']?.typeParams).toBeUndefined();
     });
 
@@ -125,7 +126,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(/typeParams/);
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).toThrow(/typeParams/);
     });
 
     it('accepts array typeParams (array-vs-object validated by emitter)', () => {
@@ -152,7 +153,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).not.toThrow();
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).not.toThrow();
     });
 
     it('rejects typeParams when typeRef is also present (mutually exclusive)', () => {
@@ -188,7 +189,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).toThrow(
         /typeParams.*typeRef|typeRef.*typeParams/,
       );
     });
@@ -227,7 +228,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<TestContract>(input);
+      const result = validateContract<TestContract>(input, emptyCodecLookup);
       const vectorCol = result.storage.tables['Embedding']?.columns['vector'];
       expect(vectorCol?.typeRef).toBe('Vector1536');
     });
@@ -256,7 +257,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(/typeRef/);
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).toThrow(/typeRef/);
     });
 
     it('accepts typeRef pointing to non-existent key (cross-ref validated by emitter)', () => {
@@ -291,7 +292,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).not.toThrow();
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).not.toThrow();
     });
 
     it('accepts typeRef when storage.types is missing (cross-ref validated by emitter)', () => {
@@ -319,7 +320,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).not.toThrow();
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).not.toThrow();
     });
   });
 
@@ -339,7 +340,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<TestContract>(input);
+      const result = validateContract<TestContract>(input, emptyCodecLookup);
       expect(result.storage.types).toEqual({
         Vector1536: {
           codecId: 'pg/vector@1',
@@ -369,12 +370,12 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<TestContract>(input);
+      const result = validateContract<TestContract>(input, emptyCodecLookup);
       expect(Object.keys(result.storage.types!)).toHaveLength(2);
     });
 
     it('accepts storage without types (optional field)', () => {
-      const result = validateContract<TestContract>(baseContractInput);
+      const result = validateContract<TestContract>(baseContractInput, emptyCodecLookup);
       expect(result.storage.types).toBeUndefined();
     });
 
@@ -392,7 +393,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(/codecId/);
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).toThrow(/codecId/);
     });
 
     it('rejects type instance missing nativeType', () => {
@@ -409,7 +410,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(/nativeType/);
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).toThrow(/nativeType/);
     });
 
     it('rejects type instance missing typeParams', () => {
@@ -426,7 +427,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(/typeParams/);
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).toThrow(/typeParams/);
     });
 
     it('rejects non-object storage.types', () => {
@@ -438,7 +439,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).toThrow(/types/);
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).toThrow(/types/);
     });
 
     it('accepts array typeParams in type instance (array-vs-object validated by emitter)', () => {
@@ -456,7 +457,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).not.toThrow();
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).not.toThrow();
     });
   });
 
@@ -493,7 +494,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).not.toThrow();
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).not.toThrow();
     });
 
     it('accepts column with typeRef when nativeType mismatches (cross-ref validated by emitter)', () => {
@@ -528,7 +529,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<TestContract>(input)).not.toThrow();
+      expect(() => validateContract<TestContract>(input, emptyCodecLookup)).not.toThrow();
     });
 
     it('accepts column with typeRef when codecId and nativeType both match', () => {
@@ -563,7 +564,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<TestContract>(input);
+      const result = validateContract<TestContract>(input, emptyCodecLookup);
       expect(result.storage.tables['User']?.columns['role']?.typeRef).toBe('Role');
     });
   });
