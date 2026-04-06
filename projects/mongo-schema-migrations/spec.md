@@ -16,7 +16,7 @@ MongoDB has a meaningful set of DDL-equivalent operations that need versioning, 
 
 **Existing infrastructure:** The framework-level migration SPI (`TargetMigrationsCapability`, `MigrationPlanner`, `MigrationRunner`, `MigrationPlan`) is already family-agnostic in type terms (`contract: unknown`, `schema: unknown`). The graph infrastructure (`@prisma-next/migration-tools`) has zero SQL coupling. The `ContractMarkerRecord` is already a framework-level type. The main work is: enriching the Mongo contract, building a planner and runner, and wiring the target descriptor.
 
-**Index authoring:** Users specify indexes explicitly via authoring annotations (PSL `@@index`, `@@unique` or TS DSL equivalents). The emitter translates these into the contract's `storage.collections` section. The vertical slice (M1) uses hand-crafted contracts to avoid blocking on authoring support; emitter integration follows in M2.
+**Index authoring:** Users specify indexes explicitly via authoring annotations (PSL `@@index`, `@@unique` or TS DSL equivalents). The emitter translates these into the contract's `storage.collections` section. The vertical slice (M1) uses hand-crafted contracts to prove the migration path; M2 builds the authoring support needed to populate contracts from PSL/TS definitions (the authoring changes are small and built within this project).
 
 # Requirements
 
@@ -86,7 +86,7 @@ Extend each layer to cover the full breadth of MongoDB server-side configuration
 
 **Emitter:**
 
-18. **Update the Mongo emitter.** Populate the enriched `storage.collections` section. Users specify indexes explicitly via authoring annotations (PSL `@@index`, `@@unique` or TS DSL equivalents). Auto-derive `$jsonSchema` validator content from model fields. Requires authoring support — coordinate with WS2 (contract authoring) or use hand-crafted contracts for initial testing.
+18. **Update the Mongo emitter and authoring surface.** Add PSL/TS authoring support for Mongo index annotations (`@@index`, `@@unique` or equivalents). Update the Mongo emitter to populate the enriched `storage.collections` section from these annotations. Auto-derive `$jsonSchema` validator content from model fields. The authoring changes are small and built within this project.
 
 ### Milestone 3: Polymorphic index generation
 
@@ -152,12 +152,11 @@ Extend each layer to cover the full breadth of MongoDB server-side configuration
 ## Coordination
 
 - **Saevar (migration system, WS1):** The migration system's graph model, on-disk format, and CLI commands are owned by WS1. This project adds a new family implementation but doesn't change the graph model. CLI generalization (replacing `extractSqlDdl`) needs coordination.
-- **ORM consolidation (Will):** Polymorphic index generation (M3/M5) depends on the contract carrying discriminator/variants metadata, which is being implemented in the ORM consolidation project (Phase 1.75b). Non-polymorphic milestones can proceed independently.
-- **Contract domain extraction:** The `ContractBase` extraction (P1 item 1) is soft-dependency. This project can work with current `MongoContract` and adopt `ContractBase` later.
+- **ORM consolidation (Will):** Polymorphic index generation (M3) depends on the contract carrying discriminator/variants metadata, which is being implemented in the ORM consolidation project (Phase 1.75b). M1 and M2 can proceed independently.
+- **Contract domain extraction:** `ContractBase` extraction (P1 item 1) is a soft dependency. This project can work with current `MongoContract` and adopt `ContractBase` later.
 
 ## Risk
 
-- **Authoring dependency for emitter (M2).** Users specify indexes explicitly via PSL/TS authoring annotations (`@@index`, `@@unique`). The Mongo emitter needs this authoring support to populate `storage.collections`. M1 sidesteps this by using hand-crafted contracts, but M2 requires coordination with WS2 (contract authoring) or building the authoring support within this project.
 - **Polymorphic index generation depends on contract shape (M3).** If the contract's polymorphism representation changes during ORM consolidation, the partial index derivation logic may need updating. Mitigated by M3 being sequenced last and testable with hand-crafted contracts.
 
 # References
