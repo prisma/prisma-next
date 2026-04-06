@@ -6,8 +6,8 @@
   "description": "Structured error types for Prisma Next control and execution planes",
   "scripts": {
     "build": "tsdown",
-    "test": "vitest run --passWithNoTests",
-    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
