@@ -56,15 +56,39 @@ describe('MongoProjectStage', () => {
     expect(stage.projection).toEqual({ name: 1, email: 1, _id: 0 });
   });
 
+  it('accepts computed projection values (MongoAggExpr)', () => {
+    const expr = MongoAggOperator.of('$concat', [
+      MongoAggFieldRef.of('first'),
+      MongoAggLiteral.of(' '),
+      MongoAggFieldRef.of('last'),
+    ]);
+    const stage = new MongoProjectStage({ fullName: expr, _id: 0 });
+    expect(stage.projection['fullName']).toBe(expr);
+    expect(stage.projection['_id']).toBe(0);
+  });
+
   it('is frozen', () => {
     const stage = new MongoProjectStage({ name: 1 });
     expect(Object.isFrozen(stage)).toBe(true);
     expect(Object.isFrozen(stage.projection)).toBe(true);
   });
 
-  it('rewrite() returns this (leaf stage)', () => {
+  it('rewrite() returns this for scalar-only projections', () => {
     const stage = new MongoProjectStage({ name: 1 });
     expect(stage.rewrite({})).toBe(stage);
+  });
+
+  it('rewrite() recurses into expression projection values', () => {
+    const aggExpr: MongoAggExprRewriter = {
+      fieldRef: (expr) => MongoAggFieldRef.of(`r.${expr.path}`),
+    };
+    const stage = new MongoProjectStage({
+      fullName: MongoAggFieldRef.of('name'),
+      _id: 0,
+    });
+    const rewritten = stage.rewrite({ aggExpr }) as MongoProjectStage;
+    expect((rewritten.projection['fullName'] as MongoAggFieldRef).path).toBe('r.name');
+    expect(rewritten.projection['_id']).toBe(0);
   });
 });
 
@@ -209,6 +233,33 @@ describe('MongoLookupStage', () => {
     const match = rewritten.pipeline![0] as MongoMatchStage;
     expect((match.filter as MongoFieldFilter).op).toBe('$ne');
   });
+
+  it('supports correlated pipeline form with let_', () => {
+    const stage = new MongoLookupStage({
+      from: 'orders',
+      as: 'matchingOrders',
+      let_: { userId: MongoAggFieldRef.of('_id') },
+      pipeline: [new MongoMatchStage(MongoFieldFilter.eq('status', 'active'))],
+    });
+    expect(stage.let_).toBeDefined();
+    expect((stage.let_!['userId'] as MongoAggFieldRef).path).toBe('_id');
+    expect(stage.localField).toBeUndefined();
+    expect(stage.foreignField).toBeUndefined();
+  });
+
+  it('rewrite() recurses into let_ expressions', () => {
+    const aggExpr: MongoAggExprRewriter = {
+      fieldRef: (expr) => MongoAggFieldRef.of(`r.${expr.path}`),
+    };
+    const stage = new MongoLookupStage({
+      from: 'orders',
+      as: 'matchingOrders',
+      let_: { userId: MongoAggFieldRef.of('_id') },
+      pipeline: [new MongoMatchStage(MongoFieldFilter.eq('status', 'active'))],
+    });
+    const rewritten = stage.rewrite({ aggExpr }) as MongoLookupStage;
+    expect((rewritten.let_!['userId'] as MongoAggFieldRef).path).toBe('r._id');
+  });
 });
 
 describe('MongoUnwindStage', () => {
@@ -217,6 +268,12 @@ describe('MongoUnwindStage', () => {
     expect(stage.kind).toBe('unwind');
     expect(stage.path).toBe('$posts');
     expect(stage.preserveNullAndEmptyArrays).toBe(true);
+    expect(stage.includeArrayIndex).toBeUndefined();
+  });
+
+  it('supports includeArrayIndex', () => {
+    const stage = new MongoUnwindStage('$items', false, 'itemIndex');
+    expect(stage.includeArrayIndex).toBe('itemIndex');
   });
 
   it('is frozen', () => {
