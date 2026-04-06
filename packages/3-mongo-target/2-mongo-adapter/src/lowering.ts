@@ -111,8 +111,13 @@ function needsLiteralWrap(value: unknown): boolean {
   if (typeof value === 'string' && value.startsWith('$')) {
     return true;
   }
-  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-    return Object.keys(value).some((k) => k.startsWith('$'));
+  if (Array.isArray(value)) {
+    return value.some((v) => needsLiteralWrap(v));
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).some(
+      ([k, v]) => k.startsWith('$') || needsLiteralWrap(v),
+    );
   }
   return false;
 }
@@ -135,6 +140,10 @@ export function lowerFilter(filter: MongoFilterExpr): Document {
       return { [filter.field]: { $exists: filter.exists } };
     case 'expr':
       return { $expr: lowerAggExpr(filter.aggExpr) };
+    default: {
+      const _exhaustive: never = filter;
+      throw new Error(`Unhandled filter kind: ${(_exhaustive as MongoFilterExpr).kind}`);
+    }
   }
 }
 
