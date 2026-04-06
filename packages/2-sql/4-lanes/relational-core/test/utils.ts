@@ -36,18 +36,8 @@ export interface Extension {
   operations?(): ReadonlyArray<SqlOperationSignature>;
 }
 
-/**
- * Creates an ExecutionContext for testing.
- * This helper DRYs up the common pattern of context creation in tests.
- * Note: This creates an ExecutionContext, so it doesn't include an adapter.
- *
- * @param contract - The SQL contract
- * @param adapter - Optional adapter (for backward compatibility with old test code, but not used)
- * @param options - Optional extensions to register operations and codecs
- */
 export function createTestContext<TContract extends Contract<SqlStorage>>(
   contract: TContract,
-  _adapter?: Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
   options?: {
     extensions?: ReadonlyArray<Extension>;
   },

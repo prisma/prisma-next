@@ -37,7 +37,6 @@
   "exports": {
     "./config-types": "./dist/config-types.mjs",
     "./config-validation": "./dist/config-validation.mjs",
-    "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
   },
   "repository": {

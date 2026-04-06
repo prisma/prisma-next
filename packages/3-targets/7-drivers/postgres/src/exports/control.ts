@@ -17,10 +17,6 @@ import { normalizePgError } from '../normalize-error';
 export class PostgresControlDriver implements ControlDriverInstance<'sql', 'postgres'> {
   readonly familyId = 'sql' as const;
   readonly targetId = 'postgres' as const;
-  /**
-   * @deprecated Use targetId instead
-   */
-  readonly target = 'postgres' as const;
 
   constructor(private readonly client: Client) {}
 

@@ -6,7 +6,7 @@ import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import { vectorColumn as vectorColumnType } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { schema } from '../src/schema';
-import { createStubAdapter, createTestContext } from './utils';
+import { createTestContext } from './utils';
 
 describe('Operation capability gating', () => {
   it('exposes operation with required capability when capability is present', () => {
@@ -52,8 +52,7 @@ describe('Operation capability gating', () => {
       capabilities: ['pgvector.index.ivfflat'],
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature],
@@ -108,8 +107,7 @@ describe('Operation capability gating', () => {
       capabilities: ['pgvector.index.ivfflat'],
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature],
@@ -163,8 +161,7 @@ describe('Operation capability gating', () => {
       },
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature],
@@ -223,8 +220,7 @@ describe('Operation capability gating', () => {
       capabilities: ['pgvector.index.ivfflat', 'pgvector.index.hnsw'],
     };
 
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter, {
+    const context = createTestContext(contract, {
       extensions: [
         {
           operations: () => [signature],
