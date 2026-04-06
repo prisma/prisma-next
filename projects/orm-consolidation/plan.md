@@ -53,17 +53,19 @@ Phase 1 is read-only. The SQL ORM already has `create()`, `createAll()`, `create
 
 **Linear:** [TML-2202](https://linear.app/prisma-company/issue/TML-2202)
 
-Implement [ADR 184](../../docs/architecture%20docs/adrs/ADR%20184%20-%20Codec-owned%20value%20serialization.md) — extend the core `Codec` interface with `encodeJson`/`decodeJson` methods so codecs own the contract JSON serialization boundary for their types. Replace the hardcoded bigint/Date branches (`encodeDefaultLiteralValue`, `bigintJsonReplacer`, `decodeContractDefaults`, `DefaultLiteralValue<>`) with codec dispatch. This is a prerequisite for Phase 1.75: the emitter needs to serialize discriminator values into `contract.json`, and the runtime needs to decode them — both via the discriminator field's codec.
+Implement [ADR 184](../../docs/architecture%20docs/adrs/ADR%20184%20-%20Codec-owned%20value%20serialization.md) — add required `encodeJson`/`decodeJson` methods to a common `Codec` base interface at the framework layer, so codecs own the contract JSON serialization boundary for their types. Replace the hardcoded bigint/Date branches (`encodeDefaultLiteralValue`, `bigintJsonReplacer`, `decodeContractDefaults`, `DefaultLiteralValue<>`) with codec dispatch. This is a prerequisite for Phase 1.75: the emitter needs to serialize discriminator values into `contract.json`, and the runtime needs to decode them — both via the discriminator field's codec.
 
 **Scope:**
 
-1. **Core codec interface** — add optional `encodeJson`/`decodeJson` to the `Codec` interface. Codecs for JSON-safe types omit them (passthrough). Implement on `pg/int8@1` (bigint) and `pg/timestamp@1`/`pg/date@1` (Date) to replace the existing hardcoded branches.
-2. **Emission** — replace `encodeDefaultLiteralValue` and `bigintJsonReplacer` with `codec.encodeJson()` dispatch.
-3. **Validation/loading** — replace `decodeContractDefaults` with `codec.decodeJson()` dispatch.
-4. **Type generation** — simplify `DefaultLiteralValue<>` conditional type; the codec type map already knows the output type.
-5. **DDL and PSL interfaces** — the `DdlLiteralCodec` and `PslLiteralCodec` interfaces can land incrementally with migration work and authoring work respectively; they are not required for Phase 1.75.
+1. **Framework codec base interface** — extract the common codec shape (`id`, `targetTypes`, `traits`, `encode`, `decode`) from SQL's `Codec` and Mongo's `MongoCodec` into a base `Codec` interface at the framework layer. Add required `encodeJson`/`decodeJson` methods. The `codec()` factory provides identity defaults for JSON-safe types. SQL's codec extends the base with SQL-specific fields (`meta`, `paramsSchema`, `init`). Mongo's codec becomes a type alias or thin extension.
+2. **Concrete codec implementations** — implement `encodeJson`/`decodeJson` on `pg/timestamptz@1` and `pg/timestamp@1` (Date ↔ ISO string). `pg/int8@1` stays `number` (identity). All other existing codecs get identity defaults via the factory.
+3. **Emission** — extend `EmitStackInput` with codec registry access. Replace `encodeDefaultLiteralValue` and `bigintJsonReplacer` with `codec.encodeJson()` dispatch.
+4. **Contract loading** — integrate codec decoding into the `validateContract` pipeline (codec registry flows in alongside storage validator). Replace `decodeContractDefaults` with `codec.decodeJson()` dispatch.
+5. **Type generation** — simplify `DefaultLiteralValue<>` to derive the decoded type from `CodecTypes`. For the emit workflow, the emitter can resolve the concrete type per column (including parameterized types). For the no-emit workflow, a type-level mechanism maps through `CodecTypes`. Both paths must handle parameterized types where the output type depends on type parameters.
+6. **Cleanup** — remove `TaggedBigInt`, `TaggedRaw`, `TaggedLiteralValue`, `bigintJsonReplacer`, `isTaggedBigInt`, `isTaggedRaw`, and the `$type` collision guard infrastructure.
+7. **DDL and PSL interfaces** — the `DdlLiteralCodec` and `PslLiteralCodec` interfaces can land incrementally with migration work and authoring work respectively; they are not required for Phase 1.75.
 
-**Proof:** Existing column default tests pass with codec dispatch instead of hardcoded branches. A non-JSON-safe type (bigint) round-trips through `contract.json` via codec methods. No `$type` tags in newly emitted contracts.
+**Proof:** Existing column default tests pass with codec dispatch instead of hardcoded branches. A non-JSON-safe type (Date) round-trips through `contract.json` via codec methods. No `$type` tags in newly emitted contracts.
 
 ### Phase 1.75: Polymorphism, embedded documents, and value objects (both families)
 

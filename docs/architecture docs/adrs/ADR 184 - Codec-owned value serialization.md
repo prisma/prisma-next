@@ -2,21 +2,27 @@
 
 ## At a glance
 
-A column with `codecId: "pg/int8@1"` has a default value of `42n` — a JavaScript `bigint`. This value has to survive a round-trip through `contract.json`, but `bigint` has no JSON representation. The codec handles it:
+A column with `codecId: "pg/timestamptz@1"` has a default value of `new Date('2024-01-15')` — a JavaScript `Date`. This value has to survive a round-trip through `contract.json`, but `Date` has no JSON representation. The codec handles it:
 
 ```ts
-const pgInt8Codec = codec({
-  typeId: 'pg/int8@1',
-  targetTypes: ['int8'],
-  traits: ['equality', 'order', 'numeric'],
+const pgTimestamptzCodec = codec({
+  typeId: 'pg/timestamptz@1',
+  targetTypes: ['timestamptz'],
+  traits: ['equality', 'order'],
 
   // Wire (existing)
-  encode: (value: number) => value,
-  decode: (wire: number) => wire,
+  encode: (value: string | Date): string => {
+    if (value instanceof Date) return value.toISOString();
+    return value;
+  },
+  decode: (wire: string | Date): string => {
+    if (wire instanceof Date) return wire.toISOString();
+    return wire;
+  },
 
-  // Contract JSON (new) — only needed when JS type ≠ JSON type
-  encodeJson: (value: bigint) => value.toString(),
-  decodeJson: (json: JsonValue) => BigInt(json as string),
+  // Contract JSON — converts between JS type and JSON representation
+  encodeJson: (value: Date) => value.toISOString(),
+  decodeJson: (json: JsonValue) => new Date(json as string),
 });
 ```
 
@@ -25,18 +31,20 @@ The resulting contract JSON is plain — no tags, no wrappers:
 ```json
 {
   "fields": {
-    "counter": {
-      "codecId": "pg/int8@1",
+    "createdAt": {
+      "codecId": "pg/timestamptz@1",
       "nullable": false,
-      "default": { "kind": "literal", "value": "42" }
+      "default": { "kind": "literal", "value": "2024-01-15T00:00:00.000Z" }
     }
   }
 }
 ```
 
-The consumer reads `"42"`, looks up `pg/int8@1`, calls `decodeJson("42")`, gets `42n`. Most codecs don't need these methods at all — strings, numbers, booleans, and null are already JSON-safe. Only codecs for types that JSON can't represent (`bigint`, `Date`, binary data) implement them.
+The consumer reads `"2024-01-15T00:00:00.000Z"`, looks up `pg/timestamptz@1`, calls `decodeJson(...)`, gets a `Date` object.
 
-The same typed value crosses other boundaries too. The migration planner renders it into DDL (`DEFAULT 42`). The PSL printer renders it into schema source (`@default(42)`). Migration operations carry it in `ops.json`. These are the same problem for different media, but they live at different layers:
+Every codec has `encodeJson` and `decodeJson`. For JSON-safe types (strings, numbers, booleans, null), they are identity functions — the `codec()` factory provides these defaults. Only codecs for types that JSON can't represent (`Date`, binary data, etc.) override them.
+
+The same typed value crosses other boundaries too. The migration planner renders it into DDL (`DEFAULT '2024-01-15T00:00:00.000Z'`). The PSL printer renders it into schema source (`@default("2024-01-15T00:00:00.000Z")`). Migration operations carry it in `ops.json`. These are the same problem for different media, but they live at different layers:
 
 ```ts
 // Target/adapter layer, keyed by codec ID
@@ -52,14 +60,14 @@ interface PslLiteralCodec<TJs = unknown> {
 }
 ```
 
-All three interfaces are dispatched by the same `codecId`. A codec ships with wire + contract JSON support; DDL and PSL support are added independently by the target or authoring layer. Here's the full lifecycle of a bigint column default:
+All three interfaces are dispatched by the same `codecId`. A codec ships with wire + contract JSON support; DDL and PSL support are added independently by the target or authoring layer. Here's the full lifecycle of a timestamp column default:
 
 | Stage | Call | Result |
 |---|---|---|
-| TS authoring | `codec.encodeJson(42n)` | `"42"` in contract JSON |
-| Contract loading | `codec.decodeJson("42")` | `42n` in memory |
-| Migration DDL | `ddlCodec.encodeDdl(42n)` | `DEFAULT 42` |
-| PSL printing | `pslCodec.encodePsl(42n)` | `@default(42)` |
+| TS authoring | `codec.encodeJson(new Date('2024-01-15'))` | `"2024-01-15T00:00:00.000Z"` in contract JSON |
+| Contract loading | `codec.decodeJson("2024-01-15T00:00:00.000Z")` | `Date` in memory |
+| Migration DDL | `ddlCodec.encodeDdl(new Date('2024-01-15'))` | `DEFAULT '2024-01-15T00:00:00.000Z'` |
+| PSL printing | `pslCodec.encodePsl(new Date('2024-01-15'))` | `@default("2024-01-15T00:00:00.000Z")` |
 
 Column defaults aren't the only place typed values appear:
 
@@ -74,7 +82,7 @@ In every case, the codec ID is in scope. The codec can always be found.
 
 ## The codec ID is the type ID
 
-Today, values that JSON can't represent — `bigint` and `Date` — are wrapped in self-describing tags:
+Today, values that JSON can't natively represent — `bigint` and `Date` — are handled with hardcoded branches. Bigint values are wrapped in self-describing tags:
 
 ```json
 { "$type": "bigint", "value": "42" }
@@ -99,7 +107,35 @@ The tag approach is implemented as hardcoded branches in six locations:
 | Types | `DefaultLiteralValue<>` | Conditional type mapping `bigint`/`Date`/etc. |
 | Migration | `serializeValue` | Hardcoded value serialization for ops |
 
-Adding a new non-JSON-safe type — say, a `Decimal` from an extension pack — means touching all six. With codec-owned serialization, it means implementing `encodeJson`/`decodeJson` on the decimal codec. One place.
+Adding a new non-JSON-safe type — say, a `Decimal` from an extension pack — means touching all six. With codec-owned serialization, it means providing `encodeJson`/`decodeJson` on the decimal codec. One place.
+
+## Design decisions
+
+### Framework-level codec base interface
+
+Both SQL and Mongo families define structurally identical codec interfaces (`Codec` and `MongoCodec`) with the same core shape: `id`, `targetTypes`, `traits`, `encode`, `decode`. Since `encodeJson`/`decodeJson` are a cross-family concern — any family's codecs need to serialize typed values into `contract.json` — the common shape is extracted to a base `Codec` interface at the framework layer. SQL's codec extends it with SQL-specific fields (`meta`, `paramsSchema`, `init`). Mongo's codec becomes a type alias or thin extension of the same base.
+
+### Required methods with identity defaults
+
+`encodeJson` and `decodeJson` are required on the `Codec` interface, not optional. Any type that can appear in the contract may need a literal value serialized for it (column defaults, discriminator values, type parameters, migration temporary defaults). Making the methods required eliminates null checks at every dispatch site.
+
+For JSON-safe types (strings, numbers, booleans, null), the methods are identity functions. The `codec()` factory provides these defaults when not explicitly supplied, so codecs for JSON-safe types need no additional boilerplate.
+
+### Contract loading integrates decoding
+
+Decoding contract values (calling `codec.decodeJson()` on literal defaults, discriminator values, etc.) is part of the contract loading pipeline, not a separate post-validation step. The codec registry flows into `validateContract` alongside the existing storage validator, and decoding happens as part of the same call. Callers never see undecoded values.
+
+### Default value types in `contract.d.ts`
+
+The generated `contract.d.ts` reflects the **decoded** (runtime) type for literal default values, not the JSON-encoded form. A column with `codecId: 'pg/timestamptz@1'` and a Date default has `readonly value: Date` in its type, not `readonly value: string`.
+
+For the **emit** workflow, the emitter resolves the concrete type per column — including parameterized types where the output type depends on type parameters (e.g., typed JSON columns with a schema). The emitter can generate the resolved type inline.
+
+For the **no-emit** workflow, a type-level mechanism (`DefaultLiteralValue` or similar) maps through `CodecTypes` to derive the decoded type from the codec ID. This must also handle parameterized types, where the codec's output type may be narrowed by type parameters.
+
+### Emitter and codec access
+
+The emitter already receives a subset of the control stack via `EmitStackInput`. This interface is extended with a codec registry (or a minimal lookup interface) so the emission pipeline can call `codec.encodeJson()` when serializing literal values into `contract.json`. The existing `bigintJsonReplacer` and `encodeDefaultLiteralValue` are replaced by codec dispatch.
 
 ## Consequences
 
