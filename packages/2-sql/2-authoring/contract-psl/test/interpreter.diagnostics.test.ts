@@ -107,9 +107,11 @@ model User {
       expect.arrayContaining([
         expect.objectContaining({
           code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining(
-            '@map requires a positional quoted string literal argument',
-          ),
+          message: expect.stringContaining('Field "Team.id" @map requires'),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('Model "Team" @map requires'),
         }),
       ]),
     );
@@ -158,7 +160,6 @@ model User {
       ...baseInput,
       document,
       composedExtensionPacks: [],
-      controlMutationDefaults: builtinControlMutationDefaults,
     });
 
     expect(result.ok).toBe(false);
@@ -188,7 +189,6 @@ model User {
       ...baseInput,
       document,
       composedExtensionPacks: [],
-      controlMutationDefaults: builtinControlMutationDefaults,
     });
 
     expect(result.ok).toBe(false);
@@ -217,11 +217,7 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -255,11 +251,7 @@ model InvalidNativeTypes {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -304,11 +296,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -340,11 +328,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -376,11 +360,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -410,11 +390,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -448,11 +424,7 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -481,11 +453,7 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
