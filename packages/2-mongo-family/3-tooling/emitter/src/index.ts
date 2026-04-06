@@ -1,20 +1,6 @@
-import type { Contract } from '@prisma-next/contract/types';
-import {
-  deduplicateImports,
-  generateCodecTypeIntersection,
-  generateHashTypeAliases,
-  generateImportLines,
-  generateModelFieldsType,
-  generateModelRelationsType,
-  generateRootsType,
-  serializeObjectKey,
-  serializeValue,
-} from '@prisma-next/emitter/domain-type-generation';
-import type {
-  GenerateContractTypesOptions,
-  TypesImportSpec,
-  ValidationContext,
-} from '@prisma-next/framework-components/emission';
+import type { Contract, ContractModel } from '@prisma-next/contract/types';
+import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
+import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import type { MongoStorage } from '@prisma-next/mongo-contract';
 
 interface MongoModelIR {
@@ -25,80 +11,6 @@ interface MongoModelIR {
   readonly variants?: Record<string, unknown>;
   readonly base?: string;
   readonly owner?: string;
-}
-
-function generateModelStorageType(model: MongoModelIR): string {
-  const parts: string[] = [];
-  const collection = model.storage['collection'] as string | undefined;
-  if (collection) {
-    parts.push(`readonly collection: ${serializeValue(collection)}`);
-  }
-
-  const storageRelations = model.storage['relations'] as
-    | Record<string, Record<string, unknown>>
-    | undefined;
-  if (storageRelations && Object.keys(storageRelations).length > 0) {
-    const relEntries: string[] = [];
-    for (const [relName, relVal] of Object.entries(storageRelations)) {
-      relEntries.push(`readonly ${serializeObjectKey(relName)}: ${serializeValue(relVal)}`);
-    }
-    parts.push(`readonly relations: { ${relEntries.join('; ')} }`);
-  }
-
-  return parts.length > 0 ? `{ ${parts.join('; ')} }` : 'Record<string, never>';
-}
-
-function generateModelsType(models: Record<string, MongoModelIR>): string {
-  if (!models || Object.keys(models).length === 0) {
-    return 'Record<string, never>';
-  }
-
-  const modelTypes: string[] = [];
-  for (const [modelName, model] of Object.entries(models)) {
-    const fieldsType = generateModelFieldsType(model.fields);
-    const relationsType = generateModelRelationsType(model.relations);
-    const storageType = generateModelStorageType(model);
-
-    const modelParts: string[] = [
-      `readonly fields: ${fieldsType}`,
-      `readonly relations: ${relationsType}`,
-      `readonly storage: ${storageType}`,
-    ];
-
-    if (model.owner) {
-      modelParts.push(`readonly owner: ${serializeValue(model.owner)}`);
-    }
-    if (model.discriminator) {
-      modelParts.push(`readonly discriminator: ${serializeValue(model.discriminator)}`);
-    }
-    if (model.variants) {
-      modelParts.push(`readonly variants: ${serializeValue(model.variants)}`);
-    }
-    if (model.base) {
-      modelParts.push(`readonly base: ${serializeValue(model.base)}`);
-    }
-
-    modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
-  }
-
-  return `{ ${modelTypes.join('; ')} }`;
-}
-
-function generateStorageType(storage: MongoStorage): string {
-  const collectionEntries: string[] = [];
-  for (const [collName, collVal] of Object.entries(storage.collections)) {
-    if (Object.keys(collVal).length === 0) {
-      collectionEntries.push(`readonly ${serializeObjectKey(collName)}: Record<string, never>`);
-    } else {
-      collectionEntries.push(
-        `readonly ${serializeObjectKey(collName)}: ${serializeValue(collVal)}`,
-      );
-    }
-  }
-  const collectionsType =
-    collectionEntries.length > 0 ? `{ ${collectionEntries.join('; ')} }` : 'Record<string, never>';
-
-  return `{ readonly collections: ${collectionsType}; readonly storageHash: StorageHash }`;
 }
 
 export const mongoTargetFamilyHook = {
@@ -220,71 +132,66 @@ export const mongoTargetFamilyHook = {
     }
   },
 
-  generateContractTypes(
-    contract: Contract,
-    codecTypeImports: ReadonlyArray<TypesImportSpec>,
-    operationTypeImports: ReadonlyArray<TypesImportSpec>,
-    hashes: {
-      readonly storageHash: string;
-      readonly executionHash?: string;
-      readonly profileHash: string;
-    },
-    options?: GenerateContractTypesOptions,
-  ): string {
-    const parameterizedTypeImports = options?.parameterizedTypeImports;
-    const models = contract.models as Record<string, MongoModelIR>;
+  generateStorageType(contract: Contract, storageHashTypeName: string): string {
     const storage = contract.storage as MongoStorage;
+    const collectionEntries: string[] = [];
+    for (const [collName, collVal] of Object.entries(storage.collections)) {
+      if (Object.keys(collVal).length === 0) {
+        collectionEntries.push(`readonly ${serializeObjectKey(collName)}: Record<string, never>`);
+      } else {
+        collectionEntries.push(
+          `readonly ${serializeObjectKey(collName)}: ${serializeValue(collVal)}`,
+        );
+      }
+    }
+    const collectionsType =
+      collectionEntries.length > 0
+        ? `{ ${collectionEntries.join('; ')} }`
+        : 'Record<string, never>';
 
-    const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
-    if (parameterizedTypeImports) {
-      allImports.push(...parameterizedTypeImports);
+    return `{ readonly collections: ${collectionsType}; readonly storageHash: ${storageHashTypeName} }`;
+  },
+
+  generateModelStorageType(_modelName: string, model: ContractModel): string {
+    const mongoModel = model as unknown as MongoModelIR;
+    const parts: string[] = [];
+    const collection = mongoModel.storage['collection'] as string | undefined;
+    if (collection) {
+      parts.push(`readonly collection: ${serializeValue(collection)}`);
     }
 
-    const uniqueImports = deduplicateImports(allImports);
-    const importLines = generateImportLines(uniqueImports);
+    const storageRelations = mongoModel.storage['relations'] as
+      | Record<string, Record<string, unknown>>
+      | undefined;
+    if (storageRelations && Object.keys(storageRelations).length > 0) {
+      const relEntries: string[] = [];
+      for (const [relName, relVal] of Object.entries(storageRelations)) {
+        relEntries.push(`readonly ${serializeObjectKey(relName)}: ${serializeValue(relVal)}`);
+      }
+      parts.push(`readonly relations: { ${relEntries.join('; ')} }`);
+    }
 
-    const codecTypes = generateCodecTypeIntersection(codecTypeImports, 'CodecTypes');
-    const operationTypes = generateCodecTypeIntersection(operationTypeImports, 'OperationTypes');
+    return parts.length > 0 ? `{ ${parts.join('; ')} }` : 'Record<string, never>';
+  },
 
-    const hashAliases = generateHashTypeAliases(hashes);
-    const rootsType = generateRootsType(contract.roots);
-    const modelsType = generateModelsType(models);
-    const storageTypeDef = generateStorageType(storage);
+  getFamilyImports(): string[] {
+    return [
+      'import type {',
+      '  MongoContractWithTypeMaps,',
+      '  MongoTypeMaps,',
+      "} from '@prisma-next/mongo-contract';",
+    ];
+  },
 
-    return `// ⚠️  GENERATED FILE - DO NOT EDIT
-// This file is automatically generated by 'prisma-next contract emit'.
-// To regenerate, run: prisma-next contract emit
-${importLines.join('\n')}
+  getFamilyTypeAliases(): string {
+    return '';
+  },
 
-import type {
-  MongoContractWithTypeMaps,
-  MongoTypeMaps,
-} from '@prisma-next/mongo-contract';
-import type {
-  ExecutionHashBase,
-  ProfileHashBase,
-  StorageHashBase,
-} from '@prisma-next/contract/types';
+  getTypeMapsExpression(): string {
+    return 'MongoTypeMaps<CodecTypes, OperationTypes>';
+  },
 
-${hashAliases}
-
-export type CodecTypes = ${codecTypes};
-export type OperationTypes = ${operationTypes};
-export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>;
-
-type ContractBase = {
-  readonly target: ${serializeValue(contract.target)};
-  readonly targetFamily: ${serializeValue(contract.targetFamily)};
-  readonly profileHash: ProfileHash;
-  readonly capabilities: ${serializeValue(contract.capabilities)};
-  readonly extensionPacks: ${serializeValue(contract.extensionPacks)};
-  readonly meta: ${serializeValue(contract.meta)};
-  readonly roots: ${rootsType};
-  readonly models: ${modelsType};
-  readonly storage: ${storageTypeDef};
-};
-
-export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;
-`;
+  getContractWrapper(contractBaseName: string, typeMapsName: string): string {
+    return `export type Contract = MongoContractWithTypeMaps<${contractBaseName}, ${typeMapsName}>;`;
   },
 };

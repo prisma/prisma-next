@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { RenderTypeContext, TypeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types-import-spec';
@@ -29,17 +29,20 @@ export interface EmissionSpi {
 
   validateStructure(contract: Contract): void;
 
-  generateContractTypes(
-    contract: Contract,
-    codecTypeImports: ReadonlyArray<TypesImportSpec>,
-    operationTypeImports: ReadonlyArray<TypesImportSpec>,
-    hashes: {
-      readonly storageHash: string;
-      readonly executionHash?: string;
-      readonly profileHash: string;
-    },
-    options?: GenerateContractTypesOptions,
-  ): string;
+  generateStorageType(contract: Contract, storageHashTypeName: string): string;
+
+  generateModelStorageType(modelName: string, model: ContractModel): string;
+
+  /** When set, replaces default domain `models` type emission (e.g. SQL derives field codecs from storage columns). */
+  generateModelsType?(contract: Contract, options?: GenerateContractTypesOptions): string;
+
+  getFamilyImports(): string[];
+
+  getFamilyTypeAliases(options?: GenerateContractTypesOptions): string;
+
+  getTypeMapsExpression(): string;
+
+  getContractWrapper(contractBaseName: string, typeMapsName: string): string;
 }
 
 export interface ParameterizedCodecDescriptor {

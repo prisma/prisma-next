@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Contract } from '@prisma-next/contract/types';
+import { generateContractDts } from '@prisma-next/emitter';
 import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { mongoTargetFamilyHook } from '../src/index';
 
@@ -30,7 +31,7 @@ const hashes = {
   profileHash: 'sha256:orm-profile',
 };
 
-const output = mongoTargetFamilyHook.generateContractTypes(contract, codecImports, [], hashes);
+const output = generateContractDts(contract, mongoTargetFamilyHook, codecImports, [], hashes);
 
 const targets = [
   resolve(

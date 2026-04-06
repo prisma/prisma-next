@@ -1,3 +1,4 @@
+import { generateContractDts } from '@prisma-next/emitter';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
 import { mongoTargetFamilyHook } from '../src/index';
@@ -20,8 +21,9 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
   });
 
   it('generates complete contract.d.ts from blog contract', () => {
-    const types = mongoTargetFamilyHook.generateContractTypes(
+    const types = generateContractDts(
       blogContract,
+      mongoTargetFamilyHook,
       mongoCodecImports,
       [],
       testHashes,
@@ -68,7 +70,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
   });
 
   it('generates storage section with collections', () => {
-    const types = mongoTargetFamilyHook.generateContractTypes(blogContract, [], [], testHashes);
+    const types = generateContractDts(blogContract, mongoTargetFamilyHook, [], [], testHashes);
 
     expect(types).toContain('readonly collections:');
     expect(types).toContain('readonly users: Record<string, never>');
@@ -76,7 +78,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
   });
 
   it('generates Comment model with owner and empty storage', () => {
-    const types = mongoTargetFamilyHook.generateContractTypes(blogContract, [], [], testHashes);
+    const types = generateContractDts(blogContract, mongoTargetFamilyHook, [], [], testHashes);
 
     expect(types).toContain(
       "readonly text: { readonly codecId: 'mongo/string@1'; readonly nullable: false }",

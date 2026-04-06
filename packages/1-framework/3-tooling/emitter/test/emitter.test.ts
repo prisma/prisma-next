@@ -1,5 +1,4 @@
 import type {
-  EmissionSpi,
   GenerateContractTypesOptions,
   TypeRenderEntry,
   TypesImportSpec,
@@ -9,54 +8,10 @@ import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
 import { emit } from '../src/exports';
+import { createMockSpi } from './mock-spi';
 import { createTestContract } from './utils';
 
-const mockSqlHook: EmissionSpi = {
-  id: 'sql',
-  validateTypes: (contract) => {
-    const storage = contract.storage as
-      | { tables?: Record<string, { columns?: Record<string, { codecId?: string }> }> }
-      | undefined;
-    if (!storage?.tables) {
-      return;
-    }
-
-    // Only validate codec ID format (ns/name@version)
-    // Namespace validation removed - codecs can use any namespace
-    const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
-
-    for (const [tableName, table] of Object.entries(storage.tables)) {
-      if (!table.columns) continue;
-      for (const [colName, col] of Object.entries(table.columns)) {
-        if (!col.codecId) {
-          throw new Error(`Column "${colName}" in table "${tableName}" is missing codecId`);
-        }
-
-        if (!typeIdRegex.test(col.codecId)) {
-          throw new Error(
-            `Column "${colName}" in table "${tableName}" has invalid codecId format "${col.codecId}". Expected format: ns/name@version`,
-          );
-        }
-      }
-    }
-  },
-  validateStructure: (contract) => {
-    if (contract.targetFamily !== 'sql') {
-      throw new Error(`Expected targetFamily "sql", got "${contract.targetFamily}"`);
-    }
-  },
-  generateContractTypes: (contract, _codecTypeImports, _operationTypeImports, _hashes) => {
-    void contract;
-    void _codecTypeImports;
-    void _operationTypeImports;
-    void _hashes;
-    return `// Generated contract types
-export type CodecTypes = Record<string, never>;
-export type LaneCodecTypes = CodecTypes;
-export type Contract = unknown;
-`;
-  },
-};
+const mockSqlHook = createMockSpi();
 
 describe('emitter', () => {
   it(
@@ -95,7 +50,6 @@ describe('emitter', () => {
         },
       });
 
-      // Create empty registry and minimal test data (emitter tests don't load packs)
       const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
@@ -121,7 +75,6 @@ describe('emitter', () => {
   );
 
   it('does not validate codec namespaces against extensions', async () => {
-    // Namespace validation removed - codecs can use any namespace
     const ir = createTestContract({
       storage: {
         tables: {
@@ -146,7 +99,6 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    // Should succeed - namespace validation removed
     const result = await emit(ir, options, mockSqlHook);
     expect(result.contractJson).toBeDefined();
     expect(result.contractDts).toBeDefined();
@@ -181,7 +133,6 @@ describe('emitter', () => {
   });
 
   it('emits contract even when extension pack namespace does not match extensionIds', async () => {
-    // Adapter-provided codecs (pg/int4@1) don't need to be in contract.extensionPacks
     const ir = createTestContract({
       storage: {
         tables: {
@@ -202,17 +153,15 @@ describe('emitter', () => {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
-      extensionIds: [], // No extensions, but codec still works
+      extensionIds: [],
     };
 
-    // Should succeed - adapter-provided codecs don't need to be in contract.extensionPacks
     const result = await emit(ir, options, mockSqlHook);
     expect(result.contractJson).toBeDefined();
     expect(result.contractDts).toBeDefined();
   });
 
   it('handles missing extensionPacks field', async () => {
-    // Namespace validation removed - codecs can use any namespace
     const ir = createTestContract({
       storage: {
         tables: {
@@ -236,14 +185,12 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    // Should succeed - namespace validation removed
     const result = await emit(ir, options, mockSqlHook);
     expect(result.contractJson).toBeDefined();
     expect(result.contractDts).toBeDefined();
   });
 
   it('handles empty packs array', async () => {
-    // Namespace validation removed - codecs can use any namespace
     const ir = createTestContract({
       storage: {
         tables: {
@@ -267,7 +214,6 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    // Should succeed - namespace validation removed
     const result = await emit(ir, options, mockSqlHook);
     expect(result.contractJson).toBeDefined();
     expect(result.contractDts).toBeDefined();
@@ -361,49 +307,29 @@ describe('emitter', () => {
   });
 
   it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {
-    // extensionIds includes adapters/targets which are not in contract.extensionPacks
     const ir = createTestContract({
       storage: {
         tables: {},
       },
     });
 
-    // Use a mock hook that doesn't validate types to avoid type validation errors
-    const mockHookNoTypeValidation: EmissionSpi = {
-      id: 'sql',
+    const mockHookNoTypeValidation = createMockSpi({
       validateTypes: () => {},
-      validateStructure: (contract) => {
-        if (contract.targetFamily !== 'sql') {
-          throw new Error(`Expected targetFamily "sql", got "${contract.targetFamily}"`);
-        }
-      },
-      generateContractTypes: (contract, _codecTypeImports, _operationTypeImports, _hashes) => {
-        void contract;
-        void _codecTypeImports;
-        void _operationTypeImports;
-        void _hashes;
-        return `// Generated contract types
-export type CodecTypes = Record<string, never>;
-export type LaneCodecTypes = CodecTypes;
-export type Contract = unknown;
-`;
-      },
-    };
+    });
 
     const options: EmitStackInput = {
       operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
-      extensionIds: ['postgres'], // Adapter ID, not an extension
+      extensionIds: ['postgres'],
     };
 
-    // Should succeed - extensionIds can include adapters/targets
     const result = await emit(ir, options, mockHookNoTypeValidation);
     expect(result.contractJson).toBeDefined();
     expect(result.contractDts).toBeDefined();
   });
 
-  it('passes parameterizedRenderers to generateContractTypes options', async () => {
+  it('forwards parameterizedRenderers option to getFamilyTypeAliases', async () => {
     const ir = createTestContract({
       storage: {
         tables: {},
@@ -412,26 +338,14 @@ export type Contract = unknown;
 
     let receivedOptions: GenerateContractTypesOptions | undefined;
 
-    const mockHookCapturingOptions: EmissionSpi = {
-      id: 'sql',
+    const mockHookCapturingOptions = createMockSpi({
       validateTypes: () => {},
       validateStructure: () => {},
-      generateContractTypes: (
-        contract,
-        _codecTypeImports,
-        _operationTypeImports,
-        _hashes,
-        options,
-      ) => {
-        void contract;
+      getFamilyTypeAliases: (options) => {
         receivedOptions = options;
-        return `// Generated contract types
-export type CodecTypes = Record<string, never>;
-export type LaneCodecTypes = CodecTypes;
-export type Contract = unknown;
-`;
+        return '';
       },
-    };
+    });
 
     const vectorRenderer: TypeRenderEntry = {
       codecId: 'pg/vector@1',

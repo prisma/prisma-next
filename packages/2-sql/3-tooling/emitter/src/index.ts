@@ -1,11 +1,15 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractModel } from '@prisma-next/contract/types';
+import {
+  generateCodecTypeIntersection,
+  serializeObjectKey,
+  serializeValue,
+} from '@prisma-next/emitter/domain-type-generation';
 import type {
   GenerateContractTypesOptions,
-  TypeRenderEntry,
-  TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { assertDefined } from '@prisma-next/utils/assertions';
 
 type IRModelField = { readonly column: string };
 type IRModelStorage = {
@@ -19,7 +23,18 @@ type IRModelDefinition = {
   readonly owner?: string;
 };
 
-import { assertDefined } from '@prisma-next/utils/assertions';
+function serializeTypeParamsLiteral(params: Record<string, unknown>): string {
+  if (!params || Object.keys(params).length === 0) {
+    return 'Record<string, never>';
+  }
+
+  const entries: string[] = [];
+  for (const [key, value] of Object.entries(params)) {
+    entries.push(`readonly ${serializeObjectKey(key)}: ${serializeValue(value)}`);
+  }
+
+  return `{ ${entries.join('; ')} }`;
+}
 
 export const sqlTargetFamilyHook = {
   id: 'sql',
@@ -29,8 +44,6 @@ export const sqlTargetFamilyHook = {
     if (!storage || !storage.tables) {
       return;
     }
-
-    // Validate codec ID format (ns/name@version). Adapter-provided codecs are available regardless of contract.extensionPacks (which is for framework extensions); TypeScript prevents invalid usage and runtime validates availability.
 
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
@@ -115,10 +128,6 @@ export const sqlTargetFamilyHook = {
       const table = tableUnknown as StorageTable;
       const columnNames = new Set(Object.keys(table.columns));
 
-      // Column structure (nullable, nativeType, codecId) and table arrays (uniques, indexes, foreignKeys)
-      // are validated by Arktype schema validation - no need to re-check here.
-      // We only validate logical consistency (foreign key references, model references, etc.)
-
       if (!Array.isArray(table.uniques)) {
         throw new Error(
           `Table "${tableName}" is missing required field "uniques" (must be an array)`,
@@ -180,7 +189,6 @@ export const sqlTargetFamilyHook = {
           );
         }
 
-        // Table existence guaranteed by Set.has() check above
         const referencedTable: StorageTable | undefined = storage.tables[fk.references.table];
         assertDefined(
           referencedTable,
@@ -205,146 +213,8 @@ export const sqlTargetFamilyHook = {
     }
   },
 
-  generateContractTypes(
-    contract: Contract,
-    codecTypeImports: ReadonlyArray<TypesImportSpec>,
-    operationTypeImports: ReadonlyArray<TypesImportSpec>,
-    hashes: {
-      readonly storageHash: string;
-      readonly executionHash?: string;
-      readonly profileHash: string;
-    },
-    options?: GenerateContractTypesOptions,
-  ): string {
-    const parameterizedTypeImports = options?.parameterizedTypeImports;
+  generateStorageType(contract: Contract, storageHashTypeName: string): string {
     const storage = contract.storage as unknown as SqlStorage;
-    const models = contract.models as Record<string, IRModelDefinition>;
-
-    // Collect all type imports from three sources:
-    // 1. Codec type imports (from adapters, targets, and extensions)
-    // 2. Operation type imports (from adapters, targets, and extensions)
-    // 3. Parameterized type imports (for parameterized codec renderers, may contain duplicates)
-    const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
-
-    if (parameterizedTypeImports) {
-      allImports.push(...parameterizedTypeImports);
-    }
-
-    const queryOperationTypeImports = options?.queryOperationTypeImports ?? [];
-    if (queryOperationTypeImports.length > 0) {
-      allImports.push(...queryOperationTypeImports);
-    }
-
-    // Deduplicate imports by package+named to avoid duplicate import statements.
-    // Strategy: When the same package::named appears multiple times, keep the first
-    // occurrence (and its alias); later duplicates with different aliases are silently ignored.
-    //
-    // Note: uniqueImports must be an array (not a Set) because:
-    // - We need to preserve the full TypesImportSpec objects (package, named, alias)
-    // - We need to preserve insertion order (first occurrence wins)
-    // - seenImportKeys is a Set used only for O(1) duplicate detection
-    const seenImportKeys = new Set<string>();
-    const uniqueImports: TypesImportSpec[] = [];
-    for (const imp of allImports) {
-      const key = `${imp.package}::${imp.named}`;
-      if (!seenImportKeys.has(key)) {
-        seenImportKeys.add(key);
-        uniqueImports.push(imp);
-      }
-    }
-
-    // Generate import statements, omitting redundant "as Alias" when named === alias
-    const importLines = uniqueImports.map((imp) => {
-      // Simplify import when named === alias (e.g., `import type { Vector }` instead of `{ Vector as Vector }`)
-      const importClause = imp.named === imp.alias ? imp.named : `${imp.named} as ${imp.alias}`;
-      return `import type { ${importClause} } from '${imp.package}';`;
-    });
-
-    // Only intersect actual codec/operation type maps. Extra type-only imports (e.g. Vector<N>) are
-    // included in importLines via codecTypeImports but must not be intersected into CodecTypes.
-    const codecTypes = codecTypeImports
-      .filter((imp) => imp.named === 'CodecTypes')
-      .map((imp) => imp.alias)
-      .join(' & ');
-    const operationTypes = operationTypeImports
-      .filter((imp) => imp.named === 'OperationTypes')
-      .map((imp) => imp.alias)
-      .join(' & ');
-    const queryOperationTypes = queryOperationTypeImports
-      .filter((imp) => imp.named === 'QueryOperationTypes')
-      .map((imp) => imp.alias)
-      .join(' & ');
-
-    const storageType = this.generateStorageType(storage, 'StorageHash');
-    const modelsType = this.generateModelsType(models, storage, options?.parameterizedRenderers);
-    const rootsType = this.generateRootsType(contract.roots);
-
-    const executionHashType = hashes.executionHash
-      ? `ExecutionHashBase<'${hashes.executionHash}'>`
-      : 'ExecutionHashBase<string>';
-
-    return `// ⚠️  GENERATED FILE - DO NOT EDIT
-  // This file is automatically generated by 'prisma-next contract emit'.
-  // To regenerate, run: prisma-next contract emit
-  ${importLines.join('\n')}
-
-  import type {
-    Contract as ContractShape,
-    ExecutionHashBase,
-    ProfileHashBase,
-    StorageHashBase,
-  } from '@prisma-next/contract/types';
-  import type {
-    ContractWithTypeMaps,
-    TypeMaps as TypeMapsType,
-  } from '@prisma-next/sql-contract/types';
-
-  export type StorageHash = StorageHashBase<'${hashes.storageHash}'>;
-  export type ExecutionHash = ${executionHashType};
-  export type ProfileHash = ProfileHashBase<'${hashes.profileHash}'>;
-
-  export type CodecTypes = ${codecTypes || 'Record<string, never>'};
-  export type LaneCodecTypes = CodecTypes;
-  export type OperationTypes = ${operationTypes || 'Record<string, never>'};
-  export type QueryOperationTypes = ${queryOperationTypes || 'Record<string, never>'};
-  type DefaultLiteralValue<CodecId extends string, _Encoded> =
-    CodecId extends keyof CodecTypes
-      ? CodecTypes[CodecId]['output']
-      : _Encoded;
-
-  export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
-
-  type ContractBase = ContractShape<
-  ${storageType},
-  ${modelsType}
-  > & {
-    readonly target: ${this.serializeValue(contract.target)};
-    readonly roots: ${rootsType};
-    readonly capabilities: ${this.serializeValue(contract.capabilities)};
-    readonly extensionPacks: ${this.serializeValue(contract.extensionPacks)};${contract.execution !== undefined ? `\n    readonly execution: ${this.serializeValue(contract.execution)};` : ''}
-    readonly profileHash: ProfileHash;
-  };
-
-  export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
-
-  export type Tables = Contract['storage']['tables'];
-  export type Models = Contract['models'];
-  `;
-  },
-
-  generateRootsType(roots: Record<string, string> | undefined): string {
-    if (!roots || Object.keys(roots).length === 0) {
-      return 'Record<string, string>';
-    }
-    const entries = Object.entries(roots)
-      .map(
-        ([key, value]) => `readonly ${this.serializeObjectKey(key)}: ${this.serializeValue(value)}`,
-      )
-      .join('; ');
-    return `{ ${entries} }`;
-  },
-
-  generateStorageType(storage: SqlStorage, storageHashType: string): string {
     const tables: string[] = [];
     for (const [tableName, table] of Object.entries(storage.tables).sort(([a], [b]) =>
       a.localeCompare(b),
@@ -352,23 +222,23 @@ export const sqlTargetFamilyHook = {
       const columns: string[] = [];
       for (const [colName, col] of Object.entries(table.columns)) {
         const nullable = col.nullable ? 'true' : 'false';
-        const nativeType = this.serializeValue(col.nativeType);
-        const codecId = this.serializeValue(col.codecId);
+        const nativeType = serializeValue(col.nativeType);
+        const codecId = serializeValue(col.codecId);
         const defaultSpec = col.default
           ? col.default.kind === 'literal'
-            ? `; readonly default: { readonly kind: 'literal'; readonly value: DefaultLiteralValue<${codecId}, ${this.serializeValue(
+            ? `; readonly default: { readonly kind: 'literal'; readonly value: DefaultLiteralValue<${codecId}, ${serializeValue(
                 col.default.value,
               )}> }`
-            : `; readonly default: { readonly kind: 'function'; readonly expression: ${this.serializeValue(
+            : `; readonly default: { readonly kind: 'function'; readonly expression: ${serializeValue(
                 col.default.expression,
               )} }`
           : '';
         const typeParamsSpec =
           col.typeParams && Object.keys(col.typeParams).length > 0
-            ? `; readonly typeParams: ${this.serializeTypeParamsLiteral(col.typeParams)}`
+            ? `; readonly typeParams: ${serializeTypeParamsLiteral(col.typeParams)}`
             : '';
         const typeRefSpec = col.typeRef
-          ? `; readonly typeRef: ${this.serializeValue(col.typeRef)}`
+          ? `; readonly typeRef: ${serializeValue(col.typeRef)}`
           : '';
         columns.push(
           `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable}${defaultSpec}${typeParamsSpec}${typeRefSpec} }`,
@@ -378,17 +248,17 @@ export const sqlTargetFamilyHook = {
       const tableParts: string[] = [`columns: { ${columns.join('; ')} }`];
 
       if (table.primaryKey) {
-        const pkCols = table.primaryKey.columns.map((c) => this.serializeValue(c)).join(', ');
+        const pkCols = table.primaryKey.columns.map((c) => serializeValue(c)).join(', ');
         const pkName = table.primaryKey.name
-          ? `; readonly name: ${this.serializeValue(table.primaryKey.name)}`
+          ? `; readonly name: ${serializeValue(table.primaryKey.name)}`
           : '';
         tableParts.push(`primaryKey: { readonly columns: readonly [${pkCols}]${pkName} }`);
       }
 
       const uniques = table.uniques
         .map((u) => {
-          const cols = u.columns.map((c: string) => this.serializeValue(c)).join(', ');
-          const name = u.name ? `; readonly name: ${this.serializeValue(u.name)}` : '';
+          const cols = u.columns.map((c: string) => serializeValue(c)).join(', ');
+          const name = u.name ? `; readonly name: ${serializeValue(u.name)}` : '';
           return `{ readonly columns: readonly [${cols}]${name} }`;
         })
         .join(', ');
@@ -396,12 +266,11 @@ export const sqlTargetFamilyHook = {
 
       const indexes = table.indexes
         .map((i) => {
-          const cols = i.columns.map((c: string) => this.serializeValue(c)).join(', ');
-          const name = i.name ? `; readonly name: ${this.serializeValue(i.name)}` : '';
-          const using =
-            i.using !== undefined ? `; readonly using: ${this.serializeValue(i.using)}` : '';
+          const cols = i.columns.map((c: string) => serializeValue(c)).join(', ');
+          const name = i.name ? `; readonly name: ${serializeValue(i.name)}` : '';
+          const using = i.using !== undefined ? `; readonly using: ${serializeValue(i.using)}` : '';
           const config =
-            i.config !== undefined ? `; readonly config: ${this.serializeValue(i.config)}` : '';
+            i.config !== undefined ? `; readonly config: ${serializeValue(i.config)}` : '';
           return `{ readonly columns: readonly [${cols}]${name}${using}${config} }`;
         })
         .join(', ');
@@ -409,12 +278,10 @@ export const sqlTargetFamilyHook = {
 
       const fks = table.foreignKeys
         .map((fk) => {
-          const cols = fk.columns.map((c: string) => this.serializeValue(c)).join(', ');
-          const refCols = fk.references.columns
-            .map((c: string) => this.serializeValue(c))
-            .join(', ');
-          const name = fk.name ? `; readonly name: ${this.serializeValue(fk.name)}` : '';
-          return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: ${this.serializeValue(fk.references.table)}; readonly columns: readonly [${refCols}] }${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
+          const cols = fk.columns.map((c: string) => serializeValue(c)).join(', ');
+          const refCols = fk.references.columns.map((c: string) => serializeValue(c)).join(', ');
+          const name = fk.name ? `; readonly name: ${serializeValue(fk.name)}` : '';
+          return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: ${serializeValue(fk.references.table)}; readonly columns: readonly [${refCols}] }${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
         })
         .join(', ');
       tableParts.push(`foreignKeys: readonly [${fks}]`);
@@ -422,98 +289,34 @@ export const sqlTargetFamilyHook = {
       tables.push(`readonly ${tableName}: { ${tableParts.join('; ')} }`);
     }
 
-    const typesType = this.generateStorageTypesType(storage.types);
+    const typesType = generateStorageTypesType(storage.types);
 
-    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType}; readonly storageHash: ${storageHashType} }`;
+    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType}; readonly storageHash: ${storageHashTypeName} }`;
   },
 
-  /**
-   * Generates the TypeScript type for storage.types with literal types.
-   * This preserves type params as literal values for precise typing.
-   */
-  generateStorageTypesType(types: SqlStorage['types']): string {
-    if (!types || Object.keys(types).length === 0) {
-      return 'Record<string, never>';
-    }
+  generateModelStorageType(modelName: string, model: ContractModel): string {
+    const irModel = model as unknown as IRModelDefinition;
+    const tableName = irModel.storage.table;
+    const storageFields = irModel.storage.fields ?? {};
 
-    const typeEntries: string[] = [];
-    for (const [typeName, typeInstance] of Object.entries(types)) {
-      const codecId = this.serializeValue(typeInstance.codecId);
-      const nativeType = this.serializeValue(typeInstance.nativeType);
-      const typeParamsStr = this.serializeTypeParamsLiteral(typeInstance.typeParams);
-      typeEntries.push(
-        `readonly ${typeName}: { readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
-      );
-    }
-
-    return `{ ${typeEntries.join('; ')} }`;
-  },
-
-  /**
-   * Serializes a typeParams object to a TypeScript literal type.
-   * Converts { length: 1536 } to "{ readonly length: 1536 }".
-   */
-  serializeTypeParamsLiteral(params: Record<string, unknown>): string {
-    if (!params || Object.keys(params).length === 0) {
-      return 'Record<string, never>';
-    }
-
-    const entries: string[] = [];
-    for (const [key, value] of Object.entries(params)) {
-      const serialized = this.serializeValue(value);
-      entries.push(`readonly ${this.serializeObjectKey(key)}: ${serialized}`);
-    }
-
-    return `{ ${entries.join('; ')} }`;
-  },
-
-  /**
-   * Serializes a value to a TypeScript literal type expression.
-   */
-  serializeValue(value: unknown): string {
-    if (value === null) {
-      return 'null';
-    }
-    if (value === undefined) {
-      return 'undefined';
-    }
-    if (typeof value === 'string') {
-      // Escape backslashes first, then single quotes
-      const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      return `'${escaped}'`;
-    }
-    if (typeof value === 'number' || typeof value === 'boolean') {
-      return String(value);
-    }
-    if (typeof value === 'bigint') {
-      return `${value}n`;
-    }
-    if (Array.isArray(value)) {
-      const items = value.map((v) => this.serializeValue(v)).join(', ');
-      return `readonly [${items}]`;
-    }
-    if (typeof value === 'object') {
-      const entries: string[] = [];
-      for (const [k, v] of Object.entries(value)) {
-        entries.push(`readonly ${this.serializeObjectKey(k)}: ${this.serializeValue(v)}`);
+    const storageParts = [`readonly table: ${serializeValue(tableName)}`];
+    if (Object.keys(storageFields).length > 0) {
+      const fieldParts: string[] = [];
+      for (const [fieldName, field] of Object.entries(storageFields)) {
+        fieldParts.push(
+          `readonly ${serializeObjectKey(fieldName)}: { readonly column: ${serializeValue(field.column)} }`,
+        );
       }
-      return `{ ${entries.join('; ')} }`;
+      storageParts.push(`readonly fields: { ${fieldParts.join('; ')} }`);
     }
-    return 'unknown';
+
+    return `{ ${storageParts.join('; ')} }`;
   },
 
-  serializeObjectKey(key: string): string {
-    if (/^[$A-Z_a-z][$\w]*$/.test(key)) {
-      return key;
-    }
-    return this.serializeValue(key);
-  },
+  generateModelsType(contract: Contract, _options?: GenerateContractTypesOptions): string {
+    const storage = contract.storage as unknown as SqlStorage;
+    const models = contract.models as Record<string, IRModelDefinition> | undefined;
 
-  generateModelsType(
-    models: Record<string, IRModelDefinition> | undefined,
-    storage: SqlStorage,
-    parameterizedRenderers?: Map<string, TypeRenderEntry>,
-  ): string {
     if (!models) {
       return 'Record<string, never>';
     }
@@ -536,35 +339,27 @@ export const sqlTargetFamilyHook = {
               `readonly ${fieldName}: { readonly codecId: 'unknown'; readonly nullable: false }`,
             );
             storageFieldParts.push(
-              `readonly ${fieldName}: { readonly column: ${this.serializeValue(field.column)} }`,
+              `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
             );
             continue;
           }
 
           const nullable = column.nullable ?? false;
-          const resolved =
+          const resolvedTypeParams =
             column.typeParams && Object.keys(column.typeParams).length > 0
               ? column.typeParams
               : column.typeRef
                 ? storage.types?.[column.typeRef]?.typeParams
                 : undefined;
-
-          const renderer = parameterizedRenderers?.get(column.codecId);
-          if (renderer && resolved && Object.keys(resolved).length > 0) {
-            const renderedType = renderer.render(resolved, { codecTypesName: 'CodecTypes' });
-            const nullSuffix = nullable ? ' | null' : '';
-            fields.push(`readonly ${fieldName}: ${renderedType}${nullSuffix}`);
-          } else {
-            const typeParamsSpec =
-              resolved && Object.keys(resolved).length > 0
-                ? `; readonly typeParams: ${this.serializeTypeParamsLiteral(resolved)}`
-                : '';
-            fields.push(
-              `readonly ${fieldName}: { readonly codecId: ${this.serializeValue(column.codecId)}; readonly nullable: ${nullable}${typeParamsSpec} }`,
-            );
-          }
+          const fieldTypeParamsSpec =
+            resolvedTypeParams && Object.keys(resolvedTypeParams).length > 0
+              ? `; readonly typeParams: ${serializeTypeParamsLiteral(resolvedTypeParams)}`
+              : '';
+          fields.push(
+            `readonly ${fieldName}: { readonly codecId: ${serializeValue(column.codecId)}; readonly nullable: ${nullable}${fieldTypeParamsSpec} }`,
+          );
           storageFieldParts.push(
-            `readonly ${fieldName}: { readonly column: ${this.serializeValue(field.column)} }`,
+            `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
           );
         }
       } else {
@@ -573,7 +368,7 @@ export const sqlTargetFamilyHook = {
             `readonly ${fieldName}: { readonly codecId: 'unknown'; readonly nullable: false }`,
           );
           storageFieldParts.push(
-            `readonly ${fieldName}: { readonly column: ${this.serializeValue(field.column)} }`,
+            `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
           );
         }
       }
@@ -589,8 +384,8 @@ export const sqlTargetFamilyHook = {
           relParts.push(`readonly cardinality: '${relObj['cardinality']}'`);
         const on = relObj['on'] as { localFields?: string[]; targetFields?: string[] } | undefined;
         if (on?.localFields && on.targetFields) {
-          const localFields = on.localFields.map((f) => this.serializeValue(f)).join(', ');
-          const targetFields = on.targetFields.map((f) => this.serializeValue(f)).join(', ');
+          const localFields = on.localFields.map((f) => serializeValue(f)).join(', ');
+          const targetFields = on.targetFields.map((f) => serializeValue(f)).join(', ');
           relParts.push(
             `readonly on: { readonly localFields: readonly [${localFields}]; readonly targetFields: readonly [${targetFields}] }`,
           );
@@ -612,7 +407,7 @@ export const sqlTargetFamilyHook = {
       ];
 
       if (model.owner) {
-        modelParts.push(`owner: ${this.serializeValue(model.owner)}`);
+        modelParts.push(`owner: ${serializeValue(model.owner)}`);
       }
 
       modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
@@ -620,4 +415,65 @@ export const sqlTargetFamilyHook = {
 
     return `{ ${modelTypes.join('; ')} }`;
   },
+
+  serializeTypeParamsLiteral,
+
+  serializeValue,
+
+  getFamilyImports(): string[] {
+    return [
+      'import type {',
+      '  ContractWithTypeMaps,',
+      '  TypeMaps as TypeMapsType,',
+      "} from '@prisma-next/sql-contract/types';",
+    ];
+  },
+
+  getFamilyTypeAliases(options?: GenerateContractTypesOptions): string {
+    const queryOperationTypeImports = options?.queryOperationTypeImports ?? [];
+    const queryOperationTypes = generateCodecTypeIntersection(
+      queryOperationTypeImports,
+      'QueryOperationTypes',
+    );
+
+    return [
+      'export type LaneCodecTypes = CodecTypes;',
+      `export type QueryOperationTypes = ${queryOperationTypes};`,
+      'type DefaultLiteralValue<CodecId extends string, _Encoded> =',
+      '  CodecId extends keyof CodecTypes',
+      "    ? CodecTypes[CodecId]['output']",
+      '    : _Encoded;',
+    ].join('\n');
+  },
+
+  getTypeMapsExpression(): string {
+    return 'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>';
+  },
+
+  getContractWrapper(contractBaseName: string, typeMapsName: string): string {
+    return [
+      `export type Contract = ContractWithTypeMaps<${contractBaseName}, ${typeMapsName}>;`,
+      '',
+      "export type Tables = Contract['storage']['tables'];",
+      "export type Models = Contract['models'];",
+    ].join('\n');
+  },
 } as const;
+
+function generateStorageTypesType(types: SqlStorage['types']): string {
+  if (!types || Object.keys(types).length === 0) {
+    return 'Record<string, never>';
+  }
+
+  const typeEntries: string[] = [];
+  for (const [typeName, typeInstance] of Object.entries(types)) {
+    const codecId = serializeValue(typeInstance.codecId);
+    const nativeType = serializeValue(typeInstance.nativeType);
+    const typeParamsStr = serializeTypeParamsLiteral(typeInstance.typeParams);
+    typeEntries.push(
+      `readonly ${typeName}: { readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
+    );
+  }
+
+  return `{ ${typeEntries.join('; ')} }`;
+}
