@@ -1,4 +1,15 @@
 import {
+  MongoAggAccumulator,
+  MongoAggArrayFilter,
+  MongoAggCond,
+  MongoAggFieldRef,
+  MongoAggLet,
+  MongoAggLiteral,
+  MongoAggMap,
+  MongoAggMergeObjects,
+  MongoAggOperator,
+  MongoAggReduce,
+  MongoAggSwitch,
   MongoAndExpr,
   MongoExistsExpr,
   MongoFieldFilter,
@@ -14,7 +25,7 @@ import {
 } from '@prisma-next/mongo-query-ast';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
-import { lowerFilter, lowerPipeline, lowerStage } from '../src/lowering';
+import { lowerAggExpr, lowerFilter, lowerPipeline, lowerStage } from '../src/lowering';
 
 describe('lowerFilter', () => {
   it('lowers MongoFieldFilter with $eq', () => {
@@ -157,6 +168,196 @@ describe('lowerStage', () => {
     const stage = new MongoUnwindStage('$posts', true);
     expect(lowerStage(stage)).toEqual({
       $unwind: { path: '$posts', preserveNullAndEmptyArrays: true },
+    });
+  });
+});
+
+describe('lowerAggExpr', () => {
+  it('lowers MongoAggFieldRef to $-prefixed string', () => {
+    expect(lowerAggExpr(MongoAggFieldRef.of('name'))).toBe('$name');
+  });
+
+  it('lowers dotted field ref', () => {
+    expect(lowerAggExpr(MongoAggFieldRef.of('address.city'))).toBe('$address.city');
+  });
+
+  it('lowers unambiguous literal directly', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of(42))).toBe(42);
+  });
+
+  it('lowers string literal directly when unambiguous', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of('hello'))).toBe('hello');
+  });
+
+  it('lowers null literal directly', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of(null))).toBe(null);
+  });
+
+  it('lowers boolean literal directly', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of(true))).toBe(true);
+  });
+
+  it('wraps $-prefixed string literal in $literal', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of('$ambiguous'))).toEqual({
+      $literal: '$ambiguous',
+    });
+  });
+
+  it('wraps object with $-prefixed keys in $literal', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of({ $foo: 1 }))).toEqual({
+      $literal: { $foo: 1 },
+    });
+  });
+
+  it('does not wrap plain object literal', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of({ key: 'value' }))).toEqual({ key: 'value' });
+  });
+
+  it('lowers array-arg operator', () => {
+    expect(
+      lowerAggExpr(MongoAggOperator.add(MongoAggFieldRef.of('price'), MongoAggFieldRef.of('tax'))),
+    ).toEqual({ $add: ['$price', '$tax'] });
+  });
+
+  it('lowers single-arg operator', () => {
+    expect(lowerAggExpr(MongoAggOperator.toLower(MongoAggFieldRef.of('name')))).toEqual({
+      $toLower: '$name',
+    });
+  });
+
+  it('lowers nested operator expression', () => {
+    const expr = MongoAggOperator.multiply(
+      MongoAggFieldRef.of('price'),
+      MongoAggOperator.subtract(MongoAggLiteral.of(1), MongoAggFieldRef.of('discount')),
+    );
+    expect(lowerAggExpr(expr)).toEqual({
+      $multiply: ['$price', { $subtract: [1, '$discount'] }],
+    });
+  });
+
+  it('lowers accumulator with arg', () => {
+    expect(lowerAggExpr(MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')))).toEqual({
+      $sum: '$amount',
+    });
+  });
+
+  it('lowers $count accumulator with null arg to empty object', () => {
+    expect(lowerAggExpr(MongoAggAccumulator.count())).toEqual({ $count: {} });
+  });
+
+  it('lowers $cond', () => {
+    const expr = MongoAggCond.of(
+      MongoAggOperator.of('$gte', [MongoAggFieldRef.of('age'), MongoAggLiteral.of(18)]),
+      MongoAggLiteral.of('adult'),
+      MongoAggLiteral.of('minor'),
+    );
+    const thenKey = 'then';
+    expect(lowerAggExpr(expr)).toEqual({
+      $cond: Object.fromEntries([
+        ['if', { $gte: ['$age', 18] }],
+        [thenKey, 'adult'],
+        ['else', 'minor'],
+      ]),
+    });
+  });
+
+  it('lowers $switch', () => {
+    const expr = MongoAggSwitch.of(
+      [
+        {
+          case_: MongoAggOperator.of('$eq', [
+            MongoAggFieldRef.of('status'),
+            MongoAggLiteral.of('active'),
+          ]),
+          then_: MongoAggLiteral.of('Active'),
+        },
+      ],
+      MongoAggLiteral.of('Unknown'),
+    );
+    const thenKey = 'then';
+    expect(lowerAggExpr(expr)).toEqual({
+      $switch: {
+        branches: [
+          Object.fromEntries([
+            ['case', { $eq: ['$status', 'active'] }],
+            [thenKey, 'Active'],
+          ]),
+        ],
+        default: 'Unknown',
+      },
+    });
+  });
+
+  it('lowers $filter', () => {
+    const expr = MongoAggArrayFilter.of(
+      MongoAggFieldRef.of('scores'),
+      MongoAggOperator.of('$gte', [MongoAggFieldRef.of('score'), MongoAggLiteral.of(70)]),
+      'score',
+    );
+    expect(lowerAggExpr(expr)).toEqual({
+      $filter: {
+        input: '$scores',
+        cond: { $gte: ['$score', 70] },
+        as: 'score',
+      },
+    });
+  });
+
+  it('lowers $map', () => {
+    const expr = MongoAggMap.of(
+      MongoAggFieldRef.of('items'),
+      MongoAggOperator.multiply(MongoAggFieldRef.of('item.price'), MongoAggFieldRef.of('item.qty')),
+      'item',
+    );
+    expect(lowerAggExpr(expr)).toEqual({
+      $map: {
+        input: '$items',
+        in: { $multiply: ['$item.price', '$item.qty'] },
+        as: 'item',
+      },
+    });
+  });
+
+  it('lowers $reduce', () => {
+    const expr = MongoAggReduce.of(
+      MongoAggFieldRef.of('items'),
+      MongoAggLiteral.of(0),
+      MongoAggOperator.add(MongoAggFieldRef.of('value'), MongoAggFieldRef.of('this')),
+    );
+    expect(lowerAggExpr(expr)).toEqual({
+      $reduce: {
+        input: '$items',
+        initialValue: 0,
+        in: { $add: ['$value', '$this'] },
+      },
+    });
+  });
+
+  it('lowers $let', () => {
+    const expr = MongoAggLet.of(
+      {
+        total: MongoAggOperator.add(MongoAggFieldRef.of('price'), MongoAggFieldRef.of('tax')),
+      },
+      MongoAggOperator.multiply(
+        MongoAggFieldRef.of('total'),
+        MongoAggOperator.subtract(MongoAggLiteral.of(1), MongoAggFieldRef.of('discount')),
+      ),
+    );
+    expect(lowerAggExpr(expr)).toEqual({
+      $let: {
+        vars: { total: { $add: ['$price', '$tax'] } },
+        in: { $multiply: ['$total', { $subtract: [1, '$discount'] }] },
+      },
+    });
+  });
+
+  it('lowers $mergeObjects', () => {
+    const expr = MongoAggMergeObjects.of([
+      MongoAggFieldRef.of('defaults'),
+      MongoAggFieldRef.of('overrides'),
+    ]);
+    expect(lowerAggExpr(expr)).toEqual({
+      $mergeObjects: ['$defaults', '$overrides'],
     });
   });
 });
