@@ -657,6 +657,82 @@ describe('validateContract', () => {
     });
   });
 
+  describe('codec default decoding', () => {
+    it('decodes literal defaults via codecLookup', () => {
+      const contract = makeContract({
+        event: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            starts_at: {
+              codecId: 'pg/timestamptz@1',
+              nativeType: 'timestamptz',
+              nullable: false,
+              default: { kind: 'literal', value: '2025-01-01T00:00:00.000Z' },
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      });
+      const codecLookup = {
+        get: (id: string) =>
+          id === 'pg/timestamptz@1'
+            ? {
+                id: 'pg/timestamptz@1',
+                targetTypes: ['timestamptz'] as const,
+                decode: (w: unknown) => w,
+                encodeJson: (v: unknown) => (v instanceof Date ? v.toISOString() : (v as string)),
+                decodeJson: (json: unknown) => new Date(json as string),
+              }
+            : undefined,
+      };
+      const result = validateContract(contract, codecLookup);
+      const col = result.storage.tables.event.columns.starts_at;
+      expect(col.default).toEqual({
+        kind: 'literal',
+        value: new Date('2025-01-01T00:00:00.000Z'),
+      });
+    });
+
+    it('wraps non-ContractValidationError from codec.decodeJson', () => {
+      const contract = makeContract({
+        t: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            v: {
+              codecId: 'bad/codec@1',
+              nativeType: 'custom',
+              nullable: false,
+              default: { kind: 'literal', value: 'boom' },
+            },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      });
+      const codecLookup = {
+        get: (id: string) =>
+          id === 'bad/codec@1'
+            ? {
+                id: 'bad/codec@1',
+                targetTypes: ['custom'] as const,
+                decode: () => null,
+                encodeJson: () => '',
+                decodeJson: () => {
+                  throw new Error('decode exploded');
+                },
+              }
+            : undefined,
+      };
+      expect(() => validateContract(contract, codecLookup)).toThrow(ContractValidationError);
+      expect(() => validateContract(contract, codecLookup)).toThrow('decode exploded');
+    });
+  });
+
   describe('model-to-storage cross-validation', () => {
     it('rejects model whose storage.table does not exist in storage.tables with storage phase', () => {
       const contract = structuredClone(baseContract);
