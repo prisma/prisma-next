@@ -54,11 +54,11 @@ function createTestContract(
         ]),
       ),
     },
+    roots: {},
     models: {},
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    sources: {},
     profileHash: 'sha256:test',
   };
 }
