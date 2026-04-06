@@ -150,6 +150,26 @@ Extract `Collection<C, M>` base class, `CollectionState`, `InferModelRow`, and i
 - **Phase 2 depends on all three Phase 1.75 workstreams** — can't extract a meaningful shared interface until both implementations cover reads, writes, polymorphism, and embedded documents. Extracting without these features would miss the divergence points between families.
 - **Phase 2 requires coordination with Alexey** — extraction changes the SQL Collection's inheritance hierarchy.
 
+### Phase 2.5: Mongo aggregation pipeline builder
+
+**Linear:** [TML-2207](https://linear.app/prisma-company/issue/TML-2207)
+
+**Design docs:** [Aggregation expression AST](plans/aggregation-expression-ast-design.md), [Pipeline AST completeness](plans/pipeline-ast-completeness-design.md), [Pipeline builder](plans/pipeline-builder-design.md)
+
+A type-safe, contract-aware aggregation pipeline builder for MongoDB — the lower-level escape hatch for queries the ORM can't express, equivalent to the SQL query builder (`sql().from(...).select(...)`). Also introduces pipeline-style updates (computed writes using aggregation expressions).
+
+**Milestones:**
+
+1. **Raw pipeline API** — User-facing `db.rawPipeline(collection, stages)` for executing plain MongoDB pipeline stage documents. No type inference (user asserts the return type), but validates the full execution path end-to-end. This is the first vertical slice — it ships before any AST work and gives users an immediate escape hatch for any aggregation.
+
+2. **Aggregation expression AST** — Typed representation of MongoDB aggregation expressions (`MongoAggExpr` union) in `@prisma-next/mongo-query-ast`. Class hierarchy with `kind` discriminant, `accept()`/`rewrite()`, visitor/rewriter interfaces, and lowering. These expressions are shared infrastructure for both read pipelines and pipeline-style updates (computed writes).
+
+3. **Pipeline AST completeness** — Extend the stage AST to cover the complete MongoDB aggregation pipeline, eliminating `Record<string, unknown>` from `AggregatePipelineEntry`. Rename `MongoReadStage` → `MongoPipelineStage`. Add `MongoGroupStage`, `MongoAddFieldsStage`, `MongoReplaceRootStage`, `MongoFacetStage`, and all remaining stages. Extend `MongoProjectStage` to support aggregation expressions for computed fields. Add `MongoUpdateSpec` union to update commands for pipeline-style updates.
+
+4. **Pipeline builder with type-safe shape tracking** — Fluent builder (`PipelineBuilder<QC, DocShape>`) that tracks how each pipeline stage transforms the document shape at the type level. `FieldProxy` for autocomplete, `TypedAggExpr<F>` for type-carrying expressions, accumulator and expression helpers. Compiles to `MongoQueryPlan` with `AggregateCommand`. Includes `computeUpdate()` for pipeline-style computed writes.
+
+**Proof:** Pipeline builder executes multi-stage aggregation pipelines (match → group → sort → project) against `mongodb-memory-server` with full type inference. Pipeline-style updates compute values from existing fields. Raw pipeline API works for any aggregation the typed builder doesn't cover yet.
+
 ## Follow-ups
 
 ### ~~Remove legacy command types from mongo-core~~ (done)
