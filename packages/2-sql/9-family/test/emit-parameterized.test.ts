@@ -246,10 +246,9 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [extension],
     });
 
-    // Verify the parameterized renderer produces the correct type
-    expect(result.contractDts).toContain(
-      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
-    );
+    // Verify the parameterized type emits typeParams on model fields
+    expect(result.contractDts).toContain("readonly codecId: 'pg/vector@1'");
+    expect(result.contractDts).toContain('readonly typeParams: { readonly length: 1536 }');
 
     // Verify the emitted contract imports the type used by the renderer
     expect(result.contractDts).toContain(
@@ -433,10 +432,9 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [extension],
     });
 
-    // Should fall back to ContractField format
-    expect(result.contractDts).toContain(
-      "readonly value: { readonly codecId: 'custom/type@1'; readonly nullable: false }",
-    );
+    // Should still emit typeParams even without a renderer
+    expect(result.contractDts).toContain("readonly codecId: 'custom/type@1'");
+    expect(result.contractDts).toContain("readonly typeParams: { readonly foo: 'bar' }");
   });
 
   it('collects typesImport from multiple parameterized codecs', async () => {
@@ -706,9 +704,7 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [],
     });
 
-    expect(result.contractDts).toContain(
-      "readonly payload: { readonly codecId: 'pg/jsonb@1'; readonly nullable: false }",
-    );
+    expect(result.contractDts).toContain("readonly typeParams: { readonly type: 'AuditPayload' }");
     expect(result.contractDts).toContain(
       "readonly metadata: { readonly codecId: 'pg/jsonb@1'; readonly nullable: false }",
     );

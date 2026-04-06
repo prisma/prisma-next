@@ -748,7 +748,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(types).toContain(
-      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }",
     );
     expect(types).toContain(
       "readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false }",
@@ -790,7 +790,7 @@ describe('sql-target-family-hook', () => {
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
     expect(types).toContain(
-      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }",
     );
     expect(types).not.toContain('Vector<1536>');
   });

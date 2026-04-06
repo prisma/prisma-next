@@ -70,7 +70,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }",
       );
     });
 
@@ -165,7 +165,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: true }",
+        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: true; readonly typeParams: { readonly length: 1536 } }",
       );
     });
 
@@ -219,7 +219,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly value: { readonly codecId: 'pg/decimal@1'; readonly nullable: false }",
+        "readonly value: { readonly codecId: 'pg/decimal@1'; readonly nullable: false; readonly typeParams: { readonly precision: 10; readonly scale: 2 } }",
       );
     });
   });
@@ -278,7 +278,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly role: { readonly codecId: 'pg/enum@1'; readonly nullable: false }",
+        "readonly role: { readonly codecId: 'pg/enum@1'; readonly nullable: false; readonly typeRef: 'Role' }",
       );
     });
   });
@@ -337,7 +337,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeRef: 'Embedding1536' }",
       );
     });
   });
@@ -410,13 +410,13 @@ describe('sql-target-family-hook parameterized type emission', () => {
       expect(types1).toBe(types2);
 
       expect(types1).toContain(
-        "readonly embedding1: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+        "readonly embedding1: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }",
       );
       expect(types1).toContain(
-        "readonly embedding2: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+        "readonly embedding2: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 384 } }",
       );
       expect(types1).toContain(
-        "readonly embedding3: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+        "readonly embedding3: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 768 } }",
       );
     });
   });
@@ -463,7 +463,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly value: { readonly codecId: 'custom/type@1'; readonly nullable: false }",
+        "readonly value: { readonly codecId: 'custom/type@1'; readonly nullable: false; readonly typeParams: { readonly foo: 'bar' } }",
       );
     });
 
@@ -514,7 +514,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly value: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+        "readonly value: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeRef: 'NonExistent' }",
       );
     });
 
