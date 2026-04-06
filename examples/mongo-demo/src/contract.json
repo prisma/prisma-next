@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "mongo",
   "target": "mongo",
-  "profileHash": "sha256:61a2fe99c97fd73fc207fdf7752c85ff43ebd656dd21849ecf3f864f0eb672fc",
+  "profileHash": "sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840",
   "roots": {
     "posts": "Post",
     "users": "User"
@@ -11,19 +11,24 @@
     "Post": {
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1"
+          "codecId": "mongo/objectId@1",
+          "nullable": false
         },
         "authorId": {
-          "codecId": "mongo/objectId@1"
+          "codecId": "mongo/objectId@1",
+          "nullable": false
         },
         "content": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         },
         "createdAt": {
-          "codecId": "mongo/date@1"
+          "codecId": "mongo/date@1",
+          "nullable": false
         },
         "title": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -47,17 +52,20 @@
     "User": {
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1"
+          "codecId": "mongo/objectId@1",
+          "nullable": false
         },
         "bio": {
           "codecId": "mongo/string@1",
           "nullable": true
         },
         "email": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         },
         "name": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -84,7 +92,7 @@
       "posts": {},
       "users": {}
     },
-    "storageHash": "sha256:24263aece4a93353bde16b8dcebe01d0f5784d5c795e296d2a2f893b0dcbe6b5"
+    "storageHash": "sha256:3dc942d093b714429d2c735418815d37860c04e151bb78258ab6fa113e8a0141"
   },
   "capabilities": {},
   "extensionPacks": {},

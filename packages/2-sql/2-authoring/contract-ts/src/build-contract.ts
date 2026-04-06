@@ -6,7 +6,6 @@ import {
 import {
   type ColumnDefault,
   type ColumnDefaultLiteralInputValue,
-  type ColumnDefaultLiteralValue,
   type Contract,
   type ContractField,
   type ContractModel,

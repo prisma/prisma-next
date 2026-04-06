@@ -40,10 +40,9 @@ export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = PgVectorOperationTypes;
 export type QueryOperationTypes = PgVectorQueryOperationTypes;
-type DefaultLiteralValue<CodecId extends string, _Encoded> =
-  CodecId extends keyof CodecTypes
-    ? CodecTypes[CodecId]['output']
-    : _Encoded;
+type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
+  ? CodecTypes[CodecId]['output']
+  : _Encoded;
 
 export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 

@@ -1,4 +1,9 @@
-import type { Contract, ContractModel, JsonValue } from '@prisma-next/contract/types';
+import type {
+  ColumnDefaultLiteralInputValue,
+  Contract,
+  ContractModel,
+  JsonValue,
+} from '@prisma-next/contract/types';
 import {
   ContractValidationError,
   validateContract as frameworkValidateContract,
@@ -151,7 +156,9 @@ function decodeContractDefaults<T extends Contract<SqlStorage>>(
       if (column.default?.kind === 'literal') {
         const codec = codecLookup.get(column.codecId);
         if (codec) {
-          const decodedValue = codec.decodeJson(column.default.value as JsonValue);
+          const decodedValue = codec.decodeJson(
+            column.default.value as JsonValue,
+          ) as ColumnDefaultLiteralInputValue;
           if (decodedValue !== column.default.value) {
             columnsChanged = true;
             decodedColumns[columnName] = {
