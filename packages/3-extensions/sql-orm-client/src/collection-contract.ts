@@ -235,22 +235,18 @@ export function assertReturningCapability(contract: Contract<SqlStorage>, action
 }
 
 export function hasContractCapability(contract: Contract<SqlStorage>, capability: string): boolean {
-  const capabilities = contract.capabilities as Record<string, unknown> | undefined;
-  const value = capabilities?.[capability];
+  const capabilities = contract.capabilities;
+  const value = capabilities[capability];
 
   if (capabilityEnabled(value)) {
     return true;
-  }
-
-  if (!capabilities) {
-    return false;
   }
 
   return Object.values(capabilities).some((targetCapabilities) => {
     if (typeof targetCapabilities !== 'object' || targetCapabilities === null) {
       return false;
     }
-    return capabilityEnabled((targetCapabilities as Record<string, unknown>)[capability]);
+    return capabilityEnabled(targetCapabilities[capability]);
   });
 }
 
