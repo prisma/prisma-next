@@ -288,7 +288,64 @@ Update `lowerFilter()` in the adapter to handle `case 'expr'`.
 - Rewriter (recurses into the aggregation expression via `MongoAggExprRewriter`? — No: `MongoExprFilter.rewrite()` applies the filter rewriter hook only. The aggregation expression is opaque from the filter rewriter's perspective. A consumer that needs to rewrite both filter and aggregation expressions would use separate rewriters.)
 - Lowering: `MongoExprFilter` wrapping `MongoAggOperator("$gt", [fieldRef("qty"), fieldRef("minQty")])` → `{ $expr: { $gt: ["$qty", "$minQty"] } }`
 
-### 7. Exports
+### 7. Type tests
+
+Dedicated `.test-d.ts` file(s) in `packages/2-mongo-family/4-query/query-ast/test/` to verify compile-time guarantees:
+
+**Discriminated union exhaustiveness:**
+- Switching on `MongoAggExpr['kind']` requires handling all 11 kinds — missing a case is a compile-time error
+- Switching on `MongoFilterExpr['kind']` requires handling the new `'expr'` kind in addition to existing kinds
+
+**Visitor exhaustiveness:**
+- `MongoAggExprVisitor<R>` requires all 11 methods — omitting one is a compile-time error
+- Updated `MongoFilterVisitor<R>` requires the `expr` method
+
+**Rewriter optionality:**
+- `MongoAggExprRewriter` accepts an empty object `{}` (all hooks optional)
+- Each hook's return type is `MongoAggExpr` (the union, not a specific subtype)
+
+**`accept()` return type:**
+- `expr.accept(visitor)` returns `R` for a `MongoAggExprVisitor<R>` regardless of which concrete node class calls it
+
+**`rewrite()` return type:**
+- `expr.rewrite(rewriter)` returns `MongoAggExpr` (union type) for all node classes
+
+**Union membership:**
+- Each concrete class is assignable to `MongoAggExpr`
+- `MongoExprFilter` is assignable to `MongoFilterExpr`
+
+**Structural type safety:**
+- `MongoAggOperator.args` accepts both `MongoAggExpr` and `ReadonlyArray<MongoAggExpr>`
+- `MongoAggAccumulator.arg` accepts `MongoAggExpr | null`
+- `MongoAggSwitch.branches` is `ReadonlyArray` (immutable)
+- `MongoAggLet.vars` is `Readonly<Record<...>>` (immutable)
+
+### 8. Integration tests against mongodb-memory-server
+
+The `MongoExprFilter` bridge enables one end-to-end integration test within this milestone: construct a typed `$expr` filter inside a `$match` stage, execute it via the full runtime pipeline against mongodb-memory-server, and verify correct results.
+
+This test goes in `test/integration/test/mongo/` alongside the existing ORM integration tests. It uses the `describeWithMongoDB` helper for server lifecycle.
+
+**Test cases:**
+
+**Cross-field comparison via `$expr`:**
+- Seed documents with `qty` and `minQty` fields (e.g., `{ item: "A", qty: 10, minQty: 5 }`, `{ item: "B", qty: 3, minQty: 8 }`)
+- Construct: `MongoExprFilter(MongoAggOperator.of("$gt", [MongoAggFieldRef.of("qty"), MongoAggFieldRef.of("minQty")]))`
+- Embed in `MongoMatchStage`, wrap in `AggregateCommand`, build `MongoQueryPlan`
+- Execute via runtime, verify only documents where `qty > minQty` are returned
+
+**Computed `$expr` with arithmetic:**
+- Seed documents with `price` and `discount` fields
+- Construct: `MongoExprFilter(MongoAggOperator.of("$gt", [MongoAggFieldRef.of("price"), MongoAggOperator.of("$multiply", [MongoAggFieldRef.of("discount"), MongoAggLiteral.of(2)])]))`
+- Verify correct filtering with nested expression evaluation
+
+**`$expr` combined with regular filter:**
+- Combine a `MongoExprFilter` with a `MongoFieldFilter` in a `MongoAndExpr`
+- Verify both predicates are applied
+
+**Note on `$group`/`$project`/`$addFields` integration tests:** These require `MongoGroupStage`, `MongoAddFieldsStage`, etc. which are Milestone 3 deliverables. Full integration testing of aggregation expressions in non-filter contexts (accumulators, computed projections, array transforms) will follow in Milestone 3 task 3.8. The `$expr` bridge is the only path from aggregation expressions to executed queries in this milestone.
+
+### 9. Exports
 
 Update `exports/index.ts` to export:
 - All 11 concrete `MongoAggExpr` node classes
@@ -304,34 +361,50 @@ Update `exports/index.ts` to export:
 2. Compound nodes (MongoAggOperator, MongoAggAccumulator) + tests
 3. Structurally unique nodes (Cond, Switch, Filter, Map, Reduce, Let, MergeObjects) + tests
 4. Visitor and rewriter interfaces + wire accept()/rewrite() on all nodes + tests
-5. Lowering (lowerAggExpr()) + tests
-6. MongoExprFilter bridge + update filter system + lowering + tests
-7. Exports
+5. Type tests (.test-d.ts)
+6. Lowering (lowerAggExpr()) + unit tests
+7. MongoExprFilter bridge + update filter system + lowering + tests
+8. Integration tests against mongodb-memory-server
+9. Exports
 ```
 
-Steps 1–3 can be done in a single pass (they're small and have no external dependencies). Step 4 depends on all node classes existing. Step 5 depends on step 4 (lowering is a visitor). Step 6 depends on steps 4 and 5 (bridge needs both systems wired). Step 7 is last.
+Steps 1–3 can be done in a single pass (they're small and have no external dependencies). Step 4 depends on all node classes existing. Step 5 depends on step 4 (type tests verify visitor/rewriter/union contracts). Step 6 depends on step 4 (lowering is a visitor). Step 7 depends on steps 4 and 6 (bridge needs both systems wired). Step 8 depends on step 7 (integration tests use `MongoExprFilter`). Step 9 is last.
 
 In practice, the natural commit sequence is:
 
-1. **Commit: leaf and compound nodes** — `MongoAggExprNode` base, `MongoAggFieldRef`, `MongoAggLiteral`, `MongoAggOperator`, `MongoAggAccumulator` + tests
-2. **Commit: structurally unique nodes** — `MongoAggCond`, `MongoAggSwitch`, `MongoAggFilter`, `MongoAggMap`, `MongoAggReduce`, `MongoAggLet`, `MongoAggMergeObjects` + tests
-3. **Commit: visitor and rewriter** — interfaces + `accept()`/`rewrite()` wiring + tests
-4. **Commit: lowering** — `lowerAggExpr()` + round-trip tests
-5. **Commit: `MongoExprFilter` bridge** — bridge class + filter system updates + lowering case + tests
-6. **Commit: exports** — export wiring
+1. **Commit: leaf and compound nodes** — `MongoAggExprNode` base, `MongoAggFieldRef`, `MongoAggLiteral`, `MongoAggOperator`, `MongoAggAccumulator` + unit tests
+2. **Commit: structurally unique nodes** — `MongoAggCond`, `MongoAggSwitch`, `MongoAggFilter`, `MongoAggMap`, `MongoAggReduce`, `MongoAggLet`, `MongoAggMergeObjects` + unit tests
+3. **Commit: visitor and rewriter** — interfaces + `accept()`/`rewrite()` wiring + unit tests + type tests
+4. **Commit: lowering** — `lowerAggExpr()` + round-trip unit tests
+5. **Commit: `MongoExprFilter` bridge** — bridge class + filter system updates + lowering case + unit tests
+6. **Commit: integration tests** — `$expr` end-to-end tests against mongodb-memory-server
+7. **Commit: exports** — export wiring
+
+## Test file inventory
+
+| File | Package | Type | Covers |
+|------|---------|------|--------|
+| `query-ast/test/aggregation-expressions.test.ts` | `@prisma-next/mongo-query-ast` | Unit | Construction, freezing, kind, visitor dispatch, rewriter transforms for all 11 node classes |
+| `query-ast/test/aggregation-expressions.test-d.ts` | `@prisma-next/mongo-query-ast` | Type | Union exhaustiveness, visitor exhaustiveness, rewriter optionality, `accept()`/`rewrite()` return types, structural type constraints |
+| `query-ast/test/filter-expressions.test.ts` | `@prisma-next/mongo-query-ast` | Unit | `MongoExprFilter` construction, freezing, visitor dispatch, rewriter (added to existing file) |
+| `query-ast/test/filter-expressions.test-d.ts` | `@prisma-next/mongo-query-ast` | Type | Updated `MongoFilterExpr` union includes `MongoExprFilter`, updated `MongoFilterVisitor` requires `expr` method |
+| `mongo-adapter/test/lowering.test.ts` | `@prisma-next/adapter-mongo` | Unit | `lowerAggExpr()` round-trip for all node types, literal ambiguity, `lowerFilter()` with `$expr` |
+| `integration/test/mongo/expr-filter.test.ts` | Integration | Integration | Cross-field `$expr` comparison, nested arithmetic `$expr`, `$expr` combined with regular filters — all against mongodb-memory-server |
 
 ## Validation
 
 Complete when:
 
 - [ ] All 11 `MongoAggExpr` node classes extend `MongoAstNode`, are immutable (frozen), and have a `kind` discriminant
-- [ ] `MongoAggExprVisitor<R>` is exhaustive — every expression kind must be handled
-- [ ] `MongoAggExprRewriter` supports partial overrides (optional hooks per kind)
-- [ ] `lowerAggExpr()` produces correct MongoDB driver documents for all expression node types
-- [ ] `MongoAggLiteral` lowering correctly wraps ambiguous values in `{ $literal: ... }`
-- [ ] `MongoExprFilter` bridge works: `MongoExprFilter(MongoAggOperator("$gt", [fieldRef("qty"), fieldRef("minQty")]))` lowers to `{ $expr: { $gt: ["$qty", "$minQty"] } }`
-- [ ] `MongoFilterExpr` union includes `MongoExprFilter`
-- [ ] `MongoFilterVisitor` and `MongoFilterRewriter` include `expr` method
+- [ ] `MongoAggExprVisitor<R>` is exhaustive — every expression kind must be handled (verified by type test)
+- [ ] `MongoAggExprRewriter` supports partial overrides — empty `{}` compiles (verified by type test)
+- [ ] Switching on `MongoAggExpr['kind']` requires all 11 cases (verified by type test)
+- [ ] `lowerAggExpr()` produces correct MongoDB driver documents for all expression node types (verified by unit tests)
+- [ ] `MongoAggLiteral` lowering correctly wraps ambiguous values in `{ $literal: ... }` (verified by unit test)
+- [ ] `MongoExprFilter` bridge works: `MongoExprFilter(MongoAggOperator("$gt", [fieldRef("qty"), fieldRef("minQty")]))` lowers to `{ $expr: { $gt: ["$qty", "$minQty"] } }` (verified by unit test)
+- [ ] `$expr` cross-field comparison executes correctly against mongodb-memory-server (verified by integration test)
+- [ ] `MongoFilterExpr` union includes `MongoExprFilter` (verified by type test)
+- [ ] `MongoFilterVisitor` and `MongoFilterRewriter` include `expr` method (verified by type test)
 - [ ] All new types exported from `@prisma-next/mongo-query-ast`
 - [ ] All existing tests pass unchanged (no regressions in filter expressions, stages, commands)
 - [ ] `pnpm lint:deps` passes (no layering violations)
