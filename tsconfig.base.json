@@ -11,7 +11,6 @@
     { "path": "./packages/1-framework/1-core/execution-plane" },
 
     { "path": "./packages/1-framework/2-authoring/contract" },
-    { "path": "./packages/1-framework/2-authoring/contract-ts" },
     { "path": "./packages/1-framework/2-authoring/psl-parser" },
 
     { "path": "./packages/1-framework/3-tooling/cli" },
