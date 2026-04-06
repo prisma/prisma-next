@@ -1,11 +1,17 @@
-import { AggregateCommand } from '@prisma-next/mongo-query-ast';
+import {
+  AggregateCommand,
+  MongoAggAccumulator,
+  MongoAggFieldRef,
+  MongoGroupStage,
+  MongoSortStage,
+} from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 
 describe('aggregate integration', () => {
   const collectionName = 'aggregate_test_orders';
 
-  it('runs a $group aggregation pipeline', async () => {
+  it('runs a typed $group aggregation pipeline', async () => {
     await withMongod(async (ctx) => {
       const db = ctx.client.db(ctx.dbName);
       await db.collection(collectionName).insertMany([
@@ -15,8 +21,10 @@ describe('aggregate integration', () => {
       ]);
 
       const command = new AggregateCommand(collectionName, [
-        { $group: { _id: '$department', total: { $sum: '$amount' } } },
-        { $sort: { _id: 1 } },
+        new MongoGroupStage(MongoAggFieldRef.of('department'), {
+          total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')),
+        }),
+        new MongoSortStage({ _id: 1 }),
       ]);
       const rows = await ctx.runtime.execute({
         collection: collectionName,
