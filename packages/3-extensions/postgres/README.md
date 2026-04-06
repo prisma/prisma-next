@@ -42,7 +42,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 ## Dependencies
 
 - `@prisma-next/sql-runtime` for stack/context/runtime primitives
-- `@prisma-next/core-execution-plane` for stack instantiation
+- `@prisma-next/framework-components/execution` for stack instantiation
 - `@prisma-next/target-postgres` for target descriptor
 - `@prisma-next/adapter-postgres` for adapter descriptor
 - `@prisma-next/driver-postgres` for driver descriptor
@@ -71,7 +71,7 @@ flowchart TD
     Runtime --> Adapter[@prisma-next/adapter-postgres]
     Runtime --> Driver[@prisma-next/driver-postgres]
     Runtime --> SqlRuntime[@prisma-next/sql-runtime]
-    Runtime --> ExecPlane[@prisma-next/core-execution-plane]
+    Runtime --> ExecPlane[@prisma-next/framework-components/execution]
 ```
 
 ## Related Docs

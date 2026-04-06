@@ -8,7 +8,7 @@ customize. The interface between them — `TargetFamilyHook` — is an SPI
 layer, implemented by each family.
 
 ```text
-  @prisma-next/core-control-plane (core layer — calls the hook)
+  @prisma-next/emitter (tooling layer — calls the hook)
         ↓ imports
   @prisma-next/framework-components/emission (core layer — defines the SPI)
         ↑ imports                    ↑ imports
@@ -36,8 +36,8 @@ API, where the definer also calls it. SPIs arise when framework orchestration
 needs to delegate family-specific behavior — the orchestration lives in a
 lower layer, but each family's implementation lives in a higher layer.
 
-The emission pipeline is the primary example: the control-plane's `emit()`
-function (core layer) calls `targetFamily.validateTypes()` and
+The emission pipeline is the primary example: the emitter's `emit()`
+function (tooling layer) calls `targetFamily.validateTypes()` and
 `targetFamily.generateContractTypes()`. Each family provides its own hook
 implementation — `sqlTargetFamilyHook` (SQL emitter, tooling layer),
 `mongoTargetFamilyHook` (Mongo emitter, tooling layer).
@@ -61,7 +61,7 @@ layer), exported via the `./emission` subpath:
 Orchestration code imports from this subpath:
 
 ```ts
-// core layer — control-plane emission (caller)
+// tooling layer — emitter (caller)
 import type {
   TargetFamilyHook,
   ValidationContext,
@@ -100,9 +100,9 @@ types (`./execution`).
 
 ## Why not the alternatives?
 
-**Colocate with implementations (tooling layer)?** The control-plane (core
-layer) needs to import `TargetFamilyHook` as a parameter type. Core cannot
-import from tooling — layer violation.
+**Colocate with implementations (tooling layer)?** The emitter (tooling
+layer) needs to import `TargetFamilyHook` as a parameter type. Both the
+emitter and family implementations share the same SPI types from core.
 
 **Place in `@prisma-next/contract` (foundation layer)?**
 `TargetFamilyHook` references `ValidationContext`, which references

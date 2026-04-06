@@ -90,7 +90,7 @@ export const contract = defineContract()
 Register the extension when creating your execution stack:
 
 ```typescript
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';

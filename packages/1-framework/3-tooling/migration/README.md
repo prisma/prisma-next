@@ -38,9 +38,9 @@ graph TD
     IO --> TYPES["types.ts<br/>MigrationManifest, etc."]
     ATT --> IO
     ATT --> CAN["canonicalize-json.ts"]
-    ATT --> CP["@prisma-next/core-control-plane<br/>canonicalizeContract"]
+    ATT --> CP["@prisma-next/emitter<br/>canonicalizeContract"]
     GRAPH --> TYPES
-    GRAPH --> ABS["@prisma-next/core-control-plane<br/>EMPTY_CONTRACT_HASH"]
+    GRAPH --> ABS["@prisma-next/migration-tools/constants<br/>EMPTY_CONTRACT_HASH"]
 ```
 
 ## Dependencies
@@ -48,7 +48,8 @@ graph TD
 | Package | Why |
 |---|---|
 | `@prisma-next/contract` | `Contract` type for embedded contracts in manifests |
-| `@prisma-next/core-control-plane` | `MigrationPlanOperation` types, `EMPTY_CONTRACT_HASH`, `canonicalizeContract` |
+| `@prisma-next/framework-components` | `MigrationPlanOperation` types (via `./control`) |
+| `@prisma-next/emitter` | `canonicalizeContract` |
 | `arktype` | Runtime shape validation for `migration.json` and `ops.json` |
 | `@prisma-next/utils` | Workspace utility dependency (currently no direct runtime imports in this package) |
 | `pathe` | Cross-platform path manipulation |

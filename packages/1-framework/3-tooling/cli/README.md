@@ -38,7 +38,7 @@ Commands that enforce wiring validation:
 
 If you hit a wiring validation error: add the required descriptors to `config.extensionPacks` (matched by descriptor `id`) and re-run the command.
 
-**Note**: Control plane domain actions (database verification, contract emission) are implemented in `@prisma-next/core-control-plane`. The CLI uses the control plane domain actions programmatically but does not define control plane types itself.
+**Note**: Control plane domain actions (database verification, contract emission) are implemented in `@prisma-next/emitter` and `@prisma-next/framework-components/control`. The CLI uses the control plane domain actions programmatically but does not define control plane types itself.
 
 ## Command Descriptions
 
@@ -177,7 +177,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
+3. **Create Family Instance**: Creates a `ControlStack` via `createControlStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Verify Marker**: Calls `familyInstance.verify()` which:
    - Reads the contract marker from the database
    - Compares marker presence: Returns `PN-RUN-3001` if marker is missing
@@ -268,16 +268,16 @@ Schema drift failure:
 
 **Family Requirements:**
 
-The family must provide a `create()` method in the family descriptor that accepts a `ControlPlaneStack` and returns a `ControlFamilyInstance` with a `verify()` method:
+The family must provide a `create()` method in the family descriptor that accepts a `ControlStack` and returns a `ControlFamilyInstance` with a `verify()` method:
 
 ```typescript
 interface ControlFamilyDescriptor<TFamilyId, TFamilyInstance> {
   create<TTargetId extends string>(
-    stack: ControlPlaneStack<TFamilyId, TTargetId>,
+    stack: ControlStack<TFamilyId, TTargetId>,
   ): TFamilyInstance;
 }
 
-interface ControlPlaneStack<TFamilyId, TTargetId> {
+interface ControlStack<TFamilyId, TTargetId> {
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
   readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
@@ -295,7 +295,7 @@ interface ControlFamilyInstance {
 }
 ```
 
-Use `createControlPlaneStack()` from `@prisma-next/core-control-plane/stack` to create the stack with sensible defaults (`driver` defaults to `undefined`, `extensionPacks` defaults to `[]`).
+Use `createControlStack()` from `@prisma-next/framework-components/control` to create the stack with sensible defaults (`driver` defaults to `undefined`, `extensionPacks` defaults to `[]`).
 
 The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles marker checks, full `db verify` follows it with `schemaVerify()`, `--marker-only` skips that schema step, and `--schema-only` runs `schemaVerify()` without marker checks.
 
@@ -398,7 +398,7 @@ export default defineConfig({
 **Introspection Process:**
 
 1. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-2. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
+2. **Create Family Instance**: Creates a `ControlStack` via `createControlStack()` and passes it to `config.family.create(stack)` to create a family instance
 3. **Introspect**: Calls `familyInstance.introspect()` which:
    - Queries the database catalog to discover schema structure
    - Returns a family-specific schema IR (e.g., `SqlSchemaIR` for SQL family)
@@ -551,7 +551,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
+3. **Create Family Instance**: Creates a `ControlStack` via `createControlStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Schema Verification (Precondition)**: Calls `familyInstance.schemaVerify()` to verify the database schema matches the contract:
    - If verification fails: Prints schema verification output and exits with code 1 (marker is not written)
    - If verification passes: Proceeds to marker signing
@@ -757,7 +757,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
+3. **Create Family Instance**: Creates a `ControlStack` via `createControlStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Introspect Schema**: Calls `familyInstance.introspect()` to get the current database schema IR
 5. **Validate wiring**: Ensures the contract is compatible with the CLI config:
    - `contract.targetFamily` matches `config.family.familyId`
@@ -1241,7 +1241,8 @@ export default defineConfig({
 - **`esbuild`**: Bundling TypeScript contract files with import allowlisting
 - **`@prisma-next/emitter`**: Contract emission engine (returns strings)
 - **`@prisma-next/migration-tools`**: On-disk migration I/O, attestation, and history reconstruction
-- **`@prisma-next/core-control-plane`**: Config types, migration operation types, error types, control plane stack
+- **`@prisma-next/framework-components`**: Control plane types, migration operation types, control stack (via `./control`)
+- **`@prisma-next/errors`**: Error types and factories (via `./control`)
 
 ## Design Decisions
 

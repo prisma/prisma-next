@@ -31,18 +31,6 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/1-framework/1-core/control-plane/**",
-      "domain": "framework",
-      "layer": "core",
-      "plane": "migration"
-    },
-    {
-      "glob": "packages/1-framework/1-core/execution-plane/**",
-      "domain": "framework",
-      "layer": "core",
-      "plane": "runtime"
-    },
-    {
       "glob": "packages/1-framework/2-authoring/**",
       "domain": "framework",
       "layer": "authoring",

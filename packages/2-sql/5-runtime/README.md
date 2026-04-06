@@ -31,7 +31,7 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 
 ## Dependencies
 
-- `@prisma-next/core-execution-plane` - Runtime component descriptor types
+- `@prisma-next/framework-components` - Runtime component descriptor types (via `./execution`)
 - `@prisma-next/runtime-executor` - Target-neutral execution engine
 - `@prisma-next/sql-contract` - SQL contract types (via `@prisma-next/sql-contract/types`)
 - `@prisma-next/operations` - Operation registry
@@ -43,7 +43,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { createExecutionContext, createRuntime, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 
 const contract = validateContract<Contract>(contractJson);
@@ -149,7 +149,7 @@ const runtime = createRuntime({
 
 The SQL runtime composes runtime-executor with SQL-specific implementations. Descriptors implement `SqlStaticContributions` so `ExecutionContext` can be derived from the descriptors-only stack without instantiation.
 
-1. **ExecutionStack**: Descriptors-only stack (from `@prisma-next/core-execution-plane`)
+1. **ExecutionStack**: Descriptors-only stack (from `@prisma-next/framework-components/execution`)
 2. **SqlStaticContributions**: Codecs, operation signatures, parameterized codecs, and mutation default generators contributed by each descriptor
 3. **ExecutionContext**: Built from contract + stack descriptors (no instantiation)
 4. **ExecutionStackInstance**: Instantiated components used at runtime for execution

@@ -134,7 +134,7 @@ See `@prisma-next/family-sql/control` README for full error code documentation.
 ## Dependencies
 
 - **`@prisma-next/family-sql`**: SQL family types (`SqlControlTargetDescriptor`, `SqlControlFamilyInstance`)
-- **`@prisma-next/core-control-plane`**: Control plane types (`ControlTargetInstance`)
+- **`@prisma-next/framework-components`**: Control plane types via `./control` (`ControlTargetInstance`)
 - **`@prisma-next/sql-contract`**: Pack types (`TargetPackRef`)
 - **`arktype`**: Runtime validation
 

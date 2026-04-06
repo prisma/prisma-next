@@ -183,7 +183,7 @@ Each plane has its own stack type:
 | `ControlStack` | Control | The component descriptors and their aggregated contributions (type imports, renderers, extension IDs, authoring contributions) needed for contract emission and migration |
 | `ExecutionStack` | Execution | Runtime descriptors (target, adapter, driver, extensions), ready for instantiation |
 
-> **Note:** `ControlStack` is the canonical type — it carries both component descriptors and their aggregated contributions. `ControlPlaneStack` is retained as a deprecated type alias for backward compatibility (removal tracked in task 5.11). Use `createControlStack()` from `@prisma-next/framework-components/control` to build a `ControlStack`.
+> Use `createControlStack()` from `@prisma-next/framework-components/control` to build a `ControlStack`.
 
 ---
 
