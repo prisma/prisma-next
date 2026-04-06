@@ -24,6 +24,7 @@ function plan(collection: string, command: MongoQueryPlan['command']): MongoQuer
   return { collection, command, meta: testMeta };
 }
 
+// describeWithMongoDB drops the database before each test (see setup.ts beforeEach).
 describeWithMongoDB('MongoExprFilter integration ($expr)', (ctx) => {
   const col = 'inventory';
 
