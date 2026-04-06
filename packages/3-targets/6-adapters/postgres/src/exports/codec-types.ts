@@ -7,7 +7,8 @@
  * Runtime codec implementations are provided by the adapter's codec registry.
  */
 
-import type { CodecTypes as CoreCodecTypes, JsonValue } from '../core/codecs';
+import type { JsonValue } from '@prisma-next/contract/types';
+import type { CodecTypes as CoreCodecTypes } from '../core/codecs';
 
 /**
  * Compile-time view of the Standard Schema protocol.

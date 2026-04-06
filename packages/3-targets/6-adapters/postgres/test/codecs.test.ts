@@ -439,6 +439,10 @@ describe('adapter-postgres codecs', () => {
         const decoded = codec.decodeJson(encoded);
         expect(decoded).toEqual(original);
       });
+
+      it('throws on non-string input to decodeJson', () => {
+        expect(() => codec.decodeJson(42)).toThrow('Expected ISO date string for pg/timestamptz@1');
+      });
     });
 
     describe('pg/timestamp@1', () => {
@@ -454,6 +458,10 @@ describe('adapter-postgres codecs', () => {
         const result = codec.decodeJson('2024-01-15T00:00:00.000Z');
         expect(result).toBeInstanceOf(Date);
         expect(result).toEqual(new Date('2024-01-15T00:00:00.000Z'));
+      });
+
+      it('throws on non-string input to decodeJson', () => {
+        expect(() => codec.decodeJson(42)).toThrow('Expected ISO date string for pg/timestamp@1');
       });
     });
 

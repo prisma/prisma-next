@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { Codec as BaseCodec, CodecTrait } from '@prisma-next/framework-components/codec';
 
 export type MongoCodecTrait = CodecTrait;
@@ -22,8 +23,8 @@ export function mongoCodec<
   traits?: TTraits;
   encode: (value: TJs) => TWire;
   decode: (wire: TWire) => TJs;
-  encodeJson?: (value: TJs) => import('@prisma-next/contract/types').JsonValue;
-  decodeJson?: (json: import('@prisma-next/contract/types').JsonValue) => TJs;
+  encodeJson?: (value: TJs) => JsonValue;
+  decodeJson?: (json: JsonValue) => TJs;
 }): MongoCodec<Id, TTraits, TWire, TJs> {
   const traits = config.traits
     ? (Object.freeze([...config.traits]) as TTraits)
@@ -35,12 +36,8 @@ export function mongoCodec<
     traits,
     decode: config.decode,
     encode: config.encode,
-    encodeJson: (config.encodeJson ?? identity) as (
-      value: TJs,
-    ) => import('@prisma-next/contract/types').JsonValue,
-    decodeJson: (config.decodeJson ?? identity) as (
-      json: import('@prisma-next/contract/types').JsonValue,
-    ) => TJs,
+    encodeJson: (config.encodeJson ?? identity) as (value: TJs) => JsonValue,
+    decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TJs,
   };
 }
 
