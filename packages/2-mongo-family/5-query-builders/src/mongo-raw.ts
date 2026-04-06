@@ -14,6 +14,9 @@ export function mongoRaw<TContract extends MongoContract>(options: {
   return {
     collection<K extends keyof TContract['roots'] & string>(rootName: K): RawMongoCollection {
       const modelName = contract.roots[rootName] as string;
+      if (!Object.hasOwn(contract.models, modelName)) {
+        throw new Error(`Unknown model "${modelName}" for root "${rootName}"`);
+      }
       const model = contract.models[modelName] as MongoModelDefinition;
       const collectionName = model.storage.collection ?? modelName;
 
