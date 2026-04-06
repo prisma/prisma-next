@@ -21,7 +21,7 @@ import type {
 } from '@prisma-next/framework-components/emission';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
@@ -77,7 +77,7 @@ async function emitWithDescriptors(
     parameterizedTypeImports: extractParameterizedTypeImports(allDescs),
     operationRegistry,
   };
-  return emit(contract, stackInput, sqlTargetFamilyHook);
+  return emit(contract, stackInput, sqlEmission);
 }
 
 /**

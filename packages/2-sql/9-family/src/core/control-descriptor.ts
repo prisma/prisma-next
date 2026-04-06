@@ -2,7 +2,7 @@ import type {
   ControlFamilyDescriptor,
   ControlStack,
 } from '@prisma-next/framework-components/control';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './control-instance';
 
 export class SqlFamilyDescriptor
@@ -12,7 +12,7 @@ export class SqlFamilyDescriptor
   readonly id = 'sql';
   readonly familyId = 'sql' as const;
   readonly version = '0.0.1';
-  readonly emission = sqlTargetFamilyHook;
+  readonly emission = sqlEmission;
 
   create<TTargetId extends string>(
     stack: ControlStack<'sql', TTargetId>,

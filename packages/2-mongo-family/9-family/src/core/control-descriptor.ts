@@ -2,7 +2,7 @@ import type {
   ControlFamilyDescriptor,
   ControlStack,
 } from '@prisma-next/framework-components/control';
-import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
+import { mongoEmission } from '@prisma-next/mongo-emitter';
 import { createMongoFamilyInstance, type MongoControlFamilyInstance } from './control-instance';
 
 class MongoFamilyDescriptor
@@ -12,7 +12,7 @@ class MongoFamilyDescriptor
   readonly id = 'mongo';
   readonly familyId = 'mongo' as const;
   readonly version = '0.0.1';
-  readonly emission = mongoTargetFamilyHook;
+  readonly emission = mongoEmission;
 
   create<TTargetId extends string>(
     stack: ControlStack<'mongo', TTargetId>,

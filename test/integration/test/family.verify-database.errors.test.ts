@@ -12,7 +12,7 @@ import type { VerifyDatabaseResult } from '@prisma-next/framework-components/con
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
   ensureSchemaStatement,
@@ -68,7 +68,7 @@ async function emitContract(
     extensionPacks: [],
   });
 
-  const emitResult = await emit(contract, stack, sqlTargetFamilyHook);
+  const emitResult = await emit(contract, stack, sqlEmission);
 
   // Write contract files
   const contractJsonPath = resolve(testDir, 'output/contract.json');

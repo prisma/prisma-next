@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import { sqlTargetFamilyHook } from '../src/index';
+import { sqlEmission } from '../src/index';
 
 function createContract(overrides: Partial<Contract>): Contract {
   return {
@@ -47,7 +47,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).not.toThrow();
   });
 
@@ -72,7 +72,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow();
   });
 
@@ -105,7 +105,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('is missing column property');
   });
 
@@ -116,7 +116,7 @@ describe('sql-target-family-hook', () => {
     } as Contract;
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('Expected targetFamily "sql"');
   });
 
@@ -126,7 +126,7 @@ describe('sql-target-family-hook', () => {
     }) as Contract;
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('SQL contract must have storage.tables');
   });
 
@@ -136,7 +136,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('SQL contract must have storage.tables');
   });
 
@@ -161,7 +161,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('is missing storage.table');
   });
 
@@ -186,7 +186,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('references non-existent table');
   });
 
@@ -211,7 +211,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('is missing a primary key');
   });
 
@@ -242,7 +242,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('references non-existent column');
   });
 
@@ -270,7 +270,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('is missing storage.fields');
   });
 
@@ -292,7 +292,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('primaryKey references non-existent column');
   });
 
@@ -315,7 +315,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('unique constraint references non-existent column');
   });
 
@@ -338,7 +338,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('index references non-existent column');
   });
 
@@ -375,7 +375,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('foreignKey references non-existent column');
   });
 
@@ -412,7 +412,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('foreignKey references non-existent table');
   });
 
@@ -449,7 +449,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('foreignKey references non-existent column');
   });
 
@@ -486,7 +486,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('column count');
   });
 
@@ -519,7 +519,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('is missing required field "relations"');
   });
 
@@ -552,7 +552,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('is missing required field "relations"');
   });
 
@@ -574,7 +574,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('is missing required field "uniques"');
   });
 
@@ -596,7 +596,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('is missing required field "indexes"');
   });
 
@@ -618,7 +618,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('is missing required field "foreignKeys"');
   });
 
@@ -685,7 +685,7 @@ describe('sql-target-family-hook', () => {
     (ir as { storage: unknown }).storage = proxiedStorage;
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('references non-existent table');
   });
 
@@ -756,7 +756,7 @@ describe('sql-target-family-hook', () => {
     (ir as { storage: unknown }).storage = proxiedStorage;
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('references non-existent table');
   });
 
@@ -779,7 +779,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).not.toThrow();
   });
 
@@ -801,7 +801,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).not.toThrow();
   });
 
@@ -833,7 +833,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).not.toThrow();
   });
 
@@ -865,7 +865,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).toThrow('index references non-existent column');
   });
 
@@ -927,7 +927,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(() => {
-      sqlTargetFamilyHook.validateStructure(ir);
+      sqlEmission.validateStructure(ir);
     }).not.toThrow();
   });
 });

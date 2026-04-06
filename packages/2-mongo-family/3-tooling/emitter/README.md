@@ -8,13 +8,13 @@ Implements the `TargetFamilyHook` interface for Mongo contracts, generating `con
 
 ## When to use it
 
-Pass `mongoTargetFamilyHook` to the `emit()` function when generating contracts for a Mongo target:
+Pass `mongoEmission` to the `emit()` function when generating contracts for a Mongo target:
 
 ```typescript
 import { emit } from '@prisma-next/emitter';
-import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
+import { mongoEmission } from '@prisma-next/mongo-emitter';
 
-const result = emit(contractIR, mongoTargetFamilyHook, options);
+const result = emit(contractIR, mongoEmission, options);
 ```
 
 ## What it provides

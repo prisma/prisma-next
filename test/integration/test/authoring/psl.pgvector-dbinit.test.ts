@@ -9,7 +9,7 @@ import sql, {
   assemblePslInterpretationContributions,
 } from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
@@ -71,7 +71,7 @@ describe(
         extensionPacks: [pgvector],
       });
 
-      const emitted = await emit(enrichedIR, stack, sqlTargetFamilyHook);
+      const emitted = await emit(enrichedIR, stack, sqlEmission);
       return JSON.parse(emitted.contractJson) as Record<string, unknown>;
     }
 

@@ -52,7 +52,7 @@ it('creates runtime with contract and adapter', () => {
 ```typescript
 // test/integration/test/contract-emission.test.ts
 it('emits contract and executes query', async () => {
-  const { contractJson, contractDts } = await emit(ir, options, sqlTargetFamilyHook);
+  const { contractJson, contractDts } = await emit(ir, options, sqlEmission);
   const contract = validateContract<Contract>(JSON.parse(contractJson));
   const runtime = createRuntime({ contract, adapter });
   const plan = sql({ contract, adapter }).from(tables.user).select({ id: t.user.id }).build();

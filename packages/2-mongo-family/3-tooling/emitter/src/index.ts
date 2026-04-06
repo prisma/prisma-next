@@ -3,7 +3,7 @@ import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import type { MongoStorage } from '@prisma-next/mongo-contract';
 
-export const mongoTargetFamilyHook = {
+export const mongoEmission = {
   id: 'mongo',
 
   validateTypes(contract: Contract, _ctx: ValidationContext): void {

@@ -139,8 +139,8 @@ import type { Contract } from '@prisma-next/contract/types';
 import { createOperationRegistry } from '@prisma-next/operations';
 
 // Determine target family SPI based on target family
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-// or: import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
+// or: import { mongoEmission } from '@prisma-next/mongo-emitter';
 
 // Emit contract
 const contract: Contract = {
@@ -157,7 +157,7 @@ const result = await emit(contract, {
   codecTypeImports: [], // Extracted from packs (codec types)
   operationTypeImports: [], // Extracted from packs (operation types)
   extensionIds: ['postgres', 'pg'], // Extracted from packs
-}, sqlTargetFamilyHook);
+}, sqlEmission);
 
 // result.contractJson: string (JSON) - canonical JSON without _generated metadata
 // result.contractDts: string (TypeScript definitions) - includes warning header
