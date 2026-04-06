@@ -1,4 +1,4 @@
-# ADR 183 — SPI types live at the lowest consuming layer
+# ADR 185 — SPI types live at the lowest consuming layer
 
 ## At a glance
 

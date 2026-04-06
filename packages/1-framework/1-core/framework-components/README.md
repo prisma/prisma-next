@@ -31,7 +31,7 @@ By placing these interfaces in the core layer rather than alongside their implem
 
 This is the [dependency inversion principle](https://en.wikipedia.org/wiki/Dependency_inversion_principle) applied to package layering. The same pattern applies to component descriptors, control-plane types, and execution-plane types in this package.
 
-See [ADR 183 — SPI types live at the lowest consuming layer](../../../../../docs/architecture%20docs/adrs/ADR%20183%20-%20SPI%20types%20live%20at%20the%20lowest%20consuming%20layer.md).
+See [ADR 185 — SPI types live at the lowest consuming layer](../../../../../docs/architecture%20docs/adrs/ADR%20185%20-%20SPI%20types%20live%20at%20the%20lowest%20consuming%20layer.md).
 
 ## Relationship to other packages
 
