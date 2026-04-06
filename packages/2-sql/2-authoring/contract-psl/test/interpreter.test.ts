@@ -130,6 +130,45 @@ describe('interpretPslDocumentToSqlContract', () => {
       },
     });
   });
+  it('populates roots from models', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  email String
+}
+
+model Post {
+  id Int @id
+  title String
+  userId Int
+  author User @relation(fields: [userId], references: [id])
+}
+
+model Comment {
+  id Int @id
+  body String
+  postId Int
+  post Post @relation(fields: [postId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.roots).toEqual({
+      user: 'User',
+      post: 'Post',
+      comment: 'Comment',
+    });
+  });
+
   it('builds sql contract ir from simple psl schema', () => {
     const document = parsePslDocument({
       schema: `model User {
@@ -150,6 +189,7 @@ describe('interpretPslDocumentToSqlContract', () => {
 
     expect(result.value.targetFamily).toBe('sql');
     expect(result.value.target).toBe('postgres');
+    expect(result.value.roots).toEqual({ user: 'User' });
     expect(result.value.storage).toMatchObject({
       tables: {
         user: {
@@ -214,6 +254,7 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    expect(result.value.roots).toEqual({ user: 'User', post: 'Post' });
     expect(result.value.storage).toMatchObject({
       types: {
         Email: { codecId: 'pg/text@1', nativeType: 'text' },
@@ -635,6 +676,7 @@ model Member {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    expect(result.value.roots).toEqual({ org_team: 'Team', team_member: 'Member' });
     expect(result.value.storage).toMatchObject({
       tables: {
         org_team: {

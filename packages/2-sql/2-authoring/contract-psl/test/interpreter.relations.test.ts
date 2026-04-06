@@ -30,6 +30,8 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    expect(result.value.roots).toEqual({ user: 'User', post: 'Post' });
+
     const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
     expect(models['User']?.relations).toMatchObject({
       posts: {
@@ -128,6 +130,13 @@ model Member {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+
+    expect(result.value.roots).toEqual({
+      user: 'User',
+      post: 'Post',
+      team: 'Team',
+      member: 'Member',
+    });
 
     const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
     expect(models['User']?.relations).toMatchObject({
@@ -232,6 +241,8 @@ model Member {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+
+    expect(result.value.roots).toEqual({ org_team: 'Team', team_member: 'Member' });
 
     const storage = result.value.storage as unknown as {
       readonly tables: Record<string, { readonly foreignKeys?: readonly unknown[] }>;
