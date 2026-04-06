@@ -12,9 +12,9 @@ MongoDB has a meaningful set of DDL-equivalent operations that need versioning, 
 2. The CLI has SQL-specific display code (`extractSqlDdl`) that will need generalization.
 3. MongoDB users have no managed path for index lifecycle — the highest-value migration operation for MongoDB in production.
 
-**Approach: define SPI → spike Mongo → extract later.** Following the pattern established in M6 (contract-domain-extraction), define a minimal family migration SPI at the framework level. Build the Mongo implementation against it. Don't refactor SQL to use the new SPI yet — extract shared patterns from both implementations after the Mongo spike proves out.
+**Approach: refactor SPI → Mongo implements it.** A migration SPI already exists and works — `TargetMigrationsCapability`, `MigrationPlanner`, `MigrationRunner`, `MigrationPlan` in `@prisma-next/framework-components`, with the CLI delegating through `hasMigrations()` / `getTargetMigrations()`. Following the pattern being established in the emission pipeline refactoring (M6/contract-domain-extraction), refactor the existing SPI to follow the same family-hook pattern (like `TargetFamilyHook` for emitters). SQL continues to implement the refactored SPI — its internals (`SqlMigrationPlanner`, `SqlSchemaIR` diffing, operation generation) stay untouched. Mongo builds its own internals against the same SPI.
 
-**Existing infrastructure:** The framework-level migration SPI (`TargetMigrationsCapability`, `MigrationPlanner`, `MigrationRunner`, `MigrationPlan`) is already family-agnostic in type terms (`contract: unknown`, `schema: unknown`). The graph infrastructure (`@prisma-next/migration-tools`) has zero SQL coupling. The `ContractMarkerRecord` is already a framework-level type. The main work is: enriching the Mongo contract, building a planner and runner, and wiring the target descriptor.
+**Existing infrastructure:** The graph infrastructure (`@prisma-next/migration-tools`) has zero SQL coupling. The `ContractMarkerRecord` is already a framework-level type. The CLI's operation display (`extractSqlDdl`) is the main SQL-specific code path that needs generalization. The main work is: refactoring the SPI surface, enriching the Mongo contract, building a Mongo planner and runner, and wiring the target descriptor.
 
 **Index authoring:** Users specify indexes explicitly via authoring annotations (PSL `@@index`, `@@unique` or TS DSL equivalents). The emitter translates these into the contract's `storage.collections` section. The vertical slice (M1) uses hand-crafted contracts to prove the migration path; M2 builds the authoring support needed to populate contracts from PSL/TS definitions (the authoring changes are small and built within this project).
 
@@ -30,7 +30,7 @@ Define the SPI first, then build a thin slice through every layer proving the fu
 
 **SPI:**
 
-1. **Define minimal family migration SPI at the framework level.** Following the M6 emitter hook pattern: define interfaces that families implement. The existing `TargetMigrationsCapability` / `MigrationPlanner` / `MigrationRunner` may already suffice, or may need a thin extension (e.g. a family-provided operation formatter for CLI display). Don't refactor SQL to use it yet.
+1. **Refactor the existing migration SPI to follow the emission pipeline pattern.** The SPI (`TargetMigrationsCapability`, `MigrationPlanner`, `MigrationRunner`) already exists and works. Refactor its surface to follow the family-hook pattern being established in M6 (like `TargetFamilyHook` for emitters). SQL continues to implement the refactored SPI — its internals stay untouched. May need a thin extension (e.g. a family-provided operation formatter for CLI display).
 
 2. **Generalize CLI operation display.** Replace or complement `extractSqlDdl` with a family-agnostic operation display mechanism so `migration plan` can preview non-SQL operations.
 
@@ -107,13 +107,14 @@ Extend each layer to cover the full breadth of MongoDB server-side configuration
 - **Atlas-specific operations.** Atlas Search indexes and Vector Search indexes use a different API (Atlas Admin API). Whether these belong in core or in an extension pack is deferred.
 - **Rolling index build monitoring.** Progress reporting for long-running index builds on large collections is deferred.
 - **Introspection from live MongoDB.** Reading current indexes/validators/options from a live MongoDB instance (for `migration status` / drift detection) is valuable but not required for the proof. Can be added after offline planning works.
-- **Refactoring SQL migrations to the new SPI.** The SQL migration stack stays as-is. Extraction of shared patterns happens after the Mongo spike proves out.
+- **Refactoring SQL migration internals.** SQL's internal migration implementation (`SqlMigrationPlanner`, `SqlSchemaIR` diffing, `SqlMigrationPlanOperation`) stays as-is. Only the SPI surface is refactored; SQL implements the refactored surface without changing its internals.
 - **Mongo-native locking.** MongoDB lacks advisory locks. The runner uses optimistic concurrency on the marker record (check-and-update) rather than exclusive locking. Production-grade concurrent apply protection is deferred.
 
 # Acceptance Criteria
 
 ### Milestone 1: SPI + vertical slice (single index, end-to-end)
-- [ ] Family migration SPI defined at framework level
+- [ ] Existing migration SPI refactored to follow the emission pipeline family-hook pattern
+- [ ] SQL migration stack continues to work through the refactored SPI (internals untouched)
 - [ ] CLI operation display is family-agnostic (not SQL-only)
 - [ ] `MongoStorageCollection` type carries index definitions
 - [ ] `MongoContractSchema` (Arktype) validates index definitions on collections
