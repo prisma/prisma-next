@@ -235,6 +235,28 @@ describe('lowerAggExpr', () => {
     expect(lowerAggExpr(MongoAggLiteral.of({ key: 'value' }))).toEqual({ key: 'value' });
   });
 
+  it('wraps array containing $-prefixed string in $literal', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of(['$qty']))).toEqual({
+      $literal: ['$qty'],
+    });
+  });
+
+  it('wraps object with $-prefixed value in $literal', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of({ label: '$qty' }))).toEqual({
+      $literal: { label: '$qty' },
+    });
+  });
+
+  it('wraps deeply nested $-prefixed string in $literal', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of({ a: { b: '$deep' } }))).toEqual({
+      $literal: { a: { b: '$deep' } },
+    });
+  });
+
+  it('does not wrap plain array literal', () => {
+    expect(lowerAggExpr(MongoAggLiteral.of([1, 2, 3]))).toEqual([1, 2, 3]);
+  });
+
   it('lowers array-arg operator', () => {
     expect(
       lowerAggExpr(MongoAggOperator.add(MongoAggFieldRef.of('price'), MongoAggFieldRef.of('tax'))),
