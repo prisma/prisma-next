@@ -1,10 +1,10 @@
 import { MongoAstNode } from './ast-node';
 import type { MongoFilterExpr } from './filter-expressions';
-import type { MongoFilterRewriter, MongoStageVisitor } from './visitors';
+import type { MongoStageRewriterContext, MongoStageVisitor } from './visitors';
 
 abstract class MongoStageNode extends MongoAstNode {
   abstract accept<R>(visitor: MongoStageVisitor<R>): R;
-  abstract rewrite(rewriter: MongoFilterRewriter): MongoReadStage;
+  abstract rewrite(context: MongoStageRewriterContext): MongoReadStage;
 }
 
 export class MongoMatchStage extends MongoStageNode {
@@ -21,8 +21,8 @@ export class MongoMatchStage extends MongoStageNode {
     return visitor.match(this);
   }
 
-  rewrite(rewriter: MongoFilterRewriter): MongoReadStage {
-    return new MongoMatchStage(this.filter.rewrite(rewriter));
+  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+    return new MongoMatchStage(this.filter.rewrite(context.filter ?? {}));
   }
 }
 
@@ -40,7 +40,7 @@ export class MongoProjectStage extends MongoStageNode {
     return visitor.project(this);
   }
 
-  rewrite(_rewriter: MongoFilterRewriter): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
     return this;
   }
 }
@@ -59,7 +59,7 @@ export class MongoSortStage extends MongoStageNode {
     return visitor.sort(this);
   }
 
-  rewrite(_rewriter: MongoFilterRewriter): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
     return this;
   }
 }
@@ -81,7 +81,7 @@ export class MongoLimitStage extends MongoStageNode {
     return visitor.limit(this);
   }
 
-  rewrite(_rewriter: MongoFilterRewriter): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
     return this;
   }
 }
@@ -103,7 +103,7 @@ export class MongoSkipStage extends MongoStageNode {
     return visitor.skip(this);
   }
 
-  rewrite(_rewriter: MongoFilterRewriter): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
     return this;
   }
 }
@@ -136,14 +136,14 @@ export class MongoLookupStage extends MongoStageNode {
     return visitor.lookup(this);
   }
 
-  rewrite(rewriter: MongoFilterRewriter): MongoReadStage {
+  rewrite(context: MongoStageRewriterContext): MongoReadStage {
     if (!this.pipeline) return this;
     return new MongoLookupStage({
       from: this.from,
       localField: this.localField,
       foreignField: this.foreignField,
       as: this.as,
-      pipeline: this.pipeline.map((stage) => stage.rewrite(rewriter)),
+      pipeline: this.pipeline.map((stage) => stage.rewrite(context)),
     });
   }
 }
@@ -164,7 +164,7 @@ export class MongoUnwindStage extends MongoStageNode {
     return visitor.unwind(this);
   }
 
-  rewrite(_rewriter: MongoFilterRewriter): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
     return this;
   }
 }

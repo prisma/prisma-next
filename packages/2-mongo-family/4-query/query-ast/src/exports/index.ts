@@ -61,5 +61,6 @@ export type {
   MongoAggExprVisitor,
   MongoFilterRewriter,
   MongoFilterVisitor,
+  MongoStageRewriterContext,
   MongoStageVisitor,
 } from '../visitors';

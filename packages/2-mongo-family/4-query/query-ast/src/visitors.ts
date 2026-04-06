@@ -77,6 +77,11 @@ export interface MongoFilterRewriter {
   expr?(expr: MongoExprFilter): MongoFilterExpr;
 }
 
+export interface MongoStageRewriterContext {
+  filter?: MongoFilterRewriter;
+  aggExpr?: MongoAggExprRewriter;
+}
+
 export interface MongoStageVisitor<R> {
   match(stage: MongoMatchStage): R;
   project(stage: MongoProjectStage): R;
