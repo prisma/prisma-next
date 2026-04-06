@@ -108,11 +108,11 @@ export function parsePostgresDefault(
 
   // Numeric literals (integer or decimal)
   if (NUMERIC_PATTERN.test(trimmed)) {
-    if (isBigInt) {
-      return { kind: 'literal', value: { $type: 'bigint', value: trimmed } };
-    }
     const num = Number(trimmed);
     if (!Number.isFinite(num)) return undefined;
+    if (isBigInt && !Number.isSafeInteger(num)) {
+      return { kind: 'literal', value: trimmed };
+    }
     return { kind: 'literal', value: num };
   }
 
@@ -128,6 +128,13 @@ export function parsePostgresDefault(
       } catch {
         // Keep legacy behavior for malformed/non-JSON string content.
       }
+    }
+    if (isBigInt && NUMERIC_PATTERN.test(unescaped)) {
+      const num = Number(unescaped);
+      if (Number.isSafeInteger(num)) {
+        return { kind: 'literal', value: num };
+      }
+      return { kind: 'literal', value: unescaped };
     }
     return { kind: 'literal', value: unescaped };
   }

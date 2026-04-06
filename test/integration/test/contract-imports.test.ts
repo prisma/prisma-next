@@ -366,6 +366,18 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/*`,
             ],
+            '@prisma-next/framework-components/codec': [
+              `${relativeToWorkspace}/packages/1-framework/1-core/framework-components/dist/codec.d.mts`,
+            ],
+            '@prisma-next/framework-components/*': [
+              `${relativeToWorkspace}/packages/1-framework/1-core/framework-components/dist/*`,
+            ],
+            '@prisma-next/contract/types': [
+              `${relativeToWorkspace}/packages/1-framework/0-foundation/contract/dist/types.d.mts`,
+            ],
+            '@prisma-next/contract/*': [
+              `${relativeToWorkspace}/packages/1-framework/0-foundation/contract/dist/*`,
+            ],
             '@prisma-next/sql-query/*': [
               `${relativeToWorkspace}/packages/sql-query/dist/exports/*.d.ts`,
             ],
