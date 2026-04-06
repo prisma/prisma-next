@@ -1,5 +1,6 @@
 import type { Contract as FrameworkContract, StorageHashBase } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type { ContractWithTypeMaps } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { expectTypeOf, test } from 'vitest';
 import { schema } from '../src/schema';
@@ -332,4 +333,159 @@ test('schema.types preserves type information through schema() call', () => {
   // Values should be accessible
   const v1536 = freshSchema.types['Vector1536'];
   expectTypeOf(v1536).not.toBeNever();
+});
+
+// =============================================================================
+// Parameterized codec type resolution through query surface (F32)
+// =============================================================================
+
+type BrandedVector<N extends number = number> = number[] & { readonly __vectorLength?: N };
+
+type VectorCodecTypes = {
+  readonly 'pg/int4@1': { readonly output: number };
+  readonly 'pg/vector@1': {
+    readonly output: number[];
+    readonly parameterizedOutput: <P extends { readonly length: number }>(
+      params: P,
+    ) => P extends { readonly length: infer N extends number }
+      ? BrandedVector<N>
+      : BrandedVector<number>;
+  };
+};
+
+type VectorTypeMaps = {
+  readonly codecTypes: VectorCodecTypes;
+  readonly operationTypes: Record<string, never>;
+};
+
+type VectorContract = ContractWithTypeMaps<
+  FrameworkContract<
+    {
+      readonly storageHash: StorageHashBase<string>;
+      readonly tables: {
+        readonly embedding: {
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              readonly nullable: false;
+            };
+            readonly vector_data: {
+              readonly nativeType: 'vector(1536)';
+              readonly codecId: 'pg/vector@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly length: 1536 };
+            };
+            readonly unmapped_vector: {
+              readonly nativeType: 'vector(768)';
+              readonly codecId: 'pg/vector@1';
+              readonly nullable: true;
+              readonly typeParams: { readonly length: 768 };
+            };
+          };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
+        };
+      };
+      readonly types: Record<string, never>;
+    },
+    {
+      readonly Embedding: {
+        readonly storage: {
+          readonly table: 'embedding';
+          readonly fields: {
+            readonly id: { readonly column: 'id' };
+            readonly vectorData: { readonly column: 'vector_data' };
+          };
+        };
+        readonly fields: {
+          readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+          readonly vectorData: { readonly codecId: 'pg/vector@1'; readonly nullable: false };
+        };
+        readonly relations: Record<string, never>;
+      };
+    }
+  >,
+  VectorTypeMaps
+>;
+
+const vectorContract: VectorContract = {
+  target: 'postgres',
+  targetFamily: 'sql',
+  profileHash: profileHash('sha256:test'),
+  storage: {
+    storageHash: coreHash('sha256:test'),
+    tables: {
+      embedding: {
+        columns: {
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          vector_data: {
+            nativeType: 'vector(1536)',
+            codecId: 'pg/vector@1',
+            nullable: false,
+            typeParams: { length: 1536 },
+          },
+          unmapped_vector: {
+            nativeType: 'vector(768)',
+            codecId: 'pg/vector@1',
+            nullable: true,
+            typeParams: { length: 768 },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    },
+    types: {} as Record<string, never>,
+  },
+  models: {
+    Embedding: {
+      storage: {
+        table: 'embedding',
+        fields: {
+          id: { column: 'id' },
+          vectorData: { column: 'vector_data' },
+        },
+      },
+      fields: {
+        id: { codecId: 'pg/int4@1', nullable: false },
+        vectorData: { codecId: 'pg/vector@1', nullable: false },
+      },
+      relations: {},
+    },
+  },
+  roots: {},
+  extensionPacks: {},
+  capabilities: {},
+  meta: {},
+};
+
+const vectorContext = createTestContext(vectorContract);
+const vectorSchema = schema(vectorContext);
+const embeddingTable = vectorSchema.tables.embedding;
+
+test('model-mapped vector column resolves to base codec output type', () => {
+  const vectorDataCol = embeddingTable.columns.vector_data;
+
+  expectTypeOf(vectorDataCol.__jsType).toEqualTypeOf<number[]>();
+});
+
+test('unmapped vector column resolves via parameterized codec output', () => {
+  const unmappedVectorCol = embeddingTable.columns.unmapped_vector;
+
+  expectTypeOf(unmappedVectorCol.__jsType).not.toBeNever();
+  expectTypeOf(unmappedVectorCol.__jsType).not.toEqualTypeOf<unknown>();
+  // Storage column path: parameterizedOutput produces a Vector-branded type (extends number[]).
+  // Nullable column → result includes null.
+  expectTypeOf(unmappedVectorCol.__jsType).toMatchTypeOf<number[] | null>();
+});
+
+test('model-mapped non-parameterized column resolves correctly', () => {
+  const idCol = embeddingTable.columns.id;
+
+  expectTypeOf(idCol.__jsType).toEqualTypeOf<number>();
 });
