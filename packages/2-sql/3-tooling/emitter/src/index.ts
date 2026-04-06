@@ -294,7 +294,7 @@ export const sqlTargetFamilyHook = {
     return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType}; readonly storageHash: ${storageHashTypeName} }`;
   },
 
-  generateModelStorageType(modelName: string, model: ContractModel): string {
+  generateModelStorageType(_modelName: string, model: ContractModel): string {
     const irModel = model as unknown as IRModelDefinition;
     const tableName = irModel.storage.table;
     const storageFields = irModel.storage.fields ?? {};

@@ -10,7 +10,13 @@ describe('defineConfig', () => {
     id: 'sql',
     validateTypes: () => {},
     validateStructure: () => {},
-    generateContractTypes: () => '',
+    generateStorageType: () => '{}',
+    generateModelStorageType: () => '{}',
+    getFamilyImports: () => [] as string[],
+    getFamilyTypeAliases: () => '',
+    getTypeMapsExpression: () => 'never',
+    getContractWrapper: (base: string, tm: string) =>
+      `export type Contract = ${base} & { typeMaps: ${tm} };`,
   };
 
   const baseConfig: PrismaNextConfig = {
