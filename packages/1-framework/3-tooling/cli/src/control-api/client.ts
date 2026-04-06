@@ -1,11 +1,11 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
-import { emit as emitContractArtifacts } from '@prisma-next/core-control-plane/emission';
-import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
+import { emit as emitContractArtifacts } from '@prisma-next/emitter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
   ControlStack,
+  CoreSchemaView,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,

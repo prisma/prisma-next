@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { CliStructuredError } from '@prisma-next/core-control-plane/errors';
+import { CliStructuredError } from '@prisma-next/errors/control';
 import {
   type ControlAdapterDescriptor,
   type ControlExtensionDescriptor,

@@ -1,7 +1,7 @@
 import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
-import type { EmitResult, EmitStackInput } from '@prisma-next/core-control-plane/emission';
-import { emit } from '@prisma-next/core-control-plane/emission';
+import type { EmitResult, EmitStackInput } from '@prisma-next/emitter';
+import { emit } from '@prisma-next/emitter';
 import type {
   FamilyDescriptor,
   TargetDescriptor,

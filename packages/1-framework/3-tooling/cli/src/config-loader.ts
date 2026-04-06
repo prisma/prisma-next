@@ -5,7 +5,7 @@ import {
   errorConfigFileNotFound,
   errorConfigValidation,
   errorUnexpected,
-} from '@prisma-next/core-control-plane/errors';
+} from '@prisma-next/errors/control';
 import { loadConfig as loadConfigC12 } from 'c12';
 
 /**

@@ -1,5 +1,4 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
-import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
@@ -8,7 +7,9 @@ import type {
   ControlDriverInstance,
   ControlFamilyInstance,
   ControlStack,
+  CoreSchemaView,
   OperationContext,
+  SchemaTreeNode,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,

@@ -12,8 +12,8 @@
  */
 
 import { join } from 'node:path';
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { verifyMigration } from '@prisma-next/migration-tools/attestation';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
