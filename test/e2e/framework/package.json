@@ -29,6 +29,7 @@
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/ids": "workspace:*",
     "@prisma-next/integration-tests": "workspace:*",
     "@prisma-next/sql-builder": "workspace:*",

@@ -2204,6 +2204,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../packages/2-sql/9-family
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../packages/1-framework/1-core/framework-components
       '@prisma-next/ids':
         specifier: workspace:*
         version: link:../../../packages/1-framework/2-authoring/ids
