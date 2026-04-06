@@ -59,6 +59,7 @@ function createTestContract(
     capabilities: {},
     meta: {},
     sources: {},
+    profileHash: 'sha256:test',
   };
 }
 

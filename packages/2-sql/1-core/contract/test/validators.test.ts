@@ -239,7 +239,7 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContract(invalid)).toThrow(/models/);
     });
 
-    it('accepts optional profileHash', () => {
+    it('accepts contract with profileHash', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
@@ -247,6 +247,17 @@ describe('SQL contract validators', () => {
         storage: { tables: { user: userTable } },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
+    it('rejects contract without profileHash', () => {
+      const userTable = table({
+        id: col('int4', 'pg/int4@1'),
+      });
+      const c = createContract<SqlStorage>({
+        storage: { tables: { user: userTable } },
+      });
+      const { profileHash: _, ...withoutProfileHash } = c;
+      expect(() => validateSqlContract(withoutProfileHash)).toThrow(/profileHash/);
     });
 
     it('accepts optional capabilities', () => {
