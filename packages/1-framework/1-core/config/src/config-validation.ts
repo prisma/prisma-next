@@ -45,8 +45,8 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
   if (typeof family['version'] !== 'string') {
     throwValidation('family.version', 'Config.family must have version: string');
   }
-  if (!family['hook'] || typeof family['hook'] !== 'object') {
-    throwValidation('family.hook', 'Config.family must have hook: TargetFamilyHook');
+  if (!family['emission'] || typeof family['emission'] !== 'object') {
+    throwValidation('family.emission', 'Config.family must have emission: EmissionSpi');
   }
   if (typeof family['create'] !== 'function') {
     throwValidation('family.create', 'Config.family must have create: function');

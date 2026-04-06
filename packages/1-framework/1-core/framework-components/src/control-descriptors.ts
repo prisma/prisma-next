@@ -6,7 +6,7 @@ import type {
   ControlTargetInstance,
 } from './control-instances';
 import type { ControlStack } from './control-stack';
-import type { TargetFamilyHook } from './emission-types';
+import type { EmissionSpi } from './emission-types';
 import type {
   AdapterDescriptor,
   DriverDescriptor,
@@ -19,7 +19,7 @@ export interface ControlFamilyDescriptor<
   TFamilyId extends string,
   TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
 > extends FamilyDescriptor<TFamilyId> {
-  readonly hook: TargetFamilyHook;
+  readonly emission: EmissionSpi;
   create<TTargetId extends string>(stack: ControlStack<TFamilyId, TTargetId>): TFamilyInstance;
 }
 

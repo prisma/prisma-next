@@ -1,7 +1,7 @@
 export type {
+  EmissionSpi,
   GenerateContractTypesOptions,
   ParameterizedCodecDescriptor,
-  TargetFamilyHook,
   TypeRenderEntry,
   ValidationContext,
 } from '../emission-types';

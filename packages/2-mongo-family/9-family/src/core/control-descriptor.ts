@@ -12,7 +12,7 @@ class MongoFamilyDescriptor
   readonly id = 'mongo';
   readonly familyId = 'mongo' as const;
   readonly version = '0.0.1';
-  readonly hook = mongoTargetFamilyHook;
+  readonly emission = mongoTargetFamilyHook;
 
   create<TTargetId extends string>(
     stack: ControlStack<'mongo', TTargetId>,

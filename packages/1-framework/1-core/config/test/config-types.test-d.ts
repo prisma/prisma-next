@@ -22,7 +22,7 @@ const sqlFamilyDescriptor: ControlFamilyDescriptor<'sql'> = {
   version: '1',
   id: 'sql',
   familyId: 'sql',
-  hook: mockHook,
+  emission: mockHook,
   create: (_stack) =>
     ({
       familyId: 'sql',

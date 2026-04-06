@@ -12,7 +12,7 @@ const sqlFamilyWithoutCreate = {
   kind: 'family' as const,
   familyId: 'sql' as const,
   manifest: { id: 'sql', version: '0.0.1' },
-  hook: sqlTargetFamilyHook,
+  emission: sqlTargetFamilyHook,
   // create method is missing - this is what we're testing
 };
 

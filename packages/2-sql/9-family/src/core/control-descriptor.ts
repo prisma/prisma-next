@@ -12,7 +12,7 @@ export class SqlFamilyDescriptor
   readonly id = 'sql';
   readonly familyId = 'sql' as const;
   readonly version = '0.0.1';
-  readonly hook = sqlTargetFamilyHook;
+  readonly emission = sqlTargetFamilyHook;
 
   create<TTargetId extends string>(
     stack: ControlStack<'sql', TTargetId>,
