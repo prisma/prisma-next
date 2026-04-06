@@ -474,14 +474,15 @@ test('model-mapped vector column resolves to base codec output type', () => {
   expectTypeOf(vectorDataCol.__jsType).toEqualTypeOf<number[]>();
 });
 
-test('unmapped vector column resolves via parameterized codec output', () => {
+test('unmapped vector column resolves to parameterized type, not base output', () => {
   const unmappedVectorCol = embeddingTable.columns.unmapped_vector;
 
-  expectTypeOf(unmappedVectorCol.__jsType).not.toBeNever();
-  expectTypeOf(unmappedVectorCol.__jsType).not.toEqualTypeOf<unknown>();
-  // Storage column path: parameterizedOutput produces a Vector-branded type (extends number[]).
-  // Nullable column → result includes null.
+  // Parameterized output produces a branded type that is structurally narrower
+  // than the base output (number[]). Both assertions together prove parameterization:
+  // 1. Assignable to number[] | null (it's still a number array variant)
   expectTypeOf(unmappedVectorCol.__jsType).toMatchTypeOf<number[] | null>();
+  // 2. NOT equal to number[] | null (parameterizedOutput added branding)
+  expectTypeOf(unmappedVectorCol.__jsType).not.toEqualTypeOf<number[] | null>();
 });
 
 test('model-mapped non-parameterized column resolves correctly', () => {
