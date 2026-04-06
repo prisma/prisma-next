@@ -63,6 +63,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
+      - name: Link built binaries
+        run: pnpm install --frozen-lockfile
       - name: Check fixtures are up to date
         run: pnpm fixtures:check
 
