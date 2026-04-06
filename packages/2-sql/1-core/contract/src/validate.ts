@@ -1,4 +1,8 @@
-import type { ColumnDefaultLiteralInputValue, Contract } from '@prisma-next/contract/types';
+import type {
+  ColumnDefaultLiteralInputValue,
+  Contract,
+  ContractModel,
+} from '@prisma-next/contract/types';
 import { isTaggedBigInt, isTaggedRaw } from '@prisma-next/contract/types';
 import {
   ContractValidationError,
@@ -7,10 +11,11 @@ import {
 import type { SqlModelStorage, SqlStorage, StorageColumn, StorageTable } from './types';
 import { validateSqlContract, validateStorageSemantics } from './validators';
 
-function validateModelStorageReferences(contract: Contract<SqlStorage>): void {
+type SqlValidationContract = Contract<SqlStorage, Record<string, ContractModel<SqlModelStorage>>>;
+
+function validateModelStorageReferences(contract: SqlValidationContract): void {
   for (const [modelName, model] of Object.entries(contract.models)) {
-    const modelStorage = model.storage as SqlModelStorage;
-    const storageTable = modelStorage.table;
+    const storageTable = model.storage.table;
 
     const table = contract.storage.tables[storageTable] as
       | (typeof contract.storage.tables)[string]
@@ -23,7 +28,7 @@ function validateModelStorageReferences(contract: Contract<SqlStorage>): void {
     }
 
     const columnNames = new Set(Object.keys(table.columns));
-    for (const [fieldName, field] of Object.entries(modelStorage.fields)) {
+    for (const [fieldName, field] of Object.entries(model.storage.fields)) {
       if (!columnNames.has(field.column)) {
         throw new ContractValidationError(
           `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${storageTable}"`,
@@ -122,8 +127,7 @@ function validateContractLogic(contract: Contract<SqlStorage>): void {
 }
 
 function validateSqlStorage(contract: Contract): void {
-  validateSqlContract(contract);
-  const sqlContract = contract as Contract<SqlStorage>;
+  const sqlContract = validateSqlContract<SqlValidationContract>(contract);
   validateContractLogic(sqlContract);
   validateModelStorageReferences(sqlContract);
   const semanticErrors = validateStorageSemantics(sqlContract.storage);

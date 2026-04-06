@@ -192,7 +192,7 @@ export async function readContractEnvelope(config: {
 
   const { schemaVersion, target, targetFamily, profileHash } = json;
   const storage = json['storage'] as Record<string, unknown> | undefined;
-  const storageHash = storage?.['storageHash'] as string | undefined;
+  const storageHash = storage?.['storageHash'];
 
   if (typeof storageHash !== 'string') {
     throw new Error(
