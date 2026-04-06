@@ -321,11 +321,10 @@ withTempDir(({ createTempDir }) => {
               await client.query(`INSERT INTO "user" (id, email) VALUES (1, 'user@example.com')`);
             });
 
-            // Plan second migration that adds a non-null column with a UNIQUE
-            // constraint and no default.  The UNIQUE constraint prevents the
-            // planner from using its temporary-default strategy (all rows would
-            // get the same placeholder, violating uniqueness). Instead the
-            // planner emits an empty-table precheck that fails when rows exist.
+            // Plan second migration that adds a NOT NULL + UNIQUE column.
+            // The UNIQUE constraint prevents the planner's temporary-default
+            // strategy (a uniform default would violate uniqueness), so the
+            // planner falls back to an empty-table precheck that fails here.
             const contractSrc = readFileSync(contractPath!, 'utf-8');
             const modified = contractSrc.replace(
               `.primaryKey(['id'])`,
@@ -341,6 +340,9 @@ withTempDir(({ createTempDir }) => {
               'add_required_name',
               '--no-color',
             ]);
+
+            // Apply fails: the empty-table precheck rejects adding a NOT NULL + UNIQUE
+            // column to a non-empty table.
             consoleOutput.length = 0;
             let failed = false;
             try {
