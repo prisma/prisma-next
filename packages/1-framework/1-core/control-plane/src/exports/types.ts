@@ -8,7 +8,6 @@ export type {
   ControlExtensionInstance,
   ControlFamilyDescriptor,
   ControlFamilyInstance,
-  ControlPlaneStack,
   ControlStack,
   ControlTargetDescriptor,
   ControlTargetInstance,

@@ -5,7 +5,6 @@ export type {
   ControlDriverDescriptor,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
-  ControlPlaneStack,
   ControlTargetDescriptor,
 } from '../control-descriptors';
 export type {
