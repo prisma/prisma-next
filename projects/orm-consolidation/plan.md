@@ -51,6 +51,8 @@ Phase 1 is read-only. The SQL ORM already has `create()`, `createAll()`, `create
 
 ### Phase 1.6: Codec-owned value serialization
 
+**Linear:** [TML-2202](https://linear.app/prisma-company/issue/TML-2202)
+
 Implement [ADR 184](../../docs/architecture%20docs/adrs/ADR%20184%20-%20Codec-owned%20value%20serialization.md) — extend the core `Codec` interface with `encodeJson`/`decodeJson` methods so codecs own the contract JSON serialization boundary for their types. Replace the hardcoded bigint/Date branches (`encodeDefaultLiteralValue`, `bigintJsonReplacer`, `decodeContractDefaults`, `DefaultLiteralValue<>`) with codec dispatch. This is a prerequisite for Phase 1.75: the emitter needs to serialize discriminator values into `contract.json`, and the runtime needs to decode them — both via the discriminator field's codec.
 
 **Scope:**
@@ -64,6 +66,8 @@ Implement [ADR 184](../../docs/architecture%20docs/adrs/ADR%20184%20-%20Codec-ow
 **Proof:** Existing column default tests pass with codec dispatch instead of hardcoded branches. A non-JSON-safe type (bigint) round-trips through `contract.json` via codec methods. No `$type` tags in newly emitted contracts.
 
 ### Phase 1.75: Polymorphism, embedded documents, and value objects (both families)
+
+**Linear:** [TML-2203](https://linear.app/prisma-company/issue/TML-2203)
 
 Neither ORM currently has end-to-end polymorphism, embedded document, or value object support — the Mongo ORM has type-level machinery (`InferRootRow`/`VariantRow`, `InferFullRow`/`EmbedRelationKeys`) from the PoC, but no authoring path produces contracts with these features, and the SQL ORM has no polymorphism implementation at all. The contract schema has structural slots for `discriminator`, `variants`, `base`, `owner`, and `valueObjects`, but they are exercised only by hand-crafted test fixtures.
 
