@@ -41,6 +41,13 @@ function defineStagedContract<
   });
 }
 
+function modelsOf(contract: { models: unknown }) {
+  return contract.models as Record<
+    string,
+    { storage: { fields: Record<string, unknown> }; fields: Record<string, unknown> }
+  >;
+}
+
 type OwnershipRelationCase = {
   readonly label: 'hasMany' | 'hasOne';
   readonly relationName: 'posts' | 'profile';
@@ -271,10 +278,7 @@ describe('staged contract DSL authoring surface', () => {
         columns: Record<string, unknown>;
       }
     >;
-    const models = contract.models as unknown as Record<
-      string,
-      { storage: { fields: Record<string, unknown> }; fields: Record<string, unknown> }
-    >;
+    const models = modelsOf(contract);
     expect(tables['app_user']?.primaryKey).toEqual({
       columns: ['id'],
       name: 'app_user_pkey',
@@ -530,10 +534,7 @@ describe('staged contract DSL authoring surface', () => {
     expect(tables['blog_post']).toBeDefined();
     expect(tables['blog_post']?.columns['created_at']).toBeDefined();
     expect(tables['blog_post']?.columns['author_identifier']).toBeDefined();
-    const models = contract.models as unknown as Record<
-      string,
-      { storage: { fields: Record<string, unknown> } }
-    >;
+    const models = modelsOf(contract);
     expect(models['BlogPost']?.storage.fields['createdAt']).toEqual({ column: 'created_at' });
     expect(models['BlogPost']?.storage.fields['authorId']).toEqual({
       column: 'author_identifier',
