@@ -66,6 +66,7 @@ graph TD
 | `./io` | `writeMigrationPackage`, `readMigrationPackage`, `readMigrationsDir`, `formatMigrationDirName` |
 | `./attestation` | `computeMigrationId`, `attestMigration`, `verifyMigration` |
 | `./dag` | `reconstructGraph`, `findLeaf`, `findPath`, `detectCycles`, `detectOrphans` |
+| `./constants` | `EMPTY_CONTRACT_HASH` |
 
 ## On-Disk Format
 

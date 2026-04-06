@@ -12,10 +12,7 @@ import { CliStructuredError } from './control';
 /**
  * Contract marker not found in database.
  */
-export function errorMarkerMissing(options?: {
-  readonly why?: string;
-  readonly dbUrl?: string;
-}): CliStructuredError {
+export function errorMarkerMissing(options?: { readonly why?: string }): CliStructuredError {
   return new CliStructuredError('3001', 'Database not signed', {
     domain: 'RUN',
     why: options?.why ?? 'No database signature (marker) found',
@@ -35,14 +32,12 @@ export function errorHashMismatch(options?: {
     domain: 'RUN',
     why: options?.why ?? 'Contract hash does not match database marker',
     fix: 'Migrate database or re-sign if intentional',
-    ...(options?.expected || options?.actual
-      ? {
-          meta: {
-            ...(options.expected ? { expected: options.expected } : {}),
-            ...(options.actual ? { actual: options.actual } : {}),
-          },
-        }
-      : {}),
+    ...((options?.expected || options?.actual) && {
+      meta: {
+        ...ifDefined('expected', options?.expected),
+        ...ifDefined('actual', options?.actual),
+      },
+    }),
   });
 }
 
