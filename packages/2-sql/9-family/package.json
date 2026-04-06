@@ -31,6 +31,8 @@
   },
   "devDependencies": {
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/psl-parser": "workspace:*",
+    "@prisma-next/sql-contract-psl": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",

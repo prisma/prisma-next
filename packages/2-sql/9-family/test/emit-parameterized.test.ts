@@ -20,7 +20,9 @@ import type {
   TypesImportSpec,
 } from '@prisma-next/framework-components/emission';
 import { createOperationRegistry } from '@prisma-next/operations';
+import { parsePslDocument } from '@prisma-next/psl-parser';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';
@@ -708,5 +710,61 @@ describe('emit parameterized codecs integration', () => {
     expect(result.contractDts).toContain(
       "readonly metadata: { readonly codecId: 'pg/jsonb@1'; readonly nullable: false }",
     );
+  });
+});
+
+describe('E2E: PSL named types → interpret → emit', () => {
+  it('resolves typeRef to inline typeParams on model fields from PSL named types', async () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Embedding1536 = Bytes @pgvector.column(length: 1536)
+}
+
+model Document {
+  id Int @id
+  embedding Embedding1536
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const interpretResult = interpretPslDocumentToSqlContract({
+      document,
+      target: {
+        kind: 'target',
+        familyId: 'sql',
+        targetId: 'postgres',
+        id: 'postgres',
+        version: '0.0.1',
+        capabilities: {},
+      },
+      scalarTypeDescriptors: new Map([
+        ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
+        ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
+      ]),
+      composedExtensionPacks: ['pgvector'],
+    });
+
+    expect(interpretResult.ok).toBe(true);
+    if (!interpretResult.ok) return;
+
+    const contract = interpretResult.value;
+
+    const result = await emitWithDescriptors(contract, {
+      family: createMockFamily(),
+      target: createMockTarget(),
+      adapter: createMockAdapter(),
+      extensionPacks: [
+        createMockExtensionWithParameterizedRenderer(
+          'pgvector',
+          'pg/vector@1',
+          (params) => `Vector<${params['length']}>`,
+        ),
+      ],
+    });
+
+    expect(result.contractDts).toContain('readonly typeParams: { readonly length: 1536 }');
+    expect(result.contractDts).toContain("readonly typeRef: 'Embedding1536'");
+    expect(result.contractDts).not.toMatch(/readonly embedding:.*typeRef/);
   });
 });

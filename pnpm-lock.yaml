@@ -1652,6 +1652,12 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../3-targets/7-drivers/postgres
+      '@prisma-next/psl-parser':
+        specifier: workspace:*
+        version: link:../../1-framework/2-authoring/psl-parser
+      '@prisma-next/sql-contract-psl':
+        specifier: workspace:*
+        version: link:../2-authoring/contract-psl
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
