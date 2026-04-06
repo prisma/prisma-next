@@ -8,6 +8,7 @@ import type {
 import type { Document } from '@prisma-next/mongo-value';
 import { resolveValue } from './resolve-value';
 
+// Biome flags `{ then: ... }` as a thenable object (noThenProperty). Build via Object.fromEntries to avoid.
 const THEN_KEY = 'then';
 
 function condBranch(
