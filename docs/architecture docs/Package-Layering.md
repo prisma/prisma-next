@@ -61,7 +61,6 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 |   |-- operations/    → @prisma-next/operations
 |-- 2-authoring (migration plane)
 |   |-- contract/      → @prisma-next/contract-authoring
-|   |-- contract-ts/   → @prisma-next/contract-ts (future)
 |   |-- psl-parser/    → @prisma-next/psl-parser
 |-- 3-tooling (migration plane)
 |   |-- cli/           → @prisma-next/cli
@@ -203,7 +202,6 @@ Contract authoring surfaces for creating contracts programmatically.
 
 **Framework Domain (Migration Plane):**
 - `packages/1-framework/2-authoring/contract/` → `@prisma-next/contract-authoring` - TS builders, canonicalization, schema DSL
-- `packages/1-framework/2-authoring/contract-ts/` → `@prisma-next/contract-ts` - TS authoring surface (future)
 - `packages/1-framework/2-authoring/psl-parser/` → `@prisma-next/psl-parser` - PSL parser + IR (future)
 
 **SQL Domain (Migration Plane):**
@@ -280,7 +278,6 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/1-framework/1-core/control-plane/` | `@prisma-next/core-control-plane` |
 | `packages/1-framework/1-core/execution-plane/` | `@prisma-next/core-execution-plane` |
 | `packages/1-framework/2-authoring/contract/` | `@prisma-next/contract-authoring` |
-| `packages/1-framework/2-authoring/contract-ts/` | `@prisma-next/contract-ts` |
 | `packages/1-framework/2-authoring/psl-parser/` | `@prisma-next/psl-parser` |
 | `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |
 | `packages/1-framework/3-tooling/emitter/` | `@prisma-next/emitter` |

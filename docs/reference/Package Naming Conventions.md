@@ -54,7 +54,6 @@ Planes are a conceptual grouping recorded in `architecture.config.json` but do n
 | `packages/1-framework/1-core/control-plane/` | `@prisma-next/core-control-plane` |
 | `packages/1-framework/1-core/execution-plane/` | `@prisma-next/core-execution-plane` |
 | `packages/1-framework/2-authoring/contract/` | `@prisma-next/contract-authoring` |
-| `packages/1-framework/2-authoring/contract-ts/` | `@prisma-next/contract-ts` |
 | `packages/1-framework/2-authoring/psl-parser/` | `@prisma-next/psl-parser` |
 | `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |
 | `packages/1-framework/3-tooling/emitter/` | `@prisma-next/emitter` |

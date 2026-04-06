@@ -46,7 +46,6 @@ Create a new **framework core / shared plane** package:
   - config-specific validation errors (as structured errors, but not “CLI envelope” concerns)
 - Update consumers (at minimum):
   - `@prisma-next/cli` config loading and re-exports
-  - `@prisma-next/contract-ts` helper(s) that return `ContractConfig`
   - Any PSL provider wiring that depends on the provider interfaces
 - Remove the moved symbols from `@prisma-next/core-control-plane` to keep it focused on domain actions/migration/control-plane operations.
 
@@ -82,7 +81,7 @@ Create a new **framework core / shared plane** package:
 # Acceptance Criteria
 
 - [ ] A dedicated package exists that exports the config typing/validation and provider interfaces used by `prisma-next.config.ts`.
-- [ ] `@prisma-next/cli` and `@prisma-next/contract-ts` consume the new package and build/typecheck successfully.
+- [ ] `@prisma-next/cli` consumes the new package and builds/typechecks successfully.
 - [ ] Existing config-loader and config-types tests still pass (or are updated to the new import paths) with no behavior regressions.
 - [ ] `@prisma-next/core-control-plane` no longer owns the moved config/provider symbols and remains buildable.
 - [ ] Package READMEs reflect the new responsibilities and point to the correct import paths.
