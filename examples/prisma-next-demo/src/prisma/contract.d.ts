@@ -55,6 +55,7 @@ type ContractBase = ContractShape<
             readonly nativeType: 'character';
             readonly codecId: 'sql/char@1';
             readonly nullable: false;
+            readonly typeParams: { readonly length: 36 };
           };
           readonly title: {
             readonly nativeType: 'text';
@@ -76,6 +77,7 @@ type ContractBase = ContractShape<
             readonly nativeType: 'vector';
             readonly codecId: 'pg/vector@1';
             readonly nullable: true;
+            readonly typeRef: 'Embedding1536';
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
@@ -96,6 +98,7 @@ type ContractBase = ContractShape<
             readonly nativeType: 'character';
             readonly codecId: 'sql/char@1';
             readonly nullable: false;
+            readonly typeParams: { readonly length: 36 };
           };
           readonly email: {
             readonly nativeType: 'text';
@@ -112,6 +115,7 @@ type ContractBase = ContractShape<
             readonly nativeType: 'user_type';
             readonly codecId: 'pg/enum@1';
             readonly nullable: false;
+            readonly typeRef: 'user_type';
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
@@ -147,11 +151,19 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'sql/char@1'; readonly nullable: false };
+        readonly id: {
+          readonly codecId: 'sql/char@1';
+          readonly nullable: false;
+          readonly typeParams: { readonly length: 36 };
+        };
         readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
         readonly userId: { readonly codecId: 'pg/text@1'; readonly nullable: false };
         readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
-        readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: true };
+        readonly embedding: {
+          readonly codecId: 'pg/vector@1';
+          readonly nullable: true;
+          readonly typeParams: { readonly length: 1536 };
+        };
       };
       readonly relations: {
         readonly user: {
@@ -175,10 +187,18 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'sql/char@1'; readonly nullable: false };
+        readonly id: {
+          readonly codecId: 'sql/char@1';
+          readonly nullable: false;
+          readonly typeParams: { readonly length: 36 };
+        };
         readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
         readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
-        readonly kind: { readonly codecId: 'pg/enum@1'; readonly nullable: false };
+        readonly kind: {
+          readonly codecId: 'pg/enum@1';
+          readonly nullable: false;
+          readonly typeParams: { readonly values: readonly ['admin', 'user'] };
+        };
       };
       readonly relations: {
         readonly posts: {
