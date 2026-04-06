@@ -34,14 +34,12 @@
   },
   "exports": {
     "./control": "./dist/control.mjs",
+    "./execution": "./dist/execution.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/1-framework/1-core/errors"
-  },
-  "main": "./dist/control.mjs",
-  "module": "./dist/control.mjs",
-  "types": "./dist/control.d.mts"
+  }
 }

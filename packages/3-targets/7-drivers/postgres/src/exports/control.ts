@@ -1,4 +1,4 @@
-import { errorRuntime } from '@prisma-next/errors/control';
+import { errorRuntime } from '@prisma-next/errors/execution';
 import type {
   ControlDriverDescriptor,
   ControlDriverInstance,

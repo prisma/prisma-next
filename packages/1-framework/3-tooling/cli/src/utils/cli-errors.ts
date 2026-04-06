@@ -5,25 +5,28 @@
 export type { CliErrorConflict, CliErrorEnvelope } from '@prisma-next/errors/control';
 export {
   CliStructuredError,
-  ERROR_CODE_DESTRUCTIVE_CHANGES,
   errorConfigFileNotFound,
   errorConfigValidation,
   errorContractConfigMissing,
   errorContractMissingExtensionPacks,
   errorContractValidationFailed,
   errorDatabaseConnectionRequired,
-  errorDestructiveChanges,
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
-  errorHashMismatch,
-  errorMarkerMissing,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
+  errorTargetMigrationNotSupported,
+  errorUnexpected,
+} from '@prisma-next/errors/control';
+export {
+  ERROR_CODE_DESTRUCTIVE_CHANGES,
+  errorDestructiveChanges,
+  errorHashMismatch,
+  errorMarkerMissing,
+  errorMarkerRequired,
   errorRunnerFailed,
   errorRuntime,
   errorSchemaVerificationFailed,
-  errorTargetMigrationNotSupported,
   errorTargetMismatch,
-  errorUnexpected,
-} from '@prisma-next/errors/control';
+} from '@prisma-next/errors/execution';
