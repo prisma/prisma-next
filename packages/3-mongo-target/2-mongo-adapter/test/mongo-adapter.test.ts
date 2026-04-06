@@ -10,6 +10,15 @@ import {
   MongoFieldFilter,
   MongoMatchStage,
   MongoProjectStage,
+  RawAggregateCommand,
+  RawDeleteManyCommand,
+  RawDeleteOneCommand,
+  RawFindOneAndDeleteCommand,
+  RawFindOneAndUpdateCommand,
+  RawInsertManyCommand,
+  RawInsertOneCommand,
+  RawUpdateManyCommand,
+  RawUpdateOneCommand,
   UpdateManyCommand,
   UpdateOneCommand,
 } from '@prisma-next/mongo-query-ast';
@@ -205,6 +214,114 @@ describe('MongoAdapter', () => {
       });
       const wire = narrowWire(adapter.lower(plan('events', command)), 'insertOne');
       expect(wire.document['occurredAt']).toBe(now);
+    });
+  });
+
+  describe('RawAggregateCommand', () => {
+    it('passes pipeline through unchanged', () => {
+      const pipeline = [
+        { $match: { status: 'active' } },
+        { $group: { _id: '$dept', total: { $sum: '$amount' } } },
+      ];
+      const command = new RawAggregateCommand('orders', pipeline);
+      const wire = narrowWire(adapter.lower(plan('orders', command)), 'aggregate');
+      expect(wire.pipeline).toEqual(pipeline);
+    });
+  });
+
+  describe('RawInsertOneCommand', () => {
+    it('passes document through unchanged', () => {
+      const doc = { name: 'Alice', email: 'alice@example.com' };
+      const command = new RawInsertOneCommand('users', doc);
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'insertOne');
+      expect(wire.document).toEqual(doc);
+    });
+  });
+
+  describe('RawInsertManyCommand', () => {
+    it('passes documents through unchanged', () => {
+      const docs = [{ name: 'Alice' }, { name: 'Bob' }];
+      const command = new RawInsertManyCommand('users', docs);
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'insertMany');
+      expect(wire.documents).toEqual(docs);
+    });
+  });
+
+  describe('RawUpdateOneCommand', () => {
+    it('passes filter and update through unchanged', () => {
+      const filter = { email: 'alice@example.com' };
+      const update = { $set: { name: 'Alice B' } };
+      const command = new RawUpdateOneCommand('users', filter, update);
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'updateOne');
+      expect(wire.filter).toEqual(filter);
+      expect(wire.update).toEqual(update);
+    });
+  });
+
+  describe('RawUpdateManyCommand', () => {
+    it('passes filter and object update through unchanged', () => {
+      const filter = { status: 'inactive' };
+      const update = { $set: { archived: true } };
+      const command = new RawUpdateManyCommand('users', filter, update);
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'updateMany');
+      expect(wire.filter).toEqual(filter);
+      expect(wire.update).toEqual(update);
+    });
+
+    it('passes pipeline-style update (array) through unchanged', () => {
+      const filter = { firstName: { $exists: true } };
+      const update = [{ $set: { fullName: { $concat: ['$firstName', ' ', '$lastName'] } } }];
+      const command = new RawUpdateManyCommand('users', filter, update);
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'updateMany');
+      expect(wire.update).toEqual(update);
+    });
+  });
+
+  describe('RawDeleteOneCommand', () => {
+    it('passes filter through unchanged', () => {
+      const filter = { email: 'alice@example.com' };
+      const command = new RawDeleteOneCommand('users', filter);
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'deleteOne');
+      expect(wire.filter).toEqual(filter);
+    });
+  });
+
+  describe('RawDeleteManyCommand', () => {
+    it('passes filter through unchanged', () => {
+      const filter = { status: 'expired' };
+      const command = new RawDeleteManyCommand('sessions', filter);
+      const wire = narrowWire(adapter.lower(plan('sessions', command)), 'deleteMany');
+      expect(wire.filter).toEqual(filter);
+    });
+  });
+
+  describe('RawFindOneAndUpdateCommand', () => {
+    it('passes filter, update, and upsert through unchanged', () => {
+      const filter = { _id: 'counter1' };
+      const update = { $inc: { count: 1 } };
+      const command = new RawFindOneAndUpdateCommand('counters', filter, update, true);
+      const wire = narrowWire(adapter.lower(plan('counters', command)), 'findOneAndUpdate');
+      expect(wire.filter).toEqual(filter);
+      expect(wire.update).toEqual(update);
+      expect(wire.upsert).toBe(true);
+    });
+
+    it('passes pipeline-style update through unchanged', () => {
+      const filter = { _id: 'x' };
+      const update = [{ $set: { computed: { $add: ['$a', '$b'] } } }];
+      const command = new RawFindOneAndUpdateCommand('items', filter, update, false);
+      const wire = narrowWire(adapter.lower(plan('items', command)), 'findOneAndUpdate');
+      expect(wire.update).toEqual(update);
+      expect(wire.upsert).toBe(false);
+    });
+  });
+
+  describe('RawFindOneAndDeleteCommand', () => {
+    it('passes filter through unchanged', () => {
+      const filter = { email: 'alice@example.com' };
+      const command = new RawFindOneAndDeleteCommand('users', filter);
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'findOneAndDelete');
+      expect(wire.filter).toEqual(filter);
     });
   });
 });

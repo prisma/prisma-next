@@ -27,9 +27,9 @@ export class InsertOneWireCommand extends MongoWireCommand {
 export class UpdateOneWireCommand extends MongoWireCommand {
   readonly kind = 'updateOne' as const;
   readonly filter: Document;
-  readonly update: Document;
+  readonly update: Document | ReadonlyArray<Document>;
 
-  constructor(collection: string, filter: Document, update: Document) {
+  constructor(collection: string, filter: Document, update: Document | ReadonlyArray<Document>) {
     super(collection);
     this.filter = filter;
     this.update = update;
@@ -62,9 +62,9 @@ export class InsertManyWireCommand extends MongoWireCommand {
 export class UpdateManyWireCommand extends MongoWireCommand {
   readonly kind = 'updateMany' as const;
   readonly filter: Document;
-  readonly update: Document;
+  readonly update: Document | ReadonlyArray<Document>;
 
-  constructor(collection: string, filter: Document, update: Document) {
+  constructor(collection: string, filter: Document, update: Document | ReadonlyArray<Document>) {
     super(collection);
     this.filter = filter;
     this.update = update;
@@ -86,10 +86,15 @@ export class DeleteManyWireCommand extends MongoWireCommand {
 export class FindOneAndUpdateWireCommand extends MongoWireCommand {
   readonly kind = 'findOneAndUpdate' as const;
   readonly filter: Document;
-  readonly update: Document;
+  readonly update: Document | ReadonlyArray<Document>;
   readonly upsert: boolean;
 
-  constructor(collection: string, filter: Document, update: Document, upsert: boolean) {
+  constructor(
+    collection: string,
+    filter: Document,
+    update: Document | ReadonlyArray<Document>,
+    upsert: boolean,
+  ) {
     super(collection);
     this.filter = filter;
     this.update = update;
