@@ -1,3 +1,4 @@
+import type { ContractModel } from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 
 export function serializeValue(value: unknown): string {
@@ -96,6 +97,45 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
   }
 
   return `{ ${relationEntries.join('; ')} }`;
+}
+
+export function generateModelsType(
+  models: Record<string, ContractModel>,
+  generateModelStorage: (modelName: string, model: ContractModel) => string,
+): string {
+  if (!models || Object.keys(models).length === 0) {
+    return 'Record<string, never>';
+  }
+
+  const modelTypes: string[] = [];
+  for (const [modelName, model] of Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) {
+    const fieldsType = generateModelFieldsType(model.fields);
+    const relationsType = generateModelRelationsType(model.relations);
+    const storageType = generateModelStorage(modelName, model);
+
+    const modelParts: string[] = [
+      `readonly fields: ${fieldsType}`,
+      `readonly relations: ${relationsType}`,
+      `readonly storage: ${storageType}`,
+    ];
+
+    if (model.owner) {
+      modelParts.push(`readonly owner: ${serializeValue(model.owner)}`);
+    }
+    if (model.discriminator) {
+      modelParts.push(`readonly discriminator: ${serializeValue(model.discriminator)}`);
+    }
+    if (model.variants) {
+      modelParts.push(`readonly variants: ${serializeValue(model.variants)}`);
+    }
+    if (model.base) {
+      modelParts.push(`readonly base: ${serializeValue(model.base)}`);
+    }
+
+    modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
+  }
+
+  return `{ ${modelTypes.join('; ')} }`;
 }
 
 export function deduplicateImports(imports: TypesImportSpec[]): TypesImportSpec[] {
