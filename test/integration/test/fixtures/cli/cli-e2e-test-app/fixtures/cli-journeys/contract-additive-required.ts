@@ -10,7 +10,8 @@ export const contract = defineContract<CodecTypes>()
       .column('id', { type: int4Column, nullable: false })
       .column('email', { type: textColumn, nullable: false })
       .column('required_name', { type: textColumn, nullable: false })
-      .primaryKey(['id']),
+      .primaryKey(['id'])
+      .unique(['required_name'], 'user_required_name_key'),
   )
   .model('User', 'user', (m) =>
     m.field('id', 'id').field('email', 'email').field('required_name', 'required_name'),

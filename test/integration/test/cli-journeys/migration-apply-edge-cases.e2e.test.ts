@@ -72,7 +72,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'resumes from last successful migration after NOT NULL violation',
+      'resumes from last successful migration after empty-table precheck failure',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -105,9 +105,11 @@ withTempDir(({ createTempDir }) => {
         const plan1 = await runMigrationPlan(ctx, ['--name', 'add-required-name']);
         expect(plan1.exitCode, 'plan add-required-name').toBe(0);
 
-        // Apply fails because existing rows violate NOT NULL
+        // Apply fails because the planner's empty-table precheck rejects adding
+        // a NOT NULL + UNIQUE column to a non-empty table (temporary default
+        // strategy is disabled when the column has a UNIQUE constraint).
         const applyFail = await runMigrationApply(ctx, ['--json']);
-        expect(applyFail.exitCode, 'apply fails on NOT NULL').toBe(1);
+        expect(applyFail.exitCode, 'apply fails on non-empty table precheck').toBe(1);
 
         // Marker stays at the first migration's target hash
         const marker = await sql(
