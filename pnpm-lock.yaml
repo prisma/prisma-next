@@ -429,6 +429,31 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
+  packages/1-framework/1-core/errors:
+    dependencies:
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../framework-components
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../0-foundation/utils
+    devDependencies:
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
+
   packages/1-framework/1-core/framework-components:
     dependencies:
       '@prisma-next/contract':
@@ -695,19 +720,22 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../0-foundation/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../1-core/control-plane
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-core/framework-components
-      arktype:
-        specifier: ^2.0.0
-        version: 2.1.29
-    devDependencies:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-core/operations
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../0-foundation/utils
+      arktype:
+        specifier: ^2.0.0
+        version: 2.1.29
+      prettier:
+        specifier: ^3.3.3
+        version: 3.6.2
+    devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils

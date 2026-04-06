@@ -20,12 +20,13 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
-    "arktype": "^2.0.0"
+    "@prisma-next/operations": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
+    "arktype": "^2.0.0",
+    "prettier": "^3.3.3"
   },
   "devDependencies": {
-    "@prisma-next/operations": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@types/node": "catalog:",

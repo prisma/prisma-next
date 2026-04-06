@@ -1,5 +1,3 @@
-export type { EmitResult, EmitStackInput } from '@prisma-next/core-control-plane/emission';
-export { emit } from '@prisma-next/core-control-plane/emission';
 export {
   deduplicateImports,
   generateCodecTypeIntersection,
@@ -10,3 +8,5 @@ export {
   serializeObjectKey,
   serializeValue,
 } from '../domain-type-generation';
+export { emit } from '../emit';
+export type { EmitResult, EmitStackInput } from '../emit-types';

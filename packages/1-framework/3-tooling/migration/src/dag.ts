@@ -1,5 +1,5 @@
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { EMPTY_CONTRACT_HASH } from './constants';
 import {
   errorAmbiguousTarget,
   errorDuplicateMigrationId,
