@@ -46,13 +46,20 @@ export {
   RawUpdateManyCommand,
   RawUpdateOneCommand,
 } from '../raw-commands';
-export type { MongoReadStage } from '../stages';
+export type { MongoGroupId, MongoProjectionValue, MongoReadStage } from '../stages';
 export {
+  MongoAddFieldsStage,
+  MongoCountStage,
+  MongoGroupStage,
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
   MongoProjectStage,
+  MongoRedactStage,
+  MongoReplaceRootStage,
+  MongoSampleStage,
   MongoSkipStage,
+  MongoSortByCountStage,
   MongoSortStage,
   MongoUnwindStage,
 } from '../stages';
