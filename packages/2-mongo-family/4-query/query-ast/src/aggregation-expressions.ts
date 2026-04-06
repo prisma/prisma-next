@@ -18,6 +18,9 @@ export class MongoAggFieldRef extends MongoAggExprNode {
 
   constructor(path: string) {
     super();
+    if (!path) {
+      throw new Error('Field path must not be empty');
+    }
     this.path = path;
     this.freeze();
   }

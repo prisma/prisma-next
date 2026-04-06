@@ -45,7 +45,7 @@ Build the typed `MongoAggExpr` class hierarchy — the foundation that every sub
 - [ ] 2.2 — `MongoAggOperator` (kind: `operator`, uniform `{ $op: expr | [expr] }` shape with `op: string`). `MongoAggAccumulator` (kind: `accumulator`, group/window accumulators with `op: string` + `arg`). Unit tests.
 - [ ] 2.3 — `MongoAggExprVisitor<R>` (exhaustive) and `MongoAggExprRewriter` (optional hooks) interfaces. `accept()` and `rewrite()` on all node classes. Tests for visitor dispatch and rewriter identity/transform.
 - [ ] 2.4 — `lowerAggExpr()` visitor implementation. Tests: lowering of field refs, literals (including `$literal` escape), operators (single-arg and array-arg), accumulators. Verify round-trip: construct AST → lower → compare to expected MongoDB document.
-- [ ] 2.5 — Structurally unique expression nodes: `MongoAggCond`, `MongoAggSwitch`, `MongoAggFilter`, `MongoAggMap`, `MongoAggReduce`, `MongoAggLet`, `MongoAggMergeObjects`. Each with construction, visitor, rewriter, lowering tests.
+- [ ] 2.5 — Structurally unique expression nodes: `MongoAggCond`, `MongoAggSwitch`, `MongoAggArrayFilter`, `MongoAggMap`, `MongoAggReduce`, `MongoAggLet`, `MongoAggMergeObjects`. Each with construction, visitor, rewriter, lowering tests.
 - [ ] 2.6 — `MongoExprFilter` bridge class in filter expressions (`kind: 'expr'`). Update `MongoFilterExpr` union and `MongoFilterVisitor`/`MongoFilterRewriter`. Update `lowerFilter()` to handle `expr` kind. Test: `{ $match: { $expr: { $gt: ["$qty", "$minQty"] } } }`.
 - [ ] 2.7 — Export `MongoAggExpr` union and all concrete classes from `@prisma-next/mongo-query-ast` exports.
 

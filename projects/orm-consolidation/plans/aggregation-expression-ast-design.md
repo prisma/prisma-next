@@ -257,7 +257,7 @@ MongoAggExprNode (abstract, hidden)
 │
 ├── MongoAggLiteral             kind: 'literal'
 │   Constant value, or $literal escape for ambiguous values
-│   Fields: value: MongoValue
+│   Fields: value: unknown
 │
 ├── MongoAggOperator            kind: 'operator'
 │   Uniform { $op: expr | [expr, ...] } operators
@@ -278,7 +278,7 @@ MongoAggExprNode (abstract, hidden)
 │   Fields: branches: ReadonlyArray<{ case_: MongoAggExpr, then_: MongoAggExpr }>,
 │           default_: MongoAggExpr
 │
-├── MongoAggFilter              kind: 'filter'
+├── MongoAggArrayFilter         kind: 'filter'
 │   { $filter: { input, cond, as } }
 │   Fields: input: MongoAggExpr, cond: MongoAggExpr, as: string
 │
@@ -309,7 +309,7 @@ type MongoAggExpr =
   | MongoAggAccumulator
   | MongoAggCond
   | MongoAggSwitch
-  | MongoAggFilter
+  | MongoAggArrayFilter
   | MongoAggMap
   | MongoAggReduce
   | MongoAggLet
@@ -364,7 +364,7 @@ interface MongoAggExprVisitor<R> {
   accumulator(expr: MongoAggAccumulator): R;
   cond(expr: MongoAggCond): R;
   switch_(expr: MongoAggSwitch): R;
-  filter(expr: MongoAggFilter): R;
+  filter(expr: MongoAggArrayFilter): R;
   map(expr: MongoAggMap): R;
   reduce(expr: MongoAggReduce): R;
   let_(expr: MongoAggLet): R;
@@ -378,7 +378,7 @@ interface MongoAggExprRewriter {
   accumulator?(expr: MongoAggAccumulator): MongoAggExpr;
   cond?(expr: MongoAggCond): MongoAggExpr;
   switch_?(expr: MongoAggSwitch): MongoAggExpr;
-  filter?(expr: MongoAggFilter): MongoAggExpr;
+  filter?(expr: MongoAggArrayFilter): MongoAggExpr;
   map?(expr: MongoAggMap): MongoAggExpr;
   reduce?(expr: MongoAggReduce): MongoAggExpr;
   let_?(expr: MongoAggLet): MongoAggExpr;
@@ -404,7 +404,7 @@ Lowering translates typed expression nodes into the plain documents the MongoDB 
 | `MongoAggAccumulator("$count", null)` | `{ $count: {} }` |
 | `MongoAggCond(if, then, else)` | `{ $cond: { if: lower(if), then: lower(then), else: lower(else) } }` |
 | `MongoAggSwitch(branches, default)` | `{ $switch: { branches: [...], default: lower(default) } }` |
-| `MongoAggFilter(input, cond, as)` | `{ $filter: { input: lower(input), cond: lower(cond), as: as } }` |
+| `MongoAggArrayFilter(input, cond, as)` | `{ $filter: { input: lower(input), cond: lower(cond), as: as } }` |
 | `MongoAggMap(input, in, as)` | `{ $map: { input: lower(input), in: lower(in), as: as } }` |
 | `MongoAggReduce(input, init, in)` | `{ $reduce: { input: lower(input), initialValue: lower(init), in: lower(in) } }` |
 | `MongoAggLet(vars, in)` | `{ $let: { vars: mapValues(lower, vars), in: lower(in) } }` |
@@ -451,7 +451,7 @@ The aggregation expression AST lives in a new module within `@prisma-next/mongo-
 src/
   aggregation-expressions.ts    MongoAggFieldRef, MongoAggLiteral, MongoAggOperator,
                                 MongoAggAccumulator, MongoAggCond, MongoAggSwitch,
-                                MongoAggFilter, MongoAggMap, MongoAggReduce,
+                                MongoAggArrayFilter, MongoAggMap, MongoAggReduce,
                                 MongoAggLet, MongoAggMergeObjects, MongoAggExpr union
 ```
 

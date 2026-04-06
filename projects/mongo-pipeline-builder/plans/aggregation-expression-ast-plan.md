@@ -48,7 +48,7 @@ MongoAggExprNode (abstract, not exported)
 ├── MongoAggAccumulator    kind: 'accumulator'    $sum, $avg, $min, $max, $first, $last, $push, $addToSet, $count
 ├── MongoAggCond           kind: 'cond'           { $cond: { if, then, else } }
 ├── MongoAggSwitch         kind: 'switch'         { $switch: { branches, default } }
-├── MongoAggFilter         kind: 'filter'         { $filter: { input, cond, as } }
+├── MongoAggArrayFilter    kind: 'filter'         { $filter: { input, cond, as } }
 ├── MongoAggMap            kind: 'map'            { $map: { input, in, as } }
 ├── MongoAggReduce         kind: 'reduce'         { $reduce: { input, initialValue, in } }
 ├── MongoAggLet            kind: 'let'            { $let: { vars, in } }
@@ -67,7 +67,7 @@ type MongoAggExpr =
   | MongoAggAccumulator
   | MongoAggCond
   | MongoAggSwitch
-  | MongoAggFilter
+  | MongoAggArrayFilter
   | MongoAggMap
   | MongoAggReduce
   | MongoAggLet
@@ -94,7 +94,7 @@ interface MongoAggExprVisitor<R> {
   accumulator(expr: MongoAggAccumulator): R;
   cond(expr: MongoAggCond): R;
   switch_(expr: MongoAggSwitch): R;
-  filter(expr: MongoAggFilter): R;
+  filter(expr: MongoAggArrayFilter): R;
   map(expr: MongoAggMap): R;
   reduce(expr: MongoAggReduce): R;
   let_(expr: MongoAggLet): R;
@@ -108,7 +108,7 @@ interface MongoAggExprRewriter {
   accumulator?(expr: MongoAggAccumulator): MongoAggExpr;
   cond?(expr: MongoAggCond): MongoAggExpr;
   switch_?(expr: MongoAggSwitch): MongoAggExpr;
-  filter?(expr: MongoAggFilter): MongoAggExpr;
+  filter?(expr: MongoAggArrayFilter): MongoAggExpr;
   map?(expr: MongoAggMap): MongoAggExpr;
   reduce?(expr: MongoAggReduce): MongoAggExpr;
   let_?(expr: MongoAggLet): MongoAggExpr;
@@ -134,7 +134,7 @@ The visitor is exhaustive (every kind must be handled). The rewriter uses option
 | `MongoAggAccumulator("$count", null)` | `{ $count: {} }` |
 | `MongoAggCond(if, then, else)` | `{ $cond: { if: ..., then: ..., else: ... } }` |
 | `MongoAggSwitch(branches, default)` | `{ $switch: { branches: [...], default: ... } }` |
-| `MongoAggFilter(input, cond, as)` | `{ $filter: { input: ..., cond: ..., as: ... } }` |
+| `MongoAggArrayFilter(input, cond, as)` | `{ $filter: { input: ..., cond: ..., as: ... } }` |
 | `MongoAggMap(input, in, as)` | `{ $map: { input: ..., in: ..., as: ... } }` |
 | `MongoAggReduce(input, init, in)` | `{ $reduce: { input: ..., initialValue: ..., in: ... } }` |
 | `MongoAggLet(vars, in)` | `{ $let: { vars: ..., in: ... } }` |
@@ -229,7 +229,7 @@ Create `aggregation-expressions.ts` with the hidden abstract base `MongoAggExprN
 
 `MongoAggCond`: `condition: MongoAggExpr`, `then_: MongoAggExpr`, `else_: MongoAggExpr`
 `MongoAggSwitch`: `branches: ReadonlyArray<{ case_: MongoAggExpr; then_: MongoAggExpr }>`, `default_: MongoAggExpr`
-`MongoAggFilter`: `input: MongoAggExpr`, `cond: MongoAggExpr`, `as: string`
+`MongoAggArrayFilter`: `input: MongoAggExpr`, `cond: MongoAggExpr`, `as: string`
 `MongoAggMap`: `input: MongoAggExpr`, `in_: MongoAggExpr`, `as: string`
 `MongoAggReduce`: `input: MongoAggExpr`, `initialValue: MongoAggExpr`, `in_: MongoAggExpr`
 `MongoAggLet`: `vars: Readonly<Record<string, MongoAggExpr>>`, `in_: MongoAggExpr`
@@ -373,7 +373,7 @@ Steps 1–3 can be done in a single pass (they're small and have no external dep
 In practice, the natural commit sequence is:
 
 1. **Commit: leaf and compound nodes** — `MongoAggExprNode` base, `MongoAggFieldRef`, `MongoAggLiteral`, `MongoAggOperator`, `MongoAggAccumulator` + unit tests
-2. **Commit: structurally unique nodes** — `MongoAggCond`, `MongoAggSwitch`, `MongoAggFilter`, `MongoAggMap`, `MongoAggReduce`, `MongoAggLet`, `MongoAggMergeObjects` + unit tests
+2. **Commit: structurally unique nodes** — `MongoAggCond`, `MongoAggSwitch`, `MongoAggArrayFilter`, `MongoAggMap`, `MongoAggReduce`, `MongoAggLet`, `MongoAggMergeObjects` + unit tests
 3. **Commit: visitor and rewriter** — interfaces + `accept()`/`rewrite()` wiring + unit tests + type tests
 4. **Commit: lowering** — `lowerAggExpr()` + round-trip unit tests
 5. **Commit: `MongoExprFilter` bridge** — bridge class + filter system updates + lowering case + unit tests

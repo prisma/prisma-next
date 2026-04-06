@@ -31,6 +31,10 @@ describe('MongoAggFieldRef', () => {
     const ref = MongoAggFieldRef.of('name');
     expect(Object.isFrozen(ref)).toBe(true);
   });
+
+  it('rejects empty path', () => {
+    expect(() => MongoAggFieldRef.of('')).toThrow('Field path must not be empty');
+  });
 });
 
 describe('MongoAggLiteral', () => {
