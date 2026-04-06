@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "mongo",
   "target": "mongo",
-  "profileHash": "sha256:b755b71c49b8ee968f9117349a5bdbf2e331d07a3404b6baf5ba70fbfb29505c",
+  "profileHash": "sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840",
   "roots": {
     "tasks": "Task",
     "users": "User"
@@ -11,13 +11,16 @@
     "Address": {
       "fields": {
         "city": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         },
         "street": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         },
         "zip": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         }
       },
       "owner": "User",
@@ -28,7 +31,8 @@
       "base": "Task",
       "fields": {
         "severity": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -39,13 +43,16 @@
     "Comment": {
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1"
+          "codecId": "mongo/objectId@1",
+          "nullable": false
         },
         "createdAt": {
-          "codecId": "mongo/date@1"
+          "codecId": "mongo/date@1",
+          "nullable": false
         },
         "text": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         }
       },
       "owner": "Task",
@@ -56,10 +63,12 @@
       "base": "Task",
       "fields": {
         "priority": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         },
         "targetRelease": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         }
       },
       "relations": {},
@@ -73,16 +82,20 @@
       },
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1"
+          "codecId": "mongo/objectId@1",
+          "nullable": false
         },
         "assigneeId": {
-          "codecId": "mongo/objectId@1"
+          "codecId": "mongo/objectId@1",
+          "nullable": false
         },
         "title": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         },
         "type": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -123,13 +136,16 @@
     "User": {
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1"
+          "codecId": "mongo/objectId@1",
+          "nullable": false
         },
         "email": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         },
         "name": {
-          "codecId": "mongo/string@1"
+          "codecId": "mongo/string@1",
+          "nullable": false
         }
       },
       "relations": {
@@ -153,7 +169,7 @@
       "tasks": {},
       "users": {}
     },
-    "storageHash": "sha256:b6866bf493a997c3ad2a0ca6b57f62bc1c65c1633f6f253fb196d6f3313297c4"
+    "storageHash": "sha256:de882d199d3e43918b7dbd576f638a67f6fee5bb34289a3f05c0f0bee847d6db"
   },
   "capabilities": {},
   "extensionPacks": {},
