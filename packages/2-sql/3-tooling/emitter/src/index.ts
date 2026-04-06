@@ -322,8 +322,7 @@ export const sqlTargetFamilyHook = {
     readonly target: ${this.serializeValue(contract.target)};
     readonly roots: ${rootsType};
     readonly capabilities: ${this.serializeValue(contract.capabilities)};
-    readonly extensionPacks: ${this.serializeValue(contract.extensionPacks)};
-    readonly execution: ${this.serializeValue(contract.execution)};
+    readonly extensionPacks: ${this.serializeValue(contract.extensionPacks)};${contract.execution !== undefined ? `\n    readonly execution: ${this.serializeValue(contract.execution)};` : ''}
     readonly profileHash: ProfileHash;
   };
 

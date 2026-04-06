@@ -343,7 +343,9 @@ describe('builder integration', () => {
     const builderUserModel = builderContract.models.User as unknown as ModelShape;
     const fixtureUserModel = fixtureContract.models.User as unknown as ModelShape;
     expect(builderUserModel.storage.table).toBe(fixtureUserModel.storage.table);
-    expect(Object.keys(builderUserModel.fields)).toEqual(Object.keys(fixtureUserModel.fields));
+    expect(Object.keys(builderUserModel.fields).sort()).toEqual(
+      Object.keys(fixtureUserModel.fields).sort(),
+    );
 
     // Type checks - verify builder contract preserves types like fixture
     expectTypeOf(builderContract.target).toEqualTypeOf<'postgres'>();

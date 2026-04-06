@@ -1047,13 +1047,13 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain("readonly id: 'uuidv4'");
   });
 
-  it('emits execution as undefined when IR has no execution', () => {
+  it('omits execution field when IR has no execution', () => {
     const ir = createContract({
       storage: { tables: {} },
     });
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
-    expect(types).toContain('readonly execution: undefined;');
+    expect(types).not.toContain('readonly execution');
   });
 
   it('serializes empty typeParams to Record<string, never>', () => {
