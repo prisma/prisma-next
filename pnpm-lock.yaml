@@ -237,9 +237,6 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/cli
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../packages/1-framework/1-core/control-plane
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/emitter
@@ -373,46 +370,6 @@ importers:
         specifier: ^2.1.26
         version: 2.1.29
     devDependencies:
-      '@prisma-next/tsconfig':
-        specifier: workspace:*
-        version: link:../../../0-config/tsconfig
-      '@prisma-next/tsdown':
-        specifier: workspace:*
-        version: link:../../../0-config/tsdown
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.18.4(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
-
-  packages/1-framework/1-core/control-plane:
-    dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../0-foundation/contract
-      '@prisma-next/framework-components':
-        specifier: workspace:*
-        version: link:../framework-components
-      '@prisma-next/operations':
-        specifier: workspace:*
-        version: link:../operations
-      '@prisma-next/utils':
-        specifier: workspace:*
-        version: link:../../0-foundation/utils
-      arktype:
-        specifier: ^2.1.26
-        version: 2.1.29
-      prettier:
-        specifier: ^3.3.3
-        version: 3.6.2
-    devDependencies:
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../../../../test/utils
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../0-config/tsconfig
@@ -629,9 +586,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../0-foundation/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../1-core/control-plane
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../emitter
@@ -766,9 +720,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../0-foundation/contract
-      '@prisma-next/core-control-plane':
+      '@prisma-next/framework-components':
         specifier: workspace:*
-        version: link:../../1-core/control-plane
+        version: link:../../1-core/framework-components
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../0-foundation/utils
@@ -1167,9 +1121,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../1-framework/1-core/control-plane
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/emitter
@@ -1420,9 +1371,6 @@ importers:
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
     devDependencies:
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/control-plane
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/framework-components
@@ -1648,9 +1596,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../1-framework/1-core/control-plane
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/emitter
@@ -1749,9 +1694,6 @@ importers:
       '@prisma-next/contract-authoring':
         specifier: workspace:*
         version: link:../../1-framework/2-authoring/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../1-framework/1-core/control-plane
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../2-sql/9-family
@@ -2033,9 +1975,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/control-plane
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../2-sql/9-family
@@ -2103,9 +2042,6 @@ importers:
       '@prisma-next/contract-authoring':
         specifier: workspace:*
         version: link:../../../1-framework/2-authoring/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/control-plane
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../2-sql/9-family
@@ -2170,9 +2106,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/control-plane
       '@prisma-next/errors':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/errors
@@ -2319,9 +2252,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../packages/1-framework/0-foundation/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../packages/1-framework/1-core/control-plane
       '@prisma-next/driver-mongo':
         specifier: workspace:*
         version: link:../../packages/3-mongo-target/3-mongo-driver
@@ -2482,9 +2412,6 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../../../../../packages/1-framework/3-tooling/cli
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../../../../../packages/1-framework/1-core/control-plane
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../../../../../packages/3-targets/7-drivers/postgres

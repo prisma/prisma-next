@@ -33,15 +33,15 @@
     "node": ">=20"
   },
   "exports": {
-    "./control": {
-      "types": "./dist/exports/control.d.mts",
-      "import": "./dist/exports/control.mjs"
-    },
+    "./control": "./dist/control.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/1-framework/1-core/errors"
-  }
+  },
+  "main": "./dist/control.mjs",
+  "module": "./dist/control.mjs",
+  "types": "./dist/control.d.mts"
 }

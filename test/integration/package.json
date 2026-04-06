@@ -20,7 +20,6 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
