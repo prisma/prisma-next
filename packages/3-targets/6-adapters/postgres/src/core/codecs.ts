@@ -77,6 +77,8 @@ function aliasCodec<
     ...ifDefined('encode', base.encode),
     ...ifDefined('traits', base.traits),
     decode: base.decode,
+    encodeJson: base.encodeJson,
+    decodeJson: base.decodeJson,
   } as Codec<Id, TTraits, TWire, TJs, TParams, THelper>;
 }
 
@@ -298,6 +300,8 @@ const pgTimestampCodec = codec<
     if (wire instanceof Date) return wire.toISOString();
     return wire;
   },
+  encodeJson: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
+  decodeJson: (json) => new Date(json as string),
   paramsSchema: precisionParamsSchema,
   meta: {
     db: {
@@ -328,6 +332,8 @@ const pgTimestamptzCodec = codec<
     if (wire instanceof Date) return wire.toISOString();
     return wire;
   },
+  encodeJson: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
+  decodeJson: (json) => new Date(json as string),
   paramsSchema: precisionParamsSchema,
   meta: {
     db: {

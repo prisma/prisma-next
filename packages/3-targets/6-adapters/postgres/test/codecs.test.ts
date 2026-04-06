@@ -413,6 +413,77 @@ describe('adapter-postgres codecs', () => {
     });
   });
 
+  describe('encodeJson / decodeJson', () => {
+    describe('pg/timestamptz@1', () => {
+      const codec = codecDefinitions.timestamptz.codec;
+
+      it('encodes Date to ISO string', () => {
+        expect(codec.encodeJson(new Date('2024-01-15T00:00:00.000Z'))).toBe(
+          '2024-01-15T00:00:00.000Z',
+        );
+      });
+
+      it('encodes string as-is', () => {
+        expect(codec.encodeJson('2024-01-15T00:00:00.000Z')).toBe('2024-01-15T00:00:00.000Z');
+      });
+
+      it('decodes ISO string to Date', () => {
+        const result = codec.decodeJson('2024-01-15T00:00:00.000Z');
+        expect(result).toBeInstanceOf(Date);
+        expect(result).toEqual(new Date('2024-01-15T00:00:00.000Z'));
+      });
+
+      it('round-trips Date values', () => {
+        const original = new Date('2024-06-15T14:30:00.000Z');
+        const encoded = codec.encodeJson(original);
+        const decoded = codec.decodeJson(encoded);
+        expect(decoded).toEqual(original);
+      });
+    });
+
+    describe('pg/timestamp@1', () => {
+      const codec = codecDefinitions.timestamp.codec;
+
+      it('encodes Date to ISO string', () => {
+        expect(codec.encodeJson(new Date('2024-01-15T00:00:00.000Z'))).toBe(
+          '2024-01-15T00:00:00.000Z',
+        );
+      });
+
+      it('decodes ISO string to Date', () => {
+        const result = codec.decodeJson('2024-01-15T00:00:00.000Z');
+        expect(result).toBeInstanceOf(Date);
+        expect(result).toEqual(new Date('2024-01-15T00:00:00.000Z'));
+      });
+    });
+
+    describe('identity codecs', () => {
+      it('pg/int4@1 round-trips numbers', () => {
+        const codec = codecDefinitions.int4.codec;
+        expect(codec.encodeJson(42)).toBe(42);
+        expect(codec.decodeJson(42)).toBe(42);
+      });
+
+      it('pg/text@1 round-trips strings', () => {
+        const codec = codecDefinitions.text.codec;
+        expect(codec.encodeJson('hello')).toBe('hello');
+        expect(codec.decodeJson('hello')).toBe('hello');
+      });
+
+      it('pg/bool@1 round-trips booleans', () => {
+        const codec = codecDefinitions.bool.codec;
+        expect(codec.encodeJson(true)).toBe(true);
+        expect(codec.decodeJson(false)).toBe(false);
+      });
+
+      it('pg/int8@1 round-trips numbers (identity)', () => {
+        const codec = codecDefinitions.int8.codec;
+        expect(codec.encodeJson(9001)).toBe(9001);
+        expect(codec.decodeJson(9001)).toBe(9001);
+      });
+    });
+  });
+
   describe('numeric codec decode', () => {
     const numericCodec = codecDefinitions.numeric.codec as {
       decode: (wire: string | number) => string;
