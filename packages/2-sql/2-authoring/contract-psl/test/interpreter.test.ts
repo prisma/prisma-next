@@ -80,6 +80,7 @@ describe('interpretPslDocumentToSqlContract', () => {
         },
       },
     });
+    expect(result.value.roots).toEqual({ user: 'User' });
   });
 
   it('does not derive generated column type without descriptor resolver', () => {
@@ -130,6 +131,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       },
     });
   });
+
   it('populates roots from models', () => {
     const document = parsePslDocument({
       schema: `model User {
@@ -409,6 +411,7 @@ model Event {
         },
       },
     });
+    expect(result.value.roots).toEqual({ event: 'Event' });
   });
 
   it('preserves enum native type names from @@map instead of lowercasing declarations', () => {
@@ -475,6 +478,7 @@ model User {
         },
       },
     });
+    expect(result.value.roots).toEqual({ user: 'User' });
   });
 
   it('lowers additional Postgres native type attributes on named types', () => {
@@ -573,6 +577,7 @@ model Event {
         },
       },
     });
+    expect(result.value.roots).toEqual({ event: 'Event' });
   });
 
   it('returns diagnostics for unsupported referential action tokens', () => {
