@@ -11,8 +11,6 @@ import { ConfigValidationError } from '../src/errors';
 
 const mockHook = {
   id: 'sql',
-  validateTypes: () => {},
-  validateStructure: () => {},
   generateStorageType: () => '{}',
   generateModelStorageType: () => '{}',
   getFamilyImports: () => [] as string[],

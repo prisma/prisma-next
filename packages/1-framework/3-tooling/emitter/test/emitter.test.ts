@@ -104,34 +104,6 @@ describe('emitter', () => {
     expect(result.contractDts).toBeDefined();
   });
 
-  it('validates type ID format', async () => {
-    const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'invalid-format', nativeType: 'int4', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('invalid codecId format');
-  });
-
   it('emits contract even when extension pack namespace does not match extensionIds', async () => {
     const ir = createTestContract({
       storage: {
@@ -313,9 +285,7 @@ describe('emitter', () => {
       },
     });
 
-    const mockHookNoTypeValidation = createMockSpi({
-      validateTypes: () => {},
-    });
+    const mockHookNoTypeValidation = createMockSpi();
 
     const options: EmitStackInput = {
       operationRegistry: createOperationRegistry(),
@@ -339,8 +309,6 @@ describe('emitter', () => {
     let receivedOptions: GenerateContractTypesOptions | undefined;
 
     const mockHookCapturingOptions = createMockSpi({
-      validateTypes: () => {},
-      validateStructure: () => {},
       getFamilyTypeAliases: (options) => {
         receivedOptions = options;
         return '';

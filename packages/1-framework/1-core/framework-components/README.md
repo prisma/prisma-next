@@ -16,12 +16,12 @@ Framework component types, authoring logic, control stack assembly, and emission
 import { ComponentMetadata, FamilyDescriptor, normalizeRenderer } from '@prisma-next/framework-components/components';
 import { AuthoringContributions, instantiateAuthoringTypeConstructor } from '@prisma-next/framework-components/authoring';
 import { createControlStack, ControlStack } from '@prisma-next/framework-components/control';
-import type { TargetFamilyHook, ValidationContext } from '@prisma-next/framework-components/emission';
+import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 ```
 
 ## Why SPI types live here (dependency inversion)
 
-This package sits in the **core** layer — below the tooling layer where family-specific emitters and control implementations live. SPI interfaces like `TargetFamilyHook` and `ValidationContext` define the contract between framework orchestration code (control-plane emission, CLI) and family-specific implementations (SQL emitter hook, Mongo emitter hook).
+This package sits in the **core** layer — below the tooling layer where family-specific emitters and control implementations live. SPI interfaces like `EmissionSpi` define the contract between framework orchestration code (control-plane emission, CLI) and family-specific implementations (SQL emitter, Mongo emitter).
 
 By placing these interfaces in the core layer rather than alongside their implementations:
 

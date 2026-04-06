@@ -1,6 +1,6 @@
 import { canonicalizeContractToObject } from '@prisma-next/contract/hashing';
 import type { Contract } from '@prisma-next/contract/types';
-import type { EmissionSpi, ValidationContext } from '@prisma-next/framework-components/emission';
+import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { format } from 'prettier';
 import type { EmitResult, EmitStackInput } from './emit-types';
@@ -14,24 +14,12 @@ export async function emit(
   targetFamily: EmissionSpi,
 ): Promise<EmitResult> {
   const {
-    operationRegistry,
     codecTypeImports,
     operationTypeImports,
-    extensionIds,
     parameterizedRenderers,
     parameterizedTypeImports,
     queryOperationTypeImports,
   } = stack;
-
-  const ctx: ValidationContext = {
-    ...ifDefined('operationRegistry', operationRegistry),
-    ...ifDefined('codecTypeImports', codecTypeImports),
-    ...ifDefined('operationTypeImports', operationTypeImports),
-    ...ifDefined('extensionIds', extensionIds),
-  };
-  targetFamily.validateTypes(contract, ctx);
-
-  targetFamily.validateStructure(contract);
 
   const { storageHash } = contract.storage;
   const executionHash = contract.execution?.executionHash;

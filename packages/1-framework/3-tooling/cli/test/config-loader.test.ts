@@ -22,9 +22,12 @@ describe('config loader', () => {
   const createValidConfig = () => {
     return `const mockHook = {
       id: 'sql',
-      validateTypes: () => {},
-      validateStructure: () => {},
-      generateContractTypes: () => '',
+      generateStorageType: () => '{}',
+      generateModelStorageType: () => '{}',
+      getFamilyImports: () => [],
+      getFamilyTypeAliases: () => '',
+      getTypeMapsExpression: () => 'never',
+      getContractWrapper: () => '',
     };
     export default {
       family: {
@@ -70,9 +73,12 @@ describe('config loader', () => {
         configPath,
         `const mockHook = {
           id: 'sql',
-          validateTypes: () => {},
-          validateStructure: () => {},
-          generateContractTypes: () => '',
+          generateStorageType: () => '{}',
+          generateModelStorageType: () => '{}',
+          getFamilyImports: () => [],
+          getFamilyTypeAliases: () => '',
+          getTypeMapsExpression: () => 'never',
+          getContractWrapper: () => '',
         };
         export const config = {
           family: {
@@ -181,9 +187,12 @@ describe('config loader', () => {
         configPath,
         `const mockHook = {
           id: 'sql',
-          validateTypes: () => {},
-          validateStructure: () => {},
-          generateContractTypes: () => '',
+          generateStorageType: () => '{}',
+          generateModelStorageType: () => '{}',
+          getFamilyImports: () => [],
+          getFamilyTypeAliases: () => '',
+          getTypeMapsExpression: () => 'never',
+          getContractWrapper: () => '',
         };
         export default {
           family: {

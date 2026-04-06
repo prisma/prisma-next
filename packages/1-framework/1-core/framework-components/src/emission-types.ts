@@ -25,10 +25,6 @@ export interface ValidationContext {
 export interface EmissionSpi {
   readonly id: string;
 
-  validateTypes(contract: Contract, ctx: ValidationContext): void;
-
-  validateStructure(contract: Contract): void;
-
   generateStorageType(contract: Contract, storageHashTypeName: string): string;
 
   generateModelStorageType(modelName: string, model: ContractModel): string;

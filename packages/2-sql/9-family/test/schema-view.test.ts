@@ -14,8 +14,6 @@ function createMockStack() {
       create: (() => ({})) as unknown as ControlFamilyDescriptor<'sql'>['create'],
       emission: {
         id: 'sql',
-        validateTypes() {},
-        validateStructure() {},
         generateStorageType: () =>
           '{ readonly tables: Record<string, never>; readonly types: Record<string, never>; readonly storageHash: StorageHash }',
         generateModelStorageType: () => 'Record<string, never>',
