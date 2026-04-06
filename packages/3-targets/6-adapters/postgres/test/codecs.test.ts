@@ -443,6 +443,12 @@ describe('adapter-postgres codecs', () => {
       it('throws on non-string input to decodeJson', () => {
         expect(() => codec.decodeJson(42)).toThrow('Expected ISO date string for pg/timestamptz@1');
       });
+
+      it('throws on malformed date string in decodeJson', () => {
+        expect(() => codec.decodeJson('not-a-date')).toThrow(
+          'Invalid ISO date string for pg/timestamptz@1',
+        );
+      });
     });
 
     describe('pg/timestamp@1', () => {
@@ -462,6 +468,12 @@ describe('adapter-postgres codecs', () => {
 
       it('throws on non-string input to decodeJson', () => {
         expect(() => codec.decodeJson(42)).toThrow('Expected ISO date string for pg/timestamp@1');
+      });
+
+      it('throws on malformed date string in decodeJson', () => {
+        expect(() => codec.decodeJson('garbage')).toThrow(
+          'Invalid ISO date string for pg/timestamp@1',
+        );
       });
     });
 
