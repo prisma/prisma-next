@@ -181,7 +181,7 @@ describe('generateModelsType', () => {
 
   it('includes variants when present', () => {
     const models: Record<string, ContractModel> = {
-      Animal: makeModel({ variants: { Dog: { model: 'Dog' }, Cat: { model: 'Cat' } } }),
+      Animal: makeModel({ variants: { Dog: { value: 'dog' }, Cat: { value: 'cat' } } }),
     };
     const result = generateModelsType(models, noopStorage);
     expect(result).toContain('readonly variants:');

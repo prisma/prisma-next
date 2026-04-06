@@ -15,15 +15,15 @@ import type { Timetz } from '@prisma-next/adapter-postgres/codec-types';
 import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
 
 import type {
-  Contract as ContractShape,
+  ContractWithTypeMaps,
+  TypeMaps as TypeMapsType,
+} from '@prisma-next/sql-contract/types';
+import type {
+  Contract as ContractType,
   ExecutionHashBase,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
-import type {
-  ContractWithTypeMaps,
-  TypeMaps as TypeMapsType,
-} from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
   StorageHashBase<'sha256:40f5fa8a9aff79d990ef87dd76ded466b6c106288882cde04c0973ff4643575e'>;
@@ -33,8 +33,8 @@ export type ProfileHash =
   ProfileHashBase<'sha256:29a17a141f69a59f39e6e5ce56adda9719ab0899a8af17bc6e4db2c4e866a182'>;
 
 export type CodecTypes = PgTypes;
-export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = Record<string, never>;
+export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = Record<string, never>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
@@ -42,7 +42,7 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
-type ContractBase = ContractShape<
+type ContractBase = ContractType<
   {
     readonly tables: {
       readonly comment: {
