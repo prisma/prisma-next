@@ -122,10 +122,6 @@ function validateContractLogic(contract: Contract<SqlStorage>): void {
 }
 
 function validateSqlStorage(contract: Contract): void {
-  // Intentional layered validation: framework ContractSchema validates generic
-  // shape; SQL validateSqlContract re-validates with stricter '+': 'reject' to
-  // catch unknown fields. The overlap is small and ensures SQL-specific
-  // constraints (e.g. storage table schema) are enforced.
   validateSqlContract(contract);
   const sqlContract = contract as Contract<SqlStorage>;
   validateContractLogic(sqlContract);
