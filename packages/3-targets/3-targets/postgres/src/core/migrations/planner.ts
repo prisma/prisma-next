@@ -387,7 +387,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       codecHooks,
       storageTypes,
     } = options;
-    const notNull = column.nullable === false;
+    const notNull = !column.nullable;
     const hasDefault = column.default !== undefined;
     // Planner logic decides whether this column needs the coordinated multi-step
     // strategy. The strategy recipe itself is built by a dedicated helper.
