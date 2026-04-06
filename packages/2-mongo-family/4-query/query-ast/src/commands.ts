@@ -1,6 +1,7 @@
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoAstNode } from './ast-node';
 import type { MongoFilterExpr } from './filter-expressions';
+import type { RawMongoCommand } from './raw-commands';
 import type { MongoReadStage } from './stages';
 
 export class InsertOneCommand extends MongoAstNode {
@@ -144,4 +145,5 @@ export type AnyMongoCommand =
   | DeleteManyCommand
   | FindOneAndUpdateCommand
   | FindOneAndDeleteCommand
-  | AggregateCommand;
+  | AggregateCommand
+  | RawMongoCommand;

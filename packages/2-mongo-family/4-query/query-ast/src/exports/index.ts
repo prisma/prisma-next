@@ -19,6 +19,18 @@ export {
   MongoOrExpr,
 } from '../filter-expressions';
 export type { MongoQueryPlan } from '../query-plan';
+export type { RawMongoCommand } from '../raw-commands';
+export {
+  RawAggregateCommand,
+  RawDeleteManyCommand,
+  RawDeleteOneCommand,
+  RawFindOneAndDeleteCommand,
+  RawFindOneAndUpdateCommand,
+  RawInsertManyCommand,
+  RawInsertOneCommand,
+  RawUpdateManyCommand,
+  RawUpdateOneCommand,
+} from '../raw-commands';
 export type { MongoReadStage } from '../stages';
 export {
   MongoLimitStage,
