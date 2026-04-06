@@ -28,6 +28,7 @@ export type { MongoFilterExpr } from '../filter-expressions';
 export {
   MongoAndExpr,
   MongoExistsExpr,
+  MongoExprFilter,
   MongoFieldFilter,
   MongoNotExpr,
   MongoOrExpr,

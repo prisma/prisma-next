@@ -126,6 +126,8 @@ export function lowerFilter(filter: MongoFilterExpr): Document {
       return { $nor: [lowerFilter(filter.expr)] };
     case 'exists':
       return { [filter.field]: { $exists: filter.exists } };
+    case 'expr':
+      return { $expr: lowerAggExpr(filter.aggExpr) };
   }
 }
 

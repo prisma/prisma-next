@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { MongoAggFieldRef, MongoAggOperator } from '../src/aggregation-expressions';
 import type { MongoFilterExpr } from '../src/filter-expressions';
 import {
   MongoAndExpr,
   MongoExistsExpr,
+  MongoExprFilter,
   MongoFieldFilter,
   MongoNotExpr,
   MongoOrExpr,
@@ -132,6 +134,23 @@ describe('.not() convenience method', () => {
   });
 });
 
+describe('MongoExprFilter', () => {
+  it('constructs with aggregation expression', () => {
+    const aggExpr = MongoAggOperator.of('$gt', [
+      MongoAggFieldRef.of('qty'),
+      MongoAggFieldRef.of('minQty'),
+    ]);
+    const filter = MongoExprFilter.of(aggExpr);
+    expect(filter.kind).toBe('expr');
+    expect(filter.aggExpr).toBe(aggExpr);
+  });
+
+  it('is frozen after construction', () => {
+    const filter = MongoExprFilter.of(MongoAggFieldRef.of('x'));
+    expect(Object.isFrozen(filter)).toBe(true);
+  });
+});
+
 describe('MongoFilterVisitor', () => {
   const kindVisitor: MongoFilterVisitor<string> = {
     field: (expr) => `field:${expr.field}`,
@@ -139,6 +158,7 @@ describe('MongoFilterVisitor', () => {
     or: (expr) => `or:${expr.exprs.length}`,
     not: () => 'not',
     exists: (expr) => `exists:${expr.field}`,
+    expr: () => 'expr',
   };
 
   it('dispatches field', () => {
@@ -162,6 +182,11 @@ describe('MongoFilterVisitor', () => {
 
   it('dispatches exists', () => {
     expect(MongoExistsExpr.exists('name').accept(kindVisitor)).toBe('exists:name');
+  });
+
+  it('dispatches expr', () => {
+    const filter = MongoExprFilter.of(MongoAggFieldRef.of('x'));
+    expect(filter.accept(kindVisitor)).toBe('expr');
   });
 });
 
@@ -221,6 +246,21 @@ describe('MongoFilterRewriter', () => {
     const rewriter: MongoFilterRewriter = {};
     const original = MongoExistsExpr.exists('name');
     expect(original.rewrite(rewriter)).toBe(original);
+  });
+
+  it('leaves expr untouched when no hook', () => {
+    const rewriter: MongoFilterRewriter = {};
+    const original = MongoExprFilter.of(MongoAggFieldRef.of('x'));
+    expect(original.rewrite(rewriter)).toBe(original);
+  });
+
+  it('applies expr hook', () => {
+    const rewriter: MongoFilterRewriter = {
+      expr: () => MongoFieldFilter.eq('x', 1),
+    };
+    const original = MongoExprFilter.of(MongoAggFieldRef.of('x'));
+    const rewritten = original.rewrite(rewriter);
+    expect(rewritten.kind).toBe('field');
   });
 });
 

@@ -15,6 +15,7 @@ import type {
 import type {
   MongoAndExpr,
   MongoExistsExpr,
+  MongoExprFilter,
   MongoFieldFilter,
   MongoFilterExpr,
   MongoNotExpr,
@@ -64,6 +65,7 @@ export interface MongoFilterVisitor<R> {
   or(expr: MongoOrExpr): R;
   not(expr: MongoNotExpr): R;
   exists(expr: MongoExistsExpr): R;
+  expr(expr: MongoExprFilter): R;
 }
 
 export interface MongoFilterRewriter {
@@ -72,6 +74,7 @@ export interface MongoFilterRewriter {
   or?(expr: MongoOrExpr): MongoFilterExpr;
   not?(expr: MongoNotExpr): MongoFilterExpr;
   exists?(expr: MongoExistsExpr): MongoFilterExpr;
+  expr?(expr: MongoExprFilter): MongoFilterExpr;
 }
 
 export interface MongoStageVisitor<R> {
