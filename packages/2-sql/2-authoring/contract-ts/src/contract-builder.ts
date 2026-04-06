@@ -22,6 +22,7 @@ import {
   ModelBuilder,
   TableBuilder,
 } from '@prisma-next/contract-authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   ExtensionPackRef,
   FamilyPackRef,
@@ -280,7 +281,7 @@ class SqlContractBuilder<
    *
    * @returns A normalized Contract with all required fields present
    */
-  build(): Target extends string
+  build(options?: { codecLookup?: CodecLookup }): Target extends string
     ? ContractWithTypeMaps<
         Contract<BuildStorage<Tables, Types>, BuildModels<Models>> & {
           readonly schemaVersion: '1';
@@ -296,7 +297,10 @@ class SqlContractBuilder<
         TypeMaps<CodecTypes, Record<string, never>>
       >
     : never {
-    return buildContract(this.state as unknown as RuntimeBuilderState) as unknown as ReturnType<
+    return buildContract(
+      this.state as unknown as RuntimeBuilderState,
+      options?.codecLookup,
+    ) as unknown as ReturnType<
       SqlContractBuilder<
         CodecTypes,
         Target,

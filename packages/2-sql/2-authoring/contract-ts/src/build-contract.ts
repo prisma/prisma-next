@@ -14,8 +14,8 @@ import {
   coreHash,
   type ExecutionMutationDefault,
   type ExecutionMutationDefaultValue,
+  type JsonValue,
   type StorageHashBase,
-  type TaggedRaw,
 } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
@@ -24,6 +24,7 @@ import type {
   RelationDefinition,
   TableBuilderState,
 } from '@prisma-next/contract-authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   applyFkDefaults,
   type SqlStorage,
@@ -57,50 +58,30 @@ export type RuntimeBuilderState = ContractBuilderState<
   Record<string, Record<string, boolean>> | undefined
 >;
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
-
-function isJsonValue(value: unknown): value is ColumnDefaultLiteralValue {
-  if (value === null) return true;
-  const valueType = typeof value;
-  if (valueType === 'string' || valueType === 'number' || valueType === 'boolean') return true;
-  if (Array.isArray(value)) {
-    return value.every((item) => isJsonValue(item));
-  }
-  if (isPlainObject(value)) {
-    return Object.values(value).every((item) => isJsonValue(item));
-  }
-  return false;
-}
-
 function encodeDefaultLiteralValue(
   value: ColumnDefaultLiteralInputValue,
-): ColumnDefaultLiteralValue {
-  if (typeof value === 'bigint') {
-    return { $type: 'bigint', value: value.toString() };
+  codecId: string,
+  codecLookup?: CodecLookup,
+): JsonValue {
+  const codec = codecLookup?.get(codecId);
+  if (codec) {
+    return codec.encodeJson(value);
   }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (isJsonValue(value)) {
-    if (isPlainObject(value) && '$type' in value) {
-      return { $type: 'raw', value } satisfies TaggedRaw;
-    }
-    return value;
-  }
-  throw new Error(
-    'Unsupported column default literal value: expected JSON-safe value, bigint, or Date.',
-  );
+  return value as JsonValue;
 }
 
-function encodeColumnDefault(defaultInput: ColumnDefault): ColumnDefault {
+function encodeColumnDefault(
+  defaultInput: ColumnDefault,
+  codecId: string,
+  codecLookup?: CodecLookup,
+): ColumnDefault {
   if (defaultInput.kind === 'function') {
     return { kind: 'function', expression: defaultInput.expression };
   }
-  return { kind: 'literal', value: encodeDefaultLiteralValue(defaultInput.value) };
+  return {
+    kind: 'literal',
+    value: encodeDefaultLiteralValue(defaultInput.value, codecId, codecLookup),
+  };
 }
 
 function assertStorageSemantics(storage: SqlStorage): void {
@@ -110,7 +91,10 @@ function assertStorageSemantics(storage: SqlStorage): void {
   }
 }
 
-export function buildContract(state: RuntimeBuilderState): Contract<SqlStorage> {
+export function buildContract(
+  state: RuntimeBuilderState,
+  codecLookup?: CodecLookup,
+): Contract<SqlStorage> {
   if (!state.target) {
     throw new Error('target is required. Call .target() before .build()');
   }
@@ -133,7 +117,7 @@ export function buildContract(state: RuntimeBuilderState): Contract<SqlStorage> 
 
       const encodedDefault =
         columnState.default !== undefined
-          ? encodeColumnDefault(columnState.default as ColumnDefault)
+          ? encodeColumnDefault(columnState.default as ColumnDefault, columnState.type, codecLookup)
           : undefined;
 
       columns[columnName] = {
@@ -356,6 +340,7 @@ function assertTargetTableMatches(
 
 export function buildSqlContractFromSemanticDefinition(
   definition: SqlSemanticContractDefinition,
+  codecLookup?: CodecLookup,
 ): Contract {
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
 
@@ -506,5 +491,5 @@ export function buildSqlContractFromSemanticDefinition(
     ...ifDefined('extensionNamespaces', extensionNamespaces),
   };
 
-  return buildContract(state);
+  return buildContract(state, codecLookup);
 }
