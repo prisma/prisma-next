@@ -1851,6 +1851,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../2-sql/9-family
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/framework-components
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../2-sql/2-authoring/contract-ts
@@ -2101,6 +2104,9 @@ importers:
         specifier: ^2.0.0
         version: 2.1.29
     devDependencies:
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils

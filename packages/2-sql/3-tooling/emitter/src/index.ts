@@ -306,12 +306,10 @@ export const sqlTargetFamilyHook = {
   export type LaneCodecTypes = CodecTypes;
   export type OperationTypes = ${operationTypes || 'Record<string, never>'};
   export type QueryOperationTypes = ${queryOperationTypes || 'Record<string, never>'};
-  type DefaultLiteralValue<CodecId extends string, Encoded> =
+  type DefaultLiteralValue<CodecId extends string, _Encoded> =
     CodecId extends keyof CodecTypes
-      ? CodecTypes[CodecId] extends { readonly output: infer O }
-        ? O extends Date | bigint ? O : Encoded
-        : Encoded
-      : Encoded;
+      ? CodecTypes[CodecId]['output']
+      : _Encoded;
 
   export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
