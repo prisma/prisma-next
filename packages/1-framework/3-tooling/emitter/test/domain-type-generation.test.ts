@@ -1,5 +1,6 @@
+import type { ContractModel } from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   deduplicateImports,
   generateCodecTypeIntersection,
@@ -7,6 +8,7 @@ import {
   generateImportLines,
   generateModelFieldsType,
   generateModelRelationsType,
+  generateModelsType,
   generateRootsType,
   serializeObjectKey,
   serializeValue,
@@ -109,6 +111,90 @@ describe('generateModelFieldsType', () => {
       'field-name': { codecId: 'sql/text@1', nullable: false },
     });
     expect(result).toContain("readonly 'field-name':");
+  });
+});
+
+describe('generateModelsType', () => {
+  const noopStorage = () => 'Record<string, never>';
+
+  function makeModel(overrides: Partial<ContractModel> = {}): ContractModel {
+    return {
+      fields: {},
+      relations: {},
+      storage: { storageHash: 'test' },
+      ...overrides,
+    };
+  }
+
+  it('returns Record<string, never> for empty models', () => {
+    expect(generateModelsType({}, noopStorage)).toBe('Record<string, never>');
+  });
+
+  it('generates model with fields, relations, and storage', () => {
+    const models: Record<string, ContractModel> = {
+      User: makeModel({
+        fields: { name: { codecId: 'sql/text@1', nullable: false } },
+        relations: { posts: { to: 'Post', cardinality: '1:N' } },
+      }),
+    };
+    const result = generateModelsType(models, () => "{ readonly table: 'users' }");
+    expect(result).toContain('readonly User:');
+    expect(result).toContain("readonly codecId: 'sql/text@1'");
+    expect(result).toContain("readonly to: 'Post'");
+    expect(result).toContain("readonly table: 'users'");
+  });
+
+  it('sorts models by name', () => {
+    const models: Record<string, ContractModel> = {
+      Zebra: makeModel(),
+      Alpha: makeModel(),
+    };
+    const result = generateModelsType(models, noopStorage);
+    const alphaIdx = result.indexOf('Alpha');
+    const zebraIdx = result.indexOf('Zebra');
+    expect(alphaIdx).toBeLessThan(zebraIdx);
+  });
+
+  it('passes modelName and model to the storage callback', () => {
+    const model = makeModel();
+    const models: Record<string, ContractModel> = { User: model };
+    const storageFn = vi.fn(() => 'Record<string, never>');
+    generateModelsType(models, storageFn);
+    expect(storageFn).toHaveBeenCalledWith('User', model);
+  });
+
+  it('includes owner when present', () => {
+    const models: Record<string, ContractModel> = {
+      Comment: makeModel({ owner: 'Post' }),
+    };
+    const result = generateModelsType(models, noopStorage);
+    expect(result).toContain("readonly owner: 'Post'");
+  });
+
+  it('includes discriminator when present', () => {
+    const models: Record<string, ContractModel> = {
+      Animal: makeModel({ discriminator: { field: 'type' } }),
+    };
+    const result = generateModelsType(models, noopStorage);
+    expect(result).toContain("readonly discriminator: { readonly field: 'type' }");
+  });
+
+  it('includes variants when present', () => {
+    const models: Record<string, ContractModel> = {
+      Animal: makeModel({ variants: { Dog: { model: 'Dog' }, Cat: { model: 'Cat' } } }),
+    };
+    const result = generateModelsType(models, noopStorage);
+    expect(result).toContain('readonly variants:');
+    expect(result).toContain('readonly Dog:');
+    expect(result).toContain('readonly Cat:');
+  });
+
+  it('includes base when present', () => {
+    const models: Record<string, ContractModel> = {
+      Dog: makeModel({ base: 'Animal' }),
+    };
+    const result = generateModelsType(models, noopStorage);
+    expect(result).toContain("readonly base: 'Animal'");
   });
 });
 
