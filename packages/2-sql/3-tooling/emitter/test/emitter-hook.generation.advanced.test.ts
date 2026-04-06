@@ -729,7 +729,7 @@ describe('sql-target-family-hook', () => {
     });
 
     expect(types).toContain(
-      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeRef: 'Vector1536' }",
+      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }",
     );
   });
 });

@@ -2,7 +2,6 @@ export type ContractField = {
   readonly nullable: boolean;
   readonly codecId: string;
   readonly typeParams?: Record<string, unknown>;
-  readonly typeRef?: string;
 };
 
 export type ContractRelationOn = {
