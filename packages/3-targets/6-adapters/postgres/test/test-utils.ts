@@ -5,28 +5,15 @@
  * schemas, and other common test fixtures.
  */
 
+import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
 export function createTestContract(storage: Partial<SqlStorage> = {}): Contract<SqlStorage> {
-  return {
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
-    storage: {
-      storageHash: coreHash('sha256:test'),
-      tables: {},
-      types: {},
-      ...storage,
-    } as SqlStorage,
-    models: {},
-    roots: {},
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-  } as Contract<SqlStorage>;
+  return createContract<SqlStorage>({
+    storage: { tables: {}, types: {}, ...storage },
+  });
 }
 
 /**

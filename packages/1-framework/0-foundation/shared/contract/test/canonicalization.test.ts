@@ -5,6 +5,7 @@ import {
   orderTopLevel,
 } from '../src/canonicalization';
 import type { Contract } from '../src/contract-types';
+import { coreHash, profileHash } from '../src/types';
 
 function minimal(overrides?: Record<string, unknown>): Contract {
   return {
@@ -12,13 +13,13 @@ function minimal(overrides?: Record<string, unknown>): Contract {
     target: 'postgres',
     roots: {},
     models: {},
-    storage: { storageHash: 'sha256:stub' },
+    storage: { storageHash: coreHash('sha256:stub') },
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    profileHash: 'sha256:stub',
+    profileHash: profileHash('sha256:stub'),
     ...overrides,
-  } as Contract;
+  };
 }
 
 function drill(obj: Record<string, unknown>, ...keys: string[]): Record<string, unknown> {
