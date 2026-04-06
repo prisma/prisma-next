@@ -52,7 +52,7 @@ export const mongoDateCodec = mongoCodec({
 export const mongoVectorCodec = mongoCodec({
   typeId: MONGO_VECTOR_CODEC_ID,
   targetTypes: ['vector'],
-  traits: ['equality', 'vector'],
+  traits: ['equality'],
   decode: (wire: readonly number[]) => wire,
   encode: (value: readonly number[]) => value,
 });

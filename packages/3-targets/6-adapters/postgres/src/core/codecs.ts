@@ -11,6 +11,7 @@
  * at compile time (to derive CodecTypes).
  */
 
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { Codec, CodecMeta, CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import { codec, defineCodecs, sqlCodecDefinitions } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -88,14 +89,6 @@ const sqlIntCodec = sqlCodecDefinitions.int.codec;
 const sqlFloatCodec = sqlCodecDefinitions.float.codec;
 const sqlTextCodec = sqlCodecDefinitions.text.codec;
 const sqlTimestampCodec = sqlCodecDefinitions.timestamp.codec;
-
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | { readonly [key: string]: JsonValue }
-  | readonly JsonValue[];
 
 // Create individual codec instances
 const pgTextCodec = codec({
@@ -301,7 +294,12 @@ const pgTimestampCodec = codec<
     return wire;
   },
   encodeJson: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
-  decodeJson: (json) => new Date(json as string),
+  decodeJson: (json) => {
+    if (typeof json !== 'string') {
+      throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
+    }
+    return new Date(json);
+  },
   paramsSchema: precisionParamsSchema,
   meta: {
     db: {
@@ -333,7 +331,12 @@ const pgTimestamptzCodec = codec<
     return wire;
   },
   encodeJson: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
-  decodeJson: (json) => new Date(json as string),
+  decodeJson: (json) => {
+    if (typeof json !== 'string') {
+      throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
+    }
+    return new Date(json);
+  },
   paramsSchema: precisionParamsSchema,
   meta: {
     db: {

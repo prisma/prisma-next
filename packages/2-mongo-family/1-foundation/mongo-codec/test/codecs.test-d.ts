@@ -21,7 +21,7 @@ const multiTraitCodec = mongoCodec({
 const vectorCodec = mongoCodec({
   typeId: 'test/vector@1',
   targetTypes: ['vector'],
-  traits: ['equality', 'vector'],
+  traits: ['equality', 'numeric'],
   decode: (w: readonly number[]) => w,
   encode: (v: readonly number[]) => v,
 });
@@ -36,8 +36,8 @@ test('MongoCodecTraits extracts multiple traits as union', () => {
   >();
 });
 
-test('MongoCodecTraits extracts vector trait', () => {
-  expectTypeOf<MongoCodecTraits<typeof vectorCodec>>().toEqualTypeOf<'equality' | 'vector'>();
+test('MongoCodecTraits extracts multiple traits from vector codec', () => {
+  expectTypeOf<MongoCodecTraits<typeof vectorCodec>>().toEqualTypeOf<'equality' | 'numeric'>();
 });
 
 const traitlessCodec = mongoCodec({

@@ -609,6 +609,41 @@ describe('column default encoding', () => {
     });
   });
 
+  it('encodes Date default to ISO string via codec dispatch', () => {
+    const dateValue = new Date('2025-01-01T00:00:00.000Z');
+    const codecLookup = {
+      get: (id: string) =>
+        id === 'pg/timestamptz@1'
+          ? {
+              id: 'pg/timestamptz@1',
+              targetTypes: ['timestamptz'],
+              traits: ['equality', 'order'] as const,
+              decode: (wire: unknown) => wire,
+              encodeJson: (value: unknown) =>
+                value instanceof Date ? value.toISOString() : (value as string),
+              decodeJson: (json: unknown) => new Date(json as string),
+            }
+          : undefined,
+    };
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('event', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('startsAt', {
+            type: timestampColumn,
+            default: { kind: 'literal', value: dateValue },
+          })
+          .primaryKey(['id']),
+      )
+      .build({ codecLookup });
+
+    expect(contract.storage.tables.event.columns.startsAt.default).toEqual({
+      kind: 'literal',
+      value: '2025-01-01T00:00:00.000Z',
+    });
+  });
+
   it('passes through JSON objects with $type key unchanged', () => {
     const jsonbColumn = columnDescriptor('pg/jsonb@1');
     const jsonDefault = { $type: 'custom', data: [1, 2, 3] } as const;

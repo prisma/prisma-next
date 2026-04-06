@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { Codec as BaseCodec, CodecTrait } from '@prisma-next/framework-components/codec';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
@@ -194,8 +195,8 @@ export function codec<
   targetTypes: readonly string[];
   encode: (value: TJs) => TWire;
   decode: (wire: TWire) => TJs;
-  encodeJson?: (value: TJs) => import('@prisma-next/contract/types').JsonValue;
-  decodeJson?: (json: import('@prisma-next/contract/types').JsonValue) => TJs;
+  encodeJson?: (value: TJs) => JsonValue;
+  decodeJson?: (json: JsonValue) => TJs;
   meta?: CodecMeta;
   paramsSchema?: Type<TParams>;
   init?: (params: TParams) => THelper;
@@ -214,12 +215,8 @@ export function codec<
     ),
     encode: config.encode,
     decode: config.decode,
-    encodeJson: (config.encodeJson ?? identity) as (
-      value: TJs,
-    ) => import('@prisma-next/contract/types').JsonValue,
-    decodeJson: (config.decodeJson ?? identity) as (
-      json: import('@prisma-next/contract/types').JsonValue,
-    ) => TJs,
+    encodeJson: (config.encodeJson ?? identity) as (value: TJs) => JsonValue,
+    decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TJs,
   };
 }
 
