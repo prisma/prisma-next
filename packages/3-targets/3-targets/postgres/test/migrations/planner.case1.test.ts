@@ -700,7 +700,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
     expect(sql).toContain('"id" uuid DEFAULT (gen_random_uuid(INTERVAL \'5500 years\')) NOT NULL');
   });
 
-  it('renders JSONB default with $type key as JSON, not as tagged bigint', () => {
+  it('renders JSONB default with $type key as regular JSON', () => {
     const sql = planTableSql('metadata', {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       payload: {

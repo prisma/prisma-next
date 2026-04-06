@@ -355,8 +355,7 @@ describe('validateContract', () => {
     );
   });
 
-  it('keeps tagged bigint default unchanged when codec lookup is empty', () => {
-    const tagged = { $type: 'bigint', value: '9007199254740993' } as const;
+  it('keeps number default unchanged when codec lookup is empty', () => {
     const contract = makeContract({
       User: {
         columns: {
@@ -365,7 +364,7 @@ describe('validateContract', () => {
             codecId: 'pg/int8@1',
             nativeType: 'bigint',
             nullable: false,
-            default: { kind: 'literal', value: tagged },
+            default: { kind: 'literal', value: 42 },
           },
         },
         primaryKey: { columns: ['id'] },
@@ -376,7 +375,7 @@ describe('validateContract', () => {
     });
     const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     const col = result.storage.tables.User.columns.count;
-    expect(col.default).toEqual({ kind: 'literal', value: tagged });
+    expect(col.default).toEqual({ kind: 'literal', value: 42 });
   });
 
   it('keeps ISO date string defaults unchanged on temporal column', () => {
@@ -476,17 +475,17 @@ describe('validateContract', () => {
     expect(col.default).toEqual({ kind: 'literal', value: 'draft' });
   });
 
-  it('keeps invalid tagged bigint literal when codec lookup is empty', () => {
-    const tagged = { $type: 'bigint', value: 'not-a-number' } as const;
+  it('keeps JSON object default unchanged when codec lookup is empty', () => {
+    const jsonDefault = { key: 'value', nested: { count: 42 } } as const;
     const contract = makeContract({
       User: {
         columns: {
           id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          count: {
-            codecId: 'pg/int8@1',
-            nativeType: 'bigint',
+          config: {
+            codecId: 'pg/jsonb@1',
+            nativeType: 'jsonb',
             nullable: false,
-            default: { kind: 'literal', value: tagged },
+            default: { kind: 'literal', value: jsonDefault },
           },
         },
         primaryKey: { columns: ['id'] },
@@ -496,9 +495,9 @@ describe('validateContract', () => {
       },
     });
     const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
-    expect(result.storage.tables.User.columns.count.default).toEqual({
+    expect(result.storage.tables.User.columns.config.default).toEqual({
       kind: 'literal',
-      value: tagged,
+      value: jsonDefault,
     });
   });
 
@@ -527,17 +526,17 @@ describe('validateContract', () => {
     });
   });
 
-  it('keeps tagged bigint literals unchanged for non-bigint columns', () => {
-    const tagged = { $type: 'bigint', value: '42' } as const;
+  it('keeps array default unchanged when codec lookup is empty', () => {
+    const arrayDefault = ['alpha', 'beta'] as const;
     const contract = makeContract({
       User: {
         columns: {
           id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          payload: {
+          tags: {
             codecId: 'pg/jsonb@1',
             nativeType: 'jsonb',
             nullable: false,
-            default: { kind: 'literal', value: tagged },
+            default: { kind: 'literal', value: arrayDefault },
           },
         },
         primaryKey: { columns: ['id'] },
@@ -547,40 +546,14 @@ describe('validateContract', () => {
       },
     });
     const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
-    expect(result.storage.tables.User.columns.payload.default).toEqual({
+    expect(result.storage.tables.User.columns.tags.default).toEqual({
       kind: 'literal',
-      value: tagged,
+      value: arrayDefault,
     });
   });
 
-  it('keeps raw-tagged default unchanged when codec lookup is empty', () => {
-    const rawWrapped = { $type: 'raw', value: { $type: 'bigint', value: '42' } } as const;
-    const contract = makeContract({
-      User: {
-        columns: {
-          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          payload: {
-            codecId: 'pg/jsonb@1',
-            nativeType: 'jsonb',
-            nullable: false,
-            default: { kind: 'literal', value: rawWrapped },
-          },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      },
-    });
-    const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
-    expect(result.storage.tables.User.columns.payload.default).toEqual({
-      kind: 'literal',
-      value: rawWrapped,
-    });
-  });
-
-  it('keeps nested raw-tagged default unchanged when codec lookup is empty', () => {
-    const rawWrapped = { $type: 'raw', value: { $type: 'custom', data: [1, 2, 3] } } as const;
+  it('keeps nested JSON object default unchanged when codec lookup is empty', () => {
+    const nestedDefault = { type: 'custom', data: [1, 2, 3] } as const;
     const contract = makeContract({
       User: {
         columns: {
@@ -589,7 +562,7 @@ describe('validateContract', () => {
             codecId: 'pg/jsonb@1',
             nativeType: 'jsonb',
             nullable: false,
-            default: { kind: 'literal', value: rawWrapped },
+            default: { kind: 'literal', value: nestedDefault },
           },
         },
         primaryKey: { columns: ['id'] },
@@ -601,7 +574,7 @@ describe('validateContract', () => {
     const result = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
     expect(result.storage.tables.User.columns.meta.default).toEqual({
       kind: 'literal',
-      value: rawWrapped,
+      value: nestedDefault,
     });
   });
 

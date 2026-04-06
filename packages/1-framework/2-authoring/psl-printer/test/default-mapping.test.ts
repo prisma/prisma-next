@@ -52,12 +52,6 @@ describe('mapDefault', () => {
     });
   });
 
-  it('maps bigint', () => {
-    expect(mapDefault({ kind: 'literal', value: 42n })).toEqual({
-      attribute: '@default(42)',
-    });
-  });
-
   it('maps string', () => {
     expect(mapDefault({ kind: 'literal', value: 'hello' })).toEqual({
       attribute: '@default("hello")',
@@ -94,11 +88,9 @@ describe('mapDefault', () => {
     });
   });
 
-  it('maps tagged bigint', () => {
-    expect(
-      mapDefault({ kind: 'literal', value: { $type: 'bigint', value: '9007199254740993' } }),
-    ).toEqual({
-      attribute: '@default(9007199254740993)',
+  it('maps large number literal', () => {
+    expect(mapDefault({ kind: 'literal', value: 9007199254740991 })).toEqual({
+      attribute: '@default(9007199254740991)',
     });
   });
 

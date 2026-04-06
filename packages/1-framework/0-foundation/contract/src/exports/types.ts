@@ -39,15 +39,5 @@ export type {
   Source,
   StorageBase,
   StorageHashBase,
-  TaggedBigInt,
-  TaggedLiteralValue,
-  TaggedRaw,
 } from '../types';
-export {
-  bigintJsonReplacer,
-  coreHash,
-  executionHash,
-  isTaggedBigInt,
-  isTaggedRaw,
-  profileHash,
-} from '../types';
+export { coreHash, executionHash, profileHash } from '../types';

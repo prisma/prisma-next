@@ -144,10 +144,6 @@ describe('renderDefaultLiteral', () => {
     expect(renderDefaultLiteral(null)).toBe('NULL');
   });
 
-  it('renders bigint', () => {
-    expect(renderDefaultLiteral(123n)).toBe('123');
-  });
-
   it('renders JSON object for jsonb column', () => {
     const result = renderDefaultLiteral({ key: 'val' }, col({ nativeType: 'jsonb' }));
     expect(result).toBe(`'{"key":"val"}'::jsonb`);

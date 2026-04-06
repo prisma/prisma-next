@@ -521,7 +521,7 @@ describe('printPsl', () => {
     `);
   });
 
-  it('preserves raw bigint defaults without precision loss', () => {
+  it('renders raw bigint defaults as numbers', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {
         counter: {
@@ -547,7 +547,7 @@ describe('printPsl', () => {
       "// This file was introspected from the database. Do not edit manually.
 
       model Counter {
-        id BigInt @id @default(9223372036854775807)
+        id BigInt @id @default(9223372036854776000)
 
         @@map("counter")
       }

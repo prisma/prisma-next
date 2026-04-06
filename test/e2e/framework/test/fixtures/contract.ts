@@ -129,7 +129,7 @@ export const contract = defineContract()
       })
       .column('big_count', {
         type: int8Column,
-        default: { kind: 'literal', value: 9007199254740993n },
+        default: { kind: 'literal', value: 9007199254740991 },
       })
       .column('metadata', {
         type: jsonb(),

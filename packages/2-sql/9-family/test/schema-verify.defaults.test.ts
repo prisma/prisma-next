@@ -262,7 +262,7 @@ describe('verifySqlSchema - defaults', () => {
     expect(result.schema.issues).toHaveLength(0);
   });
 
-  it('matches JSONB default that looks like a tagged bigint', () => {
+  it('matches JSONB default with arbitrary JSON object', () => {
     const contract = createTestContract({
       literal_defaults: createContractTable({
         payload: {

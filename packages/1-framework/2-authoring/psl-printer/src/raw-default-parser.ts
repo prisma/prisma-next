@@ -1,4 +1,4 @@
-import type { ColumnDefault, TaggedBigInt } from '@prisma-next/contract/types';
+import type { ColumnDefault } from '@prisma-next/contract/types';
 
 /**
  * Parses a raw database default expression into a normalized ColumnDefault.
@@ -17,7 +17,6 @@ const UUID_OSSP_PATTERN = /^uuid_generate_v4\s*\(\s*\)$/i;
 const NULL_PATTERN = /^NULL(?:::.+)?$/i;
 const TRUE_PATTERN = /^true$/i;
 const FALSE_PATTERN = /^false$/i;
-const INTEGER_PATTERN = /^-?\d+$/;
 const NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
 const JSON_CAST_SUFFIX = /::jsonb?$/i;
 const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/;
@@ -48,8 +47,6 @@ export function parseRawDefault(
 ): ColumnDefault | undefined {
   const trimmed = rawDefault.trim();
   const normalizedType = nativeType?.toLowerCase();
-  const isBigInt =
-    normalizedType === undefined || normalizedType === 'bigint' || normalizedType === 'int8';
 
   if (NEXTVAL_PATTERN.test(trimmed)) {
     return { kind: 'function', expression: 'autoincrement()' };
@@ -77,14 +74,7 @@ export function parseRawDefault(
   }
 
   if (NUMERIC_PATTERN.test(trimmed)) {
-    const numericValue = Number(trimmed);
-    if (isBigInt && INTEGER_PATTERN.test(trimmed) && !Number.isSafeInteger(numericValue)) {
-      return {
-        kind: 'literal',
-        value: { $type: 'bigint', value: trimmed } satisfies TaggedBigInt,
-      };
-    }
-    return { kind: 'literal', value: numericValue };
+    return { kind: 'literal', value: Number(trimmed) };
   }
 
   const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);

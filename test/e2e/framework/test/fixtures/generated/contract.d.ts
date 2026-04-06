@@ -26,7 +26,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:9a2e401594554ab0789d0a857f55f2d8a2b1bc51930b5863cf507ca569c21d13'>;
+  StorageHashBase<'sha256:6ead2fd733253cfe7ecd3c40307921dd2c237221ad11686f126bc17be4ee3990'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27'>;
 export type ProfileHash =
@@ -36,10 +36,9 @@ export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = Record<string, never>;
 export type QueryOperationTypes = Record<string, never>;
-type DefaultLiteralValue<CodecId extends string, _Encoded> =
-  CodecId extends keyof CodecTypes
-    ? CodecTypes[CodecId]['output']
-    : _Encoded;
+type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
+  ? CodecTypes[CodecId]['output']
+  : _Encoded;
 
 export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
@@ -99,7 +98,7 @@ type ContractBase = ContractShape<
             readonly nullable: false;
             readonly default: {
               readonly kind: 'literal';
-              readonly value: DefaultLiteralValue<'pg/timestamptz@1', '2024-01-15T10:30:00.000Z'>;
+              readonly value: DefaultLiteralValue<'pg/timestamptz@1', {}>;
             };
           };
           readonly created_at: {
@@ -164,10 +163,7 @@ type ContractBase = ContractShape<
             readonly nullable: false;
             readonly default: {
               readonly kind: 'literal';
-              readonly value: DefaultLiteralValue<
-                'pg/int8@1',
-                { readonly $type: 'bigint'; readonly value: '9007199254740993' }
-              >;
+              readonly value: DefaultLiteralValue<'pg/int8@1', 9007199254740991>;
             };
           };
           readonly metadata: {
