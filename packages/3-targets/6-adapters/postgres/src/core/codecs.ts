@@ -298,7 +298,11 @@ const pgTimestampCodec = codec<
     if (typeof json !== 'string') {
       throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
     }
-    return new Date(json);
+    const date = new Date(json);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
+    }
+    return date;
   },
   paramsSchema: precisionParamsSchema,
   meta: {
@@ -335,7 +339,11 @@ const pgTimestamptzCodec = codec<
     if (typeof json !== 'string') {
       throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
     }
-    return new Date(json);
+    const date = new Date(json);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
+    }
+    return date;
   },
   paramsSchema: precisionParamsSchema,
   meta: {
