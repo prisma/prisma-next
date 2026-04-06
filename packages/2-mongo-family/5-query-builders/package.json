@@ -22,6 +22,7 @@
     "@prisma-next/runtime-executor": "workspace:*"
   },
   "devDependencies": {
+    "@prisma-next/adapter-mongo": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
