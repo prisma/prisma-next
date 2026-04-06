@@ -127,7 +127,6 @@ describe('validateMongoContract()', () => {
     it('validates the ORM test contract', () => {
       const result = validateMongoContract(ormContractJson);
       expect(result.contract).toBeDefined();
-      expect(result.warnings).toHaveLength(0);
       expect(result.indices.variantToBase).toBeDefined();
       expect(result.indices.modelToVariants).toBeDefined();
     });

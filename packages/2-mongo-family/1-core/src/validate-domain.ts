@@ -1,6 +1,5 @@
 export {
   type DomainContractShape,
   type DomainModelShape,
-  type DomainValidationResult,
   validateContractDomain,
 } from '@prisma-next/contract/validate-domain';

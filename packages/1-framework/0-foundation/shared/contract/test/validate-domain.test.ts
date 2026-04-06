@@ -282,53 +282,15 @@ describe('validateContractDomain()', () => {
     });
   });
 
-  describe('orphaned model warnings', () => {
-    it('returns warnings for orphaned models', () => {
-      const contract = makeValidContract({
-        roots: { items: 'Item' },
-        models: {
-          Item: makeMinimalModel(),
-          Orphan: makeMinimalModel(),
-        },
-      });
-      const result = validateContractDomain(contract);
-      expect(result.warnings).toContainEqual(expect.stringMatching(/orphan.*Orphan/i));
+  it('does not reject orphaned models (advisory, removed from runtime validation)', () => {
+    const contract = makeValidContract({
+      roots: { items: 'Item' },
+      models: {
+        Item: makeMinimalModel(),
+        Orphan: makeMinimalModel(),
+      },
     });
-
-    it('does not warn for models referenced by relations', () => {
-      const contract = makeValidContract({
-        roots: { items: 'Item' },
-        models: {
-          Item: makeMinimalModel({
-            relations: {
-              tag: {
-                to: 'Tag',
-                cardinality: '1:1',
-              },
-            },
-          }),
-          Tag: makeMinimalModel({ owner: 'Item' }),
-        },
-      });
-      const result = validateContractDomain(contract);
-      expect(result.warnings).toHaveLength(0);
-    });
-
-    it('does not warn for models listed as variants', () => {
-      const contract = makeValidContract({
-        roots: { items: 'Item' },
-        models: {
-          Item: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
-            discriminator: { field: 'type' },
-            variants: { Special: { value: 'special' } },
-          }),
-          Special: makeMinimalModel({ base: 'Item' }),
-        },
-      });
-      const result = validateContractDomain(contract);
-      expect(result.warnings).toHaveLength(0);
-    });
+    expect(() => validateContractDomain(contract)).not.toThrow();
   });
 
   describe('ownership validation', () => {
@@ -450,8 +412,7 @@ describe('validateContractDomain()', () => {
           }),
         },
       };
-      const result = validateContractDomain(contract);
-      expect(result.warnings).toHaveLength(0);
+      expect(() => validateContractDomain(contract)).not.toThrow();
     });
   });
 });

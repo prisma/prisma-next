@@ -14,13 +14,8 @@ export interface DomainContractShape {
   readonly models: Record<string, DomainModelShape>;
 }
 
-export interface DomainValidationResult {
-  readonly warnings: string[];
-}
-
-export function validateContractDomain(contract: DomainContractShape): DomainValidationResult {
+export function validateContractDomain(contract: DomainContractShape): void {
   const errors: string[] = [];
-  const warnings: string[] = [];
   const modelNames = new Set(Object.keys(contract.models));
 
   validateRoots(contract, modelNames, errors);
@@ -28,7 +23,6 @@ export function validateContractDomain(contract: DomainContractShape): DomainVal
   validateRelationTargets(contract, modelNames, errors);
   validateDiscriminators(contract, errors);
   validateOwnership(contract, modelNames, errors);
-  detectOrphanedModels(contract, modelNames, warnings);
 
   if (errors.length > 0) {
     throw new ContractValidationError(
@@ -36,8 +30,6 @@ export function validateContractDomain(contract: DomainContractShape): DomainVal
       'domain',
     );
   }
-
-  return { warnings };
 }
 
 function validateRoots(
@@ -168,43 +160,6 @@ function validateOwnership(
           `Owned model "${modelName}" must not appear in roots (found as root "${rootKey}")`,
         );
       }
-    }
-  }
-}
-
-function detectOrphanedModels(
-  contract: DomainContractShape,
-  modelNames: Set<string>,
-  warnings: string[],
-): void {
-  const referenced = new Set<string>();
-
-  for (const modelName of Object.values(contract.roots)) {
-    referenced.add(modelName);
-  }
-
-  for (const [modelName, model] of Object.entries(contract.models)) {
-    for (const relation of Object.values(model.relations ?? {})) {
-      referenced.add(relation.to);
-    }
-    if (model.variants) {
-      for (const variantName of Object.keys(model.variants)) {
-        referenced.add(variantName);
-      }
-    }
-    if (model.base) {
-      referenced.add(model.base);
-    }
-    if (model.owner) {
-      referenced.add(modelName);
-    }
-  }
-
-  for (const modelName of modelNames) {
-    if (!referenced.has(modelName)) {
-      warnings.push(
-        `Orphaned model: "${modelName}" is not referenced by any root, relation, or variant`,
-      );
     }
   }
 }
