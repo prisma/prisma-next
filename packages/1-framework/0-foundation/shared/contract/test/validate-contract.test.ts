@@ -42,10 +42,10 @@ describe('validateContract', () => {
     expect('schemaVersion' in result).toBe(false);
   });
 
-  it('strips sources from the result', () => {
-    const raw = { ...minimalContract(), sources: { user: { readOnly: false, projection: {} } } };
+  it('strips _generated from the result', () => {
+    const raw = { ...minimalContract(), _generated: { timestamp: '2024-01-01' } };
     const result = validateContract<Contract>(raw, noopValidator);
-    expect('sources' in result).toBe(false);
+    expect('_generated' in result).toBe(false);
   });
 
   it('calls the storage validator', () => {

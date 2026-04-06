@@ -1,4 +1,5 @@
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 import type { Contract } from './contract-types';
 import { bigintJsonReplacer } from './types';
@@ -243,14 +244,14 @@ export function canonicalizeContractToObject(
   options?: { schemaVersion?: string },
 ): Record<string, unknown> {
   const normalized: Record<string, unknown> = {
-    ...(options?.schemaVersion !== undefined ? { schemaVersion: options.schemaVersion } : {}),
+    ...ifDefined('schemaVersion', options?.schemaVersion),
     targetFamily: contract.targetFamily,
     target: contract.target,
     profileHash: contract.profileHash,
     roots: contract.roots,
     models: contract.models,
     storage: contract.storage,
-    ...(contract.execution !== undefined ? { execution: contract.execution } : {}),
+    ...ifDefined('execution', contract.execution),
     extensionPacks: contract.extensionPacks,
     capabilities: contract.capabilities,
     meta: contract.meta,

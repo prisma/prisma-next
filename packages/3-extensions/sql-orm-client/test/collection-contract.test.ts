@@ -209,14 +209,14 @@ describe('collection-contract capability detection', () => {
     expect(hasContractCapability(withNestedCapability, 'jsonAgg')).toBe(false);
   });
 
-  it('hasContractCapability() returns false when capabilities are absent', () => {
+  it('hasContractCapability() returns false when no capabilities are set', () => {
     const contract = getTestContract();
-    const withoutCapabilities = {
+    const withEmptyCapabilities = {
       ...contract,
-      capabilities: undefined,
-    } as unknown as typeof contract;
+      capabilities: {},
+    } as typeof contract;
 
-    expect(hasContractCapability(withoutCapabilities, 'returning')).toBe(false);
+    expect(hasContractCapability(withEmptyCapabilities, 'returning')).toBe(false);
   });
 
   it('isToOneCardinality() identifies to-one relations', () => {

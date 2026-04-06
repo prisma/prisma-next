@@ -229,5 +229,13 @@ export function validateContract<TContract extends Contract<SqlStorage>>(
   value: unknown,
 ): TContract {
   const validated = frameworkValidateContract<TContract>(value, validateSqlStorage);
-  return decodeContractDefaults(validated);
+  try {
+    return decodeContractDefaults(validated);
+  } catch (error) {
+    if (error instanceof ContractValidationError) throw error;
+    throw new ContractValidationError(
+      error instanceof Error ? error.message : String(error),
+      'storage',
+    );
+  }
 }

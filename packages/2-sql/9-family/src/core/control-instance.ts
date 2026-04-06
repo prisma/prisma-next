@@ -309,31 +309,19 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly contractPath: string;
       readonly configPath?: string;
     }): Promise<VerifyDatabaseResult> {
-      const { driver, contract, expectedTargetId, contractPath, configPath } = verifyOptions;
+      const {
+        driver,
+        contract: rawContract,
+        expectedTargetId,
+        contractPath,
+        configPath,
+      } = verifyOptions;
       const startTime = Date.now();
 
-      if (
-        typeof contract !== 'object' ||
-        contract === null ||
-        !('storage' in contract) ||
-        !('target' in contract) ||
-        typeof contract.target !== 'string'
-      ) {
-        throw new Error('Contract is missing required fields: storage or target');
-      }
+      const contract = sqlValidateContract<Contract<SqlStorage>>(rawContract);
 
-      const storage = contract.storage as Record<string, unknown>;
-      const storageHash =
-        typeof storage['storageHash'] === 'string' ? storage['storageHash'] : undefined;
-      if (!storageHash) {
-        throw new Error('Contract is missing required field: storage.storageHash');
-      }
-
-      const contractStorageHash = storageHash;
-      const contractProfileHash =
-        'profileHash' in contract && typeof contract.profileHash === 'string'
-          ? contract.profileHash
-          : undefined;
+      const contractStorageHash = contract.storage.storageHash;
+      const contractProfileHash = contract.profileHash;
       const contractTarget = contract.target;
 
       const marker = await readMarker(driver);

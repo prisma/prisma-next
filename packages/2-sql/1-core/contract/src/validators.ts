@@ -213,16 +213,10 @@ export function validateModel(value: unknown): unknown {
 }
 
 /**
- * Validates the structural shape of a Contract using Arktype.
+ * Validates the structural shape of an SQL contract using Arktype.
  *
- * **Responsibility: Validation Only**
- * This function validates that the contract has the correct structure and types.
- * It does NOT normalize the contract - normalization must happen in the contract builder.
- *
- * The contract passed to this function must already be normalized (all required fields present).
- * If normalization is needed, it should be done by the contract builder before calling this function.
- *
- * This ensures all required fields are present and have the correct types.
+ * Ensures all required fields are present and have the correct types,
+ * including SQL-specific storage structure (tables, columns, constraints).
  *
  * @param value - The contract value to validate (typically from a JSON import)
  * @returns The validated contract if structure is valid
