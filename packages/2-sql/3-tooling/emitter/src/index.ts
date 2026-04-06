@@ -362,8 +362,15 @@ export const sqlTargetFamilyHook = {
                 col.default.expression,
               )} }`
           : '';
+        const typeParamsSpec =
+          col.typeParams && Object.keys(col.typeParams).length > 0
+            ? `; readonly typeParams: ${this.serializeTypeParamsLiteral(col.typeParams)}`
+            : '';
+        const typeRefSpec = col.typeRef
+          ? `; readonly typeRef: ${this.serializeValue(col.typeRef)}`
+          : '';
         columns.push(
-          `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable}${defaultSpec} }`,
+          `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable}${defaultSpec}${typeParamsSpec}${typeRefSpec} }`,
         );
       }
 
@@ -533,8 +540,15 @@ export const sqlTargetFamilyHook = {
           }
 
           const nullable = column.nullable ?? false;
+          const fieldTypeParamsSpec =
+            column.typeParams && Object.keys(column.typeParams).length > 0
+              ? `; readonly typeParams: ${this.serializeTypeParamsLiteral(column.typeParams)}`
+              : '';
+          const fieldTypeRefSpec = column.typeRef
+            ? `; readonly typeRef: ${this.serializeValue(column.typeRef)}`
+            : '';
           fields.push(
-            `readonly ${fieldName}: { readonly codecId: ${this.serializeValue(column.codecId)}; readonly nullable: ${nullable} }`,
+            `readonly ${fieldName}: { readonly codecId: ${this.serializeValue(column.codecId)}; readonly nullable: ${nullable}${fieldTypeParamsSpec}${fieldTypeRefSpec} }`,
           );
           storageFieldParts.push(
             `readonly ${fieldName}: { readonly column: ${this.serializeValue(field.column)} }`,
