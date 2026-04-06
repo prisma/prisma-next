@@ -17,8 +17,8 @@ describe('Runtime Errors', () => {
     expect(error.domain).toBe('RUN');
   });
 
-  it('errorMarkerMissing with custom why and dbUrl', () => {
-    const error = errorMarkerMissing({ why: 'Custom reason', dbUrl: 'postgres://localhost' });
+  it('errorMarkerMissing with custom why', () => {
+    const error = errorMarkerMissing({ why: 'Custom reason' });
     expect(error.why).toBe('Custom reason');
   });
 

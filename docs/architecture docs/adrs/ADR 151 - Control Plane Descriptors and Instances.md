@@ -252,7 +252,7 @@ This ADR covers:
 
 - Cross-family interfaces in core for the **control plane**
 - Refactoring and naming alignment for the **SQL family + Postgres target**:
-  - **Core:** `FamilyDescriptor`, `FamilyInstance`, `ControlPlaneDriver` in `@prisma-next/framework-components/control`
+  - **Core:** `ControlFamilyDescriptor`, `ControlFamilyInstance`, `ControlDriverInstance` in `@prisma-next/framework-components/control`
   - **SQL family:** `SqlControlAdapter`, SQL control family instance
   - **Postgres target pack:** Postgres control adapter descriptor and instance
   - **Postgres driver pack:** Postgres control driver descriptor and instance
