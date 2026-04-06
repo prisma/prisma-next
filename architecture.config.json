@@ -25,6 +25,12 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/1-framework/1-core/errors/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/1-framework/1-core/control-plane/**",
       "domain": "framework",
       "layer": "core",
