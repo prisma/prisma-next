@@ -46,7 +46,6 @@
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
-    "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",

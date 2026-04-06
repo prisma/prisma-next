@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   poolCtor: vi.fn(),
 }));
 
-vi.mock('@prisma-next/core-execution-plane/stack', () => ({
+vi.mock('@prisma-next/framework-components/execution', () => ({
   instantiateExecutionStack: mocks.instantiateExecutionStack,
 }));
 
