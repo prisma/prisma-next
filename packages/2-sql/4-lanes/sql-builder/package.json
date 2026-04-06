@@ -21,7 +21,6 @@
     "@prisma-next/sql-relational-core": "workspace:*"
   },
   "devDependencies": {
-    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/contract": "workspace:*",
