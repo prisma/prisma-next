@@ -62,6 +62,29 @@ class MongoAdapterImpl implements MongoAdapter {
         return new FindOneAndDeleteWireCommand(command.collection, lowerFilter(command.filter));
       case 'aggregate':
         return new AggregateWireCommand(command.collection, lowerPipeline(command.pipeline));
+      case 'rawAggregate':
+        return new AggregateWireCommand(command.collection, command.pipeline);
+      case 'rawInsertOne':
+        return new InsertOneWireCommand(command.collection, command.document);
+      case 'rawInsertMany':
+        return new InsertManyWireCommand(command.collection, command.documents);
+      case 'rawUpdateOne':
+        return new UpdateOneWireCommand(command.collection, command.filter, command.update);
+      case 'rawUpdateMany':
+        return new UpdateManyWireCommand(command.collection, command.filter, command.update);
+      case 'rawDeleteOne':
+        return new DeleteOneWireCommand(command.collection, command.filter);
+      case 'rawDeleteMany':
+        return new DeleteManyWireCommand(command.collection, command.filter);
+      case 'rawFindOneAndUpdate':
+        return new FindOneAndUpdateWireCommand(
+          command.collection,
+          command.filter,
+          command.update,
+          command.upsert,
+        );
+      case 'rawFindOneAndDelete':
+        return new FindOneAndDeleteWireCommand(command.collection, command.filter);
       // v8 ignore next 4
       default: {
         const _exhaustive: never = command;
