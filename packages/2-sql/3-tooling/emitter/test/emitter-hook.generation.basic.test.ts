@@ -1056,24 +1056,4 @@ describe('sql-target-family-hook', () => {
     const types = generateContractDts(ir, sqlTargetFamilyHook, [], [], testHashes);
     expect(types).not.toContain('readonly execution');
   });
-
-  it('serializes empty typeParams to Record<string, never>', () => {
-    const result = sqlTargetFamilyHook.serializeTypeParamsLiteral({});
-    expect(result).toBe('Record<string, never>');
-  });
-
-  it('serializes bigint values correctly', () => {
-    const result = sqlTargetFamilyHook.serializeValue(BigInt('12345678901234567890'));
-    expect(result).toBe('12345678901234567890n');
-  });
-
-  it('serializes unknown types as unknown', () => {
-    // Test with a function (not serializable)
-    const result = sqlTargetFamilyHook.serializeValue(() => {});
-    expect(result).toBe('unknown');
-
-    // Test with a symbol
-    const symbolResult = sqlTargetFamilyHook.serializeValue(Symbol('test'));
-    expect(symbolResult).toBe('unknown');
-  });
 });

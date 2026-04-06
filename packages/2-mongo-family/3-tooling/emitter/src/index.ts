@@ -3,26 +3,13 @@ import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import type { MongoStorage } from '@prisma-next/mongo-contract';
 
-interface MongoModelIR {
-  readonly fields: Record<string, { readonly codecId: string; readonly nullable: boolean }>;
-  readonly relations: Record<string, unknown>;
-  readonly storage: Record<string, unknown>;
-  readonly discriminator?: { readonly field: string };
-  readonly variants?: Record<string, unknown>;
-  readonly base?: string;
-  readonly owner?: string;
-}
-
 export const mongoTargetFamilyHook = {
   id: 'mongo',
 
   validateTypes(contract: Contract, _ctx: ValidationContext): void {
-    const models = contract.models as Record<string, MongoModelIR> | undefined;
-    if (!models) return;
-
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
-    for (const [modelName, model] of Object.entries(models)) {
+    for (const [modelName, model] of Object.entries(contract.models)) {
       for (const [fieldName, field] of Object.entries(model.fields)) {
         const { codecId } = field;
         if (!codecId) {
@@ -48,8 +35,8 @@ export const mongoTargetFamilyHook = {
       throw new Error('Mongo contract must have storage.collections');
     }
 
-    const models = contract.models as Record<string, MongoModelIR> | undefined;
-    if (!models) return;
+    const models = contract.models;
+    if (!models || Object.keys(models).length === 0) return;
 
     const collectionNames = new Set(Object.keys(storage.collections));
 
@@ -153,14 +140,13 @@ export const mongoTargetFamilyHook = {
   },
 
   generateModelStorageType(_modelName: string, model: ContractModel): string {
-    const mongoModel = model as unknown as MongoModelIR;
     const parts: string[] = [];
-    const collection = mongoModel.storage['collection'] as string | undefined;
+    const collection = model.storage['collection'] as string | undefined;
     if (collection) {
       parts.push(`readonly collection: ${serializeValue(collection)}`);
     }
 
-    const storageRelations = mongoModel.storage['relations'] as
+    const storageRelations = model.storage['relations'] as
       | Record<string, Record<string, unknown>>
       | undefined;
     if (storageRelations && Object.keys(storageRelations).length > 0) {

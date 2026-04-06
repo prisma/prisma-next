@@ -8,20 +8,8 @@ import type {
   GenerateContractTypesOptions,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlModelStorage, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { assertDefined } from '@prisma-next/utils/assertions';
-
-type IRModelField = { readonly column: string };
-type IRModelStorage = {
-  readonly table: string;
-  readonly fields?: Record<string, IRModelField>;
-};
-type IRModelDefinition = {
-  readonly storage: IRModelStorage;
-  readonly fields?: Record<string, unknown>;
-  readonly relations: Record<string, unknown>;
-  readonly owner?: string;
-};
 
 function serializeTypeParamsLiteral(params: Record<string, unknown>): string {
   if (!params || Object.keys(params).length === 0) {
@@ -76,12 +64,11 @@ export const sqlTargetFamilyHook = {
       throw new Error('SQL contract must have storage.tables');
     }
 
-    const models = contract.models as Record<string, IRModelDefinition> | undefined;
+    const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
     const tableNames = new Set(Object.keys(storage.tables));
 
     if (models) {
-      for (const [modelName, modelUnknown] of Object.entries(models)) {
-        const model = modelUnknown as IRModelDefinition;
+      for (const [modelName, model] of Object.entries(models)) {
         if (!model.storage?.table) {
           throw new Error(`Model "${modelName}" is missing storage.table`);
         }
@@ -295,9 +282,9 @@ export const sqlTargetFamilyHook = {
   },
 
   generateModelStorageType(_modelName: string, model: ContractModel): string {
-    const irModel = model as unknown as IRModelDefinition;
-    const tableName = irModel.storage.table;
-    const storageFields = irModel.storage.fields ?? {};
+    const sqlModel = model as ContractModel<SqlModelStorage>;
+    const tableName = sqlModel.storage.table;
+    const storageFields = sqlModel.storage.fields;
 
     const storageParts = [`readonly table: ${serializeValue(tableName)}`];
     if (Object.keys(storageFields).length > 0) {
@@ -315,11 +302,7 @@ export const sqlTargetFamilyHook = {
 
   generateModelsType(contract: Contract, _options?: GenerateContractTypesOptions): string {
     const storage = contract.storage as unknown as SqlStorage;
-    const models = contract.models as Record<string, IRModelDefinition> | undefined;
-
-    if (!models) {
-      return 'Record<string, never>';
-    }
+    const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
 
     const modelTypes: string[] = [];
     for (const [modelName, model] of Object.entries(models).sort(([a], [b]) =>
@@ -330,7 +313,7 @@ export const sqlTargetFamilyHook = {
       const tableName = model.storage.table;
       const table = storage.tables[tableName];
 
-      const storageFields = model.storage.fields ?? {};
+      const storageFields = model.storage.fields;
       if (table) {
         for (const [fieldName, field] of Object.entries(storageFields)) {
           const column = table.columns[field.column];
@@ -415,10 +398,6 @@ export const sqlTargetFamilyHook = {
 
     return `{ ${modelTypes.join('; ')} }`;
   },
-
-  serializeTypeParamsLiteral,
-
-  serializeValue,
 
   getFamilyImports(): string[] {
     return [
