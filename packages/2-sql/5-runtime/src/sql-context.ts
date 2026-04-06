@@ -1,17 +1,18 @@
 import type { Contract, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
-import { createExecutionStack, type ExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import type {
-  RuntimeAdapterDescriptor,
-  RuntimeAdapterInstance,
-  RuntimeDriverDescriptor,
-  RuntimeDriverInstance,
-  RuntimeExtensionDescriptor,
-  RuntimeExtensionInstance,
-  RuntimeTargetDescriptor,
-  RuntimeTargetInstance,
-} from '@prisma-next/core-execution-plane/types';
 import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
+import {
+  createExecutionStack,
+  type ExecutionStack,
+  type RuntimeAdapterDescriptor,
+  type RuntimeAdapterInstance,
+  type RuntimeDriverDescriptor,
+  type RuntimeDriverInstance,
+  type RuntimeExtensionDescriptor,
+  type RuntimeExtensionInstance,
+  type RuntimeTargetDescriptor,
+  type RuntimeTargetInstance,
+} from '@prisma-next/framework-components/execution';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';

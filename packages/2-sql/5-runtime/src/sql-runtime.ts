@@ -1,6 +1,8 @@
 import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
-import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
-import type { RuntimeDriverInstance } from '@prisma-next/core-execution-plane/types';
+import type {
+  ExecutionStackInstance,
+  RuntimeDriverInstance,
+} from '@prisma-next/framework-components/execution';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type {
   Log,

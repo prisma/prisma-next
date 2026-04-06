@@ -1,11 +1,11 @@
 import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import type {
-  RuntimeDriverInstance,
-  RuntimeExtensionInstance,
-} from '@prisma-next/core-execution-plane/types';
+import {
+  type ExecutionStackInstance,
+  instantiateExecutionStack,
+  type RuntimeDriverInstance,
+  type RuntimeExtensionInstance,
+} from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   CodecRegistry,

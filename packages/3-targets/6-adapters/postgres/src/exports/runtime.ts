@@ -1,5 +1,5 @@
 import type { GeneratedValueSpec } from '@prisma-next/contract/types';
-import type { RuntimeAdapterInstance } from '@prisma-next/core-execution-plane/types';
+import type { RuntimeAdapterInstance } from '@prisma-next/framework-components/execution';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import type { Adapter, AnyQueryAst, CodecRegistry } from '@prisma-next/sql-relational-core/ast';

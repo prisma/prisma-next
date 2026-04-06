@@ -1,11 +1,11 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
   PostgresBinding,
   PostgresDriverCreateOptions,
 } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Log, Plugin, Runtime, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import {

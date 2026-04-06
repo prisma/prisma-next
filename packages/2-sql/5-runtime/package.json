@@ -17,7 +17,6 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/ids": "workspace:*",
     "@prisma-next/operations": "workspace:*",

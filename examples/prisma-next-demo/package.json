@@ -24,8 +24,8 @@
   "dependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/ids": "workspace:*",

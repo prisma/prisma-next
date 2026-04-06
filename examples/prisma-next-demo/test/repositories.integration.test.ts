@@ -1,4 +1,4 @@
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
 import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
