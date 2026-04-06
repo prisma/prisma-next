@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import type { ControlTargetDescriptor } from '@prisma-next/core-control-plane/types';
-import { hasMigrations } from '@prisma-next/core-control-plane/types';
+import type { ControlTargetDescriptor } from '@prisma-next/framework-components/control';
+import { hasMigrations } from '@prisma-next/framework-components/control';
 import type { PathDecision } from '@prisma-next/migration-tools/dag';
 import { reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';

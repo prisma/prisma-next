@@ -1,5 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { MigrationOperationPolicy } from '@prisma-next/core-control-plane/types';
+import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';

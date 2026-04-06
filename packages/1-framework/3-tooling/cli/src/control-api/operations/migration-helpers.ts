@@ -1,4 +1,4 @@
-import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
+import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import type { ControlActionName, OnControlProgress } from '../types';
 
 /**

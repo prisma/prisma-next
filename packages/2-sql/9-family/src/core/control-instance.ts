@@ -1,18 +1,18 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
+  TargetBoundComponentDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/framework-components/components';
+import type {
   ControlDriverInstance,
   ControlFamilyInstance,
+  ControlStack,
   OperationContext,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
-import type {
-  TargetBoundComponentDescriptor,
-  TargetDescriptor,
-} from '@prisma-next/framework-components/components';
-import type { ControlStack } from '@prisma-next/framework-components/control';
+} from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';

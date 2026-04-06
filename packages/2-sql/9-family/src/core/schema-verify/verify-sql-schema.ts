@@ -8,13 +8,13 @@
 
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import { isTaggedBigInt } from '@prisma-next/contract/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   OperationContext,
   SchemaIssue,
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+} from '@prisma-next/framework-components/control';
 import type {
   SqlStorage,
   StorageColumn,

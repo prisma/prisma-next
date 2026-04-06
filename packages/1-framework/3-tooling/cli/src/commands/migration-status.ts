@@ -1,5 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
+import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import {
   findPath,
   findPathWithDecision,

@@ -1,4 +1,4 @@
-import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
+import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { PostgresControlAdapter } from '../src/core/control-adapter';

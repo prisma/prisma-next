@@ -4,7 +4,10 @@ import {
   coreHash,
   profileHash,
 } from '@prisma-next/contract/types';
-import type { MigrationOperationPolicy, SchemaIssue } from '@prisma-next/core-control-plane/types';
+import type {
+  MigrationOperationPolicy,
+  SchemaIssue,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildReconciliationPlan } from '../../src/core/migrations/planner-reconciliation';

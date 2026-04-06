@@ -3,7 +3,6 @@ import {
   parsePostgresDefault,
   quoteIdentifier,
 } from '@prisma-next/adapter-postgres/control';
-import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
   ComponentDatabaseDependency,
@@ -21,6 +20,7 @@ import {
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type {
   StorageColumn,
   StorageTable,

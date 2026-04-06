@@ -1,13 +1,13 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ControlFamilyInstance,
+  ControlStack,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
-import type { ControlStack } from '@prisma-next/framework-components/control';
-import type { MongoContract } from '@prisma-next/mongo-contract';
-import { validateMongoContract } from '@prisma-next/mongo-contract';
+} from '@prisma-next/framework-components/control';
+import type { MongoContract } from '@prisma-next/mongo-core';
+import { validateMongoContract } from '@prisma-next/mongo-core';
 
 export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo'> {
   validateContract(contractJson: unknown): Contract;

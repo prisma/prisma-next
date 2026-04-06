@@ -1,6 +1,6 @@
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
-import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
+import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import type {
   AttestedMigrationBundle,
   AttestedMigrationManifest,

@@ -1,5 +1,5 @@
-import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
+import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type {
   DependencyIR,
   PrimaryKey,

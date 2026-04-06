@@ -11,7 +11,7 @@ import type {
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 import type { TargetFamilyHook } from '@prisma-next/framework-components/emission';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';

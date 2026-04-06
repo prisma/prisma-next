@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type {
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
+} from '@prisma-next/framework-components/control';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';

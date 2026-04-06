@@ -7,6 +7,7 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/family-mongo": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",

@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
@@ -6,8 +7,7 @@ import type {
   MigrationPlannerResult,
   MigrationRunnerResult,
   TargetMigrationsCapability,
-} from '@prisma-next/core-control-plane/types';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+} from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbInitResult, DbInitSuccess, OnControlProgress } from '../types';

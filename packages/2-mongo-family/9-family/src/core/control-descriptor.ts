@@ -1,5 +1,7 @@
-import type { ControlFamilyDescriptor } from '@prisma-next/core-control-plane/types';
-import type { ControlStack } from '@prisma-next/framework-components/control';
+import type {
+  ControlFamilyDescriptor,
+  ControlStack,
+} from '@prisma-next/framework-components/control';
 import { mongoTargetFamilyHook } from '@prisma-next/mongo-emitter';
 import { createMongoFamilyInstance, type MongoControlFamilyInstance } from './control-instance';
 

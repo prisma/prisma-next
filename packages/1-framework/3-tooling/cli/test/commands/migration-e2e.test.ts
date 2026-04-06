@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
+import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { attestMigration, verifyMigration } from '@prisma-next/migration-tools/attestation';
 import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {

@@ -1,11 +1,11 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
   MigrationRunnerResult,
   TargetMigrationsCapability,
-} from '@prisma-next/core-control-plane/types';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+} from '@prisma-next/framework-components/control';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type {
   MigrationApplyAppliedEntry,
