@@ -9,7 +9,11 @@ import {
   MongoSortStage,
   MongoUnwindStage,
 } from '../src/stages';
-import type { MongoFilterRewriter, MongoStageVisitor } from '../src/visitors';
+import type {
+  MongoFilterRewriter,
+  MongoStageRewriterContext,
+  MongoStageVisitor,
+} from '../src/visitors';
 
 describe('MongoMatchStage', () => {
   it('wraps a filter expression', () => {
@@ -24,11 +28,11 @@ describe('MongoMatchStage', () => {
   });
 
   it('rewrite() rewrites the embedded filter', () => {
-    const rewriter: MongoFilterRewriter = {
+    const filter: MongoFilterRewriter = {
       field: (expr) => MongoFieldFilter.of(expr.field, '$gte', expr.value),
     };
     const stage = new MongoMatchStage(MongoFieldFilter.eq('x', 1));
-    const rewritten = stage.rewrite(rewriter) as MongoMatchStage;
+    const rewritten = stage.rewrite({ filter }) as MongoMatchStage;
     expect(rewritten.kind).toBe('match');
     expect((rewritten.filter as MongoFieldFilter).op).toBe('$gte');
   });
@@ -180,7 +184,7 @@ describe('MongoLookupStage', () => {
   });
 
   it('rewrite() rewrites nested pipeline stages', () => {
-    const rewriter: MongoFilterRewriter = {
+    const filter: MongoFilterRewriter = {
       field: (expr) => MongoFieldFilter.of(expr.field, '$ne', expr.value),
     };
     const stage = new MongoLookupStage({
@@ -190,7 +194,7 @@ describe('MongoLookupStage', () => {
       as: 'posts',
       pipeline: [new MongoMatchStage(MongoFieldFilter.eq('published', true))],
     });
-    const rewritten = stage.rewrite(rewriter) as MongoLookupStage;
+    const rewritten = stage.rewrite({ filter }) as MongoLookupStage;
     const match = rewritten.pipeline![0] as MongoMatchStage;
     expect((match.filter as MongoFieldFilter).op).toBe('$ne');
   });
