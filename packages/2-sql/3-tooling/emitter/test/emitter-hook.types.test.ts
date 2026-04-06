@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
-import { sqlTargetFamilyHook } from '../src/index';
+import { sqlEmission } from '../src/index';
 
 function createContract(overrides: Partial<Contract>): Contract {
   return {
@@ -43,7 +43,7 @@ describe('sql-target-family-hook', () => {
     };
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, ctx);
+      sqlEmission.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 
@@ -68,7 +68,7 @@ describe('sql-target-family-hook', () => {
 
     // Should not throw - namespace validation removed
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, ctx);
+      sqlEmission.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 
@@ -88,7 +88,7 @@ describe('sql-target-family-hook', () => {
     const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, ctx);
+      sqlEmission.validateTypes(ir, ctx);
     }).toThrow('invalid codec ID format');
   });
 
@@ -110,7 +110,7 @@ describe('sql-target-family-hook', () => {
     };
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, ctx);
+      sqlEmission.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 
@@ -130,7 +130,7 @@ describe('sql-target-family-hook', () => {
     const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, ctx);
+      sqlEmission.validateTypes(ir, ctx);
     }).toThrow('is missing codecId');
   });
 
@@ -150,7 +150,7 @@ describe('sql-target-family-hook', () => {
     const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, ctx);
+      sqlEmission.validateTypes(ir, ctx);
     }).toThrow('invalid codec ID format');
   });
 
@@ -164,7 +164,7 @@ describe('sql-target-family-hook', () => {
     const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, ctx);
+      sqlEmission.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 
@@ -174,7 +174,7 @@ describe('sql-target-family-hook', () => {
     const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, ctx);
+      sqlEmission.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 
@@ -188,7 +188,7 @@ describe('sql-target-family-hook', () => {
     const ctx: ValidationContext = {};
 
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, ctx);
+      sqlEmission.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 
@@ -211,7 +211,7 @@ describe('sql-target-family-hook', () => {
 
     // Should not throw - extensionIds are not validated here
     expect(() => {
-      sqlTargetFamilyHook.validateTypes(ir, ctx);
+      sqlEmission.validateTypes(ir, ctx);
     }).not.toThrow();
   });
 
@@ -222,6 +222,6 @@ describe('sql-target-family-hook', () => {
       extensions: undefined,
     } as unknown as Contract;
 
-    expect(() => sqlTargetFamilyHook.validateTypes(ir, {})).not.toThrow();
+    expect(() => sqlEmission.validateTypes(ir, {})).not.toThrow();
   });
 });

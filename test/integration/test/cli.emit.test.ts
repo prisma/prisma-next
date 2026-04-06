@@ -9,7 +9,7 @@ import {
   extractComponentIds,
   extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { assembleOperationRegistry, getSqlDescriptorBundle } from '../utils/framework-components';
@@ -60,7 +60,7 @@ describe('emit command functionality', () => {
           operationTypeImports,
           extensionIds,
         },
-        sqlTargetFamilyHook,
+        sqlEmission,
       );
 
       const contractJsonPath = join(outputDir, 'contract.json');
@@ -106,7 +106,7 @@ describe('emit command functionality', () => {
           operationTypeImports,
           extensionIds,
         },
-        sqlTargetFamilyHook,
+        sqlEmission,
       );
 
       expect(result.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
@@ -131,7 +131,7 @@ describe('emit command functionality', () => {
           operationTypeImports,
           extensionIds,
         },
-        sqlTargetFamilyHook,
+        sqlEmission,
       );
 
       mkdirSync(newOutputDir, { recursive: true });

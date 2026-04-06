@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import { emit } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers';
@@ -63,7 +63,7 @@ describe('emitContract API', () => {
       }
 
       const stack = buildControlStack(config);
-      const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
+      const result = await emit(contractRaw, stack, sqlEmission);
 
       expect(result).toBeDefined();
       expect(result.storageHash).toBeDefined();
@@ -109,7 +109,7 @@ describe('emitContract API', () => {
       }
 
       const stack = buildControlStack(config);
-      const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
+      const result = await emit(contractRaw, stack, sqlEmission);
 
       const contractJsonPath = resolve(testDir, contractConfig.output);
       const contractDtsPath = contractJsonPath.replace(/\.json$/, '.d.ts');
@@ -149,7 +149,7 @@ describe('emitContract API', () => {
         }
 
         const stack = buildControlStack(config);
-        const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
+        const result = await emit(contractRaw, stack, sqlEmission);
 
         const contractJsonPath = resolve(customTestDir, contractConfig.output);
         const contractDtsPath = contractJsonPath.replace(/\.json$/, '.d.ts');
@@ -182,7 +182,7 @@ describe('emitContract API', () => {
       }
 
       const stack = buildControlStack(config);
-      const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
+      const result = await emit(contractRaw, stack, sqlEmission);
 
       expect(typeof result.profileHash).toBe('string');
       expect(result.profileHash.length).toBeGreaterThan(0);
@@ -206,7 +206,7 @@ describe('emitContract API', () => {
       }
 
       const stack = buildControlStack(config);
-      const result = await emit(contractRaw, stack, sqlTargetFamilyHook);
+      const result = await emit(contractRaw, stack, sqlEmission);
 
       expect(result.storageHash).toBeDefined();
       expect(result.contractJson).toBeDefined();

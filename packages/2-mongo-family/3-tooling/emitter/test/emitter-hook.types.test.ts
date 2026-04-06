@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { mongoTargetFamilyHook } from '../src/index';
+import { mongoEmission } from '../src/index';
 import { createMongoContract } from './fixtures/create-mongo-contract';
 
-describe('mongoTargetFamilyHook.validateTypes', () => {
+describe('mongoEmission.validateTypes', () => {
   it('passes with valid codec IDs', () => {
     const contract = createMongoContract({
       models: {
@@ -16,12 +16,12 @@ describe('mongoTargetFamilyHook.validateTypes', () => {
         },
       },
     });
-    expect(() => mongoTargetFamilyHook.validateTypes(contract, {})).not.toThrow();
+    expect(() => mongoEmission.validateTypes(contract, {})).not.toThrow();
   });
 
   it('passes with no models', () => {
     const contract = createMongoContract({ models: {} });
-    expect(() => mongoTargetFamilyHook.validateTypes(contract, {})).not.toThrow();
+    expect(() => mongoEmission.validateTypes(contract, {})).not.toThrow();
   });
 
   it('throws for missing codecId', () => {
@@ -36,7 +36,7 @@ describe('mongoTargetFamilyHook.validateTypes', () => {
         },
       },
     });
-    expect(() => mongoTargetFamilyHook.validateTypes(contract, {})).toThrow('missing codecId');
+    expect(() => mongoEmission.validateTypes(contract, {})).toThrow('missing codecId');
   });
 
   it('throws for invalid codec ID format', () => {
@@ -51,8 +51,6 @@ describe('mongoTargetFamilyHook.validateTypes', () => {
         },
       },
     });
-    expect(() => mongoTargetFamilyHook.validateTypes(contract, {})).toThrow(
-      'invalid codec ID format',
-    );
+    expect(() => mongoEmission.validateTypes(contract, {})).toThrow('invalid codec ID format');
   });
 });

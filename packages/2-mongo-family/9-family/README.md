@@ -5,7 +5,7 @@ Mongo family descriptor for Prisma Next.
 ## Purpose
 
 Provides the Mongo family descriptor (`ControlFamilyDescriptor`) that includes:
-- The Mongo target family hook (`mongoTargetFamilyHook`)
+- The Mongo target family hook (`mongoEmission`)
 - Factory method (`create()`) to create family instances
 - The Mongo target descriptor with codec type imports
 
@@ -13,7 +13,7 @@ Provides the Mongo family descriptor (`ControlFamilyDescriptor`) that includes:
 
 - **Family Descriptor Export**: Exports the Mongo `ControlFamilyDescriptor` for use in CLI configuration files and the Mongo demo
 - **Family Instance Creation**: Creates `MongoControlFamilyInstance` objects that implement control-plane domain actions (`validateContract`, `emitContract`)
-- **Family Hook Integration**: Integrates the Mongo target family hook (`mongoTargetFamilyHook`) from `@prisma-next/mongo-emitter`
+- **Family Hook Integration**: Integrates the Mongo target family hook (`mongoEmission`) from `@prisma-next/mongo-emitter`
 - **Target Descriptor Export**: Exports a pre-built `mongoTargetDescriptor` with codec type imports pointing to `@prisma-next/mongo-core/codec-types`
 - **Contract Validation**: Validates Mongo contract JSON via `validateMongoContract()` from `@prisma-next/mongo-core`
 - **Contract Emission**: Emits `contract.json` and `contract.d.ts` for the Mongo family using the shared `emit()` pipeline
@@ -52,7 +52,7 @@ const result = await familyInstance.emitContract({ contract });
 - **`@prisma-next/emitter`**: `emit()` function for contract emission
 - **`@prisma-next/contract`**: `Contract`, `ContractMarkerRecord`
 - **`@prisma-next/mongo-core`**: `MongoContract`, `validateMongoContract()`
-- **`@prisma-next/mongo-emitter`**: `mongoTargetFamilyHook`
+- **`@prisma-next/mongo-emitter`**: `mongoEmission`
 - **`@prisma-next/target-mongo`**: Target descriptor metadata
 
 **Dependents:**

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { mongoTargetFamilyHook } from '../src/index';
+import { mongoEmission } from '../src/index';
 import { createMongoContract } from './fixtures/create-mongo-contract';
 
-describe('mongoTargetFamilyHook.validateStructure', () => {
+describe('mongoEmission.validateStructure', () => {
   it('passes for valid minimal contract', () => {
     const contract = createMongoContract({
       models: {
@@ -14,19 +14,19 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).not.toThrow();
+    expect(() => mongoEmission.validateStructure(contract)).not.toThrow();
   });
 
   it('throws for wrong targetFamily', () => {
     const contract = createMongoContract({ targetFamily: 'sql' });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'Expected targetFamily "mongo"',
     );
   });
 
   it('throws for missing storage.collections', () => {
     const contract = createMongoContract({ storage: {} });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'must have storage.collections',
     );
   });
@@ -42,7 +42,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: {} },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'references collection "users" which is not in storage.collections',
     );
   });
@@ -57,7 +57,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'missing required field "fields"',
     );
   });
@@ -72,7 +72,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'missing required field "relations"',
     );
   });
@@ -94,7 +94,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'Owned model "Address" must not have storage.collection',
     );
   });
@@ -111,7 +111,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: {} },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'declares owner "NonExistent" which does not exist',
     );
   });
@@ -136,7 +136,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).not.toThrow();
+    expect(() => mongoEmission.validateStructure(contract)).not.toThrow();
   });
 
   it('passes with polymorphic models sharing collection', () => {
@@ -161,7 +161,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { tasks: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).not.toThrow();
+    expect(() => mongoEmission.validateStructure(contract)).not.toThrow();
   });
 
   it('throws when variant does not share base collection', () => {
@@ -186,7 +186,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { tasks: {}, bugs: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       "must share its base's collection",
     );
   });
@@ -201,7 +201,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'missing required field "storage"',
     );
   });
@@ -218,7 +218,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { tasks: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'declares base "NonExistent" which does not exist',
     );
   });
@@ -240,7 +240,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'embed relation "addresses" to owned model "Address" but no matching storage.relations entry',
     );
   });
@@ -259,7 +259,7 @@ describe('mongoTargetFamilyHook.validateStructure', () => {
       },
       storage: { collections: { users: {} } },
     });
-    expect(() => mongoTargetFamilyHook.validateStructure(contract)).toThrow(
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'storage.relations.addresses but no matching domain-level relation',
     );
   });

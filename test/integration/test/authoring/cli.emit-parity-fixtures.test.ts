@@ -6,7 +6,7 @@ import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/cli/c
 import { enrichContract } from '@prisma-next/cli/control-api';
 import { emit } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { executeCommand, setupCommandMocks } from '../utils/cli-test-helpers';
@@ -129,10 +129,10 @@ describe('emit parity fixtures', () => {
           const normalizedPsl = familyInstance.validateContract(enrichedPsl);
           expect(normalizedTs).toEqual(normalizedPsl);
 
-          const tsEmitFirst = await emit(normalizedTs, stack, sqlTargetFamilyHook);
-          const tsEmitSecond = await emit(normalizedTs, stack, sqlTargetFamilyHook);
-          const pslEmitFirst = await emit(normalizedPsl, stack, sqlTargetFamilyHook);
-          const pslEmitSecond = await emit(normalizedPsl, stack, sqlTargetFamilyHook);
+          const tsEmitFirst = await emit(normalizedTs, stack, sqlEmission);
+          const tsEmitSecond = await emit(normalizedTs, stack, sqlEmission);
+          const pslEmitFirst = await emit(normalizedPsl, stack, sqlEmission);
+          const pslEmitSecond = await emit(normalizedPsl, stack, sqlEmission);
 
           expect(tsEmitFirst).toMatchObject({
             contractJson: tsEmitSecond.contractJson,

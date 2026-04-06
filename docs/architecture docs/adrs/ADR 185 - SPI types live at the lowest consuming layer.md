@@ -39,8 +39,8 @@ lower layer, but each family's implementation lives in a higher layer.
 The emission pipeline is the primary example: the emitter's `emit()`
 function (tooling layer) calls `targetFamily.validateTypes()` and
 `targetFamily.generateContractTypes()`. Each family provides its own hook
-implementation — `sqlTargetFamilyHook` (SQL emitter, tooling layer),
-`mongoTargetFamilyHook` (Mongo emitter, tooling layer).
+implementation — `sqlEmission` (SQL emitter, tooling layer),
+`mongoEmission` (Mongo emitter, tooling layer).
 
 ## Decision
 
@@ -80,7 +80,7 @@ Family emitters implement the interface:
 // tooling layer — SQL emitter (implementer)
 import type { TargetFamilyHook } from '@prisma-next/framework-components/emission';
 
-export const sqlTargetFamilyHook: TargetFamilyHook = {
+export const sqlEmission: TargetFamilyHook = {
   id: 'sql',
   validateTypes(contract, ctx) { ... },
   validateStructure(contract) { ... },

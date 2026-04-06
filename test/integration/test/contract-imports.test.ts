@@ -12,7 +12,7 @@ import {
   extractComponentIds,
   extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { assembleOperationRegistry, getSqlDescriptorBundle } from '../utils/framework-components';
@@ -155,7 +155,7 @@ describe('contract.d.ts imports resolution', () => {
         extensionIds,
       };
 
-      const result = await emit(ir, options, sqlTargetFamilyHook);
+      const result = await emit(ir, options, sqlEmission);
 
       const contractJsonPath = join(testDir, 'contract.json');
       const contractDtsPath = join(testDir, 'contract.d.ts');
@@ -291,7 +291,7 @@ type UserIdColumn = UserColumns['id'];
         extensionIds,
       };
 
-      const result = await emit(ir, options, sqlTargetFamilyHook);
+      const result = await emit(ir, options, sqlEmission);
 
       const contractJsonPath = join(testDir, 'contract.json');
       const contractDtsPath = join(testDir, 'contract.d.ts');

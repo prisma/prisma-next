@@ -24,7 +24,7 @@ function serializeTypeParamsLiteral(params: Record<string, unknown>): string {
   return `{ ${entries.join('; ')} }`;
 }
 
-export const sqlTargetFamilyHook = {
+export const sqlEmission = {
   id: 'sql',
 
   validateTypes(contract: Contract, _ctx: ValidationContext): void {

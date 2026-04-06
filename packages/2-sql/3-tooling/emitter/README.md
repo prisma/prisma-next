@@ -53,9 +53,9 @@ flowchart TD
 
 ```typescript
 import { emit } from '@prisma-next/emitter';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 
-const result = await emit(contractIR, options, sqlTargetFamilyHook);
+const result = await emit(contractIR, options, sqlEmission);
 
 // result.contractDts contains generated TypeScript types
 // result.contractJson contains validated contract JSON

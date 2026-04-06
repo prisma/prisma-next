@@ -2,7 +2,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import type { ControlFamilyDescriptor } from '@prisma-next/framework-components/control';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import postgres from '@prisma-next/target-postgres/control';
 import { contract } from './contract';
 
@@ -12,7 +12,7 @@ const sqlFamilyWithoutCreate = {
   kind: 'family' as const,
   familyId: 'sql' as const,
   manifest: { id: 'sql', version: '0.0.1' },
-  emission: sqlTargetFamilyHook,
+  emission: sqlEmission,
   // create method is missing - this is what we're testing
 };
 

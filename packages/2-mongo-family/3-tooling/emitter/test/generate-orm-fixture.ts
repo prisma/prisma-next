@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import type { Contract } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
-import { mongoTargetFamilyHook } from '../src/index';
+import { mongoEmission } from '../src/index';
 
 const codecImports = [
   {
@@ -31,7 +31,7 @@ const hashes = {
   profileHash: 'sha256:orm-profile',
 };
 
-const output = generateContractDts(contract, mongoTargetFamilyHook, codecImports, [], hashes);
+const output = generateContractDts(contract, mongoEmission, codecImports, [], hashes);
 
 const targets = [
   resolve(

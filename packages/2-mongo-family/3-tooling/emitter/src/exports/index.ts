@@ -1,1 +1,1 @@
-export { mongoTargetFamilyHook } from '../index';
+export { mongoEmission } from '../index';

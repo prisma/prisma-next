@@ -5,7 +5,7 @@ SQL family descriptor for Prisma Next.
 ## Purpose
 
 Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
-- The SQL target family hook (`sqlTargetFamilyHook`)
+- The SQL target family hook (`sqlEmission`)
 - Factory method (`create()`) to create family instances
 
 ## Responsibilities
@@ -13,7 +13,7 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Family Descriptor Export**: Exports the SQL `ControlFamilyDescriptor` for use in CLI configuration files
 - **Family Instance Creation**: Creates `SqlFamilyInstance` objects that implement control-plane domain actions (`verify`, `schemaVerify`, `introspect`, `emitContract`, `validateContract`)
 - **Planner & Runner SPI**: Owns the `MigrationPlanner` / `MigrationRunner` interfaces plus the `SqlControlTargetDescriptor` helper so targets can expose planners and runners (e.g., Postgres init planner/runner)
-- **Family Hook Integration**: Integrates the SQL target family hook (`sqlTargetFamilyHook`) from `@prisma-next/sql-contract-emitter`
+- **Family Hook Integration**: Integrates the SQL target family hook (`sqlEmission`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
 - **Component Database Dependencies**: Consumes database dependencies declared by framework components (target/adapter/extension packs). Callers pass the active `frameworkComponents` list into planning/execution/verification; SQL layers structurally narrow to components that declare `databaseDependencies` and use their pure verification hooks (no fuzzy matching against `contract.extensionPacks`).
 - **Contract-to-SchemaIR Conversion**: Converts `SqlStorage` from a contract into `SqlSchemaIR` for offline migration planning, enabling `migration plan` to work without a database connection
@@ -150,7 +150,7 @@ The runner returns structured errors with the following codes:
 ## Dependencies
 
 - **`@prisma-next/framework-components`**: Control plane types via `./control` (`ControlFamilyDescriptor`, `ControlTargetDescriptor`, `ControlAdapterDescriptor`, `ControlDriverDescriptor`, `ControlExtensionDescriptor`, `ControlDriverInstance`, etc.)
-- **`@prisma-next/sql-contract-emitter`**: SQL target family hook (`sqlTargetFamilyHook`)
+- **`@prisma-next/sql-contract-emitter`**: SQL target family hook (`sqlEmission`)
 - **`@prisma-next/sql-contract-ts`**: Contract validation (`validateContract`)
 - **`@prisma-next/sql-contract`**: SQL contract types (`SqlContract`, `SqlStorage`)
 - **`@prisma-next/sql-operations`**: SQL operation signature types (`SqlOperationSignature`)
