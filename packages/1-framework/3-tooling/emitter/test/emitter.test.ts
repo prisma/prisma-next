@@ -299,15 +299,13 @@ describe('emitter', () => {
     expect(result.contractDts).toBeDefined();
   });
 
-  it('defaults codecTypeImports and operationTypeImports to empty arrays when undefined', async () => {
+  it('defaults codecTypeImports and operationTypeImports to empty arrays when omitted', async () => {
     const ir = createTestContract({
       storage: { tables: {} },
     });
 
     const options: EmitStackInput = {
       operationRegistry: createOperationRegistry(),
-      codecTypeImports: undefined,
-      operationTypeImports: undefined,
       extensionIds: [],
     };
 

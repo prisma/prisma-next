@@ -224,9 +224,7 @@ export const sqlEmission = {
           col.typeParams && Object.keys(col.typeParams).length > 0
             ? `; readonly typeParams: ${serializeTypeParamsLiteral(col.typeParams)}`
             : '';
-        const typeRefSpec = col.typeRef
-          ? `; readonly typeRef: ${serializeValue(col.typeRef)}`
-          : '';
+        const typeRefSpec = col.typeRef ? `; readonly typeRef: ${serializeValue(col.typeRef)}` : '';
         columns.push(
           `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable}${defaultSpec}${typeParamsSpec}${typeRefSpec} }`,
         );
