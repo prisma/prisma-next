@@ -1,4 +1,5 @@
 import type { MongoValue } from '@prisma-next/mongo-value';
+import type { MongoAggExpr } from './aggregation-expressions';
 import { MongoAstNode } from './ast-node';
 import type { MongoFilterRewriter, MongoFilterVisitor } from './visitors';
 
@@ -177,9 +178,33 @@ export class MongoExistsExpr extends MongoFilterExpression {
   }
 }
 
+export class MongoExprFilter extends MongoFilterExpression {
+  readonly kind = 'expr' as const;
+  readonly aggExpr: MongoAggExpr;
+
+  constructor(aggExpr: MongoAggExpr) {
+    super();
+    this.aggExpr = aggExpr;
+    this.freeze();
+  }
+
+  static of(aggExpr: MongoAggExpr): MongoExprFilter {
+    return new MongoExprFilter(aggExpr);
+  }
+
+  accept<R>(visitor: MongoFilterVisitor<R>): R {
+    return visitor.expr(this);
+  }
+
+  rewrite(rewriter: MongoFilterRewriter): MongoFilterExpr {
+    return rewriter.expr ? rewriter.expr(this) : this;
+  }
+}
+
 export type MongoFilterExpr =
   | MongoFieldFilter
   | MongoAndExpr
   | MongoOrExpr
   | MongoNotExpr
-  | MongoExistsExpr;
+  | MongoExistsExpr
+  | MongoExprFilter;

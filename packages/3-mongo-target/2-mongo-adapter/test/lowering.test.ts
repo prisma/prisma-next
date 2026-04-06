@@ -12,6 +12,7 @@ import {
   MongoAggSwitch,
   MongoAndExpr,
   MongoExistsExpr,
+  MongoExprFilter,
   MongoFieldFilter,
   MongoLimitStage,
   MongoLookupStage,
@@ -101,6 +102,27 @@ describe('lowerFilter', () => {
     const param = MongoParamRef.of(42);
     const filter = MongoFieldFilter.of('data', '$elemMatch', { value: param });
     expect(lowerFilter(filter)).toEqual({ data: { $elemMatch: { value: 42 } } });
+  });
+
+  it('lowers MongoExprFilter to $expr with aggregation expression', () => {
+    const filter = MongoExprFilter.of(
+      MongoAggOperator.of('$gt', [MongoAggFieldRef.of('qty'), MongoAggFieldRef.of('minQty')]),
+    );
+    expect(lowerFilter(filter)).toEqual({
+      $expr: { $gt: ['$qty', '$minQty'] },
+    });
+  });
+
+  it('lowers MongoExprFilter with nested arithmetic', () => {
+    const filter = MongoExprFilter.of(
+      MongoAggOperator.of('$gt', [
+        MongoAggFieldRef.of('price'),
+        MongoAggOperator.multiply(MongoAggFieldRef.of('discount'), MongoAggLiteral.of(2)),
+      ]),
+    );
+    expect(lowerFilter(filter)).toEqual({
+      $expr: { $gt: ['$price', { $multiply: ['$discount', 2] }] },
+    });
   });
 });
 
