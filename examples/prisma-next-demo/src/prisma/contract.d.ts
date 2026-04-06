@@ -19,15 +19,15 @@ import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/exte
 import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
 import type {
-  Contract as ContractShape,
+  ContractWithTypeMaps,
+  TypeMaps as TypeMapsType,
+} from '@prisma-next/sql-contract/types';
+import type {
+  Contract as ContractType,
   ExecutionHashBase,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
-import type {
-  ContractWithTypeMaps,
-  TypeMaps as TypeMapsType,
-} from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
   StorageHashBase<'sha256:6cdb03e59e009e569ed535404a9a071d6a73e87f7f00fd2947b8ffd683b989da'>;
@@ -37,16 +37,15 @@ export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
-export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = PgVectorOperationTypes;
+export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgVectorQueryOperationTypes;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
-
 export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
-type ContractBase = ContractShape<
+type ContractBase = ContractType<
   {
     readonly tables: {
       readonly post: {
@@ -198,6 +197,7 @@ type ContractBase = ContractShape<
   }
 > & {
   readonly target: 'postgres';
+  readonly targetFamily: 'sql';
   readonly roots: { readonly user: 'User'; readonly post: 'Post' };
   readonly capabilities: {
     readonly postgres: {
