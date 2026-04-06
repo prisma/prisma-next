@@ -158,6 +158,7 @@ model User {
       ...baseInput,
       document,
       composedExtensionPacks: [],
+      controlMutationDefaults: builtinControlMutationDefaults,
     });
 
     expect(result.ok).toBe(false);
@@ -187,6 +188,7 @@ model User {
       ...baseInput,
       document,
       composedExtensionPacks: [],
+      controlMutationDefaults: builtinControlMutationDefaults,
     });
 
     expect(result.ok).toBe(false);
@@ -215,7 +217,11 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -249,7 +255,11 @@ model InvalidNativeTypes {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -294,7 +304,11 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -326,7 +340,11 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -358,7 +376,11 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -388,7 +410,11 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -422,7 +448,11 @@ model Post {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -451,7 +481,11 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
