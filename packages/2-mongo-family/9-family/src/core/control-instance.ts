@@ -6,8 +6,8 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import type { MongoContract } from '@prisma-next/mongo-core';
-import { validateMongoContract } from '@prisma-next/mongo-core';
+import type { MongoContract } from '@prisma-next/mongo-contract';
+import { validateMongoContract } from '@prisma-next/mongo-contract';
 
 export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo'> {
   validateContract(contractJson: unknown): Contract;
