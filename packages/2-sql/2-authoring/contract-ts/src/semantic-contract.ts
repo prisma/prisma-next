@@ -64,10 +64,23 @@ export interface SqlSemanticRelationNode {
   };
 }
 
+export interface SqlSemanticValueObjectFieldNode {
+  readonly fieldName: string;
+  readonly columnName: string;
+  readonly valueObjectName: string;
+  readonly nullable: boolean;
+  readonly many?: boolean;
+}
+
+export interface SqlSemanticValueObjectNode {
+  readonly name: string;
+  readonly fields: readonly SqlSemanticFieldNode[];
+}
+
 export interface SqlSemanticModelNode {
   readonly modelName: string;
   readonly tableName: string;
-  readonly fields: readonly SqlSemanticFieldNode[];
+  readonly fields: readonly (SqlSemanticFieldNode | SqlSemanticValueObjectFieldNode)[];
   readonly id?: SqlSemanticPrimaryKeyNode;
   readonly uniques?: readonly SqlSemanticUniqueConstraintNode[];
   readonly indexes?: readonly SqlSemanticIndexNode[];
@@ -83,4 +96,5 @@ export interface SqlSemanticContractDefinition {
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
   readonly storageTypes?: Record<string, StorageTypeInstance>;
   readonly models: readonly SqlSemanticModelNode[];
+  readonly valueObjects?: readonly SqlSemanticValueObjectNode[];
 }

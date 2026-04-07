@@ -10,6 +10,7 @@ import {
   type ContractField,
   type ContractModel,
   type ContractRelation,
+  type ContractValueObject,
   coreHash,
   type ExecutionMutationDefault,
   type ExecutionMutationDefaultValue,
@@ -33,7 +34,12 @@ import {
 } from '@prisma-next/sql-contract/types';
 import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { SqlSemanticContractDefinition, SqlSemanticModelNode } from './semantic-contract';
+import type {
+  SqlSemanticContractDefinition,
+  SqlSemanticFieldNode,
+  SqlSemanticModelNode,
+  SqlSemanticValueObjectFieldNode,
+} from './semantic-contract';
 
 type RuntimeTableState = TableBuilderState<
   string,
@@ -41,12 +47,19 @@ type RuntimeTableState = TableBuilderState<
   readonly string[] | undefined
 >;
 
+type ValueObjectFieldRef = {
+  readonly name: string;
+  readonly many?: boolean;
+};
+
 type RuntimeModelState = ModelBuilderState<
   string,
   string,
   Record<string, string>,
   Record<string, RelationDefinition>
->;
+> & {
+  readonly valueObjectFields?: Record<string, ValueObjectFieldRef>;
+};
 
 export type RuntimeBuilderState = ContractBuilderState<
   string | undefined,
@@ -55,7 +68,9 @@ export type RuntimeBuilderState = ContractBuilderState<
   string | undefined,
   Record<string, unknown> | undefined,
   Record<string, Record<string, boolean>> | undefined
->;
+> & {
+  readonly valueObjects?: Record<string, ContractValueObject>;
+};
 
 function encodeDefaultLiteralValue(
   value: ColumnDefaultLiteralInputValue,
@@ -223,16 +238,26 @@ export function buildContract(
 
       storageFields[fieldName] = { column: columnName };
 
-      const columnState = tableState?.columns[columnName];
-      if (columnState) {
+      const voRef = modelState.valueObjectFields?.[fieldName];
+      if (voRef) {
+        const columnState = tableState?.columns[columnName];
         domainFields[fieldName] = {
-          type: {
-            kind: 'scalar',
-            codecId: columnState.type,
-            ...ifDefined('typeParams', columnState.typeParams),
-          },
-          nullable: columnState.nullable ?? false,
+          type: { kind: 'valueObject', name: voRef.name },
+          nullable: columnState?.nullable ?? false,
+          ...(voRef.many ? { many: true } : {}),
         };
+      } else {
+        const columnState = tableState?.columns[columnName];
+        if (columnState) {
+          domainFields[fieldName] = {
+            type: {
+              kind: 'scalar',
+              codecId: columnState.type,
+              ...ifDefined('typeParams', columnState.typeParams),
+            },
+            nullable: columnState.nullable ?? false,
+          };
+        }
       }
     }
 
@@ -299,6 +324,7 @@ export function buildContract(
     roots,
     storage,
     ...(executionWithHash ? { execution: executionWithHash } : {}),
+    ...ifDefined('valueObjects', state.valueObjects),
     extensionPacks,
     capabilities,
     profileHash,
@@ -338,6 +364,15 @@ function assertTargetTableMatches(
   }
 }
 
+function isValueObjectField(
+  field: SqlSemanticFieldNode | SqlSemanticValueObjectFieldNode,
+): field is SqlSemanticValueObjectFieldNode {
+  return 'valueObjectName' in field;
+}
+
+const JSONB_CODEC_ID = 'pg/jsonb@1';
+const JSONB_NATIVE_TYPE = 'jsonb';
+
 export function buildSqlContractFromSemanticDefinition(
   definition: SqlSemanticContractDefinition,
   codecLookup?: CodecLookup,
@@ -349,6 +384,16 @@ export function buildSqlContractFromSemanticDefinition(
     const columns: Record<string, ColumnBuilderState<string, boolean, string>> = {};
 
     for (const field of model.fields) {
+      if (isValueObjectField(field)) {
+        columns[field.columnName] = {
+          name: field.columnName,
+          type: JSONB_CODEC_ID,
+          nativeType: JSONB_NATIVE_TYPE,
+          nullable: field.nullable,
+        } as ColumnBuilderState<string, boolean, string>;
+        continue;
+      }
+
       if (field.executionDefault) {
         if (field.default !== undefined) {
           throw new Error(
@@ -428,8 +473,16 @@ export function buildSqlContractFromSemanticDefinition(
   const modelStates: Record<string, RuntimeModelState> = {};
   for (const model of definition.models) {
     const fields: Record<string, string> = {};
+    const valueObjectFields: Record<string, ValueObjectFieldRef> = {};
+
     for (const field of model.fields) {
       fields[field.fieldName] = field.columnName;
+      if (isValueObjectField(field)) {
+        valueObjectFields[field.fieldName] = {
+          name: field.valueObjectName,
+          ...(field.many ? { many: true } : {}),
+        };
+      }
     }
 
     const relations: Record<string, RelationDefinition> = {};
@@ -472,8 +525,33 @@ export function buildSqlContractFromSemanticDefinition(
       table: model.tableName,
       fields,
       relations,
+      ...(Object.keys(valueObjectFields).length > 0 ? { valueObjectFields } : {}),
     };
   }
+
+  const valueObjects: Record<string, ContractValueObject> | undefined =
+    definition.valueObjects && definition.valueObjects.length > 0
+      ? Object.fromEntries(
+          definition.valueObjects.map((vo) => [
+            vo.name,
+            {
+              fields: Object.fromEntries(
+                vo.fields.map((f) => [
+                  f.fieldName,
+                  {
+                    type: {
+                      kind: 'scalar' as const,
+                      codecId: f.descriptor.codecId,
+                      ...ifDefined('typeParams', f.descriptor.typeParams),
+                    },
+                    nullable: f.nullable,
+                  },
+                ]),
+              ),
+            },
+          ]),
+        )
+      : undefined;
 
   const extensionNamespaces = definition.extensionPacks
     ? Object.values(definition.extensionPacks).map((pack) => pack.id)
@@ -489,6 +567,7 @@ export function buildSqlContractFromSemanticDefinition(
     ...ifDefined('capabilities', definition.capabilities),
     ...ifDefined('foreignKeyDefaults', definition.foreignKeyDefaults),
     ...ifDefined('extensionNamespaces', extensionNamespaces),
+    ...ifDefined('valueObjects', valueObjects),
   };
 
   return buildContract(state, codecLookup);
