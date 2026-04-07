@@ -70,12 +70,14 @@ export interface SqlSemanticValueObjectFieldNode {
   readonly columnName: string;
   readonly valueObjectName: string;
   readonly nullable: boolean;
+  readonly default?: ColumnDefault;
+  readonly executionDefault?: ExecutionMutationDefaultValue;
   readonly many?: boolean;
 }
 
 export interface SqlSemanticValueObjectNode {
   readonly name: string;
-  readonly fields: readonly SqlSemanticFieldNode[];
+  readonly fields: readonly (SqlSemanticFieldNode | SqlSemanticValueObjectFieldNode)[];
 }
 
 export interface SqlSemanticModelNode {

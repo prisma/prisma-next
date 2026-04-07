@@ -376,7 +376,9 @@ type ResolveModelFieldToJsType<
           ? unknown
           : ApplyFieldModifiers<VOType, FieldValue, Nullable>
         : unknown
-      : FieldValue
+      : FT extends { readonly kind: 'union' }
+        ? unknown
+        : FieldValue
   : FieldValue;
 
 type ExtractColumnJsTypeFromModels<
