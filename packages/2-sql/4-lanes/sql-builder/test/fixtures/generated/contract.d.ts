@@ -189,11 +189,7 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: {
-          readonly codecId: 'sql/char@1';
-          readonly nullable: false;
-          readonly typeParams: { readonly length: 36 };
-        };
+        readonly id: Char<36>;
         readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
       };
       readonly relations: {};
