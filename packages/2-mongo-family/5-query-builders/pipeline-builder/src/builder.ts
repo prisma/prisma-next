@@ -5,12 +5,7 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import type {
-  MongoAggAccumulator,
-  MongoFilterExpr,
-  MongoQueryPlan,
-  MongoReadStage,
-} from '@prisma-next/mongo-query-ast';
+import type { MongoFilterExpr, MongoQueryPlan, MongoReadStage } from '@prisma-next/mongo-query-ast';
 import {
   AggregateCommand,
   MongoAddFieldsStage,
@@ -118,12 +113,10 @@ export class PipelineBuilder<
     TContract,
     Shape & Record<As, { readonly codecId: 'mongo/array@1'; readonly nullable: false }>
   > {
-    const modelName = (this.#contract as MongoContract).roots[options.from];
-    const collections = (this.#contract as MongoContract).storage.collections;
-    const collectionName =
-      (collections && typeof collections === 'object' ? Object.keys(collections) : []).find(
-        (c) => c === modelName || c === options.from,
-      ) ?? options.from;
+    const contract = this.#contract as MongoContract;
+    const modelName = contract.roots[options.from];
+    const model = modelName ? contract.models[modelName] : undefined;
+    const collectionName = model?.storage?.collection ?? options.from;
     return this.#withStage(
       new MongoLookupStage({
         from: collectionName,
@@ -171,7 +164,7 @@ export class PipelineBuilder<
     options?: { preserveNullAndEmptyArrays?: boolean },
   ): PipelineBuilder<TContract, UnwoundShape<Shape, K>> {
     return this.#withStage<UnwoundShape<Shape, K>>(
-      new MongoUnwindStage(field, options?.preserveNullAndEmptyArrays ?? false),
+      new MongoUnwindStage(`$${field}`, options?.preserveNullAndEmptyArrays ?? false),
     );
   }
 
@@ -184,10 +177,17 @@ export class PipelineBuilder<
     const spec = fn(proxy);
     const { _id: groupIdExpr, ...rest } = spec;
     const groupId = groupIdExpr === null ? null : groupIdExpr.node;
-    const accumulators: Record<string, MongoAggAccumulator> = {};
+    const accumulators: Record<string, import('@prisma-next/mongo-query-ast').MongoAggAccumulator> =
+      {};
     for (const [key, typed] of Object.entries(rest)) {
       if (typed !== null) {
-        accumulators[key] = typed.node as MongoAggAccumulator;
+        if (typed.node.kind !== 'accumulator') {
+          throw new Error(
+            `group() field "${key}" must use an accumulator (e.g. acc.sum(), acc.count()). Got "${typed.node.kind}" expression.`,
+          );
+        }
+        accumulators[key] =
+          typed.node as import('@prisma-next/mongo-query-ast').MongoAggAccumulator;
       }
     }
     return this.#withStage<GroupedDocShape<Spec>>(new MongoGroupStage(groupId, accumulators));

@@ -19,6 +19,7 @@ export type {
   ResolveRow,
   ResolveRowFromContract,
   SortSpec,
+  TypedAccumulatorExpr,
   TypedAggExpr,
   UnwoundShape,
   UnwrapArrayDocField,

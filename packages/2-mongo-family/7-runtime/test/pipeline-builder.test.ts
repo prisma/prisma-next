@@ -105,7 +105,7 @@ describe('pipeline builder integration', () => {
     });
   });
 
-  it('addFields → match on computed field', async () => {
+  it('addFields → assert computed field is present', async () => {
     await withMongod(async (ctx) => {
       const db = ctx.client.db(ctx.dbName);
       await db.collection('orders').insertMany([
@@ -130,9 +130,9 @@ describe('pipeline builder integration', () => {
       const rows = await ctx.runtime.execute(plan);
       expect(rows).toHaveLength(2);
 
-      const typed = rows as Array<{ department: string; amount: number }>;
-      expect(typed[0]?.amount).toBe(200);
-      expect(typed[1]?.amount).toBe(100);
+      const typed = rows as Array<{ department: string; amount: number; isHighValue: boolean }>;
+      expect(typed[0]).toMatchObject({ amount: 200, isHighValue: true });
+      expect(typed[1]).toMatchObject({ amount: 100, isHighValue: true });
     });
   });
 
