@@ -6,6 +6,7 @@ import type {
   ContractModel,
   ContractReferenceRelation,
   ContractRelation,
+  ContractValueObject,
   ScalarFieldType,
   ValueObjectFieldType,
 } from '../src/domain-types';
@@ -148,5 +149,26 @@ describe('contract types', () => {
       owner: 'User',
     };
     expect(model.owner).toBe('User');
+  });
+
+  it('ContractValueObject holds fields without identity', () => {
+    const vo: ContractValueObject = {
+      fields: {
+        street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+        city: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+        zip: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+      },
+    };
+    expect(Object.keys(vo.fields)).toEqual(['street', 'city', 'zip']);
+  });
+
+  it('ContractValueObject field can reference another value object', () => {
+    const vo: ContractValueObject = {
+      fields: {
+        home: { nullable: false, type: { kind: 'valueObject', name: 'Address' } },
+        work: { nullable: true, type: { kind: 'valueObject', name: 'Address' } },
+      },
+    };
+    expect(vo.fields['home']!.type.kind).toBe('valueObject');
   });
 });

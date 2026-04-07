@@ -49,6 +49,10 @@ export type ContractVariantEntry = {
   readonly value: string;
 };
 
+export type ContractValueObject = {
+  readonly fields: Record<string, ContractField>;
+};
+
 export type ModelStorageBase = Readonly<Record<string, unknown>>;
 
 /**
