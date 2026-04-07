@@ -165,6 +165,8 @@ type ContractBase = ContractType<
   readonly roots: { readonly tasks: 'Task'; readonly users: 'User' };
   readonly capabilities: {};
   readonly extensionPacks: {};
+  readonly meta: {};
+
   readonly profileHash: ProfileHash;
 };
 

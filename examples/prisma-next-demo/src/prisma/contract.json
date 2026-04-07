@@ -11,39 +11,42 @@
     "Post": {
       "fields": {
         "createdAt": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/timestamptz@1"
-          },
-          "nullable": false
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         },
         "embedding": {
+          "nullable": true,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/vector@1"
-          },
-          "nullable": true
+            "codecId": "pg/vector@1",
+            "kind": "scalar"
+          }
         },
         "id": {
+          "nullable": false,
           "type": {
+            "codecId": "sql/char@1",
             "kind": "scalar",
-            "codecId": "sql/char@1"
-          },
-          "nullable": false
+            "typeParams": {
+              "length": 36
+            }
+          }
         },
         "title": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
-          },
-          "nullable": false
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "userId": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
-          },
-          "nullable": false
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -84,32 +87,35 @@
     "User": {
       "fields": {
         "createdAt": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/timestamptz@1"
-          },
-          "nullable": false
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         },
         "email": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
-          },
-          "nullable": false
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "id": {
+          "nullable": false,
           "type": {
+            "codecId": "sql/char@1",
             "kind": "scalar",
-            "codecId": "sql/char@1"
-          },
-          "nullable": false
+            "typeParams": {
+              "length": 36
+            }
+          }
         },
         "kind": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/enum@1"
-          },
-          "nullable": false
+            "codecId": "pg/enum@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {

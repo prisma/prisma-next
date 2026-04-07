@@ -16,8 +16,8 @@
         "id": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
             "codecId": "sql/char@1",
+            "kind": "scalar",
             "typeParams": {
               "length": 36
             }
@@ -26,8 +26,8 @@
         "title": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
+            "codecId": "pg/text@1",
+            "kind": "scalar"
           }
         }
       },
@@ -49,22 +49,22 @@
         "body": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
+            "codecId": "pg/text@1",
+            "kind": "scalar"
           }
         },
         "id": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
           }
         },
         "postId": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
           }
         }
       },
@@ -89,29 +89,29 @@
         "id": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
           }
         },
         "title": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
+            "codecId": "pg/text@1",
+            "kind": "scalar"
           }
         },
         "userId": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
           }
         },
         "views": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
           }
         }
       },
@@ -164,22 +164,22 @@
         "bio": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
+            "codecId": "pg/text@1",
+            "kind": "scalar"
           }
         },
         "id": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
           }
         },
         "userId": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
           }
         }
       },
@@ -204,29 +204,29 @@
         "email": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
+            "codecId": "pg/text@1",
+            "kind": "scalar"
           }
         },
         "id": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
           }
         },
         "invitedById": {
           "nullable": true,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
           }
         },
         "name": {
           "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
+            "codecId": "pg/text@1",
+            "kind": "scalar"
           }
         }
       },
