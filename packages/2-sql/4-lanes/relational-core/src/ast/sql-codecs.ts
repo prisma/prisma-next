@@ -43,6 +43,10 @@ const sqlCharCodec = codec<
   decode: (wire: string): string => wire.trimEnd(),
   paramsSchema: lengthParamsSchema,
   init: createLengthTypeHelper('fixed'),
+  renderOutputType: (typeParams) => {
+    const length = typeParams['length'];
+    return typeof length === 'number' ? `Char<${length}>` : undefined;
+  },
 });
 
 const sqlVarcharCodec = codec<
@@ -58,6 +62,10 @@ const sqlVarcharCodec = codec<
   decode: (wire: string): string => wire,
   paramsSchema: lengthParamsSchema,
   init: createLengthTypeHelper('variable'),
+  renderOutputType: (typeParams) => {
+    const length = typeParams['length'];
+    return typeof length === 'number' ? `Varchar<${length}>` : undefined;
+  },
 });
 
 const sqlIntCodec = codec({
@@ -91,6 +99,10 @@ const sqlTimestampCodec = codec({
   encode: (value: string | Date): string => (value instanceof Date ? value.toISOString() : value),
   decode: (wire: string | Date): string => (wire instanceof Date ? wire.toISOString() : wire),
   paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => {
+    const precision = typeParams['precision'];
+    return typeof precision === 'number' ? `Timestamp<${precision}>` : 'Timestamp';
+  },
 });
 
 const codecs = defineCodecs()

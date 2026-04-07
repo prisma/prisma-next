@@ -201,6 +201,7 @@ export function codec<
   paramsSchema?: Type<TParams>;
   init?: (params: TParams) => THelper;
   traits?: TTraits;
+  renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }): Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
   const identity = (v: unknown) => v;
   return {
@@ -213,6 +214,7 @@ export function codec<
       'traits',
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
     ),
+    ...ifDefined('renderOutputType', config.renderOutputType),
     encode: config.encode,
     decode: config.decode,
     encodeJson: (config.encodeJson ?? identity) as (value: TJs) => JsonValue,

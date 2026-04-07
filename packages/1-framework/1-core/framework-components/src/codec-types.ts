@@ -33,6 +33,8 @@ export interface Codec<
   encodeJson(value: TJs): JsonValue;
   /** Converts a JSON representation back to the JS type. Called during contract loading via `validateContract`. */
   decodeJson(json: JsonValue): TJs;
+  /** Produces the TypeScript output type expression for a field given its `typeParams`. Used during contract.d.ts emission. */
+  renderOutputType?(typeParams: Record<string, unknown>): string | undefined;
 }
 
 export interface CodecLookup {
