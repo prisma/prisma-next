@@ -105,7 +105,7 @@ interface Codec<...> {
    *
    * Return undefined to use the default const literal serialization.
    */
-  renderTypeParams?(typeParams: Record<string, unknown>): Record<string, unknown> | undefined;
+  emitTypeParams?(typeParams: Record<string, unknown>): Record<string, unknown> | undefined;
 }
 ```
 
