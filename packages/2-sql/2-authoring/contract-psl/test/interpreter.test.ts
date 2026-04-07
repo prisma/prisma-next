@@ -530,6 +530,49 @@ model User {
     });
   });
 
+  it('emits nested value object references within composite types', () => {
+    const document = parsePslDocument({
+      schema: `type Address {
+  street String
+  city String
+}
+
+type ShippingInfo {
+  address Address
+  notes String
+}
+
+model Order {
+  id Int @id
+  ship ShippingInfo
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.valueObjects).toEqual({
+      Address: {
+        fields: {
+          street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+          city: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+        },
+      },
+      ShippingInfo: {
+        fields: {
+          address: { nullable: false, type: { kind: 'valueObject', name: 'Address' } },
+          notes: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+        },
+      },
+    });
+  });
+
   it('omits valueObjects from contract when no composite types exist', () => {
     const document = parsePslDocument({
       schema: `model User {

@@ -695,10 +695,19 @@ function buildValueObjects(
   sourceId: string,
 ): Record<string, ContractValueObject> {
   const valueObjects: Record<string, ContractValueObject> = {};
+  const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
 
   for (const compositeType of compositeTypes) {
     const fields: Record<string, ContractField> = {};
     for (const field of compositeType.fields) {
+      if (compositeTypeNames.has(field.typeName)) {
+        const result: ContractField = {
+          type: { kind: 'valueObject', name: field.typeName },
+          nullable: field.optional,
+        };
+        fields[field.name] = field.list ? { ...result, many: true } : result;
+        continue;
+      }
       const descriptor = resolveColumnDescriptor(
         field,
         enumTypeDescriptors as Map<string, ColumnDescriptor>,
