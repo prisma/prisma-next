@@ -2,7 +2,18 @@ import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoAstNode } from './ast-node';
 import type { MongoFilterExpr } from './filter-expressions';
 import type { RawMongoCommand } from './raw-commands';
-import type { MongoPipelineStage } from './stages';
+import type {
+  MongoAddFieldsStage,
+  MongoPipelineStage,
+  MongoProjectStage,
+  MongoReplaceRootStage,
+} from './stages';
+
+export type MongoUpdatePipelineStage =
+  | MongoAddFieldsStage
+  | MongoProjectStage
+  | MongoReplaceRootStage;
+export type MongoUpdateSpec = Record<string, MongoValue> | ReadonlyArray<MongoUpdatePipelineStage>;
 
 export class InsertOneCommand extends MongoAstNode {
   readonly kind = 'insertOne' as const;
@@ -21,9 +32,9 @@ export class UpdateOneCommand extends MongoAstNode {
   readonly kind = 'updateOne' as const;
   readonly collection: string;
   readonly filter: MongoFilterExpr;
-  readonly update: Record<string, MongoValue>;
+  readonly update: MongoUpdateSpec;
 
-  constructor(collection: string, filter: MongoFilterExpr, update: Record<string, MongoValue>) {
+  constructor(collection: string, filter: MongoFilterExpr, update: MongoUpdateSpec) {
     super();
     this.collection = collection;
     this.filter = filter;
@@ -62,9 +73,9 @@ export class UpdateManyCommand extends MongoAstNode {
   readonly kind = 'updateMany' as const;
   readonly collection: string;
   readonly filter: MongoFilterExpr;
-  readonly update: Record<string, MongoValue>;
+  readonly update: MongoUpdateSpec;
 
-  constructor(collection: string, filter: MongoFilterExpr, update: Record<string, MongoValue>) {
+  constructor(collection: string, filter: MongoFilterExpr, update: MongoUpdateSpec) {
     super();
     this.collection = collection;
     this.filter = filter;
@@ -90,13 +101,13 @@ export class FindOneAndUpdateCommand extends MongoAstNode {
   readonly kind = 'findOneAndUpdate' as const;
   readonly collection: string;
   readonly filter: MongoFilterExpr;
-  readonly update: Record<string, MongoValue>;
+  readonly update: MongoUpdateSpec;
   readonly upsert: boolean;
 
   constructor(
     collection: string,
     filter: MongoFilterExpr,
-    update: Record<string, MongoValue>,
+    update: MongoUpdateSpec,
     upsert: boolean,
   ) {
     super();

@@ -7,6 +7,9 @@ import {
   FindOneAndUpdateCommand,
   InsertManyCommand,
   InsertOneCommand,
+  MongoAddFieldsStage,
+  MongoAggFieldRef,
+  MongoAggLiteral,
   MongoFieldFilter,
   MongoMatchStage,
   MongoProjectStage,
@@ -71,6 +74,41 @@ describe('MongoAdapter', () => {
       const wire = narrowWire(adapter.lower(plan('users', command)), 'updateOne');
       expect(wire.filter).toEqual({ _id: { $eq: 'id-123' } });
       expect(wire.update).toEqual({ $set: { name: 'Charlie' } });
+    });
+
+    it('lowers pipeline-style update', () => {
+      const command = new UpdateOneCommand(
+        'users',
+        MongoFieldFilter.eq('_id', new MongoParamRef('id-123')),
+        [new MongoAddFieldsStage({ fullName: MongoAggFieldRef.of('name') })],
+      );
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'updateOne');
+      expect(wire.update).toEqual([{ $addFields: { fullName: '$name' } }]);
+    });
+  });
+
+  describe('UpdateManyCommand with pipeline-style update', () => {
+    it('lowers pipeline-style update', () => {
+      const command = new UpdateManyCommand('users', MongoFieldFilter.eq('active', true), [
+        new MongoAddFieldsStage({
+          lastSeen: MongoAggLiteral.of(new Date('2026-01-01').toISOString()),
+        }),
+      ]);
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'updateMany');
+      expect(wire.update).toEqual([{ $addFields: { lastSeen: '2026-01-01T00:00:00.000Z' } }]);
+    });
+  });
+
+  describe('FindOneAndUpdateCommand with pipeline-style update', () => {
+    it('lowers pipeline-style update', () => {
+      const command = new FindOneAndUpdateCommand(
+        'users',
+        MongoFieldFilter.eq('_id', new MongoParamRef('id-1')),
+        [new MongoProjectStage({ name: 1, email: 1 })],
+        false,
+      );
+      const wire = narrowWire(adapter.lower(plan('users', command)), 'findOneAndUpdate');
+      expect(wire.update).toEqual([{ $project: { name: 1, email: 1 } }]);
     });
   });
 

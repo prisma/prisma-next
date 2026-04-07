@@ -1,5 +1,5 @@
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
-import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
+import type { MongoQueryPlan, MongoUpdateSpec } from '@prisma-next/mongo-query-ast';
 import type { Document, MongoExpr } from '@prisma-next/mongo-value';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import {
@@ -13,7 +13,7 @@ import {
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
-import { lowerFilter, lowerPipeline } from './lowering';
+import { lowerFilter, lowerPipeline, lowerStage } from './lowering';
 import { resolveValue } from './resolve-value';
 
 function resolveDocument(expr: MongoExpr): Document {
@@ -22,6 +22,13 @@ function resolveDocument(expr: MongoExpr): Document {
     result[key] = resolveValue(val);
   }
   return result;
+}
+
+function lowerUpdate(update: MongoUpdateSpec): Document | ReadonlyArray<Document> {
+  if (Array.isArray(update)) {
+    return update.map((stage) => lowerStage(stage));
+  }
+  return resolveDocument(update);
 }
 
 class MongoAdapterImpl implements MongoAdapter {
@@ -34,7 +41,7 @@ class MongoAdapterImpl implements MongoAdapter {
         return new UpdateOneWireCommand(
           command.collection,
           lowerFilter(command.filter),
-          resolveDocument(command.update),
+          lowerUpdate(command.update),
         );
       case 'insertMany':
         return new InsertManyWireCommand(
@@ -45,7 +52,7 @@ class MongoAdapterImpl implements MongoAdapter {
         return new UpdateManyWireCommand(
           command.collection,
           lowerFilter(command.filter),
-          resolveDocument(command.update),
+          lowerUpdate(command.update),
         );
       case 'deleteOne':
         return new DeleteOneWireCommand(command.collection, lowerFilter(command.filter));
@@ -55,7 +62,7 @@ class MongoAdapterImpl implements MongoAdapter {
         return new FindOneAndUpdateWireCommand(
           command.collection,
           lowerFilter(command.filter),
-          resolveDocument(command.update),
+          lowerUpdate(command.update),
           command.upsert,
         );
       case 'findOneAndDelete':
