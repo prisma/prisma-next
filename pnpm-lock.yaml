@@ -1035,6 +1035,9 @@ importers:
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../../4-query/query-ast
+      '@prisma-next/mongo-value':
+        specifier: workspace:*
+        version: link:../../1-foundation/mongo-value
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
