@@ -61,11 +61,8 @@ Clean, well-structured extension of the MongoDB query AST that adds 14 new pipel
 
 - **Location:** [packages/2-mongo-family/5-query-builders/pipeline-builder/test/builder.test-d.ts](packages/2-mongo-family/5-query-builders/pipeline-builder/test/builder.test-d.ts) — lines 11–14
 - **Issue:** The existing type test only checks `expectTypeOf(plan).toMatchTypeOf<MongoQueryPlan>()` — the default `Row = unknown` parameter. It never asserts that `build()` carries a specific `Row` type, or that `MongoRuntime.execute(plan)` returns typed rows. Consequently, there is no compile-time guard that the pipeline DSL's type-safety promise actually holds at the point a user consumes query results. The demo app (`examples/mongo-demo/src/server.ts`) confirms that `(await runtime.execute(plan))[0].author` resolves to `unknown` — all row fields are untyped.
-- **Severity:** High — this is the core value proposition of a "type-safe aggregation pipeline DSL". Without a type test anchoring the `build()` → `execute()` → typed result contract, the type flow can silently break (and has).
-- **Suggestion:** Add type-level tests in `builder.test-d.ts` that:
-  1. Assert `build()` produces `MongoQueryPlan<{ _id: string; total: number; ... }>` (not just `MongoQueryPlan`).
-  2. Assert `runtime.execute(plan)` returns `AsyncIterableResult<{ _id: string; ... }>`.
-  3. Assert that post-`group`, post-`addFields`, and post-`lookup` shapes resolve to concrete field types (not `unknown`).
+- **Severity:** Blocking — this is the core value proposition of a "type-safe aggregation pipeline DSL". Without a type test anchoring the `build()` → `execute()` → typed result contract, the type flow can silently break (and has).
+- **Resolution:** New acceptance criteria added to the spec ("Pipeline DSL row-type safety" section) requiring rigorous type-level tests for every pipeline transformation, operation, and expression — verifying that **resolved row types** (concrete field types after `ResolveRow`) are correct, not just shape keys. See the spec for the full checklist.
 
 ## Deferred (Out of Scope)
 
