@@ -233,6 +233,10 @@ export function lowerStage(stage: MongoReadStage): Record<string, unknown> {
       return { $sample: { size: stage.size } };
     case 'redact':
       return { $redact: lowerAggExpr(stage.expr) };
+    default: {
+      const _exhaustive: never = stage;
+      throw new Error(`Unhandled stage kind: ${(_exhaustive as MongoReadStage).kind}`);
+    }
   }
 }
 

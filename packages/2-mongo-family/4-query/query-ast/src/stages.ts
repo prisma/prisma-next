@@ -10,6 +10,10 @@ import type {
 export type MongoGroupId = null | MongoAggExpr | Readonly<Record<string, MongoAggExpr>>;
 export type MongoProjectionValue = 0 | 1 | MongoAggExpr;
 
+// Structural guard: MongoAggExpr nodes always carry a `kind` string discriminant,
+// while scalar projection values (0 | 1) are numbers. This convention holds for all
+// current AST node types. If non-node objects with `kind` are introduced in the future,
+// consider a shared branded isAggExprNode() guard.
 function isAggExpr(value: MongoProjectionValue): value is MongoAggExpr {
   return typeof value === 'object' && value !== null && 'kind' in value;
 }
@@ -173,6 +177,11 @@ export class MongoLookupStage extends MongoStageNode {
     let_?: Record<string, MongoAggExpr>;
   }) {
     super();
+    if (!options.localField && !options.foreignField && !options.pipeline && !options.let_) {
+      throw new Error(
+        'MongoLookupStage requires either equality fields (localField/foreignField) or a pipeline',
+      );
+    }
     this.from = options.from;
     this.localField = options.localField;
     this.foreignField = options.foreignField;
@@ -250,6 +259,10 @@ export class MongoGroupStage extends MongoStageNode {
     if (!rewriter) return this;
     const newAccumulators: Record<string, MongoAggAccumulator> = {};
     for (const [key, acc] of Object.entries(this.accumulators)) {
+      // MongoAggAccumulator.rewrite() returns MongoAggExpr (the base union). The cast is safe
+      // because the default rewriter rebuilds an accumulator from its rewritten arg. A custom
+      // accumulator() hook could technically return a non-accumulator — narrowing the return type
+      // on MongoAggAccumulator.rewrite() is tracked as a follow-up for the agg expression AST.
       newAccumulators[key] = acc.rewrite(rewriter) as MongoAggAccumulator;
     }
     return new MongoGroupStage(rewriteGroupId(this.groupId, rewriter), newAccumulators);
