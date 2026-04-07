@@ -316,4 +316,149 @@ describe('mongoEmission.generateContractTypes', () => {
       expect(types).toContain('readonly collections: Record<string, never>');
     });
   });
+
+  describe('value object type generation', () => {
+    it('emits named value object type aliases', () => {
+      const contract = createMongoContract({
+        models: {
+          User: {
+            fields: {
+              _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+            },
+            relations: {},
+            storage: { collection: 'users' },
+          },
+        },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+              city: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
+          },
+        },
+        storage: { collections: { users: {} } },
+      });
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      expect(types).toContain('export type Address =');
+      expect(types).toContain("readonly street: CodecTypes['mongo/string@1']['output']");
+      expect(types).toContain("readonly city: CodecTypes['mongo/string@1']['output']");
+    });
+
+    it('emits valueObjects descriptor on ContractBase', () => {
+      const contract = createMongoContract({
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
+          },
+        },
+      });
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      expect(types).toContain('readonly valueObjects:');
+      expect(types).toContain('readonly Address: { readonly fields:');
+    });
+
+    it('emits model field with valueObject kind', () => {
+      const contract = createMongoContract({
+        models: {
+          User: {
+            fields: {
+              _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+              homeAddress: {
+                nullable: true,
+                type: { kind: 'valueObject', name: 'Address' },
+              },
+            },
+            relations: {},
+            storage: { collection: 'users' },
+          },
+        },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
+          },
+        },
+        storage: { collections: { users: {} } },
+      });
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      expect(types).toContain(
+        "readonly homeAddress: { readonly nullable: true; readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' } }",
+      );
+    });
+
+    it('handles many: true on value object model fields', () => {
+      const contract = createMongoContract({
+        models: {
+          User: {
+            fields: {
+              _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+              previousAddresses: {
+                nullable: false,
+                type: { kind: 'valueObject', name: 'Address' },
+                many: true,
+              },
+            },
+            relations: {},
+            storage: { collection: 'users' },
+          },
+        },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
+          },
+        },
+        storage: { collections: { users: {} } },
+      });
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      expect(types).toContain(
+        "readonly previousAddresses: { readonly nullable: false; readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' }; readonly many: true }",
+      );
+    });
+
+    it('handles self-referencing value object type alias', () => {
+      const contract = createMongoContract({
+        valueObjects: {
+          NavItem: {
+            fields: {
+              label: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+              children: {
+                nullable: false,
+                type: { kind: 'valueObject', name: 'NavItem' },
+                many: true,
+              },
+            },
+          },
+        },
+      });
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      expect(types).toContain('export type NavItem =');
+      expect(types).toContain('readonly children: ReadonlyArray<NavItem>');
+    });
+
+    it('emits empty valueObjects when none exist', () => {
+      const contract = createMongoContract();
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      expect(types).toContain('readonly valueObjects: Record<string, never>');
+    });
+
+    it('emits nullable value object type alias field', () => {
+      const contract = createMongoContract({
+        valueObjects: {
+          Address: {
+            fields: {
+              zip: { nullable: true, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
+          },
+        },
+      });
+      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      expect(types).toContain("readonly zip: CodecTypes['mongo/string@1']['output'] | null");
+    });
+  });
 });

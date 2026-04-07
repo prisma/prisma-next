@@ -1050,4 +1050,202 @@ describe('sql-target-family-hook', () => {
     const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
     expect(types).not.toContain('readonly execution');
   });
+
+  describe('value object type generation', () => {
+    it('emits named value object type aliases', () => {
+      const ir = createContract({
+        models: {
+          User: {
+            storage: { table: 'user', fields: { id: { column: 'id' } } },
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+            },
+            relations: {},
+          },
+        },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+              city: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            },
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      });
+      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      expect(types).toContain('export type Address =');
+      expect(types).toContain("readonly street: CodecTypes['pg/text@1']['output']");
+      expect(types).toContain("readonly city: CodecTypes['pg/text@1']['output']");
+    });
+
+    it('emits valueObjects descriptor on ContractBase', () => {
+      const ir = createContract({
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            },
+          },
+        },
+        storage: { tables: {} },
+      });
+      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      expect(types).toContain('readonly valueObjects:');
+      expect(types).toContain('readonly Address: { readonly fields:');
+    });
+
+    it('emits model fields referencing value objects with valueObject kind', () => {
+      const ir = createContract({
+        models: {
+          User: {
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+                homeAddress: { column: 'home_address' },
+              },
+            },
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              homeAddress: {
+                nullable: true,
+                type: { kind: 'valueObject', name: 'Address' },
+              },
+            },
+            relations: {},
+          },
+        },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            },
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                home_address: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: true },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      });
+      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      expect(types).toContain(
+        "readonly homeAddress: { readonly nullable: true; readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' } }",
+      );
+    });
+
+    it('handles many: true on value object model fields', () => {
+      const ir = createContract({
+        models: {
+          User: {
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+                addresses: { column: 'addresses' },
+              },
+            },
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              addresses: {
+                nullable: false,
+                type: { kind: 'valueObject', name: 'Address' },
+                many: true,
+              },
+            },
+            relations: {},
+          },
+        },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            },
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                addresses: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      });
+      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      expect(types).toContain(
+        "readonly addresses: { readonly nullable: false; readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' }; readonly many: true }",
+      );
+    });
+
+    it('handles self-referencing value object type alias', () => {
+      const ir = createContract({
+        valueObjects: {
+          NavItem: {
+            fields: {
+              label: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+              children: {
+                nullable: false,
+                type: { kind: 'valueObject', name: 'NavItem' },
+                many: true,
+              },
+            },
+          },
+        },
+        storage: { tables: {} },
+      });
+      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      expect(types).toContain('export type NavItem =');
+      expect(types).toContain('readonly children: ReadonlyArray<NavItem>');
+    });
+
+    it('emits empty valueObjects when none exist', () => {
+      const ir = createContract({
+        storage: { tables: {} },
+      });
+      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      expect(types).toContain('readonly valueObjects: Record<string, never>');
+    });
+
+    it('emits nullable value object type alias field', () => {
+      const ir = createContract({
+        valueObjects: {
+          Address: {
+            fields: {
+              zip: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            },
+          },
+        },
+        storage: { tables: {} },
+      });
+      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      expect(types).toContain("readonly zip: CodecTypes['pg/text@1']['output'] | null");
+    });
+  });
 });

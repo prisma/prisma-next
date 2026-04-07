@@ -1,6 +1,7 @@
-import type { Contract, ContractModel } from '@prisma-next/contract/types';
+import type { Contract, ContractField, ContractModel } from '@prisma-next/contract/types';
 import {
   generateCodecTypeIntersection,
+  generateContractFieldDescriptor,
   serializeObjectKey,
   serializeValue,
 } from '@prisma-next/emitter/domain-type-generation';
@@ -22,6 +23,14 @@ function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined)
   }
 
   return `{ ${entries.join('; ')} }`;
+}
+
+function isNonScalarField(field: unknown): field is ContractField {
+  if (typeof field !== 'object' || field === null) return false;
+  const f = field as Record<string, unknown>;
+  if (typeof f['type'] !== 'object' || f['type'] === null) return false;
+  const t = f['type'] as Record<string, unknown>;
+  return t['kind'] !== 'scalar';
 }
 
 export const sqlEmission = {
@@ -315,16 +324,24 @@ export const sqlEmission = {
       const tableName = model.storage.table;
       const table = storage.tables[tableName];
 
-      const storageFields = model.storage.fields;
+      const storageFields = model.storage.fields ?? {};
+      const domainFields = model.fields as Record<string, ContractField> | undefined;
       if (table) {
         for (const [fieldName, field] of Object.entries(storageFields)) {
+          storageFieldParts.push(
+            `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
+          );
+
+          const domainField = domainFields?.[fieldName];
+          if (isNonScalarField(domainField)) {
+            fields.push(generateContractFieldDescriptor(fieldName, domainField));
+            continue;
+          }
+
           const column = table.columns[field.column];
           if (!column) {
             fields.push(
               `readonly ${fieldName}: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'unknown' } }`,
-            );
-            storageFieldParts.push(
-              `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
             );
             continue;
           }
@@ -352,17 +369,21 @@ export const sqlEmission = {
               `readonly ${fieldName}: { readonly nullable: ${nullable}; readonly type: { readonly kind: 'scalar'; readonly codecId: ${serializeValue(column.codecId)}${fieldTypeParamsSpec} } }`,
             );
           }
-          storageFieldParts.push(
-            `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
-          );
         }
       } else {
         for (const [fieldName, field] of Object.entries(storageFields)) {
-          fields.push(
-            `readonly ${fieldName}: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'unknown' } }`,
-          );
           storageFieldParts.push(
             `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
+          );
+
+          const domainField = domainFields?.[fieldName];
+          if (isNonScalarField(domainField)) {
+            fields.push(generateContractFieldDescriptor(fieldName, domainField));
+            continue;
+          }
+
+          fields.push(
+            `readonly ${fieldName}: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'unknown' } }`,
           );
         }
       }
