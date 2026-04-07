@@ -11,14 +11,14 @@ Move output type rendering onto codecs, emit resolved output types into a dedica
 
 ## Prerequisites
 
-- **TML-2206** (value objects & embedded documents) must land first. It restructures `ContractField` into a discriminated union with `ScalarFieldType` (which carries `typeParams`) and introduces `generateFieldResolvedType` in the framework emitter.
+- **TML-2206** (value objects & embedded documents) must land first. It restructures `ContractField` so its `type` field is a discriminated union (`ContractFieldType = ScalarFieldType | ValueObjectFieldType | UnionFieldType`), where `ScalarFieldType` carries `codecId` and `typeParams`. It also introduces `generateFieldResolvedType` in the framework emitter, which resolves the output type for all three field kinds.
 - **TML-2215** (bug fix) has landed — `typeParams` and `typeRef` are emitted on storage columns and model fields.
 
 ## Design
 
 ### Two concepts, two locations
 
-**Codec field configuration** — `typeParams` on the `ContractField`. How the codec is configured for this field. Runtime data, JSON-serializable, identical in `contract.json` and `contract.d.ts`.
+**Codec field configuration** — `typeParams` on `ScalarFieldType` (accessed via `field.type.typeParams`). How the codec is configured for this field. Runtime data, JSON-serializable, identical in `contract.json` and `contract.d.ts`.
 
 **Field output type** — entry in the `FieldOutputTypes` map. What TypeScript type the field produces. Determined by the codec and its configuration.
 
@@ -124,7 +124,7 @@ Non-parameterized codecs (e.g., `pg/int4@1`, `pg/text@1`, `pg/bool@1`) don't nee
 
 ### `typeParams` stays truthful
 
-The `typeParams` on `ContractField` in `contract.d.ts` is always serialized from the runtime value — same as `contract.json`. For Vector: `{ readonly length: 1536 }`. For JSONB: `{ readonly schemaJson: { ... } }`. No transformations, no phantom types.
+The `typeParams` on `ScalarFieldType` (i.e. `field.type.typeParams`) in `contract.d.ts` is always serialized from the runtime value — same as `contract.json`. For Vector: `{ readonly length: 1536 }`. For JSONB: `{ readonly schemaJson: { ... } }`. No transformations, no phantom types.
 
 This means `ContractModelBase.fields` can be tightened back to `Record<string, ContractField>`. The widening to `Record<string, unknown>` (with its explanatory doc comment about "rendered types") was only needed because renderers replaced the field shape.
 
@@ -140,13 +140,16 @@ After TML-2206, model fields are self-contained — they carry resolved `codecId
 
 ### Framework emitter changes
 
-The framework emitter's field generation in `generateContractDts`:
+TML-2206 introduced `generateFieldResolvedType` in `domain-type-generation.ts`, which already resolves the output type for all three field kinds: scalar → `CodecTypes[codecId]['output']`, value object → name reference, union → members joined. It also handles `many`, `dict`, and `nullable` modifiers.
 
-1. For each model, for each field, reads `codecId` and `typeParams`
-2. Looks up the codec via `CodecLookup` (added to emission pipeline)
-3. Calls `codec.renderOutputType(typeParams)` if present; otherwise emits a type-level reference to `CodecTypes[codecId]['output']`
+This function is extended with codec dispatch for scalars. When a `CodecLookup` is provided:
+
+1. For scalar fields with `typeParams`, looks up the codec via `CodecLookup`
+2. Calls `codec.renderOutputType(field.type.typeParams)` if present
+3. Uses the returned string as the output type expression (falling back to `CodecTypes[codecId]['output']` as before)
 4. Stamps the result into `FieldOutputTypes`
-5. Serializes `typeParams` truthfully as const literals on the field (existing behavior from TML-2206)
+
+Value object and union fields pass through unchanged — their output types don't depend on codecs.
 
 The emitter generates the `FieldOutputTypes` map as a new `export type` in `contract.d.ts`.
 
@@ -161,10 +164,10 @@ Descriptor metadata needs a new contribution point: `types.codecTypes.codecs` (a
 ### `ComputeColumnJsType` simplification
 
 Today, `ComputeColumnJsType` in `relational-core/src/types.ts` is a ~50-line conditional type that:
-1. Tries `ExtractColumnJsTypeFromModels` (model fields → `CodecTypes[codecId]['output']`)
+1. Tries `ExtractColumnJsTypeFromModels` → `ResolveModelFieldToJsType`, which branches on `field.type.kind`: scalar → `CodecTypes[codecId]['output']`, valueObject → `ResolveValueObjectJsType`, union → `unknown`
 2. Falls back to storage column resolution with `ExtractParameterizedCodecOutputType`
 
-After this change, it reads from `FieldOutputTypes[ModelName][FieldName]`. The `ExtractParameterizedCodecOutputType` branch and `ResolveColumnTypeParams` helper are deleted. The model-field-to-`CodecTypes` dispatch is replaced by a direct map lookup.
+After this change, it reads from `FieldOutputTypes[ModelName][FieldName]`. The `ExtractParameterizedCodecOutputType` branch, `ResolveColumnTypeParams`, and `ResolveModelFieldToJsType` helpers are deleted. The entire chain is replaced by a direct map lookup, since `FieldOutputTypes` already contains resolved types for all field kinds (scalar, value object, union) with `many`/`dict`/`nullable` modifiers applied.
 
 ### No-emit path
 
@@ -192,7 +195,7 @@ The phantom `schema` key on `TypedColumnDescriptor` (used by `parameterizedOutpu
 | SQL emitter's `generateModelsType` override | `sql-contract-emitter/src/index.ts` |
 | `parameterizedOutput` on `CodecTypes` entries | `adapter-postgres/src/exports/codec-types.ts`, `pgvector/src/types/codec-types.ts` |
 | `ResolveStandardSchemaOutput`, compile-time `StandardSchemaLike` | `adapter-postgres/src/exports/codec-types.ts` |
-| `ExtractParameterizedCodecOutputType` | `relational-core/src/types.ts` |
+| `ExtractParameterizedCodecOutputType`, `ResolveModelFieldToJsType`, `ResolveValueObjectJsType` | `relational-core/src/types.ts` |
 | Phantom `schema` key on `TypedColumnDescriptor` | `adapter-postgres/src/exports/column-types.ts` |
 
 ## `typeImports` remain on descriptor metadata
@@ -211,7 +214,7 @@ Adapters and extensions still contribute import specs for types referenced by re
 
 **Emit path:**
 1. Emitter looks up `pg/vector@1` codec, calls `renderOutputType({ length: 1536 })` → `'Vector<1536>'`
-2. Emitted d.ts field: `{ readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }`
+2. Emitted d.ts field: `{ readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1'; readonly typeParams: { readonly length: 1536 } } }`
 3. Emitted `FieldOutputTypes`: `readonly embedding: Vector<1536>`
 
 **No-emit path:**
@@ -229,7 +232,7 @@ const payloadSchema = arktype({ action: 'string', actorId: 'number' });
 
 **Emit path:**
 1. Emitter looks up `pg/jsonb@1` codec, calls `renderOutputType({ schemaJson: { ... } })` → `'{ action: string; actorId: number }'`
-2. Emitted d.ts field: `{ readonly codecId: 'pg/jsonb@1'; readonly nullable: false; readonly typeParams: { readonly schemaJson: { ... } } }` (truthful)
+2. Emitted d.ts field: `{ readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1'; readonly typeParams: { readonly schemaJson: { ... } } } }` (truthful)
 3. Emitted `FieldOutputTypes`: `readonly payload: { action: string; actorId: number }`
 
 **No-emit path:**
@@ -246,7 +249,7 @@ const payloadSchema = arktype({ action: 'string', actorId: 'number' });
 
 **Emit path:**
 1. Emitter looks up `pg/enum@1` codec, calls `renderOutputType({ values: ['USER', 'ADMIN'] })` → `"'USER' | 'ADMIN'"`
-2. Emitted d.ts field: `{ readonly codecId: 'pg/enum@1'; readonly nullable: false; readonly typeParams: { readonly values: readonly ['USER', 'ADMIN'] } }`
+2. Emitted d.ts field: `{ readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/enum@1'; readonly typeParams: { readonly values: readonly ['USER', 'ADMIN'] } } }`
 3. Emitted `FieldOutputTypes`: `readonly role: 'USER' | 'ADMIN'`
 
 ### Non-parameterized column
@@ -259,7 +262,7 @@ const payloadSchema = arktype({ action: 'string', actorId: 'number' });
 
 **Emit path:**
 1. `pg/text@1` codec has no `renderOutputType` → emitter emits a reference to `CodecTypes['pg/text@1']['output']`
-2. Emitted d.ts field: `{ readonly codecId: 'pg/text@1'; readonly nullable: false }`
+2. Emitted d.ts field: `{ readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' } }`
 3. Emitted `FieldOutputTypes`: `readonly email: string` (resolved via `CodecTypes` reference)
 
 ## Open questions

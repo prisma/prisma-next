@@ -123,19 +123,26 @@ Add a new extraction function that collects codec instances from adapter and ext
 
 Add `codecLookup` to the `ControlStack` interface and wire it in `createControlStack`.
 
-### 2.3 Generate `FieldOutputTypes` in the framework emitter
+### 2.3 Extend `generateFieldResolvedType` with codec dispatch
 
 **File:** `packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts`
 
-Add a new function `generateFieldOutputTypesMap` that:
+TML-2206 introduced `generateFieldResolvedType(field: ContractField): string`, which already handles all three field kinds:
+- Scalar → `CodecTypes[codecId]['output']`
+- ValueObject → name reference
+- Union → members joined with `|`
+- Plus `many`, `dict`, `nullable` modifiers
 
-1. Iterates models and their fields
-2. For each field, reads `codecId` and `typeParams`
-3. Looks up the codec via `CodecLookup`
-4. Calls `codec.renderOutputType(typeParams)` if available
-5. Falls back to `CodecTypes[codecId]['output']` as a type reference (e.g., emits the string `CodecTypes['pg/int4@1']['output']`)
-6. Validates the rendered string via `isSafeTypeExpression`
-7. Returns the full map type expression
+Extend this function to accept an optional `CodecLookup`. For scalar fields with `typeParams`, when a `CodecLookup` is provided:
+
+1. Look up the codec via `codecLookup.get(field.type.codecId)`
+2. If the codec has `renderOutputType`, call it with `field.type.typeParams`
+3. If it returns a string, validate via `isSafeTypeExpression`, then use it as the output type
+4. Otherwise fall back to `CodecTypes[codecId]['output']` (existing behavior)
+
+Value object and union fields pass through unchanged.
+
+Add a new function `generateFieldOutputTypesMap` that iterates models and their fields, calls the extended `generateFieldResolvedType` for each, and returns the full map type expression.
 
 ### 2.4 Emit the map in `generateContractDts`
 
@@ -211,7 +218,9 @@ Add E2E tests that emit a contract and verify the `FieldOutputTypes` export exis
 
 **File:** `packages/2-sql/4-lanes/relational-core/src/types.ts`
 
-Replace the ~50-line conditional type with a map lookup:
+Today, `ComputeColumnJsType` first tries `ExtractColumnJsTypeFromModels` → `ResolveModelFieldToJsType` (which branches on `field.type.kind`: scalar → `CodecTypes[codecId]['output']`, valueObject → `ResolveValueObjectJsType`, union → `unknown`), then falls back to storage column resolution with `ExtractParameterizedCodecOutputType`.
+
+Replace the entire chain with a map lookup:
 
 ```typescript
 export type ComputeColumnJsType<
@@ -223,9 +232,9 @@ export type ComputeColumnJsType<
 > = ExtractFieldOutputTypeForColumn<TContract, TableName, ColumnName>;
 ```
 
-Where `ExtractFieldOutputTypeForColumn` resolves `Table → Model → Field` and reads from `FieldOutputTypes[ModelName][FieldName]`.
+Where `ExtractFieldOutputTypeForColumn` resolves `Table → Model → Field` and reads from `FieldOutputTypes[ModelName][FieldName]`. Since `FieldOutputTypes` already contains resolved types for all field kinds with `many`/`dict`/`nullable` modifiers applied, the entire `ResolveModelFieldToJsType` chain is redundant.
 
-Delete: `ExtractParameterizedCodecOutputType`, `ResolveColumnTypeParams`, `ResolveModelFieldToJsType` (or simplify if needed for backward compat with callers).
+Delete: `ExtractParameterizedCodecOutputType`, `ResolveColumnTypeParams`, `ResolveModelFieldToJsType`, `ResolveValueObjectJsType` (these are all replaced by the map lookup).
 
 ### 3.2 Tighten `ContractModelBase.fields`
 
@@ -343,7 +352,7 @@ Remove all code that is now redundant. This is the largest single diff but all b
 
 ### 5.6 Verify no remaining references
 
-Grep for: `parameterizedRenderers`, `TypeRenderEntry`, `NormalizedTypeRenderer`, `normalizeRenderer`, `interpolateTypeTemplate`, `parameterizedOutput`, `ExtractParameterizedCodecOutputType`, `RenderTypeContext`, `ParameterizedCodecDescriptor`, phantom `schema` key — no remaining references in source code (excluding docs and ADR historical context).
+Grep for: `parameterizedRenderers`, `TypeRenderEntry`, `NormalizedTypeRenderer`, `normalizeRenderer`, `interpolateTypeTemplate`, `parameterizedOutput`, `ExtractParameterizedCodecOutputType`, `ResolveModelFieldToJsType`, `ResolveValueObjectJsType`, `RenderTypeContext`, `ParameterizedCodecDescriptor`, phantom `schema` key — no remaining references in source code (excluding docs and ADR historical context).
 
 ### Packages touched
 

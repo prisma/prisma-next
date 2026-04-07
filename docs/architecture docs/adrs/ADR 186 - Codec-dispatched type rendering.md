@@ -25,14 +25,20 @@ The contract's model fields stay truthful — `typeParams` matches the runtime d
 readonly User: {
   readonly fields: {
     readonly embedding: {
-      readonly codecId: 'pg/vector@1';
       readonly nullable: false;
-      readonly typeParams: { readonly length: 1536 };
+      readonly type: {
+        readonly kind: 'scalar';
+        readonly codecId: 'pg/vector@1';
+        readonly typeParams: { readonly length: 1536 };
+      };
     };
     readonly payload: {
-      readonly codecId: 'pg/jsonb@1';
       readonly nullable: false;
-      readonly typeParams: { readonly schemaJson: { readonly type: 'object'; ... } };
+      readonly type: {
+        readonly kind: 'scalar';
+        readonly codecId: 'pg/jsonb@1';
+        readonly typeParams: { readonly schemaJson: { readonly type: 'object'; ... } };
+      };
     };
   };
 };
@@ -40,7 +46,7 @@ readonly User: {
 
 Two distinct concepts, two distinct locations:
 
-- **Codec field configuration** (`typeParams` on the field) — how the codec is configured for this field. Runtime data, JSON-serializable, same in `contract.json` and `contract.d.ts`.
+- **Codec field configuration** (`typeParams` on `ScalarFieldType`, accessed via `field.type.typeParams`) — how the codec is configured for this field. Runtime data, JSON-serializable, same in `contract.json` and `contract.d.ts`.
 - **Field output type** (`FieldOutputTypes` map) — what TypeScript type this field produces. Determined by the codec and its configuration.
 
 ## Context
@@ -60,7 +66,7 @@ The fourth representation — the TypeScript output type in `contract.d.ts` — 
 
 The problems this causes:
 
-- **Renderers replace the entire field in contract.d.ts.** When a parameterized renderer fires, it emits `readonly payload: AuditPayload` — a raw type expression — instead of preserving the structural `ContractField` shape. Code that expects model fields to have `{ nullable, codecId, typeParams }` breaks.
+- **Renderers replace the entire field in contract.d.ts.** When a parameterized renderer fires, it emits `readonly payload: AuditPayload` — a raw type expression — instead of preserving the structural `ContractField` shape. Code that expects model fields to have `{ nullable, type: { kind, codecId, typeParams } }` breaks.
 
 - **Renderers are registered in descriptor metadata, not on the codec.** The codec owns every other representation of the type. Type rendering is an outlier.
 
@@ -92,7 +98,7 @@ The no-emit contract builder produces the same map. When you write `.column('emb
 
 ### `typeParams` stays truthful
 
-The `typeParams` on a `ContractField` always matches the runtime value in `contract.json`. For Vector: `{ length: 1536 }`. For JSONB with schema: `{ schemaJson: { ... } }`. The emitter never transforms or replaces `typeParams` — it serializes the runtime values as const literals.
+The `typeParams` on a scalar field (accessed via `field.type.typeParams`) always matches the runtime value in `contract.json`. For Vector: `{ length: 1536 }`. For JSONB with schema: `{ schemaJson: { ... } }`. The emitter never transforms or replaces `typeParams` — it serializes the runtime values as const literals.
 
 This means `ContractModelBase.fields` can be tightened back to `Record<string, ContractField>`. The widening to `Record<string, unknown>` was only needed because renderers replaced the field shape.
 
@@ -143,17 +149,18 @@ The emitter always emits model fields with the full `ContractField` structure. T
 
 ### `EmissionSpi.generateModelsType?` override is removed
 
-This is a hard constraint. After TML-2206, model fields are self-contained — they carry resolved `codecId` and `typeParams` at build time. The SQL emitter's override is deleted. The framework emitter's `generateFieldResolvedType` handles all families (SQL, Mongo) and all field contexts (model fields, value object fields, union members).
+This is a hard constraint. After TML-2206, model fields are self-contained — they carry resolved `codecId` and `typeParams` at build time, and `generateFieldResolvedType` already handles all three field kinds (scalar, value object, union) with modifier application. The SQL emitter's override is deleted. The framework emitter handles all families (SQL, Mongo) and all field contexts (model fields, value object fields, union members).
 
 ### The framework emitter owns rendering dispatch
 
-The framework emitter's field generation:
+The framework emitter's existing `generateFieldResolvedType` (introduced in TML-2206) already handles all three field kinds — scalar, value object, union — and applies `many`/`dict`/`nullable` modifiers. This function is extended with codec dispatch for scalar fields:
 
-1. Reads `ScalarFieldType.typeParams` from the field
+1. For scalar fields, reads `field.type.typeParams` and `field.type.codecId`
 2. Looks up the codec via `CodecLookup` (added to the emission pipeline)
 3. Calls `codec.renderOutputType(typeParams)` if present; otherwise emits a reference to `CodecTypes[codecId]['output']`
-4. Stamps the result into the `FieldOutputTypes` map
-5. Serializes `typeParams` truthfully as const literals on the field
+4. Value object and union fields pass through unchanged
+5. Stamps the result into the `FieldOutputTypes` map
+6. Serializes `typeParams` truthfully as const literals on the field
 
 This lives in `@prisma-next/emitter` (tooling layer), dispatching to codecs via `CodecLookup` from the core layer. The legacy renderer infrastructure — `TypeRenderer`, normalization pipeline, `parameterizedRenderers` threading through the control stack, and `parameterized` maps in descriptor metadata — is deleted.
 
