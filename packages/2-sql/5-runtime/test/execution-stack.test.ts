@@ -38,6 +38,7 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
             target: 'postgres',
             capabilities: {},
             codecs: () => registry,
+            readMarkerStatement: () => ({ sql: '', params: [] }),
           },
           lower() {
             return {

@@ -164,7 +164,8 @@ describe('SQLite codecs', () => {
 
     it('handles already-parsed objects from wire', () => {
       const parsed = { key: 'value' };
-      expect(codec.decode(parsed)).toEqual(parsed);
+      // SQLite may return already-parsed JSON objects from the wire
+      expect(codec.decode(parsed as unknown as string)).toEqual(parsed);
     });
   });
 

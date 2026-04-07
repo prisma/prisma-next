@@ -32,6 +32,7 @@ export async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
 
 interface IntegrationTestContext {
   db: () => Db<TestContract>;
+  runtime: () => Runtime;
   ormClient: () => ReturnType<typeof orm<TestContract>>;
 }
 

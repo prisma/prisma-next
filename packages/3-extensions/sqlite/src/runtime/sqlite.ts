@@ -53,7 +53,7 @@ export interface SqliteClient<
   TContract extends Contract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 > {
-  readonly sql: Db<TContract, TTypeMaps>;
+  readonly sql: Db<TContract>;
   readonly schema: SchemaHandle<
     TContract,
     ResolveCodecTypes<TContract, TTypeMaps>,
@@ -127,7 +127,7 @@ export default function sqlite<
   });
 
   const schema = schemaBuilder<TContract, TTypeMaps>(context);
-  const sql = sqlBuilder<TContract, TTypeMaps>({ context });
+  const sql: Db<TContract> = sqlBuilder<TContract>({ context });
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
