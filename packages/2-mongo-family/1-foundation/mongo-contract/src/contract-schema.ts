@@ -13,7 +13,15 @@ const ValueObjectFieldTypeSchema = type({
   name: 'string',
 });
 
-const FieldTypeSchema = ScalarFieldTypeSchema.or(ValueObjectFieldTypeSchema);
+const UnionFieldTypeSchema = type({
+  '+': 'reject',
+  kind: "'union'",
+  members: ScalarFieldTypeSchema.or(ValueObjectFieldTypeSchema).array(),
+});
+
+const FieldTypeSchema = ScalarFieldTypeSchema.or(ValueObjectFieldTypeSchema).or(
+  UnionFieldTypeSchema,
+);
 
 const RawFieldSchema = type({
   '+': 'reject',
@@ -94,5 +102,7 @@ export const MongoContractSchema = type({
     'storageHash?': 'string',
   }),
   models: type({ '[string]': ModelDefinitionSchema }),
-  'valueObjects?': 'Record<string, unknown>',
+  'valueObjects?': type({
+    '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
+  }),
 });
