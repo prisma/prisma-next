@@ -2,7 +2,9 @@ import {
   AggregateCommand,
   MongoAggAccumulator,
   MongoAggFieldRef,
+  MongoFieldFilter,
   MongoGroupStage,
+  MongoMatchStage,
   MongoSortStage,
 } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
@@ -21,6 +23,7 @@ describe('aggregate integration', () => {
       ]);
 
       const command = new AggregateCommand(collectionName, [
+        new MongoMatchStage(MongoFieldFilter.of('amount', '$gte', 100)),
         new MongoGroupStage(MongoAggFieldRef.of('department'), {
           total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')),
         }),

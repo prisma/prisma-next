@@ -234,6 +234,12 @@ describe('MongoLookupStage', () => {
     expect((match.filter as MongoFieldFilter).op).toBe('$ne');
   });
 
+  it('rejects construction with neither equality nor pipeline form', () => {
+    expect(() => new MongoLookupStage({ from: 'posts', as: 'posts' })).toThrow(
+      'MongoLookupStage requires either equality fields (localField/foreignField) or a pipeline',
+    );
+  });
+
   it('supports correlated pipeline form with let_', () => {
     const stage = new MongoLookupStage({
       from: 'orders',
