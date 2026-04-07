@@ -40,11 +40,45 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   ? CodecTypes[CodecId]['output']
   : _Encoded;
 export type Address = {
-  readonly street: CodecTypes['pg/text@1']['output'];
-  readonly city: CodecTypes['pg/text@1']['output'];
-  readonly zip: CodecTypes['pg/text@1']['output'] | null;
+  readonly street: string;
+  readonly city: string;
+  readonly zip: string | null;
 };
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
+export type FieldOutputTypes = {
+  readonly Article: {
+    readonly id: number;
+    readonly title: string;
+    readonly reviewerId: number;
+  };
+  readonly Comment: {
+    readonly id: number;
+    readonly body: string;
+    readonly postId: number;
+  };
+  readonly Post: {
+    readonly id: number;
+    readonly title: string;
+    readonly userId: number;
+    readonly views: number;
+  };
+  readonly Profile: {
+    readonly id: number;
+    readonly userId: number;
+    readonly bio: string;
+  };
+  readonly Tag: {
+    readonly id: string;
+    readonly name: string;
+  };
+  readonly User: {
+    readonly id: number;
+    readonly name: string;
+    readonly email: string;
+    readonly invitedById: number | null;
+    readonly address: Address | null;
+  };
+};
+export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes>;
 
 type ContractBase = ContractType<
   {

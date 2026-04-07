@@ -40,7 +40,47 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   ? CodecTypes[CodecId]['output']
   : _Encoded;
 
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
+export type FieldOutputTypes = {
+  readonly Comment: {
+    readonly id: number;
+    readonly postId: number;
+    readonly content: string;
+    readonly createdAt: string;
+    readonly updatedAt: string | null;
+  };
+  readonly Event: {
+    readonly id: Char<36>;
+    readonly name: string;
+    readonly scheduledAt: string;
+    readonly createdAt: string;
+  };
+  readonly LiteralDefaults: {
+    readonly id: number;
+    readonly label: string;
+    readonly score: number;
+    readonly rating: number;
+    readonly active: boolean;
+    readonly bigCount: number;
+    readonly metadata: unknown;
+    readonly tags: unknown;
+  };
+  readonly Post: {
+    readonly id: number;
+    readonly userId: number;
+    readonly title: string;
+    readonly createdAt: string;
+    readonly updatedAt: string | null;
+    readonly meta: unknown | null;
+  };
+  readonly User: {
+    readonly id: number;
+    readonly email: Varchar<255>;
+    readonly createdAt: string;
+    readonly updatedAt: string | null;
+    readonly profile: unknown | null;
+  };
+};
+export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes>;
 
 type ContractBase = ContractType<
   {
