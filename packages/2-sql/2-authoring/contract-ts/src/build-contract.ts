@@ -390,6 +390,8 @@ export function buildSqlContractFromSemanticDefinition(
           type: JSONB_CODEC_ID,
           nativeType: JSONB_NATIVE_TYPE,
           nullable: field.nullable,
+          ...ifDefined('default', field.default),
+          ...ifDefined('executionDefault', field.executionDefault),
         } as ColumnBuilderState<string, boolean, string>;
         continue;
       }
@@ -554,14 +556,20 @@ export function buildSqlContractFromSemanticDefinition(
               fields: Object.fromEntries(
                 vo.fields.map((f) => [
                   f.fieldName,
-                  {
-                    type: {
-                      kind: 'scalar' as const,
-                      codecId: f.descriptor.codecId,
-                      ...ifDefined('typeParams', f.descriptor.typeParams),
-                    },
-                    nullable: f.nullable,
-                  },
+                  isValueObjectField(f)
+                    ? {
+                        type: { kind: 'valueObject' as const, name: f.valueObjectName },
+                        nullable: f.nullable,
+                        ...(f.many ? { many: true } : {}),
+                      }
+                    : {
+                        type: {
+                          kind: 'scalar' as const,
+                          codecId: f.descriptor.codecId,
+                          ...ifDefined('typeParams', f.descriptor.typeParams),
+                        },
+                        nullable: f.nullable,
+                      },
                 ]),
               ),
             },

@@ -229,6 +229,84 @@ describe('value objects in semantic contract builder', () => {
     });
   });
 
+  it('emits nested value-object references inside a parent value object', () => {
+    const contract = buildSqlContractFromSemanticDefinition({
+      target: postgresTargetPack,
+      models: [
+        {
+          modelName: 'Company',
+          tableName: 'company',
+          fields: [
+            {
+              fieldName: 'id',
+              columnName: 'id',
+              descriptor: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              nullable: false,
+            },
+            {
+              fieldName: 'address',
+              columnName: 'address',
+              valueObjectName: 'CompanyAddress',
+              nullable: false,
+            },
+          ],
+          id: { columns: ['id'] },
+        },
+      ],
+      valueObjects: [
+        {
+          name: 'GeoLocation',
+          fields: [
+            {
+              fieldName: 'lat',
+              columnName: 'lat',
+              descriptor: { codecId: 'pg/float8@1', nativeType: 'float8' },
+              nullable: false,
+            },
+            {
+              fieldName: 'lng',
+              columnName: 'lng',
+              descriptor: { codecId: 'pg/float8@1', nativeType: 'float8' },
+              nullable: false,
+            },
+          ],
+        },
+        {
+          name: 'CompanyAddress',
+          fields: [
+            {
+              fieldName: 'street',
+              columnName: 'street',
+              descriptor: { codecId: 'pg/text@1', nativeType: 'text' },
+              nullable: false,
+            },
+            {
+              fieldName: 'location',
+              columnName: 'location',
+              valueObjectName: 'GeoLocation',
+              nullable: true,
+            },
+          ],
+        },
+      ],
+    });
+
+    const valueObjects = contract.valueObjects as Record<string, ContractValueObject> | undefined;
+
+    expect(valueObjects?.['CompanyAddress']?.fields['location']).toEqual({
+      type: { kind: 'valueObject', name: 'GeoLocation' },
+      nullable: true,
+    });
+    expect(valueObjects?.['CompanyAddress']?.fields['street']).toEqual({
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+      nullable: false,
+    });
+    expect(valueObjects?.['GeoLocation']?.fields['lat']).toEqual({
+      type: { kind: 'scalar', codecId: 'pg/float8@1' },
+      nullable: false,
+    });
+  });
+
   it('omits valueObjects from contract when none are defined', () => {
     const contract = buildSqlContractFromSemanticDefinition({
       target: postgresTargetPack,
