@@ -2,21 +2,35 @@ import { assertType, expectTypeOf, test } from 'vitest';
 import type { MongoAggAccumulator, MongoAggExpr } from '../src/aggregation-expressions';
 import type {
   MongoAddFieldsStage,
+  MongoBucketAutoStage,
+  MongoBucketStage,
   MongoCountStage,
+  MongoDensifyStage,
+  MongoFacetStage,
+  MongoFillStage,
+  MongoGeoNearStage,
+  MongoGraphLookupStage,
   MongoGroupStage,
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
+  MongoMergeStage,
+  MongoOutStage,
   MongoPipelineStage,
   MongoProjectionValue,
   MongoProjectStage,
   MongoRedactStage,
   MongoReplaceRootStage,
   MongoSampleStage,
+  MongoSearchMetaStage,
+  MongoSearchStage,
+  MongoSetWindowFieldsStage,
   MongoSkipStage,
   MongoSortByCountStage,
   MongoSortStage,
+  MongoUnionWithStage,
   MongoUnwindStage,
+  MongoVectorSearchStage,
 } from '../src/stages';
 import type { MongoStageVisitor } from '../src/visitors';
 
@@ -35,9 +49,23 @@ test('each concrete stage class is assignable to MongoPipelineStage', () => {
   expectTypeOf<MongoSortByCountStage>().toExtend<MongoPipelineStage>();
   expectTypeOf<MongoSampleStage>().toExtend<MongoPipelineStage>();
   expectTypeOf<MongoRedactStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoOutStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoUnionWithStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoBucketStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoBucketAutoStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoGeoNearStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoFacetStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoGraphLookupStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoMergeStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoSetWindowFieldsStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoDensifyStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoFillStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoSearchStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoSearchMetaStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoVectorSearchStage>().toExtend<MongoPipelineStage>();
 });
 
-test('MongoPipelineStage kind union covers all 14 kinds', () => {
+test('MongoPipelineStage kind union covers all 28 kinds', () => {
   expectTypeOf<MongoPipelineStage['kind']>().toEqualTypeOf<
     | 'match'
     | 'project'
@@ -53,6 +81,20 @@ test('MongoPipelineStage kind union covers all 14 kinds', () => {
     | 'sortByCount'
     | 'sample'
     | 'redact'
+    | 'out'
+    | 'unionWith'
+    | 'bucket'
+    | 'bucketAuto'
+    | 'geoNear'
+    | 'facet'
+    | 'graphLookup'
+    | 'merge'
+    | 'setWindowFields'
+    | 'densify'
+    | 'fill'
+    | 'search'
+    | 'searchMeta'
+    | 'vectorSearch'
   >();
 });
 
@@ -87,6 +129,34 @@ test('switching on kind is exhaustive', () => {
         return 'sample';
       case 'redact':
         return 'redact';
+      case 'out':
+        return 'out';
+      case 'unionWith':
+        return 'unionWith';
+      case 'bucket':
+        return 'bucket';
+      case 'bucketAuto':
+        return 'bucketAuto';
+      case 'geoNear':
+        return 'geoNear';
+      case 'facet':
+        return 'facet';
+      case 'graphLookup':
+        return 'graphLookup';
+      case 'merge':
+        return 'merge';
+      case 'setWindowFields':
+        return 'setWindowFields';
+      case 'densify':
+        return 'densify';
+      case 'fill':
+        return 'fill';
+      case 'search':
+        return 'search';
+      case 'searchMeta':
+        return 'searchMeta';
+      case 'vectorSearch':
+        return 'vectorSearch';
       default: {
         const _exhaustive: never = stage;
         return _exhaustive;
@@ -96,7 +166,7 @@ test('switching on kind is exhaustive', () => {
   assertType<(stage: MongoPipelineStage) => string>(exhaustiveSwitch);
 });
 
-test('MongoStageVisitor requires all 14 methods', () => {
+test('MongoStageVisitor requires all 28 methods', () => {
   type Complete = MongoStageVisitor<string>;
 
   expectTypeOf<Complete>().toHaveProperty('match');
@@ -113,8 +183,22 @@ test('MongoStageVisitor requires all 14 methods', () => {
   expectTypeOf<Complete>().toHaveProperty('sortByCount');
   expectTypeOf<Complete>().toHaveProperty('sample');
   expectTypeOf<Complete>().toHaveProperty('redact');
+  expectTypeOf<Complete>().toHaveProperty('out');
+  expectTypeOf<Complete>().toHaveProperty('unionWith');
+  expectTypeOf<Complete>().toHaveProperty('bucket');
+  expectTypeOf<Complete>().toHaveProperty('bucketAuto');
+  expectTypeOf<Complete>().toHaveProperty('geoNear');
+  expectTypeOf<Complete>().toHaveProperty('facet');
+  expectTypeOf<Complete>().toHaveProperty('graphLookup');
+  expectTypeOf<Complete>().toHaveProperty('merge');
+  expectTypeOf<Complete>().toHaveProperty('setWindowFields');
+  expectTypeOf<Complete>().toHaveProperty('densify');
+  expectTypeOf<Complete>().toHaveProperty('fill');
+  expectTypeOf<Complete>().toHaveProperty('search');
+  expectTypeOf<Complete>().toHaveProperty('searchMeta');
+  expectTypeOf<Complete>().toHaveProperty('vectorSearch');
 
-  // @ts-expect-error - missing 'match' method
+  // @ts-expect-error - missing 'match' method (and all new stage methods)
   assertType<MongoStageVisitor<string>>({
     project: () => '',
     sort: () => '',
@@ -167,6 +251,20 @@ test('accept returns R for any visitor R', () => {
     sortByCount: () => 12,
     sample: () => 13,
     redact: () => 14,
+    out: () => 15,
+    unionWith: () => 16,
+    bucket: () => 17,
+    bucketAuto: () => 18,
+    geoNear: () => 19,
+    facet: () => 20,
+    graphLookup: () => 21,
+    merge: () => 22,
+    setWindowFields: () => 23,
+    densify: () => 24,
+    fill: () => 25,
+    search: () => 26,
+    searchMeta: () => 27,
+    vectorSearch: () => 28,
   };
   expectTypeOf(stage.accept(visitor)).toBeNumber();
 });

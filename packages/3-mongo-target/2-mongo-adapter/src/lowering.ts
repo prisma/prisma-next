@@ -6,6 +6,7 @@ import type {
   MongoGroupId,
   MongoPipelineStage,
   MongoProjectionValue,
+  MongoWindowField,
 } from '@prisma-next/mongo-query-ast';
 import type { Document } from '@prisma-next/mongo-value';
 import { resolveValue } from './resolve-value';
@@ -172,6 +173,14 @@ function lowerProjectionValue(value: MongoProjectionValue): unknown {
   return lowerAggExpr(value);
 }
 
+function lowerWindowField(wf: MongoWindowField): Record<string, unknown> {
+  const result: Record<string, unknown> = lowerAggExpr(wf.operator) as Record<string, unknown>;
+  if (wf.window) {
+    result['window'] = { ...wf.window };
+  }
+  return result;
+}
+
 export function lowerStage(stage: MongoPipelineStage): Record<string, unknown> {
   switch (stage.kind) {
     case 'match':
@@ -233,6 +242,135 @@ export function lowerStage(stage: MongoPipelineStage): Record<string, unknown> {
       return { $sample: { size: stage.size } };
     case 'redact':
       return { $redact: lowerAggExpr(stage.expr) };
+    case 'out':
+      return { $out: stage.db ? { db: stage.db, coll: stage.collection } : stage.collection };
+    case 'unionWith': {
+      const unionWith: Record<string, unknown> = { coll: stage.collection };
+      if (stage.pipeline) {
+        unionWith['pipeline'] = stage.pipeline.map((s) => lowerStage(s));
+      }
+      return { $unionWith: unionWith };
+    }
+    case 'bucket': {
+      const bucket: Record<string, unknown> = {
+        groupBy: lowerAggExpr(stage.groupBy),
+        boundaries: [...stage.boundaries],
+      };
+      if (stage.default_ !== undefined) bucket['default'] = stage.default_;
+      if (stage.output) bucket['output'] = lowerExprRecord(stage.output);
+      return { $bucket: bucket };
+    }
+    case 'bucketAuto': {
+      const bucketAuto: Record<string, unknown> = {
+        groupBy: lowerAggExpr(stage.groupBy),
+        buckets: stage.buckets,
+      };
+      if (stage.output) bucketAuto['output'] = lowerExprRecord(stage.output);
+      if (stage.granularity !== undefined) bucketAuto['granularity'] = stage.granularity;
+      return { $bucketAuto: bucketAuto };
+    }
+    case 'geoNear': {
+      const geoNear: Record<string, unknown> = {
+        near: stage.near,
+        distanceField: stage.distanceField,
+      };
+      if (stage.spherical !== undefined) geoNear['spherical'] = stage.spherical;
+      if (stage.maxDistance !== undefined) geoNear['maxDistance'] = stage.maxDistance;
+      if (stage.minDistance !== undefined) geoNear['minDistance'] = stage.minDistance;
+      if (stage.query) geoNear['query'] = lowerFilter(stage.query);
+      if (stage.key !== undefined) geoNear['key'] = stage.key;
+      if (stage.distanceMultiplier !== undefined)
+        geoNear['distanceMultiplier'] = stage.distanceMultiplier;
+      if (stage.includeLocs !== undefined) geoNear['includeLocs'] = stage.includeLocs;
+      return { $geoNear: geoNear };
+    }
+    case 'facet': {
+      const facet: Record<string, unknown> = {};
+      for (const [key, pipeline] of Object.entries(stage.facets)) {
+        facet[key] = pipeline.map((s) => lowerStage(s));
+      }
+      return { $facet: facet };
+    }
+    case 'graphLookup': {
+      const graphLookup: Record<string, unknown> = {
+        from: stage.from,
+        startWith: lowerAggExpr(stage.startWith),
+        connectFromField: stage.connectFromField,
+        connectToField: stage.connectToField,
+        as: stage.as,
+      };
+      if (stage.maxDepth !== undefined) graphLookup['maxDepth'] = stage.maxDepth;
+      if (stage.depthField !== undefined) graphLookup['depthField'] = stage.depthField;
+      if (stage.restrictSearchWithMatch)
+        graphLookup['restrictSearchWithMatch'] = lowerFilter(stage.restrictSearchWithMatch);
+      return { $graphLookup: graphLookup };
+    }
+    case 'merge': {
+      const merge: Record<string, unknown> = { into: stage.into };
+      if (stage.on !== undefined) merge['on'] = stage.on;
+      if (stage.whenMatched !== undefined) {
+        merge['whenMatched'] = Array.isArray(stage.whenMatched)
+          ? stage.whenMatched.map((s) => lowerStage(s))
+          : stage.whenMatched;
+      }
+      if (stage.whenNotMatched !== undefined) merge['whenNotMatched'] = stage.whenNotMatched;
+      return { $merge: merge };
+    }
+    case 'setWindowFields': {
+      const swf: Record<string, unknown> = {};
+      if (stage.partitionBy) swf['partitionBy'] = lowerAggExpr(stage.partitionBy);
+      if (stage.sortBy) swf['sortBy'] = { ...stage.sortBy };
+      const output: Record<string, unknown> = {};
+      for (const [key, wf] of Object.entries(stage.output)) {
+        output[key] = lowerWindowField(wf);
+      }
+      swf['output'] = output;
+      return { $setWindowFields: swf };
+    }
+    case 'densify': {
+      const densify: Record<string, unknown> = {
+        field: stage.field,
+        range: { ...stage.range },
+      };
+      if (stage.partitionByFields) densify['partitionByFields'] = [...stage.partitionByFields];
+      return { $densify: densify };
+    }
+    case 'fill': {
+      const fill: Record<string, unknown> = {};
+      if (stage.partitionBy) fill['partitionBy'] = lowerAggExpr(stage.partitionBy);
+      if (stage.partitionByFields) fill['partitionByFields'] = [...stage.partitionByFields];
+      if (stage.sortBy) fill['sortBy'] = { ...stage.sortBy };
+      const output: Record<string, unknown> = {};
+      for (const [key, fo] of Object.entries(stage.output)) {
+        const entry: Record<string, unknown> = {};
+        if (fo.method !== undefined) entry['method'] = fo.method;
+        if (fo.value !== undefined) entry['value'] = lowerAggExpr(fo.value);
+        output[key] = entry;
+      }
+      fill['output'] = output;
+      return { $fill: fill };
+    }
+    case 'search': {
+      const search: Record<string, unknown> = { ...stage.config };
+      if (stage.index !== undefined) search['index'] = stage.index;
+      return { $search: search };
+    }
+    case 'searchMeta': {
+      const searchMeta: Record<string, unknown> = { ...stage.config };
+      if (stage.index !== undefined) searchMeta['index'] = stage.index;
+      return { $searchMeta: searchMeta };
+    }
+    case 'vectorSearch': {
+      const vs: Record<string, unknown> = {
+        index: stage.index,
+        path: stage.path,
+        queryVector: [...stage.queryVector],
+        numCandidates: stage.numCandidates,
+        limit: stage.limit,
+      };
+      if (stage.filter) vs['filter'] = { ...stage.filter };
+      return { $vectorSearch: vs };
+    }
     default: {
       const _exhaustive: never = stage;
       throw new Error(`Unhandled stage kind: ${(_exhaustive as MongoPipelineStage).kind}`);
