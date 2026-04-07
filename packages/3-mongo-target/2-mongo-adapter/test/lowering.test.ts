@@ -678,6 +678,27 @@ describe('lowerStage — new stages', () => {
     });
   });
 
+  it('lowers $geoNear with all optional fields', () => {
+    const stage = new MongoGeoNearStage({
+      near: { type: 'Point', coordinates: [0, 0] },
+      distanceField: 'dist',
+      minDistance: 100,
+      key: 'location',
+      distanceMultiplier: 0.001,
+      includeLocs: 'loc',
+    });
+    expect(lowerStage(stage)).toEqual({
+      $geoNear: {
+        near: { type: 'Point', coordinates: [0, 0] },
+        distanceField: 'dist',
+        minDistance: 100,
+        key: 'location',
+        distanceMultiplier: 0.001,
+        includeLocs: 'loc',
+      },
+    });
+  });
+
   it('lowers $facet', () => {
     const stage = new MongoFacetStage({
       priceStats: [
@@ -792,6 +813,16 @@ describe('lowerStage — new stages', () => {
         },
       },
     });
+  });
+
+  it('throws when $setWindowFields operator lowers to non-object', () => {
+    const stage = new MongoSetWindowFieldsStage({
+      sortBy: { ts: 1 },
+      output: {
+        bad: { operator: MongoAggFieldRef.of('x') },
+      },
+    });
+    expect(() => lowerStage(stage)).toThrow('Window field operator must lower to an object');
   });
 
   it('lowers $densify', () => {
