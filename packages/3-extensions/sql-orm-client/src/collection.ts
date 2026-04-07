@@ -2,7 +2,10 @@ import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
+  BinaryExpr,
+  ColumnRef,
   isWhereExpr,
+  LiteralExpr,
   type OrderByItem,
   type ToWhereExpr,
   type WhereArg,
@@ -88,10 +91,14 @@ import {
   type MutationCreateInputWithRelations,
   type MutationUpdateInput,
   type NumericFieldNames,
+  type OrderByDirective,
+  type OrderExpr,
   type RelatedModelName,
   type RelationNames,
   type ShorthandWhereFilter,
   type UniqueConstraintCriterion,
+  type VariantModelRow,
+  type VariantNames,
 } from './types';
 import { normalizeWhereArg } from './where-interop';
 
@@ -198,6 +205,49 @@ export class Collection<
 
     return this.#clone<WithWhereState<State>>({
       filters: [...this.state.filters, filter],
+    });
+  }
+
+  variant<V extends VariantNames<TContract, ModelName>>(
+    variantName: V,
+  ): Collection<
+    TContract,
+    ModelName,
+    VariantModelRow<TContract, ModelName, V>,
+    WithWhereState<State>
+  > {
+    const model = this.contract.models[this.modelName] as Record<string, unknown> | undefined;
+    const discriminator = model?.['discriminator'] as { field: string } | undefined;
+    const variants = model?.['variants'] as Record<string, { value: string }> | undefined;
+
+    if (!discriminator || !variants) {
+      return this as unknown as Collection<
+        TContract,
+        ModelName,
+        VariantModelRow<TContract, ModelName, V>,
+        WithWhereState<State>
+      >;
+    }
+
+    const variantEntry = variants[variantName];
+    if (!variantEntry) {
+      return this as unknown as Collection<
+        TContract,
+        ModelName,
+        VariantModelRow<TContract, ModelName, V>,
+        WithWhereState<State>
+      >;
+    }
+
+    const columnName = resolveFieldToColumn(this.contract, this.modelName, discriminator.field);
+    const filter = BinaryExpr.eq(
+      ColumnRef.of(this.tableName, columnName),
+      LiteralExpr.of(variantEntry.value),
+    );
+
+    return this.#cloneWithRow<VariantModelRow<TContract, ModelName, V>, WithWhereState<State>>({
+      filters: [...this.state.filters, filter],
+      variantName: variantName as string,
     });
   }
 
