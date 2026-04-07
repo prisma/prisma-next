@@ -86,8 +86,9 @@ Replace the bespoke `parameterizedRenderers` / phantom `typeParams.schema` pipel
 1. **Codec-owned TypeScript type rendering** — replace the `parameterizedRenderers` map with a codec-level type rendering interface, dispatched by `codecId`. Codecs without `renderType` fall back to `CodecTypes[codecId]['output']`.
 2. **Remove phantom `typeParams.schema`** — type rendering driven by `typeParams.schemaJson` through the codec's `renderType` method.
 3. **Untyped JSON columns** — `jsonb()` with no schema continues to produce `JsonValue`.
+4. **Unify SQL emitter `generateModelsType` with the shared function** — the SQL emitter currently overrides the shared `generateModelsType()` (via the optional `EmissionSpi.generateModelsType?` escape hatch) because its field type generation cross-references `storage.tables[].columns` to resolve `typeParams` and invoke `parameterizedRenderers`. Once `parameterizedRenderers` are replaced by codec-dispatched `renderType`, this cross-referencing is no longer needed — field type rendering becomes a callback the shared `generateModelsType()` can invoke per-field, and the SQL emitter can drop its custom override. This closes the remaining gap from the contract-domain-extraction project's M6 (task 6.1.2).
 
-**Proof:** Existing typed JSON column tests pass with codec-dispatch infrastructure. `jsonb()` and `jsonb(schema)` both produce correct types.
+**Proof:** Existing typed JSON column tests pass with codec-dispatch infrastructure. `jsonb()` and `jsonb(schema)` both produce correct types. SQL emitter no longer implements `generateModelsType?` — it uses the shared function with a codec-dispatched field renderer callback.
 
 #### Phase 1.75b: Polymorphism (both families)
 
