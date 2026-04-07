@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
+import type { Collection } from '../src/collection';
 import type { DefaultModelRow, InferRootRow } from '../src/types';
 
 interface PolyStorage {
@@ -203,4 +204,25 @@ test('DefaultModelRow still works for non-polymorphic model', () => {
   type PlainRow = DefaultModelRow<PolyContract, 'PlainModel'>;
   expectTypeOf<PlainRow>().toHaveProperty('id');
   expectTypeOf<PlainRow>().toHaveProperty('name');
+});
+
+test('Collection default Row for polymorphic model is discriminated union', () => {
+  type TaskCollection = Collection<PolyContract, 'Task'>;
+  type TaskRow = TaskCollection extends { all(): infer R }
+    ? R extends AsyncIterable<infer T>
+      ? T
+      : never
+    : never;
+  expectTypeOf<TaskRow['type']>().toEqualTypeOf<'bug' | 'feature'>();
+});
+
+test('Collection default Row for non-polymorphic model equals DefaultModelRow', () => {
+  type PlainCollection = Collection<PolyContract, 'PlainModel'>;
+  type PlainRow = PlainCollection extends { all(): infer R }
+    ? R extends AsyncIterable<infer T>
+      ? T
+      : never
+    : never;
+  type Expected = DefaultModelRow<PolyContract, 'PlainModel'>;
+  expectTypeOf<PlainRow>().toEqualTypeOf<Expected>();
 });

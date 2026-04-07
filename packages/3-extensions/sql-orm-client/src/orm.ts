@@ -6,7 +6,7 @@ import type {
   CollectionContext,
   CollectionModelName,
   CollectionTypeState,
-  DefaultModelRow,
+  InferRootRow,
   RuntimeQueryable,
 } from './types';
 
@@ -37,7 +37,7 @@ type ModelCollection<
   Collections extends Partial<Record<string, AnyCollectionClass>>,
   ModelName extends ModelNames<TContract>,
 > = [CustomCollectionForKey<Collections, ModelName>] extends [never]
-  ? Collection<TContract, ModelName, DefaultModelRow<TContract, ModelName>>
+  ? Collection<TContract, ModelName, InferRootRow<TContract, ModelName>>
   : CustomCollectionForKey<Collections, ModelName>;
 
 type ModelCollectionMap<

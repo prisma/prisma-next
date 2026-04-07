@@ -86,6 +86,7 @@ import {
   type IncludeCombineBranch,
   type IncludeExpr,
   type IncludeScalar,
+  type InferRootRow,
   type ModelAccessor,
   type MutationCreateInput,
   type MutationCreateInputWithRelations,
@@ -140,7 +141,7 @@ function isWhereDirectInput(value: unknown): value is WhereDirectInput {
 export class Collection<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-  Row = DefaultModelRow<TContract, ModelName>,
+  Row = InferRootRow<TContract, ModelName>,
   State extends CollectionTypeState = DefaultCollectionTypeState,
 > implements RowSelection<Row>
 {
