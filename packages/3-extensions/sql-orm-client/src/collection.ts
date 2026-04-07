@@ -697,7 +697,7 @@ export class Collection<
       this.state.selectedFields,
       parentJoinColumns,
     );
-    if (this.contract.capabilities?.sql?.defaultInInsert !== true) {
+    if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
       const plans = compileInsertReturningSplit(
         this.contract,
         this.tableName,
@@ -742,7 +742,7 @@ export class Collection<
     );
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
 
-    if (this.contract.capabilities?.sql?.defaultInInsert !== true) {
+    if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
       const plans = compileInsertCountSplit(this.contract, this.tableName, mappedRows);
       for (const plan of plans) {
         await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, plan).toArray();
