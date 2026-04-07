@@ -1024,6 +1024,34 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
+  packages/2-mongo-family/5-query-builders/pipeline-builder:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../../1-foundation/mongo-contract
+      '@prisma-next/mongo-query-ast':
+        specifier: workspace:*
+        version: link:../../4-query/query-ast
+    devDependencies:
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
+
   packages/2-mongo-family/6-transport/mongo-lowering:
     dependencies:
       '@prisma-next/mongo-query-ast':
