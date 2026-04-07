@@ -19,6 +19,7 @@ Common SQL features reported by adapters using the `sql` namespace. This is a na
 | `enums` | boolean | Supports native enum storage types | Stable |
 | `foreignKeys` | boolean | Supports FOREIGN KEY constraint DDL | Stable |
 | `autoIndexesForeignKeys` | boolean | Database automatically creates indexes for foreign keys | Stable |
+| `defaultInInsert` | boolean | Supports `DEFAULT` as a value in multi-row `INSERT ... VALUES` (e.g. `INSERT INTO t (a, b) VALUES (1, DEFAULT)`). When false, the ORM splits multi-row inserts by column signature so each statement has a uniform column list. | Stable |
 
 ### `postgres`
 PostgreSQL-specific capabilities managed by the adapter.
@@ -224,6 +225,7 @@ Canonical capability keys with descriptions, typical implementers, and ADR refer
 | sql.jsonAgg | JSON aggregation support | adapters that support JSON aggregation | ADR 065 |
 | sql.foreignKeys | FK constraint DDL support | adapters that support FOREIGN KEY | ADR 161 |
 | sql.autoIndexesForeignKeys | DB auto-indexes FKs | adapters where DB auto-creates FK indexes | ADR 161 |
+| sql.defaultInInsert | Supports DEFAULT in multi-row INSERT VALUES | adapters that support DEFAULT keyword as a value | — |
 | postgres.partialIndex | Partial/filtered index support | postgres adapter | ADR 065 |
 | mysql.generatedColumns | Generated column support | mysql adapter | ADR 065 |
 | sqlite.fts5 | FTS5 support | sqlite adapter | ADR 065 |
