@@ -143,6 +143,53 @@ describe('MongoCollection chaining', () => {
   });
 });
 
+describe('MongoCollection variant()', () => {
+  it('returns a new instance from variant()', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'Task', executor);
+    const narrowed = col.variant('Bug');
+    expect(narrowed).not.toBe(col);
+  });
+
+  it('injects discriminator eq filter for the variant value', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'Task', executor).variant('Bug');
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('field');
+    if (match.filter.kind === 'field') {
+      expect(match.filter.field).toBe('type');
+      expect(match.filter.op).toBe('$eq');
+    }
+  });
+
+  it('does not mutate original collection', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'Task', executor);
+    col.variant('Bug');
+    col.all();
+    expect(executor.lastStages!).toHaveLength(0);
+  });
+
+  it('composes with where()', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'Task', executor)
+      .variant('Feature')
+      .where(MongoFieldFilter.eq('title', 'Login'));
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('and');
+  });
+
+  it('returns self when model has no discriminator (non-polymorphic)', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor);
+    // @ts-expect-error VariantNames<Contract, 'User'> is never
+    const result = col.variant('NonExistent');
+    expect(result).toBe(col);
+  });
+});
+
 describe('MongoCollection include()', () => {
   it('adds a relation include', () => {
     const executor = createMockExecutor();

@@ -11,6 +11,8 @@ import type {
   MongoIncludeSpec,
   MongoWhereFilter,
   ReferenceRelationKeys,
+  VariantModelRow,
+  VariantNames,
 } from '../src/types';
 
 // --- Root accessors ---
@@ -135,6 +137,33 @@ test('InferRootRow for non-polymorphic model returns plain row', () => {
   expectTypeOf<UserRow>().toHaveProperty('name');
   expectTypeOf<UserRow>().toHaveProperty('email');
   expectTypeOf<UserRow>().toHaveProperty('addresses');
+});
+
+// --- VariantNames / VariantModelRow ---
+
+test('VariantNames extracts variant names from polymorphic model', () => {
+  type Names = VariantNames<Contract, 'Task'>;
+  expectTypeOf<Names>().toEqualTypeOf<'Bug' | 'Feature'>();
+});
+
+test('VariantNames is never for non-polymorphic model', () => {
+  type Names = VariantNames<Contract, 'User'>;
+  expectTypeOf<Names>().toBeNever();
+});
+
+test('VariantModelRow narrows to Bug-specific fields', () => {
+  type BugRow = VariantModelRow<Contract, 'Task', 'Bug'>;
+  expectTypeOf<BugRow>().toHaveProperty('severity');
+  expectTypeOf<BugRow>().toHaveProperty('_id');
+  expectTypeOf<BugRow>().toHaveProperty('title');
+  expectTypeOf<BugRow['type']>().toEqualTypeOf<'bug'>();
+});
+
+test('VariantModelRow narrows to Feature-specific fields', () => {
+  type FeatureRow = VariantModelRow<Contract, 'Task', 'Feature'>;
+  expectTypeOf<FeatureRow>().toHaveProperty('priority');
+  expectTypeOf<FeatureRow>().toHaveProperty('targetRelease');
+  expectTypeOf<FeatureRow['type']>().toEqualTypeOf<'feature'>();
 });
 
 // --- Collection API type constraints ---
