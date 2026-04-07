@@ -45,7 +45,12 @@ const sqlCharCodec = codec<
   init: createLengthTypeHelper('fixed'),
   renderOutputType: (typeParams) => {
     const length = typeParams['length'];
-    return typeof length === 'number' ? `Char<${length}>` : undefined;
+    if (typeof length !== 'number') {
+      throw new Error(
+        `renderOutputType: expected numeric "length" in typeParams for Char, got ${typeof length}`,
+      );
+    }
+    return `Char<${length}>`;
   },
 });
 
@@ -64,7 +69,12 @@ const sqlVarcharCodec = codec<
   init: createLengthTypeHelper('variable'),
   renderOutputType: (typeParams) => {
     const length = typeParams['length'];
-    return typeof length === 'number' ? `Varchar<${length}>` : undefined;
+    if (typeof length !== 'number') {
+      throw new Error(
+        `renderOutputType: expected numeric "length" in typeParams for Varchar, got ${typeof length}`,
+      );
+    }
+    return `Varchar<${length}>`;
   },
 });
 
@@ -101,7 +111,15 @@ const sqlTimestampCodec = codec({
   paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => {
     const precision = typeParams['precision'];
-    return typeof precision === 'number' ? `Timestamp<${precision}>` : 'Timestamp';
+    if (precision === undefined) {
+      return 'Timestamp';
+    }
+    if (typeof precision !== 'number') {
+      throw new Error(
+        `renderOutputType: expected numeric "precision" in typeParams for Timestamp, got ${typeof precision}`,
+      );
+    }
+    return `Timestamp<${precision}>`;
   },
 });
 
