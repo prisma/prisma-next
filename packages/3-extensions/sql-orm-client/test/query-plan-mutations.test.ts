@@ -73,11 +73,11 @@ describe('query plan mutations', () => {
       invited_by_id: usersColParam(contract, 'invited_by_id', 10),
     });
     expect(plan.ast.returning).toEqual([
+      ColumnRef.of('users', 'address'),
       ColumnRef.of('users', 'email'),
       ColumnRef.of('users', 'id'),
       ColumnRef.of('users', 'invited_by_id'),
       ColumnRef.of('users', 'name'),
-      ColumnRef.of('users', 'address'),
     ]);
   });
 
