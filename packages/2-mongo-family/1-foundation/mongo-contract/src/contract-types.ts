@@ -53,7 +53,7 @@ type ExtractValueObjects<TContract> = TContract extends {
   valueObjects: infer VO extends Record<string, ContractValueObject>;
 }
   ? VO
-  : Record<string, never>;
+  : Record<never, never>;
 
 type InferFieldBaseType<
   TFieldType,
@@ -71,7 +71,14 @@ type InferFieldBaseType<
           >;
         }
       : unknown
-    : unknown;
+    : TFieldType extends {
+          kind: 'union';
+          members: infer TMembers extends ReadonlyArray<unknown>;
+        }
+      ? TMembers[number] extends infer TMember
+        ? InferFieldBaseType<TMember, TValueObjects, TCodecTypes>
+        : unknown
+      : unknown;
 
 type InferFieldType<
   TField extends ContractField,
