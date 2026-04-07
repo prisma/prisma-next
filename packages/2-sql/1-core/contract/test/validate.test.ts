@@ -777,5 +777,67 @@ describe('validateContract', () => {
     it('accepts a valid model-to-storage mapping', () => {
       expect(() => validateContract(structuredClone(baseContract), emptyCodecLookup)).not.toThrow();
     });
+
+    it('rejects value object field mapped to non-JSON column', () => {
+      const contract = structuredClone(baseContract);
+      (contract as Record<string, unknown>).models = {
+        User: {
+          storage: {
+            table: 'User',
+            fields: { id: { column: 'id' }, address: { column: 'email' } },
+          },
+          fields: {
+            id: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false },
+            address: { type: { kind: 'valueObject', name: 'Address' }, nullable: false },
+          },
+          relations: {},
+        },
+      };
+      expect(() => validateContract(contract, emptyCodecLookup)).toThrow(
+        /value object.*nativeType "text".*expected json or jsonb/,
+      );
+    });
+
+    it('accepts value object field mapped to jsonb column', () => {
+      const contract = structuredClone(baseContract);
+      const tables = (contract as Record<string, Record<string, unknown>>).storage.tables as Record<
+        string,
+        Record<string, unknown>
+      >;
+      tables['User'] = {
+        ...(tables['User'] as Record<string, unknown>),
+        columns: {
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          address: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: false },
+        },
+      };
+      (contract as Record<string, unknown>).models = {
+        User: {
+          storage: {
+            table: 'User',
+            fields: {
+              id: { column: 'id' },
+              email: { column: 'email' },
+              address: { column: 'address' },
+            },
+          },
+          fields: {
+            id: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false },
+            email: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+            address: { type: { kind: 'valueObject', name: 'Address' }, nullable: false },
+          },
+          relations: {},
+        },
+      };
+      (contract as Record<string, unknown>).valueObjects = {
+        Address: {
+          fields: {
+            street: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+          },
+        },
+      };
+      expect(() => validateContract(contract, emptyCodecLookup)).not.toThrow();
+    });
   });
 });

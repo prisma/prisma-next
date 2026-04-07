@@ -24,6 +24,8 @@ export function validateContractDomain(contract: DomainContractShape): void {
   validateRelationTargets(contract, modelNames, errors);
   validateDiscriminators(contract, errors);
   validateOwnership(contract, modelNames, errors);
+  validateValueObjectReferences(contract, errors);
+  validateFieldModifiers(contract, errors);
 
   if (errors.length > 0) {
     throw new ContractValidationError(
@@ -161,6 +163,60 @@ function validateOwnership(
           `Owned model "${modelName}" must not appear in roots (found as root "${rootKey}")`,
         );
       }
+    }
+  }
+}
+
+interface FieldLike {
+  readonly type?: { readonly kind?: string; readonly name?: string };
+  readonly many?: boolean;
+  readonly dict?: boolean;
+}
+
+function validateValueObjectReferences(contract: DomainContractShape, errors: string[]): void {
+  const voNames = new Set(Object.keys(contract.valueObjects ?? {}));
+
+  function checkField(field: unknown, location: string): void {
+    const f = field as FieldLike | undefined;
+    if (f?.type?.kind === 'valueObject' && f.type.name) {
+      if (!voNames.has(f.type.name)) {
+        errors.push(
+          `${location} references value object "${f.type.name}" which does not exist in valueObjects`,
+        );
+      }
+    }
+  }
+
+  for (const [modelName, model] of Object.entries(contract.models)) {
+    for (const [fieldName, field] of Object.entries(model.fields)) {
+      checkField(field, `Model "${modelName}" field "${fieldName}"`);
+    }
+  }
+
+  for (const [voName, vo] of Object.entries(contract.valueObjects ?? {})) {
+    for (const [fieldName, field] of Object.entries(vo.fields)) {
+      checkField(field, `Value object "${voName}" field "${fieldName}"`);
+    }
+  }
+}
+
+function validateFieldModifiers(contract: DomainContractShape, errors: string[]): void {
+  function checkField(field: unknown, location: string): void {
+    const f = field as FieldLike | undefined;
+    if (f?.many && f?.dict) {
+      errors.push(`${location} cannot have both "many" and "dict" modifiers`);
+    }
+  }
+
+  for (const [modelName, model] of Object.entries(contract.models)) {
+    for (const [fieldName, field] of Object.entries(model.fields)) {
+      checkField(field, `Model "${modelName}" field "${fieldName}"`);
+    }
+  }
+
+  for (const [voName, vo] of Object.entries(contract.valueObjects ?? {})) {
+    for (const [fieldName, field] of Object.entries(vo.fields)) {
+      checkField(field, `Value object "${voName}" field "${fieldName}"`);
     }
   }
 }

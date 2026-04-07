@@ -445,4 +445,96 @@ describe('validateContractDomain()', () => {
       expect(() => validateContractDomain(contract)).not.toThrow();
     });
   });
+
+  describe('value object reference validation', () => {
+    it('accepts valid value object references from model fields', () => {
+      const contract: DomainContractShape = {
+        roots: { users: 'User' },
+        models: {
+          User: makeMinimalModel({
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              homeAddress: { nullable: false, type: { kind: 'valueObject', name: 'Address' } },
+            },
+          }),
+        },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+              city: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            },
+          },
+        },
+      };
+      expect(() => validateContractDomain(contract)).not.toThrow();
+    });
+
+    it('rejects nonexistent value object reference from model field', () => {
+      const contract: DomainContractShape = {
+        roots: { users: 'User' },
+        models: {
+          User: makeMinimalModel({
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              addr: { nullable: false, type: { kind: 'valueObject', name: 'Missing' } },
+            },
+          }),
+        },
+      };
+      expect(() => validateContractDomain(contract)).toThrow(/Missing.*does not exist/);
+    });
+
+    it('accepts self-referencing value object', () => {
+      const contract: DomainContractShape = {
+        roots: {},
+        models: {},
+        valueObjects: {
+          TreeNode: {
+            fields: {
+              label: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+              child: { nullable: true, type: { kind: 'valueObject', name: 'TreeNode' } },
+            },
+          },
+        },
+      };
+      expect(() => validateContractDomain(contract)).not.toThrow();
+    });
+
+    it('rejects nonexistent value object reference from another value object', () => {
+      const contract: DomainContractShape = {
+        roots: {},
+        models: {},
+        valueObjects: {
+          Wrapper: {
+            fields: {
+              inner: { nullable: false, type: { kind: 'valueObject', name: 'Nonexistent' } },
+            },
+          },
+        },
+      };
+      expect(() => validateContractDomain(contract)).toThrow(/Nonexistent.*does not exist/);
+    });
+  });
+
+  describe('field modifier validation', () => {
+    it('rejects many + dict on the same field', () => {
+      const contract: DomainContractShape = {
+        roots: {},
+        models: {
+          User: makeMinimalModel({
+            fields: {
+              tags: {
+                nullable: false,
+                type: { kind: 'scalar', codecId: 'pg/text@1' },
+                many: true,
+                dict: true,
+              },
+            },
+          }),
+        },
+      };
+      expect(() => validateContractDomain(contract)).toThrow(/many.*dict|dict.*many/i);
+    });
+  });
 });
