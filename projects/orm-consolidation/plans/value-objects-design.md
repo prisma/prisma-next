@@ -34,20 +34,20 @@ The authoring layer emits this contract:
   "models": {
     "User": {
       "fields": {
-        "_id":    { "nullable": false, "codecId": "mongo/objectId@1" },
-        "email":  { "nullable": false, "codecId": "mongo/string@1" },
-        "homeAddress":       { "nullable": true,  "type": "Address" },
-        "previousAddresses": { "nullable": false, "type": "Address", "many": true },
-        "tags":              { "nullable": false, "codecId": "mongo/string@1", "many": true }
+        "_id":    { "nullable": false, "type": { "kind": "scalar", "codecId": "mongo/objectId@1" } },
+        "email":  { "nullable": false, "type": { "kind": "scalar", "codecId": "mongo/string@1" } },
+        "homeAddress":       { "nullable": true,  "type": { "kind": "valueObject", "name": "Address" } },
+        "previousAddresses": { "nullable": false, "type": { "kind": "valueObject", "name": "Address" }, "many": true },
+        "tags":              { "nullable": false, "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "many": true }
       }
     }
   },
   "valueObjects": {
     "Address": {
       "fields": {
-        "street": { "nullable": false, "codecId": "mongo/string@1" },
-        "city":   { "nullable": false, "codecId": "mongo/string@1" },
-        "zip":    { "nullable": false, "codecId": "mongo/string@1" }
+        "street": { "nullable": false, "type": { "kind": "scalar", "codecId": "mongo/string@1" } },
+        "city":   { "nullable": false, "type": { "kind": "scalar", "codecId": "mongo/string@1" } },
+        "zip":    { "nullable": false, "type": { "kind": "scalar", "codecId": "mongo/string@1" } }
       }
     }
   }
@@ -56,7 +56,7 @@ The authoring layer emits this contract:
 
 Three things to notice:
 
-1. **Fields express their type through one of three mutually exclusive properties.** `"codecId": "mongo/string@1"` means a scalar type with a codec. `"type": "Address"` means a reference to a value object definition. (The third option, `"union": [...]`, handles fields that can be more than one type — see [ADR 179](../../../docs/architecture%20docs/adrs/ADR%20179%20-%20Union%20field%20types.md).)
+1. **Every field has a `type` property that fully describes what the field holds.** The `type` object uses a `kind` discriminant: `"scalar"` for a codec-backed primitive, `"valueObject"` for a reference to a value object definition, or `"union"` for a field that can hold one of several types (see [ADR 179](../../../docs/architecture%20docs/adrs/ADR%20179%20-%20Union%20field%20types.md)). Because `type` is a single property with a tagged value, the data structure itself prevents conflicting type specifiers — there's one slot, holding one thing.
 
 2. **`many: true` works on both scalars and value objects.** `tags` is a scalar array (`string[]`). `previousAddresses` is a value object array (`Address[]`). The modifier is orthogonal to the type specifier.
 
@@ -108,7 +108,7 @@ None of this exists in code yet. `ContractField` is `{ nullable: boolean; codecI
 
 ## Design decisions
 
-### 1. Field descriptor — discriminated union that prevents invalid states
+### 1. Field descriptor — structurally exclusive type specifier
 
 Today every field is a scalar with a codec:
 
@@ -119,44 +119,50 @@ type ContractField = {
 };
 ```
 
-Value objects introduce two new ways a field can express its type: a reference to a value object definition (`type`), or a union of types (`union`). These three specifiers — `codecId`, `type`, `union` — are mutually exclusive. A field with `codecId: "pg/text@1"` and `type: "Address"` is nonsensical.
+Value objects introduce two new ways a field can express its type: a reference to a value object definition, or a union of types. These three specifiers — scalar, value object, union — are mutually exclusive. A field that is both a scalar and a value object reference is nonsensical.
 
-The TypeScript type should make this structurally impossible, not rely on runtime validation to catch it. A discriminated union where each variant carries exactly one specifier achieves this:
+The old flat-key approach (`codecId`, `type`, `union` as separate properties on the field) can't prevent conflicting keys at the data level — you'd need TypeScript tricks like `?: never` to paper over a structural problem. Instead, the field carries a single `type` property whose value is a tagged object with a `kind` discriminant:
 
 ```ts
-type ContractFieldBase = {
-  readonly nullable: boolean;
-  readonly many?: true;
-  readonly dict?: true;
-};
-
-type ScalarContractField = ContractFieldBase & {
+type ScalarFieldType = {
+  readonly kind: 'scalar';
   readonly codecId: string;
   readonly typeParams?: Record<string, unknown>;
 };
 
-type ValueObjectRefField = ContractFieldBase & {
-  readonly type: string;
+type ValueObjectFieldType = {
+  readonly kind: 'valueObject';
+  readonly name: string;
 };
 
-type UnionMember = { readonly codecId: string } | { readonly type: string };
-
-type UnionContractField = ContractFieldBase & {
-  readonly union: ReadonlyArray<UnionMember>;
+type UnionFieldType = {
+  readonly kind: 'union';
+  readonly members: ReadonlyArray<ScalarFieldType | ValueObjectFieldType>;
 };
 
-type ContractField = ScalarContractField | ValueObjectRefField | UnionContractField;
+type FieldType = ScalarFieldType | ValueObjectFieldType | UnionFieldType;
+
+type ContractField = {
+  readonly nullable: boolean;
+  readonly type: FieldType;
+  readonly many?: true;
+  readonly dict?: true;
+};
 ```
+
+There's one slot (`type`), holding one tagged value. The JSON itself can't represent conflicting type specifiers — they'd have to be two values in the same property, which JSON doesn't allow.
 
 Key choices:
 
-- **No explicit `kind` discriminant.** The JSON contract doesn't carry one. TypeScript narrows structurally via `'codecId' in field`. Adding `kind` would mean maintaining a discriminant in the contract JSON that exists only for TypeScript's benefit.
+- **`kind` values are `scalar` / `valueObject` / `union`.** `scalar` for codec-backed primitives, `valueObject` for references to the `valueObjects` section, `union` for fields that can hold one of several types. (Not `ref` — too ambiguous about what's being referenced.)
 
-- **`typeParams` lives on `ScalarContractField` only.** Codec parameters (like a JSON Schema for `pg/jsonb@1`) apply to scalar fields with a codec. Value object references and unions don't have codec parameters. (Note: TML-2215 restores `typeParams` to model fields — it belongs on the scalar variant.)
+- **`typeParams` lives on `ScalarFieldType` only.** Codec parameters (like a JSON Schema for `pg/jsonb@1`) apply to scalar fields with a codec. Value object references and unions don't have codec parameters. (TML-2215 restores `typeParams` to model fields — it belongs on the scalar variant.)
 
-- **`many` and `dict` are shared modifiers on the base.** They're orthogonal to the type specifier: `many: true` makes any field type into an array; `dict: true` makes it a `Record<string, T>`. They compose with `nullable`. They don't compose with each other — `dict` + `many` on the same field is a validation error, not a type error, to keep the types simple.
+- **`many` and `dict` are modifiers on the outer field, not on `FieldType`.** They modify how the field behaves (array vs single, map vs direct), not what type it holds. `many: true` makes any field type into an array; `dict: true` makes it a `Record<string, T>`. They compose with `nullable`. They don't compose with each other — `dict` + `many` on the same field is a validation error.
 
-- **`many` and `dict` are present-when-true.** `many?: true` rather than `many?: boolean`. Absence means "not many." This keeps the contract JSON clean — no `"many": false` noise on every scalar field. (This is different from `nullable`, which is always explicit for historical reasons.)
+- **`many` and `dict` are present-when-true.** `many?: true` rather than `many?: boolean`. Absence means "not many." This keeps the contract JSON clean. (This is different from `nullable`, which is always explicit for historical reasons.)
+
+- **JSON verbosity is acceptable.** Scalar fields go from `{ "codecId": "..." }` to `{ "type": { "kind": "scalar", "codecId": "..." } }`. The contract is emitted, not hand-written. If compaction is needed later, it can be done at the serialization layer without affecting the in-memory contract representation.
 
 ### 2. `valueObjects` as a top-level contract key
 
@@ -218,51 +224,13 @@ Both produce nested TypeScript types. Both support nested create/update inputs. 
 
 ## Implementation sequence
 
-### Step 1: Contract field type system
-
-Extend `ContractField` to the discriminated union. Add `ContractValueObject`. Add `valueObjects` to `Contract`. Update canonicalization to include `valueObjects` in serialization order.
-
-**Package:** `@prisma-next/contract`
-
-### Step 2: Contract validation
-
-Extend `validateContractDomain`: every `type` reference in a field must resolve to a name in `valueObjects`. Self-referencing value objects are allowed (a `NavItem` can have `children: NavItem[]`). Validate `dict` + `many` exclusivity. For SQL: storage validator checks that value object fields map to JSON-compatible columns.
-
-**Packages:** `@prisma-next/contract`, `@prisma-next/sql-contract`
-
-### Step 3: Contract authoring (PSL + TS)
-
-PSL interpreter: support `type` declarations and fields referencing value objects. TS authoring: helpers to define value objects and reference them from model fields.
-
-**Packages:** `@prisma-next/sql-contract-psl`, `@prisma-next/mongo-contract-psl`, `@prisma-next/sql-contract-ts`
-
-### Step 4: Contract emission
-
-Emitter serializes `valueObjects` in `contract.json`. Type generation recursively expands value object references into TypeScript types (`many` → array, `dict` → `Record<string, T>`, `nullable` → `| null`).
-
-**Package:** `@prisma-next/emitter`
-
-### Step 5: ORM reads
-
-Value object fields appear in row types. Dot-path filtering compiles to Mongo native dot notation or SQL JSONB path operators. `.select()` supports value object fields as wholes.
-
-**Packages:** `@prisma-next/mongo-orm`, `@prisma-next/sql-orm-client`
-
-### Step 6: ORM writes
-
-Nested create inputs accept value object structure inline. Update accepts wholesale replacement. Input types derived from value object field descriptors.
-
-**Packages:** `@prisma-next/mongo-orm`, `@prisma-next/sql-orm-client`
-
-### Step 7: Integration tests
-
-Both families tested against real databases with value-object contracts produced by the authoring/emission pipeline.
+See [phase-1.75c-value-objects-plan.md](phase-1.75c-value-objects-plan.md) for the full execution plan with milestones, tasks, and test coverage.
 
 ## Open questions
 
-1. **Self-referencing value objects and type generation.** A `NavItem` with `{ type: "NavItem", many: true }` is valid per ADR 178. Type generation must emit a named TypeScript type and reference it by name — inlining would recurse infinitely. Contract validation must allow self-references while detecting genuinely uninstantiable cycles (e.g. a required non-array self-reference with no base case).
+1. **Self-referencing value objects and type generation.** A `NavItem` with `{ "type": { "kind": "valueObject", "name": "NavItem" }, "many": true }` is valid per ADR 178. Type generation must emit a named TypeScript type and reference it by name — inlining would recurse infinitely. Contract validation must allow self-references while detecting genuinely uninstantiable cycles (e.g. a required non-array self-reference with no base case).
 
-2. **`dict` as modifier vs type constructor.** The spec uses the modifier form: `{ codecId: "...", dict: true }` → `Record<string, string>`. The alternative — `{ dict: { codecId: "..." } }` — composes better with nesting (dict of dict, dict of many). Starting with the modifier form; revisit if nesting requirements emerge.
+2. **`dict` as modifier vs type constructor.** The spec uses the modifier form: `{ "type": { "kind": "scalar", "codecId": "..." }, "dict": true }` → `Record<string, string>`. The alternative — wrapping the type in a `dict` constructor — composes better with nesting (dict of dict, dict of many). Starting with the modifier form; revisit if nesting requirements emerge.
 
 ## References
 
