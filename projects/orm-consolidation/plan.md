@@ -111,6 +111,10 @@ End-to-end polymorphism in both SQL and Mongo ORM clients. This is the critical 
 
 **Spec:** [specs/embedded-documents-and-value-objects.spec.md](specs/embedded-documents-and-value-objects.spec.md)
 
+**Design:** [plans/value-objects-design.md](plans/value-objects-design.md)
+
+**Execution plan:** [plans/phase-1.75c-value-objects-plan.md](plans/phase-1.75c-value-objects-plan.md)
+
 End-to-end value objects and embedded documents. Value objects and embedded documents share the same ORM infrastructure (inlined in results, nested input types, dot-path filtering) and are best implemented together.
 
 **Scope:**
