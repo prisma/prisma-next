@@ -4,6 +4,7 @@ export type {
   ContractEmbedRelation,
   ContractField,
   ContractModel,
+  ContractModelBase,
   ContractReferenceRelation,
   ContractRelation,
   ContractRelationOn,

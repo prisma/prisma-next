@@ -32,14 +32,27 @@ export type ContractVariantEntry = {
 
 export type ModelStorageBase = Readonly<Record<string, unknown>>;
 
-export interface ContractModel<TModelStorage extends ModelStorageBase = ModelStorageBase> {
-  readonly fields: Record<string, ContractField>;
+/**
+ * Widened model constraint that accepts both structural {@link ContractField}
+ * values and rendered types (e.g. `Char<36>`, `Vector<1536>`) produced by
+ * parameterized renderers during contract emission.
+ *
+ * Used as the constraint on `Contract.TModels` so emitted contracts with
+ * rendered model-field types satisfy the generic `Contract` interface.
+ */
+export interface ContractModelBase<TModelStorage extends ModelStorageBase = ModelStorageBase> {
+  readonly fields: Readonly<Record<string, unknown>>;
   readonly relations: Record<string, ContractRelation>;
   readonly storage: TModelStorage;
   readonly discriminator?: ContractDiscriminator;
   readonly variants?: Record<string, ContractVariantEntry>;
   readonly base?: string;
   readonly owner?: string;
+}
+
+export interface ContractModel<TModelStorage extends ModelStorageBase = ModelStorageBase>
+  extends ContractModelBase<TModelStorage> {
+  readonly fields: Record<string, ContractField>;
 }
 
 // ── Relation key helpers ─────────────────────────────────────────────────────
