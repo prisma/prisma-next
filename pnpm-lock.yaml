@@ -2377,6 +2377,9 @@ importers:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../packages/2-sql/2-authoring/contract-ts
+      '@prisma-next/sql-orm-client':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/sql-orm-client
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../packages/2-sql/4-lanes/relational-core
