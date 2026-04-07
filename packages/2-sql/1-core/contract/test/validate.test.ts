@@ -793,6 +793,13 @@ describe('validateContract', () => {
           relations: {},
         },
       };
+      (contract as Record<string, unknown>).valueObjects = {
+        Address: {
+          fields: {
+            street: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+          },
+        },
+      };
       expect(() => validateContract(contract, emptyCodecLookup)).toThrow(
         /value object.*nativeType "text".*expected json or jsonb/,
       );
