@@ -1,5 +1,7 @@
 import { expectTypeOf } from 'vitest';
 import type {
+  BooleanField,
+  DateField,
   DocField,
   DocShape,
   ExtractDocShape,
@@ -57,6 +59,18 @@ describe('type machinery', () => {
     type Row = ResolveRow<Shape, TestCodecTypes>;
 
     expectTypeOf<Row['x']>().toEqualTypeOf<unknown>();
+  });
+
+  it('BooleanField resolves to boolean through ResolveRow', () => {
+    type Shape = { readonly flag: BooleanField };
+    type Row = ResolveRow<Shape, TestCodecTypes>;
+    expectTypeOf<Row['flag']>().toEqualTypeOf<boolean>();
+  });
+
+  it('DateField resolves to Date through ResolveRow', () => {
+    type Shape = { readonly ts: DateField };
+    type Row = ResolveRow<Shape, TestCodecTypes>;
+    expectTypeOf<Row['ts']>().toEqualTypeOf<Date>();
   });
 
   it('ExtractDocShape extracts field types from TypedAggExpr record', () => {

@@ -68,6 +68,8 @@ export type TestCodecTypes = {
   readonly 'mongo/double@1': { readonly output: number };
   readonly 'mongo/array@1': { readonly output: unknown[] };
   readonly 'mongo/null@1': { readonly output: null };
+  readonly 'mongo/bool@1': { readonly output: boolean };
+  readonly 'mongo/date@1': { readonly output: Date };
 };
 
 export type TestTypeMaps = MongoTypeMaps<TestCodecTypes>;
