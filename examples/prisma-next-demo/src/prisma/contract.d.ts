@@ -151,9 +151,18 @@ type ContractBase = ContractType<
       };
       readonly fields: {
         readonly id: Char<36>;
-        readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly userId: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly title: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly userId: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly createdAt: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+        };
         readonly embedding: Vector<1536> | null;
       };
       readonly relations: {
@@ -179,8 +188,14 @@ type ContractBase = ContractType<
       };
       readonly fields: {
         readonly id: Char<36>;
-        readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly email: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly createdAt: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+        };
         readonly kind: 'admin' | 'user';
       };
       readonly relations: {

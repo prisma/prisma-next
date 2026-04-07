@@ -50,7 +50,7 @@ function extractDomainShape(contract: Contract): DomainContractShape {
   return {
     roots: contract.roots,
     models: contract.models,
-    valueObjects: contract.valueObjects,
+    ...(contract.valueObjects ? { valueObjects: contract.valueObjects } : {}),
   };
 }
 

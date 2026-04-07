@@ -11,19 +11,31 @@
     "Post": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/int4@1"
+          },
           "nullable": false
         },
         "rating": {
-          "codecId": "pg/float8@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/float8@1"
+          },
           "nullable": true
         },
         "title": {
-          "codecId": "pg/text@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/text@1"
+          },
           "nullable": false
         },
         "userId": {
-          "codecId": "pg/int4@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/int4@1"
+          },
           "nullable": false
         }
       },
@@ -58,27 +70,45 @@
     "User": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/timestamptz@1"
+          },
           "nullable": false
         },
         "email": {
-          "codecId": "pg/text@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/text@1"
+          },
           "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/int4@1"
+          },
           "nullable": false
         },
         "isActive": {
-          "codecId": "pg/bool@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/bool@1"
+          },
           "nullable": false
         },
         "profile": {
-          "codecId": "pg/jsonb@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/jsonb@1"
+          },
           "nullable": true
         },
         "role": {
-          "codecId": "pg/enum@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/enum@1"
+          },
           "nullable": false
         }
       },

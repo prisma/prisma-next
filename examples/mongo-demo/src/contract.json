@@ -11,23 +11,38 @@
     "Post": {
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
           "nullable": false
         },
         "authorId": {
-          "codecId": "mongo/objectId@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
           "nullable": false
         },
         "content": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         },
         "createdAt": {
-          "codecId": "mongo/date@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/date@1"
+          },
           "nullable": false
         },
         "title": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         }
       },
@@ -52,19 +67,31 @@
     "User": {
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
           "nullable": false
         },
         "bio": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": true
         },
         "email": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         },
         "name": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         }
       },

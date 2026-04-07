@@ -14,24 +14,39 @@
     "Comment": {
       "fields": {
         "content": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "createdAt": {
-          "codecId": "pg/timestamptz@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "postId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "updatedAt": {
-          "codecId": "pg/timestamptz@1",
-          "nullable": true
+          "nullable": true,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -59,20 +74,35 @@
     "Event": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "sql/char@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
         },
         "name": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "scheduledAt": {
-          "codecId": "pg/timestamptz@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -97,36 +127,60 @@
     "LiteralDefaults": {
       "fields": {
         "active": {
-          "codecId": "pg/bool@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/bool@1",
+            "kind": "scalar"
+          }
         },
         "bigCount": {
-          "codecId": "pg/int8@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int8@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "label": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "metadata": {
-          "codecId": "pg/jsonb@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/jsonb@1",
+            "kind": "scalar"
+          }
         },
         "rating": {
-          "codecId": "pg/float8@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/float8@1",
+            "kind": "scalar"
+          }
         },
         "score": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "tags": {
-          "codecId": "pg/jsonb@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/jsonb@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -163,28 +217,46 @@
     "Post": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "meta": {
-          "codecId": "pg/json@1",
-          "nullable": true
+          "nullable": true,
+          "type": {
+            "codecId": "pg/json@1",
+            "kind": "scalar"
+          }
         },
         "title": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "updatedAt": {
-          "codecId": "pg/timestamptz@1",
-          "nullable": true
+          "nullable": true,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         },
         "userId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -215,24 +287,42 @@
     "User": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         },
         "email": {
-          "codecId": "sql/varchar@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "sql/varchar@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 255
+            }
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "profile": {
-          "codecId": "pg/jsonb@1",
-          "nullable": true
+          "nullable": true,
+          "type": {
+            "codecId": "pg/jsonb@1",
+            "kind": "scalar"
+          }
         },
         "updatedAt": {
-          "codecId": "pg/timestamptz@1",
-          "nullable": true
+          "nullable": true,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},

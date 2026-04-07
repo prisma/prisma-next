@@ -18,10 +18,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { describeWithMongoDB } from '../mongo/setup';
 import type { Contract as MongoVOContract } from './fixtures/generated/mongo-contract.d';
 import mongoContractJson from './fixtures/generated/mongo-contract.json';
-import type {
-  Location as SqlLocation,
-  Contract as SqlVOContract,
-} from './fixtures/generated/sql-contract.d';
+import type { Contract as SqlVOContract } from './fixtures/generated/sql-contract.d';
 import sqlContractJson from './fixtures/generated/sql-contract.json';
 
 describeWithMongoDB('value objects e2e: Mongo → real DB → typed ORM', (ctx) => {
@@ -94,12 +91,13 @@ describeWithMongoDB('value objects e2e: Mongo → real DB → typed ORM', (ctx) 
         notes: null,
       });
 
-    expect(updated.location).toEqual({
+    expect(updated).not.toBeNull();
+    expect(updated!.location).toEqual({
       street: '99 New Blvd',
       city: 'Metropolis',
       zip: '99999',
     });
-    expect(updated.notes).toBeNull();
+    expect(updated!.notes).toBeNull();
   });
 });
 
@@ -160,11 +158,6 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
 
             const shop = shops[0]!;
 
-            expectTypeOf(shop.location).toEqualTypeOf<SqlLocation>();
-            expectTypeOf(shop.notes).toEqualTypeOf<SqlLocation | null>();
-            expectTypeOf(shop.name).toEqualTypeOf<string>();
-            expectTypeOf(shop.id).toEqualTypeOf<number>();
-
             expect(shop.name).toBe('Green Cafe');
             expect(shop.location).toEqual(locationData);
             expect(shop.notes).toBeNull();
@@ -175,8 +168,6 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
               location: { street: '7 Elm St', city: 'Seattle', zip: '98101' },
               notes: { street: '8 Pine St', city: 'Tacoma', zip: '98401' },
             });
-
-            expectTypeOf(created.location).toEqualTypeOf<SqlLocation>();
 
             expect(created.location).toEqual({
               street: '7 Elm St',

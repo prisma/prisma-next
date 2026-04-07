@@ -11,15 +11,24 @@
     "Address": {
       "fields": {
         "city": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         },
         "street": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         },
         "zip": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         }
       },
@@ -31,7 +40,10 @@
       "base": "Task",
       "fields": {
         "severity": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         }
       },
@@ -43,15 +55,24 @@
     "Comment": {
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
           "nullable": false
         },
         "createdAt": {
-          "codecId": "mongo/date@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/date@1"
+          },
           "nullable": false
         },
         "text": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         }
       },
@@ -63,11 +84,17 @@
       "base": "Task",
       "fields": {
         "priority": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         },
         "targetRelease": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         }
       },
@@ -82,19 +109,31 @@
       },
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
           "nullable": false
         },
         "assigneeId": {
-          "codecId": "mongo/objectId@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
           "nullable": false
         },
         "title": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         },
         "type": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         }
       },
@@ -136,15 +175,24 @@
     "User": {
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
           "nullable": false
         },
         "email": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         },
         "name": {
-          "codecId": "mongo/string@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         }
       },
