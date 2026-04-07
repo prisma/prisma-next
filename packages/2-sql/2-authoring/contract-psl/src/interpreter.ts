@@ -42,10 +42,13 @@ import type {
 } from './default-function-registry';
 import {
   getAttribute,
+  getPositionalArgument,
+  lowerFirst,
   mapFieldNamesToColumns,
   parseAttributeFieldList,
   parseConstraintMapArgument,
   parseMapName,
+  parseQuotedStringLiteral,
 } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
 import {
@@ -379,7 +382,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   const primaryKeyFields = resolvedFields.filter((field) => field.isId);
   const primaryKeyColumns = primaryKeyFields.map((field) => field.columnName);
   const primaryKeyName = primaryKeyFields.length === 1 ? primaryKeyFields[0]?.idName : undefined;
-  if (primaryKeyColumns.length === 0) {
+  const isVariantModel = model.attributes.some((attr) => attr.name === 'base');
+  if (primaryKeyColumns.length === 0 && !isVariantModel) {
     diagnostics.push({
       code: 'PSL_MISSING_PRIMARY_KEY',
       message: `Model "${model.name}" must declare at least one @id field for SQL provider`,
@@ -465,6 +469,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
 
   for (const modelAttribute of model.attributes) {
     if (modelAttribute.name === 'map') {
+      continue;
+    }
+    if (modelAttribute.name === 'discriminator' || modelAttribute.name === 'base') {
       continue;
     }
     if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
@@ -773,6 +780,191 @@ function patchModelDomainFields(
   return patched;
 }
 
+type DiscriminatorDeclaration = {
+  readonly fieldName: string;
+  readonly span: ContractSourceDiagnosticSpan;
+};
+
+type BaseDeclaration = {
+  readonly baseName: string;
+  readonly value: string;
+  readonly span: ContractSourceDiagnosticSpan;
+};
+
+function collectPolymorphismDeclarations(
+  models: readonly PslModel[],
+  sourceId: string,
+  diagnostics: ContractSourceDiagnostic[],
+): {
+  discriminatorDeclarations: Map<string, DiscriminatorDeclaration>;
+  baseDeclarations: Map<string, BaseDeclaration>;
+} {
+  const discriminatorDeclarations = new Map<string, DiscriminatorDeclaration>();
+  const baseDeclarations = new Map<string, BaseDeclaration>();
+
+  for (const model of models) {
+    for (const attr of model.attributes) {
+      if (attr.name === 'discriminator') {
+        const fieldName = getPositionalArgument(attr);
+        if (!fieldName) {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `Model "${model.name}" @@discriminator requires a field name argument`,
+            sourceId,
+            span: attr.span,
+          });
+          continue;
+        }
+        discriminatorDeclarations.set(model.name, { fieldName, span: attr.span });
+      }
+
+      if (attr.name === 'base') {
+        const baseName = getPositionalArgument(attr, 0);
+        const rawValue = getPositionalArgument(attr, 1);
+        if (!baseName || !rawValue) {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `Model "${model.name}" @@base requires two arguments: base model name and discriminator value`,
+            sourceId,
+            span: attr.span,
+          });
+          continue;
+        }
+        const value = parseQuotedStringLiteral(rawValue);
+        if (value === undefined) {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `Model "${model.name}" @@base discriminator value must be a quoted string literal`,
+            sourceId,
+            span: attr.span,
+          });
+          continue;
+        }
+        baseDeclarations.set(model.name, { baseName, value, span: attr.span });
+      }
+    }
+  }
+
+  return { discriminatorDeclarations, baseDeclarations };
+}
+
+function resolvePolymorphism(
+  models: Record<string, ContractModel>,
+  discriminatorDeclarations: Map<string, DiscriminatorDeclaration>,
+  baseDeclarations: Map<string, BaseDeclaration>,
+  modelNames: Set<string>,
+  modelMappings: ReadonlyMap<string, ModelNameMapping>,
+  sourceId: string,
+  diagnostics: ContractSourceDiagnostic[],
+): Record<string, ContractModel> {
+  let patched = models;
+
+  for (const [modelName, decl] of discriminatorDeclarations) {
+    if (baseDeclarations.has(modelName)) {
+      diagnostics.push({
+        code: 'PSL_DISCRIMINATOR_AND_BASE',
+        message: `Model "${modelName}" cannot have both @@discriminator and @@base`,
+        sourceId,
+        span: decl.span,
+      });
+      continue;
+    }
+
+    const model = patched[modelName];
+    if (!model) continue;
+
+    if (!Object.hasOwn(model.fields, decl.fieldName)) {
+      diagnostics.push({
+        code: 'PSL_DISCRIMINATOR_FIELD_NOT_FOUND',
+        message: `Discriminator field "${decl.fieldName}" is not a field on model "${modelName}"`,
+        sourceId,
+        span: decl.span,
+      });
+      continue;
+    }
+
+    const variants: Record<string, { readonly value: string }> = {};
+    const seenValues = new Map<string, string>();
+
+    for (const [variantName, baseDecl] of baseDeclarations) {
+      if (baseDecl.baseName !== modelName) continue;
+
+      const existingVariant = seenValues.get(baseDecl.value);
+      if (existingVariant) {
+        diagnostics.push({
+          code: 'PSL_DUPLICATE_DISCRIMINATOR_VALUE',
+          message: `Discriminator value "${baseDecl.value}" is used by both "${existingVariant}" and "${variantName}" on base model "${modelName}"`,
+          sourceId,
+          span: baseDecl.span,
+        });
+        continue;
+      }
+      seenValues.set(baseDecl.value, variantName);
+      variants[variantName] = { value: baseDecl.value };
+    }
+
+    if (Object.keys(variants).length === 0) {
+      diagnostics.push({
+        code: 'PSL_ORPHANED_DISCRIMINATOR',
+        message: `Model "${modelName}" has @@discriminator but no variant models declare @@base(${modelName}, ...)`,
+        sourceId,
+        span: decl.span,
+      });
+      continue;
+    }
+
+    patched = {
+      ...patched,
+      [modelName]: { ...model, discriminator: { field: decl.fieldName }, variants },
+    };
+  }
+
+  for (const [variantName, baseDecl] of baseDeclarations) {
+    if (!modelNames.has(baseDecl.baseName)) {
+      diagnostics.push({
+        code: 'PSL_BASE_TARGET_NOT_FOUND',
+        message: `Model "${variantName}" @@base references non-existent model "${baseDecl.baseName}"`,
+        sourceId,
+        span: baseDecl.span,
+      });
+      continue;
+    }
+
+    if (!discriminatorDeclarations.has(baseDecl.baseName)) {
+      diagnostics.push({
+        code: 'PSL_ORPHANED_BASE',
+        message: `Model "${variantName}" declares @@base(${baseDecl.baseName}, ...) but "${baseDecl.baseName}" has no @@discriminator`,
+        sourceId,
+        span: baseDecl.span,
+      });
+      continue;
+    }
+
+    if (discriminatorDeclarations.has(variantName)) {
+      continue;
+    }
+
+    const variantModel = patched[variantName];
+    if (!variantModel) continue;
+
+    const baseMapping = modelMappings.get(baseDecl.baseName);
+    const variantMapping = modelMappings.get(variantName);
+    const hasOwnMap = variantMapping && variantMapping.tableName !== lowerFirst(variantName);
+    const resolvedTable = hasOwnMap ? variantMapping.tableName : baseMapping?.tableName;
+
+    patched = {
+      ...patched,
+      [variantName]: {
+        ...variantModel,
+        base: baseDecl.baseName,
+        ...(resolvedTable ? { storage: { ...variantModel.storage, table: resolvedTable } } : {}),
+      },
+    };
+  }
+
+  return patched;
+}
+
 export function interpretPslDocumentToSqlContract(
   input: InterpretPslDocumentToSqlContractInput,
 ): Result<Contract, ContractSourceDiagnostics> {
@@ -879,6 +1071,12 @@ export function interpretPslDocumentToSqlContract(
     sourceId,
   });
 
+  const { discriminatorDeclarations, baseDeclarations } = collectPolymorphismDeclarations(
+    input.document.ast.models,
+    sourceId,
+    diagnostics,
+  );
+
   if (diagnostics.length > 0) {
     const dedupedDiagnostics = diagnostics.filter(
       (diagnostic, index, allDiagnostics) =>
@@ -930,13 +1128,37 @@ export function interpretPslDocumentToSqlContract(
     sourceId,
   );
 
-  const patchedModels = patchModelDomainFields(
+  let patchedModels = patchModelDomainFields(
     contract.models as Record<string, ContractModel>,
     modelResolvedFields,
   );
 
+  const polyDiagnostics: ContractSourceDiagnostic[] = [];
+  patchedModels = resolvePolymorphism(
+    patchedModels,
+    discriminatorDeclarations,
+    baseDeclarations,
+    modelNames,
+    modelMappings,
+    sourceId,
+    polyDiagnostics,
+  );
+
+  if (polyDiagnostics.length > 0) {
+    return notOk({
+      summary: 'PSL to SQL contract interpretation failed',
+      diagnostics: polyDiagnostics,
+    });
+  }
+
+  const variantModelNames = new Set(baseDeclarations.keys());
+  const filteredRoots = Object.fromEntries(
+    Object.entries(contract.roots).filter(([, modelName]) => !variantModelNames.has(modelName)),
+  );
+
   const patchedContract: Contract = {
     ...contract,
+    roots: filteredRoots,
     models: patchedModels,
     ...(Object.keys(valueObjects).length > 0 ? { valueObjects } : {}),
   };
