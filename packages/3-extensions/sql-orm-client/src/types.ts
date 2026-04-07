@@ -396,6 +396,37 @@ export type DefaultModelRow<TContract extends Contract<SqlStorage>, ModelName ex
   [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
 };
 
+// ---------------------------------------------------------------------------
+// InferRootRow — discriminated union for polymorphic base models
+// ---------------------------------------------------------------------------
+
+type Simplify<T> = { [K in keyof T]: T[K] } & {};
+
+type VariantRow<TContract extends Contract<SqlStorage>, ModelName extends string> = ModelDef<
+  TContract,
+  ModelName
+> extends {
+  readonly discriminator: { readonly field: infer DiscField extends string };
+  readonly variants: infer V;
+}
+  ? V extends Record<string, { readonly value: string }>
+    ? {
+        [VK in keyof V]: VK extends string & keyof ModelsOf<TContract>
+          ? Simplify<
+              Omit<DefaultModelRow<TContract, ModelName>, DiscField> &
+                DefaultModelRow<TContract, VK> &
+                Record<DiscField, V[VK]['value']>
+            >
+          : never;
+      }[keyof V]
+    : DefaultModelRow<TContract, ModelName>
+  : DefaultModelRow<TContract, ModelName>;
+
+export type InferRootRow<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+> = VariantRow<TContract, ModelName>;
+
 declare const aggregateResultBrand: unique symbol;
 
 export interface AggregateSelector<Result> {
