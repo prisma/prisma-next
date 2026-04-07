@@ -11,39 +11,39 @@
     "Post": {
       "fields": {
         "_id": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "mongo/objectId@1"
-          },
-          "nullable": false
+            "codecId": "mongo/objectId@1",
+            "kind": "scalar"
+          }
         },
         "authorId": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "mongo/objectId@1"
-          },
-          "nullable": false
+            "codecId": "mongo/objectId@1",
+            "kind": "scalar"
+          }
         },
         "content": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "mongo/string@1"
-          },
-          "nullable": false
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         },
         "createdAt": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "mongo/date@1"
-          },
-          "nullable": false
+            "codecId": "mongo/date@1",
+            "kind": "scalar"
+          }
         },
         "title": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "mongo/string@1"
-          },
-          "nullable": false
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -67,32 +67,39 @@
     "User": {
       "fields": {
         "_id": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "mongo/objectId@1"
-          },
-          "nullable": false
+            "codecId": "mongo/objectId@1",
+            "kind": "scalar"
+          }
+        },
+        "address": {
+          "nullable": true,
+          "type": {
+            "kind": "valueObject",
+            "name": "Address"
+          }
         },
         "bio": {
+          "nullable": true,
           "type": {
-            "kind": "scalar",
-            "codecId": "mongo/string@1"
-          },
-          "nullable": true
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         },
         "email": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "mongo/string@1"
-          },
-          "nullable": false
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         },
         "name": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "mongo/string@1"
-          },
-          "nullable": false
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -111,6 +118,40 @@
       },
       "storage": {
         "collection": "users"
+      }
+    }
+  },
+  "valueObjects": {
+    "Address": {
+      "fields": {
+        "city": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        },
+        "country": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        },
+        "street": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        },
+        "zip": {
+          "nullable": true,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        }
       }
     }
   },

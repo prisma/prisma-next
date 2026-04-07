@@ -1,5 +1,6 @@
 import {
   enumType,
+  jsonbColumn,
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
@@ -21,6 +22,7 @@ const User = model('User', {
     email: field.column(textColumn),
     createdAt: field.column(timestamptzColumn).defaultSql('now()'),
     kind: field.namedType(types.user_type),
+    address: field.column(jsonbColumn).optional(),
   },
 });
 

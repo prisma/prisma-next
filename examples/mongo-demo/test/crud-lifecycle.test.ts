@@ -46,6 +46,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
       name: 'Alice',
       email: 'alice@example.com',
       bio: 'Writer',
+      address: null,
     });
 
     expect(alice._id).toBeDefined();
@@ -80,9 +81,9 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
     const created = await orm.users.createAll([
-      { name: 'Alice', email: 'alice@example.com', bio: null },
-      { name: 'Bob', email: 'bob@example.com', bio: null },
-      { name: 'Carol', email: 'carol@example.com', bio: null },
+      { name: 'Alice', email: 'alice@example.com', bio: null, address: null },
+      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
+      { name: 'Carol', email: 'carol@example.com', bio: null, address: null },
     ]);
 
     expect(created).toHaveLength(3);
@@ -120,8 +121,8 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
     const count = await orm.users.createCount([
-      { name: 'Alice', email: 'alice@example.com', bio: null },
-      { name: 'Bob', email: 'bob@example.com', bio: null },
+      { name: 'Alice', email: 'alice@example.com', bio: null, address: null },
+      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
     ]);
 
     expect(count).toBe(2);
@@ -134,9 +135,9 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
     await orm.users.createAll([
-      { name: 'Alice', email: 'alice@example.com', bio: null },
-      { name: 'Bob', email: 'bob@example.com', bio: null },
-      { name: 'Carol', email: 'carol@example.com', bio: 'existing' },
+      { name: 'Alice', email: 'alice@example.com', bio: null, address: null },
+      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
+      { name: 'Carol', email: 'carol@example.com', bio: 'existing', address: null },
     ]);
 
     const count = await orm.users
@@ -150,9 +151,9 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
     await orm.users.createAll([
-      { name: 'Alice', email: 'alice@example.com', bio: null },
-      { name: 'Bob', email: 'bob@example.com', bio: null },
-      { name: 'Carol', email: 'carol@example.com', bio: 'keep' },
+      { name: 'Alice', email: 'alice@example.com', bio: null, address: null },
+      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
+      { name: 'Carol', email: 'carol@example.com', bio: 'keep', address: null },
     ]);
 
     const count = await orm.users.where(MongoFieldFilter.eq('bio', null)).deleteCount();
@@ -168,7 +169,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
     const result = await orm.users.where(MongoFieldFilter.eq('email', 'new@example.com')).upsert({
-      create: { name: 'New User', email: 'new@example.com', bio: 'New bio' },
+      create: { name: 'New User', email: 'new@example.com', bio: 'New bio', address: null },
       update: { name: 'Updated Name' },
     });
 
@@ -185,13 +186,70 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
     });
   });
 
+  it('create and read user with embedded Address value object', async () => {
+    const orm = mongoOrm({ contract, executor: runtime });
+    const address = { street: '789 Elm Blvd', city: 'Austin', zip: '73301', country: 'US' };
+
+    const alice = await orm.users.create({
+      name: 'Alice',
+      email: 'alice@example.com',
+      bio: null,
+      address,
+    });
+
+    expect(alice.address).toEqual(address);
+
+    const fetched = await orm.users
+      .where(MongoFieldFilter.eq('email', 'alice@example.com'))
+      .first();
+    expect(fetched).not.toBeNull();
+    expect(fetched!.address).toEqual(address);
+  });
+
+  it('create user with null address', async () => {
+    const orm = mongoOrm({ contract, executor: runtime });
+
+    const bob = await orm.users.create({
+      name: 'Bob',
+      email: 'bob@example.com',
+      bio: null,
+      address: null,
+    });
+
+    expect(bob.address).toBeNull();
+
+    const fetched = await orm.users.where(MongoFieldFilter.eq('email', 'bob@example.com')).first();
+    expect(fetched).not.toBeNull();
+    expect(fetched!.address).toBeNull();
+  });
+
+  it('update embedded Address value object', async () => {
+    const orm = mongoOrm({ contract, executor: runtime });
+    const original = { street: '100 First Ave', city: 'Seattle', zip: '98101', country: 'US' };
+
+    await orm.users.create({
+      name: 'Carol',
+      email: 'carol@example.com',
+      bio: null,
+      address: original,
+    });
+
+    const newAddress = { street: '200 Second St', city: 'Denver', zip: '80201', country: 'US' };
+    const updated = await orm.users
+      .where(MongoFieldFilter.eq('email', 'carol@example.com'))
+      .update({ address: newAddress });
+
+    expect(updated).not.toBeNull();
+    expect(updated!.address).toEqual(newAddress);
+  });
+
   it('upsert updates when match exists', async () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
-    await orm.users.create({ name: 'Alice', email: 'alice@example.com', bio: null });
+    await orm.users.create({ name: 'Alice', email: 'alice@example.com', bio: null, address: null });
 
     const result = await orm.users.where(MongoFieldFilter.eq('email', 'alice@example.com')).upsert({
-      create: { name: 'Should Not Insert', email: 'alice@example.com', bio: null },
+      create: { name: 'Should Not Insert', email: 'alice@example.com', bio: null, address: null },
       update: { name: 'Alice Upserted' },
     });
 

@@ -7,6 +7,7 @@ import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
 import { ormClientAggregateUsers } from '../src/orm-client/aggregate-users';
 import { ormClientCreateUser } from '../src/orm-client/create-user';
+import { ormClientCreateUserWithAddress } from '../src/orm-client/create-user-with-address';
 import { ormClientDeleteUser } from '../src/orm-client/delete-user';
 import { ormClientFindUserByEmail } from '../src/orm-client/find-user-by-email';
 import { ormClientFindUserById } from '../src/orm-client/find-user-by-id';
@@ -279,6 +280,49 @@ describe('ORM client integration examples', () => {
             email: 'updated@example.com',
             kind: 'user',
           });
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientCreateUserWithAddress creates a user with an embedded Address value object',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          const address = {
+            street: '789 Elm Blvd',
+            city: 'Austin',
+            zip: '73301',
+            country: 'US',
+          };
+          const created = await ormClientCreateUserWithAddress(
+            {
+              id: '00000000-0000-0000-0000-000000000088',
+              email: 'addressed@example.com',
+              kind: 'user',
+              createdAt: new Date('2024-02-01T00:00:00.000Z'),
+              address,
+            },
+            runtime,
+          );
+
+          expect(created).toMatchObject({
+            id: '00000000-0000-0000-0000-000000000088',
+            email: 'addressed@example.com',
+            kind: 'user',
+            address,
+          });
+
+          const fetched = await ormClientGetUsers(10, runtime);
+          const found = fetched.find((u) => u.id === '00000000-0000-0000-0000-000000000088');
+          expect(found?.address).toEqual(address);
         } finally {
           await runtime.close();
         }

@@ -1,9 +1,17 @@
+type Address {
+  street  String
+  city    String
+  zip     String?
+  country String
+}
+
 model User {
-  id    ObjectId @id @map("_id")
-  name  String
-  email String
-  bio   String?
-  posts Post[]
+  id      ObjectId @id @map("_id")
+  name    String
+  email   String
+  bio     String?
+  address Address?
+  posts   Post[]
   @@map("users")
 }
 

@@ -86,6 +86,13 @@
     },
     "User": {
       "fields": {
+        "address": {
+          "nullable": true,
+          "type": {
+            "kind": "valueObject",
+            "name": "Address"
+          }
+        },
         "createdAt": {
           "nullable": false,
           "type": {
@@ -134,6 +141,9 @@
       },
       "storage": {
         "fields": {
+          "address": {
+            "column": "address"
+          },
           "createdAt": {
             "column": "createdAt"
           },
@@ -151,8 +161,42 @@
       }
     }
   },
+  "valueObjects": {
+    "Address": {
+      "fields": {
+        "city": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "country": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "street": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "zip": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      }
+    }
+  },
   "storage": {
-    "storageHash": "sha256:6cdb03e59e009e569ed535404a9a071d6a73e87f7f00fd2947b8ffd683b989da",
+    "storageHash": "sha256:8092aadb113c201a38d569e3c9226435a7b8bec111a9c13a608fb29e37875bb7",
     "tables": {
       "post": {
         "columns": {
@@ -215,6 +259,11 @@
       },
       "user": {
         "columns": {
+          "address": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": true
+          },
           "createdAt": {
             "codecId": "pg/timestamptz@1",
             "default": {

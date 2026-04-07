@@ -38,19 +38,35 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     await Promise.allSettled([runtime?.close(), client?.close(), replSet?.stop()]);
   }, timeouts.spinUpDbServer);
 
-  it('all() returns seeded users', async () => {
+  it('all() returns seeded users with embedded address value objects', async () => {
     const orm = mongoOrm({ contract, executor: runtime });
+    const aliceAddress = {
+      street: '123 Main St',
+      city: 'San Francisco',
+      zip: '94102',
+      country: 'US',
+    };
     await orm.users.createAll([
-      { name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
-      { name: 'Bob', email: 'bob@example.com', bio: null },
+      { name: 'Alice', email: 'alice@example.com', bio: 'Writer', address: aliceAddress },
+      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
     ]);
 
     const users = await orm.users.all();
     const sorted = [...users].sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
     expect(sorted).toHaveLength(2);
-    expect(sorted[0]).toMatchObject({ name: 'Alice', email: 'alice@example.com', bio: 'Writer' });
-    expect(sorted[1]).toMatchObject({ name: 'Bob', email: 'bob@example.com', bio: null });
+    expect(sorted[0]).toMatchObject({
+      name: 'Alice',
+      email: 'alice@example.com',
+      bio: 'Writer',
+      address: aliceAddress,
+    });
+    expect(sorted[1]).toMatchObject({
+      name: 'Bob',
+      email: 'bob@example.com',
+      bio: null,
+      address: null,
+    });
   });
 
   it('all() returns seeded posts', async () => {
@@ -59,6 +75,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
       name: 'Alice',
       email: 'alice@example.com',
       bio: null,
+      address: null,
     });
     await orm.posts.createAll([
       {
@@ -89,6 +106,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
       name: 'Alice',
       email: 'alice@example.com',
       bio: 'Writer',
+      address: null,
     });
     await orm.posts.create({
       title: 'Hello World',
@@ -110,8 +128,13 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     const orm = mongoOrm({ contract, executor: runtime });
 
     const createdUsers = await orm.users.createAll([
-      { name: 'Alice', email: 'alice@example.com', bio: 'Writer' },
-      { name: 'Bob', email: 'bob@example.com', bio: null },
+      {
+        name: 'Alice',
+        email: 'alice@example.com',
+        bio: 'Writer',
+        address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
+      },
+      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
     ]);
     const alice = createdUsers[0];
     const bob = createdUsers[1];
