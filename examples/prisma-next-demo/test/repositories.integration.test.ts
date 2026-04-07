@@ -149,7 +149,7 @@ describe('ORM client integration examples', () => {
     'ormClientGetUsers returns limited rows',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -174,7 +174,7 @@ describe('ORM client integration examples', () => {
     'ormClientGetAdminUsers returns only admin rows',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -199,7 +199,7 @@ describe('ORM client integration examples', () => {
     'ormClientFindUserByEmail returns a matching user and null for unknown email',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -225,7 +225,7 @@ describe('ORM client integration examples', () => {
     'ormClientFindUserById uses shorthand first({ id })',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -250,7 +250,7 @@ describe('ORM client integration examples', () => {
     'ormClientCreateUser and ormClientUpdateUserEmail run create()/update() terminal methods',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -291,7 +291,7 @@ describe('ORM client integration examples', () => {
     'ormClientAggregateUsers computes aggregate() totals',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -314,7 +314,7 @@ describe('ORM client integration examples', () => {
     'ormClientGetUserPosts returns scoped posts in descending createdAt order',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -335,7 +335,7 @@ describe('ORM client integration examples', () => {
     'ormClientGetDashboardUsers composes compound filters with select and include',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -363,7 +363,7 @@ describe('ORM client integration examples', () => {
     'ormClientGetPostFeed returns posts with projected to-one include payloads',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -393,7 +393,7 @@ describe('ORM client integration examples', () => {
     'ormClientGetUsersByIdCursor returns rows after cursor boundary',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -421,7 +421,7 @@ describe('ORM client integration examples', () => {
     'ormClientGetLatestUserPerKind returns one latest row per kind using distinctOn',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -446,7 +446,7 @@ describe('ORM client integration examples', () => {
     'ormClientGetUserInsights returns per-user counts with latest related post',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -479,7 +479,7 @@ describe('ORM client integration examples', () => {
     'ormClientGetUserKindBreakdown returns grouped user counts with having filter',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -504,7 +504,7 @@ describe('ORM client integration examples', () => {
     'ormClientUpsertUser updates existing row and inserts missing row',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -559,7 +559,7 @@ describe('ORM client integration examples', () => {
     'ormClientDeleteUser removes a user by id',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -583,7 +583,7 @@ describe('ORM client integration examples', () => {
     'ormClientGetUsersBackwardCursor returns rows before cursor in descending id order',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contract: contract });
+        await initTestDatabase({ connection: connectionString, contract });
         const runtime = await getRuntime(connectionString);
 
         try {
