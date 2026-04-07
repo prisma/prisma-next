@@ -27,6 +27,7 @@ const ContractSchema = type({
   targetFamily: 'string',
   roots: 'Record<string, string>',
   models: 'Record<string, unknown>',
+  'valueObjects?': 'Record<string, unknown>',
   storage: 'Record<string, unknown>',
   capabilities: 'Record<string, Record<string, boolean>>',
   extensionPacks: 'Record<string, unknown>',
@@ -49,6 +50,7 @@ function extractDomainShape(contract: Contract): DomainContractShape {
   return {
     roots: contract.roots,
     models: contract.models,
+    valueObjects: contract.valueObjects,
   };
 }
 

@@ -12,6 +12,7 @@ export interface DomainModelShape {
 export interface DomainContractShape {
   readonly roots: Record<string, string>;
   readonly models: Record<string, DomainModelShape>;
+  readonly valueObjects?: Record<string, { readonly fields: Record<string, unknown> }>;
 }
 
 export function validateContractDomain(contract: DomainContractShape): void {

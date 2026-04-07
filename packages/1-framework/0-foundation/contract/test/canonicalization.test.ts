@@ -520,4 +520,41 @@ describe('orderTopLevel', () => {
     });
     expect(Object.keys(result)).toEqual(['targetFamily', 'target', 'apple', 'zebra']);
   });
+
+  it('places valueObjects between models and storage', () => {
+    const result = orderTopLevel({
+      storage: {},
+      valueObjects: { Address: { fields: {} } },
+      models: {},
+      target: 'postgres',
+    });
+    const keys = Object.keys(result);
+    expect(keys.indexOf('models')).toBeLessThan(keys.indexOf('valueObjects'));
+    expect(keys.indexOf('valueObjects')).toBeLessThan(keys.indexOf('storage'));
+  });
+});
+
+describe('canonicalize with valueObjects', () => {
+  it('includes valueObjects in canonicalized output when present', () => {
+    const contract = minimal({
+      valueObjects: {
+        Address: {
+          fields: {
+            street: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+            city: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+          },
+        },
+      },
+    });
+    const result = canonicalizeContractToObject(contract);
+    expect(result).toHaveProperty('valueObjects');
+    const vo = result['valueObjects'] as Record<string, unknown>;
+    expect(vo).toHaveProperty('Address');
+  });
+
+  it('omits valueObjects from output when undefined', () => {
+    const contract = minimal();
+    const result = canonicalizeContractToObject(contract);
+    expect(result).not.toHaveProperty('valueObjects');
+  });
 });

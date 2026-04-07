@@ -1,5 +1,5 @@
 import type { Contract } from './contract-types';
-import type { ContractModel, ContractModelBase, ModelStorageBase } from './domain-types';
+import type { ContractModel, ContractModelBase, ContractValueObject, ModelStorageBase } from './domain-types';
 import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
 import type { ExecutionSection, ProfileHashBase, StorageBase } from './types';
 import { coreHash } from './types';
@@ -13,6 +13,7 @@ type ContractOverrides<
   roots?: Record<string, string>;
   models?: TModels;
   storage?: Omit<TStorage, 'storageHash'>;
+  valueObjects?: Record<string, ContractValueObject>;
   capabilities?: Record<string, Record<string, boolean>>;
   extensionPacks?: Record<string, unknown>;
   execution?: Omit<ExecutionSection, 'executionHash'>;
@@ -52,6 +53,7 @@ export function createContract<
     targetFamily,
     roots: overrides.roots ?? {},
     models: (overrides.models ?? {}) as TModels,
+    ...(overrides.valueObjects ? { valueObjects: overrides.valueObjects } : {}),
     storage,
     capabilities,
     extensionPacks: overrides.extensionPacks ?? {},

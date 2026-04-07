@@ -9,6 +9,7 @@ export type {
   ContractReferenceRelation,
   ContractRelation,
   ContractRelationOn,
+  ContractValueObject,
   ContractVariantEntry,
   EmbedRelationKeys,
   ModelStorageBase,
