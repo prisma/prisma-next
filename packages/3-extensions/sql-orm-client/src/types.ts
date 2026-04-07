@@ -79,6 +79,7 @@ export interface CollectionState {
   readonly selectedFields: readonly string[] | undefined;
   readonly limit: number | undefined;
   readonly offset: number | undefined;
+  readonly variantName: string | undefined;
 }
 
 export function emptyState(): CollectionState {
@@ -92,6 +93,7 @@ export function emptyState(): CollectionState {
     selectedFields: undefined,
     limit: undefined,
     offset: undefined,
+    variantName: undefined,
   };
 }
 
@@ -426,6 +428,34 @@ export type InferRootRow<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
 > = VariantRow<TContract, ModelName>;
+
+export type VariantNames<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+> = ModelDef<TContract, ModelName> extends {
+  readonly variants: infer V extends Record<string, unknown>;
+}
+  ? keyof V & string
+  : never;
+
+export type VariantModelRow<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  VariantName extends string,
+> = ModelDef<TContract, ModelName> extends {
+  readonly discriminator: { readonly field: infer DiscField extends string };
+  readonly variants: infer V;
+}
+  ? V extends Record<string, { readonly value: string }>
+    ? VariantName extends keyof V & string & keyof ModelsOf<TContract>
+      ? Simplify<
+          Omit<DefaultModelRow<TContract, ModelName>, DiscField> &
+            DefaultModelRow<TContract, VariantName> &
+            Record<DiscField, V[VariantName]['value']>
+        >
+      : DefaultModelRow<TContract, ModelName>
+    : DefaultModelRow<TContract, ModelName>
+  : DefaultModelRow<TContract, ModelName>;
 
 declare const aggregateResultBrand: unique symbol;
 
