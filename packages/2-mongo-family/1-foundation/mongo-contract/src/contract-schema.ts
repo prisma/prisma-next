@@ -1,11 +1,19 @@
 import { type } from 'arktype';
 
-const FieldTypeSchema = type({
+const ScalarFieldTypeSchema = type({
   '+': 'reject',
   kind: "'scalar'",
   codecId: 'string',
   'typeParams?': 'Record<string, unknown>',
 });
+
+const ValueObjectFieldTypeSchema = type({
+  '+': 'reject',
+  kind: "'valueObject'",
+  name: 'string',
+});
+
+const FieldTypeSchema = ScalarFieldTypeSchema.or(ValueObjectFieldTypeSchema);
 
 const RawFieldSchema = type({
   '+': 'reject',
@@ -86,4 +94,5 @@ export const MongoContractSchema = type({
     'storageHash?': 'string',
   }),
   models: type({ '[string]': ModelDefinitionSchema }),
+  'valueObjects?': 'Record<string, unknown>',
 });
