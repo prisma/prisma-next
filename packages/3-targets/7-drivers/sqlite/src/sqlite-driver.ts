@@ -137,62 +137,68 @@ class SqliteTransactionImpl implements SqlTransaction {
   }
 }
 
-export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
-  readonly #path: string;
-  #closed = false;
+interface ConnectedState {
+  readonly kind: 'connected';
+  readonly path: string;
+  readonly conn: SqliteConnectionImpl;
+}
 
-  constructor(path: string) {
-    this.#path = path;
+type DriverState = { readonly kind: 'unbound' } | ConnectedState | { readonly kind: 'closed' };
+
+export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
+  #state: DriverState = { kind: 'unbound' };
+
+  #requireConnected(): ConnectedState {
+    if (this.#state.kind !== 'connected') {
+      throw new Error('SQLite driver not connected. Call connect(binding) first.');
+    }
+    return this.#state;
   }
 
   get state(): SqlDriverState {
-    return this.#closed ? 'closed' : 'connected';
+    return this.#state.kind;
   }
 
-  async connect(_binding: SqliteBinding): Promise<void> {}
+  async connect(binding: SqliteBinding): Promise<void> {
+    if (this.#state.kind !== 'connected') {
+      this.#state = {
+        kind: 'connected',
+        path: binding.path,
+        conn: new SqliteConnectionImpl(openConnection(binding.path)),
+      };
+    }
+  }
 
   async acquireConnection(): Promise<SqliteConnectionImpl> {
-    const db = openConnection(this.#path);
-    return new SqliteConnectionImpl(db);
+    const { path } = this.#requireConnected();
+    return new SqliteConnectionImpl(openConnection(path));
   }
 
   async close(): Promise<void> {
-    this.#closed = true;
+    if (this.#state.kind !== 'connected') return;
+    const { conn } = this.#state;
+    this.#state = { kind: 'closed' };
+    await conn.release();
   }
 
   async *execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
-    const conn = await this.acquireConnection();
-    try {
-      for await (const row of conn.execute<Row>(request)) {
-        yield row;
-      }
-    } finally {
-      await conn.release();
-    }
+    yield* this.#requireConnected().conn.execute<Row>(request);
   }
 
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
-    const conn = await this.acquireConnection();
-    try {
-      return await conn.explain(request);
-    } finally {
-      await conn.release();
-    }
+    return this.#requireConnected().conn.explain(request);
   }
 
   async query<Row = Record<string, unknown>>(
     sql: string,
     params?: readonly unknown[],
   ): Promise<SqlQueryResult<Row>> {
-    const conn = await this.acquireConnection();
-    try {
-      return await conn.query<Row>(sql, params);
-    } finally {
-      await conn.release();
-    }
+    return this.#requireConnected().conn.query<Row>(sql, params);
   }
 }
 
 export function createBoundDriverFromBinding(binding: SqliteBinding): SqlDriver<SqliteBinding> {
-  return new SqliteBoundDriver(binding.path);
+  const driver = new SqliteBoundDriver();
+  void driver.connect(binding);
+  return driver;
 }
