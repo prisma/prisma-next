@@ -1,9 +1,12 @@
 import { MongoAggAccumulator } from '@prisma-next/mongo-query-ast';
-import type { DocField, TypedAccumulatorExpr, TypedAggExpr } from './types';
-
-type NumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: false };
-type NullableNumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: true };
-type ArrayField = { readonly codecId: 'mongo/array@1'; readonly nullable: false };
+import type {
+  ArrayField,
+  DocField,
+  NullableNumericField,
+  NumericField,
+  TypedAccumulatorExpr,
+  TypedAggExpr,
+} from './types';
 
 export const acc = {
   sum(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<NumericField> {
@@ -76,4 +79,4 @@ export const acc = {
       node: MongoAggAccumulator.count(),
     };
   },
-} as const;
+};
