@@ -715,6 +715,84 @@ describe('emit parameterized codecs integration', () => {
   });
 });
 
+describe('E2E: jsonb(schema) renderer dispatch', () => {
+  // TML-2204: once renderer dispatch is implemented, remove `.fails` — the
+  // emitter should call the renderer and produce `AuditPayload` as a rendered
+  // type expression instead of structural `typeParams` data.
+  it.fails('renders jsonb column via parameterized renderer (TML-2204)', async () => {
+    const target = createMockTarget();
+    const adapter: SqlControlAdapterDescriptor<'postgres'> = {
+      ...createMockAdapter(),
+      types: {
+        codecTypes: {
+          import: {
+            package: '@prisma-next/adapter-postgres/codec-types',
+            named: 'CodecTypes',
+            alias: 'PgCodecTypes',
+          },
+          parameterized: {
+            'pg/jsonb@1': {
+              kind: 'function',
+              render: (params: Record<string, unknown>) => {
+                const typeName = params['type'];
+                return typeof typeName === 'string' && typeName.length > 0 ? typeName : 'JsonValue';
+              },
+            },
+          },
+          typeImports: [
+            {
+              package: '@prisma-next/adapter-postgres/codec-types',
+              named: 'JsonValue',
+              alias: 'JsonValue',
+            },
+          ],
+        },
+      },
+    };
+
+    const contract = createTestContract({
+      models: {
+        Event: {
+          storage: {
+            table: 'event',
+            fields: {
+              payload: { column: 'payload' },
+            },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          event: {
+            columns: {
+              payload: {
+                nativeType: 'jsonb',
+                codecId: 'pg/jsonb@1',
+                nullable: false,
+                typeParams: { type: 'AuditPayload' },
+              },
+            },
+            primaryKey: { columns: [] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const result = await emitWithDescriptors(contract, {
+      family: createMockFamily(),
+      target,
+      adapter,
+      extensionPacks: [],
+    });
+
+    expect(result.contractDts).toMatch(/readonly payload:\s*AuditPayload\b/);
+  });
+});
+
 describe('E2E: PSL named types → interpret → emit', () => {
   it('resolves typeRef to inline typeParams on model fields from PSL named types', async () => {
     const document = parsePslDocument({
