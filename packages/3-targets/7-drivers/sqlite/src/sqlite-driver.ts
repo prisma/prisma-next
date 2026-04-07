@@ -151,7 +151,7 @@ export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
 
   async connect(_binding: SqliteBinding): Promise<void> {}
 
-  async acquireConnection(): Promise<SqlConnection> {
+  async acquireConnection(): Promise<SqliteConnectionImpl> {
     const db = openConnection(this.#path);
     return new SqliteConnectionImpl(db);
   }
@@ -174,8 +174,7 @@ export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
     const conn = await this.acquireConnection();
     try {
-      // SqliteConnectionImpl always has explain defined
-      return await conn.explain!(request);
+      return await conn.explain(request);
     } finally {
       await conn.release();
     }

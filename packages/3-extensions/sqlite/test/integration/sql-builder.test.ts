@@ -1,6 +1,6 @@
 import type { JsonValue } from '@prisma-next/adapter-sqlite/codec-types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { collect, setupIntegrationTest } from './setup';
+import { setupIntegrationTest } from './setup';
 
 describe('integration: sql-builder on SQLite', () => {
   const { db, runtime } = setupIntegrationTest();
