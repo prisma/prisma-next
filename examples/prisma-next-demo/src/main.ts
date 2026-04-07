@@ -53,6 +53,7 @@ import { ormClientGetAdminUsers } from './orm-client/get-admin-users';
 import { ormClientGetDashboardUsers } from './orm-client/get-dashboard-users';
 import { ormClientGetLatestUserPerKind } from './orm-client/get-latest-user-per-kind';
 import { ormClientGetPostFeed } from './orm-client/get-post-feed';
+import { ormClientGetBugs, ormClientGetFeatures, ormClientGetTasks } from './orm-client/get-tasks';
 import { ormClientGetUserInsights } from './orm-client/get-user-insights';
 import { ormClientGetUserKindBreakdown } from './orm-client/get-user-kind-breakdown';
 import { ormClientGetUserPosts } from './orm-client/get-user-posts';
@@ -179,6 +180,21 @@ async function main() {
       const rows = await ormClientGetUserKindBreakdown(minUsers, runtime);
 
       console.log(JSON.stringify(rows, null, 2));
+    } else if (cmd === 'repo-tasks') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const tasks = await ormClientGetTasks(limit, runtime);
+
+      console.log(JSON.stringify(tasks, null, 2));
+    } else if (cmd === 'repo-bugs') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const bugs = await ormClientGetBugs(limit, runtime);
+
+      console.log(JSON.stringify(bugs, null, 2));
+    } else if (cmd === 'repo-features') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const features = await ormClientGetFeatures(limit, runtime);
+
+      console.log(JSON.stringify(features, null, 2));
     } else if (cmd === 'repo-upsert-user') {
       const [id, email, kind] = args;
       if (!id || !email || !kind) {
