@@ -268,3 +268,8 @@ test('accept returns R for any visitor R', () => {
   };
   expectTypeOf(stage.accept(visitor)).toBeNumber();
 });
+
+test('raw objects are not assignable to MongoPipelineStage', () => {
+  // @ts-expect-error - raw objects are not valid pipeline stages
+  assertType<MongoPipelineStage>({ $match: { status: 'active' } });
+});

@@ -12,7 +12,7 @@ export {
   MongoAggReduce,
   MongoAggSwitch,
 } from '../aggregation-expressions';
-export type { AggregatePipelineEntry, AnyMongoCommand } from '../commands';
+export type { AnyMongoCommand } from '../commands';
 export {
   AggregateCommand,
   DeleteManyCommand,

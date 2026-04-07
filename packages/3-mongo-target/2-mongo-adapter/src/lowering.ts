@@ -1,5 +1,4 @@
 import type {
-  AggregatePipelineEntry,
   MongoAggExpr,
   MongoAggExprVisitor,
   MongoFilterExpr,
@@ -378,12 +377,8 @@ export function lowerStage(stage: MongoPipelineStage): Record<string, unknown> {
   }
 }
 
-function isTypedStage(entry: AggregatePipelineEntry): entry is MongoPipelineStage {
-  return typeof (entry as MongoPipelineStage).kind === 'string' && 'accept' in entry;
-}
-
 export function lowerPipeline(
-  entries: ReadonlyArray<AggregatePipelineEntry>,
+  stages: ReadonlyArray<MongoPipelineStage>,
 ): Array<Record<string, unknown>> {
-  return entries.map((entry) => (isTypedStage(entry) ? lowerStage(entry) : { ...entry }));
+  return stages.map(lowerStage);
 }

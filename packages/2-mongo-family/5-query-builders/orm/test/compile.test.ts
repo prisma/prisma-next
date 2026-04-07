@@ -1,4 +1,4 @@
-import type { AggregatePipelineEntry, MongoQueryPlan } from '@prisma-next/mongo-query-ast';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
 import {
   type MongoAndExpr,
   MongoFieldFilter,
@@ -18,7 +18,7 @@ import { compileMongoQuery } from '../src/compile';
 
 const testHash = 'test-hash';
 
-function stages(plan: MongoQueryPlan): ReadonlyArray<AggregatePipelineEntry> {
+function stages(plan: MongoQueryPlan): ReadonlyArray<MongoPipelineStage> {
   if (plan.command.kind !== 'aggregate')
     throw new Error(`Expected aggregate, got ${plan.command.kind}`);
   return plan.command.pipeline;
@@ -189,7 +189,7 @@ describe('compileMongoQuery', () => {
     };
     const plan = compileMongoQuery('users', state, testHash);
 
-    const stageKinds = (stages(plan) as ReadonlyArray<MongoPipelineStage>).map((s) => s.kind);
+    const stageKinds = stages(plan).map((s) => s.kind);
     expect(stageKinds).toEqual(['match', 'lookup', 'sort', 'skip', 'limit', 'project']);
   });
 });
