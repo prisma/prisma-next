@@ -8,6 +8,10 @@ export default defineConfig({
     testTimeout: timeouts.spinUpDbServer,
     hookTimeout: timeouts.spinUpDbServer,
     fileParallelism: false,
+    typecheck: {
+      enabled: true,
+      include: ['test/**/*.test-d.ts'],
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
