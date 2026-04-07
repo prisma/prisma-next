@@ -42,45 +42,50 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly Comment: {
-    readonly id: number;
-    readonly postId: number;
-    readonly content: string;
-    readonly createdAt: string;
-    readonly updatedAt: string | null;
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly postId: CodecTypes['pg/int4@1']['output'];
+    readonly content: CodecTypes['pg/text@1']['output'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+    readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
   };
   readonly Event: {
     readonly id: Char<36>;
-    readonly name: string;
-    readonly scheduledAt: string;
-    readonly createdAt: string;
+    readonly name: CodecTypes['pg/text@1']['output'];
+    readonly scheduledAt: CodecTypes['pg/timestamptz@1']['output'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
   };
   readonly LiteralDefaults: {
-    readonly id: number;
-    readonly label: string;
-    readonly score: number;
-    readonly rating: number;
-    readonly active: boolean;
-    readonly bigCount: number;
-    readonly metadata: unknown;
-    readonly tags: unknown;
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly label: CodecTypes['pg/text@1']['output'];
+    readonly score: CodecTypes['pg/int4@1']['output'];
+    readonly rating: CodecTypes['pg/float8@1']['output'];
+    readonly active: CodecTypes['pg/bool@1']['output'];
+    readonly bigCount: CodecTypes['pg/int8@1']['output'];
+    readonly metadata: CodecTypes['pg/jsonb@1']['output'];
+    readonly tags: CodecTypes['pg/jsonb@1']['output'];
   };
   readonly Post: {
-    readonly id: number;
-    readonly userId: number;
-    readonly title: string;
-    readonly createdAt: string;
-    readonly updatedAt: string | null;
-    readonly meta: unknown | null;
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly userId: CodecTypes['pg/int4@1']['output'];
+    readonly title: CodecTypes['pg/text@1']['output'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+    readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
+    readonly meta: CodecTypes['pg/json@1']['output'] | null;
   };
   readonly User: {
-    readonly id: number;
+    readonly id: CodecTypes['pg/int4@1']['output'];
     readonly email: Varchar<255>;
-    readonly createdAt: string;
-    readonly updatedAt: string | null;
-    readonly profile: unknown | null;
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+    readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
+    readonly profile: CodecTypes['pg/jsonb@1']['output'] | null;
   };
 };
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes>;
+export type TypeMaps = TypeMapsType<
+  CodecTypes,
+  OperationTypes,
+  QueryOperationTypes,
+  FieldOutputTypes
+>;
 
 type ContractBase = ContractType<
   {
@@ -388,16 +393,6 @@ type ContractBase = ContractType<
   },
   {
     readonly Comment: {
-      readonly storage: {
-        readonly table: 'comment';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly postId: { readonly column: 'postId' };
-          readonly content: { readonly column: 'content' };
-          readonly createdAt: { readonly column: 'created_at' };
-          readonly updatedAt: { readonly column: 'update_at' };
-        };
-      };
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -420,20 +415,28 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly Event: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'event';
+        readonly table: 'comment';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly name: { readonly column: 'name' };
-          readonly scheduledAt: { readonly column: 'scheduled_at' };
+          readonly postId: { readonly column: 'postId' };
+          readonly content: { readonly column: 'content' };
           readonly createdAt: { readonly column: 'created_at' };
+          readonly updatedAt: { readonly column: 'update_at' };
         };
       };
+    };
+    readonly Event: {
       readonly fields: {
-        readonly id: Char<36>;
+        readonly id: {
+          readonly nullable: false;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'sql/char@1';
+            readonly typeParams: { readonly length: 36 };
+          };
+        };
         readonly name: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -447,22 +450,18 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly LiteralDefaults: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'literal_defaults';
+        readonly table: 'event';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly label: { readonly column: 'label' };
-          readonly score: { readonly column: 'score' };
-          readonly rating: { readonly column: 'rating' };
-          readonly active: { readonly column: 'active' };
-          readonly bigCount: { readonly column: 'big_count' };
-          readonly metadata: { readonly column: 'metadata' };
-          readonly tags: { readonly column: 'tags' };
+          readonly name: { readonly column: 'name' };
+          readonly scheduledAt: { readonly column: 'scheduled_at' };
+          readonly createdAt: { readonly column: 'created_at' };
         };
       };
+    };
+    readonly LiteralDefaults: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -497,54 +496,22 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly ParamTypes: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'param_types';
+        readonly table: 'literal_defaults';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly name: { readonly column: 'name' };
-          readonly code: { readonly column: 'code' };
-          readonly price: { readonly column: 'price' };
-          readonly flags: { readonly column: 'flags' };
-          readonly bits: { readonly column: 'bits' };
-          readonly createdAt: { readonly column: 'created_at' };
-          readonly startsAt: { readonly column: 'starts_at' };
-          readonly startsAtTz: { readonly column: 'starts_at_tz' };
-          readonly duration: { readonly column: 'duration' };
+          readonly label: { readonly column: 'label' };
+          readonly score: { readonly column: 'score' };
+          readonly rating: { readonly column: 'rating' };
+          readonly active: { readonly column: 'active' };
+          readonly bigCount: { readonly column: 'big_count' };
+          readonly metadata: { readonly column: 'metadata' };
+          readonly tags: { readonly column: 'tags' };
         };
       };
-      readonly fields: {
-        readonly id: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-        };
-        readonly name: Varchar<255> | null;
-        readonly code: Char<16> | null;
-        readonly price: Numeric<10, 2> | null;
-        readonly flags: Bit<8> | null;
-        readonly bits: VarBit<12> | null;
-        readonly createdAt: Timestamptz<3> | null;
-        readonly startsAt: Time<2> | null;
-        readonly startsAtTz: Timetz<2> | null;
-        readonly duration: Interval<6> | null;
-      };
-      readonly relations: {};
     };
     readonly Post: {
-      readonly storage: {
-        readonly table: 'post';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly userId: { readonly column: 'userId' };
-          readonly title: { readonly column: 'title' };
-          readonly createdAt: { readonly column: 'created_at' };
-          readonly updatedAt: { readonly column: 'update_at' };
-          readonly published: { readonly column: 'published' };
-          readonly meta: { readonly column: 'meta' };
-        };
-      };
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -566,34 +533,38 @@ type ContractBase = ContractType<
           readonly nullable: true;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
         };
-        readonly published: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
-        };
         readonly meta: {
           readonly nullable: true;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/json@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly User: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'user';
+        readonly table: 'post';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly email: { readonly column: 'email' };
+          readonly userId: { readonly column: 'userId' };
+          readonly title: { readonly column: 'title' };
           readonly createdAt: { readonly column: 'created_at' };
           readonly updatedAt: { readonly column: 'update_at' };
-          readonly profile: { readonly column: 'profile' };
+          readonly meta: { readonly column: 'meta' };
         };
       };
+    };
+    readonly User: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
         };
-        readonly email: Varchar<255>;
+        readonly email: {
+          readonly nullable: false;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'sql/varchar@1';
+            readonly typeParams: { readonly length: 255 };
+          };
+        };
         readonly createdAt: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
@@ -607,7 +578,17 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
         };
       };
-      readonly relations: {};
+      readonly relations: Record<string, never>;
+      readonly storage: {
+        readonly table: 'user';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly email: { readonly column: 'email' };
+          readonly createdAt: { readonly column: 'created_at' };
+          readonly updatedAt: { readonly column: 'update_at' };
+          readonly profile: { readonly column: 'profile' };
+        };
+      };
     };
   }
 > & {
@@ -617,7 +598,6 @@ type ContractBase = ContractType<
     readonly user: 'User';
     readonly post: 'Post';
     readonly comment: 'Comment';
-    readonly param_types: 'ParamTypes';
     readonly event: 'Event';
     readonly literal_defaults: 'LiteralDefaults';
   };
