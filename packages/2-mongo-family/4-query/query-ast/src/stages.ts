@@ -481,6 +481,9 @@ export class MongoBucketStage extends MongoStageNode {
     output?: Record<string, MongoAggAccumulator>;
   }) {
     super();
+    if (options.boundaries.length < 2) {
+      throw new RangeError('boundaries must contain at least 2 values');
+    }
     this.groupBy = options.groupBy;
     this.boundaries = Object.freeze([...options.boundaries]);
     this.default_ = options.default_;
@@ -521,6 +524,9 @@ export class MongoBucketAutoStage extends MongoStageNode {
     granularity?: string;
   }) {
     super();
+    if (!Number.isInteger(options.buckets) || options.buckets < 1) {
+      throw new RangeError('buckets must be a positive integer');
+    }
     this.groupBy = options.groupBy;
     this.buckets = options.buckets;
     this.output = options.output ? Object.freeze({ ...options.output }) : undefined;
@@ -955,6 +961,12 @@ export class MongoVectorSearchStage extends MongoStageNode {
     filter?: Record<string, unknown>;
   }) {
     super();
+    if (!Number.isInteger(options.limit) || options.limit < 1) {
+      throw new RangeError('limit must be a positive integer');
+    }
+    if (!Number.isInteger(options.numCandidates) || options.numCandidates < options.limit) {
+      throw new RangeError('numCandidates must be an integer >= limit');
+    }
     this.index = options.index;
     this.path = options.path;
     this.queryVector = Object.freeze([...options.queryVector]);
