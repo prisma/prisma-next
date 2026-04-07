@@ -10,6 +10,7 @@ import {
   generateModelRelationsType,
   generateModelsType,
   generateRootsType,
+  serializeExecutionType,
   serializeObjectKey,
   serializeValue,
 } from '../src/domain-type-generation';
@@ -401,5 +402,25 @@ describe('generateHashTypeAliases', () => {
       profileHash: 'sha256:prof',
     });
     expect(result).toContain('ExecutionHashBase<string>');
+  });
+});
+
+describe('serializeExecutionType', () => {
+  it('uses ExecutionHash alias instead of literal hash value', () => {
+    const result = serializeExecutionType({
+      executionHash: 'sha256:abc123',
+      mutations: { defaults: [] },
+    });
+    expect(result).toContain('readonly executionHash: ExecutionHash');
+    expect(result).not.toContain('sha256:abc123');
+  });
+
+  it('serializes non-hash fields normally', () => {
+    const result = serializeExecutionType({
+      executionHash: 'sha256:abc123',
+      mutations: { defaults: [{ kind: 'autoIncrement' }] },
+    });
+    expect(result).toContain('readonly mutations:');
+    expect(result).toContain("readonly kind: 'autoIncrement'");
   });
 });

@@ -11,6 +11,7 @@ import {
   generateImportLines,
   generateModelsType,
   generateRootsType,
+  serializeExecutionType,
   serializeValue,
 } from './domain-type-generation';
 
@@ -59,7 +60,7 @@ export function generateContractDts(
 
   const executionClause =
     contract.execution !== undefined
-      ? `\n  readonly execution: ${serializeValue(contract.execution)};`
+      ? `\n  readonly execution: ${serializeExecutionType(contract.execution)};`
       : '';
 
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');

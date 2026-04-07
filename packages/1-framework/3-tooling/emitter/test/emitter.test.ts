@@ -378,6 +378,7 @@ describe('emitter', () => {
 
     const result = await emit(ir, options, mockSqlHook);
     expect(result.contractDts).toContain('readonly execution:');
+    expect(result.contractDts).toContain('readonly executionHash: ExecutionHash');
     expect(result.executionHash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
