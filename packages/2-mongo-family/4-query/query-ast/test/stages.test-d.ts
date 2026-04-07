@@ -7,9 +7,9 @@ import type {
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
+  MongoPipelineStage,
   MongoProjectionValue,
   MongoProjectStage,
-  MongoReadStage,
   MongoRedactStage,
   MongoReplaceRootStage,
   MongoSampleStage,
@@ -20,25 +20,25 @@ import type {
 } from '../src/stages';
 import type { MongoStageVisitor } from '../src/visitors';
 
-test('each concrete stage class is assignable to MongoReadStage', () => {
-  expectTypeOf<MongoMatchStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoProjectStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoSortStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoLimitStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoSkipStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoLookupStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoUnwindStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoGroupStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoAddFieldsStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoReplaceRootStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoCountStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoSortByCountStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoSampleStage>().toExtend<MongoReadStage>();
-  expectTypeOf<MongoRedactStage>().toExtend<MongoReadStage>();
+test('each concrete stage class is assignable to MongoPipelineStage', () => {
+  expectTypeOf<MongoMatchStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoProjectStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoSortStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoLimitStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoSkipStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoLookupStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoUnwindStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoGroupStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoAddFieldsStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoReplaceRootStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoCountStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoSortByCountStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoSampleStage>().toExtend<MongoPipelineStage>();
+  expectTypeOf<MongoRedactStage>().toExtend<MongoPipelineStage>();
 });
 
-test('MongoReadStage kind union covers all 14 kinds', () => {
-  expectTypeOf<MongoReadStage['kind']>().toEqualTypeOf<
+test('MongoPipelineStage kind union covers all 14 kinds', () => {
+  expectTypeOf<MongoPipelineStage['kind']>().toEqualTypeOf<
     | 'match'
     | 'project'
     | 'sort'
@@ -57,7 +57,7 @@ test('MongoReadStage kind union covers all 14 kinds', () => {
 });
 
 test('switching on kind is exhaustive', () => {
-  function exhaustiveSwitch(stage: MongoReadStage): string {
+  function exhaustiveSwitch(stage: MongoPipelineStage): string {
     switch (stage.kind) {
       case 'match':
         return 'match';
@@ -93,7 +93,7 @@ test('switching on kind is exhaustive', () => {
       }
     }
   }
-  assertType<(stage: MongoReadStage) => string>(exhaustiveSwitch);
+  assertType<(stage: MongoPipelineStage) => string>(exhaustiveSwitch);
 });
 
 test('MongoStageVisitor requires all 14 methods', () => {

@@ -9,9 +9,9 @@ import type {
   MongoAggAccumulator,
   MongoAggExpr,
   MongoFilterExpr,
+  MongoPipelineStage,
   MongoProjectionValue,
   MongoQueryPlan,
-  MongoReadStage,
 } from '@prisma-next/mongo-query-ast';
 import {
   AggregateCommand,
@@ -48,7 +48,7 @@ import type {
 
 interface PipelineBuilderState {
   readonly collection: string;
-  readonly stages: ReadonlyArray<MongoReadStage>;
+  readonly stages: ReadonlyArray<MongoPipelineStage>;
   readonly storageHash: string;
 }
 
@@ -65,7 +65,7 @@ export class PipelineBuilder<
   }
 
   #withStage<NewShape extends DocShape>(
-    stage: MongoReadStage,
+    stage: MongoPipelineStage,
   ): PipelineBuilder<TContract, NewShape> {
     return new PipelineBuilder<TContract, NewShape>(this.#contract, {
       ...this.#state,
@@ -235,10 +235,10 @@ export class PipelineBuilder<
 
   // --- Escape hatch ---
 
-  pipe(stage: MongoReadStage): PipelineBuilder<TContract, Shape>;
-  pipe<NewShape extends DocShape>(stage: MongoReadStage): PipelineBuilder<TContract, NewShape>;
+  pipe(stage: MongoPipelineStage): PipelineBuilder<TContract, Shape>;
+  pipe<NewShape extends DocShape>(stage: MongoPipelineStage): PipelineBuilder<TContract, NewShape>;
   pipe<NewShape extends DocShape = Shape>(
-    stage: MongoReadStage,
+    stage: MongoPipelineStage,
   ): PipelineBuilder<TContract, NewShape> {
     return this.#withStage<NewShape>(stage);
   }

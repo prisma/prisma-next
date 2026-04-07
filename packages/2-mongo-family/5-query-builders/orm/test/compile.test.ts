@@ -5,8 +5,8 @@ import {
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
+  type MongoPipelineStage,
   MongoProjectStage,
-  type MongoReadStage,
   MongoSkipStage,
   MongoSortStage,
   MongoUnwindStage,
@@ -189,7 +189,7 @@ describe('compileMongoQuery', () => {
     };
     const plan = compileMongoQuery('users', state, testHash);
 
-    const stageKinds = (stages(plan) as ReadonlyArray<MongoReadStage>).map((s) => s.kind);
+    const stageKinds = (stages(plan) as ReadonlyArray<MongoPipelineStage>).map((s) => s.kind);
     expect(stageKinds).toEqual(['match', 'lookup', 'sort', 'skip', 'limit', 'project']);
   });
 });

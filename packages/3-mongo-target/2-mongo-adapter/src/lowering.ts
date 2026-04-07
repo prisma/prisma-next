@@ -4,8 +4,8 @@ import type {
   MongoAggExprVisitor,
   MongoFilterExpr,
   MongoGroupId,
+  MongoPipelineStage,
   MongoProjectionValue,
-  MongoReadStage,
 } from '@prisma-next/mongo-query-ast';
 import type { Document } from '@prisma-next/mongo-value';
 import { resolveValue } from './resolve-value';
@@ -172,7 +172,7 @@ function lowerProjectionValue(value: MongoProjectionValue): unknown {
   return lowerAggExpr(value);
 }
 
-export function lowerStage(stage: MongoReadStage): Record<string, unknown> {
+export function lowerStage(stage: MongoPipelineStage): Record<string, unknown> {
   switch (stage.kind) {
     case 'match':
       return { $match: lowerFilter(stage.filter) };
@@ -235,13 +235,13 @@ export function lowerStage(stage: MongoReadStage): Record<string, unknown> {
       return { $redact: lowerAggExpr(stage.expr) };
     default: {
       const _exhaustive: never = stage;
-      throw new Error(`Unhandled stage kind: ${(_exhaustive as MongoReadStage).kind}`);
+      throw new Error(`Unhandled stage kind: ${(_exhaustive as MongoPipelineStage).kind}`);
     }
   }
 }
 
-function isTypedStage(entry: AggregatePipelineEntry): entry is MongoReadStage {
-  return typeof (entry as MongoReadStage).kind === 'string' && 'accept' in entry;
+function isTypedStage(entry: AggregatePipelineEntry): entry is MongoPipelineStage {
+  return typeof (entry as MongoPipelineStage).kind === 'string' && 'accept' in entry;
 }
 
 export function lowerPipeline(

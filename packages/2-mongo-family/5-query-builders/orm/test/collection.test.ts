@@ -4,8 +4,8 @@ import {
   type MongoLimitStage,
   type MongoLookupStage,
   type MongoMatchStage,
+  type MongoPipelineStage,
   type MongoProjectStage,
-  type MongoReadStage,
   type MongoSkipStage,
   type MongoSortStage,
 } from '@prisma-next/mongo-query-ast';
@@ -21,7 +21,7 @@ const contract = ormContractJson as unknown as Contract;
 function createMockExecutor(...responses: unknown[][]): MongoQueryExecutor & {
   lastPlan: MongoQueryPlan | undefined;
   readonly lastCommand: MongoQueryPlan['command'] | undefined;
-  readonly lastStages: ReadonlyArray<MongoReadStage> | undefined;
+  readonly lastStages: ReadonlyArray<MongoPipelineStage> | undefined;
 } {
   let callIndex = 0;
   const mock = {
@@ -29,9 +29,9 @@ function createMockExecutor(...responses: unknown[][]): MongoQueryExecutor & {
     get lastCommand() {
       return mock.lastPlan?.command;
     },
-    get lastStages(): ReadonlyArray<MongoReadStage> | undefined {
+    get lastStages(): ReadonlyArray<MongoPipelineStage> | undefined {
       const cmd = mock.lastPlan?.command;
-      if (cmd?.kind === 'aggregate') return cmd.pipeline as ReadonlyArray<MongoReadStage>;
+      if (cmd?.kind === 'aggregate') return cmd.pipeline as ReadonlyArray<MongoPipelineStage>;
       return undefined;
     },
     execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {

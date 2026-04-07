@@ -46,7 +46,7 @@ export {
   RawUpdateManyCommand,
   RawUpdateOneCommand,
 } from '../raw-commands';
-export type { MongoGroupId, MongoProjectionValue, MongoReadStage } from '../stages';
+export type { MongoGroupId, MongoPipelineStage, MongoProjectionValue } from '../stages';
 export {
   MongoAddFieldsStage,
   MongoCountStage,

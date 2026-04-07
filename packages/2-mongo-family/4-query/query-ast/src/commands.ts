@@ -2,7 +2,7 @@ import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoAstNode } from './ast-node';
 import type { MongoFilterExpr } from './filter-expressions';
 import type { RawMongoCommand } from './raw-commands';
-import type { MongoReadStage } from './stages';
+import type { MongoPipelineStage } from './stages';
 
 export class InsertOneCommand extends MongoAstNode {
   readonly kind = 'insertOne' as const;
@@ -121,7 +121,7 @@ export class FindOneAndDeleteCommand extends MongoAstNode {
   }
 }
 
-export type AggregatePipelineEntry = MongoReadStage | Record<string, unknown>;
+export type AggregatePipelineEntry = MongoPipelineStage | Record<string, unknown>;
 
 export class AggregateCommand extends MongoAstNode {
   readonly kind = 'aggregate' as const;
