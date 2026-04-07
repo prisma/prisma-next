@@ -378,7 +378,23 @@ type VOCodecTypes = {
   };
 };
 
-type VOTypeMaps = TypeMaps<VOCodecTypes>;
+type ExpectedAddressShape = { street: string; city: string; zip: string };
+
+type VOFieldOutputTypes = {
+  User: {
+    id: number;
+    name: string;
+    homeAddress: ExpectedAddressShape | null;
+    workAddress: ExpectedAddressShape;
+  };
+};
+
+type VOTypeMaps = TypeMaps<
+  VOCodecTypes,
+  Record<string, never>,
+  Record<string, never>,
+  VOFieldOutputTypes
+>;
 
 type VOContractBase = Contract<
   {
@@ -457,8 +473,6 @@ type VOContractBase = Contract<
 };
 
 type VOContract = ContractWithTypeMaps<VOContractBase, VOTypeMaps>;
-
-type ExpectedAddressShape = { street: string; city: string; zip: string };
 
 type VOUserRow = import('../src/types').DefaultModelRow<VOContract, 'User'>;
 type VOCreateInput = import('../src/types').CreateInput<VOContract, 'User'>;
