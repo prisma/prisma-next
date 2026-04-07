@@ -1,8 +1,3 @@
-import type {
-  MongoContract,
-  MongoContractWithTypeMaps,
-  MongoTypeMaps,
-} from '@prisma-next/mongo-contract';
 import {
   AggregateCommand,
   MongoAddFieldsStage,
@@ -26,67 +21,8 @@ import { describe, expect, it } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
 import { fn } from '../src/expression-helpers';
 import { mongoPipeline } from '../src/pipeline';
-
-type TestContract = MongoContract & {
-  readonly models: {
-    readonly Order: {
-      readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly status: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly amount: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
-        readonly customerId: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: { readonly collection: 'orders' };
-    };
-    readonly User: {
-      readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly firstName: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly lastName: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly email: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: { readonly collection: 'users' };
-    };
-  };
-  readonly roots: { readonly orders: 'Order'; readonly users: 'User' };
-};
-
-type TContract = MongoContractWithTypeMaps<TestContract, MongoTypeMaps>;
-
-const testContractJson = {
-  target: 'mongo',
-  targetFamily: 'mongo',
-  roots: { orders: 'Order', users: 'User' },
-  models: {
-    Order: {
-      fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        status: { codecId: 'mongo/string@1', nullable: false },
-        amount: { codecId: 'mongo/double@1', nullable: false },
-        customerId: { codecId: 'mongo/objectId@1', nullable: false },
-      },
-      relations: {},
-      storage: { collection: 'orders' },
-    },
-    User: {
-      fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        firstName: { codecId: 'mongo/string@1', nullable: false },
-        lastName: { codecId: 'mongo/string@1', nullable: false },
-        email: { codecId: 'mongo/string@1', nullable: false },
-      },
-      relations: {},
-      storage: { collection: 'users' },
-    },
-  },
-  storage: { storageHash: 'test-hash', collections: { orders: {}, users: {} } },
-  capabilities: {},
-  extensionPacks: {},
-  profileHash: 'test-profile',
-  meta: {},
-};
+import type { TContract } from './fixtures/test-contract';
+import { testContractJson } from './fixtures/test-contract';
 
 function createOrdersBuilder() {
   return mongoPipeline<TContract>({ contractJson: testContractJson }).from('orders');

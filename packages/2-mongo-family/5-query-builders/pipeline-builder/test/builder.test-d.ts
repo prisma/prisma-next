@@ -1,48 +1,9 @@
-import type {
-  MongoContract,
-  MongoContractWithTypeMaps,
-  MongoTypeMaps,
-} from '@prisma-next/mongo-contract';
 import type { MongoFilterExpr, MongoQueryPlan } from '@prisma-next/mongo-query-ast';
 import { expectTypeOf } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
 import { fn } from '../src/expression-helpers';
 import { mongoPipeline } from '../src/pipeline';
-
-type TestContract = MongoContract & {
-  readonly models: {
-    readonly Order: {
-      readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly status: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly amount: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
-        readonly customerId: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly tags: { readonly codecId: 'mongo/array@1'; readonly nullable: false };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: Record<string, never>;
-    };
-    readonly User: {
-      readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly name: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: Record<string, never>;
-    };
-  };
-  readonly roots: { readonly orders: 'Order'; readonly users: 'User' };
-};
-
-type TestCodecTypes = {
-  readonly 'mongo/objectId@1': { readonly output: string };
-  readonly 'mongo/string@1': { readonly output: string };
-  readonly 'mongo/double@1': { readonly output: number };
-  readonly 'mongo/array@1': { readonly output: unknown[] };
-};
-
-type TestTypeMaps = MongoTypeMaps<TestCodecTypes>;
-type TContract = MongoContractWithTypeMaps<TestContract, TestTypeMaps>;
+import type { TContract } from './fixtures/test-contract';
 
 const contractJson = {} as unknown;
 
@@ -129,5 +90,35 @@ describe('builder type tests', () => {
       upper: fn.toUpper(f.status),
     }));
     extended.sort({ upper: 1 });
+  });
+
+  it('lookup() adds array field and preserves existing fields', () => {
+    const p = mongoPipeline<TContract>({ contractJson });
+    const withLookup = p.from('orders').lookup({
+      from: 'users',
+      localField: 'customerId',
+      foreignField: '_id',
+      as: 'customer',
+    });
+
+    withLookup.sort({ status: 1 });
+    withLookup.sort({ amount: -1 });
+    withLookup.sort({ customer: 1 });
+
+    // @ts-expect-error -- 'bogus' is not in shape
+    withLookup.sort({ bogus: 1 });
+  });
+
+  it('replaceRoot() replaces entire shape', () => {
+    const p = mongoPipeline<TContract>({ contractJson });
+    type NewShape = {
+      readonly x: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+    };
+    const replaced = p.from('orders').replaceRoot<NewShape>((f) => f.status);
+
+    replaced.sort({ x: 1 });
+
+    // @ts-expect-error -- 'status' no longer exists after replaceRoot
+    replaced.sort({ status: 1 });
   });
 });

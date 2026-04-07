@@ -1,4 +1,3 @@
-import type { MongoContract } from '@prisma-next/mongo-contract';
 import { expectTypeOf } from 'vitest';
 import type {
   DocField,
@@ -8,28 +7,7 @@ import type {
   ResolveRow,
   TypedAggExpr,
 } from '../src/types';
-
-type TestContract = MongoContract & {
-  readonly models: {
-    readonly Order: {
-      readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly status: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly amount: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
-        readonly notes: { readonly codecId: 'mongo/string@1'; readonly nullable: true };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: Record<string, never>;
-    };
-  };
-  readonly roots: { readonly orders: 'Order' };
-};
-
-type TestCodecTypes = {
-  readonly 'mongo/objectId@1': { readonly output: string };
-  readonly 'mongo/string@1': { readonly output: string };
-  readonly 'mongo/double@1': { readonly output: number };
-};
+import type { TestCodecTypes, TestContract } from './fixtures/test-contract';
 
 describe('type machinery', () => {
   it('DocField has codecId and nullable', () => {
