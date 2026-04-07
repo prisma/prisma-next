@@ -322,6 +322,41 @@ type ExtractFieldValue<
     : never
   : never;
 
+type ApplyNullability<T, Nullable> = Nullable extends true ? T | null : T;
+
+type ApplyFieldModifiers<T, FieldValue, Nullable> = FieldValue extends { readonly many: true }
+  ? ApplyNullability<T[], Nullable>
+  : FieldValue extends { readonly dict: true }
+    ? ApplyNullability<Record<string, T>, Nullable>
+    : ApplyNullability<T, Nullable>;
+
+type ExtractValueObject<
+  TContract extends Contract<SqlStorage>,
+  Name extends string,
+> = TContract extends { readonly valueObjects: infer VOs }
+  ? VOs extends Record<string, { readonly fields: Record<string, unknown> }>
+    ? Name extends keyof VOs
+      ? VOs[Name]
+      : never
+    : never
+  : never;
+
+type ExpandValueObjectFields<
+  TContract extends Contract<SqlStorage>,
+  Fields extends Record<string, unknown>,
+> = {
+  [K in keyof Fields & string]: ResolveModelFieldToJsType<TContract, Fields[K]>;
+};
+
+type ResolveValueObjectJsType<
+  TContract extends Contract<SqlStorage>,
+  Name extends string,
+> = ExtractValueObject<TContract, Name> extends infer VO
+  ? VO extends { readonly fields: infer F extends Record<string, unknown> }
+    ? ExpandValueObjectFields<TContract, F>
+    : never
+  : never;
+
 type ResolveModelFieldToJsType<
   TContract extends Contract<SqlStorage>,
   FieldValue,
@@ -332,12 +367,16 @@ type ResolveModelFieldToJsType<
   ? FT extends { readonly kind: 'scalar'; readonly codecId: infer Id extends string }
     ? Id extends keyof ExtractCodecTypes<TContract>
       ? ExtractCodecTypes<TContract>[Id] extends { readonly output: infer O }
-        ? Nullable extends true
-          ? O | null
-          : O
+        ? ApplyFieldModifiers<O, FieldValue, Nullable>
         : never
       : never
-    : FieldValue
+    : FT extends { readonly kind: 'valueObject'; readonly name: infer Name extends string }
+      ? ResolveValueObjectJsType<TContract, Name> extends infer VOType
+        ? [VOType] extends [never]
+          ? unknown
+          : ApplyFieldModifiers<VOType, FieldValue, Nullable>
+        : unknown
+      : FieldValue
   : FieldValue;
 
 type ExtractColumnJsTypeFromModels<
