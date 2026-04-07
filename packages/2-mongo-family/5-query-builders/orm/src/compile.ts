@@ -1,5 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { MongoQueryPlan, MongoReadStage } from '@prisma-next/mongo-query-ast';
+import type { MongoPipelineStage, MongoQueryPlan } from '@prisma-next/mongo-query-ast';
 import {
   AggregateCommand,
   MongoAndExpr,
@@ -13,8 +13,8 @@ import {
 } from '@prisma-next/mongo-query-ast';
 import type { MongoCollectionState, MongoIncludeExpr } from './collection-state';
 
-function compileIncludes(includes: readonly MongoIncludeExpr[]): MongoReadStage[] {
-  const stages: MongoReadStage[] = [];
+function compileIncludes(includes: readonly MongoIncludeExpr[]): MongoPipelineStage[] {
+  const stages: MongoPipelineStage[] = [];
 
   for (const inc of includes) {
     stages.push(
@@ -39,7 +39,7 @@ export function compileMongoQuery<Row = unknown>(
   state: MongoCollectionState,
   storageHash: string,
 ): MongoQueryPlan<Row> {
-  const stages: MongoReadStage[] = [];
+  const stages: MongoPipelineStage[] = [];
 
   const singleFilter = state.filters.length === 1 ? state.filters[0] : undefined;
   if (singleFilter) {

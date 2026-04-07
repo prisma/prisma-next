@@ -48,7 +48,7 @@ function rewriteExprRecord(
 
 abstract class MongoStageNode extends MongoAstNode {
   abstract accept<R>(visitor: MongoStageVisitor<R>): R;
-  abstract rewrite(context: MongoStageRewriterContext): MongoReadStage;
+  abstract rewrite(context: MongoStageRewriterContext): MongoPipelineStage;
 }
 
 export class MongoMatchStage extends MongoStageNode {
@@ -65,7 +65,7 @@ export class MongoMatchStage extends MongoStageNode {
     return visitor.match(this);
   }
 
-  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
     return new MongoMatchStage(this.filter.rewrite(context.filter ?? {}));
   }
 }
@@ -84,7 +84,7 @@ export class MongoProjectStage extends MongoStageNode {
     return visitor.project(this);
   }
 
-  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
     const rewriter = context.aggExpr;
     if (!rewriter) return this;
     let hasExpr = false;
@@ -117,7 +117,7 @@ export class MongoSortStage extends MongoStageNode {
     return visitor.sort(this);
   }
 
-  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
     return this;
   }
 }
@@ -139,7 +139,7 @@ export class MongoLimitStage extends MongoStageNode {
     return visitor.limit(this);
   }
 
-  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
     return this;
   }
 }
@@ -161,7 +161,7 @@ export class MongoSkipStage extends MongoStageNode {
     return visitor.skip(this);
   }
 
-  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
     return this;
   }
 }
@@ -172,7 +172,7 @@ export class MongoLookupStage extends MongoStageNode {
   readonly localField: string | undefined;
   readonly foreignField: string | undefined;
   readonly as: string;
-  readonly pipeline: ReadonlyArray<MongoReadStage> | undefined;
+  readonly pipeline: ReadonlyArray<MongoPipelineStage> | undefined;
   readonly let_: Readonly<Record<string, MongoAggExpr>> | undefined;
 
   constructor(options: {
@@ -180,7 +180,7 @@ export class MongoLookupStage extends MongoStageNode {
     localField?: string;
     foreignField?: string;
     as: string;
-    pipeline?: ReadonlyArray<MongoReadStage>;
+    pipeline?: ReadonlyArray<MongoPipelineStage>;
     let_?: Record<string, MongoAggExpr>;
   }) {
     super();
@@ -211,7 +211,7 @@ export class MongoLookupStage extends MongoStageNode {
     return visitor.lookup(this);
   }
 
-  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
     if (!this.pipeline && !this.let_) return this;
     const rewrittenLet =
       this.let_ && context.aggExpr ? rewriteExprRecord(this.let_, context.aggExpr) : this.let_;
@@ -220,7 +220,7 @@ export class MongoLookupStage extends MongoStageNode {
       localField?: string;
       foreignField?: string;
       as: string;
-      pipeline?: ReadonlyArray<MongoReadStage>;
+      pipeline?: ReadonlyArray<MongoPipelineStage>;
       let_?: Record<string, MongoAggExpr>;
     } = { from: this.from, as: this.as };
     if (this.localField !== undefined) options.localField = this.localField;
@@ -249,7 +249,7 @@ export class MongoUnwindStage extends MongoStageNode {
     return visitor.unwind(this);
   }
 
-  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
     return this;
   }
 }
@@ -270,7 +270,7 @@ export class MongoGroupStage extends MongoStageNode {
     return visitor.group(this);
   }
 
-  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
     const rewriter = context.aggExpr;
     if (!rewriter) return this;
     const newAccumulators: Record<string, MongoAggAccumulator> = {};
@@ -299,7 +299,7 @@ export class MongoAddFieldsStage extends MongoStageNode {
     return visitor.addFields(this);
   }
 
-  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
     const rewriter = context.aggExpr;
     if (!rewriter) return this;
     return new MongoAddFieldsStage(rewriteExprRecord(this.fields, rewriter));
@@ -320,7 +320,7 @@ export class MongoReplaceRootStage extends MongoStageNode {
     return visitor.replaceRoot(this);
   }
 
-  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
     const rewriter = context.aggExpr;
     if (!rewriter) return this;
     return new MongoReplaceRootStage(this.newRoot.rewrite(rewriter));
@@ -341,7 +341,7 @@ export class MongoCountStage extends MongoStageNode {
     return visitor.count(this);
   }
 
-  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
     return this;
   }
 }
@@ -360,7 +360,7 @@ export class MongoSortByCountStage extends MongoStageNode {
     return visitor.sortByCount(this);
   }
 
-  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
     const rewriter = context.aggExpr;
     if (!rewriter) return this;
     return new MongoSortByCountStage(this.expr.rewrite(rewriter));
@@ -384,7 +384,7 @@ export class MongoSampleStage extends MongoStageNode {
     return visitor.sample(this);
   }
 
-  rewrite(_context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
     return this;
   }
 }
@@ -403,14 +403,14 @@ export class MongoRedactStage extends MongoStageNode {
     return visitor.redact(this);
   }
 
-  rewrite(context: MongoStageRewriterContext): MongoReadStage {
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
     const rewriter = context.aggExpr;
     if (!rewriter) return this;
     return new MongoRedactStage(this.expr.rewrite(rewriter));
   }
 }
 
-export type MongoReadStage =
+export type MongoPipelineStage =
   | MongoMatchStage
   | MongoProjectStage
   | MongoSortStage
