@@ -362,6 +362,18 @@ describe('MongoBucketStage', () => {
     expect((rewritten.groupBy as MongoAggFieldRef).path).toBe('r.price');
   });
 
+  it('rewrite() recurses into output accumulators', () => {
+    const aggExpr = prefixFieldRefRewriter('r.');
+    const stage = new MongoBucketStage({
+      groupBy: MongoAggFieldRef.of('price'),
+      boundaries: [0, 100],
+      output: { total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')) },
+    });
+    const rewritten = stage.rewrite({ aggExpr }) as MongoBucketStage;
+    const acc = rewritten.output!['total']!;
+    expect((acc.arg as MongoAggFieldRef).path).toBe('r.amount');
+  });
+
   it('rewrite() returns this with empty context', () => {
     const stage = new MongoBucketStage({
       groupBy: MongoAggFieldRef.of('price'),
@@ -399,6 +411,18 @@ describe('MongoBucketAutoStage', () => {
     expect((rewritten.groupBy as MongoAggFieldRef).path).toBe('r.price');
   });
 
+  it('rewrite() recurses into output accumulators', () => {
+    const aggExpr = prefixFieldRefRewriter('r.');
+    const stage = new MongoBucketAutoStage({
+      groupBy: MongoAggFieldRef.of('price'),
+      buckets: 5,
+      output: { avg: MongoAggAccumulator.avg(MongoAggFieldRef.of('score')) },
+    });
+    const rewritten = stage.rewrite({ aggExpr }) as MongoBucketAutoStage;
+    const acc = rewritten.output!['avg']!;
+    expect((acc.arg as MongoAggFieldRef).path).toBe('r.score');
+  });
+
   it('rewrite() returns this with empty context', () => {
     const stage = new MongoBucketAutoStage({
       groupBy: MongoAggFieldRef.of('price'),
@@ -434,8 +458,11 @@ describe('MongoGeoNearStage', () => {
       query: MongoFieldFilter.eq('active', true),
     });
     const rewritten = stage.rewrite({ filter }) as MongoGeoNearStage;
-    expect(rewritten.query).toBeDefined();
     expect(rewritten).not.toBe(stage);
+    expect(rewritten.query!.kind).toBe('field');
+    const rewrittenFilter = rewritten.query as MongoFieldFilter;
+    expect(rewrittenFilter.field).toBe('rewritten');
+    expect(rewrittenFilter.value).toBe(true);
   });
 
   it('rewrite() returns this without query', () => {
@@ -517,6 +544,23 @@ describe('MongoGraphLookupStage', () => {
     expect((rewritten.startWith as MongoAggFieldRef).path).toBe('r.reportsTo');
   });
 
+  it('rewrite() recurses into restrictSearchWithMatch', () => {
+    const filter = { field: () => MongoFieldFilter.eq('rewritten', true) };
+    const stage = new MongoGraphLookupStage({
+      from: 'e',
+      startWith: MongoAggFieldRef.of('x'),
+      connectFromField: 'a',
+      connectToField: 'b',
+      as: 'c',
+      restrictSearchWithMatch: MongoFieldFilter.eq('active', true),
+    });
+    const rewritten = stage.rewrite({ filter }) as MongoGraphLookupStage;
+    expect(rewritten).not.toBe(stage);
+    expect(rewritten.restrictSearchWithMatch!.kind).toBe('field');
+    const rewrittenFilter = rewritten.restrictSearchWithMatch as MongoFieldFilter;
+    expect(rewrittenFilter.field).toBe('rewritten');
+  });
+
   it('rewrite() returns this with empty context', () => {
     const stage = new MongoGraphLookupStage({
       from: 'e',
@@ -558,6 +602,18 @@ describe('MongoMergeStage', () => {
       whenMatched: [new MongoAddFieldsStage({ x: MongoAggFieldRef.of('amount') })],
     });
     const rewritten = stage.rewrite({ aggExpr }) as MongoMergeStage;
+    const pipeline = rewritten.whenMatched as MongoAddFieldsStage[];
+    expect((pipeline[0]!.fields['x'] as MongoAggFieldRef).path).toBe('r.amount');
+  });
+
+  it('rewrite() preserves object into through rewrite', () => {
+    const aggExpr = prefixFieldRefRewriter('r.');
+    const stage = new MongoMergeStage({
+      into: { db: 'archive', coll: 'results' },
+      whenMatched: [new MongoAddFieldsStage({ x: MongoAggFieldRef.of('amount') })],
+    });
+    const rewritten = stage.rewrite({ aggExpr }) as MongoMergeStage;
+    expect(rewritten.into).toEqual({ db: 'archive', coll: 'results' });
     const pipeline = rewritten.whenMatched as MongoAddFieldsStage[];
     expect((pipeline[0]!.fields['x'] as MongoAggFieldRef).path).toBe('r.amount');
   });
