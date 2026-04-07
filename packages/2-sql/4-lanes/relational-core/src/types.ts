@@ -151,12 +151,12 @@ export type ComputeColumnJsType<
             ? ModelName extends keyof ExtractFieldOutputTypes<TContract>
               ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
                 ? ExtractFieldOutputTypes<TContract>[ModelName][FieldName]
-                : FallbackCodecLookup<ColumnMeta, CodecTypes>
-              : FallbackCodecLookup<ColumnMeta, CodecTypes>
-            : FallbackCodecLookup<ColumnMeta, CodecTypes>
-        : FallbackCodecLookup<ColumnMeta, CodecTypes>
-      : FallbackCodecLookup<ColumnMeta, CodecTypes>
-  : FallbackCodecLookup<ColumnMeta, CodecTypes>;
+                : never
+              : never
+            : never
+        : never
+      : never
+  : never;
 
 /**
  * Utility type to check if a contract has the required capabilities for includeMany.
