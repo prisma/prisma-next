@@ -126,7 +126,11 @@ export class PipelineBuilder<
   > {
     const contract = this.#contract as MongoContract;
     const modelName = contract.roots[options.from];
-    const model = modelName ? contract.models[modelName] : undefined;
+    if (!modelName) {
+      const validRoots = Object.keys(contract.roots).join(', ');
+      throw new Error(`lookup() unknown root: "${options.from}". Valid roots: ${validRoots}`);
+    }
+    const model = contract.models[modelName];
     const collectionName = model?.storage?.collection ?? options.from;
     return this.#withStage(
       new MongoLookupStage({

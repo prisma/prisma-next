@@ -226,6 +226,19 @@ describe('PipelineBuilder', () => {
     });
   });
 
+  describe('lookup()', () => {
+    it('throws for unknown root', () => {
+      expect(() =>
+        createOrdersBuilder().lookup({
+          from: 'nonexistent' as 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'items',
+        }),
+      ).toThrow('lookup() unknown root: "nonexistent"');
+    });
+  });
+
   describe('replaceRoot()', () => {
     it('produces MongoReplaceRootStage', () => {
       const plan = createOrdersBuilder()

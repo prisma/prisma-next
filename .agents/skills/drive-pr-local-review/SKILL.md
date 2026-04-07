@@ -186,7 +186,7 @@ Prioritize findings by impact: security > correctness > performance > maintainab
 All findings must have a **unique, unambiguous ID** so they can be referenced from other places (follow-up docs, comments, issue trackers).
 
 - Use a single, globally unique sequence across the entire `code-review.md` (do not restart numbering per section).
-- Preferred format: `F<NN>` (e.g. `F01`, `F02`, …), optionally with a section prefix for readability (e.g. `BLOCK-F01`, `NB-F02`, `NIT-F03`), but keep IDs globally unique.
+- Preferred format: `F<NN>` (e.g. `F01`, `F02`, …). All findings and deferred items share the same sequence.
 
 For each finding, include:
 - **Location**: repo-relative path, and line range **as plain text** (not inside a `path:line` markdown link). In **Cursor** (`CURSOR_AGENT`, `CURSOR_TRACE_ID`, or `CURSOR_CLI` set, or user says output is for Cursor): use a path-only markdown link `[path](path)` and put the range after it, e.g. ` — lines 12–34`. Outside Cursor, you may use `[path (L12–L34)](path:12-34)` if links resolve for the reader.
