@@ -8,14 +8,14 @@ type ArrayField = { readonly codecId: 'mongo/array@1'; readonly nullable: false 
 export const acc = {
   sum(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<NumericField> {
     return {
-      _field: { codecId: 'mongo/double@1', nullable: false } as NumericField,
+      _field: undefined as never,
       node: MongoAggAccumulator.sum(expr.node),
     };
   },
 
   avg(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<NullableNumericField> {
     return {
-      _field: { codecId: 'mongo/double@1', nullable: true } as NullableNumericField,
+      _field: undefined as never,
       node: MongoAggAccumulator.avg(expr.node),
     };
   },
@@ -24,10 +24,7 @@ export const acc = {
     expr: TypedAggExpr<F>,
   ): TypedAccumulatorExpr<{ readonly codecId: F['codecId']; readonly nullable: true }> {
     return {
-      _field: { codecId: expr._field?.codecId, nullable: true } as {
-        readonly codecId: F['codecId'];
-        readonly nullable: true;
-      },
+      _field: undefined as never,
       node: MongoAggAccumulator.min(expr.node),
     };
   },
@@ -36,10 +33,7 @@ export const acc = {
     expr: TypedAggExpr<F>,
   ): TypedAccumulatorExpr<{ readonly codecId: F['codecId']; readonly nullable: true }> {
     return {
-      _field: { codecId: expr._field?.codecId, nullable: true } as {
-        readonly codecId: F['codecId'];
-        readonly nullable: true;
-      },
+      _field: undefined as never,
       node: MongoAggAccumulator.max(expr.node),
     };
   },
@@ -48,10 +42,7 @@ export const acc = {
     expr: TypedAggExpr<F>,
   ): TypedAccumulatorExpr<{ readonly codecId: F['codecId']; readonly nullable: true }> {
     return {
-      _field: { codecId: expr._field?.codecId, nullable: true } as {
-        readonly codecId: F['codecId'];
-        readonly nullable: true;
-      },
+      _field: undefined as never,
       node: MongoAggAccumulator.first(expr.node),
     };
   },
@@ -60,31 +51,28 @@ export const acc = {
     expr: TypedAggExpr<F>,
   ): TypedAccumulatorExpr<{ readonly codecId: F['codecId']; readonly nullable: true }> {
     return {
-      _field: { codecId: expr._field?.codecId, nullable: true } as {
-        readonly codecId: F['codecId'];
-        readonly nullable: true;
-      },
+      _field: undefined as never,
       node: MongoAggAccumulator.last(expr.node),
     };
   },
 
   push(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<ArrayField> {
     return {
-      _field: { codecId: 'mongo/array@1', nullable: false } as ArrayField,
+      _field: undefined as never,
       node: MongoAggAccumulator.push(expr.node),
     };
   },
 
   addToSet(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<ArrayField> {
     return {
-      _field: { codecId: 'mongo/array@1', nullable: false } as ArrayField,
+      _field: undefined as never,
       node: MongoAggAccumulator.addToSet(expr.node),
     };
   },
 
   count(): TypedAccumulatorExpr<NumericField> {
     return {
-      _field: { codecId: 'mongo/double@1', nullable: false } as NumericField,
+      _field: undefined as never,
       node: MongoAggAccumulator.count(),
     };
   },

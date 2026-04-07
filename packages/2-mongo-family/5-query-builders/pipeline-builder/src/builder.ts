@@ -180,15 +180,15 @@ export class PipelineBuilder<
     const accumulators: Record<string, import('@prisma-next/mongo-query-ast').MongoAggAccumulator> =
       {};
     for (const [key, typed] of Object.entries(rest)) {
-      if (typed !== null) {
-        if (typed.node.kind !== 'accumulator') {
-          throw new Error(
-            `group() field "${key}" must use an accumulator (e.g. acc.sum(), acc.count()). Got "${typed.node.kind}" expression.`,
-          );
-        }
-        accumulators[key] =
-          typed.node as import('@prisma-next/mongo-query-ast').MongoAggAccumulator;
+      if (typed === null) {
+        throw new Error(`group() field "${key}" must not be null. Only _id can be null.`);
       }
+      if (typed.node.kind !== 'accumulator') {
+        throw new Error(
+          `group() field "${key}" must use an accumulator (e.g. acc.sum(), acc.count()). Got "${typed.node.kind}" expression.`,
+        );
+      }
+      accumulators[key] = typed.node as import('@prisma-next/mongo-query-ast').MongoAggAccumulator;
     }
     return this.#withStage<GroupedDocShape<Spec>>(new MongoGroupStage(groupId, accumulators));
   }
@@ -242,8 +242,6 @@ export class PipelineBuilder<
       lane: 'mongo-pipeline',
       paramDescriptors: [],
     };
-    return { collection: this.#state.collection, command, meta } as MongoQueryPlan<
-      ResolveRow<Shape, ExtractMongoCodecTypes<TContract>>
-    >;
+    return { collection: this.#state.collection, command, meta };
   }
 }

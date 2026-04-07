@@ -19,7 +19,8 @@ function createFilterHandle(field: string): FilterHandle {
 
 export function createFilterProxy<S extends DocShape>(): FilterProxy<S> {
   return new Proxy({} as FilterProxy<S>, {
-    get(_target, prop: string): FilterHandle {
+    get(_target, prop: string | symbol): FilterHandle | undefined {
+      if (typeof prop === 'symbol') return undefined;
       return createFilterHandle(prop);
     },
   });
