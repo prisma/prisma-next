@@ -1,5 +1,9 @@
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
-import type { MongoQueryPlan, MongoUpdateSpec } from '@prisma-next/mongo-query-ast';
+import type {
+  MongoQueryPlan,
+  MongoUpdatePipelineStage,
+  MongoUpdateSpec,
+} from '@prisma-next/mongo-query-ast';
 import type { Document, MongoExpr } from '@prisma-next/mongo-value';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import {
@@ -24,8 +28,14 @@ function resolveDocument(expr: MongoExpr): Document {
   return result;
 }
 
+function isUpdatePipeline(
+  update: MongoUpdateSpec,
+): update is ReadonlyArray<MongoUpdatePipelineStage> {
+  return Array.isArray(update);
+}
+
 function lowerUpdate(update: MongoUpdateSpec): Document | ReadonlyArray<Document> {
-  if (Array.isArray(update)) {
+  if (isUpdatePipeline(update)) {
     return update.map((stage) => lowerStage(stage));
   }
   return resolveDocument(update);
