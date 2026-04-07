@@ -9,8 +9,8 @@ describe('codec renderOutputType', () => {
       expect(codec.renderOutputType!({ length: 36 })).toBe('Char<36>');
     });
 
-    it('returns undefined when length is missing', () => {
-      expect(codec.renderOutputType!({})).toBeUndefined();
+    it('throws when length is missing', () => {
+      expect(() => codec.renderOutputType!({})).toThrow(/expected numeric "length"/);
     });
   });
 
@@ -21,8 +21,8 @@ describe('codec renderOutputType', () => {
       expect(codec.renderOutputType!({ length: 255 })).toBe('Varchar<255>');
     });
 
-    it('returns undefined when length is missing', () => {
-      expect(codec.renderOutputType!({})).toBeUndefined();
+    it('throws when length is missing', () => {
+      expect(() => codec.renderOutputType!({})).toThrow(/expected numeric "length"/);
     });
   });
 
@@ -53,8 +53,8 @@ describe('codec renderOutputType', () => {
       expect(codec.renderOutputType!({ precision: 10 })).toBe('Numeric<10>');
     });
 
-    it('returns undefined when precision is missing', () => {
-      expect(codec.renderOutputType!({})).toBeUndefined();
+    it('throws when precision is missing', () => {
+      expect(() => codec.renderOutputType!({})).toThrow(/expected numeric "precision"/);
     });
   });
 
@@ -65,8 +65,8 @@ describe('codec renderOutputType', () => {
       expect(codec.renderOutputType!({ length: 8 })).toBe('Bit<8>');
     });
 
-    it('returns undefined when length is missing', () => {
-      expect(codec.renderOutputType!({})).toBeUndefined();
+    it('throws when length is missing', () => {
+      expect(() => codec.renderOutputType!({})).toThrow(/expected numeric "length"/);
     });
   });
 
@@ -133,8 +133,8 @@ describe('codec renderOutputType', () => {
       expect(codec.renderOutputType!({ values: ['USER', 'ADMIN'] })).toBe("'USER' | 'ADMIN'");
     });
 
-    it('returns undefined when values is missing', () => {
-      expect(codec.renderOutputType!({})).toBeUndefined();
+    it('throws when values is missing', () => {
+      expect(() => codec.renderOutputType!({})).toThrow(/expected array "values"/);
     });
   });
 
@@ -156,8 +156,8 @@ describe('codec renderOutputType', () => {
       expect(codec.renderOutputType!({ type: 'AuditPayload' })).toBe('AuditPayload');
     });
 
-    it('returns undefined when no type or schemaJson', () => {
-      expect(codec.renderOutputType!({})).toBeUndefined();
+    it('throws when no type or schemaJson', () => {
+      expect(() => codec.renderOutputType!({})).toThrow(/JSON codec typeParams/);
     });
   });
 

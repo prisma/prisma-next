@@ -55,20 +55,30 @@ const precisionParamsSchema = arktype({
   'precision?': 'number.integer >= 0 & number.integer <= 6',
 });
 
-function renderLength(typeName: string, typeParams: Record<string, unknown>): string | undefined {
+function renderLength(typeName: string, typeParams: Record<string, unknown>): string {
   const length = typeParams['length'];
-  return typeof length === 'number' ? `${typeName}<${length}>` : undefined;
+  if (typeof length !== 'number') {
+    throw new Error(
+      `renderOutputType: expected numeric "length" in typeParams for ${typeName}, got ${typeof length}`,
+    );
+  }
+  return `${typeName}<${length}>`;
 }
 
-function renderPrecision(
-  typeName: string,
-  typeParams: Record<string, unknown>,
-): string | undefined {
+function renderPrecision(typeName: string, typeParams: Record<string, unknown>): string {
   const precision = typeParams['precision'];
-  return typeof precision === 'number' ? `${typeName}<${precision}>` : typeName;
+  if (precision === undefined) {
+    return typeName;
+  }
+  if (typeof precision !== 'number') {
+    throw new Error(
+      `renderOutputType: expected numeric "precision" in typeParams for ${typeName}, got ${typeof precision}`,
+    );
+  }
+  return `${typeName}<${precision}>`;
 }
 
-function renderJsonOutputType(typeParams: Record<string, unknown>): string | undefined {
+function renderJsonOutputType(typeParams: Record<string, unknown>): string {
   const typeName = typeParams['type'];
   if (typeof typeName === 'string' && typeName.trim().length > 0) {
     return typeName.trim();
@@ -77,7 +87,9 @@ function renderJsonOutputType(typeParams: Record<string, unknown>): string | und
   if (schema && typeof schema === 'object') {
     return renderTypeScriptTypeFromJsonSchema(schema);
   }
-  return undefined;
+  throw new Error(
+    `renderOutputType: JSON codec typeParams must contain "type" (string) or "schemaJson" (object), got keys: ${Object.keys(typeParams).join(', ')}`,
+  );
 }
 
 function aliasCodec<
@@ -225,7 +237,11 @@ const pgNumericCodec = codec<
   paramsSchema: numericParamsSchema,
   renderOutputType: (typeParams) => {
     const precision = typeParams['precision'];
-    if (typeof precision !== 'number') return undefined;
+    if (typeof precision !== 'number') {
+      throw new Error(
+        `renderOutputType: expected numeric "precision" in typeParams for Numeric, got ${typeof precision}`,
+      );
+    }
     const scale = typeParams['scale'];
     return typeof scale === 'number' ? `Numeric<${precision}, ${scale}>` : `Numeric<${precision}>`;
   },
@@ -503,7 +519,11 @@ const pgEnumCodec = codec({
   decode: (wire: string): string => wire,
   renderOutputType: (typeParams) => {
     const values = typeParams['values'];
-    if (!Array.isArray(values)) return undefined;
+    if (!Array.isArray(values)) {
+      throw new Error(
+        `renderOutputType: expected array "values" in typeParams for enum, got ${typeof values}`,
+      );
+    }
     return values.map((value) => `'${String(value).replace(/'/g, "\\'")}'`).join(' | ');
   },
 });

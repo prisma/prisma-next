@@ -13,7 +13,12 @@ const pgVectorCodec = codec({
   traits: ['equality'],
   renderOutputType: (typeParams) => {
     const length = typeParams['length'];
-    return typeof length === 'number' ? `Vector<${length}>` : undefined;
+    if (typeof length !== 'number') {
+      throw new Error(
+        `renderOutputType: expected numeric "length" in typeParams for Vector, got ${typeof length}`,
+      );
+    }
+    return `Vector<${length}>`;
   },
   encode: (value: number[]): string => {
     // Validate that value is an array of numbers

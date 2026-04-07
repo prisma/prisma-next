@@ -12,7 +12,7 @@ describe('pgvector codec renderOutputType', () => {
     expect(codec.renderOutputType!({ length: 3 })).toBe('Vector<3>');
   });
 
-  it('returns undefined when length is missing', () => {
-    expect(codec.renderOutputType!({})).toBeUndefined();
+  it('throws when length is missing', () => {
+    expect(() => codec.renderOutputType!({})).toThrow(/expected numeric "length"/);
   });
 });
