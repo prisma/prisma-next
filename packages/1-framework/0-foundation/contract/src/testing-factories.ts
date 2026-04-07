@@ -1,12 +1,12 @@
 import type { Contract } from './contract-types';
-import type { ContractModel, ModelStorageBase } from './domain-types';
+import type { ContractModel, ContractModelBase, ModelStorageBase } from './domain-types';
 import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
 import type { ExecutionSection, ProfileHashBase, StorageBase } from './types';
 import { coreHash } from './types';
 
 type ContractOverrides<
   TStorage extends StorageBase = StorageBase,
-  TModels extends Record<string, ContractModel> = Record<string, ContractModel>,
+  TModels extends Record<string, ContractModelBase> = Record<string, ContractModel>,
 > = {
   target?: string;
   targetFamily?: string;
@@ -24,7 +24,7 @@ const DUMMY_HASH = coreHash('sha256:test');
 
 export function createContract<
   TStorage extends StorageBase = StorageBase,
-  TModels extends Record<string, ContractModel> = Record<string, ContractModel>,
+  TModels extends Record<string, ContractModelBase> = Record<string, ContractModel>,
 >(overrides: ContractOverrides<TStorage, TModels> = {}): Contract<TStorage, TModels> {
   const target = overrides.target ?? 'postgres';
   const targetFamily = overrides.targetFamily ?? 'sql';

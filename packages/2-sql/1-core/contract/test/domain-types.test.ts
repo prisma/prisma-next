@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import type { SqlStorage } from '../src/types';
 
@@ -12,10 +12,9 @@ describe('domain type compatibility', () => {
     });
   });
 
-  describe('domain fields accessible on Contract<SqlStorage> models', () => {
+  describe('domain fields accessible on ContractModel', () => {
     it('ContractModel fields are accessible via index signature', () => {
-      type ModelFromContract = Contract<SqlStorage>['models'][string];
-      type FieldsFromModel = ModelFromContract['fields'];
+      type FieldsFromModel = ContractModel['fields'];
 
       const fields: FieldsFromModel = {
         id: { nullable: false, codecId: 'pg/int4@1' },

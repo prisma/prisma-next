@@ -1,4 +1,4 @@
-import type { ContractModel } from './domain-types';
+import type { ContractModel, ContractModelBase } from './domain-types';
 import type {
   ExecutionHashBase,
   ExecutionMutationDefault,
@@ -39,7 +39,7 @@ export type ContractExecutionSection<THash extends string = string> = {
  */
 export interface Contract<
   TStorage extends StorageBase = StorageBase,
-  TModels extends Record<string, ContractModel> = Record<string, ContractModel>,
+  TModels extends Record<string, ContractModelBase> = Record<string, ContractModelBase>,
 > {
   readonly target: string;
   readonly targetFamily: string;
