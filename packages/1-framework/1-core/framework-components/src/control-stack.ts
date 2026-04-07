@@ -245,16 +245,24 @@ export function assembleAuthoringContributions(
 }
 
 export function extractCodecLookup(
-  descriptors: ReadonlyArray<Pick<ComponentMetadata, 'types'>>,
+  descriptors: ReadonlyArray<Pick<ComponentMetadata & { id?: string }, 'types' | 'id'>>,
 ): CodecLookup {
   const byId = new Map<string, import('./codec-types').Codec>();
+  const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
     const codecInstances = descriptor.types?.codecTypes?.codecInstances;
     if (!codecInstances) continue;
+    const descriptorId = descriptor.id ?? '<unknown>';
     for (const codec of codecInstances) {
-      if (!byId.has(codec.id)) {
-        byId.set(codec.id, codec);
-      }
+      assertUniqueCodecOwner({
+        codecId: codec.id,
+        owners,
+        descriptorId,
+        entityLabel: 'codec instance',
+        entityOwnershipLabel: 'codec instance provider',
+      });
+      owners.set(codec.id, descriptorId);
+      byId.set(codec.id, codec);
     }
   }
   return { get: (id) => byId.get(id) };

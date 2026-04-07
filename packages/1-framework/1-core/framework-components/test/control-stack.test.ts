@@ -3,6 +3,7 @@ import type { CreateControlStackInput } from '../src/control-stack';
 import {
   assembleAuthoringContributions,
   createControlStack,
+  extractCodecLookup,
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,
@@ -183,6 +184,44 @@ describe('assembleAuthoringContributions', () => {
         }),
       ]),
     ).toThrow(/Duplicate authoring field helper "dup"/);
+  });
+});
+
+describe('extractCodecLookup', () => {
+  const stubCodec = (id: string) =>
+    ({
+      id,
+      targetTypes: [],
+      decode: (w: unknown) => w,
+      encodeJson: (v: unknown) => v,
+      decodeJson: (j: unknown) => j,
+    }) as unknown as import('../src/codec-types').Codec;
+
+  it('builds a lookup from codec instances across descriptors', () => {
+    const codec1 = stubCodec('a@1');
+    const codec2 = stubCodec('b@1');
+    const lookup = extractCodecLookup([
+      { id: 'desc-1', types: { codecTypes: { codecInstances: [codec1] } } },
+      { id: 'desc-2', types: { codecTypes: { codecInstances: [codec2] } } },
+    ]);
+    expect(lookup.get('a@1')).toBe(codec1);
+    expect(lookup.get('b@1')).toBe(codec2);
+  });
+
+  it('returns undefined for unknown codec ids', () => {
+    const lookup = extractCodecLookup([
+      { id: 'desc', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
+    ]);
+    expect(lookup.get('z@1')).toBeUndefined();
+  });
+
+  it('throws on duplicate codec ids from different descriptors', () => {
+    expect(() =>
+      extractCodecLookup([
+        { id: 'desc-1', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
+        { id: 'desc-2', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
+      ]),
+    ).toThrow(/Duplicate codec instance for codecId "a@1"/);
   });
 });
 
