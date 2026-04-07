@@ -949,8 +949,9 @@ function resolvePolymorphism(
 
     const baseMapping = modelMappings.get(baseDecl.baseName);
     const variantMapping = modelMappings.get(variantName);
-    const hasOwnMap = variantMapping && variantMapping.tableName !== lowerFirst(variantName);
-    const resolvedTable = hasOwnMap ? variantMapping.tableName : baseMapping?.tableName;
+    const hasExplicitMap =
+      variantMapping?.model.attributes.some((attr) => attr.name === 'map') ?? false;
+    const resolvedTable = hasExplicitMap ? variantMapping?.tableName : baseMapping?.tableName;
 
     patched = {
       ...patched,
