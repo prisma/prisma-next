@@ -1,164 +1,130 @@
-# Codec-Dispatched Type Rendering — Design
+# Codec-Dispatched Type Rendering — Design Spec
 
 **Linear:** [TML-2204](https://linear.app/prisma-company/issue/TML-2204)
+**ADR:** [ADR 186 — Codec-dispatched type rendering](../../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md)
 
 **Status:** Draft
 
-## Problem
+## Summary
 
-Type rendering for parameterized codecs is scattered across multiple systems, couples the SQL emitter to storage internals, and conflates runtime values with compile-time types.
+Move output type rendering onto codecs, emit resolved output types into a dedicated `FieldOutputTypes` map in `contract.d.ts`, keep `typeParams` truthful, and delete the legacy renderer infrastructure including the SQL emitter's `EmissionSpi.generateModelsType?` override.
 
-### Current state
+## Two concepts, two locations
 
-Three independent systems participate in resolving a codec's output type in the emitted `contract.d.ts`:
+**Codec field configuration** — `typeParams` on the `ContractField`. How the codec is configured for this field. Runtime data, JSON-serializable, identical in `contract.json` and `contract.d.ts`. Examples: `{ length: 1536 }` for Vector, `{ schemaJson: { ... } }` for typed JSON, `{ values: ['USER', 'ADMIN'] }` for Enum.
 
-1. **`CodecTypes` module augmentation** — Each adapter/extension exports a `CodecTypes` type that maps `codecId → { input, output, traits }`. The emitter intersects them into a single `CodecTypes` alias. `ComputeColumnJsType` resolves the JS type via `CodecTypes[codecId]['output']`. Works for non-parameterized codecs.
+**Field output type** — entry in the `FieldOutputTypes` map. What TypeScript type the field produces. Determined by the codec and its configuration. Resolved by the emitter (emit path) or the contract builder (no-emit path). Examples: `Vector<1536>`, `{ name: string }`, `'USER' | 'ADMIN'`.
 
-2. **`parameterized` renderers in descriptor metadata** — Adapter/extension descriptors register a `parameterized` map: `codecId → TypeRenderer`. These renderer functions produce TypeScript type expression *strings* (like `'Char<5>'`, `"'USER' | 'ADMIN'"`) at emit time. The framework normalizes them (`TypeRenderer` → `NormalizedTypeRenderer`), extracts them onto the control stack, and threads them through `EmitStackInput` → `emit()` → `GenerateContractTypesOptions` → `EmissionSpi.generateModelsType()`. Four different type shapes (`string`, raw function, `{kind:'template'}`, `{kind:'function'}`) are normalized to one.
+## `FieldOutputTypes` map
 
-3. **`parameterizedOutput` on `CodecTypes`** — Some `CodecTypes` entries carry a `parameterizedOutput` function type that takes `typeParams` and returns a resolved type. This is the no-emit type-level resolution path. Used by `ComputeColumnJsType` via `ExtractParameterizedCodecOutputType`.
-
-### What's wrong
-
-- **Renderers replace the entire field type in contract.d.ts.** When a parameterized renderer fires, it emits `readonly payload: AuditPayload` instead of preserving the structural `ContractField` shape. This breaks any code that expects model fields to conform to `ContractField`. The renderer should only affect the *output type* portion.
-
-- **Renderers are registered in descriptor metadata, not on the codec.** The codec is the natural owner of "how to represent my type" — it already owns wire representation (`encode`/`decode`) and JSON serialization (`encodeJson`/`decodeJson`). Type rendering is the missing piece.
-
-- **The SQL emitter overrides `EmissionSpi.generateModelsType?`.** The only reason it does this is to inject renderer dispatch and to cross-reference model fields against storage columns (deriving `codecId` and `typeParams` from the storage layer). After TML-2206, model fields carry their own `type: ScalarFieldType` with `codecId` and `typeParams` resolved at build time, so the storage cross-referencing is redundant. The override duplicates ~110 lines of the framework's 37-line default and makes `EmissionSpi` harder to maintain.
-
-- **The `TypeRenderer` union is over-engineered.** Four input shapes (`string`, raw function, `{kind:'template'}`, `{kind:'function'}`) normalized to one, plus a `RenderTypeContext` that always carries `codecTypesName: 'CodecTypes'`.
-
-- **Two parallel type resolution mechanisms have no common abstraction.** The renderer (emit-time string) and `parameterizedOutput` (type-level function) serve the same purpose in different contexts but share no interface or contract.
-
-## Design
-
-### Core model: two parallel representations of type parameters
-
-A parameterized codec has type parameters that determine its output type. These type parameters exist in two parallel representations:
-
-1. **Runtime values** — stored in `typeParams` on the contract field. Serialized into `contract.json`. Example: `{ length: 1536 }` for Vector, `{ schemaJson: { type: 'object', properties: { name: { type: 'string' } } } }` for typed JSON.
-
-2. **Type-level values** — what appears in `contract.d.ts` as TypeScript literal types. These are what the parameterized output type on `CodecTypes` consumes to compute the output type.
-
-The **mapping from runtime values to type-level values is codec-controlled**:
-
-- **Default (most codecs):** Identity — the runtime values are serialized as const literal types by the emitter. `{ length: 1536 }` → `{ readonly length: 1536 }`. The parameterized output type computes the result: `P extends { length: infer L extends number } ? Vector<L> : number[]`.
-
-- **JSON Schema:** A transformation — the runtime JSON Schema value (in `typeParams.schemaJson`) is converted into the TypeScript output type at authoring/emission time. The type-level typeParams carry the *result* of that transformation. The parameterized output type simply extracts it.
-
-This is not a special case or escape hatch. It's the same architecture — a codec declares a parameterized output type and controls how its runtime type parameters are rendered as type-level values. The JSON Schema codec simply uses a non-identity rendering function.
-
-### Parameterized output types on `CodecTypes`
-
-Every parameterized codec declares a parameterized output type: a type-level function from type-level typeParams to the codec's output type. This is the **single mechanism** for resolving output types, in both emit and no-emit paths.
-
-Examples:
+A new type emitted alongside the contract, mapping `ModelName → FieldName → OutputType`:
 
 ```typescript
-// Vector: length → Vector<L>
-type VectorOutput<P> = P extends { readonly length: infer L extends number }
-  ? Vector<L>
-  : number[];
-
-// Char: length → Char<L>
-type CharOutput<P> = P extends { readonly length: infer L extends number }
-  ? Char<L>
-  : string;
-
-// Enum: values → literal union
-type EnumOutput<P> = P extends { readonly values: readonly (infer V extends string)[] }
-  ? V
-  : string;
-
-// Numeric: precision, optional scale
-type NumericOutput<P> = P extends { readonly precision: infer Pr extends number; readonly scale: infer S extends number }
-  ? Numeric<Pr, S>
-  : P extends { readonly precision: infer Pr extends number }
-    ? Numeric<Pr>
-    : string;
-
-// JSONB with rendered schema: output type carried directly in typeParams
-type JsonbOutput<P> = P extends { readonly schema: infer Schema }
-  ? Schema extends { readonly infer: infer Output } ? Output     // no-emit: Arktype .infer
-    : Schema extends { readonly '~standard': { readonly types?: { readonly output?: infer Output } } }
-      ? Output extends undefined ? JsonValue : Output              // no-emit: Standard Schema
-      : JsonValue
-  : P extends { readonly outputType: infer O }                     // emit: rendered type
-    ? O
-    : JsonValue;
+// contract.d.ts
+export type FieldOutputTypes = {
+  readonly User: {
+    readonly id: number;
+    readonly email: string;
+    readonly embedding: Vector<1536>;
+    readonly payload: { name: string };
+    readonly role: 'USER' | 'ADMIN';
+  };
+};
 ```
 
-These are declared by the codec's type-only export (e.g., `@prisma-next/adapter-postgres/codec-types`, `@prisma-next/extension-pgvector/codec-types`) and emitted into `contract.d.ts` via the existing `CodecTypes` intersection mechanism.
+Both paths produce it:
+- **Emit:** The emitter calls `codec.renderOutputType(typeParams)` for each field, falling back to `CodecTypes[codecId]['output']` as a type reference. Stamps results into the map.
+- **No-emit:** The contract builder propagates type-level output types from column descriptors into the map.
 
-### TypeParams rendering: codec-controlled mapping
+`ComputeColumnJsType` reads from `FieldOutputTypes[ModelName][FieldName]`. One access pattern, all fields.
 
-The emitter serializes each field's `typeParams` into the d.ts as type-level values. By default, this is const literal serialization (identity mapping). Codecs that need a non-identity mapping provide a **typeParams rendering function** on the codec object:
+## `renderOutputType` on the Codec interface
+
+Optional method. Produces the TypeScript output type expression for a field given its `typeParams`:
 
 ```typescript
 interface Codec<...> {
   // ... existing encode, decode, encodeJson, decodeJson ...
-
-  /**
-   * Transforms runtime typeParams into their type-level representation
-   * for contract.d.ts emission. Called by the emitter for each field
-   * with typeParams that references this codec.
-   *
-   * Return undefined to use the default const literal serialization.
-   */
-  emitTypeParams?(typeParams: Record<string, unknown>): Record<string, unknown> | undefined;
+  renderOutputType?(typeParams: Record<string, unknown>): string | undefined;
 }
 ```
 
-For JSON Schema codecs, this function converts `typeParams.schemaJson` (the serialized JSON Schema) into a TypeScript type expression and returns it as a type-level value:
+- When absent or returns `undefined`: emitter falls back to `CodecTypes[codecId]['output']` as a type reference.
+- When present: emitter uses the returned string as the type expression in `FieldOutputTypes`.
+
+### Examples
 
 ```typescript
-// pg/jsonb@1 codec:
-renderTypeParams(typeParams: Record<string, unknown>): Record<string, unknown> | undefined {
+// pg/vector@1 — no renderOutputType needed; most codecs are like this
+// Emitter falls back to CodecTypes['pg/vector@1']['output'] → number[]
+// BUT: if typeParams has { length: 1536 }, we want Vector<1536>, not number[]
+// So Vector DOES need renderOutputType:
+renderOutputType(typeParams) {
+  const length = typeParams['length'];
+  return typeof length === 'number' ? `Vector<${length}>` : undefined;
+}
+
+// pg/jsonb@1 — transforms JSON Schema into TypeScript type
+renderOutputType(typeParams) {
   const schemaJson = typeParams['schemaJson'];
   if (schemaJson && typeof schemaJson === 'object') {
-    const tsType = renderTypeScriptTypeFromJsonSchema(schemaJson);
-    return { outputType: tsType };
+    return renderTypeFromJsonSchema(schemaJson);
   }
-  return undefined; // fall back to default serialization
+  return undefined; // fallback to JsonValue
 }
+
+// pg/enum@1 — renders literal union from values
+renderOutputType(typeParams) {
+  const values = typeParams['values'];
+  if (Array.isArray(values) && values.length > 0) {
+    return values.map(v => `'${v}'`).join(' | ');
+  }
+  return undefined; // fallback to string
+}
+
+// sql/char@1 — renders branded Char<N>
+renderOutputType(typeParams) {
+  const length = typeParams['length'];
+  return typeof length === 'number' ? `Char<${length}>` : undefined;
+}
+
+// pg/int4@1 — no typeParams, no renderOutputType needed
+// Emitter uses CodecTypes['pg/int4@1']['output'] → number
 ```
 
-The emitter then serializes the *returned* value (not the original runtime value) as the type-level typeParams in the d.ts. The parameterized output type on `CodecTypes` receives the transformed value and resolves the output type.
+## `typeParams` stays truthful
 
-For the **no-emit path**, no rendering function is called. The authoring surface captures the type-level values directly — e.g., the phantom `schema` key on `TypedColumnDescriptor` carries the original Arktype/Zod schema object's TypeScript type, and `parameterizedOutput` extracts the output type via `.infer` or `~standard.types.output`.
+The `typeParams` on `ContractField` in the d.ts is always serialized from the runtime value — same as `contract.json`. For Vector: `{ readonly length: 1536 }`. For JSONB: `{ readonly schemaJson: { ... } }`. No transformations, no phantom types.
 
-### Structural field shape is always preserved
+This means `ContractModelBase.fields` can be tightened back to `Record<string, ContractField>`.
 
-The emitter always emits model fields with the structural `ContractField` shape — `{ nullable, type: { kind: 'scalar', codecId, typeParams } }`. The rendered typeParams (with transformed type-level values where applicable) go inside this shape. The renderer never replaces the entire field.
+## `parameterizedOutput` is removed from `CodecTypes`
 
-This means `ContractModelBase.fields` can be tightened back to `Record<string, ContractField>` — the widening to `Record<string, unknown>` was only needed because renderers replaced the field shape.
+With `FieldOutputTypes` produced by both paths, there's no need for type-level output type computation. The `parameterizedOutput` function type and `ExtractParameterizedCodecOutputType` utility are deleted. `CodecTypes` retains `input`, `output`, and `traits` only.
 
-### `EmissionSpi.generateModelsType?` override is removed
+The `output` key on `CodecTypes` remains — it's the codec's *default* output type, used by the emitter as a fallback when no `renderOutputType` is present.
 
-After TML-2206, model fields carry their own `type: ScalarFieldType` with `codecId` and `typeParams` resolved at build time. The SQL emitter's `generateModelsType` override was only needed to:
+## `EmissionSpi.generateModelsType?` override is removed (hard AC)
 
-1. Cross-reference storage columns to derive `codecId`/`typeParams` — redundant after TML-2206
-2. Resolve `typeRef` → `typeParams` — done at build time after TML-2206
-3. Dispatch parameterized renderers — moved to the framework emitter
+After TML-2206, model fields are self-contained. The SQL emitter's override is deleted. The framework's `generateModelsType` handles all families.
 
-With all three reasons removed, the override is deleted. The framework's `generateModelsType` (and its `generateModelFieldEntry` / `generateFieldResolvedType` helpers) handles all families. This is a hard acceptance criterion.
+## Framework emitter changes
 
-### Framework emitter owns typeParams rendering
+The framework emitter's field generation:
 
-The framework emitter's field generation logic:
+1. For each model field, reads `codecId` and `typeParams`
+2. Looks up the codec via `CodecLookup`
+3. Calls `codec.renderOutputType(typeParams)` if present; otherwise uses `CodecTypes[codecId]['output']` as a type reference
+4. Stamps the result into `FieldOutputTypes`
+5. Serializes `typeParams` truthfully as const literals on the field
 
-1. For each `ScalarFieldType` with `typeParams`, looks up the codec via `CodecLookup`
-2. If the codec has `renderTypeParams`, calls it to transform the runtime typeParams
-3. Serializes the (possibly transformed) typeParams as type-level literal values in the d.ts
-4. The parameterized output type on `CodecTypes` resolves the output type at the type level
-
-This logic lives in the framework layer (`@prisma-next/emitter`), benefiting all families (SQL, Mongo) and all field contexts (model fields, value object fields, union members).
+The emitter generates the `FieldOutputTypes` map as a new `export type` in `contract.d.ts`.
 
 ### Codec lookup in the emission pipeline
 
-The emitter needs access to codec objects to call `renderTypeParams`. The emission pipeline's `EmitStackInput` is widened to include a `CodecLookup` (or the full `CodecRegistry`). The control stack already receives the adapter and extension pack descriptors, so it can assemble the codec lookup during stack creation.
+`EmitStackInput` is widened to include a `CodecLookup`. The control stack assembles it from adapter and extension pack descriptors during stack creation.
 
-### Dead infrastructure is deleted
+## Dead infrastructure
 
 All of the following are removed:
 
@@ -174,16 +140,16 @@ All of the following are removed:
 | `EmissionSpi.generateModelsType?` | `framework-components/src/emission-types.ts` |
 | SQL emitter's `generateModelsType` override | `sql-contract-emitter/src/index.ts` |
 | `renderJsonTypeExpression`, `isSafeTypeExpression` from descriptor-meta | `adapter-postgres/src/core/descriptor-meta.ts` |
+| `parameterizedOutput` on `CodecTypes` entries | `adapter-postgres/src/exports/codec-types.ts`, `pgvector/src/types/codec-types.ts` |
+| `ExtractParameterizedCodecOutputType` | `sql-relational-core/src/ast/codec-types.ts` |
 
-### `typeImports` remain on descriptor metadata
+## `typeImports` remain on descriptor metadata
 
-Adapters and extensions still contribute import specs for types referenced by rendered type expressions (`Char`, `Vector`, `JsonValue`, etc.) via `types.codecTypes.typeImports` on descriptor metadata. These are decoupled from the renderer infrastructure — they're just type import declarations.
-
-Moving type imports onto codecs (so each codec declares its own imports) is a nice-to-have for a future pass.
+Adapters and extensions still contribute import specs for types referenced by rendered type expressions (`Char`, `Vector`, `JsonValue`, etc.) via `types.codecTypes.typeImports` on descriptor metadata. Moving type imports onto codecs is a nice-to-have for a future pass.
 
 ## Worked examples
 
-### Vector column (default typeParams rendering)
+### Vector column
 
 **Authoring:**
 ```typescript
@@ -192,33 +158,33 @@ Moving type imports onto codecs (so each codec declares its own imports) is a ni
 ```
 
 **Emit path:**
-1. `pg/vector@1` codec has no `renderTypeParams` → default const literal serialization
-2. Emitted d.ts field: `{ readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1'; readonly typeParams: { readonly length: 1536 } } }`
-3. `ComputeColumnJsType` calls `CodecTypes['pg/vector@1']['parameterizedOutput']` with `{ readonly length: 1536 }` → `Vector<1536>`
+1. Emitter looks up `pg/vector@1` codec, calls `renderOutputType({ length: 1536 })` → `'Vector<1536>'`
+2. Emitted d.ts field: `{ readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }`
+3. Emitted `FieldOutputTypes`: `readonly embedding: Vector<1536>`
 
 **No-emit path:**
-- Same mechanism — `parameterizedOutput` resolves `Vector<1536>` from the type-level typeParams
+- `vector(1536)` column descriptor carries `Vector<1536>` at the type level
+- Contract builder collects it into `FieldOutputTypes`
 
-### JSON Schema column (custom typeParams rendering)
+### JSON Schema column
 
 **Authoring:**
 ```typescript
 const payloadSchema = arktype({ action: 'string', actorId: 'number' });
 .column('payload', { type: jsonb(payloadSchema), nullable: false })
-// Runtime typeParams = { schemaJson: { type: 'object', properties: { action: { type: 'string' }, actorId: { type: 'number' } } } }
+// typeParams = { schemaJson: { type: 'object', properties: { action: { type: 'string' }, actorId: { type: 'number' } } } }
 ```
 
 **Emit path:**
-1. `pg/jsonb@1` codec has `renderTypeParams` → transforms `{ schemaJson: ... }` into `{ outputType: '{ action: string; actorId: number }' }` (type expression string)
-2. Emitter serializes the transformed value: `{ readonly outputType: { action: string; actorId: number } }` (note: the string becomes an actual TypeScript type in the d.ts)
-3. Emitted d.ts field: `{ readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1'; readonly typeParams: { readonly outputType: { action: string; actorId: number } } } }`
-4. `ComputeColumnJsType` calls `CodecTypes['pg/jsonb@1']['parameterizedOutput']` with `{ readonly outputType: { action: string; actorId: number } }` → extracts `{ action: string; actorId: number }`
+1. Emitter looks up `pg/jsonb@1` codec, calls `renderOutputType({ schemaJson: { ... } })` → `'{ action: string; actorId: number }'`
+2. Emitted d.ts field: `{ readonly codecId: 'pg/jsonb@1'; readonly nullable: false; readonly typeParams: { readonly schemaJson: { ... } } }` (truthful)
+3. Emitted `FieldOutputTypes`: `readonly payload: { action: string; actorId: number }`
 
 **No-emit path:**
-- Phantom `schema` key carries the Arktype schema's TypeScript type
-- `parameterizedOutput` extracts the output type via `.infer` → `{ action: string; actorId: number }`
+- `jsonb(payloadSchema)` column descriptor carries `{ action: string; actorId: number }` via Arktype's `.infer`
+- Contract builder collects it into `FieldOutputTypes`
 
-### Enum column (default typeParams rendering)
+### Enum column
 
 **Authoring:**
 ```typescript
@@ -227,11 +193,24 @@ const payloadSchema = arktype({ action: 'string', actorId: 'number' });
 ```
 
 **Emit path:**
-1. `pg/enum@1` codec has no `renderTypeParams` → default const literal serialization
-2. Emitted d.ts field: `{ readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/enum@1'; readonly typeParams: { readonly values: readonly ['USER', 'ADMIN'] } } }`
-3. `ComputeColumnJsType` calls `CodecTypes['pg/enum@1']['parameterizedOutput']` with `{ readonly values: readonly ['USER', 'ADMIN'] }` → `'USER' | 'ADMIN'`
+1. Emitter looks up `pg/enum@1` codec, calls `renderOutputType({ values: ['USER', 'ADMIN'] })` → `"'USER' | 'ADMIN'"`
+2. Emitted d.ts field: `{ readonly codecId: 'pg/enum@1'; readonly nullable: false; readonly typeParams: { readonly values: readonly ['USER', 'ADMIN'] } }`
+3. Emitted `FieldOutputTypes`: `readonly role: 'USER' | 'ADMIN'`
 
-### ID column with @prisma-next/ids (default typeParams rendering)
+### Non-parameterized column
+
+**Authoring:**
+```typescript
+.column('email', { type: text(), nullable: false })
+// No typeParams
+```
+
+**Emit path:**
+1. `pg/text@1` codec has no `renderOutputType` → emitter uses `CodecTypes['pg/text@1']['output']` → `string`
+2. Emitted d.ts field: `{ readonly codecId: 'pg/text@1'; readonly nullable: false }`
+3. Emitted `FieldOutputTypes`: `readonly email: string`
+
+### ID column with @prisma-next/ids
 
 **Authoring:**
 ```typescript
@@ -240,26 +219,27 @@ const payloadSchema = arktype({ action: 'string', actorId: 'number' });
 ```
 
 **Emit path:**
-1. `sql/char@1` codec has no `renderTypeParams` → default const literal serialization
-2. Emitted d.ts field: `{ readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'sql/char@1'; readonly typeParams: { readonly length: 36 } } }`
-3. `ComputeColumnJsType` calls `CodecTypes['sql/char@1']['parameterizedOutput']` with `{ readonly length: 36 }` → `Char<36>`
+1. Emitter looks up `sql/char@1` codec, calls `renderOutputType({ length: 36 })` → `'Char<36>'`
+2. Emitted d.ts field: `{ readonly codecId: 'sql/char@1'; readonly nullable: false; readonly typeParams: { readonly length: 36 } }`
+3. Emitted `FieldOutputTypes`: `readonly id: Char<36>`
 
 ## Open questions
 
-### `renderTypeParams` return value for JSON Schema
+### `typeImports` cleanup
 
-The JSON Schema `renderTypeParams` needs to return a value where one key contains a TypeScript *type*, not a JSON value. The emitter must serialize this key differently — as an inline TypeScript type expression, not a const literal. The exact mechanism for this (a special marker type? a convention on the key name? a separate return field?) needs to be resolved during implementation.
-
-### `extractParameterizedTypeImports` / `typeImports` cleanup
-
-After deleting `parameterizedRenderers`, the `parameterizedTypeImports` mechanism may still be needed or can be folded into the existing `codecTypeImports`. This should be evaluated during implementation.
+After deleting `parameterizedRenderers`, the `parameterizedTypeImports` mechanism may still be needed or can be folded into the existing `codecTypeImports`. Evaluate during implementation.
 
 ### Fixing the no-emit plumbing for JSON Schema
 
-The phantom `schema` key plumbing is broken end-to-end — the integration type test asserts `unknown`, not the schema-derived type. Fixing this is orthogonal to TML-2204 (it's a plumbing bug in the contract builder → validate → query pipeline) but should be tracked.
+The phantom `schema` key plumbing is broken end-to-end — the integration type test asserts `unknown`, not the schema-derived type. Fixing this is orthogonal to TML-2204 but should be tracked.
+
+### `FieldOutputTypes` placement
+
+Should `FieldOutputTypes` be a standalone export in `contract.d.ts`, or part of `TypeMaps`? `TypeMaps` already carries `CodecTypes` and `OperationTypes`. Adding `FieldOutputTypes` to it would keep all type-level metadata in one place. Evaluate during implementation.
 
 ## Relationship to other work
 
-- **TML-2206 (Value objects):** Must land first. It restructures `ContractField` into a discriminated union with `ScalarFieldType` (which carries `typeParams`), and ensures model fields are self-contained at build time.
+- **TML-2206 (Value objects):** Must land first. Restructures `ContractField` into a discriminated union with `ScalarFieldType` (which carries `typeParams`), ensures model fields are self-contained at build time.
 - **TML-2215 (Bug fix):** Already landed. Restored emission of `typeParams` and `typeRef` on storage columns and model fields.
 - **ADR 184 (Codec-owned value serialization):** Established the pattern of codecs owning their representations (`encodeJson`/`decodeJson`). This design extends the pattern to type rendering.
+- **ADR 186 (Codec-dispatched type rendering):** The architectural decision this spec implements.
