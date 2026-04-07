@@ -109,9 +109,6 @@
             "named": "CodecTypes",
             "package": "@prisma-next/extension-pgvector/codec-types"
           },
-          "parameterized": {
-            "pg/vector@1": "Vector<{{length}}>"
-          },
           "typeImports": [
             {
               "alias": "Vector",
