@@ -213,9 +213,6 @@ export function buildContract(
     roots[tableName] = modelName;
 
     const tableState = state.tables[tableName];
-    const tableColumns = tableState
-      ? (tableState.columns as Record<string, { type: string; nullable?: boolean }>)
-      : {};
 
     const storageFields: Record<string, { readonly column: string }> = {};
     const domainFields: Record<string, ContractField> = {};
@@ -226,11 +223,15 @@ export function buildContract(
 
       storageFields[fieldName] = { column: columnName };
 
-      const column = tableColumns[columnName];
-      if (column) {
+      const columnState = tableState?.columns[columnName];
+      if (columnState) {
         domainFields[fieldName] = {
-          codecId: column.type,
-          nullable: column.nullable ?? false,
+          type: {
+            kind: 'scalar',
+            codecId: columnState.type,
+            ...ifDefined('typeParams', columnState.typeParams),
+          },
+          nullable: columnState.nullable ?? false,
         };
       }
     }

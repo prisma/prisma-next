@@ -73,20 +73,34 @@ describe('emitter round-trip', () => {
       const ir = createTestContract({
         models: {
           User: {
-            storage: { table: 'user' },
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+                email: { column: 'email' },
+                name: { column: 'name' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              email: { column: 'email' },
-              name: { column: 'name' },
+              id: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false },
+              email: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+              name: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: true },
             },
             relations: {},
           },
           Post: {
-            storage: { table: 'post' },
+            storage: {
+              table: 'post',
+              fields: {
+                id: { column: 'id' },
+                title: { column: 'title' },
+                userId: { column: 'user_id' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              title: { column: 'title' },
-              userId: { column: 'user_id' },
+              id: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false },
+              title: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+              userId: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false },
             },
             relations: {},
           },

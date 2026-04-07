@@ -16,8 +16,14 @@ type ExampleModelStorage = {
 type ExampleModels = {
   readonly User: ContractModel<ExampleModelStorage> & {
     readonly fields: {
-      readonly id: { readonly nullable: false; readonly codecId: 'pg/int4@1' };
-      readonly email: { readonly nullable: false; readonly codecId: 'pg/text@1' };
+      readonly id: {
+        readonly nullable: false;
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+      };
+      readonly email: {
+        readonly nullable: false;
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+      };
     };
     readonly relations: {
       readonly posts: {
@@ -66,8 +72,8 @@ test('StorageBase with specific hash extends default StorageBase', () => {
 
 test('preserves model field literal types through TModels', () => {
   expectTypeOf<
-    ExampleContract['models']['User']['fields']['id']['codecId']
-  >().toEqualTypeOf<'pg/int4@1'>();
+    ExampleContract['models']['User']['fields']['id']['type']['kind']
+  >().toEqualTypeOf<'scalar'>();
 });
 
 test('preserves relation literal types through TModels', () => {

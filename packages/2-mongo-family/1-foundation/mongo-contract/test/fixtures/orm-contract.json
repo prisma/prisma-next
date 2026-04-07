@@ -18,10 +18,13 @@
         "relations": { "comments": { "field": "comments" } }
       },
       "fields": {
-        "_id": { "codecId": "mongo/objectId@1", "nullable": false },
-        "title": { "codecId": "mongo/string@1", "nullable": false },
-        "type": { "codecId": "mongo/string@1", "nullable": false },
-        "assigneeId": { "codecId": "mongo/objectId@1", "nullable": false }
+        "_id": { "type": { "kind": "scalar", "codecId": "mongo/objectId@1" }, "nullable": false },
+        "title": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
+        "type": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
+        "assigneeId": {
+          "type": { "kind": "scalar", "codecId": "mongo/objectId@1" },
+          "nullable": false
+        }
       },
       "relations": {
         "assignee": {
@@ -46,7 +49,7 @@
     "Bug": {
       "storage": { "collection": "tasks" },
       "fields": {
-        "severity": { "codecId": "mongo/string@1", "nullable": false }
+        "severity": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false }
       },
       "relations": {},
       "base": "Task"
@@ -54,8 +57,14 @@
     "Feature": {
       "storage": { "collection": "tasks" },
       "fields": {
-        "priority": { "codecId": "mongo/string@1", "nullable": false },
-        "targetRelease": { "codecId": "mongo/string@1", "nullable": false }
+        "priority": {
+          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "nullable": false
+        },
+        "targetRelease": {
+          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "nullable": false
+        }
       },
       "relations": {},
       "base": "Task"
@@ -66,9 +75,9 @@
         "relations": { "addresses": { "field": "addresses" } }
       },
       "fields": {
-        "_id": { "codecId": "mongo/objectId@1", "nullable": false },
-        "name": { "codecId": "mongo/string@1", "nullable": false },
-        "email": { "codecId": "mongo/string@1", "nullable": false }
+        "_id": { "type": { "kind": "scalar", "codecId": "mongo/objectId@1" }, "nullable": false },
+        "name": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
+        "email": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false }
       },
       "relations": {
         "addresses": {
@@ -80,9 +89,9 @@
     "Address": {
       "storage": {},
       "fields": {
-        "street": { "codecId": "mongo/string@1", "nullable": false },
-        "city": { "codecId": "mongo/string@1", "nullable": false },
-        "zip": { "codecId": "mongo/string@1", "nullable": false }
+        "street": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
+        "city": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
+        "zip": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false }
       },
       "relations": {},
       "owner": "User"
@@ -90,9 +99,9 @@
     "Comment": {
       "storage": {},
       "fields": {
-        "_id": { "codecId": "mongo/objectId@1", "nullable": false },
-        "text": { "codecId": "mongo/string@1", "nullable": false },
-        "createdAt": { "codecId": "mongo/date@1", "nullable": false }
+        "_id": { "type": { "kind": "scalar", "codecId": "mongo/objectId@1" }, "nullable": false },
+        "text": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
+        "createdAt": { "type": { "kind": "scalar", "codecId": "mongo/date@1" }, "nullable": false }
       },
       "relations": {},
       "owner": "Task"

@@ -311,8 +311,8 @@ describe('SQL contract factories', () => {
         email: { column: 'email' },
       });
       expect(userModel.fields).toEqual({
-        id: { nullable: false, codecId: 'pg/int4@1' },
-        name: { nullable: true, codecId: 'pg/text@1' },
+        id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+        name: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
         email: { nullable: false },
       });
     });

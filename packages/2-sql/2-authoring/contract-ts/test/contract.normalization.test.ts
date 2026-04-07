@@ -189,7 +189,7 @@ describe('validateContract validation', () => {
         User: {
           storage: { table: 'User', fields: { id: { column: 'id' } } },
           fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
+            id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
           },
         },
       },
@@ -217,11 +217,11 @@ describe('validateContract validation', () => {
       models: {
         User: {
           storage: { table: 'user', fields: { id: { column: 'id' } } },
-          fields: { id: { codecId: 'pg/text@1', nullable: false } },
+          fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
         },
         Post: {
           storage: { table: 'post', fields: { id: { column: 'id' } } },
-          fields: { id: { codecId: 'pg/text@1', nullable: false } },
+          fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
         },
       },
       storage: {
@@ -252,7 +252,7 @@ describe('validateContract validation', () => {
       models: {
         User: {
           storage: { table: 'User', fields: { id: { column: 'id' } } },
-          fields: { id: { codecId: 'pg/text@1', nullable: false } },
+          fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
           relations: {
             posts: {
               to: 'Post',
@@ -267,8 +267,8 @@ describe('validateContract validation', () => {
             fields: { id: { column: 'id' }, userId: { column: 'userId' } },
           },
           fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
-            userId: { codecId: 'pg/text@1', nullable: false },
+            id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+            userId: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
           },
           relations: {
             user: {
@@ -324,7 +324,7 @@ describe('validateContract validation', () => {
       models: {
         User: {
           storage: { table: 'User', fields: { id: { column: 'id' } } },
-          fields: { id: { codecId: 'pg/text@1', nullable: false } },
+          fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
           relations: {
             posts: {
               to: 'Post',
@@ -339,8 +339,8 @@ describe('validateContract validation', () => {
             fields: { id: { column: 'id' }, userId: { column: 'userId' } },
           },
           fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
-            userId: { codecId: 'pg/text@1', nullable: false },
+            id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+            userId: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
           },
         },
       },

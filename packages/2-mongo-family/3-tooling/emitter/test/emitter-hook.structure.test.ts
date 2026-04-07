@@ -7,7 +7,9 @@ describe('mongoEmission.validateStructure', () => {
     const contract = createMongoContract({
       models: {
         User: {
-          fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          },
           relations: {},
           storage: { collection: 'users' },
         },
@@ -35,7 +37,9 @@ describe('mongoEmission.validateStructure', () => {
     const contract = createMongoContract({
       models: {
         User: {
-          fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          },
           relations: {},
           storage: { collection: 'users' },
         },
@@ -66,7 +70,9 @@ describe('mongoEmission.validateStructure', () => {
     const contract = createMongoContract({
       models: {
         User: {
-          fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          },
           storage: { collection: 'users' },
         },
       },
@@ -81,12 +87,16 @@ describe('mongoEmission.validateStructure', () => {
     const contract = createMongoContract({
       models: {
         User: {
-          fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          },
           relations: {},
           storage: { collection: 'users' },
         },
         Address: {
-          fields: { street: { codecId: 'mongo/string@1', nullable: false } },
+          fields: {
+            street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+          },
           relations: {},
           storage: { collection: 'users' },
           owner: 'User',
@@ -103,7 +113,9 @@ describe('mongoEmission.validateStructure', () => {
     const contract = createMongoContract({
       models: {
         Address: {
-          fields: { street: { codecId: 'mongo/string@1', nullable: false } },
+          fields: {
+            street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+          },
           relations: {},
           storage: {},
           owner: 'NonExistent',
@@ -120,7 +132,9 @@ describe('mongoEmission.validateStructure', () => {
     const contract = createMongoContract({
       models: {
         User: {
-          fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          },
           relations: { addresses: { to: 'Address', cardinality: '1:N' } },
           storage: {
             collection: 'users',
@@ -128,7 +142,9 @@ describe('mongoEmission.validateStructure', () => {
           },
         },
         Address: {
-          fields: { street: { codecId: 'mongo/string@1', nullable: false } },
+          fields: {
+            street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+          },
           relations: {},
           storage: {},
           owner: 'User',
@@ -144,8 +160,8 @@ describe('mongoEmission.validateStructure', () => {
       models: {
         Task: {
           fields: {
-            _id: { codecId: 'mongo/objectId@1', nullable: false },
-            type: { codecId: 'mongo/string@1', nullable: false },
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+            type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
           },
           relations: {},
           storage: { collection: 'tasks' },
@@ -153,7 +169,9 @@ describe('mongoEmission.validateStructure', () => {
           variants: { Bug: { value: 'bug' } },
         },
         Bug: {
-          fields: { severity: { codecId: 'mongo/string@1', nullable: false } },
+          fields: {
+            severity: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+          },
           relations: {},
           storage: { collection: 'tasks' },
           base: 'Task',
@@ -169,8 +187,8 @@ describe('mongoEmission.validateStructure', () => {
       models: {
         Task: {
           fields: {
-            _id: { codecId: 'mongo/objectId@1', nullable: false },
-            type: { codecId: 'mongo/string@1', nullable: false },
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+            type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
           },
           relations: {},
           storage: { collection: 'tasks' },
@@ -178,7 +196,9 @@ describe('mongoEmission.validateStructure', () => {
           variants: { Bug: { value: 'bug' } },
         },
         Bug: {
-          fields: { severity: { codecId: 'mongo/string@1', nullable: false } },
+          fields: {
+            severity: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+          },
           relations: {},
           storage: { collection: 'bugs' },
           base: 'Task',
@@ -195,7 +215,9 @@ describe('mongoEmission.validateStructure', () => {
     const contract = createMongoContract({
       models: {
         User: {
-          fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          },
           relations: {},
         },
       },
@@ -210,7 +232,9 @@ describe('mongoEmission.validateStructure', () => {
     const contract = createMongoContract({
       models: {
         Bug: {
-          fields: { severity: { codecId: 'mongo/string@1', nullable: false } },
+          fields: {
+            severity: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+          },
           relations: {},
           storage: { collection: 'tasks' },
           base: 'NonExistent',
@@ -227,12 +251,16 @@ describe('mongoEmission.validateStructure', () => {
     const contract = createMongoContract({
       models: {
         User: {
-          fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          },
           relations: { addresses: { to: 'Address', cardinality: '1:N' } },
           storage: { collection: 'users' },
         },
         Address: {
-          fields: { street: { codecId: 'mongo/string@1', nullable: false } },
+          fields: {
+            street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+          },
           relations: {},
           storage: {},
           owner: 'User',
@@ -249,7 +277,9 @@ describe('mongoEmission.validateStructure', () => {
     const contract = createMongoContract({
       models: {
         User: {
-          fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          },
           relations: {},
           storage: {
             collection: 'users',

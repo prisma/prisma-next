@@ -17,10 +17,11 @@ describe('domain type compatibility', () => {
       type FieldsFromModel = ContractModel['fields'];
 
       const fields: FieldsFromModel = {
-        id: { nullable: false, codecId: 'pg/int4@1' },
+        id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
       };
       expect(fields.id.nullable).toBe(false);
-      expect(fields.id.codecId).toBe('pg/int4@1');
+      expect(fields.id.type.kind).toBe('scalar');
+      expect(fields.id.type.codecId).toBe('pg/int4@1');
     });
   });
 
@@ -39,7 +40,7 @@ describe('domain type compatibility', () => {
           readonly fields: {
             readonly name: {
               readonly nullable: true;
-              readonly codecId: 'pg/text@1';
+              readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
             };
           };
           readonly relations: Record<string, never>;
@@ -55,7 +56,7 @@ describe('domain type compatibility', () => {
       type NameField = ExampleContract['models']['User']['fields']['name'];
 
       const _nullable: NameField['nullable'] = true;
-      const _codecId: NameField['codecId'] = 'pg/text@1';
+      const _codecId: NameField['type']['codecId'] = 'pg/text@1';
 
       expect(_nullable).toBe(true);
       expect(_codecId).toBe('pg/text@1');

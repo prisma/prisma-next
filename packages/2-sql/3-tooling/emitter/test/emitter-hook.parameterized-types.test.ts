@@ -114,7 +114,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false }",
+        "readonly id: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' } }",
       );
     });
 
@@ -448,7 +448,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly value: { readonly codecId: 'custom/type@1'; readonly nullable: false; readonly typeParams: { readonly foo: 'bar' } }",
+        "readonly value: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'custom/type@1'; readonly typeParams: { readonly foo: 'bar' } } }",
       );
     });
 
@@ -499,7 +499,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly value: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+        "readonly value: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1' } }",
       );
     });
 
@@ -549,7 +549,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       expect(types).toContain(
-        "readonly value: { readonly codecId: 'pg/vector@1'; readonly nullable: false }",
+        "readonly value: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1' } }",
       );
     });
 
@@ -584,7 +584,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
 
       expect(types).toContain(
-        "readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false }",
+        "readonly id: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' } }",
       );
     });
   });

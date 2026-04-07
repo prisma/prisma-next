@@ -56,7 +56,7 @@ describe('validateContract edge cases', () => {
         User: {
           storage: { table: 'user', fields: { id: { column: 'id' } } },
           fields: {
-            id: { column: 'id' },
+            id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
           },
           relations: null,
         },
@@ -124,7 +124,7 @@ describe('validateContract edge cases', () => {
         User: {
           storage: { table: 'user', fields: { id: { column: 'id' } } },
           fields: {
-            id: { column: 'id' },
+            id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
           },
           relations: {
             posts: {
@@ -169,7 +169,7 @@ describe('validateContract edge cases', () => {
         User: {
           storage: { table: 'user', fields: { id: { column: 'id' } } },
           fields: {
-            id: { column: 'id' },
+            id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
           },
           relations: {
             posts: {
@@ -214,7 +214,7 @@ describe('validateContract edge cases', () => {
         User: {
           storage: { table: 'user', fields: { id: { column: 'id' } } },
           fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
+            id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
           },
           relations: {
             posts: {
@@ -230,8 +230,8 @@ describe('validateContract edge cases', () => {
             fields: { id: { column: 'id' }, userId: { column: 'userId' } },
           },
           fields: {
-            id: { codecId: 'pg/text@1', nullable: false },
-            userId: { codecId: 'pg/text@1', nullable: false },
+            id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+            userId: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
           },
         },
       },

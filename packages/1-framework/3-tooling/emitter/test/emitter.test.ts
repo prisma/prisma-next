@@ -20,10 +20,16 @@ describe('emitter', () => {
       const ir = createTestContract({
         models: {
           User: {
-            storage: { table: 'user' },
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+                email: { column: 'email' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              email: { column: 'email' },
+              id: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false },
+              email: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
             },
             relations: {},
           },

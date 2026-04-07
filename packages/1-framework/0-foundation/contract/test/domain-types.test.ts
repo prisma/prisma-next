@@ -2,18 +2,72 @@ import { describe, expect, it } from 'vitest';
 import type {
   ContractEmbedRelation,
   ContractField,
+  ContractFieldType,
   ContractModel,
   ContractReferenceRelation,
   ContractRelation,
+  ScalarFieldType,
+  ValueObjectFieldType,
 } from '../src/domain-types';
 
 type AssertExtends<T, U> = T extends U ? true : never;
 
 describe('contract types', () => {
-  it('ContractField carries nullable and codecId', () => {
-    const field: ContractField = { nullable: true, codecId: 'pg/text@1' };
+  it('ContractField carries nullable and typed scalar', () => {
+    const field: ContractField = {
+      nullable: true,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+    };
     expect(field.nullable).toBe(true);
-    expect(field.codecId).toBe('pg/text@1');
+    expect(field.type.kind).toBe('scalar');
+  });
+
+  it('ContractFieldType narrows on kind to scalar', () => {
+    const fieldType: ContractFieldType = { kind: 'scalar', codecId: 'pg/text@1' };
+    if (fieldType.kind === 'scalar') {
+      const _codecId: string = fieldType.codecId;
+      expect(_codecId).toBe('pg/text@1');
+    }
+  });
+
+  it('ContractFieldType narrows on kind to valueObject', () => {
+    const fieldType: ContractFieldType = { kind: 'valueObject', name: 'Address' };
+    if (fieldType.kind === 'valueObject') {
+      const _name: string = fieldType.name;
+      expect(_name).toBe('Address');
+    }
+  });
+
+  it('ScalarFieldType accepts optional typeParams', () => {
+    const scalar: ScalarFieldType = {
+      kind: 'scalar',
+      codecId: 'pg/jsonb@1',
+      typeParams: { schema: {} },
+    };
+    expect(scalar.typeParams).toBeDefined();
+  });
+
+  it('ContractField supports many modifier', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+      many: true,
+    };
+    expect(field.many).toBe(true);
+  });
+
+  it('ContractField supports dict modifier', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'valueObject', name: 'Address' },
+      dict: true,
+    };
+    expect(field.dict).toBe(true);
+  });
+
+  it('ValueObjectFieldType extends ContractFieldType', () => {
+    const _check: AssertExtends<ValueObjectFieldType, ContractFieldType> = true;
+    expect(_check).toBe(true);
   });
 
   it('ContractReferenceRelation requires on and allows all cardinalities', () => {
@@ -62,7 +116,9 @@ describe('contract types', () => {
 
   it('ContractModel supports polymorphism fields', () => {
     const model: ContractModel = {
-      fields: { type: { nullable: false, codecId: 'pg/text@1' } },
+      fields: {
+        type: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+      },
       relations: {},
       storage: {},
       discriminator: { field: 'type' },
@@ -85,7 +141,7 @@ describe('contract types', () => {
   it('ContractModel supports owner for component membership', () => {
     const model: ContractModel = {
       fields: {
-        street: { nullable: false, codecId: 'pg/text@1' },
+        street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
       },
       relations: {},
       storage: {},

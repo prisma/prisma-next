@@ -9,7 +9,7 @@ function makeValidContractJson() {
     storage: { collections: { items: {} } },
     models: {
       Item: {
-        fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+        fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
         storage: { collection: 'items' },
       },
     },
@@ -38,7 +38,7 @@ describe('validateMongoContract()', () => {
         ...makeValidContractJson(),
         models: {
           Item: {
-            fields: { _id: { codecId: 123 } },
+            fields: { _id: { type: { kind: 'scalar', codecId: 123 } } },
             storage: { collection: 'items' },
           },
         },
@@ -51,7 +51,9 @@ describe('validateMongoContract()', () => {
         ...makeValidContractJson(),
         models: {
           Item: {
-            fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+            fields: {
+              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+            },
             storage: { collection: 'items' },
             relations: {
               bad: { to: 'Other', cardinality: '1:1', extra: true },
@@ -86,7 +88,9 @@ describe('validateMongoContract()', () => {
         storage: { collections: { items: {}, tags: {} } },
         models: {
           Item: {
-            fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+            fields: {
+              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+            },
             storage: {
               collection: 'items',
               relations: { tags: { field: 'tags' } },
@@ -96,7 +100,9 @@ describe('validateMongoContract()', () => {
             },
           },
           Tag: {
-            fields: { name: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+            },
             storage: { collection: 'tags' },
             owner: 'Item',
           },
