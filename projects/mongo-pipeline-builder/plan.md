@@ -21,73 +21,104 @@ Build a type-safe MongoDB aggregation pipeline builder that tracks document shap
 
 ## Milestones
 
-### Milestone 1: Raw pipeline API
+### ~~Milestone 1: Raw pipeline API~~ ✅
 
-Ship a user-facing `rawPipeline()` that executes plain MongoDB pipeline stage documents. This proves the full execution path end-to-end and gives users an immediate escape hatch before any typed AST work.
+Delivered by [TML-2208](https://linear.app/prisma-company/issue/TML-2208). `mongoRaw().collection(root).aggregate(pipeline)` ships the raw pipeline API with `RawAggregateCommand`.
 
-**Validation:** Integration test seeds data into mongodb-memory-server, runs a `$group` + `$sort` pipeline via `rawPipeline()`, and verifies correct aggregated results with a user-asserted return type.
+### ~~Milestone 2: Aggregation expression AST~~ ✅
 
-**Tasks:**
+Delivered by [TML-2209](https://linear.app/prisma-company/issue/TML-2209). `MongoAggExpr` class hierarchy (11 node types), `MongoAggExprVisitor`/`MongoAggExprRewriter`, `lowerAggExpr()`, and `MongoExprFilter` bridge.
 
-- [ ] 1.1 — Add `rawPipeline<Row>(collection, stages)` method to the mongo client surface in `5-query-builders`. Internally constructs `AggregateCommand` with raw stages and executes via `MongoQueryExecutor`. Collection name validated against contract at the type level.
-- [ ] 1.2 — Integration test: seed order data, execute `$group` + `$sort` pipeline, verify aggregated results. Test type assertion (`rawPipeline<{ _id: string; total: number }>`).
-- [ ] 1.3 — Export wiring and package.json updates for the new API surface.
+### ~~Milestone 3: Core pipeline stage extensions + `$group` end-to-end~~ ✅
 
-### Milestone 2: Aggregation expression AST
+Delivered by [TML-2210](https://linear.app/prisma-company/issue/TML-2210). 7 new stage classes (`MongoGroupStage`, `MongoAddFieldsStage`, `MongoReplaceRootStage`, `MongoCountStage`, `MongoSortByCountStage`, `MongoSampleStage`, `MongoRedactStage`), extended `MongoProjectStage`/`MongoLookupStage`/`MongoUnwindStage`, adapter lowering for all, and integration tests.
 
-Build the typed `MongoAggExpr` class hierarchy — the foundation that every subsequent milestone depends on. This milestone is pure AST infrastructure with no pipeline integration yet.
+### Milestone 4: Pipeline builder with shape tracking ← **current** ([TML-2211](https://linear.app/prisma-company/issue/TML-2211))
 
-**Validation:** Unit tests verify construction, freezing, visitor dispatch, rewriter transforms, and lowering to MongoDB driver documents for all expression node types.
+Build the fluent `PipelineBuilder<TContract, DocShape>` that tracks document shape transformations at the type level. This is the main user-facing deliverable.
 
-**Tasks:**
+**Design decisions (resolved):**
 
-- [ ] 2.1 — `MongoAggExprNode` abstract base class (extends `MongoAstNode`, hidden from export). `MongoAggFieldRef` (kind: `fieldRef`, field path reference). `MongoAggLiteral` (kind: `literal`, constant value with `$literal` escape for ambiguous values). Unit tests for construction, freezing, kind discriminant.
-- [ ] 2.2 — `MongoAggOperator` (kind: `operator`, uniform `{ $op: expr | [expr] }` shape with `op: string`). `MongoAggAccumulator` (kind: `accumulator`, group/window accumulators with `op: string` + `arg`). Unit tests.
-- [ ] 2.3 — `MongoAggExprVisitor<R>` (exhaustive) and `MongoAggExprRewriter` (optional hooks) interfaces. `accept()` and `rewrite()` on all node classes. Tests for visitor dispatch and rewriter identity/transform.
-- [ ] 2.4 — `lowerAggExpr()` visitor implementation. Tests: lowering of field refs, literals (including `$literal` escape), operators (single-arg and array-arg), accumulators. Verify round-trip: construct AST → lower → compare to expected MongoDB document.
-- [ ] 2.5 — Structurally unique expression nodes: `MongoAggCond`, `MongoAggSwitch`, `MongoAggArrayFilter`, `MongoAggMap`, `MongoAggReduce`, `MongoAggLet`, `MongoAggMergeObjects`. Each with construction, visitor, rewriter, lowering tests.
-- [ ] 2.6 — `MongoExprFilter` bridge class in filter expressions (`kind: 'expr'`). Update `MongoFilterExpr` union and `MongoFilterVisitor`/`MongoFilterRewriter`. Update `lowerFilter()` to handle `expr` kind. Test: `{ $match: { $expr: { $gt: ["$qty", "$minQty"] } } }`.
-- [ ] 2.7 — Export `MongoAggExpr` union and all concrete classes from `@prisma-next/mongo-query-ast` exports.
+- **Static builder, no runtime.** The pipeline builder produces `MongoQueryPlan` via `build()`. There is no `execute()` method — the user passes the plan to their runtime separately. No dependency on `@prisma-next/runtime-executor` or `MongoQueryExecutor`.
+- **Separate package under restructured `5-query-builders/`.** Move `@prisma-next/mongo-orm` to `5-query-builders/orm/`, create new `@prisma-next/mongo-pipeline-builder` at `5-query-builders/pipeline-builder/`.
+- **Entry point:** `mongoPipeline<Contract>({ contractJson }).from('collectionName')` — a one-liner root constructor, analogous to `postgres<Contract>({ contractJson })`. Sufficient for this branch; a convenience function that wires builder + runtime is a later concern.
+- **Flat fields only.** `FieldProxy` and `FilterProxy` support top-level field access. Nested/dot-path access (ADR 180) deferred until value objects land.
+- **Starter expression helpers.** Arithmetic, `$concat`, `$cond`, `$literal`, `$toLower`/`$toUpper`, `$size`. Full operator coverage is a follow-up: [TML-2217](https://linear.app/prisma-company/issue/TML-2217).
+- **Accumulator output types default to `'double'`.** Precision refinement deferred to [TML-2217](https://linear.app/prisma-company/issue/TML-2217).
 
-### Milestone 3: Core pipeline stage extensions + `$group` end-to-end
+**Worked example — type safety through shape transformations:**
 
-Extend the stage AST with the most important new stages (`$group`, `$addFields`, `$project` computed, `$replaceRoot`, `$count`) and prove they execute correctly through the full stack.
+```typescript
+import { mongoPipeline, acc, fn } from '@prisma-next/mongo-pipeline-builder';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
 
-**Validation:** Integration test constructs a multi-stage typed pipeline (`MongoMatchStage` → `MongoGroupStage` → `MongoSortStage`) and executes it against mongodb-memory-server with correct results. Existing ORM tests pass unchanged.
+const p = mongoPipeline<Contract>({ contractJson });
 
-**Tasks:**
+// Shape starts as Order model fields:
+//   { _id: ObjectId, customerId: ObjectId, status: string, amount: number, createdAt: Date }
 
-- [ ] 3.1 — `MongoGroupStage` class (kind: `group`). Fields: `groupId: MongoGroupId`, `accumulators: Record<string, MongoAggAccumulator>`. Rewriter recurses into groupId and accumulator expressions. Unit tests for construction, visitor, rewriter.
-- [ ] 3.2 — `MongoAddFieldsStage` class (kind: `addFields`). Fields: `fields: Record<string, MongoAggExpr>`. `$addFields` and `$set` are aliases; AST uses one class, lowering emits `$addFields`. Unit tests.
-- [ ] 3.3 — Extend `MongoProjectStage`: widen projection value from `Record<string, 0 | 1>` to `Record<string, 0 | 1 | MongoAggExpr>`. Lowering calls `lowerAggExpr()` for expression values, passes through `0`/`1`. Unit tests. Verify existing ORM usage still compiles (backward compat).
-- [ ] 3.4 — `MongoReplaceRootStage` (kind: `replaceRoot`), `MongoCountStage` (kind: `count`), `MongoSortByCountStage` (kind: `sortByCount`), `MongoSampleStage` (kind: `sample`), `MongoRedactStage` (kind: `redact`). Construction, visitor, rewriter, lowering tests for each.
-- [ ] 3.5 — Extend `MongoLookupStage` with `let_` and `pipeline` fields for correlated sub-queries. Extend `MongoUnwindStage` with `includeArrayIndex`. Update lowering and tests.
-- [ ] 3.6 — Update `MongoStageVisitor<R>` and `MongoStageRewriter` with methods for all new stage kinds.
-- [ ] 3.7 — Adapter lowering: add cases to `lowerStage()` in `adapter-mongo/src/lowering.ts` for all new stages. Calls `lowerAggExpr()` for stages with expressions.
-- [ ] 3.8 — Integration test: construct `MongoMatchStage` → `MongoGroupStage` → `MongoSortStage` pipeline as typed AST, execute through runtime, verify results. Update existing `aggregate.test.ts` to use typed stages instead of raw objects.
+const plan = p
+  .from('orders')
 
-### Milestone 4: Pipeline builder with shape tracking
+  // match(): identity stage — shape unchanged, FilterProxy gives autocomplete
+  .match(f => f.status.eq('completed'))       // ✅ `status` known, `.eq()` accepts string
+  // .match(f => f.bogus.eq('x'))             // ❌ compile error: `bogus` not in shape
 
-Build the fluent `PipelineBuilder<QC, DocShape>` that tracks document shape transformations at the type level. This is the main user-facing deliverable.
+  // group(): replacement stage — previous shape is discarded entirely
+  .group(f => ({
+    _id: f.customerId,                        // ✅ field ref from current shape
+    total: acc.sum(f.amount),                 // ✅ accumulator wrapping a field ref
+    orderCount: acc.count(),
+  }))
+  // Shape is now: { _id: ObjectId, total: number, orderCount: number }
+  // .match(f => f.status.eq('x'))            // ❌ compile error: `status` no longer exists
+
+  // sort(): identity stage on the NEW shape
+  .sort({ total: -1 })                        // ✅ `total` is in the grouped shape
+  // .sort({ amount: -1 })                    // ❌ compile error: `amount` is gone
+
+  .limit(10)
+  .build();
+// plan: MongoQueryPlan<{ _id: ObjectId; total: number; orderCount: number }>
+
+
+// addFields(): additive — new fields appear in the shape alongside existing ones
+const plan2 = p
+  .from('users')
+  // Shape: { _id: ObjectId, firstName: string, lastName: string, email: string }
+  .addFields(f => ({
+    fullName: fn.concat(f.firstName, fn.literal(' '), f.lastName),
+  }))
+  // Shape: { _id, firstName, lastName, email, fullName: string }
+  .match(f => f.fullName.eq('Alice Smith'))   // ✅ computed field is now in scope
+  .project('_id', 'fullName', 'email')        // ✅ narrows to 3 fields
+  // .match(f => f.firstName.eq('x'))         // ❌ compile error: `firstName` projected out
+  .build();
+// plan2: MongoQueryPlan<{ _id: ObjectId; fullName: string; email: string }>
+```
+
+Each stage method returns a new `PipelineBuilder<TContract, NewShape>` where `NewShape` reflects the transformation. The type parameter prevents referencing fields that don't exist in the current shape, and `build()` resolves `DocShape` codec metadata into concrete TypeScript types via the contract's type maps.
 
 **Validation:** Type tests verify shape tracking for all transformation categories. Integration tests execute multi-stage pipelines against mongodb-memory-server with full type inference.
 
 **Tasks:**
 
-- [ ] 4.1 — Scaffold `packages/2-mongo-family/5-query-builders/mongo-pipeline-builder/` package. `package.json`, `tsconfig.json`, `tsdown.config.ts`, exports, layering config.
+- [ ] 4.0 — **Restructure `5-query-builders`.** Move `@prisma-next/mongo-orm` to `packages/2-mongo-family/5-query-builders/orm/`. Update workspace config, architecture config globs, and any repo-wide path references. No new code — purely structural.
+- [ ] 4.1 — Scaffold `packages/2-mongo-family/5-query-builders/pipeline-builder/` package. `package.json` (`@prisma-next/mongo-pipeline-builder`), `tsconfig.json`, `tsdown.config.ts`, exports, layering config. Dependencies: `@prisma-next/contract`, `@prisma-next/mongo-contract`, `@prisma-next/mongo-query-ast`.
 - [ ] 4.2 — Core type machinery: `DocField`, `DocShape`, `ModelToDocShape<Contract, ModelName>`, `ResolveRow<Shape, CodecTypes>`. Type tests verifying contract → DocShape derivation and DocShape → concrete types resolution.
-- [ ] 4.3 — `PipelineBuilder<QC, Shape>` class with immutable state (`PipelineBuilderState`). `cloneState()` pattern. Identity stage methods: `match(filter)`, `sort(spec)`, `limit(n)`, `skip(n)`, `sample(n)`. `build()` → `MongoQueryPlan`. `execute()` → `AsyncIterableResult`. Type tests: shape is unchanged after identity stages.
+- [ ] 4.3 — `PipelineBuilder<TContract, Shape>` class with immutable state (`PipelineBuilderState`). `cloneState()` pattern. Identity stage methods: `match(filter)`, `sort(spec)`, `limit(n)`, `skip(n)`, `sample(n)`. `build()` → `MongoQueryPlan`. Type tests: shape is unchanged after identity stages.
 - [ ] 4.4 — `FieldProxy<Shape>` and `FilterProxy<Shape>`. `match()` callback overload: `match(fn: (fields: FilterProxy<Shape>) => MongoFilterExpr)`. `SortSpec<Shape>` constrained to current shape keys. Type tests and unit tests.
-- [ ] 4.5 — `TypedAggExpr<F>` wrapper. `ExpressionHelpers` (concat, add, subtract, multiply, divide, cond, literal, toLower, toUpper, size, slice). `addFields()` method with `Shape & ExtractDocShape<NewFields>` return type. Type tests: new fields accessible, existing fields preserved.
+- [ ] 4.5 — `TypedAggExpr<F>` wrapper. `ExpressionHelpers` (starter set: concat, add, subtract, multiply, divide, cond, literal, toLower, toUpper, size). `addFields()` method with `Shape & ExtractDocShape<NewFields>` return type. Type tests: new fields accessible, existing fields preserved.
 - [ ] 4.6 — `project()` — both inclusion overload (`project('field1', 'field2')` → `Pick<Shape>`) and computed overload (callback returning `Record<string, 1 | TypedAggExpr>`). Type tests: excluded fields inaccessible, computed fields have correct types.
 - [ ] 4.7 — `AccumulatorHelpers` (sum, avg, min, max, first, last, push, addToSet, count). `group()` method with `GroupedDocShape<Spec>` return type. Type tests: previous shape replaced, accumulator output types correct.
 - [ ] 4.8 — `unwind()` with `UnwoundShape<Shape, K>` (array → element type). Type tests.
 - [ ] 4.9 — `lookup()` (equality form) with foreign collection shape addition. `replaceRoot()` with embedded document navigation. `count()` and `sortByCount()`. Type tests for each.
-- [ ] 4.10 — `.pipe(stage)` escape hatch (shape-preserving and shape-asserting overloads). Entry point: `mongoPipeline({ context }).from('collection')` or proxy-based `pipeline.users`.
+- [ ] 4.10 — `.pipe(stage)` escape hatch (shape-preserving and shape-asserting overloads). Entry point: `mongoPipeline<Contract>({ contractJson }).from('collection')`.
 - [ ] 4.11 — Integration tests against mongodb-memory-server: (a) match → group → sort → limit, (b) addFields → match on computed field, (c) lookup → unwind → project, (d) replaceRoot into embedded document.
-- [ ] 4.12 — Export wiring from `mongo-pipeline-builder` package. Update `pnpm lint:deps` layering config.
+- [ ] 4.12 — Export wiring from `@prisma-next/mongo-pipeline-builder` package. Update `pnpm lint:deps` layering config.
 
-### Milestone 5: Remaining stages, pipeline-style updates, cleanup
+### Milestone 5: Remaining stages, pipeline-style updates, cleanup ([TML-2212](https://linear.app/prisma-company/issue/TML-2212))
 
 Complete AST coverage for all MongoDB pipeline stages, add pipeline-style updates, and remove the `Record<string, unknown>` escape hatch.
 
@@ -105,6 +136,10 @@ Complete AST coverage for all MongoDB pipeline stages, add pipeline-style update
 - [ ] 5.8 — Integration tests: (a) computed update with cross-field reference (`fullName` from `firstName` + `lastName`), (b) conditional update (tier upgrade based on purchase count), (c) traditional operator update still works (backward compat).
 - [ ] 5.9 — Builder methods for remaining stages where feasible: `facet()` basic form (independent sub-pipelines), builder-level `$lookup` pipeline form.
 
+### Follow-up: Complete expression and accumulator helpers ([TML-2217](https://linear.app/prisma-company/issue/TML-2217))
+
+Expand `ExpressionHelpers` and `AccumulatorHelpers` to cover the full MongoDB aggregation operator set. TML-2211 ships with a starter set; this ticket fills in the long tail (date, string, array, set, type, object, comparison operators; additional accumulators; numeric precision refinement).
+
 ### Close-out
 
 - [ ] Verify all acceptance criteria in [spec.md](spec.md)
@@ -118,21 +153,6 @@ Complete AST coverage for all MongoDB pipeline stages, add pipeline-style update
 
 | Acceptance Criterion | Test Type | Task | Notes |
 |---|---|---|---|
-| `rawPipeline` executes and returns correct results | Integration | 1.2 | mongodb-memory-server |
-| Collection name validated against contract | Type test | 1.2 | Compile-time error for unknown collection |
-| Type parameter assertion on rawPipeline | Type test | 1.2 | `.test-d.ts` |
-| All MongoAggExpr nodes are immutable with kind discriminant | Unit | 2.1–2.5 | Construction + freeze tests |
-| MongoAggExprVisitor is exhaustive | Unit | 2.3 | Visitor dispatch test |
-| MongoAggExprRewriter supports partial overrides | Unit | 2.3 | Rewriter with one hook |
-| lowerAggExpr produces correct documents | Unit | 2.4–2.5 | Round-trip tests |
-| MongoExprFilter bridge works in $match | Unit + Integration | 2.6 | Cross-field comparison |
-| AggregatePipelineEntry removed | Compilation | 5.4 | Type deleted, all consumers compile |
-| AggregateCommand.pipeline is MongoPipelineStage[] | Compilation | 5.4 | Type change verified |
-| MongoReadStage renamed to MongoPipelineStage | Compilation | 5.3 | All imports updated |
-| All new stages have lowering | Unit | 3.1–3.7, 5.1–5.2 | Lower → compare expected doc |
-| All new stages have visitor/rewriter | Unit | 3.1–3.6, 5.1–5.2 | Visitor dispatch, rewriter identity |
-| Existing ORM code compiles unchanged | Compilation | 3.3, 5.4 | Backward compat verification |
-| aggregate.test.ts uses typed stages | Integration | 3.8 | Updated test |
 | Builder match/sort/limit produces typed results | Integration + Type | 4.3–4.4, 4.11a | Shape unchanged |
 | group() produces replacement DocShape | Type test | 4.7 | Previous fields inaccessible |
 | addFields() extends DocShape | Type test | 4.5 | New + existing fields accessible |
@@ -142,16 +162,24 @@ Complete AST coverage for all MongoDB pipeline stages, add pipeline-style update
 | replaceRoot() replaces entire DocShape | Type test | 4.9 | Embedded doc shape |
 | Multi-stage pipeline executes with type inference | Integration | 4.11 | mongodb-memory-server |
 | .pipe() escape hatch works | Unit + Type | 4.10 | Shape preserved/asserted |
+| build() returns MongoQueryPlan (no execute) | Unit | 4.3 | Static builder |
+| AggregatePipelineEntry removed | Compilation | 5.4 | Type deleted, all consumers compile |
+| AggregateCommand.pipeline is MongoPipelineStage[] | Compilation | 5.4 | Type change verified |
+| MongoReadStage renamed to MongoPipelineStage | Compilation | 5.3 | All imports updated |
+| Existing ORM code compiles unchanged | Compilation | 4.0 | Backward compat after restructure |
 | computeUpdate with cross-field reference | Integration | 5.8a | Set fullName from parts |
 | computeUpdate with conditional logic | Integration | 5.8b | Tier upgrade |
 | Traditional updates unchanged | Integration | 5.8c | Backward compat |
 
+## Resolved Items
+
+1. ~~**Builder entry point**~~ — **Resolved.** Separate root constructor: `mongoPipeline<Contract>({ contractJson })`. Not on `MongoOrmClient`. Analogous to `postgres<Contract>({ contractJson })`.
+2. ~~**Nested field access in FieldProxy**~~ — **Resolved.** Flat fields only for now. Deep/dot-path access deferred until value objects land (ADR 180).
+3. ~~**Expression helper coverage**~~ — **Resolved.** Starter set in TML-2211. Full coverage tracked as [TML-2217](https://linear.app/prisma-company/issue/TML-2217).
+4. ~~**Accumulator output type precision**~~ — **Resolved.** Default to `'double'`. Precision refinement tracked in [TML-2217](https://linear.app/prisma-company/issue/TML-2217).
+
 ## Open Items
 
-1. **Builder entry point** — Should `rawPipeline()` and `mongoPipeline()` live on `MongoOrmClient` or a separate client? Resolve during milestone 1 (decide when implementing).
-2. **Nested field access in FieldProxy** — Chained property access vs dot-path. Defer to milestone 4 implementation; start with flat fields, iterate.
-3. **Expression helper coverage** — Start with arithmetic + concat + cond + literal + toLower/toUpper + size. Expand based on usage during milestone 4.
-4. **`$facet` sub-pipeline typing** — Complex type-level work. Basic form in milestone 5; independent shape tracking deferred.
-5. **`$lookup` pipeline form typing** — Let bindings + foreign scope in type system. Basic form in milestone 5; full type inference deferred.
-6. **Window function type inference** — `$setWindowFields` stage exists in AST (milestone 5) but builder method deferred.
-7. **Accumulator output type precision** — Pragmatic default: all numeric accumulators produce `'double'`. Precision improvement (int→int, double→double) deferred.
+1. **`$facet` sub-pipeline typing** — Complex type-level work. Basic form in milestone 5; independent shape tracking deferred.
+2. **`$lookup` pipeline form typing** — Let bindings + foreign scope in type system. Basic form in milestone 5; full type inference deferred.
+3. **Window function type inference** — `$setWindowFields` stage exists in AST (milestone 5) but builder method deferred.
