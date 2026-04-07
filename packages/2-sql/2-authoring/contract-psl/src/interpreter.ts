@@ -3,7 +3,12 @@ import type {
   ContractSourceDiagnosticSpan,
   ContractSourceDiagnostics,
 } from '@prisma-next/config/config-types';
-import type { Contract } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractField,
+  ContractModel,
+  ContractValueObject,
+} from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringTypeConstructorDescriptor,
@@ -13,6 +18,7 @@ import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-com
 import type {
   ParsePslDocumentResult,
   PslAttribute,
+  PslCompositeType,
   PslEnum,
   PslField,
   PslModel,
@@ -45,6 +51,7 @@ import type { ColumnDescriptor } from './psl-column-resolution';
 import {
   getAuthoringTypeConstructor,
   parsePgvectorLength,
+  resolveColumnDescriptor,
   resolveDbNativeTypeAttribute,
   toNamedTypeFieldDescriptor,
 } from './psl-column-resolution';
@@ -52,6 +59,7 @@ import {
   buildModelMappings,
   collectResolvedFields,
   type ModelNameMapping,
+  type ResolvedField,
 } from './psl-field-resolution';
 import {
   applyBackrelationCandidates,
@@ -327,6 +335,7 @@ interface BuildSemanticModelInput {
   readonly mapping: ModelNameMapping;
   readonly modelMappings: ReadonlyMap<string, ModelNameMapping>;
   readonly modelNames: Set<string>;
+  readonly compositeTypeNames: ReadonlySet<string>;
   readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
   readonly namedTypeBaseTypes: Map<string, string>;
@@ -343,6 +352,7 @@ interface BuildSemanticModelResult {
   readonly semanticModel: SqlSemanticModelNode;
   readonly fkRelationMetadata: FkRelationMetadata[];
   readonly backrelationCandidates: ModelBackrelationCandidate[];
+  readonly resolvedFields: readonly ResolvedField[];
 }
 
 function buildSemanticModelFromPsl(input: BuildSemanticModelInput): BuildSemanticModelResult {
@@ -356,6 +366,7 @@ function buildSemanticModelFromPsl(input: BuildSemanticModelInput): BuildSemanti
     input.namedTypeDescriptors,
     input.namedTypeBaseTypes,
     input.modelNames,
+    input.compositeTypeNames,
     input.composedExtensions,
     input.authoringContributions,
     input.defaultFunctionRegistry,
@@ -671,7 +682,86 @@ function buildSemanticModelFromPsl(input: BuildSemanticModelInput): BuildSemanti
     },
     fkRelationMetadata: resultFkRelationMetadata,
     backrelationCandidates: resultBackrelationCandidates,
+    resolvedFields,
   };
+}
+
+function buildValueObjects(
+  compositeTypes: readonly PslCompositeType[],
+  enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
+  namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
+  scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
+  diagnostics: ContractSourceDiagnostic[],
+  sourceId: string,
+): Record<string, ContractValueObject> {
+  const valueObjects: Record<string, ContractValueObject> = {};
+
+  for (const compositeType of compositeTypes) {
+    const fields: Record<string, ContractField> = {};
+    for (const field of compositeType.fields) {
+      const descriptor = resolveColumnDescriptor(
+        field,
+        enumTypeDescriptors as Map<string, ColumnDescriptor>,
+        namedTypeDescriptors as Map<string, ColumnDescriptor>,
+        scalarTypeDescriptors,
+      );
+      if (!descriptor) {
+        diagnostics.push({
+          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+          message: `Field "${compositeType.name}.${field.name}" type "${field.typeName}" is not supported`,
+          sourceId,
+          span: field.span,
+        });
+        continue;
+      }
+      fields[field.name] = {
+        nullable: field.optional,
+        type: { kind: 'scalar', codecId: descriptor.codecId },
+      };
+    }
+    valueObjects[compositeType.name] = { fields };
+  }
+
+  return valueObjects;
+}
+
+function patchModelDomainFields(
+  models: Record<string, ContractModel>,
+  modelResolvedFields: ReadonlyMap<string, readonly ResolvedField[]>,
+): Record<string, ContractModel> {
+  let patched = models;
+
+  for (const [modelName, resolvedFields] of modelResolvedFields) {
+    const model = patched[modelName];
+    if (!model) continue;
+
+    let needsPatch = false;
+    const patchedFields: Record<string, ContractField> = { ...model.fields };
+
+    for (const rf of resolvedFields) {
+      if (rf.valueObjectTypeName) {
+        needsPatch = true;
+        patchedFields[rf.field.name] = {
+          nullable: rf.field.optional,
+          type: { kind: 'valueObject', name: rf.valueObjectTypeName },
+          ...(rf.many ? { many: true as const } : {}),
+        };
+      } else if (rf.many && rf.scalarCodecId) {
+        needsPatch = true;
+        patchedFields[rf.field.name] = {
+          nullable: rf.field.optional,
+          type: { kind: 'scalar', codecId: rf.scalarCodecId },
+          many: true as const,
+        };
+      }
+    }
+
+    if (needsPatch) {
+      patched = { ...patched, [modelName]: { ...model, fields: patchedFields } };
+    }
+  }
+
+  return patched;
 }
 
 export function interpretPslDocumentToSqlContract(
@@ -705,6 +795,7 @@ export function interpretPslDocumentToSqlContract(
 
   const diagnostics: ContractSourceDiagnostic[] = mapParserDiagnostics(input.document);
   const modelNames = new Set(input.document.ast.models.map((model) => model.name));
+  const compositeTypeNames = new Set(input.document.ast.compositeTypes.map((ct) => ct.name));
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
   const defaultFunctionRegistry =
     input.controlMutationDefaults?.defaultFunctionRegistry ?? new Map<string, never>();
@@ -740,6 +831,7 @@ export function interpretPslDocumentToSqlContract(
   const semanticModels: SqlSemanticModelNode[] = [];
   const fkRelationMetadata: FkRelationMetadata[] = [];
   const backrelationCandidates: ModelBackrelationCandidate[] = [];
+  const modelResolvedFields = new Map<string, readonly ResolvedField[]>();
 
   for (const model of input.document.ast.models) {
     const mapping = modelMappings.get(model.name);
@@ -751,6 +843,7 @@ export function interpretPslDocumentToSqlContract(
       mapping,
       modelMappings,
       modelNames,
+      compositeTypeNames,
       enumTypeDescriptors: enumResult.enumTypeDescriptors,
       namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
       namedTypeBaseTypes: namedTypeResult.namedTypeBaseTypes,
@@ -765,6 +858,7 @@ export function interpretPslDocumentToSqlContract(
     semanticModels.push(result.semanticModel);
     fkRelationMetadata.push(...result.fkRelationMetadata);
     backrelationCandidates.push(...result.backrelationCandidates);
+    modelResolvedFields.set(model.name, result.resolvedFields);
   }
 
   const { modelRelations, fkRelationsByPair } = indexFkRelations({ fkRelationMetadata });
@@ -817,5 +911,26 @@ export function interpretPslDocumentToSqlContract(
         : {}),
     })),
   });
-  return ok(contract);
+
+  const valueObjects = buildValueObjects(
+    input.document.ast.compositeTypes,
+    enumResult.enumTypeDescriptors,
+    namedTypeResult.namedTypeDescriptors,
+    input.scalarTypeDescriptors,
+    diagnostics,
+    sourceId,
+  );
+
+  const patchedModels = patchModelDomainFields(
+    contract.models as Record<string, ContractModel>,
+    modelResolvedFields,
+  );
+
+  const patchedContract: Contract = {
+    ...contract,
+    models: patchedModels,
+    ...(Object.keys(valueObjects).length > 0 ? { valueObjects } : {}),
+  };
+
+  return ok(patchedContract);
 }

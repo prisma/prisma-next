@@ -77,7 +77,6 @@ model User {
       expect.arrayContaining([
         'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
         'PSL_MISSING_PRIMARY_KEY',
-        'PSL_UNSUPPORTED_FIELD_LIST',
         'PSL_UNSUPPORTED_FIELD_TYPE',
         'PSL_INVALID_RELATION_TARGET',
       ]),
@@ -207,11 +206,11 @@ model User {
     );
   });
 
-  it('returns diagnostics for unsupported list fields', () => {
+  it('returns diagnostics for list fields with unknown types', () => {
     const document = parsePslDocument({
       schema: `model User {
   id Int @id
-  tags String[]
+  things Unknown[]
 }
 `,
       sourceId: 'schema.prisma',
@@ -226,8 +225,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_UNSUPPORTED_FIELD_LIST',
-          message: expect.stringContaining('scalar/storage list type'),
+          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+          message: expect.stringContaining('Unknown'),
         }),
       ]),
     );

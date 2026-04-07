@@ -124,7 +124,7 @@ model Post {
         schemaPath,
         `model User {
   id Int @id
-  tags String[]
+  things Unknown[]
 }
 `,
         'utf-8',
@@ -141,9 +141,9 @@ model Post {
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'PSL_UNSUPPORTED_FIELD_LIST',
+            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
             sourceId: './schema.prisma',
-            message: expect.stringContaining('scalar/storage list type'),
+            message: expect.stringContaining('Unknown'),
             span: expect.objectContaining({
               start: expect.objectContaining({ line: 3 }),
             }),
