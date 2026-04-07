@@ -49,17 +49,4 @@ describe('pgvector descriptor', () => {
     },
     timeouts.typeScriptCompilation,
   );
-
-  describe('parameterized codec renderers', () => {
-    it('has parameterized renderers in codecTypes', () => {
-      const parameterized = pgvectorExtensionDescriptor.types?.codecTypes?.parameterized;
-      expect(parameterized).toHaveProperty('pg/vector@1');
-    });
-
-    it('vector codec has template renderer', () => {
-      const vectorRenderer =
-        pgvectorExtensionDescriptor.types?.codecTypes?.parameterized?.['pg/vector@1'];
-      expect(vectorRenderer).toBe('Vector<{{length}}>');
-    });
-  });
 });

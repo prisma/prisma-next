@@ -275,9 +275,7 @@ export function generateFieldOutputTypesMap(
   for (const [modelName, model] of Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) {
     if (!model) continue;
     const fieldEntries: string[] = [];
-    const fields = (model as Record<string, unknown>)['fields'] as
-      | Record<string, ContractField>
-      | undefined;
+    const fields = model.fields as Record<string, ContractField> | undefined;
     if (fields && typeof fields === 'object') {
       for (const [fieldName, field] of Object.entries(fields)) {
         if (!field || typeof field !== 'object' || !('type' in field)) continue;

@@ -1,6 +1,5 @@
 import type { Codec } from './codec-types';
 import type { AuthoringContributions } from './framework-authoring';
-import type { TypeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types-import-spec';
 
 /**
@@ -29,20 +28,12 @@ export interface ComponentMetadata {
        */
       readonly import?: TypesImportSpec;
       /**
-       * Optional renderers for parameterized codecs owned by this component.
-       * Key is codecId (e.g., 'pg/vector@1'), value is the type renderer.
-       *
-       * Templates are normalized to functions during pack assembly.
-       * Duplicate codecId across descriptors is a hard error.
-       */
-      readonly parameterized?: Record<string, TypeRenderer>;
-      /**
-       * Optional additional type-only imports required by parameterized renderers.
+       * Additional type-only imports for parameterized codec branded types.
        *
        * These imports are included in generated `contract.d.ts` but are NOT treated as
        * codec type maps (i.e., they should not be intersected into `export type CodecTypes = ...`).
        *
-       * Example: `Vector<N>` for pgvector renderers that emit `Vector<{{length}}>`
+       * Example: `Vector<N>` for pgvector codecs that emit `Vector<1536>`
        */
       readonly typeImports?: ReadonlyArray<TypesImportSpec>;
       /**

@@ -60,9 +60,6 @@ export const pgvectorPackMeta = {
           alias: 'Vector',
         },
       ],
-      parameterized: {
-        [pgvectorTypeId]: 'Vector<{{length}}>',
-      },
     },
     operationTypes: {
       import: {

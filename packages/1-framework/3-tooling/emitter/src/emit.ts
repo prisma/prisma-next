@@ -13,13 +13,7 @@ export async function emit(
   stack: EmitStackInput,
   targetFamily: EmissionSpi,
 ): Promise<EmitResult> {
-  const {
-    codecTypeImports,
-    operationTypeImports,
-    parameterizedRenderers,
-    parameterizedTypeImports,
-    queryOperationTypeImports,
-  } = stack;
+  const { codecTypeImports, operationTypeImports, queryOperationTypeImports } = stack;
 
   const { storageHash } = contract.storage;
   const executionHash = contract.execution?.executionHash;
@@ -41,14 +35,7 @@ export async function emit(
     2,
   );
 
-  const generateOptions =
-    parameterizedRenderers || parameterizedTypeImports || queryOperationTypeImports
-      ? {
-          ...ifDefined('parameterizedRenderers', parameterizedRenderers),
-          ...ifDefined('parameterizedTypeImports', parameterizedTypeImports),
-          ...ifDefined('queryOperationTypeImports', queryOperationTypeImports),
-        }
-      : undefined;
+  const generateOptions = queryOperationTypeImports ? { queryOperationTypeImports } : undefined;
 
   const contractTypeHashes = {
     storageHash,

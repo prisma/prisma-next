@@ -17,16 +17,4 @@ import type { CodecTypes as CoreCodecTypes } from '../core/codecs';
  */
 export type Vector<N extends number = number> = number[] & { readonly __vectorLength?: N };
 
-/**
- * Codec types for pgvector.
- *
- * - Scalar output remains `number[]` (runtime representation).
- * - `parameterizedOutput` enables lane typing to compute `Vector<N>` from column `typeParams`.
- */
-export type CodecTypes = CoreCodecTypes & {
-  readonly 'pg/vector@1': CoreCodecTypes['pg/vector@1'] & {
-    readonly parameterizedOutput: <P extends { readonly length: number }>(
-      params: P,
-    ) => P extends { readonly length: infer N extends number } ? Vector<N> : Vector<number>;
-  };
-};
+export type CodecTypes = CoreCodecTypes;
