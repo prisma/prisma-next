@@ -275,13 +275,9 @@ export function generateFieldOutputTypesMap(
   for (const [modelName, model] of Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) {
     if (!model) continue;
     const fieldEntries: string[] = [];
-    const fields = model.fields as Record<string, ContractField> | undefined;
-    if (fields && typeof fields === 'object') {
-      for (const [fieldName, field] of Object.entries(fields)) {
-        if (!field || typeof field !== 'object' || !('type' in field)) continue;
-        const resolvedType = generateFieldResolvedType(field as ContractField, codecLookup);
-        fieldEntries.push(`readonly ${serializeObjectKey(fieldName)}: ${resolvedType}`);
-      }
+    for (const [fieldName, field] of Object.entries(model.fields)) {
+      const resolvedType = generateFieldResolvedType(field, codecLookup);
+      fieldEntries.push(`readonly ${serializeObjectKey(fieldName)}: ${resolvedType}`);
     }
     const fieldsType =
       fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';

@@ -55,16 +55,8 @@ export type ContractValueObject = {
 
 export type ModelStorageBase = Readonly<Record<string, unknown>>;
 
-/**
- * Widened model constraint that accepts both structural {@link ContractField}
- * values and rendered types (e.g. `Char<36>`, `Vector<1536>`) produced by
- * parameterized renderers during contract emission.
- *
- * Used as the constraint on `Contract.TModels` so emitted contracts with
- * rendered model-field types satisfy the generic `Contract` interface.
- */
 export interface ContractModelBase<TModelStorage extends ModelStorageBase = ModelStorageBase> {
-  readonly fields: Readonly<Record<string, unknown>>;
+  readonly fields: Record<string, ContractField>;
   readonly relations: Record<string, ContractRelation>;
   readonly storage: TModelStorage;
   readonly discriminator?: ContractDiscriminator;
