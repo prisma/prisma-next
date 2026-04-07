@@ -82,56 +82,60 @@ describe('emitter integration', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('produces stable hashes for identical input', async () => {
-    const ir = createTestContract({
-      models: {
-        User: {
-          storage: { table: 'user' },
-          fields: {
-            id: { column: 'id' },
-          },
-          relations: {},
-        },
-      },
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+  it(
+    'produces stable hashes for identical input',
+    async () => {
+      const ir = createTestContract({
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: {
+              id: { column: 'id' },
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+            relations: {},
           },
         },
-      },
-      extensionPacks: {
-        postgres: {
-          version: '0.0.1',
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
         },
-        pg: {},
-      },
-    });
+        extensionPacks: {
+          postgres: {
+            version: '0.0.1',
+          },
+          pg: {},
+        },
+      });
 
-    const operationRegistry = createOperationRegistry();
-    const codecTypeImports: TypesImportSpec[] = [];
-    const operationTypeImports: TypesImportSpec[] = [];
-    const extensionIds = ['postgres', 'pg'];
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports,
-      operationTypeImports,
-      extensionIds,
-    };
+      const operationRegistry = createOperationRegistry();
+      const codecTypeImports: TypesImportSpec[] = [];
+      const operationTypeImports: TypesImportSpec[] = [];
+      const extensionIds = ['postgres', 'pg'];
+      const options: EmitStackInput = {
+        operationRegistry,
+        codecTypeImports,
+        operationTypeImports,
+        extensionIds,
+      };
 
-    const result1 = await emit(ir, options, mockSqlHook);
-    const result2 = await emit(ir, options, mockSqlHook);
+      const result1 = await emit(ir, options, mockSqlHook);
+      const result2 = await emit(ir, options, mockSqlHook);
 
-    expect(result1.storageHash).toBe(result2.storageHash);
-    expect(result1.contractDts).toBe(result2.contractDts);
-    expect(result1.contractJson).toBe(result2.contractJson);
-  });
+      expect(result1.storageHash).toBe(result2.storageHash);
+      expect(result1.contractDts).toBe(result2.contractDts);
+      expect(result1.contractJson).toBe(result2.contractJson);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'round-trip: IR → JSON → parse JSON → compare',

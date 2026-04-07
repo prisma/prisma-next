@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import type {
   EmissionSpi,
   GenerateContractTypesOptions,
@@ -52,8 +52,10 @@ export function generateContractDts(
 
   const modelsType = emitter.generateModelsType
     ? emitter.generateModelsType(contract, options)
-    : generateModelsType(contract.models, (name, model) =>
-        emitter.generateModelStorageType(name, model),
+    : generateModelsType(
+        // Contract.models defaults to ContractModelBase, but at emit time fields are always ContractField
+        contract.models as Record<string, ContractModel>,
+        (name, model) => emitter.generateModelStorageType(name, model),
       );
 
   const rootsType = generateRootsType(contract.roots);
