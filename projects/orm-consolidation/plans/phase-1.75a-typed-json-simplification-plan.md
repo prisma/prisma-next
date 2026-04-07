@@ -191,6 +191,19 @@ The specific approach should be decided during implementation, considering TML-2
 
 Remove the phantom Standard Schema key that was used by the type-level `parameterizedOutput` path.
 
+#### No-emit path analysis
+
+The phantom `schema` key was designed to enable type-level resolution for JSON schemas in the no-emit (programmatic contract builder) path. However, **this path was never wired end-to-end**. The integration type test at `test/integration/test/contract-builder.types.test-d.ts` (L487–518) is explicitly named "jsonb schema preserves **JsonValue fallback** in no-emit type path" and asserts that `jsonb(schema)` resolves to `unknown`, not the schema-derived type.
+
+`ResolveStandardSchemaOutput` works in isolation (proven by the standalone type tests at L521–558), but the contract builder → validate → query pipeline loses the phantom `schema` somewhere before it reaches `ComputeColumnJsType`. Since the system is contract-first (production always emits), this was apparently intentional — the no-emit path is a test convenience, not a production path.
+
+This means removing the phantom `schema` key is safe and does not regress any working behavior:
+
+| Path | Branded types (vector, char) | JSON schema types | Enum unions |
+|------|-----|-----|-----|
+| **Emit** (contract.d.ts) | Works via `CodecTypes['output']` | **Fixed by TML-2204** via `renderType` | **Fixed by TML-2204** via `renderType` |
+| **No-emit** (builder) | Works via `parameterizedOutput` | Already `unknown` — no regression | Not yet supported |
+
 #### 3.1 Remove phantom from `column-types.ts`
 
 In `adapter-postgres/src/exports/column-types.ts`:
@@ -198,27 +211,32 @@ In `adapter-postgres/src/exports/column-types.ts`:
 - Simplify `createJsonColumnFactory` — return type no longer includes phantom
 - Overload signatures for `json()` and `jsonb()` may simplify (the `TypedColumnDescriptor<TSchema>` return type is no longer needed)
 
-#### 3.2 Remove `parameterizedOutput` from `CodecTypes`
+#### 3.2 Remove `parameterizedOutput` from JSON `CodecTypes`
 
 In `adapter-postgres/src/exports/codec-types.ts`:
 - Remove the `parameterizedOutput` extension on `pg/json@1` and `pg/jsonb@1`
 - Remove `ResolveStandardSchemaOutput` and the compile-time `StandardSchemaLike`
-- `CodecTypes` becomes just `CoreCodecTypes` (plus branded types)
 
-If `parameterizedOutput` is still needed by other codecs (e.g., pgvector's `CodecTypes` in `pgvector/src/types/codec-types.ts`), keep the interface but remove the JSON-specific entries.
+Keep `parameterizedOutput` on other codecs (e.g., pgvector's `CodecTypes` in `pgvector/src/types/codec-types.ts`) — branded types still use this path in the no-emit builder.
 
 #### 3.3 Simplify `ComputeColumnJsType`
 
 In `sql-relational-core/src/types.ts`:
-- The `ExtractParameterizedCodecOutputType` branch handled the type-level `parameterizedOutput` path
-- After TML-2206 + emit-time rendering, this branch may be removable (if all parameterized type resolution goes through the emitter)
-- If branded types (vector, char) still use `parameterizedOutput`, keep the branch but remove the JSON-specific path
+- The `ExtractParameterizedCodecOutputType` branch handles the type-level `parameterizedOutput` path
+- Keep this branch — it still serves branded types (vector, char, varchar) in the no-emit path
+- The JSON-specific `parameterizedOutput` entries are removed (3.2), so this branch will naturally stop affecting JSON codecs
 
-#### 3.4 Tests
+#### 3.4 Delete `ResolveStandardSchemaOutput` type tests
 
-- `jsonb(schema)` in the no-emit path continues to compile (type may be `JsonValue` without emit-time rendering — this is expected)
+In `test/integration/test/contract-builder.types.test-d.ts`:
+- Delete the standalone `ResolveStandardSchemaOutput` type tests (L521–558) — they test a type utility that is being removed
+- Keep the "jsonb schema preserves JsonValue fallback in no-emit type path" test (L487–518), updating the assertion if the resolved type changes from `unknown` to `JsonValue`
+
+#### 3.5 Other tests
+
+- `jsonb(schema)` in the no-emit path continues to compile (resolves to `JsonValue` or `unknown` — no change from current behavior)
 - `jsonb()` continues to produce `JsonValue`
-- Existing vector/char/varchar branded type tests pass (these still work via `CodecTypes[codecId]['output']`)
+- Existing vector/char/varchar branded type tests pass (these still work via `CodecTypes[codecId]['parameterizedOutput']`)
 - No remaining references to phantom `schema` key in source code
 
 ### Milestone 4: Delete dead `parameterizedRenderers` infrastructure
@@ -294,9 +312,11 @@ Grep for `parameterizedRenderers`, `TypeRenderEntry`, `NormalizedTypeRenderer`, 
 | Untyped `jsonb()` emits `JsonValue` | Snapshot | 2.3 |
 | Codec without `renderType` falls back to `CodecTypes` output | Unit | 2.3 |
 | E2E: `jsonb(schema)` → emit → query → typed result | Type test | 2.3 |
-| Phantom `typeParams.schema` removed | Grep check | 3.4 |
-| `jsonb()` no-emit path compiles | Type test | 3.4 |
-| Branded types (vector, char) still work | Type test | 3.4 |
+| Phantom `typeParams.schema` removed from source | Grep check | 3.5 |
+| `ResolveStandardSchemaOutput` type tests deleted | Grep check | 3.4 |
+| `jsonb()` no-emit path compiles (resolves to `JsonValue`/`unknown`) | Type test | 3.5 |
+| Branded types (vector, char) still work in both paths | Type test | 3.5 |
+| No-emit `jsonb(schema)` does not regress (was already `unknown`) | Type test | 3.5 |
 | No remaining `parameterizedRenderers` references in source | Grep check | 4.6 |
 | All existing tests pass | Full suite | 4.6 |
 | `pnpm build` succeeds | Build | 4.6 |
