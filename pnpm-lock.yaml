@@ -1008,6 +1008,12 @@ importers:
       '@prisma-next/adapter-mongo':
         specifier: workspace:*
         version: link:../../../3-mongo-target/2-mongo-adapter
+      '@prisma-next/driver-mongo':
+        specifier: workspace:*
+        version: link:../../../3-mongo-target/3-mongo-driver
+      '@prisma-next/mongo-runtime':
+        specifier: workspace:*
+        version: link:../../7-runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -1017,6 +1023,12 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../../0-config/tsdown
+      mongodb:
+        specifier: 'catalog:'
+        version: 6.21.0
+      mongodb-memory-server:
+        specifier: ^10.4.0
+        version: 10.4.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
