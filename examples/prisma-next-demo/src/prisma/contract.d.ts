@@ -260,6 +260,7 @@ type ContractBase = ContractType<
     };
   };
   readonly execution: {
+    readonly executionHash: ExecutionHash;
     readonly mutations: {
       readonly defaults: readonly [
         {
@@ -272,7 +273,6 @@ type ContractBase = ContractType<
         },
       ];
     };
-    readonly executionHash: 'sha256:8c5eef43d2153fd832b8288ed2d8ffc9f5afb62908f8b4b7e6a4b7018444c41f';
   };
   readonly profileHash: ProfileHash;
 };
