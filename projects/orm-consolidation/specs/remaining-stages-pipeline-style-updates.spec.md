@@ -155,6 +155,29 @@ new UpdateManyCommand(coll, filter, [
 - [ ] Each builder method produces the correct AST stage node
 - [ ] Unit tests for each new builder method
 
+### Pipeline DSL row-type safety
+
+Every pipeline transformation, operation, and expression must have a type-level test proving that the **resolved row type** (i.e. the concrete field types after `ResolveRow`) is correct — not just that the shape keys are present. The existing shape tests (e.g. "sort accepts/rejects keys") are necessary but not sufficient: they only test the intermediate `DocShape`, not the final row type a user receives from `execute()`.
+
+- [ ] `build()` produces `MongoQueryPlan<Row>` where `Row` resolves to concrete field types (e.g. `{ _id: string; status: string; amount: number }`) — not `MongoQueryPlan<unknown>`
+- [ ] `from()` → `build()`: row type matches the model's fields resolved through codec types
+- [ ] `match()` preserves row type
+- [ ] `sort()` preserves row type
+- [ ] `limit()` / `skip()` / `sample()` preserve row type
+- [ ] `addFields()`: row type extends with the new fields at their correct resolved types
+- [ ] `project()` (inclusion): row type narrows to the selected fields at correct types
+- [ ] `project()` (computed): row type includes computed expression fields at correct types
+- [ ] `group()`: row type has `_id` at the grouped-by field's type, accumulator fields at their correct types (e.g. `acc.sum()` → `number`, `acc.count()` → `number`, `acc.max()` → `T | null`)
+- [ ] `unwind()`: row type preserves shape (array field element type tracking is deferred)
+- [ ] `count()`: row type is `{ [field]: number }`
+- [ ] `sortByCount()`: row type is `{ _id: <field type>; count: number }`
+- [ ] `lookup()`: row type adds the `as` field as `unknown[]`, preserves existing fields at correct types
+- [ ] `replaceRoot()`: row type is the new shape resolved to concrete types
+- [ ] `pipe()`: row type is preserved or narrowed as specified by the type parameter
+- [ ] Nullable fields resolve to `T | null`
+- [ ] Chained pipelines (e.g. `match → group → sort → limit → build`) produce correct cumulative row types
+- [ ] `runtime.execute(plan)` returns `AsyncIterableResult<Row>` where `Row` matches `build()`'s row type
+
 ## References
 
 - [Pipeline AST completeness design](../plans/pipeline-ast-completeness-design.md)
