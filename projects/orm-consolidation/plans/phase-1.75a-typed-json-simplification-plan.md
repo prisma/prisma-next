@@ -28,11 +28,13 @@ There are two separate mechanisms for parameterized type rendering, neither full
 
 1. **`parameterizedRenderers` infrastructure (dead code).** Adapter descriptors register `TypeRenderer` entries under `types.codecTypes.parameterized`. These are extracted into a `Map<string, NormalizedTypeRenderer>` by `extractParameterizedRenderers()`, stored on the control stack, threaded through `EmitStackInput` and `emit()` into `GenerateContractTypesOptions` — and then **never consumed**. The emitter's `generateContractTypes` reads `options?.parameterizedTypeImports` but ignores `options?.parameterizedRenderers`. The consumer code (`generateColumnType`, `resolveColumnTypeParams`) was deleted in commit `a39cea308`.
 
-2. **Type-level `parameterizedOutput` on `CodecTypes` (partially working).** `CodecTypes['pg/jsonb@1']` carries a `parameterizedOutput` function type that uses `ResolveStandardSchemaOutput<P>`, which looks for a phantom `typeParams.schema` key. This works for branded numeric types (vector, char, varchar) where type parameters compose at the type level, but **cannot work** for JSON schema or enum unions — those require emit-time code generation because you can't turn a runtime string or JSON Schema into a TypeScript type at the type level.
+2. **Type-level `parameterizedOutput` on `CodecTypes` (plumbing broken).** `CodecTypes['pg/jsonb@1']` carries a `parameterizedOutput` function type that uses `ResolveStandardSchemaOutput<P>`, which extracts the output type from a schema object's type parameter (via Arktype's `.infer` or Standard Schema's `~standard.types.output`). The authoring surface (`jsonb(myArktypeSchema)`) captures the schema's TypeScript type through a phantom `typeParams.schema` key, and `ResolveStandardSchemaOutput` extracts the output type — this is pure compile-time type resolution, driven by the schema library. The mechanism works in isolation (proven by standalone type tests), but the phantom key gets lost somewhere in the contract builder → validate → query pipeline, so the no-emit path currently resolves to `unknown` instead of the schema-derived type.
 
 ### What this changes
 
-Replace both mechanisms with a single pattern: **codec-owned `renderType`**. The codec object provides an optional `renderType(typeParams): string` method that produces a TypeScript type expression at emit time. The emitter calls it for scalar fields with `typeParams`. Codecs without `renderType` fall back to `CodecTypes[codecId]['output']` (the existing type-level path, which works for non-parameterized codecs and branded types).
+Replace both mechanisms with a single pattern: **codec-owned `renderType`**. The codec object provides an optional `renderType(typeParams): string` method that produces a TypeScript type expression at emit time. The emitter needs this because it works from serialized data — at emit time, only `typeParams.schemaJson` (a JSON Schema record) is available, not the original Arktype/Zod schema object with its type parameter. `renderType` turns that serialized representation into a TypeScript type expression string for `contract.d.ts`.
+
+The no-emit path (programmatic contract builder) doesn't need `renderType` — the authoring surface captures the schema's TypeScript type directly, and type-level resolution handles the rest. Codecs without `renderType` fall back to `CodecTypes[codecId]['output']` (the existing type-level path, which works for non-parameterized codecs and branded types).
 
 This follows the same architectural pattern as `encodeJson`/`decodeJson` from [ADR 184](../../../docs/architecture%20docs/adrs/ADR%20184%20-%20Codec-owned%20value%20serialization.md): the codec owns all representations of its type.
 
@@ -193,16 +195,16 @@ Remove the phantom Standard Schema key that was used by the type-level `paramete
 
 #### No-emit path analysis
 
-The phantom `schema` key was designed to enable type-level resolution for JSON schemas in the no-emit (programmatic contract builder) path. However, **this path was never wired end-to-end**. The integration type test at `test/integration/test/contract-builder.types.test-d.ts` (L487–518) is explicitly named "jsonb schema preserves **JsonValue fallback** in no-emit type path" and asserts that `jsonb(schema)` resolves to `unknown`, not the schema-derived type.
+The phantom `schema` key was designed to enable type-level resolution for JSON schemas in the no-emit (programmatic contract builder) path. The authoring surface (`jsonb(myArktypeSchema)`) captures the schema's TypeScript type through the phantom key, and `ResolveStandardSchemaOutput` extracts the output type — this mechanism works in isolation (proven by standalone type tests at L521–558).
 
-`ResolveStandardSchemaOutput` works in isolation (proven by the standalone type tests at L521–558), but the contract builder → validate → query pipeline loses the phantom `schema` somewhere before it reaches `ComputeColumnJsType`. Since the system is contract-first (production always emits), this was apparently intentional — the no-emit path is a test convenience, not a production path.
+However, the **plumbing is broken end-to-end**: the contract builder → validate → query pipeline loses the phantom `schema` somewhere before it reaches `ComputeColumnJsType`. The integration type test at `test/integration/test/contract-builder.types.test-d.ts` (L487–518) asserts that `jsonb(schema)` resolves to `unknown`, not the schema-derived type.
 
-This means removing the phantom `schema` key is safe and does not regress any working behavior:
+Fixing the no-emit plumbing is out of scope for TML-2204. Since the system is contract-first (production always emits), the no-emit path is primarily a test convenience. Removing the phantom `schema` key does not regress any currently working behavior:
 
 | Path | Branded types (vector, char) | JSON schema types | Enum unions |
 |------|-----|-----|-----|
 | **Emit** (contract.d.ts) | Works via `CodecTypes['output']` | **Fixed by TML-2204** via `renderType` | **Fixed by TML-2204** via `renderType` |
-| **No-emit** (builder) | Works via `parameterizedOutput` | Already `unknown` — no regression | Not yet supported |
+| **No-emit** (builder) | Works via `parameterizedOutput` | Broken (resolves to `unknown`) — no regression | Not yet supported |
 
 #### 3.1 Remove phantom from `column-types.ts`
 
