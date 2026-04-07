@@ -298,7 +298,7 @@ export const sqlEmission = {
     return `{ ${storageParts.join('; ')} }`;
   },
 
-  generateModelsType(contract: Contract, _options?: GenerateContractTypesOptions): string {
+  generateModelsType(contract: Contract, options?: GenerateContractTypesOptions): string {
     const storage = contract.storage as unknown as SqlStorage;
     const models = contract.models as Record<string, ContractModel<SqlModelStorage>> | undefined;
 
@@ -336,13 +336,22 @@ export const sqlEmission = {
               : column.typeRef
                 ? storage.types?.[column.typeRef]?.typeParams
                 : undefined;
-          const fieldTypeParamsSpec =
-            resolvedTypeParams && Object.keys(resolvedTypeParams).length > 0
-              ? `; readonly typeParams: ${serializeTypeParamsLiteral(resolvedTypeParams)}`
-              : '';
-          fields.push(
-            `readonly ${fieldName}: { readonly codecId: ${serializeValue(column.codecId)}; readonly nullable: ${nullable}${fieldTypeParamsSpec} }`,
-          );
+          const renderer = options?.parameterizedRenderers?.get(column.codecId);
+          if (renderer && resolvedTypeParams && Object.keys(resolvedTypeParams).length > 0) {
+            const renderedType = renderer.render(resolvedTypeParams, {
+              codecTypesName: 'CodecTypes',
+            });
+            const nullSuffix = nullable ? ' | null' : '';
+            fields.push(`readonly ${fieldName}: ${renderedType}${nullSuffix}`);
+          } else {
+            const fieldTypeParamsSpec =
+              resolvedTypeParams && Object.keys(resolvedTypeParams).length > 0
+                ? `; readonly typeParams: ${serializeTypeParamsLiteral(resolvedTypeParams)}`
+                : '';
+            fields.push(
+              `readonly ${fieldName}: { readonly codecId: ${serializeValue(column.codecId)}; readonly nullable: ${nullable}${fieldTypeParamsSpec} }`,
+            );
+          }
           storageFieldParts.push(
             `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
           );
