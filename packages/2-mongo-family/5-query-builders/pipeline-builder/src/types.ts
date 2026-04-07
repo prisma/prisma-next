@@ -104,7 +104,12 @@ export type GroupedDocShape<Spec extends GroupSpec> = {
       : DocField;
 };
 
-export type UnwrapArrayDocField<F extends DocField> = F;
+/**
+ * Intentionally identity — full array element type extraction is deferred.
+ * Used by `UnwoundShape` so the unwind result shape can be refined later
+ * without changing the public API.
+ */
+type UnwrapArrayDocField<F extends DocField> = F;
 
 export type UnwoundShape<S extends DocShape, K extends keyof S & string> = {
   [P in keyof S & string]: P extends K ? UnwrapArrayDocField<S[P]> : S[P];
