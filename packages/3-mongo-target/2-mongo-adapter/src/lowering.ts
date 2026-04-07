@@ -173,7 +173,11 @@ function lowerProjectionValue(value: MongoProjectionValue): unknown {
 }
 
 function lowerWindowField(wf: MongoWindowField): Record<string, unknown> {
-  const result: Record<string, unknown> = lowerAggExpr(wf.operator) as Record<string, unknown>;
+  const lowered = lowerAggExpr(wf.operator);
+  if (typeof lowered !== 'object' || lowered === null) {
+    throw new Error('Window field operator must lower to an object');
+  }
+  const result: Record<string, unknown> = { ...lowered };
   if (wf.window) {
     result['window'] = { ...wf.window };
   }
