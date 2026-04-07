@@ -121,14 +121,12 @@ export class FindOneAndDeleteCommand extends MongoAstNode {
   }
 }
 
-export type AggregatePipelineEntry = MongoPipelineStage | Record<string, unknown>;
-
 export class AggregateCommand extends MongoAstNode {
   readonly kind = 'aggregate' as const;
   readonly collection: string;
-  readonly pipeline: ReadonlyArray<AggregatePipelineEntry>;
+  readonly pipeline: ReadonlyArray<MongoPipelineStage>;
 
-  constructor(collection: string, pipeline: ReadonlyArray<AggregatePipelineEntry>) {
+  constructor(collection: string, pipeline: ReadonlyArray<MongoPipelineStage>) {
     super();
     this.collection = collection;
     this.pipeline = pipeline;
