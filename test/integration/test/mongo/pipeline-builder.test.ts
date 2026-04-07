@@ -135,7 +135,8 @@ describeWithMongoDB('Pipeline builder integration (mongoPipeline DSL)', (ctx) =>
   }
 
   async function exec(plan: MongoQueryPlan): Promise<Row[]> {
-    return ctx.runtime.execute(plan) as Promise<Row[]>;
+    const rows = await ctx.runtime.execute(plan).toArray();
+    return rows as Row[];
   }
 
   // ---------- Basic pipeline flow ----------
