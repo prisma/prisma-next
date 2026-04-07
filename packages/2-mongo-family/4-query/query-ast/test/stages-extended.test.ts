@@ -381,6 +381,16 @@ describe('MongoBucketStage', () => {
     });
     expect(stage.rewrite({})).toBe(stage);
   });
+
+  it('throws if boundaries has fewer than 2 values', () => {
+    expect(
+      () =>
+        new MongoBucketStage({
+          groupBy: MongoAggFieldRef.of('price'),
+          boundaries: [0],
+        }),
+    ).toThrow(RangeError);
+  });
 });
 
 describe('MongoBucketAutoStage', () => {
@@ -429,6 +439,30 @@ describe('MongoBucketAutoStage', () => {
       buckets: 5,
     });
     expect(stage.rewrite({})).toBe(stage);
+  });
+
+  it('throws if buckets is not a positive integer', () => {
+    expect(
+      () =>
+        new MongoBucketAutoStage({
+          groupBy: MongoAggFieldRef.of('price'),
+          buckets: 0,
+        }),
+    ).toThrow(RangeError);
+    expect(
+      () =>
+        new MongoBucketAutoStage({
+          groupBy: MongoAggFieldRef.of('price'),
+          buckets: -1,
+        }),
+    ).toThrow(RangeError);
+    expect(
+      () =>
+        new MongoBucketAutoStage({
+          groupBy: MongoAggFieldRef.of('price'),
+          buckets: 2.5,
+        }),
+    ).toThrow(RangeError);
   });
 });
 
@@ -793,6 +827,32 @@ describe('MongoVectorSearchStage', () => {
       limit: 5,
     });
     expect(stage.rewrite({})).toBe(stage);
+  });
+
+  it('throws if limit is not a positive integer', () => {
+    expect(
+      () =>
+        new MongoVectorSearchStage({
+          index: 'i',
+          path: 'p',
+          queryVector: [1],
+          numCandidates: 10,
+          limit: 0,
+        }),
+    ).toThrow(RangeError);
+  });
+
+  it('throws if numCandidates < limit', () => {
+    expect(
+      () =>
+        new MongoVectorSearchStage({
+          index: 'i',
+          path: 'p',
+          queryVector: [1],
+          numCandidates: 3,
+          limit: 5,
+        }),
+    ).toThrow(RangeError);
   });
 });
 
