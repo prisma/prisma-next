@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "mongo",
+  "target": "mongo",
+  "profileHash": "sha256:vo-test-profile-hash",
+  "roots": {
+    "shop": "Shop"
+  },
+  "models": {
+    "Shop": {
+      "fields": {
+        "_id": {
+          "type": { "kind": "scalar", "codecId": "mongo/objectId@1" },
+          "nullable": false
+        },
+        "name": {
+          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "nullable": false
+        },
+        "location": {
+          "type": { "kind": "valueObject", "name": "Location" },
+          "nullable": false
+        },
+        "notes": {
+          "type": { "kind": "valueObject", "name": "Location" },
+          "nullable": true
+        }
+      },
+      "relations": {},
+      "storage": {
+        "collection": "shops"
+      }
+    }
+  },
+  "valueObjects": {
+    "Location": {
+      "fields": {
+        "street": {
+          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "nullable": false
+        },
+        "city": {
+          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "nullable": false
+        },
+        "zip": {
+          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "nullable": false
+        }
+      }
+    }
+  },
+  "storage": {
+    "collections": {
+      "shops": {}
+    },
+    "storageHash": "sha256:vo-test-storage-hash"
+  },
+  "capabilities": {},
+  "extensionPacks": {},
+  "meta": {}
+}
