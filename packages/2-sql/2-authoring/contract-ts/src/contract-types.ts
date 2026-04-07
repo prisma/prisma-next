@@ -463,6 +463,32 @@ type BuiltStorage<Definition> = {
   readonly types: DefinitionTypes<Definition>;
 };
 
+type FieldOutputType<
+  Definition,
+  ModelName extends ModelNames<Definition>,
+  FieldName extends ModelFieldNames<Definition, ModelName>,
+> = ModelStorageColumn<Definition, ModelName, FieldName> extends infer Col
+  ? Col extends { readonly codecId: infer Id extends string }
+    ? Id extends keyof CodecTypesFromDefinition<Definition>
+      ? CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
+        ? Col extends { readonly nullable: true }
+          ? O | null
+          : O
+        : unknown
+      : unknown
+    : unknown
+  : unknown;
+
+type FieldOutputTypes<Definition> = {
+  readonly [ModelName in ModelNames<Definition>]: {
+    readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldOutputType<
+      Definition,
+      ModelName,
+      FieldName
+    >;
+  };
+};
+
 export type SqlContractResult<Definition> = ContractWithTypeMaps<
   Contract<BuiltStorage<Definition>, BuiltModels<Definition>> & {
     readonly target: DefinitionTargetId<Definition>;
@@ -478,5 +504,10 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
       ? DefinitionCapabilities<Definition>
       : Record<string, Record<string, boolean>>;
   },
-  TypeMaps<CodecTypesFromDefinition<Definition>, Record<string, never>>
+  TypeMaps<
+    CodecTypesFromDefinition<Definition>,
+    Record<string, never>,
+    Record<string, never>,
+    FieldOutputTypes<Definition>
+  >
 >;
