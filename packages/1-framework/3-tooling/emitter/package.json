@@ -44,6 +44,10 @@
       "types": "./dist/domain-type-generation.d.mts",
       "import": "./dist/domain-type-generation.mjs"
     },
+    "./type-expression-safety": {
+      "types": "./dist/type-expression-safety.d.mts",
+      "import": "./dist/type-expression-safety.mjs"
+    },
     "./test/utils": {
       "types": "./dist/test/utils.d.mts",
       "import": "./dist/test/utils.mjs"
