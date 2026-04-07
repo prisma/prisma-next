@@ -87,7 +87,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
         sql = renderSelect(node, context.contract);
         break;
       case 'insert':
-        sql = renderInsert(node, context.contract);
+        sql = renderInsert(node);
         break;
       case 'update':
         sql = renderUpdate(node, context.contract);
@@ -402,67 +402,43 @@ function renderJoinOn(on: JoinOnExpr, contract?: SqliteContract): string {
   return renderExpr(on, contract);
 }
 
-// Collects the union of column names across all rows in insertion order.
-// Multi-row inserts may have different keys per row (some rows omit columns
-// that get DEFAULT). This builds a stable column list so every row renders
-// with the same column positions.
-function collectInsertColumns(
-  rows: ReadonlyArray<Record<string, InsertValue>>,
-  contract: SqliteContract,
-  tableName: string,
-): string[] {
-  const orderedColumns: string[] = [];
-  const seenColumns = new Set<string>();
-
-  for (const row of rows) {
-    for (const column of Object.keys(row)) {
-      if (seenColumns.has(column)) {
-        continue;
-      }
-      seenColumns.add(column);
-      orderedColumns.push(column);
-    }
-  }
-
-  if (orderedColumns.length > 0) {
-    return orderedColumns;
-  }
-
-  return Object.keys(contract.storage.tables[tableName]?.columns ?? {});
-}
-
-function renderInsertValue(value: InsertValue | undefined): string {
-  if (!value || value.kind === 'default-value') {
-    throw new Error('SQLite does not support DEFAULT as a value in INSERT ... VALUES');
-  }
-
+function renderInsertValue(value: InsertValue): string {
   switch (value.kind) {
     case 'param-ref':
       return '?';
     case 'column-ref':
       return renderColumn(value);
+    case 'default-value':
+      throw new Error('SQLite does not support DEFAULT as a value in INSERT ... VALUES');
     default:
       throw new Error(`Unsupported value node in INSERT: ${(value as { kind: string }).kind}`);
   }
 }
 
-function renderInsert(ast: InsertAst, contract: SqliteContract): string {
+function renderInsert(ast: InsertAst): string {
   const table = quoteIdentifier(ast.table.name);
   const rows = ast.rows;
   if (rows.length === 0) {
     throw new Error('INSERT requires at least one row');
   }
-  const hasExplicitValues = rows.some((row) => Object.keys(row).length > 0);
+
+  const [firstRow] = rows;
+  const columnOrder = Object.keys(firstRow);
 
   let insertClause: string;
-  if (!hasExplicitValues) {
+  if (columnOrder.length === 0) {
     insertClause = `INSERT INTO ${table} DEFAULT VALUES`;
   } else {
-    const columnOrder = collectInsertColumns(rows, contract, ast.table.name);
     const columns = columnOrder.map((column) => quoteIdentifier(column));
     const values = rows
       .map((row) => {
-        const renderedRow = columnOrder.map((column) => renderInsertValue(row[column]));
+        const renderedRow = columnOrder.map((column) => {
+          const value = row[column];
+          if (!value) {
+            throw new Error(`Missing value for column "${column}" in INSERT row`);
+          }
+          return renderInsertValue(value);
+        });
         return `(${renderedRow.join(', ')})`;
       })
       .join(', ');
