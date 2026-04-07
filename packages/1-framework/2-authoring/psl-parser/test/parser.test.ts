@@ -523,3 +523,96 @@ model User {
     expect(roleField?.typeRef).toBeUndefined();
   });
 });
+
+describe('composite type blocks', () => {
+  it('parses type X { ... } as compositeType with fields', () => {
+    const schema = `
+type Address {
+  street String
+  city   String
+  zip    String?
+}
+
+model User {
+  id      Int     @id
+  name    String
+  address Address
+}
+`;
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    expect(result.ok).toBe(true);
+    expect(result.ast.compositeTypes).toHaveLength(1);
+
+    const address = result.ast.compositeTypes[0]!;
+    expect(address.kind).toBe('compositeType');
+    expect(address.name).toBe('Address');
+    expect(address.fields).toHaveLength(3);
+    expect(address.fields[0]!.name).toBe('street');
+    expect(address.fields[0]!.typeName).toBe('String');
+    expect(address.fields[2]!.optional).toBe(true);
+  });
+
+  it('does not add typeRef for composite type field references on models', () => {
+    const schema = `
+type Address {
+  street String
+}
+
+types {
+  PostalCode = String
+}
+
+model User {
+  id      Int
+  address Address
+  zip     PostalCode
+}
+`;
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    expect(result.ok).toBe(true);
+
+    const userModel = result.ast.models.find((m) => m.name === 'User')!;
+    const addressField = userModel.fields.find((f) => f.name === 'address')!;
+    expect(addressField.typeName).toBe('Address');
+    expect(addressField.typeRef).toBeUndefined();
+
+    const zipField = userModel.fields.find((f) => f.name === 'zip')!;
+    expect(zipField.typeName).toBe('PostalCode');
+    expect(zipField.typeRef).toBe('PostalCode');
+  });
+
+  it('parses nested composite type references within composite types', () => {
+    const schema = `
+type GeoPoint {
+  lat Float
+  lng Float
+}
+
+type Address {
+  street   String
+  location GeoPoint
+}
+`;
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    expect(result.ok).toBe(true);
+    expect(result.ast.compositeTypes).toHaveLength(2);
+
+    const address = result.ast.compositeTypes.find((ct) => ct.name === 'Address')!;
+    const locationField = address.fields.find((f) => f.name === 'location')!;
+    expect(locationField.typeName).toBe('GeoPoint');
+  });
+
+  it('parses composite type with list fields', () => {
+    const schema = `
+type Address {
+  tags String[]
+}
+`;
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    expect(result.ok).toBe(true);
+    const address = result.ast.compositeTypes[0]!;
+    const tagsField = address.fields.find((f) => f.name === 'tags')!;
+    expect(tagsField.list).toBe(true);
+    expect(tagsField.typeName).toBe('String');
+  });
+});
