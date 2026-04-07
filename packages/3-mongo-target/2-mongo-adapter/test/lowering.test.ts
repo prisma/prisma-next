@@ -12,24 +12,38 @@ import {
   MongoAggReduce,
   MongoAggSwitch,
   MongoAndExpr,
+  MongoBucketAutoStage,
+  MongoBucketStage,
   MongoCountStage,
+  MongoDensifyStage,
   MongoExistsExpr,
   MongoExprFilter,
+  MongoFacetStage,
   MongoFieldFilter,
+  MongoFillStage,
+  MongoGeoNearStage,
+  MongoGraphLookupStage,
   MongoGroupStage,
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
+  MongoMergeStage,
   MongoNotExpr,
   MongoOrExpr,
+  MongoOutStage,
   MongoProjectStage,
   MongoRedactStage,
   MongoReplaceRootStage,
   MongoSampleStage,
+  MongoSearchMetaStage,
+  MongoSearchStage,
+  MongoSetWindowFieldsStage,
   MongoSkipStage,
   MongoSortByCountStage,
   MongoSortStage,
+  MongoUnionWithStage,
   MongoUnwindStage,
+  MongoVectorSearchStage,
 } from '@prisma-next/mongo-query-ast';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
@@ -571,6 +585,288 @@ describe('lowerAggExpr', () => {
     ]);
     expect(lowerAggExpr(expr)).toEqual({
       $mergeObjects: ['$defaults', '$overrides'],
+    });
+  });
+});
+
+describe('lowerStage — new stages', () => {
+  it('lowers $out with collection only', () => {
+    expect(lowerStage(new MongoOutStage('results'))).toEqual({ $out: 'results' });
+  });
+
+  it('lowers $out with db and collection', () => {
+    expect(lowerStage(new MongoOutStage('results', 'archive'))).toEqual({
+      $out: { db: 'archive', coll: 'results' },
+    });
+  });
+
+  it('lowers $unionWith without pipeline', () => {
+    expect(lowerStage(new MongoUnionWithStage('other'))).toEqual({
+      $unionWith: { coll: 'other' },
+    });
+  });
+
+  it('lowers $unionWith with pipeline', () => {
+    const stage = new MongoUnionWithStage('other', [
+      new MongoMatchStage(MongoFieldFilter.eq('status', 'active')),
+    ]);
+    expect(lowerStage(stage)).toEqual({
+      $unionWith: {
+        coll: 'other',
+        pipeline: [{ $match: { status: { $eq: 'active' } } }],
+      },
+    });
+  });
+
+  it('lowers $bucket', () => {
+    const stage = new MongoBucketStage({
+      groupBy: MongoAggFieldRef.of('price'),
+      boundaries: [0, 100, 500],
+      default_: 'Other',
+      output: { count: MongoAggAccumulator.sum(MongoAggLiteral.of(1)) },
+    });
+    expect(lowerStage(stage)).toEqual({
+      $bucket: {
+        groupBy: '$price',
+        boundaries: [0, 100, 500],
+        default: 'Other',
+        output: { count: { $sum: 1 } },
+      },
+    });
+  });
+
+  it('lowers $bucketAuto', () => {
+    const stage = new MongoBucketAutoStage({
+      groupBy: MongoAggFieldRef.of('price'),
+      buckets: 5,
+      granularity: 'R10',
+    });
+    expect(lowerStage(stage)).toEqual({
+      $bucketAuto: { groupBy: '$price', buckets: 5, granularity: 'R10' },
+    });
+  });
+
+  it('lowers $geoNear', () => {
+    const stage = new MongoGeoNearStage({
+      near: { type: 'Point', coordinates: [-73.99, 40.73] },
+      distanceField: 'dist.calculated',
+      spherical: true,
+      maxDistance: 5000,
+    });
+    expect(lowerStage(stage)).toEqual({
+      $geoNear: {
+        near: { type: 'Point', coordinates: [-73.99, 40.73] },
+        distanceField: 'dist.calculated',
+        spherical: true,
+        maxDistance: 5000,
+      },
+    });
+  });
+
+  it('lowers $geoNear with query filter', () => {
+    const stage = new MongoGeoNearStage({
+      near: [0, 0],
+      distanceField: 'dist',
+      query: MongoFieldFilter.eq('active', true),
+    });
+    expect(lowerStage(stage)).toEqual({
+      $geoNear: {
+        near: [0, 0],
+        distanceField: 'dist',
+        query: { active: { $eq: true } },
+      },
+    });
+  });
+
+  it('lowers $facet', () => {
+    const stage = new MongoFacetStage({
+      priceStats: [
+        new MongoGroupStage(null, { avg: MongoAggAccumulator.avg(MongoAggFieldRef.of('price')) }),
+      ],
+      countByStatus: [new MongoSortByCountStage(MongoAggFieldRef.of('status'))],
+    });
+    const lowered = lowerStage(stage);
+    expect(lowered).toEqual({
+      $facet: {
+        priceStats: [{ $group: { _id: null, avg: { $avg: '$price' } } }],
+        countByStatus: [{ $sortByCount: '$status' }],
+      },
+    });
+  });
+
+  it('lowers $graphLookup', () => {
+    const stage = new MongoGraphLookupStage({
+      from: 'employees',
+      startWith: MongoAggFieldRef.of('reportsTo'),
+      connectFromField: 'reportsTo',
+      connectToField: 'name',
+      as: 'hierarchy',
+      maxDepth: 3,
+      depthField: 'depth',
+    });
+    expect(lowerStage(stage)).toEqual({
+      $graphLookup: {
+        from: 'employees',
+        startWith: '$reportsTo',
+        connectFromField: 'reportsTo',
+        connectToField: 'name',
+        as: 'hierarchy',
+        maxDepth: 3,
+        depthField: 'depth',
+      },
+    });
+  });
+
+  it('lowers $graphLookup with restrictSearchWithMatch', () => {
+    const stage = new MongoGraphLookupStage({
+      from: 'e',
+      startWith: MongoAggFieldRef.of('mgr'),
+      connectFromField: 'mgr',
+      connectToField: 'name',
+      as: 'h',
+      restrictSearchWithMatch: MongoFieldFilter.eq('active', true),
+    });
+    expect(lowerStage(stage)).toEqual({
+      $graphLookup: {
+        from: 'e',
+        startWith: '$mgr',
+        connectFromField: 'mgr',
+        connectToField: 'name',
+        as: 'h',
+        restrictSearchWithMatch: { active: { $eq: true } },
+      },
+    });
+  });
+
+  it('lowers $merge with string into', () => {
+    expect(lowerStage(new MongoMergeStage({ into: 'output' }))).toEqual({
+      $merge: { into: 'output' },
+    });
+  });
+
+  it('lowers $merge with object into and whenMatched pipeline', () => {
+    const stage = new MongoMergeStage({
+      into: { db: 'archive', coll: 'results' },
+      on: '_id',
+      whenMatched: [new MongoAddFieldsStage({ updated: MongoAggLiteral.of(true) })],
+      whenNotMatched: 'insert',
+    });
+    expect(lowerStage(stage)).toEqual({
+      $merge: {
+        into: { db: 'archive', coll: 'results' },
+        on: '_id',
+        whenMatched: [{ $addFields: { updated: true } }],
+        whenNotMatched: 'insert',
+      },
+    });
+  });
+
+  it('lowers $merge with string whenMatched', () => {
+    const stage = new MongoMergeStage({ into: 'output', whenMatched: 'replace' });
+    expect(lowerStage(stage)).toEqual({
+      $merge: { into: 'output', whenMatched: 'replace' },
+    });
+  });
+
+  it('lowers $setWindowFields', () => {
+    const stage = new MongoSetWindowFieldsStage({
+      partitionBy: MongoAggFieldRef.of('state'),
+      sortBy: { orderDate: 1 },
+      output: {
+        cumTotal: {
+          operator: MongoAggAccumulator.sum(MongoAggFieldRef.of('quantity')),
+          window: { documents: [Number.NEGATIVE_INFINITY, 0] as [number, number] },
+        },
+      },
+    });
+    const lowered = lowerStage(stage);
+    expect(lowered).toEqual({
+      $setWindowFields: {
+        partitionBy: '$state',
+        sortBy: { orderDate: 1 },
+        output: {
+          cumTotal: {
+            $sum: '$quantity',
+            window: { documents: [Number.NEGATIVE_INFINITY, 0] },
+          },
+        },
+      },
+    });
+  });
+
+  it('lowers $densify', () => {
+    const stage = new MongoDensifyStage({
+      field: 'timestamp',
+      partitionByFields: ['sensorId'],
+      range: { step: 1, unit: 'hour', bounds: 'full' },
+    });
+    expect(lowerStage(stage)).toEqual({
+      $densify: {
+        field: 'timestamp',
+        partitionByFields: ['sensorId'],
+        range: { step: 1, unit: 'hour', bounds: 'full' },
+      },
+    });
+  });
+
+  it('lowers $fill with method', () => {
+    const stage = new MongoFillStage({
+      sortBy: { ts: 1 },
+      output: { qty: { method: 'linear' } },
+    });
+    expect(lowerStage(stage)).toEqual({
+      $fill: {
+        sortBy: { ts: 1 },
+        output: { qty: { method: 'linear' } },
+      },
+    });
+  });
+
+  it('lowers $fill with value expression', () => {
+    const stage = new MongoFillStage({
+      partitionBy: MongoAggFieldRef.of('region'),
+      output: { price: { value: MongoAggLiteral.of(0) } },
+    });
+    expect(lowerStage(stage)).toEqual({
+      $fill: {
+        partitionBy: '$region',
+        output: { price: { value: 0 } },
+      },
+    });
+  });
+
+  it('lowers $search', () => {
+    const stage = new MongoSearchStage({ text: { query: 'hello', path: 'body' } }, 'myIndex');
+    expect(lowerStage(stage)).toEqual({
+      $search: { index: 'myIndex', text: { query: 'hello', path: 'body' } },
+    });
+  });
+
+  it('lowers $searchMeta', () => {
+    const stage = new MongoSearchMetaStage({ facet: { operator: {} } });
+    expect(lowerStage(stage)).toEqual({
+      $searchMeta: { facet: { operator: {} } },
+    });
+  });
+
+  it('lowers $vectorSearch', () => {
+    const stage = new MongoVectorSearchStage({
+      index: 'vec_idx',
+      path: 'embedding',
+      queryVector: [0.1, 0.2, 0.3],
+      numCandidates: 100,
+      limit: 10,
+      filter: { genre: 'drama' },
+    });
+    expect(lowerStage(stage)).toEqual({
+      $vectorSearch: {
+        index: 'vec_idx',
+        path: 'embedding',
+        queryVector: [0.1, 0.2, 0.3],
+        numCandidates: 100,
+        limit: 10,
+        filter: { genre: 'drama' },
+      },
     });
   });
 });

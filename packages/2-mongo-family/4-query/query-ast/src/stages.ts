@@ -46,6 +46,17 @@ function rewriteExprRecord(
   return result;
 }
 
+function rewriteAccumulatorRecord(
+  accumulators: Readonly<Record<string, MongoAggAccumulator>>,
+  rewriter: MongoAggExprRewriter,
+): Record<string, MongoAggAccumulator> {
+  const result: Record<string, MongoAggAccumulator> = {};
+  for (const [key, acc] of Object.entries(accumulators)) {
+    result[key] = acc.rewrite(rewriter) as MongoAggAccumulator;
+  }
+  return result;
+}
+
 abstract class MongoStageNode extends MongoAstNode {
   abstract accept<R>(visitor: MongoStageVisitor<R>): R;
   abstract rewrite(context: MongoStageRewriterContext): MongoPipelineStage;
@@ -410,6 +421,558 @@ export class MongoRedactStage extends MongoStageNode {
   }
 }
 
+export class MongoOutStage extends MongoStageNode {
+  readonly kind = 'out' as const;
+  readonly collection: string;
+  readonly db: string | undefined;
+
+  constructor(collection: string, db?: string) {
+    super();
+    this.collection = collection;
+    this.db = db;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.out(this);
+  }
+
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
+    return this;
+  }
+}
+
+export class MongoUnionWithStage extends MongoStageNode {
+  readonly kind = 'unionWith' as const;
+  readonly collection: string;
+  readonly pipeline: ReadonlyArray<MongoPipelineStage> | undefined;
+
+  constructor(collection: string, pipeline?: ReadonlyArray<MongoPipelineStage>) {
+    super();
+    this.collection = collection;
+    this.pipeline = pipeline ? Object.freeze([...pipeline]) : undefined;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.unionWith(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
+    if (!this.pipeline) return this;
+    return new MongoUnionWithStage(
+      this.collection,
+      this.pipeline.map((stage) => stage.rewrite(context)),
+    );
+  }
+}
+
+export class MongoBucketStage extends MongoStageNode {
+  readonly kind = 'bucket' as const;
+  readonly groupBy: MongoAggExpr;
+  readonly boundaries: ReadonlyArray<unknown>;
+  readonly default_: unknown;
+  readonly output: Readonly<Record<string, MongoAggAccumulator>> | undefined;
+
+  constructor(options: {
+    groupBy: MongoAggExpr;
+    boundaries: ReadonlyArray<unknown>;
+    default_?: unknown;
+    output?: Record<string, MongoAggAccumulator>;
+  }) {
+    super();
+    this.groupBy = options.groupBy;
+    this.boundaries = Object.freeze([...options.boundaries]);
+    this.default_ = options.default_;
+    this.output = options.output ? Object.freeze({ ...options.output }) : undefined;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.bucket(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
+    const rewriter = context.aggExpr;
+    if (!rewriter) return this;
+    const opts: {
+      groupBy: MongoAggExpr;
+      boundaries: ReadonlyArray<unknown>;
+      default_?: unknown;
+      output?: Record<string, MongoAggAccumulator>;
+    } = { groupBy: this.groupBy.rewrite(rewriter), boundaries: this.boundaries };
+    if (this.default_ !== undefined) opts.default_ = this.default_;
+    if (this.output) opts.output = rewriteAccumulatorRecord(this.output, rewriter);
+    return new MongoBucketStage(opts);
+  }
+}
+
+export class MongoBucketAutoStage extends MongoStageNode {
+  readonly kind = 'bucketAuto' as const;
+  readonly groupBy: MongoAggExpr;
+  readonly buckets: number;
+  readonly output: Readonly<Record<string, MongoAggAccumulator>> | undefined;
+  readonly granularity: string | undefined;
+
+  constructor(options: {
+    groupBy: MongoAggExpr;
+    buckets: number;
+    output?: Record<string, MongoAggAccumulator>;
+    granularity?: string;
+  }) {
+    super();
+    this.groupBy = options.groupBy;
+    this.buckets = options.buckets;
+    this.output = options.output ? Object.freeze({ ...options.output }) : undefined;
+    this.granularity = options.granularity;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.bucketAuto(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
+    const rewriter = context.aggExpr;
+    if (!rewriter) return this;
+    const opts: {
+      groupBy: MongoAggExpr;
+      buckets: number;
+      output?: Record<string, MongoAggAccumulator>;
+      granularity?: string;
+    } = { groupBy: this.groupBy.rewrite(rewriter), buckets: this.buckets };
+    if (this.output) opts.output = rewriteAccumulatorRecord(this.output, rewriter);
+    if (this.granularity !== undefined) opts.granularity = this.granularity;
+    return new MongoBucketAutoStage(opts);
+  }
+}
+
+export class MongoGeoNearStage extends MongoStageNode {
+  readonly kind = 'geoNear' as const;
+  readonly near: unknown;
+  readonly distanceField: string;
+  readonly spherical: boolean | undefined;
+  readonly maxDistance: number | undefined;
+  readonly minDistance: number | undefined;
+  readonly query: MongoFilterExpr | undefined;
+  readonly key: string | undefined;
+  readonly distanceMultiplier: number | undefined;
+  readonly includeLocs: string | undefined;
+
+  constructor(options: {
+    near: unknown;
+    distanceField: string;
+    spherical?: boolean;
+    maxDistance?: number;
+    minDistance?: number;
+    query?: MongoFilterExpr;
+    key?: string;
+    distanceMultiplier?: number;
+    includeLocs?: string;
+  }) {
+    super();
+    this.near = options.near;
+    this.distanceField = options.distanceField;
+    this.spherical = options.spherical;
+    this.maxDistance = options.maxDistance;
+    this.minDistance = options.minDistance;
+    this.query = options.query;
+    this.key = options.key;
+    this.distanceMultiplier = options.distanceMultiplier;
+    this.includeLocs = options.includeLocs;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.geoNear(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
+    if (!this.query || !context.filter) return this;
+    const opts: {
+      near: unknown;
+      distanceField: string;
+      spherical?: boolean;
+      maxDistance?: number;
+      minDistance?: number;
+      query?: MongoFilterExpr;
+      key?: string;
+      distanceMultiplier?: number;
+      includeLocs?: string;
+    } = { near: this.near, distanceField: this.distanceField };
+    if (this.spherical !== undefined) opts.spherical = this.spherical;
+    if (this.maxDistance !== undefined) opts.maxDistance = this.maxDistance;
+    if (this.minDistance !== undefined) opts.minDistance = this.minDistance;
+    opts.query = this.query.rewrite(context.filter);
+    if (this.key !== undefined) opts.key = this.key;
+    if (this.distanceMultiplier !== undefined) opts.distanceMultiplier = this.distanceMultiplier;
+    if (this.includeLocs !== undefined) opts.includeLocs = this.includeLocs;
+    return new MongoGeoNearStage(opts);
+  }
+}
+
+export class MongoFacetStage extends MongoStageNode {
+  readonly kind = 'facet' as const;
+  readonly facets: Readonly<Record<string, ReadonlyArray<MongoPipelineStage>>>;
+
+  constructor(facets: Record<string, ReadonlyArray<MongoPipelineStage>>) {
+    super();
+    const frozen: Record<string, ReadonlyArray<MongoPipelineStage>> = {};
+    for (const [key, pipeline] of Object.entries(facets)) {
+      frozen[key] = Object.freeze([...pipeline]);
+    }
+    this.facets = Object.freeze(frozen);
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.facet(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
+    const newFacets: Record<string, ReadonlyArray<MongoPipelineStage>> = {};
+    for (const [key, pipeline] of Object.entries(this.facets)) {
+      newFacets[key] = pipeline.map((stage) => stage.rewrite(context));
+    }
+    return new MongoFacetStage(newFacets);
+  }
+}
+
+export class MongoGraphLookupStage extends MongoStageNode {
+  readonly kind = 'graphLookup' as const;
+  readonly from: string;
+  readonly startWith: MongoAggExpr;
+  readonly connectFromField: string;
+  readonly connectToField: string;
+  readonly as: string;
+  readonly maxDepth: number | undefined;
+  readonly depthField: string | undefined;
+  readonly restrictSearchWithMatch: MongoFilterExpr | undefined;
+
+  constructor(options: {
+    from: string;
+    startWith: MongoAggExpr;
+    connectFromField: string;
+    connectToField: string;
+    as: string;
+    maxDepth?: number;
+    depthField?: string;
+    restrictSearchWithMatch?: MongoFilterExpr;
+  }) {
+    super();
+    this.from = options.from;
+    this.startWith = options.startWith;
+    this.connectFromField = options.connectFromField;
+    this.connectToField = options.connectToField;
+    this.as = options.as;
+    this.maxDepth = options.maxDepth;
+    this.depthField = options.depthField;
+    this.restrictSearchWithMatch = options.restrictSearchWithMatch;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.graphLookup(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
+    const rewrittenStartWith = context.aggExpr
+      ? this.startWith.rewrite(context.aggExpr)
+      : this.startWith;
+    const rewrittenMatch =
+      this.restrictSearchWithMatch && context.filter
+        ? this.restrictSearchWithMatch.rewrite(context.filter)
+        : this.restrictSearchWithMatch;
+    if (rewrittenStartWith === this.startWith && rewrittenMatch === this.restrictSearchWithMatch) {
+      return this;
+    }
+    const opts: {
+      from: string;
+      startWith: MongoAggExpr;
+      connectFromField: string;
+      connectToField: string;
+      as: string;
+      maxDepth?: number;
+      depthField?: string;
+      restrictSearchWithMatch?: MongoFilterExpr;
+    } = {
+      from: this.from,
+      startWith: rewrittenStartWith,
+      connectFromField: this.connectFromField,
+      connectToField: this.connectToField,
+      as: this.as,
+    };
+    if (this.maxDepth !== undefined) opts.maxDepth = this.maxDepth;
+    if (this.depthField !== undefined) opts.depthField = this.depthField;
+    if (rewrittenMatch) opts.restrictSearchWithMatch = rewrittenMatch;
+    return new MongoGraphLookupStage(opts);
+  }
+}
+
+export class MongoMergeStage extends MongoStageNode {
+  readonly kind = 'merge' as const;
+  readonly into: string | { readonly db: string; readonly coll: string };
+  readonly on: string | ReadonlyArray<string> | undefined;
+  readonly whenMatched: string | ReadonlyArray<MongoPipelineStage> | undefined;
+  readonly whenNotMatched: string | undefined;
+
+  constructor(options: {
+    into: string | { db: string; coll: string };
+    on?: string | ReadonlyArray<string>;
+    whenMatched?: string | ReadonlyArray<MongoPipelineStage>;
+    whenNotMatched?: string;
+  }) {
+    super();
+    this.into =
+      typeof options.into === 'string' ? options.into : Object.freeze({ ...options.into });
+    this.on =
+      options.on === undefined
+        ? undefined
+        : typeof options.on === 'string'
+          ? options.on
+          : Object.freeze([...options.on]);
+    this.whenMatched =
+      options.whenMatched === undefined
+        ? undefined
+        : typeof options.whenMatched === 'string'
+          ? options.whenMatched
+          : Object.freeze([...options.whenMatched]);
+    this.whenNotMatched = options.whenNotMatched;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.merge(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
+    if (!Array.isArray(this.whenMatched)) return this;
+    const opts: {
+      into: string | { db: string; coll: string };
+      on?: string | ReadonlyArray<string>;
+      whenMatched?: string | ReadonlyArray<MongoPipelineStage>;
+      whenNotMatched?: string;
+    } = { into: this.into };
+    if (this.on !== undefined) opts.on = this.on;
+    opts.whenMatched = this.whenMatched.map((stage) => stage.rewrite(context));
+    if (this.whenNotMatched !== undefined) opts.whenNotMatched = this.whenNotMatched;
+    return new MongoMergeStage(opts);
+  }
+}
+
+export interface MongoWindowField {
+  readonly operator: MongoAggExpr;
+  readonly window?: {
+    readonly documents?: readonly [number, number];
+    readonly range?: { readonly start: unknown; readonly end: unknown; readonly unit?: string };
+  };
+}
+
+export class MongoSetWindowFieldsStage extends MongoStageNode {
+  readonly kind = 'setWindowFields' as const;
+  readonly partitionBy: MongoAggExpr | undefined;
+  readonly sortBy: Readonly<Record<string, 1 | -1>> | undefined;
+  readonly output: Readonly<Record<string, MongoWindowField>>;
+
+  constructor(options: {
+    partitionBy?: MongoAggExpr;
+    sortBy?: Record<string, 1 | -1>;
+    output: Record<string, MongoWindowField>;
+  }) {
+    super();
+    this.partitionBy = options.partitionBy;
+    this.sortBy = options.sortBy ? Object.freeze({ ...options.sortBy }) : undefined;
+    this.output = Object.freeze({ ...options.output });
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.setWindowFields(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
+    const rewriter = context.aggExpr;
+    if (!rewriter) return this;
+    const newOutput: Record<string, MongoWindowField> = {};
+    for (const [key, wf] of Object.entries(this.output)) {
+      newOutput[key] = { ...wf, operator: wf.operator.rewrite(rewriter) };
+    }
+    const opts: {
+      partitionBy?: MongoAggExpr;
+      sortBy?: Record<string, 1 | -1>;
+      output: Record<string, MongoWindowField>;
+    } = { output: newOutput };
+    if (this.partitionBy) opts.partitionBy = this.partitionBy.rewrite(rewriter);
+    if (this.sortBy) opts.sortBy = { ...this.sortBy };
+    return new MongoSetWindowFieldsStage(opts);
+  }
+}
+
+export interface MongoDensifyRange {
+  readonly step: number;
+  readonly unit?: string;
+  readonly bounds: 'full' | 'partition' | readonly [unknown, unknown];
+}
+
+export class MongoDensifyStage extends MongoStageNode {
+  readonly kind = 'densify' as const;
+  readonly field: string;
+  readonly partitionByFields: ReadonlyArray<string> | undefined;
+  readonly range: MongoDensifyRange;
+
+  constructor(options: {
+    field: string;
+    partitionByFields?: ReadonlyArray<string>;
+    range: MongoDensifyRange;
+  }) {
+    super();
+    this.field = options.field;
+    this.partitionByFields = options.partitionByFields
+      ? Object.freeze([...options.partitionByFields])
+      : undefined;
+    this.range = Object.freeze({ ...options.range });
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.densify(this);
+  }
+
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
+    return this;
+  }
+}
+
+export interface MongoFillOutput {
+  readonly method?: string;
+  readonly value?: MongoAggExpr;
+}
+
+export class MongoFillStage extends MongoStageNode {
+  readonly kind = 'fill' as const;
+  readonly partitionBy: MongoAggExpr | undefined;
+  readonly partitionByFields: ReadonlyArray<string> | undefined;
+  readonly sortBy: Readonly<Record<string, 1 | -1>> | undefined;
+  readonly output: Readonly<Record<string, MongoFillOutput>>;
+
+  constructor(options: {
+    partitionBy?: MongoAggExpr;
+    partitionByFields?: ReadonlyArray<string>;
+    sortBy?: Record<string, 1 | -1>;
+    output: Record<string, MongoFillOutput>;
+  }) {
+    super();
+    this.partitionBy = options.partitionBy;
+    this.partitionByFields = options.partitionByFields
+      ? Object.freeze([...options.partitionByFields])
+      : undefined;
+    this.sortBy = options.sortBy ? Object.freeze({ ...options.sortBy }) : undefined;
+    this.output = Object.freeze({ ...options.output });
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.fill(this);
+  }
+
+  rewrite(context: MongoStageRewriterContext): MongoPipelineStage {
+    const rewriter = context.aggExpr;
+    if (!rewriter) return this;
+    const newOutput: Record<string, MongoFillOutput> = {};
+    for (const [key, fo] of Object.entries(this.output)) {
+      newOutput[key] = fo.value ? { ...fo, value: fo.value.rewrite(rewriter) } : fo;
+    }
+    const opts: {
+      partitionBy?: MongoAggExpr;
+      partitionByFields?: ReadonlyArray<string>;
+      sortBy?: Record<string, 1 | -1>;
+      output: Record<string, MongoFillOutput>;
+    } = { output: newOutput };
+    if (this.partitionBy) opts.partitionBy = this.partitionBy.rewrite(rewriter);
+    if (this.partitionByFields) opts.partitionByFields = [...this.partitionByFields];
+    if (this.sortBy) opts.sortBy = { ...this.sortBy };
+    return new MongoFillStage(opts);
+  }
+}
+
+export class MongoSearchStage extends MongoStageNode {
+  readonly kind = 'search' as const;
+  readonly index: string | undefined;
+  readonly config: Readonly<Record<string, unknown>>;
+
+  constructor(config: Record<string, unknown>, index?: string) {
+    super();
+    this.config = Object.freeze({ ...config });
+    this.index = index;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.search(this);
+  }
+
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
+    return this;
+  }
+}
+
+export class MongoSearchMetaStage extends MongoStageNode {
+  readonly kind = 'searchMeta' as const;
+  readonly index: string | undefined;
+  readonly config: Readonly<Record<string, unknown>>;
+
+  constructor(config: Record<string, unknown>, index?: string) {
+    super();
+    this.config = Object.freeze({ ...config });
+    this.index = index;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.searchMeta(this);
+  }
+
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
+    return this;
+  }
+}
+
+export class MongoVectorSearchStage extends MongoStageNode {
+  readonly kind = 'vectorSearch' as const;
+  readonly index: string;
+  readonly path: string;
+  readonly queryVector: ReadonlyArray<number>;
+  readonly numCandidates: number;
+  readonly limit: number;
+  readonly filter: Readonly<Record<string, unknown>> | undefined;
+
+  constructor(options: {
+    index: string;
+    path: string;
+    queryVector: ReadonlyArray<number>;
+    numCandidates: number;
+    limit: number;
+    filter?: Record<string, unknown>;
+  }) {
+    super();
+    this.index = options.index;
+    this.path = options.path;
+    this.queryVector = Object.freeze([...options.queryVector]);
+    this.numCandidates = options.numCandidates;
+    this.limit = options.limit;
+    this.filter = options.filter ? Object.freeze({ ...options.filter }) : undefined;
+    this.freeze();
+  }
+
+  accept<R>(visitor: MongoStageVisitor<R>): R {
+    return visitor.vectorSearch(this);
+  }
+
+  rewrite(_context: MongoStageRewriterContext): MongoPipelineStage {
+    return this;
+  }
+}
+
 export type MongoPipelineStage =
   | MongoMatchStage
   | MongoProjectStage
@@ -424,4 +987,18 @@ export type MongoPipelineStage =
   | MongoCountStage
   | MongoSortByCountStage
   | MongoSampleStage
-  | MongoRedactStage;
+  | MongoRedactStage
+  | MongoOutStage
+  | MongoUnionWithStage
+  | MongoBucketStage
+  | MongoBucketAutoStage
+  | MongoGeoNearStage
+  | MongoFacetStage
+  | MongoGraphLookupStage
+  | MongoMergeStage
+  | MongoSetWindowFieldsStage
+  | MongoDensifyStage
+  | MongoFillStage
+  | MongoSearchStage
+  | MongoSearchMetaStage
+  | MongoVectorSearchStage;

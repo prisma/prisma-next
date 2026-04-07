@@ -23,19 +23,33 @@ import type {
 } from './filter-expressions';
 import type {
   MongoAddFieldsStage,
+  MongoBucketAutoStage,
+  MongoBucketStage,
   MongoCountStage,
+  MongoDensifyStage,
+  MongoFacetStage,
+  MongoFillStage,
+  MongoGeoNearStage,
+  MongoGraphLookupStage,
   MongoGroupStage,
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
+  MongoMergeStage,
+  MongoOutStage,
   MongoProjectStage,
   MongoRedactStage,
   MongoReplaceRootStage,
   MongoSampleStage,
+  MongoSearchMetaStage,
+  MongoSearchStage,
+  MongoSetWindowFieldsStage,
   MongoSkipStage,
   MongoSortByCountStage,
   MongoSortStage,
+  MongoUnionWithStage,
   MongoUnwindStage,
+  MongoVectorSearchStage,
 } from './stages';
 
 export interface MongoAggExprVisitor<R> {
@@ -104,4 +118,18 @@ export interface MongoStageVisitor<R> {
   sortByCount(stage: MongoSortByCountStage): R;
   sample(stage: MongoSampleStage): R;
   redact(stage: MongoRedactStage): R;
+  out(stage: MongoOutStage): R;
+  unionWith(stage: MongoUnionWithStage): R;
+  bucket(stage: MongoBucketStage): R;
+  bucketAuto(stage: MongoBucketAutoStage): R;
+  geoNear(stage: MongoGeoNearStage): R;
+  facet(stage: MongoFacetStage): R;
+  graphLookup(stage: MongoGraphLookupStage): R;
+  merge(stage: MongoMergeStage): R;
+  setWindowFields(stage: MongoSetWindowFieldsStage): R;
+  densify(stage: MongoDensifyStage): R;
+  fill(stage: MongoFillStage): R;
+  search(stage: MongoSearchStage): R;
+  searchMeta(stage: MongoSearchMetaStage): R;
+  vectorSearch(stage: MongoVectorSearchStage): R;
 }
