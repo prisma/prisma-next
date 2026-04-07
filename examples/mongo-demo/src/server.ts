@@ -1,4 +1,4 @@
-import { createServer } from 'node:http';
+import { createServer, type ServerResponse } from 'node:http';
 import type { SimplifyDeep } from '@prisma-next/mongo-orm';
 import { acc, fn } from '@prisma-next/mongo-pipeline-builder';
 import { MongoCountStage, MongoLimitStage, MongoSortStage } from '@prisma-next/mongo-query-ast';
@@ -144,7 +144,7 @@ export async function getDashboard(pipeline: Db['pipeline'], runtime: Db['runtim
 // HTTP server
 // ---------------------------------------------------------------------------
 
-function jsonResponse(res: import('node:http').ServerResponse, data: unknown, status = 200) {
+function jsonResponse(res: ServerResponse, data: unknown, status = 200) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
 }
