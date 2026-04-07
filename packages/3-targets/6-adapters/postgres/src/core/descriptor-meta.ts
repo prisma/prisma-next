@@ -29,6 +29,7 @@ import {
   SQL_TIMESTAMP_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
 } from './codec-ids';
+import { codecDefinitions } from './codecs';
 import { pgEnumControlHooks } from './enum-control-hooks';
 
 // ============================================================================
@@ -147,6 +148,7 @@ export const postgresAdapterDescriptorMeta = {
   },
   types: {
     codecTypes: {
+      codecInstances: Object.values(codecDefinitions).map((def) => def.codec),
       import: {
         package: '@prisma-next/adapter-postgres/codec-types',
         named: 'CodecTypes',
