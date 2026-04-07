@@ -33,6 +33,7 @@
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/sql-contract-psl": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-orm-client": "workspace:*",
     "@prisma-next/sql-builder": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
