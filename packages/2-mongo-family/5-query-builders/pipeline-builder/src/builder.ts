@@ -5,7 +5,14 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import type { MongoFilterExpr, MongoQueryPlan, MongoReadStage } from '@prisma-next/mongo-query-ast';
+import type {
+  MongoAggAccumulator,
+  MongoAggExpr,
+  MongoFilterExpr,
+  MongoProjectionValue,
+  MongoQueryPlan,
+  MongoReadStage,
+} from '@prisma-next/mongo-query-ast';
 import {
   AggregateCommand,
   MongoAddFieldsStage,
@@ -24,8 +31,6 @@ import {
 } from '@prisma-next/mongo-query-ast';
 import { createFieldProxy } from './field-proxy';
 import { createFilterProxy } from './filter-proxy';
-import type { PipelineBuilderState } from './state';
-import { cloneState } from './state';
 import type {
   DocField,
   DocShape,
@@ -40,6 +45,12 @@ import type {
   TypedAggExpr,
   UnwoundShape,
 } from './types';
+
+interface PipelineBuilderState {
+  readonly collection: string;
+  readonly stages: ReadonlyArray<MongoReadStage>;
+  readonly storageHash: string;
+}
 
 export class PipelineBuilder<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
@@ -56,10 +67,10 @@ export class PipelineBuilder<
   #withStage<NewShape extends DocShape>(
     stage: MongoReadStage,
   ): PipelineBuilder<TContract, NewShape> {
-    return new PipelineBuilder<TContract, NewShape>(
-      this.#contract,
-      cloneState(this.#state, { stages: [...this.#state.stages, stage] }),
-    );
+    return new PipelineBuilder<TContract, NewShape>(this.#contract, {
+      ...this.#state,
+      stages: [...this.#state.stages, stage],
+    });
   }
 
   // --- Identity stages ---
@@ -97,7 +108,7 @@ export class PipelineBuilder<
   ): PipelineBuilder<TContract, Shape & ExtractDocShape<NewFields>> {
     const proxy = createFieldProxy<Shape>();
     const newFields = fn(proxy);
-    const exprRecord: Record<string, import('@prisma-next/mongo-query-ast').MongoAggExpr> = {};
+    const exprRecord: Record<string, MongoAggExpr> = {};
     for (const [key, typed] of Object.entries(newFields)) {
       exprRecord[key] = typed.node;
     }
@@ -142,10 +153,7 @@ export class PipelineBuilder<
       ) => Record<string, 1 | TypedAggExpr<DocField>>;
       const proxy = createFieldProxy<Shape>();
       const spec = fn(proxy);
-      const projection: Record<
-        string,
-        import('@prisma-next/mongo-query-ast').MongoProjectionValue
-      > = {};
+      const projection: Record<string, MongoProjectionValue> = {};
       for (const [key, val] of Object.entries(spec)) {
         projection[key] = val === 1 ? 1 : (val as TypedAggExpr<DocField>).node;
       }
@@ -177,8 +185,7 @@ export class PipelineBuilder<
     const spec = fn(proxy);
     const { _id: groupIdExpr, ...rest } = spec;
     const groupId = groupIdExpr === null ? null : groupIdExpr.node;
-    const accumulators: Record<string, import('@prisma-next/mongo-query-ast').MongoAggAccumulator> =
-      {};
+    const accumulators: Record<string, MongoAggAccumulator> = {};
     for (const [key, typed] of Object.entries(rest)) {
       if (typed === null) {
         throw new Error(`group() field "${key}" must not be null. Only _id can be null.`);
@@ -188,7 +195,7 @@ export class PipelineBuilder<
           `group() field "${key}" must use an accumulator (e.g. acc.sum(), acc.count()). Got "${typed.node.kind}" expression.`,
         );
       }
-      accumulators[key] = typed.node as import('@prisma-next/mongo-query-ast').MongoAggAccumulator;
+      accumulators[key] = typed.node as MongoAggAccumulator;
     }
     return this.#withStage<GroupedDocShape<Spec>>(new MongoGroupStage(groupId, accumulators));
   }

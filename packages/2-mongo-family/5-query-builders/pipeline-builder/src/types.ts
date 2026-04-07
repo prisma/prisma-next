@@ -1,9 +1,4 @@
-import type {
-  ExtractMongoCodecTypes,
-  MongoContract,
-  MongoContractWithTypeMaps,
-  MongoTypeMaps,
-} from '@prisma-next/mongo-contract';
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type {
   MongoAggAccumulator,
   MongoAggExpr,
@@ -15,6 +10,11 @@ export interface DocField {
   readonly codecId: string;
   readonly nullable: boolean;
 }
+
+export type NumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: false };
+export type NullableNumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: true };
+export type StringField = { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+export type ArrayField = { readonly codecId: 'mongo/array@1'; readonly nullable: false };
 
 export type DocShape = Record<string, DocField>;
 
@@ -109,15 +109,3 @@ export type UnwrapArrayDocField<F extends DocField> = F;
 export type UnwoundShape<S extends DocShape, K extends keyof S & string> = {
   [P in keyof S & string]: P extends K ? UnwrapArrayDocField<S[P]> : S[P];
 };
-
-export type RootModelName<TContract extends MongoContract> = {
-  [K in keyof TContract['roots'] & string]: TContract['roots'][K] extends string &
-    keyof TContract['models']
-    ? K
-    : never;
-}[keyof TContract['roots'] & string];
-
-export type ResolveRowFromContract<
-  Shape extends DocShape,
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-> = ResolveRow<Shape, ExtractMongoCodecTypes<TContract>>;

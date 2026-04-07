@@ -1,9 +1,6 @@
 import type { MongoAggExpr } from '@prisma-next/mongo-query-ast';
 import { MongoAggCond, MongoAggLiteral, MongoAggOperator } from '@prisma-next/mongo-query-ast';
-import type { DocField, TypedAggExpr } from './types';
-
-type NumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: false };
-type StringField = { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+import type { DocField, NumericField, StringField, TypedAggExpr } from './types';
 
 function numericExpr(op: string, args: TypedAggExpr<DocField>[]): TypedAggExpr<NumericField> {
   return {
@@ -85,4 +82,4 @@ export const fn = {
       node: MongoAggLiteral.of(value),
     };
   },
-} as const;
+};
