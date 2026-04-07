@@ -17,5 +17,7 @@ export type {
   MongoIncludeSpec,
   MongoWhereFilter,
   NoIncludes,
+  ResolvedCreateInput,
   SimplifyDeep,
+  VariantCreateInput,
 } from '../types';

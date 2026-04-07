@@ -192,3 +192,32 @@ export type CreateInput<
   Partial<
     Pick<InferModelRow<TContract, ModelName>, '_id' & keyof InferModelRow<TContract, ModelName>>
   >;
+
+type DiscriminatorField<
+  TContract extends MongoContract,
+  ModelName extends string & keyof TContract['models'],
+> = TContract['models'][ModelName] extends {
+  readonly discriminator: { readonly field: infer F extends string };
+}
+  ? F
+  : never;
+
+export type VariantCreateInput<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+  VariantName extends string,
+> = Omit<
+  VariantModelRow<TContract, ModelName, VariantName>,
+  '_id' | DiscriminatorField<TContract, ModelName>
+> &
+  Partial<
+    Pick<InferModelRow<TContract, ModelName>, '_id' & keyof InferModelRow<TContract, ModelName>>
+  >;
+
+export type ResolvedCreateInput<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+  TVariant extends string,
+> = [TVariant] extends [never]
+  ? CreateInput<TContract, ModelName>
+  : VariantCreateInput<TContract, ModelName, TVariant>;

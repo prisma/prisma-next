@@ -4,6 +4,7 @@ import type { Contract } from '../../../1-foundation/mongo-contract/test/fixture
 import type { MongoCollection } from '../src/collection';
 import type { MongoOrmClient } from '../src/mongo-orm';
 import type {
+  CreateInput,
   EmbedRelationKeys,
   IncludedRow,
   InferFullRow,
@@ -11,6 +12,8 @@ import type {
   MongoIncludeSpec,
   MongoWhereFilter,
   ReferenceRelationKeys,
+  ResolvedCreateInput,
+  VariantCreateInput,
   VariantModelRow,
   VariantNames,
 } from '../src/types';
@@ -268,4 +271,59 @@ test('select() rejects nonexistent field after chaining', () => {
   const chained = col.where({} as never);
   type SelectParam = Parameters<typeof chained.select>[0];
   expectTypeOf<'nonexistent'>().not.toExtend<SelectParam>();
+});
+
+// --- VariantCreateInput ---
+
+test('VariantCreateInput includes base + variant fields minus _id and discriminator', () => {
+  type BugCreate = VariantCreateInput<Contract, 'Task', 'Bug'>;
+  expectTypeOf<BugCreate>().toHaveProperty('title');
+  expectTypeOf<BugCreate>().toHaveProperty('assigneeId');
+  expectTypeOf<BugCreate>().toHaveProperty('severity');
+  expectTypeOf<BugCreate>().not.toHaveProperty('type');
+});
+
+test('VariantCreateInput excludes other variant fields', () => {
+  type BugCreate = VariantCreateInput<Contract, 'Task', 'Bug'>;
+  expectTypeOf<BugCreate>().not.toHaveProperty('priority');
+  expectTypeOf<BugCreate>().not.toHaveProperty('targetRelease');
+});
+
+test('ResolvedCreateInput falls through to CreateInput when TVariant is never', () => {
+  type Resolved = ResolvedCreateInput<Contract, 'Task', never>;
+  type Expected = CreateInput<Contract, 'Task'>;
+  expectTypeOf<Resolved>().toEqualTypeOf<Expected>();
+});
+
+test('ResolvedCreateInput resolves to VariantCreateInput when variant is specified', () => {
+  type Resolved = ResolvedCreateInput<Contract, 'Task', 'Bug'>;
+  type Expected = VariantCreateInput<Contract, 'Task', 'Bug'>;
+  expectTypeOf<Resolved>().toEqualTypeOf<Expected>();
+});
+
+test('variant().create() accepts variant-specific fields without discriminator', () => {
+  const col = {} as MongoCollection<Contract, 'Task'>;
+  const bug = col.variant('Bug');
+  type CreateParam = Parameters<typeof bug.create>[0];
+  expectTypeOf<CreateParam>().toHaveProperty('title');
+  expectTypeOf<CreateParam>().toHaveProperty('severity');
+  expectTypeOf<CreateParam>().not.toHaveProperty('type');
+});
+
+test('non-variant create() uses base CreateInput', () => {
+  const col = {} as MongoCollection<Contract, 'Task'>;
+  type CreateParam = Parameters<typeof col.create>[0];
+  expectTypeOf<CreateParam>().toHaveProperty('type');
+  expectTypeOf<CreateParam>().toHaveProperty('title');
+});
+
+test('variant() preserves TVariant through chaining', () => {
+  const col = {} as MongoCollection<Contract, 'Task'>;
+  const chained = col
+    .variant('Bug')
+    .where({} as never)
+    .take(10);
+  type CreateParam = Parameters<typeof chained.create>[0];
+  expectTypeOf<CreateParam>().toHaveProperty('severity');
+  expectTypeOf<CreateParam>().not.toHaveProperty('type');
 });
