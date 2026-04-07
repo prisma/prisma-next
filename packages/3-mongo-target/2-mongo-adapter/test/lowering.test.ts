@@ -250,6 +250,22 @@ describe('lowerStage', () => {
     });
   });
 
+  it('lowers $group stage with compound groupId containing a "kind" key', () => {
+    const stage = new MongoGroupStage(
+      {
+        kind: MongoAggFieldRef.of('type'),
+        dept: MongoAggFieldRef.of('department'),
+      },
+      { total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')) },
+    );
+    expect(lowerStage(stage)).toEqual({
+      $group: {
+        _id: { kind: '$type', dept: '$department' },
+        total: { $sum: '$amount' },
+      },
+    });
+  });
+
   it('lowers $addFields stage', () => {
     const stage = new MongoAddFieldsStage({
       fullName: MongoAggOperator.of('$concat', [
