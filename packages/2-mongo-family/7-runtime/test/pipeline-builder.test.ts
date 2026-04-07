@@ -162,6 +162,39 @@ describe('pipeline builder integration', () => {
     });
   });
 
+  it('lookup → unwind → project joins and flattens', async () => {
+    await withMongod(async (ctx) => {
+      const db = ctx.client.db(ctx.dbName);
+      const orderId = (
+        await db
+          .collection('orders')
+          .insertOne({ department: 'eng', amount: 500, status: 'completed' })
+      ).insertedId;
+      await db.collection('users').insertMany([
+        { firstName: 'Alice', lastName: 'A', orderId },
+        { firstName: 'Bob', lastName: 'B', orderId },
+      ]);
+
+      const plan = p
+        .from('orders')
+        .lookup({ from: 'users', localField: '_id', foreignField: 'orderId', as: 'assignees' })
+        .unwind('assignees')
+        .project((f) => ({
+          department: 1 as const,
+          assignee: f.assignees,
+        }))
+        .build();
+
+      const rows = await ctx.runtime.execute(plan);
+      expect(rows).toHaveLength(2);
+
+      const typed = rows as Array<Record<string, unknown>>;
+      expect(typed[0]).toHaveProperty('department', 'eng');
+      expect(typed[0]).toHaveProperty('assignee');
+      expect(typed[1]).toHaveProperty('department', 'eng');
+    });
+  });
+
   it('project narrows to selected fields', async () => {
     await withMongod(async (ctx) => {
       const db = ctx.client.db(ctx.dbName);
