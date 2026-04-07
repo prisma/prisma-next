@@ -1,4 +1,10 @@
-import type { Contract, ContractModel, StorageBase } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractField,
+  ContractModel,
+  ContractValueObject,
+  StorageBase,
+} from '@prisma-next/contract/types';
 
 export type MongoStorageCollection = Record<string, never>;
 
@@ -43,16 +49,52 @@ export type ExtractMongoCodecTypes<T> =
       : Record<string, never>
     : Record<string, never>;
 
+type ExtractValueObjects<TContract> = TContract extends {
+  valueObjects: infer VO extends Record<string, ContractValueObject>;
+}
+  ? VO
+  : Record<string, never>;
+
+type InferFieldBaseType<
+  TFieldType,
+  TValueObjects extends Record<string, ContractValueObject>,
+  TCodecTypes extends Record<string, { output: unknown }>,
+> = TFieldType extends { kind: 'scalar'; codecId: infer CId extends string & keyof TCodecTypes }
+  ? TCodecTypes[CId]['output']
+  : TFieldType extends { kind: 'valueObject'; name: infer VOName extends string }
+    ? VOName extends keyof TValueObjects
+      ? {
+          -readonly [K in keyof TValueObjects[VOName]['fields']]: InferFieldType<
+            TValueObjects[VOName]['fields'][K],
+            TValueObjects,
+            TCodecTypes
+          >;
+        }
+      : unknown
+    : unknown;
+
+type InferFieldType<
+  TField extends ContractField,
+  TValueObjects extends Record<string, ContractValueObject>,
+  TCodecTypes extends Record<string, { output: unknown }>,
+> = TField extends { many: true }
+  ? TField['nullable'] extends true
+    ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[] | null
+    : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[]
+  : TField['nullable'] extends true
+    ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes> | null
+    : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>;
+
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
-  TFields extends Record<
-    string,
-    { type: { kind: 'scalar'; codecId: string }; nullable: boolean }
-  > = TContract['models'][ModelName]['fields'],
+  TFields extends Record<string, ContractField> = TContract['models'][ModelName]['fields'],
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
+  TValueObjects extends Record<string, ContractValueObject> = ExtractValueObjects<TContract>,
 > = {
-  -readonly [FieldName in keyof TFields]: TFields[FieldName]['nullable'] extends true
-    ? TCodecTypes[TFields[FieldName]['type']['codecId']]['output'] | null
-    : TCodecTypes[TFields[FieldName]['type']['codecId']]['output'];
+  -readonly [FieldName in keyof TFields]: InferFieldType<
+    TFields[FieldName],
+    TValueObjects,
+    TCodecTypes
+  >;
 };
