@@ -11,7 +11,7 @@ import type {
 import type { SqlModelStorage, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { assertDefined } from '@prisma-next/utils/assertions';
 
-function serializeTypeParamsLiteral(params: Record<string, unknown>): string {
+function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined): string {
   if (!params || Object.keys(params).length === 0) {
     return 'Record<string, never>';
   }
