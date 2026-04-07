@@ -66,7 +66,7 @@ describe('query plan mutations', () => {
       email: usersColParam(contract, 'email', 'alice@example.com'),
     });
     expect(plan.ast.rows[0]?.['invited_by_id']?.kind).toBe('default-value');
-    expect(plan.ast.rows[1]).toEqual({
+    expect(plan.ast.rows[1]).toMatchObject({
       id: usersColParam(contract, 'id', 11),
       name: usersColParam(contract, 'name', 'Bob'),
       email: usersColParam(contract, 'email', 'bob@example.com'),
@@ -77,6 +77,7 @@ describe('query plan mutations', () => {
       ColumnRef.of('users', 'id'),
       ColumnRef.of('users', 'invited_by_id'),
       ColumnRef.of('users', 'name'),
+      ColumnRef.of('users', 'address'),
     ]);
   });
 

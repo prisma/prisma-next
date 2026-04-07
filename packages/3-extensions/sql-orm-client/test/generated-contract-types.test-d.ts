@@ -441,10 +441,22 @@ type VOContract = ContractWithTypeMaps<VOContractBase, VOTypeMaps>;
 type ExpectedAddressShape = { street: string; city: string; zip: string };
 
 type VOUserRow = import('../src/types').DefaultModelRow<VOContract, 'User'>;
+type VOCreateInput = import('../src/types').CreateInput<VOContract, 'User'>;
+type VOUpdateInput = import('../src/types').MutationUpdateInput<VOContract, 'User'>;
 
 export type ValueObjectTypeAssertions = [
   Assert<Equal<VOUserRow['id'], number>>,
   Assert<Equal<VOUserRow['name'], string>>,
   Assert<Equal<VOUserRow['homeAddress'], ExpectedAddressShape | null>>,
   Assert<Equal<VOUserRow['workAddress'], ExpectedAddressShape>>,
+];
+
+export type ValueObjectCreateInputAssertions = [
+  Assert<Equal<VOCreateInput['homeAddress'], ExpectedAddressShape | null | undefined>>,
+  Assert<Equal<VOCreateInput['workAddress'], ExpectedAddressShape>>,
+];
+
+export type ValueObjectUpdateInputAssertions = [
+  Assert<Equal<VOUpdateInput['homeAddress'], ExpectedAddressShape | null | undefined>>,
+  Assert<Equal<VOUpdateInput['workAddress'], ExpectedAddressShape | undefined>>,
 ];

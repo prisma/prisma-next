@@ -202,6 +202,11 @@ type ContractBase = ContractType<
             readonly codecId: 'pg/int4@1';
             readonly nullable: true;
           };
+          readonly address: {
+            readonly nativeType: 'jsonb';
+            readonly codecId: 'pg/jsonb@1';
+            readonly nullable: true;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [{ readonly columns: readonly ['email'] }];
@@ -388,6 +393,7 @@ type ContractBase = ContractType<
           readonly name: { readonly column: 'name' };
           readonly email: { readonly column: 'email' };
           readonly invitedById: { readonly column: 'invited_by_id' };
+          readonly address: { readonly column: 'address' };
         };
       };
       readonly fields: {
@@ -405,6 +411,10 @@ type ContractBase = ContractType<
         };
         readonly invitedById: {
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          readonly nullable: true;
+        };
+        readonly address: {
+          readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
           readonly nullable: true;
         };
       };
@@ -447,6 +457,24 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
+  readonly valueObjects: {
+    readonly Address: {
+      readonly fields: {
+        readonly street: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        readonly city: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        readonly zip: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: true;
+        };
+      };
+    };
+  };
   readonly roots: {
     readonly users: 'User';
     readonly posts: 'Post';

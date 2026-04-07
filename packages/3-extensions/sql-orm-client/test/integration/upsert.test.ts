@@ -35,6 +35,7 @@ describe('integration/upsert', () => {
           name: 'Alice Updated',
           email: 'alice@example.com',
           invitedById: null,
+          address: null,
         });
       });
     },
@@ -61,12 +62,14 @@ describe('integration/upsert', () => {
           name: 'Bob Updated',
           email: 'bob@example.com',
           invitedById: null,
+          address: null,
         });
         expect(await users.first({ email: 'bob@example.com' })).toEqual({
           id: 2,
           name: 'Bob Updated',
           email: 'bob@example.com',
           invitedById: null,
+          address: null,
         });
         expect(await users.first({ id: 3 })).toBeNull();
       });
@@ -157,6 +160,7 @@ describe('integration/upsert', () => {
           name: 'Alice',
           email: 'alice@example.com',
           invitedById: null,
+          address: null,
         });
         const insertPlanAst = runtime.executions[0]?.ast;
         expect(isInsertAst(insertPlanAst)).toBe(true);
@@ -176,6 +180,7 @@ describe('integration/upsert', () => {
           name: 'Alice',
           email: 'alice@example.com',
           invitedById: null,
+          address: null,
         });
         const conflictPlanAst = runtime.executions[0]?.ast;
         expect(isInsertAst(conflictPlanAst)).toBe(true);
@@ -189,6 +194,7 @@ describe('integration/upsert', () => {
           name: 'Alice',
           email: 'alice@example.com',
           invitedById: null,
+          address: null,
         });
       });
     },

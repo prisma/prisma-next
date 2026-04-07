@@ -29,9 +29,10 @@ describe('integration/self-relations', () => {
             name: 'Alice',
             email: 'alice@example.com',
             invitedById: null,
+            address: null,
             invitedUsers: [
-              { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
-              { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1 },
+              { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1, address: null },
+              { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1, address: null },
             ],
           },
           {
@@ -39,13 +40,17 @@ describe('integration/self-relations', () => {
             name: 'Bob',
             email: 'bob@example.com',
             invitedById: 1,
-            invitedUsers: [{ id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 2 }],
+            address: null,
+            invitedUsers: [
+              { id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 2, address: null },
+            ],
           },
           {
             id: 3,
             name: 'Cara',
             email: 'cara@example.com',
             invitedById: 1,
+            address: null,
             invitedUsers: [],
           },
           {
@@ -53,6 +58,7 @@ describe('integration/self-relations', () => {
             name: 'Dan',
             email: 'dan@example.com',
             invitedById: 2,
+            address: null,
             invitedUsers: [],
           },
         ]);
@@ -84,6 +90,7 @@ describe('integration/self-relations', () => {
             name: 'Alice',
             email: 'alice@example.com',
             invitedById: null,
+            address: null,
             invitedBy: null,
           },
           {
@@ -91,14 +98,28 @@ describe('integration/self-relations', () => {
             name: 'Bob',
             email: 'bob@example.com',
             invitedById: 1,
-            invitedBy: { id: 1, name: 'Alice', email: 'alice@example.com', invitedById: null },
+            address: null,
+            invitedBy: {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+            },
           },
           {
             id: 3,
             name: 'Cara',
             email: 'cara@example.com',
             invitedById: 2,
-            invitedBy: { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+            address: null,
+            invitedBy: {
+              id: 2,
+              name: 'Bob',
+              email: 'bob@example.com',
+              invitedById: 1,
+              address: null,
+            },
           },
         ]);
       });

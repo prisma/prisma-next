@@ -69,6 +69,7 @@ describe('integration/create', () => {
           name: 'Neo',
           email: 'neo@example.com',
           invitedById: null,
+          address: null,
         });
 
         const rows = await runtime.query<{ id: number; name: string }>(
@@ -94,8 +95,8 @@ describe('integration/create', () => {
         ]);
 
         expect(created).toEqual([
-          { id: 10, name: 'Alice', email: 'alice@example.com', invitedById: null },
-          { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: null },
+          { id: 10, name: 'Alice', email: 'alice@example.com', invitedById: null, address: null },
+          { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: null, address: null },
         ]);
         expect(runtime.executions).toHaveLength(1);
         expectInsertBatchAst(runtime.executions[0]?.ast, [
