@@ -1,3 +1,4 @@
+import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
@@ -446,6 +447,60 @@ model OtherBug {
           }),
         ]),
       );
+    });
+  });
+
+  describe('end-to-end: PSL → interpret → domain validation', () => {
+    it('emitted polymorphic contract passes domain validation', () => {
+      const document = parsePslDocument({
+        schema: `model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  String
+
+  @@discriminator(type)
+  @@map("tasks")
+}
+
+model Bug {
+  severity String
+
+  @@base(Task, "bug")
+}
+
+model Feature {
+  priority Int
+
+  @@base(Task, "feature")
+  @@map("features")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(() => validateContractDomain(result.value)).not.toThrow();
+
+      expect(result.value.models['Task']).toMatchObject({
+        discriminator: { field: 'type' },
+        variants: {
+          Bug: { value: 'bug' },
+          Feature: { value: 'feature' },
+        },
+      });
+      expect(result.value.models['Bug']).toMatchObject({ base: 'Task' });
+      expect(result.value.models['Feature']).toMatchObject({ base: 'Task' });
+      expect(result.value.models['Bug']?.storage).toMatchObject({ table: 'tasks' });
+      expect(result.value.models['Feature']?.storage).toMatchObject({ table: 'features' });
+      expect(Object.values(result.value.roots)).not.toContain('Bug');
+      expect(Object.values(result.value.roots)).not.toContain('Feature');
+      expect(Object.values(result.value.roots)).toContain('Task');
     });
   });
 });
