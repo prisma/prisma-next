@@ -9,12 +9,6 @@ export interface TypeRenderEntry {
 }
 
 export interface GenerateContractTypesOptions {
-  /**
-   * Plumbed through the emission stack but not yet consumed by the SQL emitter.
-   * Currently, `typeParams` is emitted structurally on contract fields instead.
-   * Renderer dispatch (producing rendered types like `Vector<1536>`) is tracked
-   * in TML-2204.
-   */
   readonly parameterizedRenderers?: Map<string, TypeRenderEntry>;
   readonly parameterizedTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly queryOperationTypeImports?: ReadonlyArray<TypesImportSpec>;

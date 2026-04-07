@@ -22,7 +22,7 @@ const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-h
 
 describe('sql-target-family-hook parameterized type emission', () => {
   describe('columns with typeParams', () => {
-    it('emits typeParams on model field when parameterized renderer is provided', () => {
+    it('renders parameterized type on model field when renderer is provided', () => {
       const ir = createContract({
         models: {
           Document: {
@@ -69,9 +69,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain(
-        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }",
-      );
+      expect(types).toContain('readonly embedding: Vector<1536>');
     });
 
     it('falls back to CodecTypes[codecId].output for columns without typeParams', () => {
@@ -119,7 +117,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       );
     });
 
-    it('emits nullable parameterized type with | null suffix', () => {
+    it('renders nullable parameterized type with | null suffix', () => {
       const ir = createContract({
         models: {
           Document: {
@@ -164,12 +162,10 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain(
-        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: true; readonly typeParams: { readonly length: 1536 } }",
-      );
+      expect(types).toContain('readonly embedding: Vector<1536> | null');
     });
 
-    it('uses custom renderer logic for complex type generation', () => {
+    it('renders complex parameterized type via custom renderer', () => {
       const ir = createContract({
         models: {
           Data: {
@@ -218,14 +214,12 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain(
-        "readonly value: { readonly codecId: 'pg/decimal@1'; readonly nullable: false; readonly typeParams: { readonly precision: 10; readonly scale: 2 } }",
-      );
+      expect(types).toContain('readonly value: Decimal<10, 2>');
     });
   });
 
   describe('enum unions', () => {
-    it('emits literal unions in value order', () => {
+    it('renders enum type via renderer', () => {
       const ir = createContract({
         models: {
           User: {
@@ -277,14 +271,12 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain(
-        "readonly role: { readonly codecId: 'pg/enum@1'; readonly nullable: false; readonly typeParams: { readonly values: readonly ['USER', 'ADMIN', 'MODERATOR'] } }",
-      );
+      expect(types).toContain("readonly role: 'USER' | 'ADMIN' | 'MODERATOR'");
     });
   });
 
   describe('columns with typeRef', () => {
-    it('resolves typeRef to storage.types and emits parameterized type', () => {
+    it('resolves typeRef to storage.types and renders parameterized type', () => {
       const ir = createContract({
         models: {
           Document: {
@@ -336,14 +328,12 @@ describe('sql-target-family-hook parameterized type emission', () => {
         parameterizedRenderers,
       });
 
-      expect(types).toContain(
-        "readonly embedding: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }",
-      );
+      expect(types).toContain('readonly embedding: Vector<1536>');
     });
   });
 
   describe('deterministic output ordering', () => {
-    it('emits multiple parameterized types in deterministic column order', () => {
+    it('renders multiple parameterized types in deterministic column order', () => {
       const ir = createContract({
         models: {
           Document: {
@@ -409,15 +399,9 @@ describe('sql-target-family-hook parameterized type emission', () => {
       // Output should be identical
       expect(types1).toBe(types2);
 
-      expect(types1).toContain(
-        "readonly embedding1: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }",
-      );
-      expect(types1).toContain(
-        "readonly embedding2: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 384 } }",
-      );
-      expect(types1).toContain(
-        "readonly embedding3: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 768 } }",
-      );
+      expect(types1).toContain('readonly embedding1: Vector<1536>');
+      expect(types1).toContain('readonly embedding2: Vector<384>');
+      expect(types1).toContain('readonly embedding3: Vector<768>');
     });
   });
 

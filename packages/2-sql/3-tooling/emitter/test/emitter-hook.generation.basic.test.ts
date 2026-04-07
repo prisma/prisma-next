@@ -700,7 +700,7 @@ describe('sql-target-family-hook', () => {
     );
   });
 
-  it('emits typeParams on model field when column has typeParams and renderer exists', () => {
+  it('renders parameterized type on model field when column has typeParams and renderer exists', () => {
     const ir = createContract({
       models: {
         Embedding: {
@@ -747,9 +747,7 @@ describe('sql-target-family-hook', () => {
       parameterizedRenderers,
     });
 
-    expect(types).toContain(
-      "readonly vector: { readonly codecId: 'pg/vector@1'; readonly nullable: false; readonly typeParams: { readonly length: 1536 } }",
-    );
+    expect(types).toContain('readonly vector: Vector<1536>');
     expect(types).toContain(
       "readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false }",
     );
