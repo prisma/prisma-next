@@ -168,15 +168,14 @@ Evaluate changes against:
 `code-review.md` must include these sections at minimum (you may add additional sections as useful):
 - Summary (1–2 sentences)
 - What looks solid (positive notes; can appear near the top)
-- Blocking issues (must fix before merge)
-- Non-blocking concerns (important issues to address or explicitly track; includes maintainability, performance follow-ups, and design/ADR gaps)
-- Nits (optional; safe to ignore unless the author prefers cleanup)
+- Findings (flat list — everything to address in this PR)
+- Deferred (out of scope) (issues explicitly not addressed because they expand scope beyond what this PR delivers; must state *why* each is out of scope)
+- Already addressed (table of findings from prior review rounds that have been fixed; include commit hash when available)
 - Acceptance-criteria traceability (acceptance criteria → implementation → evidence)
 
-Guidance:
-- “Blocking issues” is the hard gate (do not merge until addressed).
-- “Non-blocking concerns” are not a merge gate, but they are not “nits”; they should be handled now or captured as explicit follow-up work.
-- “Nits” are optional polish only; avoid mixing maintainability concerns into this section.
+#### Categorization heuristic
+
+Do **not** use blocking / non-blocking / nits tiers. Agents do implementation — perceived effort is not a useful signal for whether something should be fixed. The only legitimate reason to defer a finding is **scope**: fixing it would pull in work that belongs to a different PR or milestone. If a finding is in scope, it goes in **Findings** and gets addressed. If fixing it would expand scope beyond what this PR delivers, it goes in **Deferred** with a clear reason.
 
 Prioritize findings by impact: security > correctness > performance > maintainability > style.
 
