@@ -499,6 +499,7 @@
       "transactionalDDL": true
     },
     "sql": {
+      "defaultInInsert": true,
       "enums": true,
       "foreignKeys": true,
       "jsonAgg": true,

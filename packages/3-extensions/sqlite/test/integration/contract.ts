@@ -60,6 +60,17 @@ export const contract = defineContract<CodecTypes>()
       .column('label', { type: textColumn, nullable: false })
       .primaryKey(['id']),
   )
+  .table('items', (table) =>
+    table
+      .column('id', { type: integerColumn, nullable: false })
+      .column('name', { type: textColumn, nullable: false })
+      .column('label', {
+        type: textColumn,
+        nullable: false,
+        default: { kind: 'literal', value: 'unnamed' },
+      })
+      .primaryKey(['id']),
+  )
   .model('User', 'users', (model) =>
     model
       .field('id', 'id')
@@ -131,5 +142,8 @@ export const contract = defineContract<CodecTypes>()
       .field('createdAt', 'created_at')
       .field('metadata', 'metadata')
       .field('label', 'label'),
+  )
+  .model('Item', 'items', (model) =>
+    model.field('id', 'id').field('name', 'name').field('label', 'label'),
   )
   .build();

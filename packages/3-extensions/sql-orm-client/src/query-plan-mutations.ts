@@ -129,6 +129,64 @@ export function compileInsertCount(
   return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
 }
 
+function stripUndefinedValues(row: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function groupRowsByColumnSignature(
+  rows: readonly Record<string, unknown>[],
+): ReadonlyArray<readonly Record<string, unknown>[]> {
+  const groups: Array<Record<string, unknown>[]> = [];
+  let currentKey = '';
+  let currentGroup: Record<string, unknown>[] = [];
+
+  for (const rawRow of rows) {
+    const row = stripUndefinedValues(rawRow);
+    const key = Object.keys(row).sort().join(',');
+    if (key !== currentKey || currentGroup.length === 0) {
+      if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+      }
+      currentKey = key;
+      currentGroup = [row];
+    } else {
+      currentGroup.push(row);
+    }
+  }
+  if (currentGroup.length > 0) {
+    groups.push(currentGroup);
+  }
+
+  return groups;
+}
+
+export function compileInsertReturningSplit(
+  contract: Contract<SqlStorage>,
+  tableName: string,
+  rows: readonly Record<string, unknown>[],
+  returningColumns: readonly string[] | undefined,
+): ReadonlyArray<SqlQueryPlan<Record<string, unknown>>> {
+  return groupRowsByColumnSignature(rows).map((group) =>
+    compileInsertReturning(contract, tableName, group, returningColumns),
+  );
+}
+
+export function compileInsertCountSplit(
+  contract: Contract<SqlStorage>,
+  tableName: string,
+  rows: readonly Record<string, unknown>[],
+): ReadonlyArray<SqlQueryPlan<Record<string, unknown>>> {
+  return groupRowsByColumnSignature(rows).map((group) =>
+    compileInsertCount(contract, tableName, group),
+  );
+}
+
 export function compileUpsertReturning(
   contract: Contract<SqlStorage>,
   tableName: string,

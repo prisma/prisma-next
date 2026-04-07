@@ -104,6 +104,14 @@ export function setupIntegrationTest(): IntegrationTestContext {
     `);
 
     db.exec(`
+      CREATE TABLE items (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        label TEXT NOT NULL DEFAULT 'unnamed'
+      )
+    `);
+
+    db.exec(`
       INSERT INTO users (id, name, email, invited_by_id) VALUES
         (1, 'Alice', 'alice@example.com', NULL),
         (2, 'Bob', 'bob@example.com', 1),

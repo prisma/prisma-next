@@ -67,6 +67,7 @@ const defaultCapabilities = Object.freeze({
   sql: {
     enums: true,
     returning: true,
+    defaultInInsert: true,
   },
 });
 

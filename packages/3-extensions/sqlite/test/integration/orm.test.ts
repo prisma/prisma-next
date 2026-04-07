@@ -208,6 +208,21 @@ describe('integration: ORM on SQLite', () => {
     });
   });
 
+  describe('mixed defaults in multi-row insert', () => {
+    it('createAll with 2 rows where one provides label explicitly and the other uses DB default', async () => {
+      const db = ormClient();
+      const rows = await db.Item.createAll([
+        { id: 900, name: 'Explicit', label: 'custom' },
+        { id: 901, name: 'Default' },
+      ]);
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toMatchObject({ id: 900, name: 'Explicit', label: 'custom' });
+      expect(rows[1]).toMatchObject({ id: 901, name: 'Default', label: 'unnamed' });
+
+      await db.Item.where((i) => i.id.gte(900)).deleteCount();
+    });
+  });
+
   describe('upsert', () => {
     it('inserts when row does not exist', async () => {
       const db = ormClient();
