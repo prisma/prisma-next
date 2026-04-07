@@ -494,7 +494,7 @@ describeWithMongoDB('Pipeline builder integration (mongoPipeline DSL)', (ctx) =>
       expect(results[1]).toMatchObject({ _id: 'Phone', totalQty: 3 });
     });
 
-    it('lookup → unwind → group: orders enriched with product category', async () => {
+    it('lookup → pipe(match): orders enriched with product info', async () => {
       await seed();
 
       const plan = orders()
