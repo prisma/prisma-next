@@ -1,4 +1,5 @@
 import type { Contract, ContractModel, ContractValueObject } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   EmissionSpi,
   GenerateContractTypesOptions,
@@ -7,6 +8,7 @@ import type {
 import {
   deduplicateImports,
   generateCodecTypeIntersection,
+  generateFieldOutputTypesMap,
   generateHashTypeAliases,
   generateImportLines,
   generateModelsType,
@@ -28,6 +30,7 @@ export function generateContractDts(
     readonly profileHash: string;
   },
   options?: GenerateContractTypesOptions,
+  codecLookup?: CodecLookup,
 ): string {
   const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
   if (options?.parameterizedTypeImports) {
@@ -71,6 +74,11 @@ export function generateContractDts(
       ? `\n  readonly execution: ${serializeExecutionType(contract.execution)};`
       : '';
 
+  const fieldOutputTypesMap = generateFieldOutputTypesMap(
+    contract.models as Record<string, ContractModel> | undefined,
+    codecLookup,
+  );
+
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');
 
   return `// ⚠️  GENERATED FILE - DO NOT EDIT
@@ -92,6 +100,7 @@ export type CodecTypes = ${codecTypes};
 export type OperationTypes = ${operationTypes};
 ${familyTypeAliases}
 ${valueObjectTypeAliases}
+export type FieldOutputTypes = ${fieldOutputTypesMap};
 export type TypeMaps = ${typeMapsExpr};
 
 type ContractBase = ContractType<

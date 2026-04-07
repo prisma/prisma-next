@@ -140,10 +140,12 @@ export type TypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   TOperationTypes extends Record<string, unknown> = Record<string, never>,
   TQueryOperationTypes extends Record<string, unknown> = Record<string, never>,
+  TFieldOutputTypes extends Record<string, Record<string, unknown>> = Record<string, never>,
 > = {
   readonly codecTypes: TCodecTypes;
   readonly operationTypes: TOperationTypes;
   readonly queryOperationTypes: TQueryOperationTypes;
+  readonly fieldOutputTypes: TFieldOutputTypes;
 };
 
 export type CodecTypesOf<T> = [T] extends [never]
@@ -189,8 +191,17 @@ export type ExtractTypeMapsFromContract<T> = TypeMapsPhantomKey extends keyof T
   ? NonNullable<T[TypeMapsPhantomKey & keyof T]>
   : never;
 
+export type FieldOutputTypesOf<T> = [T] extends [never]
+  ? Record<string, never>
+  : T extends { readonly fieldOutputTypes: infer F }
+    ? F extends Record<string, Record<string, unknown>>
+      ? F
+      : Record<string, never>
+    : Record<string, never>;
+
 export type ExtractCodecTypes<T> = CodecTypesOf<ExtractTypeMapsFromContract<T>>;
 export type ExtractQueryOperationTypes<T> = QueryOperationTypesOf<ExtractTypeMapsFromContract<T>>;
+export type ExtractFieldOutputTypes<T> = FieldOutputTypesOf<ExtractTypeMapsFromContract<T>>;
 
 export type ResolveCodecTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
   ? ExtractCodecTypes<TContract>
