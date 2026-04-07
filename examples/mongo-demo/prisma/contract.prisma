@@ -19,8 +19,21 @@ model Post {
   id        ObjectId @id @map("_id")
   title     String
   content   String
+  kind      String
   authorId  ObjectId
   createdAt DateTime
   author    User @relation(fields: [authorId], references: [id])
+  @@discriminator(kind)
   @@map("posts")
+}
+
+model Article {
+  summary   String
+  @@base(Post, "article")
+}
+
+model Tutorial {
+  difficulty String
+  duration   Int
+  @@base(Post, "tutorial")
 }
