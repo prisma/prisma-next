@@ -47,10 +47,9 @@ type RuntimeTableState = TableBuilderState<
   readonly string[] | undefined
 >;
 
-type ValueObjectFieldRef = {
-  readonly name: string;
-  readonly many?: boolean;
-};
+type DomainFieldRef =
+  | { readonly kind: 'scalar'; readonly many?: boolean }
+  | { readonly kind: 'valueObject'; readonly name: string; readonly many?: boolean };
 
 type RuntimeModelState = ModelBuilderState<
   string,
@@ -58,7 +57,7 @@ type RuntimeModelState = ModelBuilderState<
   Record<string, string>,
   Record<string, RelationDefinition>
 > & {
-  readonly valueObjectFields?: Record<string, ValueObjectFieldRef>;
+  readonly domainFieldRefs?: Record<string, DomainFieldRef>;
 };
 
 export type RuntimeBuilderState = ContractBuilderState<
@@ -238,13 +237,13 @@ export function buildContract(
 
       storageFields[fieldName] = { column: columnName };
 
-      const voRef = modelState.valueObjectFields?.[fieldName];
-      if (voRef) {
+      const domainRef = modelState.domainFieldRefs?.[fieldName];
+      if (domainRef?.kind === 'valueObject') {
         const columnState = tableState?.columns[columnName];
         domainFields[fieldName] = {
-          type: { kind: 'valueObject', name: voRef.name },
+          type: { kind: 'valueObject', name: domainRef.name },
           nullable: columnState?.nullable ?? false,
-          ...(voRef.many ? { many: true } : {}),
+          ...(domainRef.many ? { many: true } : {}),
         };
       } else {
         const columnState = tableState?.columns[columnName];
@@ -256,6 +255,7 @@ export function buildContract(
               ...ifDefined('typeParams', columnState.typeParams),
             },
             nullable: columnState.nullable ?? false,
+            ...(domainRef?.many ? { many: true } : {}),
           };
         }
       }
@@ -394,6 +394,16 @@ export function buildSqlContractFromSemanticDefinition(
         continue;
       }
 
+      if (field.many) {
+        columns[field.columnName] = {
+          name: field.columnName,
+          type: JSONB_CODEC_ID,
+          nativeType: JSONB_NATIVE_TYPE,
+          nullable: field.nullable,
+        } as ColumnBuilderState<string, boolean, string>;
+        continue;
+      }
+
       if (field.executionDefault) {
         if (field.default !== undefined) {
           throw new Error(
@@ -473,14 +483,20 @@ export function buildSqlContractFromSemanticDefinition(
   const modelStates: Record<string, RuntimeModelState> = {};
   for (const model of definition.models) {
     const fields: Record<string, string> = {};
-    const valueObjectFields: Record<string, ValueObjectFieldRef> = {};
+    const domainFieldRefs: Record<string, DomainFieldRef> = {};
 
     for (const field of model.fields) {
       fields[field.fieldName] = field.columnName;
       if (isValueObjectField(field)) {
-        valueObjectFields[field.fieldName] = {
+        domainFieldRefs[field.fieldName] = {
+          kind: 'valueObject',
           name: field.valueObjectName,
           ...(field.many ? { many: true } : {}),
+        };
+      } else if (field.many) {
+        domainFieldRefs[field.fieldName] = {
+          kind: 'scalar',
+          many: true,
         };
       }
     }
@@ -525,7 +541,7 @@ export function buildSqlContractFromSemanticDefinition(
       table: model.tableName,
       fields,
       relations,
-      ...(Object.keys(valueObjectFields).length > 0 ? { valueObjectFields } : {}),
+      ...(Object.keys(domainFieldRefs).length > 0 ? { domainFieldRefs } : {}),
     };
   }
 

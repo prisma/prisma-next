@@ -106,6 +106,17 @@ export function collectResolvedFields(
     const isValueObjectField = compositeTypeNames.has(field.typeName);
     const isListField = field.list;
 
+    const pgvectorOnJsonField = getAttribute(field.attributes, 'pgvector.column');
+    if (pgvectorOnJsonField && (isValueObjectField || isListField)) {
+      diagnostics.push({
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        message: `Field "${model.name}.${field.name}" uses @pgvector.column on a JSON-backed field (${isValueObjectField ? 'value object' : 'list'}). @pgvector.column is only supported on scalar Bytes fields.`,
+        sourceId,
+        span: pgvectorOnJsonField.span,
+      });
+      continue;
+    }
+
     let descriptor: ColumnDescriptor | undefined;
     let scalarCodecId: string | undefined;
 
@@ -253,9 +264,9 @@ export function collectResolvedFields(
       isUnique: Boolean(uniqueAttribute),
       ...ifDefined('idName', idName),
       ...ifDefined('uniqueName', uniqueName),
-      ...(isListField ? { many: true as const } : {}),
-      ...(isValueObjectField ? { valueObjectTypeName: field.typeName } : {}),
-      ...(scalarCodecId ? { scalarCodecId } : {}),
+      ...ifDefined('many', isListField ? (true as const) : undefined),
+      ...ifDefined('valueObjectTypeName', isValueObjectField ? field.typeName : undefined),
+      ...ifDefined('scalarCodecId', scalarCodecId),
     });
   }
 

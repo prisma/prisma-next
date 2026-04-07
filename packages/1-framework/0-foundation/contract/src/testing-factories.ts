@@ -1,5 +1,11 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Contract } from './contract-types';
-import type { ContractModel, ContractModelBase, ContractValueObject, ModelStorageBase } from './domain-types';
+import type {
+  ContractModel,
+  ContractModelBase,
+  ContractValueObject,
+  ModelStorageBase,
+} from './domain-types';
 import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
 import type { ExecutionSection, ProfileHashBase, StorageBase } from './types';
 import { coreHash } from './types';
@@ -53,7 +59,7 @@ export function createContract<
     targetFamily,
     roots: overrides.roots ?? {},
     models: (overrides.models ?? {}) as TModels,
-    ...(overrides.valueObjects ? { valueObjects: overrides.valueObjects } : {}),
+    ...ifDefined('valueObjects', overrides.valueObjects),
     storage,
     capabilities,
     extensionPacks: overrides.extensionPacks ?? {},

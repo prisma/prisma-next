@@ -84,7 +84,7 @@ export function model(
   relations: Record<string, unknown> = {},
 ): {
   storage: SqlModelStorage;
-  fields: Record<string, { readonly nullable: boolean; readonly type?: ScalarFieldType }>;
+  fields: Record<string, { readonly nullable: boolean; readonly type: ScalarFieldType }>;
   relations: Record<string, unknown>;
 } {
   const storage: SqlModelStorage = { table: tableName, fields };
@@ -93,12 +93,10 @@ export function model(
       name,
       {
         nullable: field.nullable ?? false,
-        ...(field.codecId !== undefined
-          ? { type: { kind: 'scalar' as const, codecId: field.codecId } }
-          : {}),
+        type: { kind: 'scalar' as const, codecId: field.codecId ?? 'core/unknown@1' },
       },
     ]),
-  ) as Record<string, { nullable: boolean; type?: ScalarFieldType }>;
+  ) as Record<string, { nullable: boolean; type: ScalarFieldType }>;
   return {
     storage,
     fields: domainFields,

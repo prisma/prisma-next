@@ -104,7 +104,7 @@ ${modelsType}
   readonly capabilities: ${serializeValue(contract.capabilities)};
   readonly extensionPacks: ${serializeValue(contract.extensionPacks)};${executionClause}
   readonly meta: ${serializeValue(contract.meta)};
-  readonly valueObjects: ${valueObjectsDescriptor};
+  ${valueObjects ? `readonly valueObjects: ${valueObjectsDescriptor};` : ''}
   readonly profileHash: ProfileHash;
 };
 

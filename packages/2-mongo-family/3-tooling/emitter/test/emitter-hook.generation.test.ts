@@ -441,10 +441,10 @@ describe('mongoEmission.generateContractTypes', () => {
       expect(types).toContain('readonly children: ReadonlyArray<NavItem>');
     });
 
-    it('emits empty valueObjects when none exist', () => {
+    it('omits valueObjects when none exist', () => {
       const contract = createMongoContract();
       const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
-      expect(types).toContain('readonly valueObjects: Record<string, never>');
+      expect(types).not.toContain('valueObjects');
     });
 
     it('emits nullable value object type alias field', () => {

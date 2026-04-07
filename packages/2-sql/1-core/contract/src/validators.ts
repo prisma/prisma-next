@@ -165,8 +165,8 @@ const ContractFieldTypeSchema = type('unknown').narrow((value, ctx) =>
 
 const ModelFieldSchema = type({
   '+': 'reject',
-  'nullable?': 'boolean',
-  'type?': ContractFieldTypeSchema,
+  nullable: 'boolean',
+  type: ContractFieldTypeSchema,
   'many?': 'true',
   'dict?': 'true',
 });

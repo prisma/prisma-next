@@ -13,6 +13,7 @@ export interface SqlSemanticFieldNode {
   readonly nullable: boolean;
   readonly default?: ColumnDefault;
   readonly executionDefault?: ExecutionMutationDefaultValue;
+  readonly many?: boolean;
 }
 
 export interface SqlSemanticPrimaryKeyNode {

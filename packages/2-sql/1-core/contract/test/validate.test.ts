@@ -23,8 +23,8 @@ const baseContract = {
         },
       },
       fields: {
-        id: {},
-        email: {},
+        id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+        email: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
       },
       relations: {},
     },
@@ -274,8 +274,8 @@ describe('validateContract', () => {
         },
       },
       fields: {
-        id: {},
-        userId: {},
+        id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+        userId: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
       },
       relations: {},
     };
@@ -741,7 +741,9 @@ describe('validateContract', () => {
       (contract as Record<string, unknown>).models = {
         User: {
           storage: { table: 'nonexistent', fields: { id: { column: 'id' } } },
-          fields: { id: {} },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+          },
           relations: {},
         },
       };
@@ -765,7 +767,10 @@ describe('validateContract', () => {
             table: 'User',
             fields: { id: { column: 'id' }, email: { column: 'no_such_column' } },
           },
-          fields: { id: {}, email: {} },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            email: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+          },
           relations: {},
         },
       };

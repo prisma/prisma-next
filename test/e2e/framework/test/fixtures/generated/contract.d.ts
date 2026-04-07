@@ -567,7 +567,7 @@ type ContractBase = ContractType<
     };
   };
   readonly meta: {};
-  readonly valueObjects: Record<string, never>;
+
   readonly profileHash: ProfileHash;
 };
 

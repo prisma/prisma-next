@@ -11,19 +11,35 @@ export const mongoEmission = {
 
     for (const [modelName, model] of Object.entries(contract.models)) {
       for (const [fieldName, field] of Object.entries(model.fields)) {
-        const fieldType = (field as { type?: { kind: string; codecId?: string } }).type;
-        if (!fieldType || fieldType.kind !== 'scalar') {
-          continue;
-        }
-        const { codecId } = fieldType;
-        if (!codecId) {
-          throw new Error(`Field "${fieldName}" on model "${modelName}" is missing codecId`);
-        }
-        const match = codecId.match(typeIdRegex);
-        if (!match || !match[1]) {
-          throw new Error(
-            `Field "${fieldName}" on model "${modelName}" has invalid codec ID format "${codecId}". Expected format: ns/name@version`,
-          );
+        const fieldType = (
+          field as {
+            type?: {
+              kind: string;
+              codecId?: string;
+              members?: ReadonlyArray<{ kind: string; codecId?: string }>;
+            };
+          }
+        ).type;
+        if (!fieldType) continue;
+
+        const scalarTypes: Array<{ codecId?: string }> =
+          fieldType.kind === 'scalar'
+            ? [fieldType]
+            : fieldType.kind === 'union' && fieldType.members
+              ? fieldType.members.filter((m) => m.kind === 'scalar')
+              : [];
+
+        for (const scalarType of scalarTypes) {
+          const { codecId } = scalarType;
+          if (!codecId) {
+            throw new Error(`Field "${fieldName}" on model "${modelName}" is missing codecId`);
+          }
+          const match = codecId.match(typeIdRegex);
+          if (!match || !match[1]) {
+            throw new Error(
+              `Field "${fieldName}" on model "${modelName}" has invalid codec ID format "${codecId}". Expected format: ns/name@version`,
+            );
+          }
         }
       }
     }
