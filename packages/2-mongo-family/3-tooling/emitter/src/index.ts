@@ -11,7 +11,7 @@ export const mongoEmission = {
 
     for (const [modelName, model] of Object.entries(contract.models)) {
       for (const [fieldName, field] of Object.entries(model.fields)) {
-        const { codecId } = field;
+        const { codecId } = field as { codecId?: string };
         if (!codecId) {
           throw new Error(`Field "${fieldName}" on model "${modelName}" is missing codecId`);
         }
