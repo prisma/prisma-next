@@ -39,28 +39,13 @@ readonly User: {
 ```
 
 Two distinct concepts, two distinct locations:
+
 - **Codec field configuration** (`typeParams` on the field) — how the codec is configured for this field. Runtime data, JSON-serializable, same in `contract.json` and `contract.d.ts`.
-- **Field output type** (`FieldOutputTypes` map) — what TypeScript type this field produces. Determined by the codec and its configuration. Resolved by the emitter (emit path) or the contract builder (no-emit path).
-
-The codec controls the mapping. Most codecs derive the output type directly from `typeParams` — Vector with `{ length: 1536 }` produces `Vector<1536>`. JSON Schema codecs perform a transformation — converting a JSON Schema payload into its TypeScript equivalent. The emitter delegates to the codec via an optional `renderOutputType` method:
-
-```ts
-const pgJsonbCodec = codec({
-  typeId: 'pg/jsonb@1',
-  targetTypes: ['jsonb'],
-  encode: (value): string => JSON.stringify(value),
-  decode: (wire): JsonValue => typeof wire === 'string' ? JSON.parse(wire) : wire,
-  renderOutputType(typeParams) {
-    const schemaJson = typeParams['schemaJson'];
-    if (schemaJson && typeof schemaJson === 'object') {
-      return renderTypeFromJsonSchema(schemaJson);
-    }
-    return undefined; // use default: CodecTypes[codecId]['output']
-  },
-});
-```
+- **Field output type** (`FieldOutputTypes` map) — what TypeScript type this field produces. Determined by the codec and its configuration.
 
 ## Context
+
+Prisma Next has two workflows for creating contracts. The **emit workflow** runs the emitter to generate `contract.d.ts` from contract JSON. The **no-emit workflow** lets the developer construct a contract programmatically in TypeScript, with type-level inference producing the equivalent types without code generation. Both paths must produce correct output types for every field.
 
 Codecs already own three of the four representations of a type:
 
@@ -81,7 +66,7 @@ The problems this causes:
 
 - **Output type resolution requires knowing whether the codec is parameterized.** Non-parameterized: `CodecTypes[codecId]['output']`. Parameterized: `CodecTypes[codecId]['parameterizedOutput'](typeParams)`. Two different access patterns for the same concept.
 
-- **The SQL emitter overrides `EmissionSpi.generateModelsType?` to inject renderer dispatch.** It also cross-references model fields against storage columns to derive `codecId` and `typeParams` — but after TML-2206 (value objects & embedded documents), model fields carry their own `ScalarFieldType` with `codecId` and `typeParams` resolved at contract build time. The storage cross-referencing is redundant. The override duplicates ~110 lines of the framework's 37-line default and couples the SQL emitter to storage internals.
+- **The SQL emitter overrides `EmissionSpi.generateModelsType?` to inject renderer dispatch.** This override is redundant after TML-2206 (value objects & embedded documents), which ensures model fields carry their own `codecId` and `typeParams` at build time. The override duplicates ~110 lines of the framework's 37-line default and couples the SQL emitter to storage internals.
 
 ## Decision
 
@@ -122,13 +107,31 @@ interface Codec<...> {
 }
 ```
 
-When absent (or returns `undefined`), the emitter falls back to `CodecTypes[codecId]['output']` as a type reference — the codec's default output type. When present, the codec produces the type expression:
+When absent (or returns `undefined`), the emitter falls back to the codec's default output type — it emits a reference to `CodecTypes[codecId]['output']` in the generated d.ts, which TypeScript resolves to the codec's declared output type. When present, the codec produces the concrete type expression:
 
 - `pg/vector@1`: `renderOutputType({ length: 1536 })` → `'Vector<1536>'`
 - `pg/jsonb@1`: `renderOutputType({ schemaJson: { ... } })` → `'{ name: string }'`
 - `pg/jsonb@1` (no schema): `renderOutputType({})` → `undefined` (fall back to `JsonValue`)
 
 Non-parameterized codecs don't need to implement it. The common case is zero code.
+
+Here's what the JSONB codec looks like with `renderOutputType`:
+
+```ts
+const pgJsonbCodec = codec({
+  typeId: 'pg/jsonb@1',
+  targetTypes: ['jsonb'],
+  encode: (value): string => JSON.stringify(value),
+  decode: (wire): JsonValue => typeof wire === 'string' ? JSON.parse(wire) : wire,
+  renderOutputType(typeParams) {
+    const schemaJson = typeParams['schemaJson'];
+    if (schemaJson && typeof schemaJson === 'object') {
+      return renderTypeFromJsonSchema(schemaJson);
+    }
+    return undefined;
+  },
+});
+```
 
 ### `parameterizedOutput` on `CodecTypes` is removed
 
@@ -140,7 +143,7 @@ The emitter always emits model fields with the full `ContractField` structure. T
 
 ### `EmissionSpi.generateModelsType?` override is removed
 
-This is a hard constraint. After TML-2206, model fields are self-contained — they carry resolved `codecId` and `typeParams` at build time, so the SQL emitter no longer needs to cross-reference storage columns. The framework emitter's `generateFieldResolvedType` handles all families (SQL, Mongo) and all field contexts (model fields, value object fields, union members).
+This is a hard constraint. After TML-2206, model fields are self-contained — they carry resolved `codecId` and `typeParams` at build time. The SQL emitter's override is deleted. The framework emitter's `generateFieldResolvedType` handles all families (SQL, Mongo) and all field contexts (model fields, value object fields, union members).
 
 ### The framework emitter owns rendering dispatch
 
@@ -148,7 +151,7 @@ The framework emitter's field generation:
 
 1. Reads `ScalarFieldType.typeParams` from the field
 2. Looks up the codec via `CodecLookup` (added to the emission pipeline)
-3. Calls `codec.renderOutputType(typeParams)` if present; otherwise uses `CodecTypes[codecId]['output']` as a type reference
+3. Calls `codec.renderOutputType(typeParams)` if present; otherwise emits a reference to `CodecTypes[codecId]['output']`
 4. Stamps the result into the `FieldOutputTypes` map
 5. Serializes `typeParams` truthfully as const literals on the field
 
