@@ -85,7 +85,11 @@ export type ProjectedShape<
     : Spec[K] extends TypedAggExpr<infer F>
       ? F
       : DocField;
-} & ('_id' extends keyof Shape ? ('_id' extends keyof Spec ? {} : Pick<Shape, '_id'>) : {});
+} & ('_id' extends keyof Shape
+  ? '_id' extends keyof Spec
+    ? Record<keyof never, never>
+    : Pick<Shape, '_id'>
+  : Record<keyof never, never>);
 
 export type GroupSpec = {
   _id: TypedAggExpr<DocField> | null;
