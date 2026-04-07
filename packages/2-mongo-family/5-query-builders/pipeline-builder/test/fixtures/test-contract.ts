@@ -8,22 +8,52 @@ export type TestContract = MongoContract & {
   readonly models: {
     readonly Order: {
       readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly status: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly amount: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
-        readonly customerId: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly notes: { readonly codecId: 'mongo/string@1'; readonly nullable: true };
-        readonly tags: { readonly codecId: 'mongo/array@1'; readonly nullable: false };
+        readonly _id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+          readonly nullable: false;
+        };
+        readonly status: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: false;
+        };
+        readonly amount: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
+          readonly nullable: false;
+        };
+        readonly customerId: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+          readonly nullable: false;
+        };
+        readonly notes: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: true;
+        };
+        readonly tags: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/array@1' };
+          readonly nullable: false;
+        };
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'orders' };
     };
     readonly User: {
       readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly firstName: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly lastName: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly email: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly _id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+          readonly nullable: false;
+        };
+        readonly firstName: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: false;
+        };
+        readonly lastName: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: false;
+        };
+        readonly email: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: false;
+        };
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'users' };
@@ -50,22 +80,22 @@ export const testContractJson = {
   models: {
     Order: {
       fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        status: { codecId: 'mongo/string@1', nullable: false },
-        amount: { codecId: 'mongo/double@1', nullable: false },
-        customerId: { codecId: 'mongo/objectId@1', nullable: false },
-        notes: { codecId: 'mongo/string@1', nullable: true },
-        tags: { codecId: 'mongo/array@1', nullable: false },
+        _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+        status: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+        amount: { type: { kind: 'scalar', codecId: 'mongo/double@1' }, nullable: false },
+        customerId: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+        notes: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: true },
+        tags: { type: { kind: 'scalar', codecId: 'mongo/array@1' }, nullable: false },
       },
       relations: {},
       storage: { collection: 'orders' },
     },
     User: {
       fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        firstName: { codecId: 'mongo/string@1', nullable: false },
-        lastName: { codecId: 'mongo/string@1', nullable: false },
-        email: { codecId: 'mongo/string@1', nullable: false },
+        _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+        firstName: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+        lastName: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+        email: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
       },
       relations: {},
       storage: { collection: 'users' },

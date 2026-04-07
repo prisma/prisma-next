@@ -431,8 +431,8 @@ type VOContractBase = Contract<
       };
     };
   };
-  readonly capabilities: {};
-  readonly extensionPacks: {};
+  readonly capabilities: Record<string, never>;
+  readonly extensionPacks: Record<string, never>;
   readonly profileHash: string;
 };
 

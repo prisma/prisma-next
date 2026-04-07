@@ -18,12 +18,14 @@ export type ArrayField = { readonly codecId: 'mongo/array@1'; readonly nullable:
 
 export type DocShape = Record<string, DocField>;
 
+type ExtractCodecId<F> = F extends { type: { kind: 'scalar'; codecId: infer C } } ? C : string;
+
 export type ModelToDocShape<
   TContract extends MongoContract,
   ModelName extends string & keyof TContract['models'],
 > = {
   [K in keyof TContract['models'][ModelName]['fields'] & string]: {
-    readonly codecId: TContract['models'][ModelName]['fields'][K]['codecId'];
+    readonly codecId: ExtractCodecId<TContract['models'][ModelName]['fields'][K]>;
     readonly nullable: TContract['models'][ModelName]['fields'][K]['nullable'];
   };
 };
