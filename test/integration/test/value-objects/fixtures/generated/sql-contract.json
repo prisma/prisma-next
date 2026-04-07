@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:vo-sql-test-profile-hash",
+  "roots": {
+    "shop": "Shop"
+  },
+  "models": {
+    "Shop": {
+      "fields": {
+        "id": {
+          "type": { "kind": "scalar", "codecId": "pg/int4@1" },
+          "nullable": false
+        },
+        "name": {
+          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "nullable": false
+        },
+        "location": {
+          "type": { "kind": "valueObject", "name": "Location" },
+          "nullable": false
+        },
+        "notes": {
+          "type": { "kind": "valueObject", "name": "Location" },
+          "nullable": true
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "shop",
+        "fields": {
+          "id": { "column": "id" },
+          "name": { "column": "name" },
+          "location": { "column": "location" },
+          "notes": { "column": "notes" }
+        }
+      }
+    }
+  },
+  "valueObjects": {
+    "Location": {
+      "fields": {
+        "street": {
+          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "nullable": false
+        },
+        "city": {
+          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "nullable": false
+        },
+        "zip": {
+          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "nullable": false
+        }
+      }
+    }
+  },
+  "storage": {
+    "storageHash": "sha256:vo-sql-test-storage-hash",
+    "tables": {
+      "shop": {
+        "columns": {
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false,
+            "default": {
+              "kind": "function",
+              "expression": "autoincrement()"
+            }
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "location": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": false
+          },
+          "notes": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": true
+          }
+        },
+        "primaryKey": {
+          "columns": ["id"]
+        },
+        "uniques": [],
+        "indexes": [],
+        "foreignKeys": []
+      }
+    }
+  },
+  "execution": {
+    "executionHash": "sha256:vo-sql-test-execution-hash",
+    "mutations": {
+      "defaults": []
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "defaults.autoincrement": true,
+      "returning": true
+    },
+    "sql": {
+      "returning": true
+    }
+  },
+  "extensionPacks": {},
+  "meta": {}
+}
