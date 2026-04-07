@@ -11,7 +11,14 @@ import type {
 } from '@prisma-next/contract/types';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { getAttribute, getMapName, lowerFirst, parseRelationAttribute } from './psl-helpers';
+import {
+  getAttribute,
+  getMapName,
+  getPositionalArgument,
+  lowerFirst,
+  parseQuotedStringLiteral,
+  parseRelationAttribute,
+} from './psl-helpers';
 
 export interface InterpretPslDocumentToMongoContractInput {
   readonly document: ParsePslDocumentResult;
@@ -275,10 +282,165 @@ export function interpretPslDocumentToMongoContract(
     };
   }
 
-  if (diagnostics.length > 0) {
+  // --- Polymorphism: collect @@discriminator and @@base declarations ---
+  type DiscriminatorDeclaration = { readonly fieldName: string; readonly span: PslModel['span'] };
+  type BaseDeclaration = {
+    readonly baseName: string;
+    readonly value: string;
+    readonly collectionName: string;
+    readonly span: PslModel['span'];
+  };
+
+  const discriminatorDeclarations = new Map<string, DiscriminatorDeclaration>();
+  const baseDeclarations = new Map<string, BaseDeclaration>();
+
+  for (const pslModel of document.ast.models) {
+    for (const attr of pslModel.attributes) {
+      if (attr.name === 'discriminator') {
+        const fieldName = getPositionalArgument(attr);
+        if (!fieldName) {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `Model "${pslModel.name}" @@discriminator requires a field name argument`,
+            sourceId,
+            span: attr.span,
+          });
+          continue;
+        }
+        discriminatorDeclarations.set(pslModel.name, { fieldName, span: attr.span });
+      }
+      if (attr.name === 'base') {
+        const baseName = getPositionalArgument(attr, 0);
+        const rawValue = getPositionalArgument(attr, 1);
+        if (!baseName || !rawValue) {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `Model "${pslModel.name}" @@base requires two arguments: base model name and discriminator value`,
+            sourceId,
+            span: attr.span,
+          });
+          continue;
+        }
+        const value = parseQuotedStringLiteral(rawValue);
+        if (value === undefined) {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `Model "${pslModel.name}" @@base discriminator value must be a quoted string literal`,
+            sourceId,
+            span: attr.span,
+          });
+          continue;
+        }
+        const collectionName = resolveCollectionName(pslModel);
+        baseDeclarations.set(pslModel.name, { baseName, value, collectionName, span: attr.span });
+      }
+    }
+  }
+
+  // --- Polymorphism: validate and resolve ---
+  const polyDiagnostics: ContractSourceDiagnostic[] = [];
+
+  for (const [modelName, decl] of discriminatorDeclarations) {
+    if (baseDeclarations.has(modelName)) {
+      polyDiagnostics.push({
+        code: 'PSL_DISCRIMINATOR_AND_BASE',
+        message: `Model "${modelName}" cannot have both @@discriminator and @@base`,
+        sourceId,
+        span: decl.span,
+      });
+      continue;
+    }
+
+    const model = models[modelName];
+    if (!model) continue;
+
+    if (!Object.hasOwn(model.fields, decl.fieldName)) {
+      polyDiagnostics.push({
+        code: 'PSL_DISCRIMINATOR_FIELD_NOT_FOUND',
+        message: `Discriminator field "${decl.fieldName}" is not a field on model "${modelName}"`,
+        sourceId,
+        span: decl.span,
+      });
+      continue;
+    }
+
+    const variants: Record<string, { readonly value: string }> = {};
+    for (const [variantName, baseDecl] of baseDeclarations) {
+      if (baseDecl.baseName !== modelName) continue;
+      variants[variantName] = { value: baseDecl.value };
+    }
+
+    if (Object.keys(variants).length === 0) {
+      polyDiagnostics.push({
+        code: 'PSL_ORPHANED_DISCRIMINATOR',
+        message: `Model "${modelName}" has @@discriminator but no variant models declare @@base(${modelName}, ...)`,
+        sourceId,
+        span: decl.span,
+      });
+      continue;
+    }
+
+    (models[modelName] as Record<string, unknown>)['discriminator'] = { field: decl.fieldName };
+    (models[modelName] as Record<string, unknown>)['variants'] = variants;
+  }
+
+  for (const [variantName, baseDecl] of baseDeclarations) {
+    if (!modelNames.has(baseDecl.baseName)) {
+      polyDiagnostics.push({
+        code: 'PSL_BASE_TARGET_NOT_FOUND',
+        message: `Model "${variantName}" @@base references non-existent model "${baseDecl.baseName}"`,
+        sourceId,
+        span: baseDecl.span,
+      });
+      continue;
+    }
+
+    if (!discriminatorDeclarations.has(baseDecl.baseName)) {
+      polyDiagnostics.push({
+        code: 'PSL_ORPHANED_BASE',
+        message: `Model "${variantName}" declares @@base(${baseDecl.baseName}, ...) but "${baseDecl.baseName}" has no @@discriminator`,
+        sourceId,
+        span: baseDecl.span,
+      });
+      continue;
+    }
+
+    if (discriminatorDeclarations.has(variantName)) {
+      continue;
+    }
+
+    const baseModel = models[baseDecl.baseName];
+    const variantPslModel = document.ast.models.find((m) => m.name === variantName)!;
+    const hasExplicitMap = getMapName(variantPslModel.attributes) !== undefined;
+
+    if (hasExplicitMap && baseModel && baseDecl.collectionName !== baseModel.storage.collection) {
+      polyDiagnostics.push({
+        code: 'PSL_MONGO_VARIANT_SEPARATE_COLLECTION',
+        message: `Mongo variant "${variantName}" cannot use a different collection than its base "${baseDecl.baseName}". Mongo only supports single-collection polymorphism.`,
+        sourceId,
+        span: baseDecl.span,
+      });
+      continue;
+    }
+
+    const baseCollection = baseModel?.storage.collection ?? baseDecl.collectionName;
+
+    const variantModel = models[variantName];
+    if (variantModel) {
+      (variantModel as Record<string, unknown>)['base'] = baseDecl.baseName;
+      (variantModel as Record<string, unknown>)['storage'] = { collection: baseCollection };
+    }
+
+    const variantCollectionName = resolveCollectionName(variantPslModel);
+    if (roots[variantCollectionName] === variantName) {
+      delete roots[variantCollectionName];
+    }
+  }
+
+  if (diagnostics.length > 0 || polyDiagnostics.length > 0) {
     return notOk({
       summary: 'PSL to Mongo contract interpretation failed',
-      diagnostics,
+      diagnostics: [...diagnostics, ...polyDiagnostics],
     });
   }
 
