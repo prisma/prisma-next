@@ -199,4 +199,56 @@ describe('sql-codecs', () => {
     expect(timestampCodec.encode(instant)).toBe('2024-01-15T10:30:00.000Z');
     expect(timestampCodec.decode(instant)).toBe('2024-01-15T10:30:00.000Z');
   });
+
+  describe('renderOutputType', () => {
+    it('sql/char@1 renders Char<length>', () => {
+      expect(sqlCodecDefinitions.char.codec.renderOutputType!({ length: 36 })).toBe('Char<36>');
+    });
+
+    it('sql/char@1 throws on missing length', () => {
+      expect(() => sqlCodecDefinitions.char.codec.renderOutputType!({})).toThrow(
+        /expected numeric "length"/,
+      );
+    });
+
+    it('sql/varchar@1 renders Varchar<length>', () => {
+      expect(sqlCodecDefinitions.varchar.codec.renderOutputType!({ length: 255 })).toBe(
+        'Varchar<255>',
+      );
+    });
+
+    it('sql/varchar@1 throws on missing length', () => {
+      expect(() => sqlCodecDefinitions.varchar.codec.renderOutputType!({})).toThrow(
+        /expected numeric "length"/,
+      );
+    });
+
+    it('sql/timestamp@1 renders Timestamp<P> with precision', () => {
+      expect(sqlCodecDefinitions.timestamp.codec.renderOutputType!({ precision: 3 })).toBe(
+        'Timestamp<3>',
+      );
+    });
+
+    it('sql/timestamp@1 renders bare Timestamp when precision absent', () => {
+      expect(sqlCodecDefinitions.timestamp.codec.renderOutputType!({})).toBe('Timestamp');
+    });
+
+    it('sql/timestamp@1 throws on invalid precision type', () => {
+      expect(() =>
+        sqlCodecDefinitions.timestamp.codec.renderOutputType!({ precision: 'bad' }),
+      ).toThrow(/expected numeric "precision"/);
+    });
+
+    it('sql/int@1 has no renderOutputType', () => {
+      expect(sqlCodecDefinitions.int.codec.renderOutputType).toBeUndefined();
+    });
+
+    it('sql/float@1 has no renderOutputType', () => {
+      expect(sqlCodecDefinitions.float.codec.renderOutputType).toBeUndefined();
+    });
+
+    it('sql/text@1 has no renderOutputType', () => {
+      expect(sqlCodecDefinitions.text.codec.renderOutputType).toBeUndefined();
+    });
+  });
 });
