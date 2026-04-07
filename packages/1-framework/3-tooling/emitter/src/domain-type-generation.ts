@@ -1,4 +1,4 @@
-import type { ContractField, ContractModel } from '@prisma-next/contract/types';
+import type { ContractField, ContractModel, ContractValueObject } from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 
 export function serializeValue(value: unknown): string {
@@ -207,4 +207,110 @@ export function generateHashTypeAliases(hashes: {
     `export type ExecutionHash = ${executionHashType};`,
     `export type ProfileHash = ProfileHashBase<'${hashes.profileHash}'>;`,
   ].join('\n');
+}
+
+export function generateFieldResolvedType(field: ContractField): string {
+  let baseType: string;
+  const { type } = field;
+
+  switch (type.kind) {
+    case 'scalar':
+      baseType = `CodecTypes[${serializeValue(type.codecId)}]['output']`;
+      break;
+    case 'valueObject':
+      baseType = type.name;
+      break;
+    case 'union': {
+      const memberTypes = type.members.map((m) => {
+        if (m.kind === 'scalar') return `CodecTypes[${serializeValue(m.codecId)}]['output']`;
+        return m.name;
+      });
+      baseType = memberTypes.join(' | ');
+      break;
+    }
+    default:
+      baseType = 'unknown';
+      break;
+  }
+
+  if (field.many === true) {
+    baseType = `ReadonlyArray<${baseType}>`;
+  }
+  if (field.dict === true) {
+    baseType = `Readonly<Record<string, ${baseType}>>`;
+  }
+  if (field.nullable) {
+    baseType = `${baseType} | null`;
+  }
+
+  return baseType;
+}
+
+export function generateValueObjectType(
+  _voName: string,
+  vo: ContractValueObject,
+  _valueObjects: Record<string, ContractValueObject>,
+): string {
+  const fieldEntries: string[] = [];
+  for (const [fieldName, field] of Object.entries(vo.fields)) {
+    const tsType = generateFieldResolvedType(field);
+    fieldEntries.push(`readonly ${serializeObjectKey(fieldName)}: ${tsType}`);
+  }
+  return fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';
+}
+
+export function generateContractFieldDescriptor(fieldName: string, field: ContractField): string {
+  const mods: string[] = [];
+  if (field.many === true) mods.push('; readonly many: true');
+  if (field.dict === true) mods.push('; readonly dict: true');
+  const modStr = mods.join('');
+
+  const { type } = field;
+  if (type.kind === 'scalar') {
+    const typeParamsSpec =
+      type.typeParams && Object.keys(type.typeParams).length > 0
+        ? `; readonly typeParams: ${serializeValue(type.typeParams)}`
+        : '';
+    return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${field.nullable}; readonly type: { readonly kind: 'scalar'; readonly codecId: ${serializeValue(type.codecId)}${typeParamsSpec} }${modStr} }`;
+  }
+  if (type.kind === 'valueObject') {
+    return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${field.nullable}; readonly type: { readonly kind: 'valueObject'; readonly name: ${serializeValue(type.name)} }${modStr} }`;
+  }
+  return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${field.nullable}; readonly type: ${serializeValue(type)}${modStr} }`;
+}
+
+export function generateValueObjectsDescriptorType(
+  valueObjects: Record<string, ContractValueObject> | undefined,
+): string {
+  if (!valueObjects || Object.keys(valueObjects).length === 0) {
+    return 'Record<string, never>';
+  }
+
+  const voEntries: string[] = [];
+  for (const [voName, vo] of Object.entries(valueObjects)) {
+    const fieldEntries: string[] = [];
+    for (const [fieldName, field] of Object.entries(vo.fields)) {
+      fieldEntries.push(generateContractFieldDescriptor(fieldName, field));
+    }
+    const fieldsType =
+      fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';
+    voEntries.push(`readonly ${serializeObjectKey(voName)}: { readonly fields: ${fieldsType} }`);
+  }
+
+  return `{ ${voEntries.join('; ')} }`;
+}
+
+export function generateValueObjectTypeAliases(
+  valueObjects: Record<string, ContractValueObject> | undefined,
+): string {
+  if (!valueObjects || Object.keys(valueObjects).length === 0) {
+    return '';
+  }
+
+  const aliases: string[] = [];
+  for (const [voName, vo] of Object.entries(valueObjects)) {
+    const voType = generateValueObjectType(voName, vo, valueObjects);
+    aliases.push(`export type ${voName} = ${voType};`);
+  }
+  return aliases.join('\n');
 }
