@@ -167,8 +167,14 @@ function validateOwnership(
   }
 }
 
+interface FieldTypeLike {
+  readonly kind?: string;
+  readonly name?: string;
+  readonly members?: readonly FieldTypeLike[];
+}
+
 interface FieldLike {
-  readonly type?: { readonly kind?: string; readonly name?: string };
+  readonly type?: FieldTypeLike;
   readonly many?: boolean;
   readonly dict?: boolean;
 }
@@ -191,15 +197,23 @@ function forEachContractField(
 
 function validateValueObjectReferences(contract: DomainContractShape, errors: string[]): void {
   const voNames = new Set(Object.keys(contract.valueObjects ?? {}));
+
+  function checkType(type: FieldTypeLike | undefined, location: string): void {
+    if (!type) return;
+    if (type.kind === 'valueObject' && type.name && !voNames.has(type.name)) {
+      errors.push(
+        `${location} references value object "${type.name}" which does not exist in valueObjects`,
+      );
+      return;
+    }
+    if (type.kind === 'union') {
+      for (const member of type.members ?? []) checkType(member, location);
+    }
+  }
+
   forEachContractField(contract, (field, location) => {
     const f = field as FieldLike | undefined;
-    if (f?.type?.kind === 'valueObject' && f.type.name) {
-      if (!voNames.has(f.type.name)) {
-        errors.push(
-          `${location} references value object "${f.type.name}" which does not exist in valueObjects`,
-        );
-      }
-    }
+    checkType(f?.type, location);
   });
 }
 

@@ -516,6 +516,61 @@ describe('validateContractDomain()', () => {
       };
       expect(() => validateContractDomain(contract)).toThrow(/Nonexistent.*does not exist/);
     });
+
+    it('rejects nonexistent value object reference inside union members', () => {
+      const contract: DomainContractShape = {
+        roots: { users: 'User' },
+        models: {
+          User: makeMinimalModel({
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              data: {
+                nullable: false,
+                type: {
+                  kind: 'union',
+                  members: [
+                    { kind: 'scalar', codecId: 'pg/text@1' },
+                    { kind: 'valueObject', name: 'Ghost' },
+                  ],
+                },
+              },
+            },
+          }),
+        },
+      };
+      expect(() => validateContractDomain(contract)).toThrow(/Ghost.*does not exist/);
+    });
+
+    it('accepts valid value object reference inside union members', () => {
+      const contract: DomainContractShape = {
+        roots: { users: 'User' },
+        models: {
+          User: makeMinimalModel({
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              data: {
+                nullable: false,
+                type: {
+                  kind: 'union',
+                  members: [
+                    { kind: 'scalar', codecId: 'pg/text@1' },
+                    { kind: 'valueObject', name: 'Address' },
+                  ],
+                },
+              },
+            },
+          }),
+        },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            },
+          },
+        },
+      };
+      expect(() => validateContractDomain(contract)).not.toThrow();
+    });
   });
 
   describe('field modifier validation', () => {
