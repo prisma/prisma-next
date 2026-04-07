@@ -48,11 +48,11 @@ export type InferModelRow<
   ModelName extends string & keyof TContract['models'],
   TFields extends Record<
     string,
-    { codecId: string; nullable: boolean }
+    { type: { kind: 'scalar'; codecId: string }; nullable: boolean }
   > = TContract['models'][ModelName]['fields'],
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
 > = {
   -readonly [FieldName in keyof TFields]: TFields[FieldName]['nullable'] extends true
-    ? TCodecTypes[TFields[FieldName]['codecId']]['output'] | null
-    : TCodecTypes[TFields[FieldName]['codecId']]['output'];
+    ? TCodecTypes[TFields[FieldName]['type']['codecId']]['output'] | null
+    : TCodecTypes[TFields[FieldName]['type']['codecId']]['output'];
 };

@@ -13,7 +13,7 @@ function minimalContract(overrides?: Partial<Contract>): Record<string, unknown>
     roots: { users: 'User' },
     models: {
       User: {
-        fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+        fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
         relations: {},
         storage: { table: 'user' },
       },
@@ -119,7 +119,7 @@ describe('validateContract', () => {
     const raw = minimalContract({
       models: {
         User: {
-          fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+          fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
           relations: {},
           storage: { table: 'user' },
         },

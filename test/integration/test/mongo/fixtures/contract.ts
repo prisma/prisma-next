@@ -40,10 +40,13 @@ export const contract = {
         relations: { comments: { field: 'comments' } },
       },
       fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        title: { codecId: 'mongo/string@1', nullable: false },
-        type: { codecId: 'mongo/string@1', nullable: false },
-        assigneeId: { codecId: 'mongo/objectId@1', nullable: false },
+        _id: { type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' }, nullable: false },
+        title: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
+        type: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
+        assigneeId: {
+          type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
+          nullable: false,
+        },
       },
       relations: {
         assignee: {
@@ -62,7 +65,7 @@ export const contract = {
     Bug: {
       storage: { collection: 'tasks' },
       fields: {
-        severity: { codecId: 'mongo/string@1', nullable: false },
+        severity: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
       },
       relations: {},
       base: 'Task',
@@ -70,8 +73,11 @@ export const contract = {
     Feature: {
       storage: { collection: 'tasks' },
       fields: {
-        priority: { codecId: 'mongo/string@1', nullable: false },
-        targetRelease: { codecId: 'mongo/string@1', nullable: false },
+        priority: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
+        targetRelease: {
+          type: { kind: 'scalar' as const, codecId: 'mongo/string@1' },
+          nullable: false,
+        },
       },
       relations: {},
       base: 'Task',
@@ -82,9 +88,9 @@ export const contract = {
         relations: { addresses: { field: 'addresses' } },
       },
       fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        name: { codecId: 'mongo/string@1', nullable: false },
-        email: { codecId: 'mongo/string@1', nullable: false },
+        _id: { type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' }, nullable: false },
+        name: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
+        email: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
       },
       relations: {
         addresses: { to: 'Address', cardinality: '1:N' as const },
@@ -93,9 +99,9 @@ export const contract = {
     Address: {
       storage: {},
       fields: {
-        street: { codecId: 'mongo/string@1', nullable: false },
-        city: { codecId: 'mongo/string@1', nullable: false },
-        zip: { codecId: 'mongo/string@1', nullable: false },
+        street: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
+        city: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
+        zip: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
       },
       relations: {},
       owner: 'User',
@@ -103,9 +109,9 @@ export const contract = {
     Comment: {
       storage: {},
       fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        text: { codecId: 'mongo/string@1', nullable: false },
-        createdAt: { codecId: 'mongo/date@1', nullable: false },
+        _id: { type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' }, nullable: false },
+        text: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
+        createdAt: { type: { kind: 'scalar' as const, codecId: 'mongo/date@1' }, nullable: false },
       },
       relations: {},
       owner: 'Task',

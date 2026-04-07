@@ -1,3 +1,4 @@
+import type { ScalarFieldType } from '@prisma-next/contract/types';
 import type {
   ForeignKey,
   ForeignKeyOptions,
@@ -83,7 +84,7 @@ export function model(
   relations: Record<string, unknown> = {},
 ): {
   storage: SqlModelStorage;
-  fields: Record<string, { nullable: boolean; codecId?: string }>;
+  fields: Record<string, { readonly nullable: boolean; readonly type?: ScalarFieldType }>;
   relations: Record<string, unknown>;
 } {
   const storage: SqlModelStorage = { table: tableName, fields };
@@ -92,10 +93,12 @@ export function model(
       name,
       {
         nullable: field.nullable ?? false,
-        ...(field.codecId !== undefined ? { codecId: field.codecId } : {}),
+        ...(field.codecId !== undefined
+          ? { type: { kind: 'scalar' as const, codecId: field.codecId } }
+          : {}),
       },
     ]),
-  ) as Record<string, { nullable: boolean; codecId?: string }>;
+  ) as Record<string, { nullable: boolean; type?: ScalarFieldType }>;
   return {
     storage,
     fields: domainFields,

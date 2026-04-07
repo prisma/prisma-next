@@ -1,9 +1,18 @@
 import { type } from 'arktype';
 
+const FieldTypeSchema = type({
+  '+': 'reject',
+  kind: "'scalar'",
+  codecId: 'string',
+  'typeParams?': 'Record<string, unknown>',
+});
+
 const RawFieldSchema = type({
   '+': 'reject',
-  codecId: 'string',
+  type: FieldTypeSchema,
   'nullable?': 'boolean',
+  'many?': 'boolean',
+  'dict?': 'boolean',
 });
 
 const FieldSchema = RawFieldSchema.pipe((field) => ({

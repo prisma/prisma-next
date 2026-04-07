@@ -8,8 +8,8 @@ describe('mongoEmission.validateTypes', () => {
       models: {
         User: {
           fields: {
-            _id: { codecId: 'mongo/objectId@1', nullable: false },
-            name: { codecId: 'mongo/string@1', nullable: false },
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+            name: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
           },
           relations: {},
           storage: { collection: 'users' },
@@ -29,7 +29,7 @@ describe('mongoEmission.validateTypes', () => {
       models: {
         User: {
           fields: {
-            name: { codecId: '', nullable: false },
+            name: { nullable: false, type: { kind: 'scalar', codecId: '' } },
           },
           relations: {},
           storage: {},
@@ -44,7 +44,7 @@ describe('mongoEmission.validateTypes', () => {
       models: {
         User: {
           fields: {
-            name: { codecId: 'invalid-format', nullable: false },
+            name: { nullable: false, type: { kind: 'scalar', codecId: 'invalid-format' } },
           },
           relations: {},
           storage: {},

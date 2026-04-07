@@ -259,7 +259,7 @@ describe('validateContract logic validation', () => {
           User: {
             storage: { table: 'User', fields: { id: { column: 'id' } } },
             fields: {
-              id: { column: 'id' },
+              id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
             },
             relations: {},
           },
@@ -287,8 +287,8 @@ describe('validateContract logic validation', () => {
           fields: { id: { column: 'id' }, userId: { column: 'userId' } },
         },
         fields: {
-          id: { column: 'id' },
-          userId: { column: 'userId' },
+          id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+          userId: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
         },
         relations: {},
       };
@@ -315,7 +315,7 @@ describe('validateContract logic validation', () => {
       const userModel = (contract['models'] as Record<string, Record<string, unknown>>)[
         'User'
       ] as Record<string, unknown>;
-      userModel['storage'] = { table: 'MissingTable', fields: {} };
+      userModel['storage'] = { table: 'MissingTable', fields: { id: { column: 'id' } } };
       expect(() => validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup)).toThrow(
         /references non-existent table "MissingTable"/,
       );

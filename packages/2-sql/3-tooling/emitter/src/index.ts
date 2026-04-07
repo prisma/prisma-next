@@ -321,7 +321,7 @@ export const sqlEmission = {
           const column = table.columns[field.column];
           if (!column) {
             fields.push(
-              `readonly ${fieldName}: { readonly codecId: 'unknown'; readonly nullable: false }`,
+              `readonly ${fieldName}: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'unknown' } }`,
             );
             storageFieldParts.push(
               `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
@@ -349,7 +349,7 @@ export const sqlEmission = {
                 ? `; readonly typeParams: ${serializeTypeParamsLiteral(resolvedTypeParams)}`
                 : '';
             fields.push(
-              `readonly ${fieldName}: { readonly codecId: ${serializeValue(column.codecId)}; readonly nullable: ${nullable}${fieldTypeParamsSpec} }`,
+              `readonly ${fieldName}: { readonly nullable: ${nullable}; readonly type: { readonly kind: 'scalar'; readonly codecId: ${serializeValue(column.codecId)}${fieldTypeParamsSpec} } }`,
             );
           }
           storageFieldParts.push(
@@ -359,7 +359,7 @@ export const sqlEmission = {
       } else {
         for (const [fieldName, field] of Object.entries(storageFields)) {
           fields.push(
-            `readonly ${fieldName}: { readonly codecId: 'unknown'; readonly nullable: false }`,
+            `readonly ${fieldName}: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'unknown' } }`,
           );
           storageFieldParts.push(
             `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,

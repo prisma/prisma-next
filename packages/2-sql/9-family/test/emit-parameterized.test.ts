@@ -369,12 +369,12 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [extension],
     });
 
-    // Standard columns should use ContractField format
-    expect(result.contractDts).toContain(
-      "readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false }",
+    // Standard columns should use ContractField format (emitter pretty-prints across lines)
+    expect(result.contractDts).toMatch(
+      /readonly id:\s*\{\s*readonly nullable: false;\s*readonly type: \{ readonly kind: 'scalar'; readonly codecId: 'pg\/int4@1' \};\s*\}/,
     );
-    expect(result.contractDts).toContain(
-      "readonly name: { readonly codecId: 'pg/text@1'; readonly nullable: false }",
+    expect(result.contractDts).toMatch(
+      /readonly name:\s*\{\s*readonly nullable: false;\s*readonly type: \{ readonly kind: 'scalar'; readonly codecId: 'pg\/text@1' \};\s*\}/,
     );
   });
 
@@ -701,8 +701,8 @@ describe('emit parameterized codecs integration', () => {
     });
 
     expect(result.contractDts).toMatch(/readonly payload:\s*AuditPayload\b/);
-    expect(result.contractDts).toContain(
-      "readonly metadata: { readonly codecId: 'pg/jsonb@1'; readonly nullable: false }",
+    expect(result.contractDts).toMatch(
+      /readonly metadata:\s*\{\s*readonly nullable: false;\s*readonly type: \{ readonly kind: 'scalar'; readonly codecId: 'pg\/jsonb@1' \};\s*\}/,
     );
   });
 });

@@ -165,7 +165,7 @@ export function interpretPslDocumentToMongoContract(
 
       const mappedName = fieldMappings.pslNameToMapped.get(field.name) ?? field.name;
       fields[mappedName] = {
-        codecId,
+        type: { kind: 'scalar', codecId },
         nullable: field.optional,
       };
     }

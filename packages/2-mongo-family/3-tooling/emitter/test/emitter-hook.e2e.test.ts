@@ -43,13 +43,13 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
     expect(types).toContain('readonly Comment:');
 
     expect(types).toContain(
-      "readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false }",
+      "readonly _id: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' } }",
     );
     expect(types).toContain(
-      "readonly name: { readonly codecId: 'mongo/string@1'; readonly nullable: false }",
+      "readonly name: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' } }",
     );
     expect(types).toContain(
-      "readonly bio: { readonly codecId: 'mongo/string@1'; readonly nullable: true }",
+      "readonly bio: { readonly nullable: true; readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' } }",
     );
 
     expect(types).toContain("readonly to: 'Post'");
@@ -81,10 +81,10 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
     const types = generateContractDts(blogContract, mongoEmission, [], [], testHashes);
 
     expect(types).toContain(
-      "readonly text: { readonly codecId: 'mongo/string@1'; readonly nullable: false }",
+      "readonly text: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' } }",
     );
     expect(types).toContain(
-      "readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false }",
+      "readonly createdAt: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/date@1' } }",
     );
     expect(types).toContain("readonly owner: 'Post'");
   });

@@ -54,11 +54,11 @@ describe('interpretPslDocumentToMongoContract', () => {
 
       expect(ir.models['Item']).toMatchObject({
         fields: {
-          _id: { codecId: 'mongo/objectId@1', nullable: false },
-          name: { codecId: 'mongo/string@1', nullable: false },
-          count: { codecId: 'mongo/int32@1', nullable: false },
-          active: { codecId: 'mongo/bool@1', nullable: false },
-          at: { codecId: 'mongo/date@1', nullable: false },
+          _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+          name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+          count: { type: { kind: 'scalar', codecId: 'mongo/int32@1' }, nullable: false },
+          active: { type: { kind: 'scalar', codecId: 'mongo/bool@1' }, nullable: false },
+          at: { type: { kind: 'scalar', codecId: 'mongo/date@1' }, nullable: false },
         },
       });
     });
@@ -112,8 +112,8 @@ describe('interpretPslDocumentToMongoContract', () => {
 
       expect(ir.models['Item']).toMatchObject({
         fields: {
-          _id: { codecId: 'custom/oid@2' },
-          name: { codecId: 'custom/text@2' },
+          _id: { type: { kind: 'scalar', codecId: 'custom/oid@2' }, nullable: false },
+          name: { type: { kind: 'scalar', codecId: 'custom/text@2' }, nullable: false },
         },
       });
     });
@@ -580,10 +580,10 @@ describe('interpretPslDocumentToMongoContract', () => {
         models: {
           User: {
             fields: {
-              _id: { codecId: 'mongo/objectId@1', nullable: false },
-              name: { codecId: 'mongo/string@1', nullable: false },
-              email: { codecId: 'mongo/string@1', nullable: false },
-              bio: { codecId: 'mongo/string@1', nullable: true },
+              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+              email: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+              bio: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: true },
             },
             relations: {
               posts: {
@@ -596,11 +596,11 @@ describe('interpretPslDocumentToMongoContract', () => {
           },
           Post: {
             fields: {
-              _id: { codecId: 'mongo/objectId@1', nullable: false },
-              title: { codecId: 'mongo/string@1', nullable: false },
-              content: { codecId: 'mongo/string@1', nullable: false },
-              authorId: { codecId: 'mongo/objectId@1', nullable: false },
-              createdAt: { codecId: 'mongo/date@1', nullable: false },
+              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              title: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+              content: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+              authorId: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              createdAt: { type: { kind: 'scalar', codecId: 'mongo/date@1' }, nullable: false },
             },
             relations: {
               author: {

@@ -49,9 +49,18 @@ export type Contract = ContractWithTypeMaps<BaseContract<
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          readonly nullable: false;
+        };
+        readonly email: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        readonly createdAt: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+          readonly nullable: false;
+        };
       };
       readonly relations: {
         readonly posts: {
@@ -75,10 +84,22 @@ export type Contract = ContractWithTypeMaps<BaseContract<
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly userId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          readonly nullable: false;
+        };
+        readonly title: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        readonly userId: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          readonly nullable: false;
+        };
+        readonly createdAt: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+          readonly nullable: false;
+        };
       };
       readonly relations: {
         readonly user: {

@@ -3,6 +3,7 @@ export type {
   ContractDiscriminator,
   ContractEmbedRelation,
   ContractField,
+  ContractFieldType,
   ContractModel,
   ContractModelBase,
   ContractReferenceRelation,
@@ -12,6 +13,9 @@ export type {
   EmbedRelationKeys,
   ModelStorageBase,
   ReferenceRelationKeys,
+  ScalarFieldType,
+  UnionFieldType,
+  ValueObjectFieldType,
 } from '../domain-types';
 export type {
   $,

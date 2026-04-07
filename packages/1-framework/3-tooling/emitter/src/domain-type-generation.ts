@@ -1,4 +1,4 @@
-import type { ContractModel } from '@prisma-next/contract/types';
+import type { ContractField, ContractModel } from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 
 export function serializeValue(value: unknown): string {
@@ -49,14 +49,32 @@ export function generateRootsType(roots: Record<string, string> | undefined): st
   return `{ ${entries} }`;
 }
 
-export function generateModelFieldsType(
-  fields: Record<string, { readonly codecId: string; readonly nullable: boolean }>,
-): string {
+function contractFieldModifierSuffix(field: ContractField): string {
+  const many = field.many === true ? '; readonly many: true' : '';
+  const dict = field.dict === true ? '; readonly dict: true' : '';
+  return many + dict;
+}
+
+export function generateModelFieldEntry(fieldName: string, field: ContractField): string {
+  const mods = contractFieldModifierSuffix(field);
+  const { nullable, type } = field;
+  if (type.kind === 'scalar') {
+    const typeParamsSpec =
+      type.typeParams && Object.keys(type.typeParams).length > 0
+        ? `; readonly typeParams: ${serializeValue(type.typeParams)}`
+        : '';
+    return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${nullable}; readonly type: { readonly kind: 'scalar'; readonly codecId: ${serializeValue(type.codecId)}${typeParamsSpec} }${mods} }`;
+  }
+  if (type.kind === 'valueObject') {
+    return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${nullable}; readonly type: { readonly kind: 'valueObject'; readonly name: ${serializeValue(type.name)} }${mods} }`;
+  }
+  return `readonly ${serializeObjectKey(fieldName)}: { readonly nullable: ${nullable}; readonly type: ${serializeValue(type)}${mods} }`;
+}
+
+export function generateModelFieldsType(fields: Record<string, ContractField>): string {
   const fieldEntries: string[] = [];
   for (const [fieldName, field] of Object.entries(fields)) {
-    fieldEntries.push(
-      `readonly ${serializeObjectKey(fieldName)}: { readonly codecId: ${serializeValue(field.codecId)}; readonly nullable: ${field.nullable} }`,
-    );
+    fieldEntries.push(generateModelFieldEntry(fieldName, field));
   }
   return fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';
 }

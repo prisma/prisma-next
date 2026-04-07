@@ -325,14 +325,19 @@ type ExtractFieldValue<
 type ResolveModelFieldToJsType<
   TContract extends Contract<SqlStorage>,
   FieldValue,
-> = FieldValue extends { readonly codecId: infer Id extends string }
-  ? Id extends keyof ExtractCodecTypes<TContract>
-    ? ExtractCodecTypes<TContract>[Id] extends { readonly output: infer O }
-      ? FieldValue extends { readonly nullable: true }
-        ? O | null
-        : O
+> = FieldValue extends {
+  readonly nullable: infer Nullable;
+  readonly type: infer FT;
+}
+  ? FT extends { readonly kind: 'scalar'; readonly codecId: infer Id extends string }
+    ? Id extends keyof ExtractCodecTypes<TContract>
+      ? ExtractCodecTypes<TContract>[Id] extends { readonly output: infer O }
+        ? Nullable extends true
+          ? O | null
+          : O
+        : never
       : never
-    : never
+    : FieldValue
   : FieldValue;
 
 type ExtractColumnJsTypeFromModels<

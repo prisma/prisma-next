@@ -11,10 +11,10 @@ export const blogContract: Contract = {
   models: {
     User: {
       fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        name: { codecId: 'mongo/string@1', nullable: false },
-        email: { codecId: 'mongo/string@1', nullable: false },
-        bio: { codecId: 'mongo/string@1', nullable: true },
+        _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+        name: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        bio: { nullable: true, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
       },
       relations: {
         posts: {
@@ -27,10 +27,10 @@ export const blogContract: Contract = {
     },
     Post: {
       fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        title: { codecId: 'mongo/string@1', nullable: false },
-        content: { codecId: 'mongo/string@1', nullable: false },
-        authorId: { codecId: 'mongo/objectId@1', nullable: false },
+        _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+        title: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        content: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        authorId: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
       },
       relations: {
         author: {
@@ -50,9 +50,9 @@ export const blogContract: Contract = {
     },
     Comment: {
       fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        text: { codecId: 'mongo/string@1', nullable: false },
-        createdAt: { codecId: 'mongo/date@1', nullable: false },
+        _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+        text: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        createdAt: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/date@1' } },
       },
       relations: {},
       storage: {},

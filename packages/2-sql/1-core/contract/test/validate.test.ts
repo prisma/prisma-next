@@ -591,7 +591,9 @@ describe('validateContract', () => {
         models: {
           User: {
             storage: { table: 'user', fields: { id: { column: 'id' } } },
-            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+            },
             relations: {
               posts: {
                 to: 'Post',
@@ -606,8 +608,8 @@ describe('validateContract', () => {
               fields: { id: { column: 'id' }, userId: { column: 'user_id' } },
             },
             fields: {
-              id: { nullable: false, codecId: 'pg/int4@1' },
-              userId: { nullable: false, codecId: 'pg/int4@1' },
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              userId: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
             },
             relations: {
               author: {

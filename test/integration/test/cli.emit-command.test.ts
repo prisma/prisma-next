@@ -713,8 +713,14 @@ model Post {
           models: {
             User: expect.objectContaining({
               fields: expect.objectContaining({
-                _id: { codecId: 'mongo/objectId@1', nullable: false },
-                name: { codecId: 'mongo/string@1', nullable: false },
+                _id: {
+                  type: { kind: 'scalar', codecId: 'mongo/objectId@1' },
+                  nullable: false,
+                },
+                name: {
+                  type: { kind: 'scalar', codecId: 'mongo/string@1' },
+                  nullable: false,
+                },
               }),
             }),
             Post: expect.objectContaining({

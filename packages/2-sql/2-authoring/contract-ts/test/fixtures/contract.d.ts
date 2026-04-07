@@ -40,9 +40,18 @@ export type Contract = ContractWithTypeMaps<BaseContract<
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
+        readonly id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          readonly nullable: false;
+        };
+        readonly email: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        readonly createdAt: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+          readonly nullable: false;
+        };
       };
       readonly relations: Record<string, never>;
     };

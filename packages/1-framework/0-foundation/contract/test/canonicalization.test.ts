@@ -116,8 +116,8 @@ describe('canonicalizeContractToObject', () => {
         models: {
           User: {
             fields: {
-              name: { codecId: 'text', nullable: false },
-              age: { codecId: 'int', nullable: false },
+              name: { type: { kind: 'scalar', codecId: 'text' }, nullable: false },
+              age: { type: { kind: 'scalar', codecId: 'int' }, nullable: false },
             },
             storage: { table: 'users', fields: {} },
             relations: {},
@@ -147,7 +147,7 @@ describe('default omission', () => {
       minimal({
         models: {
           User: {
-            fields: { id: { codecId: 'int', nullable: false } },
+            fields: { id: { type: { kind: 'scalar', codecId: 'int' }, nullable: false } },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -163,7 +163,9 @@ describe('default omission', () => {
       minimal({
         models: {
           User: {
-            fields: { id: { codecId: 'int', nullable: false, generated: false } },
+            fields: {
+              id: { type: { kind: 'scalar', codecId: 'int' }, nullable: false, generated: false },
+            },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -219,7 +221,7 @@ describe('default omission', () => {
       minimal({
         models: {
           User: {
-            fields: { id: { codecId: 'int', nullable: false } },
+            fields: { id: { type: { kind: 'scalar', codecId: 'int' }, nullable: false } },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -297,7 +299,7 @@ describe('default omission', () => {
       minimal({
         models: {
           Address: {
-            fields: { street: { codecId: 'string', nullable: false } },
+            fields: { street: { type: { kind: 'scalar', codecId: 'string' }, nullable: false } },
             storage: {},
             relations: {},
             owner: 'User',
@@ -314,7 +316,9 @@ describe('default omission', () => {
       minimal({
         models: {
           User: {
-            fields: { id: { codecId: 'int', nullable: false, extra: {} } },
+            fields: {
+              id: { type: { kind: 'scalar', codecId: 'int' }, nullable: false, extra: {} },
+            },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -340,7 +344,9 @@ describe('default omission', () => {
       minimal({
         models: {
           User: {
-            fields: { id: { codecId: 'int', nullable: false, default: null } },
+            fields: {
+              id: { type: { kind: 'scalar', codecId: 'int' }, nullable: false, default: null },
+            },
             storage: { table: 'users', fields: {} },
             relations: {},
           },
@@ -406,7 +412,13 @@ describe('index and unique sorting', () => {
       minimal({
         models: {
           User: {
-            fields: { createdAt: { codecId: 'timestamp', nullable: false, default: isoString } },
+            fields: {
+              createdAt: {
+                type: { kind: 'scalar', codecId: 'timestamp' },
+                nullable: false,
+                default: isoString,
+              },
+            },
             storage: { table: 'users', fields: {} },
             relations: {},
           },

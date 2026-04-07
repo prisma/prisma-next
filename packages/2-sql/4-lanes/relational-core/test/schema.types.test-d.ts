@@ -402,8 +402,14 @@ type VectorContract = ContractWithTypeMaps<
           };
         };
         readonly fields: {
-          readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-          readonly vectorData: { readonly codecId: 'pg/vector@1'; readonly nullable: false };
+          readonly id: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+          readonly vectorData: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1' };
+          };
         };
         readonly relations: Record<string, never>;
       };
@@ -453,8 +459,14 @@ const vectorContract: VectorContract = {
         },
       },
       fields: {
-        id: { codecId: 'pg/int4@1', nullable: false },
-        vectorData: { codecId: 'pg/vector@1', nullable: false },
+        id: {
+          nullable: false,
+          type: { kind: 'scalar', codecId: 'pg/int4@1' },
+        },
+        vectorData: {
+          nullable: false,
+          type: { kind: 'scalar', codecId: 'pg/vector@1' },
+        },
       },
       relations: {},
     },

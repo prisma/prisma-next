@@ -11,7 +11,11 @@ export const mongoEmission = {
 
     for (const [modelName, model] of Object.entries(contract.models)) {
       for (const [fieldName, field] of Object.entries(model.fields)) {
-        const { codecId } = field as { codecId?: string };
+        const fieldType = (field as { type?: { kind: string; codecId?: string } }).type;
+        if (!fieldType || fieldType.kind !== 'scalar') {
+          continue;
+        }
+        const { codecId } = fieldType;
         if (!codecId) {
           throw new Error(`Field "${fieldName}" on model "${modelName}" is missing codecId`);
         }

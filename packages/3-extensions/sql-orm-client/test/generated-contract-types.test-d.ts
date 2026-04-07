@@ -65,11 +65,26 @@ type GeneratedLikeContractBase = Contract<
         };
       };
       fields: {
-        id: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        name: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        email: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        active: { readonly nullable: false; readonly codecId: 'pg/bool@1' };
-        metadata: { readonly nullable: false; readonly codecId: 'pg/jsonb@1' };
+        id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        name: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        email: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        active: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+          readonly nullable: false;
+        };
+        metadata: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+          readonly nullable: false;
+        };
       };
       relations: {
         posts: {
@@ -92,9 +107,18 @@ type GeneratedLikeContractBase = Contract<
         };
       };
       fields: {
-        id: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        userId: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        title: { readonly nullable: false; readonly codecId: 'pg/text@1' };
+        id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        userId: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        title: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
       };
       relations: Record<string, never>;
     };
