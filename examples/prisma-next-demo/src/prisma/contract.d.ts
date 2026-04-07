@@ -43,6 +43,7 @@ export type QueryOperationTypes = PgVectorQueryOperationTypes;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
+
 export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
 type ContractBase = ContractType<
@@ -289,6 +290,8 @@ type ContractBase = ContractType<
       ];
     };
   };
+  readonly meta: {};
+
   readonly profileHash: ProfileHash;
 };
 
