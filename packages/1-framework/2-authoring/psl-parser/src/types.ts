@@ -117,6 +117,14 @@ export interface PslEnum {
   readonly span: PslSpan;
 }
 
+export interface PslCompositeType {
+  readonly kind: 'compositeType';
+  readonly name: string;
+  readonly fields: readonly PslField[];
+  readonly attributes: readonly PslAttribute[];
+  readonly span: PslSpan;
+}
+
 export interface PslNamedTypeDeclaration {
   readonly kind: 'namedType';
   readonly name: string;
@@ -136,6 +144,7 @@ export interface PslDocumentAst {
   readonly sourceId: string;
   readonly models: readonly PslModel[];
   readonly enums: readonly PslEnum[];
+  readonly compositeTypes: readonly PslCompositeType[];
   readonly types?: PslTypesBlock;
   readonly span: PslSpan;
 }
