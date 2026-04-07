@@ -1,6 +1,6 @@
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
 import { expectTypeOf, test } from 'vitest';
-import type { Contract } from '../../1-foundation/mongo-contract/test/fixtures/orm-contract';
+import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import type { MongoRawClient } from '../src/mongo-raw';
 import type { RawMongoCollection } from '../src/raw-collection';
 

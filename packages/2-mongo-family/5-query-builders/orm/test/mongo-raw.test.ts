@@ -1,8 +1,8 @@
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { RawMongoCommand } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../../1-foundation/mongo-contract/test/fixtures/orm-contract';
-import ormContractJson from '../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
+import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
+import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { mongoRaw } from '../src/mongo-raw';
 
 // JSON import loses literal types; typed Contract .d.ts is the source of truth
