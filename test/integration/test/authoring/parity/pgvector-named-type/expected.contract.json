@@ -10,11 +10,17 @@
     "Document": {
       "fields": {
         "embedding": {
-          "codecId": "pg/vector@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/vector@1"
+          },
           "nullable": false
         },
         "id": {
-          "codecId": "pg/int4@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/int4@1"
+          },
           "nullable": false
         }
       },

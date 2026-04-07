@@ -11,23 +11,38 @@
     "Post": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/timestamptz@1"
+          },
           "nullable": false
         },
         "embedding": {
-          "codecId": "pg/vector@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/vector@1"
+          },
           "nullable": true
         },
         "id": {
-          "codecId": "sql/char@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "sql/char@1"
+          },
           "nullable": false
         },
         "title": {
-          "codecId": "pg/text@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/text@1"
+          },
           "nullable": false
         },
         "userId": {
-          "codecId": "pg/text@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/text@1"
+          },
           "nullable": false
         }
       },
@@ -69,19 +84,31 @@
     "User": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/timestamptz@1"
+          },
           "nullable": false
         },
         "email": {
-          "codecId": "pg/text@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/text@1"
+          },
           "nullable": false
         },
         "id": {
-          "codecId": "sql/char@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "sql/char@1"
+          },
           "nullable": false
         },
         "kind": {
-          "codecId": "pg/enum@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/enum@1"
+          },
           "nullable": false
         }
       },

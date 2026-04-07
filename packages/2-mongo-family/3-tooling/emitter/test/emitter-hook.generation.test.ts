@@ -339,7 +339,7 @@ describe('mongoEmission.generateContractTypes', () => {
         },
         storage: { collections: { users: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
       expect(types).toContain('export type Address =');
       expect(types).toContain("readonly street: CodecTypes['mongo/string@1']['output']");
       expect(types).toContain("readonly city: CodecTypes['mongo/string@1']['output']");
@@ -355,7 +355,7 @@ describe('mongoEmission.generateContractTypes', () => {
           },
         },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
       expect(types).toContain('readonly valueObjects:');
       expect(types).toContain('readonly Address: { readonly fields:');
     });
@@ -384,7 +384,7 @@ describe('mongoEmission.generateContractTypes', () => {
         },
         storage: { collections: { users: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
       expect(types).toContain(
         "readonly homeAddress: { readonly nullable: true; readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' } }",
       );
@@ -415,7 +415,7 @@ describe('mongoEmission.generateContractTypes', () => {
         },
         storage: { collections: { users: {} } },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
       expect(types).toContain(
         "readonly previousAddresses: { readonly nullable: false; readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' }; readonly many: true }",
       );
@@ -436,14 +436,14 @@ describe('mongoEmission.generateContractTypes', () => {
           },
         },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
       expect(types).toContain('export type NavItem =');
       expect(types).toContain('readonly children: ReadonlyArray<NavItem>');
     });
 
     it('emits empty valueObjects when none exist', () => {
       const contract = createMongoContract();
-      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
       expect(types).toContain('readonly valueObjects: Record<string, never>');
     });
 
@@ -457,7 +457,7 @@ describe('mongoEmission.generateContractTypes', () => {
           },
         },
       });
-      const types = mongoTargetFamilyHook.generateContractTypes(contract, [], [], testHashes);
+      const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
       expect(types).toContain("readonly zip: CodecTypes['mongo/string@1']['output'] | null");
     });
   });

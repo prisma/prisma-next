@@ -11,11 +11,17 @@
     "Member": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/int4@1"
+          },
           "nullable": false
         },
         "teamId": {
-          "codecId": "pg/int4@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/int4@1"
+          },
           "nullable": false
         }
       },
@@ -44,7 +50,10 @@
     "Team": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/int4@1"
+          },
           "nullable": false
         }
       },

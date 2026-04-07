@@ -163,7 +163,7 @@ describe('value objects in semantic contract builder', () => {
       ],
     });
 
-    const storage = contract.storage as {
+    const storage = contract.storage as unknown as {
       readonly tables: Record<
         string,
         { readonly columns: Record<string, { nativeType: string; codecId: string }> }
@@ -291,7 +291,7 @@ describe('value objects in semantic contract builder', () => {
       ],
     });
 
-    const userModel = contract.models as Record<
+    const userModel = contract.models as unknown as Record<
       string,
       | {
           readonly storage: { readonly fields: Record<string, { readonly column: string }> };

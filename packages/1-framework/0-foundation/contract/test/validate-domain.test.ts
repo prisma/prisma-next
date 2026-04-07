@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ContractValidationError } from '../src/validate-contract';
+import type { DomainContractShape } from '../src/validate-domain';
 import { validateContractDomain } from '../src/validate-domain';
 
 function makeMinimalModel(overrides: Record<string, unknown> = {}) {

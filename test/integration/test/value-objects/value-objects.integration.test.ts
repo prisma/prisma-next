@@ -90,7 +90,7 @@ describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {
     const validated = validateMongoContract(contract);
 
     const orm = mongoOrm({ contract: validated.contract, executor: ctx.runtime });
-    const userCollection = orm.user;
+    const userCollection = orm['user']!;
 
     const created = await userCollection.create({
       name: 'Alice',
@@ -120,7 +120,7 @@ describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {
 
     const validated = validateMongoContract(result.value);
     const orm = mongoOrm({ contract: validated.contract, executor: ctx.runtime });
-    const userCollection = orm.user;
+    const userCollection = orm['user']!;
 
     await userCollection.create({
       name: 'Bob',
@@ -158,12 +158,12 @@ type Address {
 
     const validated = validateMongoContract(result.value);
     const orm = mongoOrm({ contract: validated.contract, executor: ctx.runtime });
-    const userCollection = orm.user;
+    const userCollection = orm['user']!;
 
     await userCollection.create({ name: 'NoAddr', address: null });
     const users = await userCollection.all();
     expect(users).toHaveLength(1);
-    expect(users[0]!.address).toBeNull();
+    expect(users[0]!['address']).toBeNull();
   });
 });
 
@@ -188,7 +188,8 @@ describe('value objects: end-to-end SQL pipeline', () => {
     expect(homeAddressField.type).toEqual({ kind: 'valueObject', name: 'Address' });
     expect(homeAddressField.nullable).toBe(false);
 
-    const storage = contract.storage as {
+    // SqlStorage type doesn't structurally overlap with this shape; use double-cast for test assertion
+    const storage = contract.storage as unknown as {
       tables: Record<string, { columns: Record<string, { nativeType: string }> }>;
     };
     const userTable = storage.tables['User'] ?? storage.tables['user'];
