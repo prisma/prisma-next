@@ -207,6 +207,7 @@ const SqlContractSchema = type({
   'meta?': ContractMetaSchema,
   'roots?': 'Record<string, string>',
   models: type({ '[string]': ModelSchema }),
+  'valueObjects?': 'Record<string, unknown>',
   storage: StorageSchema,
   'execution?': ExecutionSchema,
 });
