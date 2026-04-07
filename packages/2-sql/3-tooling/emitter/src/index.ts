@@ -458,7 +458,7 @@ export const sqlEmission = {
   },
 
   getTypeMapsExpression(): string {
-    return 'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>';
+    return 'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes>';
   },
 
   getContractWrapper(contractBaseName: string, typeMapsName: string): string {

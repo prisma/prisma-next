@@ -1,3 +1,4 @@
+import type { CodecLookup } from './codec-types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -38,6 +39,7 @@ export interface ControlStack<
   readonly extensionIds: ReadonlyArray<string>;
   readonly parameterizedRenderers: Map<string, NormalizedTypeRenderer>;
   readonly parameterizedTypeImports: ReadonlyArray<TypesImportSpec>;
+  readonly codecLookup: CodecLookup;
   readonly authoringContributions: AssembledAuthoringContributions;
 }
 
@@ -288,6 +290,22 @@ export function assembleAuthoringContributions(
   };
 }
 
+export function extractCodecLookup(
+  descriptors: ReadonlyArray<Pick<ComponentMetadata, 'types'>>,
+): CodecLookup {
+  const byId = new Map<string, import('./codec-types').Codec>();
+  for (const descriptor of descriptors) {
+    const codecInstances = descriptor.types?.codecTypes?.codecInstances;
+    if (!codecInstances) continue;
+    for (const codec of codecInstances) {
+      if (!byId.has(codec.id)) {
+        byId.set(codec.id, codec);
+      }
+    }
+  }
+  return { get: (id) => byId.get(id) };
+}
+
 export function createControlStack<TFamilyId extends string, TTargetId extends string>(
   input: CreateControlStackInput<TFamilyId, TTargetId>,
 ): ControlStack<TFamilyId, TTargetId> {
@@ -308,6 +326,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
     parameterizedRenderers: extractParameterizedRenderers(allDescriptors),
     parameterizedTypeImports: extractParameterizedTypeImports(allDescriptors),
+    codecLookup: extractCodecLookup(allDescriptors),
     authoringContributions: assembleAuthoringContributions(allDescriptors),
   };
 }

@@ -3,7 +3,9 @@ import type {
   ContractModel,
   ContractValueObject,
 } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import { isSafeTypeExpression } from './type-expression-safety';
 
 export function serializeValue(value: unknown): string {
   if (value === null) {
@@ -213,14 +215,25 @@ export function generateHashTypeAliases(hashes: {
   ].join('\n');
 }
 
-export function generateFieldResolvedType(field: ContractField): string {
+export function generateFieldResolvedType(field: ContractField, codecLookup?: CodecLookup): string {
   let baseType: string;
   const { type } = field;
 
   switch (type.kind) {
-    case 'scalar':
-      baseType = `CodecTypes[${serializeValue(type.codecId)}]['output']`;
+    case 'scalar': {
+      let resolved: string | undefined;
+      if (codecLookup && type.typeParams && Object.keys(type.typeParams).length > 0) {
+        const codec = codecLookup.get(type.codecId);
+        if (codec?.renderOutputType) {
+          const rendered = codec.renderOutputType(type.typeParams);
+          if (rendered && isSafeTypeExpression(rendered)) {
+            resolved = rendered;
+          }
+        }
+      }
+      baseType = resolved ?? `CodecTypes[${serializeValue(type.codecId)}]['output']`;
       break;
+    }
     case 'valueObject':
       baseType = type.name;
       break;
@@ -248,6 +261,36 @@ export function generateFieldResolvedType(field: ContractField): string {
   }
 
   return baseType;
+}
+
+export function generateFieldOutputTypesMap(
+  models: Record<string, ContractModel> | undefined,
+  codecLookup?: CodecLookup,
+): string {
+  if (!models || Object.keys(models).length === 0) {
+    return 'Record<string, never>';
+  }
+
+  const modelEntries: string[] = [];
+  for (const [modelName, model] of Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!model) continue;
+    const fieldEntries: string[] = [];
+    const fields = (model as Record<string, unknown>)['fields'] as
+      | Record<string, ContractField>
+      | undefined;
+    if (fields && typeof fields === 'object') {
+      for (const [fieldName, field] of Object.entries(fields)) {
+        if (!field || typeof field !== 'object' || !('type' in field)) continue;
+        const resolvedType = generateFieldResolvedType(field as ContractField, codecLookup);
+        fieldEntries.push(`readonly ${serializeObjectKey(fieldName)}: ${resolvedType}`);
+      }
+    }
+    const fieldsType =
+      fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';
+    modelEntries.push(`readonly ${serializeObjectKey(modelName)}: ${fieldsType}`);
+  }
+
+  return `{ ${modelEntries.join('; ')} }`;
 }
 
 export function generateValueObjectType(

@@ -1,6 +1,7 @@
 export {
   deduplicateImports,
   generateCodecTypeIntersection,
+  generateFieldOutputTypesMap,
   generateHashTypeAliases,
   generateImportLines,
   generateModelRelationsType,

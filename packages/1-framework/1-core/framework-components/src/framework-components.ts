@@ -1,3 +1,4 @@
+import type { Codec } from './codec-types';
 import type { AuthoringContributions } from './framework-authoring';
 import type { TypeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types-import-spec';
@@ -49,6 +50,11 @@ export interface ComponentMetadata {
        * Used by family-specific planners/verifiers to handle storage types.
        */
       readonly controlPlaneHooks?: Record<string, unknown>;
+      /**
+       * Codec instances contributed by this component.
+       * Used to build a CodecLookup for codec-dispatched type rendering during emission.
+       */
+      readonly codecInstances?: ReadonlyArray<Codec>;
     };
     readonly operationTypes?: { readonly import: TypesImportSpec };
     readonly queryOperationTypes?: { readonly import: TypesImportSpec };
