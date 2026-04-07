@@ -34,6 +34,7 @@ import type {
   MongoIncludeSpec,
   NoIncludes,
   ReferenceRelationKeys,
+  VariantNames,
 } from './types';
 
 type ModelFieldKeys<
@@ -46,6 +47,10 @@ export interface MongoCollection<
   ModelName extends string & keyof TContract['models'],
   TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
 > {
+  /** Narrows to a specific variant, injecting a discriminator filter. */
+  variant<V extends VariantNames<TContract, ModelName>>(
+    variantName: V,
+  ): MongoCollection<TContract, ModelName, TIncludes>;
   /** Appends a filter condition. Returns a new immutable collection. */
   where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes>;
   /** Restricts returned fields to the given subset. Returns a new immutable collection. */
@@ -128,6 +133,28 @@ class MongoCollectionImpl<
     const model = contract.models[modelName] as MongoModelDefinition;
     this.#collectionName = resolveCollectionName(model, modelName);
     this.#state = emptyCollectionState();
+  }
+
+  variant<V extends VariantNames<TContract, ModelName>>(
+    variantName: V,
+  ): MongoCollection<TContract, ModelName, TIncludes> {
+    const model = this.#contract.models[this.#modelName] as MongoModelDefinition | undefined;
+    if (!model?.discriminator || !model.variants) {
+      return this;
+    }
+
+    const variantEntry = model.variants[variantName as string];
+    if (!variantEntry) {
+      return this;
+    }
+
+    const filter = MongoFieldFilter.eq(
+      model.discriminator.field,
+      new MongoParamRef(variantEntry.value),
+    );
+    return this.#clone({
+      filters: [...this.#state.filters, filter],
+    });
   }
 
   where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes> {
