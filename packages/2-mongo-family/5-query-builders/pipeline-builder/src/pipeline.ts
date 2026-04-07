@@ -32,7 +32,13 @@ export function mongoPipeline<
         throw new Error(`Unknown model: ${modelName}`);
       }
       const collectionName = model.storage?.collection ?? rootName;
-      const storageHash = (contract as MongoContract).storage?.storageHash ?? 'unknown';
+      const storage = (contract as MongoContract).storage;
+      if (!storage?.storageHash) {
+        throw new Error(
+          'Contract is missing storage.storageHash. Pass a validated contract to mongoPipeline().',
+        );
+      }
+      const storageHash = storage.storageHash;
 
       type ResultShape = ModelToDocShape<
         TContract,

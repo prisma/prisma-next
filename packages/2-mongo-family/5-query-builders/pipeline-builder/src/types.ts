@@ -4,7 +4,11 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import type { MongoAggExpr, MongoFilterExpr } from '@prisma-next/mongo-query-ast';
+import type {
+  MongoAggAccumulator,
+  MongoAggExpr,
+  MongoFilterExpr,
+} from '@prisma-next/mongo-query-ast';
 import type { MongoValue } from '@prisma-next/mongo-value';
 
 export interface DocField {
@@ -38,6 +42,11 @@ export type ResolveRow<
 export interface TypedAggExpr<F extends DocField> {
   readonly _field: F;
   readonly node: MongoAggExpr;
+}
+
+export interface TypedAccumulatorExpr<F extends DocField> {
+  readonly _field: F;
+  readonly node: MongoAggAccumulator;
 }
 
 export type ExtractDocShape<T extends Record<string, TypedAggExpr<DocField>>> = {
@@ -76,15 +85,19 @@ export type ProjectedShape<
     : Spec[K] extends TypedAggExpr<infer F>
       ? F
       : DocField;
-};
+} & ('_id' extends keyof Shape ? ('_id' extends keyof Spec ? {} : Pick<Shape, '_id'>) : {});
 
 export type GroupSpec = {
   _id: TypedAggExpr<DocField> | null;
-  [key: string]: TypedAggExpr<DocField> | null;
+  [key: string]: TypedAggExpr<DocField> | TypedAccumulatorExpr<DocField> | null;
 };
 
 export type GroupedDocShape<Spec extends GroupSpec> = {
-  [K in keyof Spec & string]: Spec[K] extends TypedAggExpr<infer F> ? F : DocField;
+  [K in keyof Spec & string]: Spec[K] extends TypedAggExpr<infer F>
+    ? F
+    : Spec[K] extends null
+      ? { readonly codecId: 'mongo/null@1'; readonly nullable: true }
+      : DocField;
 };
 
 export type UnwrapArrayDocField<F extends DocField> = F;

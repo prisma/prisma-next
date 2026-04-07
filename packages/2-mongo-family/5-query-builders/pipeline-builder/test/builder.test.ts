@@ -221,6 +221,15 @@ describe('PipelineBuilder', () => {
       expect(stage.accumulators['orderCount']).toBeInstanceOf(MongoAggAccumulator);
     });
 
+    it('rejects non-accumulator expressions for non-_id keys', () => {
+      expect(() =>
+        createOrdersBuilder().group((f) => ({
+          _id: f.customerId,
+          total: f.amount as ReturnType<typeof acc.sum>,
+        })),
+      ).toThrow('must use an accumulator');
+    });
+
     it('handles _id: null for whole-collection grouping', () => {
       const plan = createOrdersBuilder()
         .group((f) => ({
@@ -239,7 +248,7 @@ describe('PipelineBuilder', () => {
       const pipeline = (plan.command as AggregateCommand).pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoUnwindStage);
-      expect((pipeline[0] as MongoUnwindStage).path).toBe('status');
+      expect((pipeline[0] as MongoUnwindStage).path).toBe('$status');
     });
 
     it('passes preserveNullAndEmptyArrays option', () => {
