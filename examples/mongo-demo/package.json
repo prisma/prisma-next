@@ -18,6 +18,7 @@
     "@prisma-next/driver-mongo": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-orm": "workspace:*",
+    "@prisma-next/mongo-pipeline-builder": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/mongo-runtime": "workspace:*",
     "mongodb": "catalog:",
