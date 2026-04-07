@@ -151,7 +151,7 @@ test('MongoProjectionValue allows 0, 1, or MongoAggExpr', () => {
 });
 
 test('accept returns R for any visitor R', () => {
-  const stage = {} as MongoMatchStage;
+  const stage = {} as unknown as MongoMatchStage;
   const visitor: MongoStageVisitor<number> = {
     match: () => 1,
     project: () => 2,

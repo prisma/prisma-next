@@ -18,9 +18,16 @@ function isAggExpr(value: MongoProjectionValue): value is MongoAggExpr {
   return typeof value === 'object' && value !== null && 'kind' in value;
 }
 
+// Discriminate MongoAggExpr from Record<string, MongoAggExpr> via the accept() method
+// that all AST nodes inherit from MongoAstNode. A plain record won't have accept(),
+// so this is robust even if a compound _id contains a key named "kind".
+function isAggExprNode(value: object): value is MongoAggExpr {
+  return 'accept' in value && typeof value.accept === 'function';
+}
+
 function rewriteGroupId(groupId: MongoGroupId, rewriter: MongoAggExprRewriter): MongoGroupId {
   if (groupId === null) return null;
-  if ('kind' in groupId) return (groupId as MongoAggExpr).rewrite(rewriter);
+  if (isAggExprNode(groupId)) return groupId.rewrite(rewriter);
   const result: Record<string, MongoAggExpr> = {};
   for (const [key, val] of Object.entries(groupId)) {
     result[key] = val.rewrite(rewriter);
@@ -177,10 +184,19 @@ export class MongoLookupStage extends MongoStageNode {
     let_?: Record<string, MongoAggExpr>;
   }) {
     super();
-    if (!options.localField && !options.foreignField && !options.pipeline && !options.let_) {
+    const hasLocalField = options.localField !== undefined;
+    const hasForeignField = options.foreignField !== undefined;
+    const hasPipeline = !!options.pipeline;
+    if (hasLocalField !== hasForeignField) {
+      throw new Error('MongoLookupStage requires both localField and foreignField together');
+    }
+    if (!hasLocalField && !hasPipeline) {
       throw new Error(
         'MongoLookupStage requires either equality fields (localField/foreignField) or a pipeline',
       );
+    }
+    if (options.let_ && !hasPipeline) {
+      throw new Error('MongoLookupStage let_ requires a pipeline');
     }
     this.from = options.from;
     this.localField = options.localField;

@@ -149,14 +149,14 @@ export function lowerFilter(filter: MongoFilterExpr): Document {
   }
 }
 
+function isAggExprNode(value: object): value is MongoAggExpr {
+  return 'accept' in value && typeof value.accept === 'function';
+}
+
 function lowerGroupId(groupId: MongoGroupId): unknown {
   if (groupId === null) return null;
-  if ('kind' in groupId) return lowerAggExpr(groupId as MongoAggExpr);
-  const result: Record<string, unknown> = {};
-  for (const [key, val] of Object.entries(groupId)) {
-    result[key] = lowerAggExpr(val);
-  }
-  return result;
+  if (isAggExprNode(groupId)) return lowerAggExpr(groupId);
+  return lowerExprRecord(groupId);
 }
 
 function lowerExprRecord(fields: Readonly<Record<string, MongoAggExpr>>): Record<string, unknown> {
