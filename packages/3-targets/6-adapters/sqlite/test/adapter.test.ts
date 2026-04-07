@@ -1,3 +1,4 @@
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   AggregateExpr,
@@ -29,40 +30,45 @@ import { describe, expect, it } from 'vitest';
 import { createSqliteAdapter } from '../src/core/adapter';
 import type { SqliteContract } from '../src/core/types';
 
-const contract = validateContract<SqliteContract>({
-  target: 'sqlite',
-  targetFamily: 'sql',
-  storageHash: 'sha256:test-core',
-  profileHash: 'sha256:test-profile',
-  storage: {
-    tables: {
-      user: {
-        columns: {
-          id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-          email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
-          active: { codecId: 'sqlite/boolean@1', nativeType: 'integer', nullable: false },
-          metadata: { codecId: 'sqlite/json@1', nativeType: 'text', nullable: true },
+const contract = validateContract<SqliteContract>(
+  {
+    target: 'sqlite',
+    targetFamily: 'sql',
+    profileHash: 'sha256:test-profile',
+    roots: {},
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    storage: {
+      storageHash: 'sha256:test-core',
+      tables: {
+        user: {
+          columns: {
+            id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+            email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+            active: { codecId: 'sqlite/boolean@1', nativeType: 'integer', nullable: false },
+            metadata: { codecId: 'sqlite/json@1', nativeType: 'text', nullable: true },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      },
-      post: {
-        columns: {
-          id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-          userId: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-          title: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+        post: {
+          columns: {
+            id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+            userId: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+            title: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
+    models: {},
   },
-  models: {},
-  relations: {},
-  mappings: {},
-});
+  emptyCodecLookup,
+);
 
 describe('SQLite adapter', () => {
   const adapter = createSqliteAdapter();

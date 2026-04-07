@@ -16,17 +16,17 @@
   },
   "dependencies": {
     "@prisma-next/adapter-sqlite": "workspace:*",
-    "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-sqlite": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/sql-builder": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
-    "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/sql-orm-client": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-sqlite": "workspace:*"
   },
   "devDependencies": {
-    "@prisma-next/sql-builder-new": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
@@ -45,7 +45,7 @@
     "directory": "packages/3-extensions/sqlite"
   },
   "exports": {
-    ".": "./dist/runtime.mjs",
+    "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/runtime.mjs",

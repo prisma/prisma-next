@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
-import { sql } from '@prisma-next/sql-builder-new/runtime';
-import type { Db } from '@prisma-next/sql-builder-new/types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { sql } from '@prisma-next/sql-builder/runtime';
+import type { Db } from '@prisma-next/sql-builder/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -21,7 +22,7 @@ import { afterAll, beforeAll } from 'vitest';
 import { contract } from './contract';
 import type { TestContract } from './contract-type';
 
-const sqlContract = validateContract<TestContract>(contract);
+const sqlContract = validateContract<TestContract>(contract, emptyCodecLookup);
 
 export async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
   const out: T[] = [];
@@ -59,7 +60,7 @@ export function setupIntegrationTest(): IntegrationTestContext {
     `);
     db.exec(`
       INSERT INTO prisma_contract_marker (id, core_hash, profile_hash)
-      VALUES (1, '${sqlContract.storageHash}', '${sqlContract.profileHash ?? sqlContract.storageHash}')
+      VALUES (1, '${sqlContract.storage.storageHash}', '${sqlContract.profileHash ?? sqlContract.storage.storageHash}')
     `);
     db.exec(`
       CREATE TABLE users (
@@ -163,7 +164,8 @@ export function setupIntegrationTest(): IntegrationTestContext {
   });
 
   return {
-    db: () => sql({ context, runtime }),
+    db: () => sql({ context }),
+    runtime: () => runtime,
     ormClient: () =>
       orm({
         context,

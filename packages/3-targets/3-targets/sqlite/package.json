@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*"

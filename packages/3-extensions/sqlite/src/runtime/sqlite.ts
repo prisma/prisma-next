@@ -1,17 +1,18 @@
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import type { Contract } from '@prisma-next/contract/types';
 import type { SqliteBinding } from '@prisma-next/driver-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
+import type { Db } from '@prisma-next/sql-builder/types';
 import type {
   ExtractTypeMapsFromContract,
   ResolveCodecTypes,
   ResolveOperationTypes,
-  SqlContract,
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import type { SelectBuilder } from '@prisma-next/sql-lane';
-import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type { SchemaHandle } from '@prisma-next/sql-relational-core/schema';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
@@ -46,20 +47,13 @@ type NormalizeOperationTypes<T> = {
 type ToSchemaOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationTypes<T>;
 
 export type SqliteTargetId = 'sqlite';
-type OrmClient<TContract extends SqlContract<SqlStorage>> = ReturnType<
-  typeof ormBuilder<TContract>
->;
+type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
 export interface SqliteClient<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 > {
-  readonly sql: SelectBuilder<
-    TContract,
-    unknown,
-    ResolveCodecTypes<TContract, TTypeMaps>,
-    ResolveOperationTypes<TContract, TTypeMaps>
-  >;
+  readonly sql: Db<TContract, TTypeMaps>;
   readonly schema: SchemaHandle<
     TContract,
     ResolveCodecTypes<TContract, TTypeMaps>,
@@ -72,50 +66,50 @@ export interface SqliteClient<
   runtime(): Runtime;
 }
 
-export interface SqliteOptionsBase<TContract extends SqlContract<SqlStorage>> {
+export interface SqliteOptionsBase<TContract extends Contract<SqlStorage>> {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<SqliteTargetId>[];
   readonly plugins?: readonly Plugin<TContract>[];
   readonly verify?: RuntimeVerifyOptions;
 }
 
-export type SqliteOptionsWithContract<TContract extends SqlContract<SqlStorage>> = {
+export type SqliteOptionsWithContract<TContract extends Contract<SqlStorage>> = {
   readonly path?: string;
 } & SqliteOptionsBase<TContract> & {
     readonly contract: TContract;
     readonly contractJson?: never;
   };
 
-export type SqliteOptionsWithContractJson<TContract extends SqlContract<SqlStorage>> = {
+export type SqliteOptionsWithContractJson<TContract extends Contract<SqlStorage>> = {
   readonly path?: string;
 } & SqliteOptionsBase<TContract> & {
     readonly contractJson: unknown;
     readonly contract?: never;
   };
 
-export type SqliteOptions<TContract extends SqlContract<SqlStorage>> =
+export type SqliteOptions<TContract extends Contract<SqlStorage>> =
   | SqliteOptionsWithContract<TContract>
   | SqliteOptionsWithContractJson<TContract>;
 
-function resolveContract<TContract extends SqlContract<SqlStorage>>(
+function resolveContract<TContract extends Contract<SqlStorage>>(
   options: SqliteOptions<TContract>,
 ): TContract {
   const contractInput =
     'contractJson' in options && options.contractJson !== undefined
       ? options.contractJson
       : (options as SqliteOptionsWithContract<TContract>).contract;
-  return validateContract<TContract>(contractInput);
+  return validateContract<TContract>(contractInput, emptyCodecLookup);
 }
 
 export default function sqlite<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 >(options: SqliteOptionsWithContract<TContract>): SqliteClient<TContract, TTypeMaps>;
 export default function sqlite<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 >(options: SqliteOptionsWithContractJson<TContract>): SqliteClient<TContract, TTypeMaps>;
 export default function sqlite<
-  TContract extends SqlContract<SqlStorage>,
+  TContract extends Contract<SqlStorage>,
   TTypeMaps = ExtractTypeMapsFromContract<TContract>,
 >(options: SqliteOptions<TContract>): SqliteClient<TContract, TTypeMaps> {
   const contract = resolveContract(options);

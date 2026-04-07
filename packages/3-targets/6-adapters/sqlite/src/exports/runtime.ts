@@ -1,4 +1,4 @@
-import type { RuntimeAdapterInstance } from '@prisma-next/core-execution-plane/types';
+import type { RuntimeAdapterInstance } from '@prisma-next/framework-components/execution';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlRuntimeAdapterDescriptor } from '@prisma-next/sql-runtime';
