@@ -3,7 +3,7 @@
 ## At a glance
 
 During emission, the framework orchestrates and family-specific packages
-customize. The interface between them — `TargetFamilyHook` — is an SPI
+customize. The interface between them — `EmissionSpi` — is an SPI
 (Service Provider Interface): defined once, consumed by the orchestration
 layer, implemented by each family.
 
@@ -37,10 +37,11 @@ needs to delegate family-specific behavior — the orchestration lives in a
 lower layer, but each family's implementation lives in a higher layer.
 
 The emission pipeline is the primary example: the emitter's `emit()`
-function (tooling layer) calls `targetFamily.validateTypes()` and
-`targetFamily.generateContractTypes()`. Each family provides its own hook
-implementation — `sqlEmission` (SQL emitter, tooling layer),
-`mongoEmission` (Mongo emitter, tooling layer).
+function (tooling layer) delegates type generation to the family via
+`EmissionSpi` callbacks (`generateStorageType`, `generateModelsType`,
+etc.). Each family provides its own implementation — `sqlEmission`
+(SQL emitter, tooling layer), `mongoEmission` (Mongo emitter, tooling
+layer).
 
 ## Decision
 
@@ -49,10 +50,9 @@ implementation — `sqlEmission` (SQL emitter, tooling layer),
 The emission SPI types live in `@prisma-next/framework-components` (core
 layer), exported via the `./emission` subpath:
 
-- `TargetFamilyHook` — the interface family emitters implement to customize
-  validation and type generation during emission
-- `ValidationContext` — context passed to family hooks during validation
-  (carries `OperationRegistry`, codec imports, extension IDs)
+- `EmissionSpi` — the interface family emitters implement to customize
+  type generation during emission (storage types, model types, imports,
+  type aliases, and contract wrapper)
 - `GenerateContractTypesOptions` — options for contract `.d.ts` generation
   (parameterized renderers, query operation imports)
 - `TypeRenderEntry`, `TypeRenderer`, `ParameterizedCodecDescriptor` —
@@ -62,15 +62,12 @@ Orchestration code imports from this subpath:
 
 ```ts
 // tooling layer — emitter (caller)
-import type {
-  TargetFamilyHook,
-  ValidationContext,
-} from '@prisma-next/framework-components/emission';
+import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 
 export async function emit(
   contract: Contract,
   stack: EmitStackInput,
-  targetFamily: TargetFamilyHook,
+  targetFamily: EmissionSpi,
 ): Promise<EmitResult> { ... }
 ```
 
@@ -78,13 +75,16 @@ Family emitters implement the interface:
 
 ```ts
 // tooling layer — SQL emitter (implementer)
-import type { TargetFamilyHook } from '@prisma-next/framework-components/emission';
+import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 
-export const sqlEmission: TargetFamilyHook = {
+export const sqlEmission: EmissionSpi = {
   id: 'sql',
-  validateTypes(contract, ctx) { ... },
-  validateStructure(contract) { ... },
-  generateContractTypes(contract, codecTypeImports, operationTypeImports, hashes, options) { ... },
+  generateStorageType(contract, storageHashTypeName) { ... },
+  generateModelStorageType(modelName, model) { ... },
+  getFamilyImports() { ... },
+  getFamilyTypeAliases(options) { ... },
+  getTypeMapsExpression() { ... },
+  getContractWrapper(contractBaseName, typeMapsName) { ... },
 };
 ```
 
@@ -101,14 +101,14 @@ types (`./execution`).
 ## Why not the alternatives?
 
 **Colocate with implementations (tooling layer)?** The emitter (tooling
-layer) needs to import `TargetFamilyHook` as a parameter type. Both the
+layer) needs to import `EmissionSpi` as a parameter type. Both the
 emitter and family implementations share the same SPI types from core.
 
 **Place in `@prisma-next/contract` (foundation layer)?**
-`TargetFamilyHook` references `ValidationContext`, which references
-`OperationRegistry` from `@prisma-next/operations` (core layer). This
-would force the contract package to depend on a core-layer package, turning
-a leaf foundation package into one with framework-domain coupling.
+`EmissionSpi` references `GenerateContractTypesOptions` and other
+core-layer types. This would force the contract package to depend on a
+core-layer package, turning a leaf foundation package into one with
+framework-domain coupling.
 
 ## Consequences
 
