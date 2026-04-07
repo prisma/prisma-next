@@ -469,6 +469,27 @@ describe('lowerAggExpr', () => {
     expect(lowerAggExpr(MongoAggAccumulator.count())).toEqual({ $count: {} });
   });
 
+  it('lowers record-arg operator', () => {
+    const expr = MongoAggOperator.of('$dateToString', {
+      format: MongoAggLiteral.of('%Y-%m-%d'),
+      date: MongoAggFieldRef.of('createdAt'),
+    });
+    expect(lowerAggExpr(expr)).toEqual({
+      $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
+    });
+  });
+
+  it('lowers record-arg accumulator', () => {
+    const expr = MongoAggAccumulator.of('$topN', {
+      output: MongoAggFieldRef.of('score'),
+      sortBy: MongoAggLiteral.of({ score: -1 }),
+      n: MongoAggLiteral.of(3),
+    });
+    expect(lowerAggExpr(expr)).toEqual({
+      $topN: { output: '$score', sortBy: { score: -1 }, n: 3 },
+    });
+  });
+
   it('lowers $cond', () => {
     const expr = MongoAggCond.of(
       MongoAggOperator.of('$gte', [MongoAggFieldRef.of('age'), MongoAggLiteral.of(18)]),

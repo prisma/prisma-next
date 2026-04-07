@@ -140,6 +140,26 @@ describe('MongoAggOperator', () => {
     const expr = MongoAggOperator.size(MongoAggFieldRef.of('items'));
     expect(expr.op).toBe('$size');
   });
+
+  it('constructs with record args', () => {
+    const expr = MongoAggOperator.of('$dateToString', {
+      format: MongoAggLiteral.of('%Y-%m-%d'),
+      date: MongoAggFieldRef.of('createdAt'),
+    });
+    expect(expr.kind).toBe('operator');
+    expect(expr.op).toBe('$dateToString');
+    expect(Array.isArray(expr.args)).toBe(false);
+    const args = expr.args as Readonly<Record<string, MongoAggExpr>>;
+    expect(Object.keys(args)).toEqual(['format', 'date']);
+  });
+
+  it('freezes record args', () => {
+    const expr = MongoAggOperator.of('$dateToString', {
+      format: MongoAggLiteral.of('%Y-%m-%d'),
+      date: MongoAggFieldRef.of('createdAt'),
+    });
+    expect(Object.isFrozen(expr.args)).toBe(true);
+  });
 });
 
 describe('MongoAggAccumulator', () => {
@@ -180,6 +200,26 @@ describe('MongoAggAccumulator', () => {
     const acc = MongoAggAccumulator.count();
     expect(acc.op).toBe('$count');
     expect(acc.arg).toBeNull();
+  });
+
+  it('constructs with record arg', () => {
+    const acc = MongoAggAccumulator.of('$topN', {
+      output: MongoAggFieldRef.of('score'),
+      sortBy: MongoAggLiteral.of({ score: -1 }),
+      n: MongoAggLiteral.of(3),
+    });
+    expect(acc.kind).toBe('accumulator');
+    expect(acc.op).toBe('$topN');
+    const arg = acc.arg as Readonly<Record<string, MongoAggExpr>>;
+    expect(Object.keys(arg)).toEqual(['output', 'sortBy', 'n']);
+  });
+
+  it('freezes record arg', () => {
+    const acc = MongoAggAccumulator.of('$firstN', {
+      input: MongoAggFieldRef.of('x'),
+      n: MongoAggLiteral.of(5),
+    });
+    expect(Object.isFrozen(acc.arg)).toBe(true);
   });
 });
 
@@ -493,6 +533,20 @@ describe('MongoAggExprRewriter', () => {
     expect((result.args as MongoAggFieldRef).path).toBe('x.name');
   });
 
+  it('rewrites record-arg operator children', () => {
+    const rewriter: MongoAggExprRewriter = {
+      fieldRef: (expr) => MongoAggFieldRef.of(`renamed.${expr.path}`),
+    };
+    const original = MongoAggOperator.of('$dateToString', {
+      format: MongoAggLiteral.of('%Y-%m-%d'),
+      date: MongoAggFieldRef.of('createdAt'),
+    });
+    const result = original.rewrite(rewriter) as MongoAggOperator;
+    const args = result.args as Readonly<Record<string, MongoAggExpr>>;
+    expect((args['date'] as MongoAggFieldRef).path).toBe('renamed.createdAt');
+    expect((args['format'] as MongoAggLiteral).value).toBe('%Y-%m-%d');
+  });
+
   it('rewrites accumulator arg', () => {
     const rewriter: MongoAggExprRewriter = {
       fieldRef: () => MongoAggFieldRef.of('replaced'),
@@ -507,6 +561,20 @@ describe('MongoAggExprRewriter', () => {
     const original = MongoAggAccumulator.count();
     const result = original.rewrite(rewriter) as MongoAggAccumulator;
     expect(result.arg).toBeNull();
+  });
+
+  it('rewrites record-arg accumulator children', () => {
+    const rewriter: MongoAggExprRewriter = {
+      fieldRef: (expr) => MongoAggFieldRef.of(`renamed.${expr.path}`),
+    };
+    const original = MongoAggAccumulator.of('$firstN', {
+      input: MongoAggFieldRef.of('score'),
+      n: MongoAggLiteral.of(3),
+    });
+    const result = original.rewrite(rewriter) as MongoAggAccumulator;
+    const arg = result.arg as Readonly<Record<string, MongoAggExpr>>;
+    expect((arg['input'] as MongoAggFieldRef).path).toBe('renamed.score');
+    expect((arg['n'] as MongoAggLiteral).value).toBe(3);
   });
 
   it('rewrites cond children bottom-up', () => {

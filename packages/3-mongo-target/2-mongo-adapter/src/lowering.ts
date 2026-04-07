@@ -11,9 +11,15 @@ import type { Document } from '@prisma-next/mongo-value';
 import { resolveValue } from './resolve-value';
 
 function isExprArray(
-  args: MongoAggExpr | ReadonlyArray<MongoAggExpr>,
+  args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | Readonly<Record<string, MongoAggExpr>>,
 ): args is ReadonlyArray<MongoAggExpr> {
   return Array.isArray(args);
+}
+
+function isRecordArgs(
+  args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | Readonly<Record<string, MongoAggExpr>>,
+): args is Readonly<Record<string, MongoAggExpr>> {
+  return !Array.isArray(args) && typeof args === 'object' && !('accept' in args);
 }
 
 // Biome flags `{ then: ... }` as a thenable object (noThenProperty). Build via Object.fromEntries to avoid.
@@ -45,12 +51,25 @@ const aggExprLoweringVisitor: MongoAggExprVisitor<unknown> = {
 
   operator(expr) {
     const { args } = expr;
-    const loweredArgs = isExprArray(args) ? args.map((a) => lowerAggExpr(a)) : lowerAggExpr(args);
+    let loweredArgs: unknown;
+    if (isExprArray(args)) {
+      loweredArgs = args.map((a) => lowerAggExpr(a));
+    } else if (isRecordArgs(args)) {
+      loweredArgs = lowerExprRecord(args);
+    } else {
+      loweredArgs = lowerAggExpr(args);
+    }
     return { [expr.op]: loweredArgs };
   },
 
   accumulator(expr) {
-    return { [expr.op]: expr.arg ? lowerAggExpr(expr.arg) : {} };
+    if (expr.arg === null) {
+      return { [expr.op]: {} };
+    }
+    if (isRecordArgs(expr.arg)) {
+      return { [expr.op]: lowerExprRecord(expr.arg) };
+    }
+    return { [expr.op]: lowerAggExpr(expr.arg) };
   },
 
   cond(expr) {
