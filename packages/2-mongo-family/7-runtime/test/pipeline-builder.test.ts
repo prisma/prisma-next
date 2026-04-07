@@ -3,11 +3,8 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import { AggregateCommand } from '@prisma-next/mongo-query-ast';
+import { acc, fn, mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
 import { describe, expect, it } from 'vitest';
-import { acc } from '../../5-query-builders/pipeline-builder/src/accumulator-helpers';
-import { fn } from '../../5-query-builders/pipeline-builder/src/expression-helpers';
-import { mongoPipeline } from '../../5-query-builders/pipeline-builder/src/pipeline';
 import { withMongod } from './setup';
 
 type TestContract = MongoContract & {
