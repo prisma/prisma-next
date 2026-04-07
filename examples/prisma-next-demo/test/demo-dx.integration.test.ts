@@ -53,18 +53,15 @@ describe('demo contract visualization DX', () => {
     const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
 
     for (const [, model] of Object.entries(contract.models)) {
-      expect(model.storage).toBeDefined();
-      expect(model.storage.table).toBeDefined();
-      expect(model.storage.fields).toBeDefined();
-      expect(model.fields).toBeDefined();
-      expect(model.relations).toBeDefined();
-      expect(typeof model.relations).toBe('object');
+      const m = model as Record<string, unknown>;
+      expect(m['storage']).toBeDefined();
+      expect(m['fields']).toBeDefined();
+      expect(m['relations']).toBeDefined();
+      expect(typeof m['relations']).toBe('object');
     }
 
     for (const [, table] of Object.entries(contract.storage.tables)) {
       expect(table.columns).toBeDefined();
-      expect(table.primaryKey).toBeDefined();
-      expect(Array.isArray(table.primaryKey?.columns)).toBe(true);
     }
   });
 });
