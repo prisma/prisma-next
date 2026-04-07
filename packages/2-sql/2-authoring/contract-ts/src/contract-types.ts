@@ -400,8 +400,11 @@ type BuiltModels<Definition> = {
     };
     readonly fields: {
       readonly [FieldName in ModelFieldNames<Definition, ModelName>]: {
-        readonly codecId: ModelStorageColumn<Definition, ModelName, FieldName>['codecId'];
         readonly nullable: ModelStorageColumn<Definition, ModelName, FieldName>['nullable'];
+        readonly type: {
+          readonly kind: 'scalar';
+          readonly codecId: ModelStorageColumn<Definition, ModelName, FieldName>['codecId'];
+        };
       };
     };
     readonly relations: Record<string, ContractRelation>;
