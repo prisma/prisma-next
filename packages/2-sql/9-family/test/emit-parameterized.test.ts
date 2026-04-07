@@ -195,8 +195,7 @@ function createTestContract(overrides: Record<string, unknown> = {}): Contract {
 }
 
 describe('emit parameterized codecs integration', () => {
-  it('emits typeParams on model field with parameterized codec', async () => {
-    // Create an extension with a parameterized renderer
+  it('renders parameterized type on model field via renderer', async () => {
     const target = createMockTarget();
     const adapter = createMockAdapter();
     const extension = createMockExtensionWithParameterizedRenderer(
@@ -205,7 +204,6 @@ describe('emit parameterized codecs integration', () => {
       (params) => `Vector<${params['length']}>`,
     );
 
-    // Create a contract IR with a column using the parameterized codec
     const contract = createTestContract({
       models: {
         Embedding: {
@@ -248,16 +246,12 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [extension],
     });
 
-    expect(result.contractDts).toMatch(
-      /readonly vector:\s*\{[\s\S]*?readonly codecId: 'pg\/vector@1';[\s\S]*?readonly typeParams: \{ readonly length: 1536 \}/,
-    );
+    expect(result.contractDts).toMatch(/readonly vector:\s*Vector<1536>/);
 
-    // Verify the emitted contract imports the type used by the renderer
     expect(result.contractDts).toContain(
       "import type { Vector } from '@prisma-next/extension-pgvector/codec-types';",
     );
 
-    // Extra type-only imports must not be intersected into `export type CodecTypes = ...`
     expect(result.contractDts).toContain(
       'export type CodecTypes = PgCodecTypes & PgvectorCodecTypes;',
     );
@@ -435,7 +429,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     expect(result.contractDts).toMatch(
-      /readonly value:\s*\{[\s\S]*?readonly codecId: 'custom\/type@1';[\s\S]*?readonly typeParams: \{ readonly foo: 'bar' \}/,
+      /readonly fields:\s*\{[\s\S]*?readonly value:\s*\{[\s\S]*?readonly codecId: 'custom\/type@1';[\s\S]*?readonly typeParams: \{ readonly foo: 'bar' \}/,
     );
   });
 
@@ -630,7 +624,7 @@ describe('emit parameterized codecs integration', () => {
     );
   });
 
-  it('emits typeParams on jsonb column and omits typeParams on unparameterized column', async () => {
+  it('renders jsonb model field via renderer and omits renderer on unparameterized column', async () => {
     const target = createMockTarget();
     const adapter: SqlControlAdapterDescriptor<'postgres'> = {
       ...createMockAdapter(),
@@ -706,9 +700,7 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [],
     });
 
-    expect(result.contractDts).toMatch(
-      /readonly payload:\s*\{[\s\S]*?readonly codecId: 'pg\/jsonb@1';[\s\S]*?readonly typeParams: \{ readonly type: 'AuditPayload' \}/,
-    );
+    expect(result.contractDts).toMatch(/readonly payload:\s*AuditPayload\b/);
     expect(result.contractDts).toContain(
       "readonly metadata: { readonly codecId: 'pg/jsonb@1'; readonly nullable: false }",
     );
@@ -716,10 +708,7 @@ describe('emit parameterized codecs integration', () => {
 });
 
 describe('E2E: jsonb(schema) renderer dispatch', () => {
-  // TML-2204: once renderer dispatch is implemented, remove `.fails` — the
-  // emitter should call the renderer and produce `AuditPayload` as a rendered
-  // type expression instead of structural `typeParams` data.
-  it.fails('renders jsonb column via parameterized renderer (TML-2204)', async () => {
+  it('renders jsonb column via parameterized renderer', async () => {
     const target = createMockTarget();
     const adapter: SqlControlAdapterDescriptor<'postgres'> = {
       ...createMockAdapter(),
@@ -843,12 +832,7 @@ model Document {
       ],
     });
 
-    expect(result.contractDts).toMatch(
-      /readonly fields:\s*\{[\s\S]*?readonly embedding:\s*\{[\s\S]*?readonly typeParams: \{ readonly length: 1536 \}/,
-    );
+    expect(result.contractDts).toMatch(/readonly embedding:\s*Vector<1536>/);
     expect(result.contractDts).toContain("readonly typeRef: 'Embedding1536'");
-    expect(result.contractDts).not.toMatch(
-      /readonly fields:\s*\{[\s\S]*?readonly embedding:\s*\{[\s\S]*?readonly typeRef:/,
-    );
   });
 });

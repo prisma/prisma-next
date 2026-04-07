@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   GenerateContractTypesOptions,
+  TypeRenderEntry,
   TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
@@ -275,7 +276,7 @@ export const sqlTargetFamilyHook = {
       .join(' & ');
 
     const storageType = this.generateStorageType(storage, 'StorageHash');
-    const modelsType = this.generateModelsType(models, storage);
+    const modelsType = this.generateModelsType(models, storage, options?.parameterizedRenderers);
     const rootsType = this.generateRootsType(contract.roots);
 
     const executionHashType = hashes.executionHash
@@ -511,6 +512,7 @@ export const sqlTargetFamilyHook = {
   generateModelsType(
     models: Record<string, IRModelDefinition> | undefined,
     storage: SqlStorage,
+    parameterizedRenderers?: Map<string, TypeRenderEntry>,
   ): string {
     if (!models) {
       return 'Record<string, never>';
@@ -546,13 +548,21 @@ export const sqlTargetFamilyHook = {
               : column.typeRef
                 ? storage.types?.[column.typeRef]?.typeParams
                 : undefined;
-          const typeParamsSpec =
-            resolved && Object.keys(resolved).length > 0
-              ? `; readonly typeParams: ${this.serializeTypeParamsLiteral(resolved)}`
-              : '';
-          fields.push(
-            `readonly ${fieldName}: { readonly codecId: ${this.serializeValue(column.codecId)}; readonly nullable: ${nullable}${typeParamsSpec} }`,
-          );
+
+          const renderer = parameterizedRenderers?.get(column.codecId);
+          if (renderer && resolved && Object.keys(resolved).length > 0) {
+            const renderedType = renderer.render(resolved, { codecTypesName: 'CodecTypes' });
+            const nullSuffix = nullable ? ' | null' : '';
+            fields.push(`readonly ${fieldName}: ${renderedType}${nullSuffix}`);
+          } else {
+            const typeParamsSpec =
+              resolved && Object.keys(resolved).length > 0
+                ? `; readonly typeParams: ${this.serializeTypeParamsLiteral(resolved)}`
+                : '';
+            fields.push(
+              `readonly ${fieldName}: { readonly codecId: ${this.serializeValue(column.codecId)}; readonly nullable: ${nullable}${typeParamsSpec} }`,
+            );
+          }
           storageFieldParts.push(
             `readonly ${fieldName}: { readonly column: ${this.serializeValue(field.column)} }`,
           );
