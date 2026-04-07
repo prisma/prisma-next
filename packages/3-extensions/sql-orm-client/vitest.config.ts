@@ -7,6 +7,10 @@ export default defineConfig({
     environment: 'node',
     testTimeout: timeouts.typeScriptCompilation,
     hookTimeout: timeouts.default,
+    typecheck: {
+      enabled: true,
+      include: ['test/**/*.test-d.ts'],
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

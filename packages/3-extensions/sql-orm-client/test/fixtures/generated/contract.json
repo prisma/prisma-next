@@ -292,6 +292,13 @@
             "codecId": "pg/text@1"
           },
           "nullable": false
+        },
+        "address": {
+          "type": {
+            "kind": "valueObject",
+            "name": "Address"
+          },
+          "nullable": true
         }
       },
       "relations": {
@@ -357,9 +364,30 @@
           },
           "name": {
             "column": "name"
+          },
+          "address": {
+            "column": "address"
           }
         },
         "table": "users"
+      }
+    }
+  },
+  "valueObjects": {
+    "Address": {
+      "fields": {
+        "street": {
+          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "nullable": false
+        },
+        "city": {
+          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "nullable": false
+        },
+        "zip": {
+          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "nullable": true
+        }
       }
     }
   },
@@ -570,6 +598,11 @@
             "codecId": "pg/text@1",
             "nativeType": "text",
             "nullable": false
+          },
+          "address": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": true
           }
         },
         "foreignKeys": [
