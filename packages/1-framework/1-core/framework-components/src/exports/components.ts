@@ -22,11 +22,3 @@ export type {
   TargetPackRef,
 } from '../framework-components';
 export { checkContractComponentRequirements } from '../framework-components';
-export type {
-  NormalizedTypeRenderer,
-  RenderTypeContext,
-  TypeRenderer,
-  TypeRendererFunction,
-  TypeRendererTemplate,
-} from '../type-renderers';
-export { interpolateTypeTemplate, normalizeRenderer } from '../type-renderers';

@@ -20,7 +20,27 @@ type GeneratedLikeCodecTypes = {
   };
 };
 
-type GeneratedLikeTypeMaps = TypeMaps<GeneratedLikeCodecTypes>;
+type GeneratedLikeFieldOutputTypes = {
+  User: {
+    id: string;
+    name: string;
+    email: string;
+    active: boolean;
+    metadata: unknown;
+  };
+  Post: {
+    id: string;
+    userId: string;
+    title: string;
+  };
+};
+
+type GeneratedLikeTypeMaps = TypeMaps<
+  GeneratedLikeCodecTypes,
+  Record<string, never>,
+  Record<string, never>,
+  GeneratedLikeFieldOutputTypes
+>;
 
 type GeneratedLikeContractBase = Contract<
   {

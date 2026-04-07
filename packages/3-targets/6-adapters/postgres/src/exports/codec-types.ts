@@ -10,47 +10,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecTypes as CoreCodecTypes } from '../core/codecs';
 
-/**
- * Compile-time view of the Standard Schema protocol.
- * Reads `~standard.types.output` to resolve TypeScript output types for contract.d.ts.
- *
- * This differs from the runtime `StandardSchemaLike` in `standard-schema.ts`, which reads
- * `~standard.jsonSchema.output` for the serializable JSON Schema representation.
- * Both are needed: this one drives compile-time type narrowing, the other drives
- * build-time contract emission.
- */
-type StandardSchemaLike = {
-  readonly '~standard'?: {
-    readonly types?: {
-      readonly output?: unknown;
-    };
-  };
-};
-
-type ResolveStandardSchemaOutput<P> = P extends { readonly schema: infer Schema }
-  ? Schema extends { readonly infer: infer Output }
-    ? Output
-    : Schema extends {
-          readonly '~standard': { readonly types?: { readonly output?: infer Output } };
-        }
-      ? Output extends undefined
-        ? JsonValue
-        : Output
-      : JsonValue
-  : JsonValue;
-
-export type CodecTypes = CoreCodecTypes & {
-  readonly 'pg/json@1': CoreCodecTypes['pg/json@1'] & {
-    readonly parameterizedOutput: <P extends { readonly schema?: StandardSchemaLike }>(
-      params: P,
-    ) => ResolveStandardSchemaOutput<P>;
-  };
-  readonly 'pg/jsonb@1': CoreCodecTypes['pg/jsonb@1'] & {
-    readonly parameterizedOutput: <P extends { readonly schema?: StandardSchemaLike }>(
-      params: P,
-    ) => ResolveStandardSchemaOutput<P>;
-  };
-};
+export type CodecTypes = CoreCodecTypes;
 
 export type { JsonValue };
 export { dataTypes } from '../core/codecs';

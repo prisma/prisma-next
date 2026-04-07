@@ -54,7 +54,5 @@ export {
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,
-  extractParameterizedRenderers,
-  extractParameterizedTypeImports,
   extractQueryOperationTypeImports,
 } from '../control-stack';

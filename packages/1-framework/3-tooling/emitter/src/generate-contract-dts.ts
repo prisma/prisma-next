@@ -33,9 +33,6 @@ export function generateContractDts(
   codecLookup?: CodecLookup,
 ): string {
   const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
-  if (options?.parameterizedTypeImports) {
-    allImports.push(...options.parameterizedTypeImports);
-  }
   if (options?.queryOperationTypeImports) {
     allImports.push(...options.queryOperationTypeImports);
   }
@@ -55,13 +52,10 @@ export function generateContractDts(
 
   const storageType = emitter.generateStorageType(contract, 'StorageHash');
 
-  const modelsType = emitter.generateModelsType
-    ? emitter.generateModelsType(contract, options)
-    : generateModelsType(
-        // Contract.models defaults to ContractModelBase, but at emit time fields are always ContractField
-        contract.models as Record<string, ContractModel>,
-        (name, model) => emitter.generateModelStorageType(name, model),
-      );
+  const modelsType = generateModelsType(
+    contract.models as Record<string, ContractModel>,
+    (name, model) => emitter.generateModelStorageType(name, model),
+  );
 
   const rootsType = generateRootsType(contract.roots);
 
