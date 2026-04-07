@@ -199,8 +199,9 @@ export function interpretPslDocumentToMongoContract(
       fields[mappedName] = resolved;
     }
 
+    const isVariantModel = pslModel.attributes.some((attr) => attr.name === 'base');
     const hasIdField = pslModel.fields.some((f) => getAttribute(f.attributes, 'id') !== undefined);
-    if (!hasIdField) {
+    if (!hasIdField && !isVariantModel) {
       diagnostics.push({
         code: 'PSL_MISSING_ID_FIELD',
         message: `Model "${pslModel.name}" has no field with @id attribute. Every model must have exactly one @id field.`,

@@ -12,7 +12,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:3dc942d093b714429d2c735418815d37860c04e151bb78258ab6fa113e8a0141'>;
+  StorageHashBase<'sha256:1d8e1aa7132561cb604442f3039a05dfac31fb0abc68d8d38eb77f5fb369ea51'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -33,10 +33,23 @@ type ContractBase = ContractType<
     readonly collections: {
       readonly users: Record<string, never>;
       readonly posts: Record<string, never>;
+      readonly article: Record<string, never>;
+      readonly tutorial: Record<string, never>;
     };
     readonly storageHash: StorageHash;
   },
   {
+    readonly Article: {
+      readonly fields: {
+        readonly summary: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: { readonly collection: 'posts' };
+      readonly base: 'Post';
+    };
     readonly Post: {
       readonly fields: {
         readonly _id: {
@@ -48,6 +61,10 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
         };
         readonly content: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly kind: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
         };
@@ -71,6 +88,26 @@ type ContractBase = ContractType<
         };
       };
       readonly storage: { readonly collection: 'posts' };
+      readonly discriminator: { readonly field: 'kind' };
+      readonly variants: {
+        readonly Article: { readonly value: 'article' };
+        readonly Tutorial: { readonly value: 'tutorial' };
+      };
+    };
+    readonly Tutorial: {
+      readonly fields: {
+        readonly difficulty: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly duration: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/int32@1' };
+        };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: { readonly collection: 'posts' };
+      readonly base: 'Post';
     };
     readonly User: {
       readonly fields: {

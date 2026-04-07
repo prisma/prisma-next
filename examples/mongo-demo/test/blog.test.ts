@@ -81,12 +81,14 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
       {
         title: 'Hello World',
         content: 'My first post',
+        kind: 'article',
         authorId: alice._id as string,
         createdAt: new Date('2026-01-15'),
       },
       {
         title: 'Second Post',
         content: 'More content',
+        kind: 'tutorial',
         authorId: alice._id as string,
         createdAt: new Date('2026-02-01'),
       },
@@ -96,8 +98,16 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     const sorted = [...posts].sort((a, b) => String(a.title).localeCompare(String(b.title)));
 
     expect(sorted).toHaveLength(2);
-    expect(sorted[0]).toMatchObject({ title: 'Hello World', content: 'My first post' });
-    expect(sorted[1]).toMatchObject({ title: 'Second Post', content: 'More content' });
+    expect(sorted[0]).toMatchObject({
+      title: 'Hello World',
+      content: 'My first post',
+      kind: 'article',
+    });
+    expect(sorted[1]).toMatchObject({
+      title: 'Second Post',
+      content: 'More content',
+      kind: 'tutorial',
+    });
   });
 
   it('include() resolves Post -> User via $lookup', async () => {
@@ -111,6 +121,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     await orm.posts.create({
       title: 'Hello World',
       content: 'My first post',
+      kind: 'article',
       authorId: alice._id as string,
       createdAt: new Date('2026-01-15'),
     });
@@ -144,12 +155,14 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
       {
         title: 'Hello World',
         content: 'My first post',
+        kind: 'article',
         authorId: alice._id as string,
         createdAt: new Date('2026-01-15'),
       },
       {
         title: 'Mongo with Prisma Next',
         content: 'Using the contract-first approach',
+        kind: 'tutorial',
         authorId: bob._id as string,
         createdAt: new Date('2026-02-20'),
       },
@@ -172,5 +185,49 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
       title: 'Mongo with Prisma Next',
       author: { name: 'Bob' },
     });
+  });
+
+  it('variant() filters posts by discriminator', async () => {
+    const orm = mongoOrm({ contract, executor: runtime });
+    const alice = await orm.users.create({
+      name: 'Alice',
+      email: 'alice@example.com',
+      bio: null,
+      address: null,
+    });
+
+    await orm.posts.createAll([
+      {
+        title: 'Article One',
+        content: 'Article content',
+        kind: 'article',
+        authorId: alice._id as string,
+        createdAt: new Date('2026-01-15'),
+      },
+      {
+        title: 'Tutorial One',
+        content: 'Tutorial content',
+        kind: 'tutorial',
+        authorId: alice._id as string,
+        createdAt: new Date('2026-02-01'),
+      },
+      {
+        title: 'Article Two',
+        content: 'Another article',
+        kind: 'article',
+        authorId: alice._id as string,
+        createdAt: new Date('2026-03-01'),
+      },
+    ]);
+
+    const articles = await orm.posts.variant('Article').all();
+    expect(articles).toHaveLength(2);
+    for (const a of articles) {
+      expect(a.kind).toBe('article');
+    }
+
+    const tutorials = await orm.posts.variant('Tutorial').all();
+    expect(tutorials).toHaveLength(1);
+    expect(tutorials[0]).toMatchObject({ title: 'Tutorial One', kind: 'tutorial' });
   });
 });
