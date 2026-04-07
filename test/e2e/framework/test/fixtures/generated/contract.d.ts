@@ -378,11 +378,7 @@ type ContractBase = ContractShape<
         };
       };
       readonly fields: {
-        readonly id: {
-          readonly codecId: 'sql/char@1';
-          readonly nullable: false;
-          readonly typeParams: { readonly length: 36 };
-        };
+        readonly id: Char<36>;
         readonly name: { readonly codecId: 'pg/text@1'; readonly nullable: false };
         readonly scheduledAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
         readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
@@ -450,11 +446,7 @@ type ContractBase = ContractShape<
       };
       readonly fields: {
         readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly email: {
-          readonly codecId: 'sql/varchar@1';
-          readonly nullable: false;
-          readonly typeParams: { readonly length: 255 };
-        };
+        readonly email: Varchar<255>;
         readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
         readonly updatedAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: true };
         readonly profile: { readonly codecId: 'pg/jsonb@1'; readonly nullable: true };
