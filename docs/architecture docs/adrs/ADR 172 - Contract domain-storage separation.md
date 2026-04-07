@@ -185,11 +185,7 @@ For Mongo, the redundancy is much smaller. There's no column indirection, so `mo
 - `validateContractDomain()` validates domain-level invariants (roots, variants, relations, discriminators) in a family-agnostic way.
 - `validateMongoStorage()` validates Mongo-specific storage rules.
 
-**Remaining follow-ups:**
-- `SqlContract` must be updated to match (move `nullable`/`codecId` into domain-level `model.fields`, move relations onto each model).
-- The SQL emitter must move relations from the top-level `relations` block onto each model's `relations` property.
-- Consumer libraries that read the contract will need to be updated — notably the SQL ORM client, which currently reads from the top-level `relations` block.
-- The `ContractBase` type must be designed as a new abstraction, not extracted mechanically from either existing contract.
+**Status:** All follow-ups are implemented. `SqlContract` uses domain-level `model.fields` with `{ nullable, codecId }` and model-keyed `model.relations`. The SQL emitter, ORM client, and all consumers have been migrated. `ContractBase` was superseded by `Contract<TStorage, TModels>` — see [ADR 182](ADR%20182%20-%20Unified%20contract%20representation.md).
 
 ## Related
 
