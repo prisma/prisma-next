@@ -22,7 +22,7 @@ const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-h
 
 describe('sql-target-family-hook parameterized type emission', () => {
   describe('columns with typeParams', () => {
-    it('emits parameterized TS type via normalized renderer', () => {
+    it('emits typeParams on model field when parameterized renderer is provided', () => {
       const ir = createContract({
         models: {
           Document: {

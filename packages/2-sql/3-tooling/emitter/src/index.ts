@@ -540,18 +540,18 @@ export const sqlTargetFamilyHook = {
           }
 
           const nullable = column.nullable ?? false;
-          const resolvedTypeParams =
+          const resolved =
             column.typeParams && Object.keys(column.typeParams).length > 0
               ? column.typeParams
               : column.typeRef
                 ? storage.types?.[column.typeRef]?.typeParams
                 : undefined;
-          const fieldTypeParamsSpec =
-            resolvedTypeParams && Object.keys(resolvedTypeParams).length > 0
-              ? `; readonly typeParams: ${this.serializeTypeParamsLiteral(resolvedTypeParams)}`
+          const typeParamsSpec =
+            resolved && Object.keys(resolved).length > 0
+              ? `; readonly typeParams: ${this.serializeTypeParamsLiteral(resolved)}`
               : '';
           fields.push(
-            `readonly ${fieldName}: { readonly codecId: ${this.serializeValue(column.codecId)}; readonly nullable: ${nullable}${fieldTypeParamsSpec} }`,
+            `readonly ${fieldName}: { readonly codecId: ${this.serializeValue(column.codecId)}; readonly nullable: ${nullable}${typeParamsSpec} }`,
           );
           storageFieldParts.push(
             `readonly ${fieldName}: { readonly column: ${this.serializeValue(field.column)} }`,

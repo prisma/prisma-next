@@ -195,7 +195,7 @@ function createTestContract(overrides: Record<string, unknown> = {}): Contract {
 }
 
 describe('emit parameterized codecs integration', () => {
-  it('emits parameterized type via renderer in contract.d.ts', async () => {
+  it('emits typeParams on model field with parameterized codec', async () => {
     // Create an extension with a parameterized renderer
     const target = createMockTarget();
     const adapter = createMockAdapter();
@@ -248,9 +248,9 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [extension],
     });
 
-    // Verify the parameterized type emits typeParams on model fields
-    expect(result.contractDts).toContain("readonly codecId: 'pg/vector@1'");
-    expect(result.contractDts).toContain('readonly typeParams: { readonly length: 1536 }');
+    expect(result.contractDts).toMatch(
+      /readonly vector:\s*\{[\s\S]*?readonly codecId: 'pg\/vector@1';[\s\S]*?readonly typeParams: \{ readonly length: 1536 \}/,
+    );
 
     // Verify the emitted contract imports the type used by the renderer
     expect(result.contractDts).toContain(
@@ -434,9 +434,9 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [extension],
     });
 
-    // Should still emit typeParams even without a renderer
-    expect(result.contractDts).toContain("readonly codecId: 'custom/type@1'");
-    expect(result.contractDts).toContain("readonly typeParams: { readonly foo: 'bar' }");
+    expect(result.contractDts).toMatch(
+      /readonly value:\s*\{[\s\S]*?readonly codecId: 'custom\/type@1';[\s\S]*?readonly typeParams: \{ readonly foo: 'bar' \}/,
+    );
   });
 
   it('collects typesImport from multiple parameterized codecs', async () => {
@@ -630,7 +630,7 @@ describe('emit parameterized codecs integration', () => {
     );
   });
 
-  it('renders typed jsonb columns and falls back to codec output', async () => {
+  it('emits typeParams on jsonb column and omits typeParams on unparameterized column', async () => {
     const target = createMockTarget();
     const adapter: SqlControlAdapterDescriptor<'postgres'> = {
       ...createMockAdapter(),
@@ -706,7 +706,9 @@ describe('emit parameterized codecs integration', () => {
       extensionPacks: [],
     });
 
-    expect(result.contractDts).toContain("readonly typeParams: { readonly type: 'AuditPayload' }");
+    expect(result.contractDts).toMatch(
+      /readonly payload:\s*\{[\s\S]*?readonly codecId: 'pg\/jsonb@1';[\s\S]*?readonly typeParams: \{ readonly type: 'AuditPayload' \}/,
+    );
     expect(result.contractDts).toContain(
       "readonly metadata: { readonly codecId: 'pg/jsonb@1'; readonly nullable: false }",
     );

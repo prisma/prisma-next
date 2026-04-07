@@ -700,7 +700,7 @@ describe('sql-target-family-hook', () => {
     );
   });
 
-  it('renders parameterized type when column has typeParams and renderer exists', () => {
+  it('emits typeParams on model field when column has typeParams and renderer exists', () => {
     const ir = createContract({
       models: {
         Embedding: {
