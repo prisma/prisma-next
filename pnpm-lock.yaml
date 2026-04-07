@@ -2341,6 +2341,9 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
+      '@prisma-next/mongo-contract-psl':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/2-authoring/contract-psl
       '@prisma-next/mongo-orm':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/5-query-builders/orm
