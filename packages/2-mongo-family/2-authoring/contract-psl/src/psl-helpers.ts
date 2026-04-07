@@ -64,6 +64,18 @@ function parseFieldList(value: string): readonly string[] {
   return inner.split(',').map((s) => s.trim());
 }
 
+export function getPositionalArgument(attribute: PslAttribute, index = 0): string | undefined {
+  const entries = attribute.args.filter((arg) => arg.kind === 'positional');
+  return entries[index]?.value;
+}
+
+export function parseQuotedStringLiteral(value: string): string | undefined {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(['"])(.*)\1$/);
+  if (!match) return undefined;
+  return match[2] ?? '';
+}
+
 function stripQuotes(value: string): string {
   if (value.startsWith('"') && value.endsWith('"')) {
     return value.slice(1, -1);
