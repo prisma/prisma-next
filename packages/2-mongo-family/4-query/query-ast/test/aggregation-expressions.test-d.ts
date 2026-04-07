@@ -145,14 +145,16 @@ test('rewrite returns MongoAggExpr', () => {
   expectTypeOf(ref.rewrite({})).toEqualTypeOf<MongoAggExpr>();
 });
 
-test('MongoAggOperator.args accepts both forms', () => {
+test('MongoAggOperator.args accepts all three forms', () => {
   expectTypeOf<MongoAggOperator['args']>().toEqualTypeOf<
-    MongoAggExpr | ReadonlyArray<MongoAggExpr>
+    MongoAggExpr | ReadonlyArray<MongoAggExpr> | Readonly<Record<string, MongoAggExpr>>
   >();
 });
 
-test('MongoAggAccumulator.arg accepts MongoAggExpr or null', () => {
-  expectTypeOf<MongoAggAccumulator['arg']>().toEqualTypeOf<MongoAggExpr | null>();
+test('MongoAggAccumulator.arg accepts MongoAggExpr, record, or null', () => {
+  expectTypeOf<MongoAggAccumulator['arg']>().toEqualTypeOf<
+    MongoAggExpr | Readonly<Record<string, MongoAggExpr>> | null
+  >();
 });
 
 test('MongoAggSwitch.branches is ReadonlyArray', () => {
