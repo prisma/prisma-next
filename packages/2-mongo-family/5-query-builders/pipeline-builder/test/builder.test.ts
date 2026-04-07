@@ -221,6 +221,15 @@ describe('PipelineBuilder', () => {
       expect(stage.accumulators['orderCount']).toBeInstanceOf(MongoAggAccumulator);
     });
 
+    it('rejects null for non-_id keys', () => {
+      expect(() =>
+        createOrdersBuilder().group((f) => ({
+          _id: f.customerId,
+          total: null as ReturnType<typeof acc.sum> | null,
+        })),
+      ).toThrow('must not be null');
+    });
+
     it('rejects non-accumulator expressions for non-_id keys', () => {
       expect(() =>
         createOrdersBuilder().group((f) => ({
