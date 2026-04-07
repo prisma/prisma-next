@@ -12,7 +12,7 @@ export {
   MongoAggReduce,
   MongoAggSwitch,
 } from '../aggregation-expressions';
-export type { AnyMongoCommand, MongoUpdatePipelineStage, MongoUpdateSpec } from '../commands';
+export type { AnyMongoCommand, MongoUpdateSpec } from '../commands';
 export {
   AggregateCommand,
   DeleteManyCommand,
@@ -52,6 +52,7 @@ export type {
   MongoGroupId,
   MongoPipelineStage,
   MongoProjectionValue,
+  MongoUpdatePipelineStage,
   MongoWindowField,
 } from '../stages';
 export {

@@ -2,17 +2,7 @@ import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoAstNode } from './ast-node';
 import type { MongoFilterExpr } from './filter-expressions';
 import type { RawMongoCommand } from './raw-commands';
-import type {
-  MongoAddFieldsStage,
-  MongoPipelineStage,
-  MongoProjectStage,
-  MongoReplaceRootStage,
-} from './stages';
-
-export type MongoUpdatePipelineStage =
-  | MongoAddFieldsStage
-  | MongoProjectStage
-  | MongoReplaceRootStage;
+import type { MongoPipelineStage, MongoUpdatePipelineStage } from './stages';
 export type MongoUpdateSpec = Record<string, MongoValue> | ReadonlyArray<MongoUpdatePipelineStage>;
 
 export class InsertOneCommand extends MongoAstNode {

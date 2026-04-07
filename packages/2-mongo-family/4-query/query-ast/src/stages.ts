@@ -719,13 +719,13 @@ export class MongoMergeStage extends MongoStageNode {
   readonly kind = 'merge' as const;
   readonly into: string | { readonly db: string; readonly coll: string };
   readonly on: string | ReadonlyArray<string> | undefined;
-  readonly whenMatched: string | ReadonlyArray<MongoPipelineStage> | undefined;
+  readonly whenMatched: string | ReadonlyArray<MongoUpdatePipelineStage> | undefined;
   readonly whenNotMatched: string | undefined;
 
   constructor(options: {
     into: string | { db: string; coll: string };
     on?: string | ReadonlyArray<string>;
-    whenMatched?: string | ReadonlyArray<MongoPipelineStage>;
+    whenMatched?: string | ReadonlyArray<MongoUpdatePipelineStage>;
     whenNotMatched?: string;
   }) {
     super();
@@ -756,11 +756,14 @@ export class MongoMergeStage extends MongoStageNode {
     const opts: {
       into: string | { db: string; coll: string };
       on?: string | ReadonlyArray<string>;
-      whenMatched?: string | ReadonlyArray<MongoPipelineStage>;
+      whenMatched?: string | ReadonlyArray<MongoUpdatePipelineStage>;
       whenNotMatched?: string;
     } = { into: this.into };
     if (this.on !== undefined) opts.on = this.on;
-    opts.whenMatched = this.whenMatched.map((stage) => stage.rewrite(context));
+    // rewrite() preserves the concrete stage type at runtime
+    opts.whenMatched = this.whenMatched.map(
+      (stage) => stage.rewrite(context) as MongoUpdatePipelineStage,
+    );
     if (this.whenNotMatched !== undefined) opts.whenNotMatched = this.whenNotMatched;
     return new MongoMergeStage(opts);
   }
@@ -984,6 +987,11 @@ export class MongoVectorSearchStage extends MongoStageNode {
     return this;
   }
 }
+
+export type MongoUpdatePipelineStage =
+  | MongoAddFieldsStage
+  | MongoProjectStage
+  | MongoReplaceRootStage;
 
 export type MongoPipelineStage =
   | MongoMatchStage

@@ -14,6 +14,7 @@ import type {
   MongoPipelineStage,
   MongoProjectionValue,
   MongoQueryPlan,
+  MongoUpdatePipelineStage,
   MongoWindowField,
 } from '@prisma-next/mongo-query-ast';
 import {
@@ -272,7 +273,7 @@ export class PipelineBuilder<
   merge(options: {
     into: string | { db: string; coll: string };
     on?: string | ReadonlyArray<string>;
-    whenMatched?: string | ReadonlyArray<MongoPipelineStage>;
+    whenMatched?: string | ReadonlyArray<MongoUpdatePipelineStage>;
     whenNotMatched?: string;
   }): PipelineBuilder<TContract, Shape> {
     return this.#withStage<Shape>(new MongoMergeStage(options));
@@ -375,8 +376,8 @@ export class PipelineBuilder<
 
   // --- Search stages ---
 
-  search(config: Record<string, unknown>, index?: string): PipelineBuilder<TContract, DocShape> {
-    return this.#withStage<DocShape>(new MongoSearchStage(config, index));
+  search(config: Record<string, unknown>, index?: string): PipelineBuilder<TContract, Shape> {
+    return this.#withStage<Shape>(new MongoSearchStage(config, index));
   }
 
   searchMeta(
@@ -393,8 +394,8 @@ export class PipelineBuilder<
     numCandidates: number;
     limit: number;
     filter?: Record<string, unknown>;
-  }): PipelineBuilder<TContract, DocShape> {
-    return this.#withStage<DocShape>(new MongoVectorSearchStage(options));
+  }): PipelineBuilder<TContract, Shape> {
+    return this.#withStage<Shape>(new MongoVectorSearchStage(options));
   }
 
   // --- Escape hatch ---
