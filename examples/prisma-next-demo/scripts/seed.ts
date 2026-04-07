@@ -23,13 +23,14 @@ async function main() {
   const runtime = await db.connect({ url: databaseUrl });
 
   try {
-    // Insert users
+    // Insert users with embedded address value objects
     await runtime.execute(
       db.sql.user
         .insert({
           email: 'alice@example.com',
           createdAt: new Date(),
           kind: 'admin',
+          address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
         })
         .build(),
     );
@@ -40,6 +41,7 @@ async function main() {
           email: 'bob@example.com',
           createdAt: new Date(),
           kind: 'user',
+          address: { street: '456 Oak Ave', city: 'Portland', zip: null, country: 'US' },
         })
         .build(),
     );

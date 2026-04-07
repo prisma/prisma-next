@@ -2,6 +2,13 @@ types {
   Embedding1536 = Bytes @pgvector.column(length: 1536)
 }
 
+type Address {
+  street  String
+  city    String
+  zip     String?
+  country String
+}
+
 enum user_type {
   admin
   user
@@ -12,6 +19,7 @@ model User {
   email     String
   createdAt DateTime  @default(now())
   kind      user_type
+  address   Address?
   posts     Post[]
 
   @@map("user")

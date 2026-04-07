@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:6cdb03e59e009e569ed535404a9a071d6a73e87f7f00fd2947b8ffd683b989da'>;
+  StorageHashBase<'sha256:8092aadb113c201a38d569e3c9226435a7b8bec111a9c13a608fb29e37875bb7'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:8c5eef43d2153fd832b8288ed2d8ffc9f5afb62908f8b4b7e6a4b7018444c41f'>;
 export type ProfileHash =
@@ -43,7 +43,12 @@ export type QueryOperationTypes = PgVectorQueryOperationTypes;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
-
+export type Address = {
+  readonly street: CodecTypes['pg/text@1']['output'];
+  readonly city: CodecTypes['pg/text@1']['output'];
+  readonly zip: CodecTypes['pg/text@1']['output'] | null;
+  readonly country: CodecTypes['pg/text@1']['output'];
+};
 export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
 type ContractBase = ContractType<
@@ -117,6 +122,11 @@ type ContractBase = ContractType<
             readonly nullable: false;
             readonly typeRef: 'user_type';
           };
+          readonly address: {
+            readonly nativeType: 'jsonb';
+            readonly codecId: 'pg/jsonb@1';
+            readonly nullable: true;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
@@ -185,6 +195,7 @@ type ContractBase = ContractType<
           readonly email: { readonly column: 'email' };
           readonly createdAt: { readonly column: 'createdAt' };
           readonly kind: { readonly column: 'kind' };
+          readonly address: { readonly column: 'address' };
         };
       };
       readonly fields: {
@@ -198,6 +209,10 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
         };
         readonly kind: 'admin' | 'user';
+        readonly address: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+        };
       };
       readonly relations: {
         readonly posts: {
@@ -291,7 +306,28 @@ type ContractBase = ContractType<
     };
   };
   readonly meta: {};
-
+  readonly valueObjects: {
+    readonly Address: {
+      readonly fields: {
+        readonly street: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly city: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly zip: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly country: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+      };
+    };
+  };
   readonly profileHash: ProfileHash;
 };
 
