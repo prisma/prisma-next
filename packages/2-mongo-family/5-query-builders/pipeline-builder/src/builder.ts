@@ -239,10 +239,12 @@ export class PipelineBuilder<
     return this.#withStage(new MongoCountStage(field));
   }
 
-  sortByCount(fn: (fields: FieldProxy<Shape>) => TypedAggExpr<DocField>): PipelineBuilder<
+  sortByCount<F extends DocField>(
+    fn: (fields: FieldProxy<Shape>) => TypedAggExpr<F>,
+  ): PipelineBuilder<
     TContract,
     {
-      _id: DocField;
+      _id: F;
       count: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
     }
   > {
