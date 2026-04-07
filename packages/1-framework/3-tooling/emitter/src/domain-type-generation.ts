@@ -166,6 +166,15 @@ export function generateCodecTypeIntersection(
   return aliases.join(' & ') || 'Record<string, never>';
 }
 
+export function serializeExecutionType(execution: Record<string, unknown>): string {
+  const parts: string[] = ['readonly executionHash: ExecutionHash'];
+  for (const [key, value] of Object.entries(execution)) {
+    if (key === 'executionHash') continue;
+    parts.push(`readonly ${serializeObjectKey(key)}: ${serializeValue(value)}`);
+  }
+  return `{ ${parts.join('; ')} }`;
+}
+
 export function generateHashTypeAliases(hashes: {
   readonly storageHash: string;
   readonly executionHash?: string;
