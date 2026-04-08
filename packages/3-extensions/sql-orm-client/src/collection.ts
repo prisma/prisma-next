@@ -92,8 +92,6 @@ import {
   type MutationCreateInputWithRelations,
   type MutationUpdateInput,
   type NumericFieldNames,
-  type OrderByDirective,
-  type OrderExpr,
   type RelatedModelName,
   type RelationNames,
   type ShorthandWhereFilter,
