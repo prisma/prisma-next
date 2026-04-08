@@ -153,15 +153,11 @@ describe('integration: ORM on SQLite', () => {
   describe('includeMany', () => {
     it('loads 1:N relation via json_group_array', async () => {
       const db = ormClient();
-      // Staged DSL widens relation names to Record<string, ContractRelation>,
-      // so .include() can't infer literal relation names at the type level.
-      // Runtime behavior is correct — cast to satisfy the type constraint.
-      const collection = db.User.where((u) => u.id.eq(1)) as ReturnType<typeof db.User.where> & {
-        include(name: string): { all(): Promise<Array<Record<string, unknown>>> };
-      };
-      const users = await collection.include('posts').all();
+      const users = await db.User.where((u) => u.id.eq(1))
+        .include('posts')
+        .all();
       expect(users).toHaveLength(1);
-      expect((users[0] as Record<string, unknown>)['posts']).toHaveLength(2);
+      expect(users[0]!.posts).toHaveLength(2);
     });
   });
 
