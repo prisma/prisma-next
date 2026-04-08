@@ -15,6 +15,14 @@ export function isRecordArgs(
   return !Array.isArray(args) && typeof args === 'object' && !('accept' in args);
 }
 
+function freezeRecordArgs(record: AggRecordArgs): AggRecordArgs {
+  const frozen: Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>> = {};
+  for (const [key, val] of Object.entries(record)) {
+    frozen[key] = Array.isArray(val) ? Object.freeze([...val]) : val;
+  }
+  return Object.freeze(frozen);
+}
+
 function rewriteRecordArgs(record: AggRecordArgs, rewriter: MongoAggExprRewriter): AggRecordArgs {
   const result: Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>> = {};
   for (const [key, val] of Object.entries(record)) {
@@ -92,7 +100,7 @@ export class MongoAggOperator extends MongoAggExprNode {
     if (Array.isArray(args)) {
       this.args = Object.freeze([...args]);
     } else if (isRecordArgs(args)) {
-      this.args = Object.freeze({ ...args });
+      this.args = freezeRecordArgs(args);
     } else {
       this.args = args;
     }
@@ -166,7 +174,7 @@ export class MongoAggAccumulator extends MongoAggExprNode {
     super();
     this.op = op;
     if (arg !== null && isRecordArgs(arg)) {
-      this.arg = Object.freeze({ ...arg });
+      this.arg = freezeRecordArgs(arg);
     } else {
       this.arg = arg;
     }
