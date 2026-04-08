@@ -66,5 +66,8 @@ describe('accumulator helpers — sortBy accumulators', () => {
     expect(recordArg).toHaveProperty('output');
     expect(recordArg).toHaveProperty('sortBy');
     expect(recordArg['sortBy']).toBeInstanceOf(MongoAggLiteral);
+    if (helperName === 'topN' || helperName === 'bottomN') {
+      expect(recordArg).toHaveProperty('n');
+    }
   });
 });
