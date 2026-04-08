@@ -176,7 +176,7 @@ test('InferRootRow discriminator field carries literal union type', () => {
 
 test('discriminator narrows to Bug fields exclusively', () => {
   type TaskRow = InferRootRow<PolyContract, 'Task'>;
-  const r = {} as TaskRow;
+  const r = {} as unknown as TaskRow;
   if (r.type === 'bug') {
     expectTypeOf<typeof r>().toHaveProperty('severity');
     // @ts-expect-error priority only exists on Feature variant
@@ -186,7 +186,7 @@ test('discriminator narrows to Bug fields exclusively', () => {
 
 test('discriminator narrows to Feature fields exclusively', () => {
   type TaskRow = InferRootRow<PolyContract, 'Task'>;
-  const r = {} as TaskRow;
+  const r = {} as unknown as TaskRow;
   if (r.type === 'feature') {
     expectTypeOf<typeof r>().toHaveProperty('priority');
     // @ts-expect-error severity only exists on Bug variant

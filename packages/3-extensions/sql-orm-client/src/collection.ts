@@ -246,8 +246,20 @@ export class Collection<
       LiteralExpr.of(variantEntry.value),
     );
 
+    const filtersWithoutPreviousVariant = this.state.variantName
+      ? this.state.filters.filter(
+          (f) =>
+            !(
+              f instanceof BinaryExpr &&
+              f.left instanceof ColumnRef &&
+              f.left.column === columnName &&
+              f.left.table === this.tableName
+            ),
+        )
+      : this.state.filters;
+
     return this.#cloneWithRow<VariantModelRow<TContract, ModelName, V>, WithWhereState<State>>({
-      filters: [...this.state.filters, filter],
+      filters: [...filtersWithoutPreviousVariant, filter],
       variantName: variantName as string,
     });
   }
