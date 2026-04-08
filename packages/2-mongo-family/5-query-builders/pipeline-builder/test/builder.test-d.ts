@@ -1,5 +1,5 @@
 import type { MongoFilterExpr, MongoQueryPlan } from '@prisma-next/mongo-query-ast';
-import { MongoLimitStage } from '@prisma-next/mongo-query-ast';
+import { MongoAggFieldRef, MongoLimitStage } from '@prisma-next/mongo-query-ast';
 import { expectTypeOf } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
 import { fn } from '../src/expression-helpers';
@@ -313,5 +313,136 @@ describe('resolved row types', () => {
     const execute = {} as <Row>(p: MongoQueryPlan<Row>) => Promise<Row[]>;
     const result = execute(plan);
     expectTypeOf<Awaited<typeof result>[0]>().toEqualTypeOf<OrderRow>();
+  });
+});
+
+describe('resolved row types — new stages', () => {
+  it('redact() preserves row type', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .redact((f) => f.status)
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
+  });
+
+  it('out() preserves row type', () => {
+    const plan = mongoPipeline<TContract>({ contractJson }).from('orders').out('archive').build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
+  });
+
+  it('merge() preserves row type', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .merge({ into: 'summary' })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
+  });
+
+  it('unionWith() preserves row type', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .unionWith('archived_orders')
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
+  });
+
+  it('densify() preserves row type', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .densify({ field: 'amount', range: { step: 10, bounds: 'full' } })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
+  });
+
+  it('fill() preserves row type', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .fill({ sortBy: { amount: 1 }, output: { notes: { method: 'linear' } } })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
+  });
+
+  it('search() preserves row type', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .search({ text: { query: 'test', path: 'status' } })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
+  });
+
+  it('vectorSearch() preserves row type', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .vectorSearch({
+        index: 'idx',
+        path: 'embedding',
+        queryVector: [0.1],
+        numCandidates: 50,
+        limit: 10,
+      })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
+  });
+
+  it('bucket() resets to untyped row', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .bucket({ groupBy: MongoAggFieldRef.of('amount'), boundaries: [0, 100, 500] })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<Record<string, unknown>>();
+  });
+
+  it('bucketAuto() resets to untyped row', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .bucketAuto({ groupBy: MongoAggFieldRef.of('amount'), buckets: 5 })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<Record<string, unknown>>();
+  });
+
+  it('facet() resets to untyped row', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .facet({ counts: [], top: [] })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<Record<string, unknown>>();
+  });
+
+  it('geoNear() resets to untyped row', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .geoNear({ near: [0, 0], distanceField: 'dist' })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<Record<string, unknown>>();
+  });
+
+  it('graphLookup() resets to untyped row', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .graphLookup({
+        from: 'categories',
+        startWith: MongoAggFieldRef.of('categoryId'),
+        connectFromField: 'parentId',
+        connectToField: '_id',
+        as: 'ancestors',
+      })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<Record<string, unknown>>();
+  });
+
+  it('setWindowFields() resets to untyped row', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .setWindowFields({ sortBy: { amount: 1 }, output: {} })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<Record<string, unknown>>();
+  });
+
+  it('searchMeta() resets to untyped row', () => {
+    const plan = mongoPipeline<TContract>({ contractJson })
+      .from('orders')
+      .searchMeta({ facet: { operator: {} } })
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<Record<string, unknown>>();
   });
 });
