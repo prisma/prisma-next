@@ -16,10 +16,12 @@ import { mapCursorValuesToColumns, mapFieldsToColumns } from './collection-colum
 import {
   assertReturningCapability,
   getColumnToFieldMap,
+  getFieldToColumnMap,
   isToOneCardinality,
   resolveFieldToColumn,
   resolveIncludeRelation,
   resolveModelTableName,
+  resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
   resolveUpsertConflictColumns,
 } from './collection-contract';
@@ -688,9 +690,7 @@ export class Collection<
 
     assertReturningCapability(this.contract, 'createAll()');
 
-    const mappedRows = data.map((row) =>
-      mapModelDataToStorageRow(this.contract, this.modelName, row),
-    );
+    const mappedRows = this.#mapCreateRows(data);
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
     const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
     const { selectedForQuery: selectedForInsert, hiddenColumns } = augmentSelectionForJoinColumns(
@@ -733,14 +733,44 @@ export class Collection<
     });
   }
 
+  #mapCreateRows(data: readonly CreateInput<TContract, ModelName>[]): Record<string, unknown>[] {
+    const variantName = this.state.variantName;
+    if (!variantName) {
+      return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
+    }
+
+    const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName);
+    if (!polyInfo) {
+      return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
+    }
+
+    const variant = polyInfo.variants.get(variantName);
+    if (!variant) {
+      return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
+    }
+
+    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName);
+    const variantFieldToColumn = getFieldToColumnMap(this.contract, variant.modelName);
+    const mergedFieldToColumn = { ...baseFieldToColumn, ...variantFieldToColumn };
+
+    return data.map((row) => {
+      const mapped: Record<string, unknown> = {};
+      for (const [fieldName, value] of Object.entries(row as Record<string, unknown>)) {
+        if (value === undefined) continue;
+        const columnName = mergedFieldToColumn[fieldName] ?? fieldName;
+        mapped[columnName] = value;
+      }
+      mapped[polyInfo.discriminatorColumn] = variant.value;
+      return mapped;
+    });
+  }
+
   async createCount(data: readonly CreateInput<TContract, ModelName>[]): Promise<number> {
     if (data.length === 0) {
       return 0;
     }
 
-    const mappedRows = data.map((row) =>
-      mapModelDataToStorageRow(this.contract, this.modelName, row),
-    );
+    const mappedRows = this.#mapCreateRows(data);
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
 
     if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
