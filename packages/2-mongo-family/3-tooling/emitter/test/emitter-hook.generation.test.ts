@@ -13,7 +13,9 @@ describe('mongoEmission.generateContractTypes', () => {
     expect(types).toContain(
       'export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>',
     );
-    expect(types).toContain('export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>');
+    expect(types).toContain(
+      'export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes>',
+    );
   });
 
   it('generates hash type aliases', () => {
