@@ -177,6 +177,9 @@ export function compileInsertReturningSplit(
   rows: readonly Record<string, unknown>[],
   returningColumns: readonly string[] | undefined,
 ): ReadonlyArray<SqlQueryPlan<Record<string, unknown>>> {
+  if (rows.length === 0) {
+    throw new Error('create() requires at least one row');
+  }
   return groupRowsByColumnSignature(rows).map((group) =>
     compileInsertReturning(contract, tableName, group, returningColumns),
   );
@@ -187,6 +190,9 @@ export function compileInsertCountSplit(
   tableName: string,
   rows: readonly Record<string, unknown>[],
 ): ReadonlyArray<SqlQueryPlan<Record<string, unknown>>> {
+  if (rows.length === 0) {
+    throw new Error('createCount() requires at least one row');
+  }
   return groupRowsByColumnSignature(rows).map((group) =>
     compileInsertCount(contract, tableName, group),
   );

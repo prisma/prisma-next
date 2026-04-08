@@ -6,7 +6,7 @@ SQLite target pack for Prisma Next.
 
 - **Domain**: targets
 - **Layer**: targets
-- **Plane**: multi-plane (migration, runtime)
+- **Plane**: multi-plane (runtime, authoring)
 
 ## Purpose
 

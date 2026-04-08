@@ -18,10 +18,14 @@ function toSqliteParams(params: readonly unknown[] | undefined): SQLInputValue[]
 }
 
 function openConnection(path: string): DatabaseSync {
-  const db = new DatabaseSync(path);
-  db.exec('PRAGMA foreign_keys = ON');
-  db.exec('PRAGMA busy_timeout = 5000');
-  return db;
+  try {
+    const db = new DatabaseSync(path);
+    db.exec('PRAGMA foreign_keys = ON');
+    db.exec('PRAGMA busy_timeout = 5000');
+    return db;
+  } catch (error) {
+    throw normalizeSqliteError(error);
+  }
 }
 
 class SqliteConnectionImpl implements SqlConnection {
@@ -68,12 +72,20 @@ class SqliteConnectionImpl implements SqlConnection {
   }
 
   async beginTransaction(): Promise<SqlTransaction> {
-    this.#db.exec('BEGIN');
-    return new SqliteTransactionImpl(this.#db);
+    try {
+      this.#db.exec('BEGIN');
+      return new SqliteTransactionImpl(this.#db);
+    } catch (error) {
+      throw normalizeSqliteError(error);
+    }
   }
 
   async release(): Promise<void> {
-    this.#db.close();
+    try {
+      this.#db.close();
+    } catch (error) {
+      throw normalizeSqliteError(error);
+    }
   }
 }
 
@@ -146,7 +158,11 @@ interface ConnectedState {
 type DriverState = { readonly kind: 'unbound' } | ConnectedState | { readonly kind: 'closed' };
 
 export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
-  #state: DriverState = { kind: 'unbound' };
+  #state: DriverState;
+
+  constructor(initialState?: ConnectedState) {
+    this.#state = initialState ?? { kind: 'unbound' };
+  }
 
   #requireConnected(): ConnectedState {
     if (this.#state.kind !== 'connected') {
@@ -198,7 +214,9 @@ export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
 }
 
 export function createBoundDriverFromBinding(binding: SqliteBinding): SqlDriver<SqliteBinding> {
-  const driver = new SqliteBoundDriver();
-  void driver.connect(binding);
-  return driver;
+  return new SqliteBoundDriver({
+    kind: 'connected',
+    path: binding.path,
+    conn: new SqliteConnectionImpl(openConnection(binding.path)),
+  });
 }

@@ -172,6 +172,8 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
         throw new Error('SQLite client already connected');
       }
 
+      backgroundConnectError = undefined;
+
       if (bindingInput !== undefined) {
         binding = resolveSqliteBinding(bindingInput);
       }

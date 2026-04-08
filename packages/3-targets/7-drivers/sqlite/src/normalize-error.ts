@@ -91,9 +91,7 @@ export function normalizeSqliteError(error: unknown): SqlQueryError | SqlConnect
   }
 
   // Connection-related Node.js errors
-  const code = (error as { code?: string }).code;
   if (
-    code === 'ERR_SQLITE_ERROR' ||
     error.message.includes('database is locked') ||
     error.message.includes('unable to open database')
   ) {
