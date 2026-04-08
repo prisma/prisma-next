@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ColumnTypeDescriptor, ContractBuilderState, ForeignKeyDefaultsState } from '../src';
+import type { ColumnTypeDescriptor, ForeignKeyDefaultsState } from '../src';
 
 describe('builder-state exports', () => {
   it('keeps column descriptors as plain data', () => {
@@ -24,15 +24,5 @@ describe('builder-state exports', () => {
       constraint: true,
       index: false,
     });
-  });
-
-  it('allows empty contract builder state objects', () => {
-    const state: ContractBuilderState = {
-      tables: {},
-      models: {},
-    };
-
-    expect(state.tables).toEqual({});
-    expect(state.models).toEqual({});
   });
 });
