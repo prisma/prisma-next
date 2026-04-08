@@ -5,6 +5,7 @@ import type {
   BooleanField,
   DateField,
   DocField,
+  NullableDocField,
   NumericField,
   StringField,
   TypedAggExpr,
@@ -92,6 +93,16 @@ function arrayUnaryExpr(op: string, arg: TypedAggExpr<DocField>): TypedAggExpr<A
 function docUnaryExpr(op: string, arg: TypedAggExpr<DocField>): TypedAggExpr<DocField> {
   return {
     _field: { codecId: arg._field.codecId, nullable: false },
+    node: MongoAggOperator.of(op, arg.node),
+  };
+}
+
+function nullableDocUnaryExpr(
+  op: string,
+  arg: TypedAggExpr<DocField>,
+): TypedAggExpr<NullableDocField> {
+  return {
+    _field: { codecId: arg._field.codecId, nullable: true },
     node: MongoAggOperator.of(op, arg.node),
   };
 }
@@ -293,17 +304,23 @@ export const fn = {
 
   // -- Array helpers --------------------------------------------------------
 
-  arrayElemAt(arr: TypedAggExpr<DocField>, idx: TypedAggExpr<DocField>): TypedAggExpr<DocField> {
-    return { _field: DOC, node: MongoAggOperator.of('$arrayElemAt', [arr.node, idx.node]) };
+  arrayElemAt(
+    arr: TypedAggExpr<DocField>,
+    idx: TypedAggExpr<DocField>,
+  ): TypedAggExpr<NullableDocField> {
+    return {
+      _field: { codecId: arr._field.codecId, nullable: true },
+      node: MongoAggOperator.of('$arrayElemAt', [arr.node, idx.node]),
+    };
   },
   concatArrays(...args: TypedAggExpr<DocField>[]): TypedAggExpr<ArrayField> {
     return arrayExpr('$concatArrays', args);
   },
-  firstElem(a: TypedAggExpr<DocField>): TypedAggExpr<DocField> {
-    return docUnaryExpr('$first', a);
+  firstElem(a: TypedAggExpr<DocField>): TypedAggExpr<NullableDocField> {
+    return nullableDocUnaryExpr('$first', a);
   },
-  lastElem(a: TypedAggExpr<DocField>): TypedAggExpr<DocField> {
-    return docUnaryExpr('$last', a);
+  lastElem(a: TypedAggExpr<DocField>): TypedAggExpr<NullableDocField> {
+    return nullableDocUnaryExpr('$last', a);
   },
   isIn(elem: TypedAggExpr<DocField>, arr: TypedAggExpr<DocField>): TypedAggExpr<BooleanField> {
     return booleanExpr('$in', [elem, arr]);

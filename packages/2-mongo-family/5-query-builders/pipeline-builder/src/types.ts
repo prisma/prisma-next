@@ -17,6 +17,7 @@ export type StringField = { readonly codecId: 'mongo/string@1'; readonly nullabl
 export type ArrayField = { readonly codecId: 'mongo/array@1'; readonly nullable: false };
 export type BooleanField = { readonly codecId: 'mongo/bool@1'; readonly nullable: false };
 export type DateField = { readonly codecId: 'mongo/date@1'; readonly nullable: false };
+export type NullableDocField = { readonly codecId: string; readonly nullable: true };
 
 export type DocShape = Record<string, DocField>;
 
