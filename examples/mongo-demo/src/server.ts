@@ -30,11 +30,14 @@ async function seed(orm: Db['orm']) {
   const carol = createdUsers[2];
   if (!alice || !bob || !carol) throw new Error('Failed to seed users');
 
-  await orm.posts.createAll([
+  const articles = orm.posts.variant('Article');
+  const tutorials = orm.posts.variant('Tutorial');
+
+  await articles.createAll([
     {
       title: 'Getting Started with Prisma Next',
       content: 'Learn how to build contract-first data access layers with Prisma Next and MongoDB.',
-      kind: 'article',
+      summary: 'A comprehensive introduction to contract-first data layers.',
       authorId: alice._id as string,
       createdAt: new Date('2026-01-15'),
     },
@@ -42,21 +45,26 @@ async function seed(orm: Db['orm']) {
       title: 'Contract-First Development',
       content:
         'Why contract-first architecture leads to better type safety and developer experience.',
-      kind: 'article',
+      summary: 'The benefits of contract-first over code-first approaches.',
       authorId: alice._id as string,
       createdAt: new Date('2026-02-01'),
     },
+  ]);
+
+  await tutorials.createAll([
     {
       title: 'Build a REST API with Prisma Next',
       content: 'Step-by-step tutorial for building a REST API with Prisma Next and MongoDB.',
-      kind: 'tutorial',
+      difficulty: 'intermediate',
+      duration: 45,
       authorId: bob._id as string,
       createdAt: new Date('2026-02-20'),
     },
     {
       title: 'Advanced Query Patterns',
       content: 'Deep dive into advanced query patterns for MongoDB.',
-      kind: 'tutorial',
+      difficulty: 'advanced',
+      duration: 90,
       authorId: carol._id as string,
       createdAt: new Date('2026-03-10'),
     },
