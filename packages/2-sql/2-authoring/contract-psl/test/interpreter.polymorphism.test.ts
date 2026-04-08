@@ -346,6 +346,41 @@ model Bug {
       );
     });
 
+    it('diagnoses non-String discriminator field', () => {
+      const document = parsePslDocument({
+        schema: `model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  Int
+
+  @@discriminator(type)
+}
+
+model Bug {
+  severity String
+
+  @@base(Task, "bug")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: expect.stringContaining('must be of type String'),
+          }),
+        ]),
+      );
+    });
+
     it('diagnoses model with both @@discriminator and @@base', () => {
       const document = parsePslDocument({
         schema: `model Task {
