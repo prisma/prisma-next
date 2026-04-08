@@ -153,11 +153,15 @@ describe('integration: ORM on SQLite', () => {
   describe('includeMany', () => {
     it('loads 1:N relation via json_group_array', async () => {
       const db = ormClient();
-      const users = await db.User.where((u) => u.id.eq(1))
-        .include('posts')
-        .all();
+      // Staged DSL widens relation names to Record<string, ContractRelation>,
+      // so .include() can't infer literal relation names at the type level.
+      // Runtime behavior is correct — cast to satisfy the type constraint.
+      const collection = db.User.where((u) => u.id.eq(1)) as ReturnType<typeof db.User.where> & {
+        include(name: string): { all(): Promise<Array<Record<string, unknown>>> };
+      };
+      const users = await collection.include('posts').all();
       expect(users).toHaveLength(1);
-      expect(users[0]!.posts).toHaveLength(2);
+      expect((users[0] as Record<string, unknown>)['posts']).toHaveLength(2);
     });
   });
 
@@ -211,10 +215,12 @@ describe('integration: ORM on SQLite', () => {
   describe('mixed defaults in multi-row insert', () => {
     it('createAll with 2 rows where one provides label explicitly and the other uses DB default', async () => {
       const db = ormClient();
+      // Staged DSL doesn't reflect .default() in the type, so label appears required.
+      // At runtime the DB default applies when label is omitted.
       const rows = await db.Item.createAll([
         { id: 900, name: 'Explicit', label: 'custom' },
         { id: 901, name: 'Default' },
-      ]);
+      ] as ReadonlyArray<{ id: number; name: string; label: string }>);
       expect(rows).toHaveLength(2);
       expect(rows[0]).toMatchObject({ id: 900, name: 'Explicit', label: 'custom' });
       expect(rows[1]).toMatchObject({ id: 901, name: 'Default', label: 'unnamed' });

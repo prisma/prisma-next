@@ -11,7 +11,6 @@ const sqliteRuntimeTargetDescriptor: SqlRuntimeTargetDescriptor<
 > = {
   ...sqliteTargetDescriptorMeta,
   codecs: () => createCodecRegistry(),
-  operationSignatures: () => [],
   parameterizedCodecs: () => [],
   create(): SqliteRuntimeTargetInstance {
     return {

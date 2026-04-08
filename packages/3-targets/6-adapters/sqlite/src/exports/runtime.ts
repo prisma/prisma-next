@@ -23,7 +23,6 @@ const sqliteRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<
 > = {
   ...sqliteAdapterDescriptorMeta,
   codecs: createSqliteCodecRegistry,
-  operationSignatures: () => [],
   parameterizedCodecs: () => [],
   mutationDefaultGenerators: () => [],
   create(): SqliteRuntimeAdapterInstance {

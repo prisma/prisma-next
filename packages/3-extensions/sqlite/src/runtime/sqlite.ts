@@ -6,20 +6,9 @@ import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
-import type {
-  ExtractTypeMapsFromContract,
-  ResolveCodecTypes,
-  ResolveOperationTypes,
-  SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
-import type { SchemaHandle } from '@prisma-next/sql-relational-core/schema';
-import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
-import type {
-  OperationTypeSignature,
-  OperationTypes,
-} from '@prisma-next/sql-relational-core/types';
 import type {
   ExecutionContext,
   Plugin,
@@ -36,29 +25,11 @@ import {
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 
-type NormalizeOperationTypes<T> = {
-  [TypeId in keyof T]: {
-    [Method in keyof T[TypeId]]: T[TypeId][Method] extends OperationTypeSignature
-      ? T[TypeId][Method]
-      : OperationTypeSignature;
-  };
-};
-
-type ToSchemaOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationTypes<T>;
-
 export type SqliteTargetId = 'sqlite';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
-export interface SqliteClient<
-  TContract extends Contract<SqlStorage>,
-  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
-> {
+export interface SqliteClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
-  readonly schema: SchemaHandle<
-    TContract,
-    ResolveCodecTypes<TContract, TTypeMaps>,
-    ToSchemaOperationTypes<ResolveOperationTypes<TContract, TTypeMaps>>
-  >;
   readonly orm: OrmClient<TContract>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<SqliteTargetId>;
@@ -100,18 +71,15 @@ function resolveContract<TContract extends Contract<SqlStorage>>(
   return validateContract<TContract>(contractInput, emptyCodecLookup);
 }
 
-export default function sqlite<
-  TContract extends Contract<SqlStorage>,
-  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
->(options: SqliteOptionsWithContract<TContract>): SqliteClient<TContract, TTypeMaps>;
-export default function sqlite<
-  TContract extends Contract<SqlStorage>,
-  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
->(options: SqliteOptionsWithContractJson<TContract>): SqliteClient<TContract, TTypeMaps>;
-export default function sqlite<
-  TContract extends Contract<SqlStorage>,
-  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
->(options: SqliteOptions<TContract>): SqliteClient<TContract, TTypeMaps> {
+export default function sqlite<TContract extends Contract<SqlStorage>>(
+  options: SqliteOptionsWithContract<TContract>,
+): SqliteClient<TContract>;
+export default function sqlite<TContract extends Contract<SqlStorage>>(
+  options: SqliteOptionsWithContractJson<TContract>,
+): SqliteClient<TContract>;
+export default function sqlite<TContract extends Contract<SqlStorage>>(
+  options: SqliteOptions<TContract>,
+): SqliteClient<TContract> {
   const contract = resolveContract(options);
   let binding = resolveOptionalSqliteBinding(options);
   const stack = createSqlExecutionStack({
@@ -126,7 +94,6 @@ export default function sqlite<
     stack,
   });
 
-  const schema = schemaBuilder<TContract, TTypeMaps>(context);
   const sql: Db<TContract> = sqlBuilder<TContract>({ context });
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
@@ -197,7 +164,6 @@ export default function sqlite<
 
   return {
     sql,
-    schema: schema as SqliteClient<TContract, TTypeMaps>['schema'],
     orm,
     context,
     stack,

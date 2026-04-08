@@ -1,4 +1,3 @@
-import type { CodecTypes } from '@prisma-next/adapter-sqlite/codec-types';
 import {
   booleanColumn,
   datetimeColumn,
@@ -6,12 +5,66 @@ import {
   jsonColumn,
   textColumn,
 } from '@prisma-next/adapter-sqlite/column-types';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import sqlFamilyPack from '@prisma-next/family-sql/pack';
+import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
 
-export const contract = defineContract<CodecTypes>()
-  .target(sqlitePack)
-  .capabilities({
+const User = model('User', {
+  fields: {
+    id: field.column(integerColumn).id(),
+    name: field.column(textColumn),
+    email: field.column(textColumn),
+    invitedById: field.column(integerColumn).optional().column('invited_by_id'),
+  },
+}).sql({ table: 'users' });
+
+const Post = model('Post', {
+  fields: {
+    id: field.column(integerColumn).id(),
+    title: field.column(textColumn),
+    userId: field.column(integerColumn).column('user_id'),
+    views: field.column(integerColumn),
+  },
+}).sql({ table: 'posts' });
+
+const Comment = model('Comment', {
+  fields: {
+    id: field.column(integerColumn).id(),
+    body: field.column(textColumn),
+    postId: field.column(integerColumn).column('post_id'),
+  },
+}).sql({ table: 'comments' });
+
+const Profile = model('Profile', {
+  fields: {
+    id: field.column(integerColumn).id(),
+    userId: field.column(integerColumn).column('user_id'),
+    bio: field.column(textColumn),
+  },
+}).sql({ table: 'profiles' });
+
+const TypedRow = model('TypedRow', {
+  fields: {
+    id: field.column(integerColumn).id(),
+    active: field.column(booleanColumn),
+    createdAt: field.column(datetimeColumn).column('created_at'),
+    metadata: field.column(jsonColumn).optional(),
+    label: field.column(textColumn),
+  },
+}).sql({ table: 'typed_rows' });
+
+const Item = model('Item', {
+  fields: {
+    id: field.column(integerColumn).id(),
+    name: field.column(textColumn),
+    label: field.column(textColumn).default('unnamed'),
+  },
+}).sql({ table: 'items' });
+
+export const contract = defineContract({
+  family: sqlFamilyPack,
+  target: sqlitePack,
+  capabilities: {
     sql: {
       lateral: false,
       returning: true,
@@ -20,130 +73,19 @@ export const contract = defineContract<CodecTypes>()
       foreignKeys: true,
       autoIndexesForeignKeys: false,
     },
-  })
-  .table('users', (table) =>
-    table
-      .column('id', { type: integerColumn, nullable: false })
-      .column('name', { type: textColumn, nullable: false })
-      .column('email', { type: textColumn, nullable: false })
-      .column('invited_by_id', { type: integerColumn, nullable: true })
-      .primaryKey(['id']),
-  )
-  .table('posts', (table) =>
-    table
-      .column('id', { type: integerColumn, nullable: false })
-      .column('title', { type: textColumn, nullable: false })
-      .column('user_id', { type: integerColumn, nullable: false })
-      .column('views', { type: integerColumn, nullable: false })
-      .primaryKey(['id']),
-  )
-  .table('comments', (table) =>
-    table
-      .column('id', { type: integerColumn, nullable: false })
-      .column('body', { type: textColumn, nullable: false })
-      .column('post_id', { type: integerColumn, nullable: false })
-      .primaryKey(['id']),
-  )
-  .table('profiles', (table) =>
-    table
-      .column('id', { type: integerColumn, nullable: false })
-      .column('user_id', { type: integerColumn, nullable: false })
-      .column('bio', { type: textColumn, nullable: false })
-      .primaryKey(['id']),
-  )
-  .table('typed_rows', (table) =>
-    table
-      .column('id', { type: integerColumn, nullable: false })
-      .column('active', { type: booleanColumn, nullable: false })
-      .column('created_at', { type: datetimeColumn, nullable: false })
-      .column('metadata', { type: jsonColumn, nullable: true })
-      .column('label', { type: textColumn, nullable: false })
-      .primaryKey(['id']),
-  )
-  .table('items', (table) =>
-    table
-      .column('id', { type: integerColumn, nullable: false })
-      .column('name', { type: textColumn, nullable: false })
-      .column('label', {
-        type: textColumn,
-        nullable: false,
-        default: { kind: 'literal', value: 'unnamed' },
-      })
-      .primaryKey(['id']),
-  )
-  .model('User', 'users', (model) =>
-    model
-      .field('id', 'id')
-      .field('name', 'name')
-      .field('email', 'email')
-      .field('invitedById', 'invited_by_id')
-      .relation('posts', {
-        toModel: 'Post',
-        toTable: 'posts',
-        cardinality: '1:N',
-        on: {
-          parentTable: 'users',
-          parentColumns: ['id'],
-          childTable: 'posts',
-          childColumns: ['user_id'],
-        },
-      })
-      .relation('profile', {
-        toModel: 'Profile',
-        toTable: 'profiles',
-        cardinality: '1:1',
-        on: {
-          parentTable: 'users',
-          parentColumns: ['id'],
-          childTable: 'profiles',
-          childColumns: ['user_id'],
-        },
-      }),
-  )
-  .model('Post', 'posts', (model) =>
-    model
-      .field('id', 'id')
-      .field('title', 'title')
-      .field('userId', 'user_id')
-      .field('views', 'views')
-      .relation('comments', {
-        toModel: 'Comment',
-        toTable: 'comments',
-        cardinality: '1:N',
-        on: {
-          parentTable: 'posts',
-          parentColumns: ['id'],
-          childTable: 'comments',
-          childColumns: ['post_id'],
-        },
-      })
-      .relation('author', {
-        toModel: 'User',
-        toTable: 'users',
-        cardinality: 'N:1',
-        on: {
-          parentTable: 'posts',
-          parentColumns: ['user_id'],
-          childTable: 'users',
-          childColumns: ['id'],
-        },
-      }),
-  )
-  .model('Comment', 'comments', (model) =>
-    model.field('id', 'id').field('body', 'body').field('postId', 'post_id'),
-  )
-  .model('Profile', 'profiles', (model) =>
-    model.field('id', 'id').field('userId', 'user_id').field('bio', 'bio'),
-  )
-  .model('TypedRow', 'typed_rows', (model) =>
-    model
-      .field('id', 'id')
-      .field('active', 'active')
-      .field('createdAt', 'created_at')
-      .field('metadata', 'metadata')
-      .field('label', 'label'),
-  )
-  .model('Item', 'items', (model) =>
-    model.field('id', 'id').field('name', 'name').field('label', 'label'),
-  )
-  .build();
+  },
+  models: {
+    User: User.relations({
+      posts: rel.hasMany(Post, { by: 'userId' }),
+      profile: rel.hasOne(Profile, { by: 'userId' }),
+    }),
+    Post: Post.relations({
+      comments: rel.hasMany(Comment, { by: 'postId' }),
+      author: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+    }),
+    Comment,
+    Profile,
+    TypedRow,
+    Item,
+  },
+});
