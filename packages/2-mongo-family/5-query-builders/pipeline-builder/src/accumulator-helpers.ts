@@ -22,7 +22,7 @@ function namedAccumulatorArgs(
 }
 
 export const acc = {
-  sum(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<NumericField> {
+  sum<F extends DocField>(expr: TypedAggExpr<F>): TypedAccumulatorExpr<F> {
     return { _field: undefined as never, node: MongoAggAccumulator.sum(expr.node) };
   },
 
