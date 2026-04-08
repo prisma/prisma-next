@@ -98,6 +98,32 @@ describe('mongoVectorCodec', () => {
   });
 });
 
+describe('mongoVectorCodec.renderOutputType', () => {
+  it('renders Vector<length> when length is present', () => {
+    expect(mongoVectorCodec.renderOutputType!({ length: 1536 })).toBe('Vector<1536>');
+  });
+
+  it('renders Vector<length> with small dimension', () => {
+    expect(mongoVectorCodec.renderOutputType!({ length: 3 })).toBe('Vector<3>');
+  });
+
+  it('returns undefined when length is absent', () => {
+    expect(mongoVectorCodec.renderOutputType!({})).toBeUndefined();
+  });
+
+  it('throws on NaN length', () => {
+    expect(() => mongoVectorCodec.renderOutputType!({ length: Number.NaN })).toThrow(
+      /expected positive integer "length"/,
+    );
+  });
+
+  it('throws on non-integer length', () => {
+    expect(() => mongoVectorCodec.renderOutputType!({ length: 3.5 })).toThrow(
+      /expected positive integer "length"/,
+    );
+  });
+});
+
 describe('vector operation descriptors (production-defined)', () => {
   it('mongoVectorNearOperation has method near', () => {
     expect(mongoVectorNearOperation.method).toBe('near');
