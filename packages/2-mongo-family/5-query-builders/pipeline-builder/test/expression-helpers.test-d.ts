@@ -188,14 +188,14 @@ describe('array helpers', () => {
     expectTypeOf(fn.slice(d, d)).toEqualTypeOf<TypedAggExpr<ArrayField>>();
   });
   it('zip returns ArrayField', () => {
-    expectTypeOf(fn.zip({ inputs: arr })).toEqualTypeOf<TypedAggExpr<ArrayField>>();
+    expectTypeOf(fn.zip({ inputs: [arr, arr] })).toEqualTypeOf<TypedAggExpr<ArrayField>>();
   });
   it('range returns ArrayField', () => {
     expectTypeOf(fn.range(d, d, d)).toEqualTypeOf<TypedAggExpr<ArrayField>>();
   });
 
   it('rejects wrong type for zip inputs key', () => {
-    // @ts-expect-error — inputs requires ArrayField, not StringField
+    // @ts-expect-error — inputs requires ArrayField[], not StringField
     fn.zip({ inputs: s });
   });
 });

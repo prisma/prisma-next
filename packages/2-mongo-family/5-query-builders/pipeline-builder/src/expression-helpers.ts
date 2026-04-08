@@ -98,16 +98,6 @@ function docUnaryExpr(op: string, arg: TypedAggExpr<DocField>): TypedAggExpr<Doc
   };
 }
 
-function nullableDocUnaryExpr(
-  op: string,
-  arg: TypedAggExpr<DocField>,
-): TypedAggExpr<NullableDocField> {
-  return {
-    _field: { codecId: arg._field.codecId, nullable: true },
-    node: MongoAggOperator.of(op, arg.node),
-  };
-}
-
 function namedArgsExpr<F extends DocField>(
   op: string,
   args: Readonly<Record<string, TypedAggExpr<DocField> | undefined>>,
@@ -381,7 +371,7 @@ export const fn = {
     idx: TypedAggExpr<DocField>,
   ): TypedAggExpr<NullableDocField> {
     return {
-      _field: { codecId: arr._field.codecId, nullable: true },
+      _field: { codecId: DOC.codecId, nullable: true },
       node: MongoAggOperator.of('$arrayElemAt', [arr.node, idx.node]),
     };
   },
@@ -389,10 +379,16 @@ export const fn = {
     return arrayExpr('$concatArrays', args);
   },
   firstElem(a: TypedAggExpr<DocField>): TypedAggExpr<NullableDocField> {
-    return nullableDocUnaryExpr('$first', a);
+    return {
+      _field: { codecId: DOC.codecId, nullable: true },
+      node: MongoAggOperator.of('$first', a.node),
+    };
   },
   lastElem(a: TypedAggExpr<DocField>): TypedAggExpr<NullableDocField> {
-    return nullableDocUnaryExpr('$last', a);
+    return {
+      _field: { codecId: DOC.codecId, nullable: true },
+      node: MongoAggOperator.of('$last', a.node),
+    };
   },
   isIn(elem: TypedAggExpr<DocField>, arr: TypedAggExpr<DocField>): TypedAggExpr<BooleanField> {
     return booleanExpr('$in', [elem, arr]);
@@ -414,11 +410,16 @@ export const fn = {
     return arrayExpr('$slice', [arr, ...rest]);
   },
   zip(args: {
-    inputs: TypedAggExpr<ArrayField>;
+    inputs: TypedAggExpr<ArrayField>[];
     useLongestLength?: TypedAggExpr<BooleanField>;
     defaults?: TypedAggExpr<ArrayField>;
   }): TypedAggExpr<ArrayField> {
-    return namedArgsExpr('$zip', args, ARRAY);
+    const nodeArgs: Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>> = {
+      inputs: args.inputs.map((a) => a.node),
+    };
+    if (args.useLongestLength) nodeArgs['useLongestLength'] = args.useLongestLength.node;
+    if (args.defaults) nodeArgs['defaults'] = args.defaults.node;
+    return { _field: ARRAY, node: MongoAggOperator.of('$zip', nodeArgs) };
   },
   range(
     start: TypedAggExpr<DocField>,
@@ -496,7 +497,7 @@ export const fn = {
     return arrayUnaryExpr('$objectToArray', a);
   },
   arrayToObject(a: TypedAggExpr<DocField>): TypedAggExpr<DocField> {
-    return docUnaryExpr('$arrayToObject', a);
+    return { _field: DOC, node: MongoAggOperator.of('$arrayToObject', a.node) };
   },
   getField(args: {
     field: TypedAggExpr<StringField>;

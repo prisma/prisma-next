@@ -50,23 +50,25 @@ describe('accumulator helper types', () => {
   });
 
   it('top returns DocField', () => {
-    expectTypeOf(acc.top({ output: d, sortBy: d })).toEqualTypeOf<TypedAccumulatorExpr<DocField>>();
+    expectTypeOf(acc.top({ output: d, sortBy: { score: -1 } })).toEqualTypeOf<
+      TypedAccumulatorExpr<DocField>
+    >();
   });
 
   it('bottom returns DocField', () => {
-    expectTypeOf(acc.bottom({ output: d, sortBy: d })).toEqualTypeOf<
+    expectTypeOf(acc.bottom({ output: d, sortBy: { score: -1 } })).toEqualTypeOf<
       TypedAccumulatorExpr<DocField>
     >();
   });
 
   it('topN returns ArrayField', () => {
-    expectTypeOf(acc.topN({ output: d, sortBy: d, n })).toEqualTypeOf<
+    expectTypeOf(acc.topN({ output: d, sortBy: { score: -1 }, n })).toEqualTypeOf<
       TypedAccumulatorExpr<ArrayField>
     >();
   });
 
   it('bottomN returns ArrayField', () => {
-    expectTypeOf(acc.bottomN({ output: d, sortBy: d, n })).toEqualTypeOf<
+    expectTypeOf(acc.bottomN({ output: d, sortBy: { score: -1 }, n })).toEqualTypeOf<
       TypedAccumulatorExpr<ArrayField>
     >();
   });
@@ -78,6 +80,6 @@ describe('accumulator helper types', () => {
 
   it('rejects wrong type for topN n key', () => {
     // @ts-expect-error — n requires NumericField, not StringField
-    acc.topN({ output: d, sortBy: d, n: s });
+    acc.topN({ output: d, sortBy: { score: -1 }, n: s });
   });
 });
