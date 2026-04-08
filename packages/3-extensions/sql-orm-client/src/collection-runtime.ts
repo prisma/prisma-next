@@ -46,12 +46,13 @@ export function stripHiddenMappedFields(
   tableName: string,
   mapped: Record<string, unknown>,
   hiddenColumns: readonly string[],
+  resolvedModelName?: string,
 ): void {
   if (hiddenColumns.length === 0) {
     return;
   }
 
-  const modelName = findModelNameForTable(contract, tableName) ?? tableName;
+  const modelName = resolvedModelName ?? findModelNameForTable(contract, tableName) ?? tableName;
   const columnToField = getColumnToFieldMap(contract, modelName);
   for (const hiddenColumn of hiddenColumns) {
     const fieldName = columnToField[hiddenColumn] ?? hiddenColumn;
@@ -63,10 +64,11 @@ export function createRowEnvelope(
   contract: Contract<SqlStorage>,
   tableName: string,
   raw: Record<string, unknown>,
+  modelName?: string,
 ): RowEnvelope {
   return {
     raw,
-    mapped: mapStorageRowToModelFields(contract, tableName, raw),
+    mapped: mapStorageRowToModelFields(contract, tableName, raw, modelName),
   };
 }
 
@@ -74,8 +76,9 @@ export function mapStorageRowToModelFields(
   contract: Contract<SqlStorage>,
   tableName: string,
   row: Record<string, unknown>,
+  resolvedModelName?: string,
 ): Record<string, unknown> {
-  const modelName = findModelNameForTable(contract, tableName);
+  const modelName = resolvedModelName ?? findModelNameForTable(contract, tableName);
   if (!modelName) {
     return { ...row };
   }

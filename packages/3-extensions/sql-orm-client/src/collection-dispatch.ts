@@ -32,15 +32,16 @@ export function dispatchCollectionRows<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
+  modelName: string;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName } = options;
+  const { contract, runtime, state, tableName, modelName } = options;
 
   if (state.includes.length === 0) {
     const compiled = compileSelect(contract, tableName, state);
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
     return mapResultRows(
       source,
-      (rawRow) => mapStorageRowToModelFields(contract, tableName, rawRow) as Row,
+      (rawRow) => mapStorageRowToModelFields(contract, tableName, rawRow, modelName) as Row,
     );
   }
 
@@ -52,6 +53,7 @@ function dispatchWithIncludeStrategy<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
+  modelName: string;
 }): AsyncIterableResult<Row> {
   const strategy = selectIncludeStrategy(options.contract);
 
@@ -84,8 +86,9 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
+  modelName: string;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName, strategy } = options;
+  const { contract, runtime, state, tableName, modelName, strategy } = options;
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
@@ -110,7 +113,9 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
         return;
       }
 
-      const parentRows = parentRowsRaw.map((row) => createRowEnvelope(contract, tableName, row));
+      const parentRows = parentRowsRaw.map((row) =>
+        createRowEnvelope(contract, tableName, row, modelName),
+      );
 
       for (const parent of parentRows) {
         for (const include of state.includes) {
@@ -121,7 +126,12 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
           }
           const rawChildren = parseIncludedRows(parent.raw[include.relationName]);
           const mappedChildren = rawChildren.map((childRow) =>
-            mapStorageRowToModelFields(contract, include.relatedTableName, childRow),
+            mapStorageRowToModelFields(
+              contract,
+              include.relatedTableName,
+              childRow,
+              include.relatedModelName,
+            ),
           );
           parent.mapped[include.relationName] = coerceSingleQueryIncludeResult(
             mappedChildren,
@@ -130,7 +140,13 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
         }
 
         if (hiddenParentColumns.length > 0) {
-          stripHiddenMappedFields(contract, tableName, parent.mapped, hiddenParentColumns);
+          stripHiddenMappedFields(
+            contract,
+            tableName,
+            parent.mapped,
+            hiddenParentColumns,
+            modelName,
+          );
         }
       }
 
@@ -152,8 +168,9 @@ function dispatchWithMultiQueryIncludes<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
+  modelName: string;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName } = options;
+  const { contract, runtime, state, tableName, modelName } = options;
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
@@ -173,12 +190,14 @@ function dispatchWithMultiQueryIncludes<Row>(options: {
         return;
       }
 
-      const parentRows = parentRowsRaw.map((row) => createRowEnvelope(contract, tableName, row));
+      const parentRows = parentRowsRaw.map((row) =>
+        createRowEnvelope(contract, tableName, row, modelName),
+      );
       await stitchIncludes(scope, contract, parentRows, state.includes);
 
       if (hiddenParentColumns.length > 0) {
         for (const row of parentRows) {
-          stripHiddenMappedFields(contract, tableName, row.mapped, hiddenParentColumns);
+          stripHiddenMappedFields(contract, tableName, row.mapped, hiddenParentColumns, modelName);
         }
       }
 
@@ -348,7 +367,7 @@ async function resolveRowsByParent(
     childCompiled,
   ).toArray();
   const childRows = childRowsRaw.map((row) =>
-    createRowEnvelope(contract, include.relatedTableName, row),
+    createRowEnvelope(contract, include.relatedTableName, row, include.relatedModelName),
   );
 
   if (state.includes.length > 0) {
@@ -360,7 +379,13 @@ async function resolveRowsByParent(
     const joinValue = child.raw[include.targetColumn];
 
     if (hiddenChildColumns.length > 0) {
-      stripHiddenMappedFields(contract, include.relatedTableName, child.mapped, hiddenChildColumns);
+      stripHiddenMappedFields(
+        contract,
+        include.relatedTableName,
+        child.mapped,
+        hiddenChildColumns,
+        include.relatedModelName,
+      );
     }
 
     let bucket = childByParentJoin.get(joinValue);
