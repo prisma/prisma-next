@@ -13,6 +13,10 @@ import type { Timestamptz } from '@prisma-next/adapter-postgres/codec-types';
 import type { Time } from '@prisma-next/adapter-postgres/codec-types';
 import type { Timetz } from '@prisma-next/adapter-postgres/codec-types';
 import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
+import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
+import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
+import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
+import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
 import type {
   ContractWithTypeMaps,
@@ -26,16 +30,16 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:02cdff7f8d501bb78f0687a20ede35d9a7397239ea1bb503f1f58d035ad3cb72'>;
+  StorageHashBase<'sha256:319804686c1aba50fc4508c05ecc509bfdc2f250324fb929ea313eceafc650c0'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:e216decd356eea44980cf151c6044d85fb936e1fad093fbfb93ca34b96cf5847'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
-export type CodecTypes = PgTypes;
-export type OperationTypes = Record<string, never>;
+export type CodecTypes = PgTypes & PgVectorTypes;
+export type OperationTypes = PgVectorOperationTypes;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = Record<string, never>;
+export type QueryOperationTypes = PgVectorQueryOperationTypes;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
@@ -60,6 +64,7 @@ export type FieldOutputTypes = {
     readonly title: CodecTypes['pg/text@1']['output'];
     readonly userId: CodecTypes['pg/int4@1']['output'];
     readonly views: CodecTypes['pg/int4@1']['output'];
+    readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
   };
   readonly Profile: {
     readonly id: CodecTypes['pg/int4@1']['output'];
@@ -162,6 +167,11 @@ type ContractBase = ContractType<
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
+          };
+          readonly embedding: {
+            readonly nativeType: 'vector';
+            readonly codecId: 'pg/vector@1';
+            readonly nullable: true;
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
@@ -346,6 +356,10 @@ type ContractBase = ContractType<
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
         };
+        readonly embedding: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1' };
+        };
       };
       readonly relations: {
         readonly comments: {
@@ -372,6 +386,7 @@ type ContractBase = ContractType<
           readonly title: { readonly column: 'title' };
           readonly userId: { readonly column: 'user_id' };
           readonly views: { readonly column: 'views' };
+          readonly embedding: { readonly column: 'embedding' };
         };
       };
     };
@@ -515,11 +530,59 @@ type ContractBase = ContractType<
       readonly lateral: true;
       readonly limit: true;
       readonly orderBy: true;
+      readonly 'pgvector/cosine': true;
       readonly returning: true;
     };
     readonly sql: { readonly enums: true; readonly returning: true };
   };
-  readonly extensionPacks: {};
+  readonly extensionPacks: {
+    readonly pgvector: {
+      readonly capabilities: { readonly postgres: { readonly 'pgvector/cosine': true } };
+      readonly familyId: 'sql';
+      readonly id: 'pgvector';
+      readonly kind: 'extension';
+      readonly targetId: 'postgres';
+      readonly types: {
+        readonly codecTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorTypes';
+            readonly named: 'CodecTypes';
+            readonly package: '@prisma-next/extension-pgvector/codec-types';
+          };
+          readonly typeImports: readonly [
+            {
+              readonly alias: 'Vector';
+              readonly named: 'Vector';
+              readonly package: '@prisma-next/extension-pgvector/codec-types';
+            },
+          ];
+        };
+        readonly operationTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorOperationTypes';
+            readonly named: 'OperationTypes';
+            readonly package: '@prisma-next/extension-pgvector/operation-types';
+          };
+        };
+        readonly queryOperationTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorQueryOperationTypes';
+            readonly named: 'QueryOperationTypes';
+            readonly package: '@prisma-next/extension-pgvector/operation-types';
+          };
+        };
+        readonly storage: readonly [
+          {
+            readonly familyId: 'sql';
+            readonly nativeType: 'vector';
+            readonly targetId: 'postgres';
+            readonly typeId: 'pg/vector@1';
+          },
+        ];
+      };
+      readonly version: '0.0.1';
+    };
+  };
   readonly execution: {
     readonly executionHash: ExecutionHash;
     readonly mutations: {

@@ -5,7 +5,10 @@ import {
   DerivedTableSource,
   ListExpression,
   LiteralExpr,
+  OperationExpr,
+  OrderByItem,
   OrExpr,
+  ParamRef,
   type SelectAst,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -27,7 +30,6 @@ function dslDescriptor(table: string, column: string) {
     >
   )[table]!.columns[column]!;
   return {
-    name: column,
     source: 'dsl' as const,
     codecId: columnMeta.codecId,
   };
@@ -144,6 +146,132 @@ describe('compileSelectWithIncludeStrategy', () => {
     expect(() => compileSelect(baseContract, 'users', invalidState)).toThrow(
       'Missing cursor value for orderBy column "id"',
     );
+  });
+
+  it('compiles expression-based orderBy to OrderByItem with the expression', () => {
+    const opExpr = new OperationExpr({
+      method: 'cosineDistance',
+      self: ColumnRef.of('posts', 'embedding'),
+      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+      returns: { codecId: 'builtin/float8', nullable: false },
+      lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
+    });
+
+    const { collection } = createCollectionFor('Post');
+    const state = {
+      ...collection.state,
+      orderBy: [OrderByItem.asc(ColumnRef.of('posts', 'id')), OrderByItem.desc(opExpr)],
+    };
+
+    const plan = compileSelect(baseContract, 'posts', state);
+    expectSelectAst(plan.ast);
+
+    expect(plan.ast.orderBy).toEqual([
+      OrderByItem.asc(ColumnRef.of('posts', 'id')),
+      OrderByItem.desc(opExpr),
+    ]);
+
+    expect(plan.params).toEqual([[1, 2, 3]]);
+    expect(plan.meta.paramDescriptors).toEqual([
+      { name: 'searchVec', codecId: 'pg/vector@1', source: 'dsl' },
+    ]);
+  });
+
+  it('cursor pagination ignores expression-based orders', () => {
+    const opExpr = new OperationExpr({
+      method: 'cosineDistance',
+      self: ColumnRef.of('posts', 'embedding'),
+      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+      returns: { codecId: 'builtin/float8', nullable: false },
+      lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
+    });
+
+    const { collection } = createCollectionFor('Post');
+    const state = {
+      ...collection.state,
+      orderBy: [OrderByItem.asc(ColumnRef.of('posts', 'id')), OrderByItem.desc(opExpr)],
+      cursor: { id: 5 },
+    };
+
+    const plan = compileSelect(baseContract, 'posts', state);
+    expectSelectAst(plan.ast);
+
+    expect(plan.ast.orderBy).toEqual([
+      new OrderByItem(ColumnRef.of('posts', 'id'), 'asc'),
+      new OrderByItem(opExpr, 'desc'),
+    ]);
+
+    expect(plan.ast.where).toEqual(
+      bindWhereExpr(baseContract, BinaryExpr.gt(ColumnRef.of('posts', 'id'), LiteralExpr.of(5))),
+    );
+  });
+
+  it('compiles extension operation in where() with correct params', () => {
+    const opExpr = new OperationExpr({
+      method: 'cosineDistance',
+      self: ColumnRef.of('posts', 'embedding'),
+      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+      returns: { codecId: 'builtin/float8', nullable: false },
+      lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
+    });
+
+    const whereExpr = new BinaryExpr('lt', opExpr, LiteralExpr.of(0.2));
+
+    const { collection } = createCollectionFor('Post');
+    const state = {
+      ...collection.state,
+      filters: [whereExpr],
+    };
+
+    const plan = compileSelect(baseContract, 'posts', state);
+    expectSelectAst(plan.ast);
+
+    expect(plan.params).toEqual([[1, 2, 3]]);
+    expect(plan.meta.paramDescriptors).toHaveLength(1);
+    expect(plan.meta.paramDescriptors[0]).toMatchObject({
+      name: 'searchVec',
+      codecId: 'pg/vector@1',
+    });
+  });
+
+  it('compiles mixed extension where + extension orderBy with correct param order', () => {
+    const opExpr = new OperationExpr({
+      method: 'cosineDistance',
+      self: ColumnRef.of('posts', 'embedding'),
+      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+      returns: { codecId: 'builtin/float8', nullable: false },
+      lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
+    });
+
+    const whereExpr = new BinaryExpr('lt', opExpr, LiteralExpr.of(0.5));
+
+    const orderOpExpr = new OperationExpr({
+      method: 'cosineDistance',
+      self: ColumnRef.of('posts', 'embedding'),
+      args: [ParamRef.of([4, 5, 6], { name: 'orderVec', codecId: 'pg/vector@1' })],
+      returns: { codecId: 'builtin/float8', nullable: false },
+      lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
+    });
+
+    const { collection } = createCollectionFor('Post');
+    const state = {
+      ...collection.state,
+      filters: [whereExpr],
+      orderBy: [OrderByItem.asc(ColumnRef.of('posts', 'id')), OrderByItem.asc(orderOpExpr)],
+    };
+
+    const plan = compileSelect(baseContract, 'posts', state);
+    expectSelectAst(plan.ast);
+
+    expect(plan.ast.orderBy).toEqual([
+      OrderByItem.asc(ColumnRef.of('posts', 'id')),
+      OrderByItem.asc(orderOpExpr),
+    ]);
+
+    expect(plan.params).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
   });
 
   it('prepends relation filters and clears nested paging for relation selects', () => {

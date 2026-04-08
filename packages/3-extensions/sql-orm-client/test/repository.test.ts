@@ -36,13 +36,7 @@ describe('Collection construction', () => {
     const scoped = collection.popular();
     expect(scoped.state.filters).toHaveLength(1);
     expect(scoped.state.filters[0]).toEqual(
-      BinaryExpr.gt(
-        ColumnRef.of('posts', 'views'),
-        ParamRef.of(1000, {
-          name: 'views',
-          codecId: 'pg/int4@1',
-        }),
-      ),
+      BinaryExpr.gt(ColumnRef.of('posts', 'views'), ParamRef.of(1000, { codecId: 'pg/int4@1' })),
     );
   });
 });

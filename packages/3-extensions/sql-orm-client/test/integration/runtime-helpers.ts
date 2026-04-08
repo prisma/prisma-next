@@ -1,10 +1,20 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import {
+  createExecutionContext,
+  createRuntime,
+  createSqlExecutionStack,
+} from '@prisma-next/sql-runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
-import { createPostgresAdapter } from '../../../../3-targets/6-adapters/postgres/src/core/adapter';
 import type { RuntimeQueryable } from '../../src/types';
-import { getTestContract } from '../helpers';
+import { getTestContract, type TestContract } from '../helpers';
 
 interface SeedUser {
   id: number;
@@ -18,6 +28,7 @@ interface SeedPost {
   title: string;
   userId: number | null;
   views: number;
+  embedding?: number[] | null;
 }
 
 interface SeedProfile {
@@ -48,13 +59,35 @@ export async function createPgIntegrationRuntime(
   const pool = new Pool({ connectionString });
   await pool.query('select 1');
 
-  const executions: ExecutionPlan[] = [];
+  const contract = getTestContract();
   const adapter = createPostgresAdapter();
-  const contract = getTestContract() as Parameters<typeof adapter.lower>[1]['contract'];
 
-  const toExecutionPlan = <Row>(
-    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
-  ): ExecutionPlan<Row> => {
+  const stack = createSqlExecutionStack({
+    target: postgresTarget,
+    adapter: postgresAdapter,
+    driver: postgresDriver,
+    extensionPacks: [pgvectorRuntime],
+  });
+
+  const context = createExecutionContext<TestContract>({ contract, stack });
+  const stackInstance = instantiateExecutionStack(stack);
+
+  const driver = stackInstance.driver;
+  if (!driver) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+  await driver.connect({ kind: 'pgPool', pool });
+
+  const realRuntime = createRuntime({
+    stackInstance,
+    context,
+    driver,
+    verify: { mode: 'onFirstUse', requireMarker: false },
+  });
+
+  const executions: ExecutionPlan[] = [];
+
+  const toLoweredPlan = <Row>(plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): ExecutionPlan<Row> => {
     if ('sql' in plan) {
       return plan;
     }
@@ -85,23 +118,11 @@ export async function createPgIntegrationRuntime(
       executions.length = 0;
     },
     async close() {
-      await pool.end();
+      await realRuntime.close();
     },
     execute<Row>(plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterableResult<Row> {
-      const executablePlan = toExecutionPlan(plan);
-      executions.push(executablePlan as ExecutionPlan);
-
-      const runQuery = pool.query<Record<string, unknown>>(executablePlan.sql, [
-        ...executablePlan.params,
-      ]);
-      const generator = async function* (): AsyncGenerator<Row, void, unknown> {
-        const result = await runQuery;
-        for (const row of result.rows) {
-          yield row as Row;
-        }
-      };
-
-      return new AsyncIterableResult(generator());
+      executions.push(toLoweredPlan(plan));
+      return realRuntime.execute(plan);
     },
   };
 
@@ -109,6 +130,19 @@ export async function createPgIntegrationRuntime(
 }
 
 export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<void> {
+  await runtime.query('create schema if not exists prisma_contract');
+  await runtime.query(`create table if not exists prisma_contract.marker (
+    id smallint primary key default 1,
+    core_hash text not null,
+    profile_hash text not null,
+    contract_json jsonb,
+    canonical_version int,
+    updated_at timestamptz not null default now(),
+    app_tag text,
+    meta jsonb not null default '{}'
+  )`);
+  await runtime.query('create extension if not exists vector');
+
   await runtime.query('drop table if exists tags');
   await runtime.query('drop table if exists comments');
   await runtime.query('drop table if exists profiles');
@@ -130,7 +164,8 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
       id integer primary key,
       title text not null,
       user_id integer,
-      views integer not null
+      views integer not null,
+      embedding vector
     )
   `);
 
@@ -175,12 +210,16 @@ export async function seedPosts(
   posts: readonly SeedPost[],
 ): Promise<void> {
   for (const post of posts) {
-    await runtime.query('insert into posts (id, title, user_id, views) values ($1, $2, $3, $4)', [
-      post.id,
-      post.title,
-      post.userId,
-      post.views,
-    ]);
+    await runtime.query(
+      'insert into posts (id, title, user_id, views, embedding) values ($1, $2, $3, $4, $5)',
+      [
+        post.id,
+        post.title,
+        post.userId,
+        post.views,
+        post.embedding ? `[${post.embedding.join(',')}]` : null,
+      ],
+    );
   }
 }
 

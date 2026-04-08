@@ -1,5 +1,7 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
+import pgvector from '@prisma-next/extension-pgvector/pack';
 import type { ColumnTypeDescriptor } from '@prisma-next/sql-contract/types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
@@ -11,6 +13,7 @@ const jsonbColumn: ColumnTypeDescriptor = {
 
 const baseContract = defineContract<CodecTypes>()
   .target(postgresPack)
+  .extensionPacks({ pgvector })
   .table('users', (table) =>
     table
       .column('id', { type: int4Column, nullable: false })
@@ -28,6 +31,7 @@ const baseContract = defineContract<CodecTypes>()
       .column('title', { type: textColumn, nullable: false })
       .column('user_id', { type: int4Column, nullable: false })
       .column('views', { type: int4Column, nullable: false })
+      .column('embedding', { type: vectorColumn, nullable: true })
       .primaryKey(['id'])
       .foreignKey(['user_id'], { table: 'users', columns: ['id'] }),
   )
@@ -119,6 +123,7 @@ const baseContract = defineContract<CodecTypes>()
       .field('title', 'title')
       .field('userId', 'user_id')
       .field('views', 'views')
+      .field('embedding', 'embedding')
       .relation('comments', {
         toModel: 'Comment',
         toTable: 'comments',

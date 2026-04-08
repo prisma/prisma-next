@@ -1,7 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { isWhereExpr, type ToWhereExpr, type WhereArg } from '@prisma-next/sql-relational-core/ast';
+import {
+  isWhereExpr,
+  type OrderByItem,
+  type ToWhereExpr,
+  type WhereArg,
+} from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import { mapCursorValuesToColumns, mapFieldsToColumns } from './collection-column-mapping';
@@ -63,33 +68,31 @@ import {
   compileUpdateReturning,
   compileUpsertReturning,
 } from './query-plan';
-import type {
-  AggregateBuilder,
-  AggregateResult,
-  AggregateSpec,
-  CollectionContext,
-  CollectionState,
-  CollectionTypeState,
-  CreateInput,
-  DefaultCollectionTypeState,
-  DefaultModelRow,
-  IncludeCombine,
-  IncludeCombineBranch,
-  IncludeExpr,
-  IncludeScalar,
-  ModelAccessor,
-  MutationCreateInput,
-  MutationCreateInputWithRelations,
-  MutationUpdateInput,
-  NumericFieldNames,
-  OrderByDirective,
-  OrderExpr,
-  RelatedModelName,
-  RelationNames,
-  ShorthandWhereFilter,
-  UniqueConstraintCriterion,
+import {
+  type AggregateBuilder,
+  type AggregateResult,
+  type AggregateSpec,
+  type CollectionContext,
+  type CollectionState,
+  type CollectionTypeState,
+  type CreateInput,
+  type DefaultCollectionTypeState,
+  type DefaultModelRow,
+  emptyState,
+  type IncludeCombine,
+  type IncludeCombineBranch,
+  type IncludeExpr,
+  type IncludeScalar,
+  type ModelAccessor,
+  type MutationCreateInput,
+  type MutationCreateInputWithRelations,
+  type MutationUpdateInput,
+  type NumericFieldNames,
+  type RelatedModelName,
+  type RelationNames,
+  type ShorthandWhereFilter,
+  type UniqueConstraintCriterion,
 } from './types';
-import { emptyState } from './types';
 import { normalizeWhereArg } from './where-interop';
 
 function applyCreateDefaults(
@@ -348,18 +351,14 @@ export class Collection<
 
   orderBy(
     selection:
-      | ((model: ModelAccessor<TContract, ModelName>) => OrderByDirective)
-      | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => OrderByDirective>,
+      | ((model: ModelAccessor<TContract, ModelName>) => OrderByItem)
+      | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => OrderByItem>,
   ): Collection<TContract, ModelName, Row, WithOrderByState<State>> {
     const accessor = createModelAccessor(this.ctx.context, this.modelName);
     const selectors = Array.isArray(selection) ? selection : [selection];
-    const nextOrders: OrderExpr[] = selectors.map((selector) => {
-      const order = selector(accessor as ModelAccessor<TContract, ModelName>);
-      return {
-        column: order.column,
-        direction: order.direction,
-      };
-    });
+    const nextOrders = selectors.map((selector) =>
+      selector(accessor as ModelAccessor<TContract, ModelName>),
+    );
     const existing = this.state.orderBy ?? [];
     return this.#clone<WithOrderByState<State>>({
       orderBy: [...existing, ...nextOrders],

@@ -96,8 +96,8 @@ describe('integration/include', () => {
             invitedById: null,
             address: null,
             posts: [
-              { id: 10, title: 'Post A', userId: 1, views: 100 },
-              { id: 11, title: 'Post B', userId: 1, views: 200 },
+              { id: 10, title: 'Post A', userId: 1, views: 100, embedding: null },
+              { id: 11, title: 'Post B', userId: 1, views: 200, embedding: null },
             ],
             profile: { id: 100, userId: 1, bio: 'Primary profile' },
           },
@@ -107,7 +107,7 @@ describe('integration/include', () => {
             email: 'bob@example.com',
             invitedById: null,
             address: null,
-            posts: [{ id: 12, title: 'Post C', userId: 2, views: 300 }],
+            posts: [{ id: 12, title: 'Post C', userId: 2, views: 300, embedding: null }],
             profile: null,
           },
         ]);
@@ -140,9 +140,9 @@ describe('integration/include', () => {
           .all();
 
         expect(rows).toEqual([
-          { id: 10, title: 'Post A', userId: 1, views: 100, comments: 2 },
-          { id: 11, title: 'Post B', userId: 1, views: 200, comments: 0 },
-          { id: 12, title: 'Post C', userId: 2, views: 300, comments: 1 },
+          { id: 10, title: 'Post A', userId: 1, views: 100, embedding: null, comments: 2 },
+          { id: 11, title: 'Post B', userId: 1, views: 200, embedding: null, comments: 0 },
+          { id: 12, title: 'Post C', userId: 2, views: 300, embedding: null, comments: 1 },
         ]);
         expect(runtime.executions).toHaveLength(2);
       });
@@ -304,8 +304,8 @@ describe('integration/include', () => {
             invitedById: null,
             address: null,
             posts: {
-              popular: [{ id: 11, title: 'Post B', userId: 1, views: 250 }],
-              latestOne: [{ id: 11, title: 'Post B', userId: 1, views: 250 }],
+              popular: [{ id: 11, title: 'Post B', userId: 1, views: 250, embedding: null }],
+              latestOne: [{ id: 11, title: 'Post B', userId: 1, views: 250, embedding: null }],
               totalCount: 2,
             },
           },
@@ -316,8 +316,8 @@ describe('integration/include', () => {
             invitedById: null,
             address: null,
             posts: {
-              popular: [{ id: 12, title: 'Post C', userId: 2, views: 300 }],
-              latestOne: [{ id: 12, title: 'Post C', userId: 2, views: 300 }],
+              popular: [{ id: 12, title: 'Post C', userId: 2, views: 300, embedding: null }],
+              latestOne: [{ id: 12, title: 'Post C', userId: 2, views: 300, embedding: null }],
               totalCount: 1,
             },
           },
@@ -365,7 +365,7 @@ describe('integration/include', () => {
             email: 'alice@example.com',
             invitedById: null,
             address: null,
-            posts: [{ id: 11, title: 'Post B', userId: 1, views: 200 }],
+            posts: [{ id: 11, title: 'Post B', userId: 1, views: 200, embedding: null }],
           },
           {
             id: 2,
@@ -522,7 +522,7 @@ describe('integration/include', () => {
             email: 'alice@example.com',
             invitedById: null,
             address: null,
-            posts: [{ id: 10, title: 'Post A', userId: 1, views: 100 }],
+            posts: [{ id: 10, title: 'Post A', userId: 1, views: 100, embedding: null }],
           },
         ]);
         expect(runtime.executions).toHaveLength(1);
@@ -672,6 +672,7 @@ describe('integration/include', () => {
                 title: 'Post A',
                 userId: 1,
                 views: 100,
+                embedding: null,
                 comments: [
                   { id: 100, body: 'Comment A', postId: 10 },
                   { id: 101, body: 'Comment B', postId: 10 },
@@ -682,6 +683,7 @@ describe('integration/include', () => {
                 title: 'Post B',
                 userId: 1,
                 views: 200,
+                embedding: null,
                 comments: [{ id: 102, body: 'Comment C', postId: 11 }],
               },
             ],
@@ -698,6 +700,7 @@ describe('integration/include', () => {
                 title: 'Post C',
                 userId: 2,
                 views: 300,
+                embedding: null,
                 comments: [],
               },
             ],

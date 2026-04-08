@@ -92,8 +92,8 @@ describe('integration/update', () => {
         expect(updated).toEqual({
           name: 'Alice Updated',
           posts: [
-            { id: 10, title: 'Post A', userId: 1, views: 100 },
-            { id: 11, title: 'Post B', userId: 1, views: 200 },
+            { id: 10, title: 'Post A', userId: 1, views: 100, embedding: null },
+            { id: 11, title: 'Post B', userId: 1, views: 200, embedding: null },
           ],
         });
       });
