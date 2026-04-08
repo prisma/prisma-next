@@ -10,13 +10,13 @@ import postgresPack from '@prisma-next/target-postgres/pack';
 import { expectTypeOf, test } from 'vitest';
 
 // ---------------------------------------------------------------------------
-// Staged DSL literal type inference tests
+// DSL literal type inference tests
 //
 // These tests verify the acceptance criterion:
 //   "Downstream schema() / sql() inference continues to work from
 //    no-emit TS-authored contracts built from the new surface."
 //
-// Each test uses `typeof contract` (the inferred type from the staged DSL),
+// Each test uses `typeof contract` (the inferred type from the DSL),
 // NOT an emitted Contract type. If TypeScript cannot reduce the inferred type
 // to literal table/column/model keys, these tests fail.
 // ---------------------------------------------------------------------------

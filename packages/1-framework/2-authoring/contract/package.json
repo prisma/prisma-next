@@ -15,10 +15,7 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:*",
-    "@prisma-next/framework-components": "workspace:*",
-    "@prisma-next/utils": "workspace:*",
-    "ts-toolbelt": "^9.6.0"
+    "@prisma-next/contract": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",

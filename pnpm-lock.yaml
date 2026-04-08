@@ -468,15 +468,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../0-foundation/contract
-      '@prisma-next/framework-components':
-        specifier: workspace:*
-        version: link:../../1-core/framework-components
-      '@prisma-next/utils':
-        specifier: workspace:*
-        version: link:../../0-foundation/utils
-      ts-toolbelt:
-        specifier: ^9.6.0
-        version: 9.6.0
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
