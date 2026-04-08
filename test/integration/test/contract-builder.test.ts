@@ -15,25 +15,25 @@ import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { CodecTypes, Contract } from './fixtures/contract.d';
+import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 describe('builder integration', () => {
   it('builds a contract matching fixture structure', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false } as const)
-          .column('email', { type: textColumn, nullable: false } as const)
-          .column('createdAt', { type: timestamptzColumn, nullable: false } as const)
-          .primaryKey(['id']),
-      )
-      .model('User', 'user', (m) =>
-        m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-      )
-      .storageHash('sha256:test-core')
-      .build();
+    const contract = defineContract({
+      family: sqlFamilyPack,
+      target: postgresPack,
+      storageHash: 'sha256:test-core',
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn),
+            createdAt: field.column(timestamptzColumn),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     // Runtime checks
     expect(contract).toMatchObject({
@@ -116,40 +116,40 @@ describe('builder integration', () => {
   });
 
   it('contract can be validated with validateContract', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('email', { type: textColumn, nullable: false })
-          .column('createdAt', { type: timestamptzColumn, nullable: false })
-          .primaryKey(['id']),
-      )
-      .model('User', 'user', (m) =>
-        m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-      )
-      .storageHash('sha256:test-core')
-      .build();
+    const contract = defineContract({
+      family: sqlFamilyPack,
+      target: postgresPack,
+      storageHash: 'sha256:test-core',
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn),
+            createdAt: field.column(timestamptzColumn),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     expect(contract.target).toBe('postgres');
     expect(contract.storage.tables.user).toBeDefined();
   });
 
   it('contract works with schema() function', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('email', { type: textColumn, nullable: false })
-          .column('createdAt', { type: timestamptzColumn, nullable: false })
-          .primaryKey(['id']),
-      )
-      .model('User', 'user', (m) =>
-        m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-      )
-      .storageHash('sha256:test-core')
-      .build();
+    const contract = defineContract({
+      family: sqlFamilyPack,
+      target: postgresPack,
+      storageHash: 'sha256:test-core',
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn),
+            createdAt: field.column(timestamptzColumn),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
@@ -167,20 +167,20 @@ describe('builder integration', () => {
   });
 
   it('contract works with sql() function', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('email', { type: textColumn, nullable: false })
-          .column('createdAt', { type: timestamptzColumn, nullable: false })
-          .primaryKey(['id']),
-      )
-      .model('User', 'user', (m) =>
-        m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-      )
-      .storageHash('sha256:test-core')
-      .build();
+    const contract = defineContract({
+      family: sqlFamilyPack,
+      target: postgresPack,
+      storageHash: 'sha256:test-core',
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn),
+            createdAt: field.column(timestamptzColumn),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
@@ -212,20 +212,20 @@ describe('builder integration', () => {
   });
 
   it('ResultType inference works with builder contract', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('email', { type: textColumn, nullable: false })
-          .column('createdAt', { type: timestamptzColumn, nullable: false })
-          .primaryKey(['id']),
-      )
-      .model('User', 'user', (m) =>
-        m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-      )
-      .storageHash('sha256:test-core')
-      .build();
+    const contract = defineContract({
+      family: sqlFamilyPack,
+      target: postgresPack,
+      storageHash: 'sha256:test-core',
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn),
+            createdAt: field.column(timestamptzColumn),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
@@ -312,20 +312,20 @@ describe('builder integration', () => {
   });
 
   it('contract structure matches fixture contract', () => {
-    const builderContract = defineContract<CodecTypes>()
-      .target(postgresPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('email', { type: textColumn, nullable: false })
-          .column('createdAt', { type: timestamptzColumn, nullable: false })
-          .primaryKey(['id']),
-      )
-      .model('User', 'user', (m) =>
-        m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-      )
-      .storageHash('sha256:test-core')
-      .build();
+    const builderContract = defineContract({
+      family: sqlFamilyPack,
+      target: postgresPack,
+      storageHash: 'sha256:test-core',
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn),
+            createdAt: field.column(timestamptzColumn),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     const fixtureContract = validateContract<Contract>(contractJson, emptyCodecLookup);
 
@@ -367,15 +367,18 @@ describe('builder integration', () => {
   });
 
   it('supports type option with dataTypes constants', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('email', { type: textColumn, nullable: false }),
-      )
-      .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-      .build();
+    const contract = defineContract({
+      family: sqlFamilyPack,
+      target: postgresPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column),
+            email: field.column(textColumn),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     // Type checks - verify codecId is a string (TypeScript may widen literal types)
     expectTypeOf(contract.storage.tables.user.columns.id.codecId).toExtend<string>();
@@ -390,71 +393,52 @@ describe('builder integration', () => {
   it('accepts any codecId format in descriptor (validation happens at runtime)', () => {
     // Column descriptors accept any codecId format - validation happens at runtime
     // when the contract is used, not at build time
-    const contract = defineContract<CodecTypes>()
-      .target(postgresPack)
-      .table('user', (t) =>
-        t.column('id', {
-          // biome-ignore lint/suspicious/noExplicitAny: Testing invalid type descriptor
-          type: { codecId: 'invalid', nativeType: 'invalid' } as any,
-        }),
-      )
-      .build();
+    const contract = defineContract({
+      family: sqlFamilyPack,
+      target: postgresPack,
+      models: {
+        User: model('User', {
+          fields: {
+            // biome-ignore lint/suspicious/noExplicitAny: Testing invalid type descriptor
+            id: field.column({ codecId: 'invalid', nativeType: 'invalid' } as any),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
     // Contract builds successfully - invalid codecId will cause errors at runtime
     expect(contract.storage.tables.user.columns.id.codecId).toBe('invalid');
   });
 
   describe('relation builder', () => {
     it('builds a contract with 1:N relation', () => {
-      const contract = defineContract<CodecTypes>()
-        .target(postgresPack)
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .table('post', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('userId', { type: int4Column, nullable: false })
-            .column('title', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .model('User', 'user', (m) =>
-          m
-            .field('id', 'id')
-            .field('email', 'email')
-            .relation('posts', {
-              toModel: 'Post',
-              toTable: 'post',
-              cardinality: '1:N',
-              on: {
-                parentTable: 'user',
-                parentColumns: ['id'],
-                childTable: 'post',
-                childColumns: ['userId'],
-              },
-            }),
-        )
-        .model('Post', 'post', (m) =>
-          m
-            .field('id', 'id')
-            .field('userId', 'userId')
-            .field('title', 'title')
-            .relation('user', {
-              toModel: 'User',
-              toTable: 'user',
-              cardinality: 'N:1',
-              on: {
-                parentTable: 'post',
-                parentColumns: ['userId'],
-                childTable: 'user',
-                childColumns: ['id'],
-              },
-            }),
-        )
-        .storageHash('sha256:test-core')
-        .build();
+      const UserBase = model('User', {
+        fields: {
+          id: field.column(int4Column).id(),
+          email: field.column(textColumn),
+        },
+      });
+
+      const Post = model('Post', {
+        fields: {
+          id: field.column(int4Column).id(),
+          userId: field.column(int4Column),
+          title: field.column(textColumn),
+        },
+        relations: {
+          user: rel.belongsTo(UserBase, { from: 'userId', to: 'id' }),
+        },
+      }).sql({ table: 'post' });
+
+      const User = UserBase.relations({
+        posts: rel.hasMany(Post, { by: 'userId' }),
+      }).sql({ table: 'user' });
+
+      const contract = defineContract({
+        family: sqlFamilyPack,
+        target: postgresPack,
+        storageHash: 'sha256:test-core',
+        models: { User, Post },
+      });
 
       type RelShape = {
         to: string;
@@ -481,70 +465,52 @@ describe('builder integration', () => {
     });
 
     it('builds a contract with N:M relation', () => {
-      const contract = defineContract<CodecTypes>()
-        .target(postgresPack)
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .table('role', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('name', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .table('userRole', (t) =>
-          t
-            .column('userId', { type: int4Column, nullable: false })
-            .column('roleId', { type: int4Column, nullable: false })
-            .primaryKey(['userId', 'roleId']),
-        )
-        .model('User', 'user', (m) =>
-          m
-            .field('id', 'id')
-            .field('email', 'email')
-            .relation('roles', {
-              toModel: 'Role',
-              toTable: 'role',
-              cardinality: 'N:M',
-              through: {
-                table: 'userRole',
-                parentColumns: ['id'],
-                childColumns: ['userId'],
-              },
-              on: {
-                parentTable: 'user',
-                parentColumns: ['id'],
-                childTable: 'userRole',
-                childColumns: ['userId'],
-              },
-            }),
-        )
-        .model('Role', 'role', (m) =>
-          m
-            .field('id', 'id')
-            .field('name', 'name')
-            .relation('users', {
-              toModel: 'User',
-              toTable: 'user',
-              cardinality: 'N:M',
-              through: {
-                table: 'userRole',
-                parentColumns: ['id'],
-                childColumns: ['roleId'],
-              },
-              on: {
-                parentTable: 'role',
-                parentColumns: ['id'],
-                childTable: 'userRole',
-                childColumns: ['roleId'],
-              },
-            }),
-        )
-        .storageHash('sha256:test-core')
-        .build();
+      const UserRole = model('UserRole', {
+        fields: {
+          userId: field.column(int4Column),
+          roleId: field.column(int4Column),
+        },
+      })
+        .attributes(({ fields, constraints }) => ({
+          id: constraints.id([fields.userId, fields.roleId]),
+        }))
+        .sql({ table: 'userRole' });
+
+      const UserBase = model('User', {
+        fields: {
+          id: field.column(int4Column).id(),
+          email: field.column(textColumn),
+        },
+      });
+
+      const Role = model('Role', {
+        fields: {
+          id: field.column(int4Column).id(),
+          name: field.column(textColumn),
+        },
+        relations: {
+          users: rel.manyToMany(UserBase, {
+            through: () => UserRole,
+            from: 'roleId',
+            to: 'userId',
+          }),
+        },
+      }).sql({ table: 'role' });
+
+      const User = UserBase.relations({
+        roles: rel.manyToMany(() => Role, {
+          through: () => UserRole,
+          from: 'userId',
+          to: 'roleId',
+        }),
+      }).sql({ table: 'user' });
+
+      const contract = defineContract({
+        family: sqlFamilyPack,
+        target: postgresPack,
+        storageHash: 'sha256:test-core',
+        models: { User, Role, UserRole },
+      });
 
       const models = contract.models as Record<string, { relations: Record<string, unknown> }>;
       expect(models['User']?.relations).toMatchObject({
@@ -561,107 +527,12 @@ describe('builder integration', () => {
       });
     });
 
-    it('validates parentTable matches model table', () => {
-      expect(() => {
-        defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) => t.column('id', { type: int4Column, nullable: false }))
-          .table('post', (t) => t.column('id', { type: int4Column, nullable: false }))
-          .model('User', 'user', (m) =>
-            m.relation('posts', {
-              toModel: 'Post',
-              toTable: 'post',
-              cardinality: '1:N',
-              on: {
-                parentTable: 'wrongTable' as 'user',
-                parentColumns: ['id'],
-                childTable: 'post',
-                childColumns: ['userId'],
-              },
-            } as unknown as Parameters<typeof m.relation>[1]),
-          )
-          .build();
-      }).toThrow(/parentTable.*does not match model table/);
-    });
-
-    it('validates childTable matches toTable for non-N:M relations', () => {
-      expect(() => {
-        defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) => t.column('id', { type: int4Column, nullable: false }))
-          .table('post', (t) => t.column('id', { type: int4Column, nullable: false }))
-          .model('User', 'user', (m) =>
-            m.relation('posts', {
-              toModel: 'Post',
-              toTable: 'post',
-              cardinality: '1:N',
-              on: {
-                parentTable: 'user',
-                parentColumns: ['id'],
-                childTable: 'wrongTable',
-                childColumns: ['userId'],
-              },
-            }),
-          )
-          .build();
-      }).toThrow(/childTable.*does not match toTable/);
-    });
-
-    it('validates N:M relations require through field', () => {
-      expect(() => {
-        defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) => t.column('id', { type: int4Column, nullable: false }))
-          .table('role', (t) => t.column('id', { type: int4Column, nullable: false }))
-          .model('User', 'user', (m) => {
-            // Intentionally omit through to test validation
-            const invalidRelation = {
-              toModel: 'Role' as const,
-              toTable: 'role' as const,
-              cardinality: 'N:M' as const,
-              on: {
-                parentTable: 'user' as const,
-                parentColumns: ['id'] as const,
-                childTable: 'userRole' as const,
-                childColumns: ['userId'] as const,
-              },
-            };
-            return m.relation(
-              'roles',
-              invalidRelation as unknown as Parameters<typeof m.relation>[1],
-            );
-          })
-          .build();
-      }).toThrow(/cardinality "N:M" requires through field/);
-    });
-
-    it('validates childTable matches through.table for N:M relations', () => {
-      expect(() => {
-        defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) => t.column('id', { type: int4Column, nullable: false }))
-          .table('role', (t) => t.column('id', { type: int4Column, nullable: false }))
-          .table('userRole', (t) => t.column('userId', { type: int4Column, nullable: false }))
-          .model('User', 'user', (m) =>
-            m.relation('roles', {
-              toModel: 'Role',
-              toTable: 'role',
-              cardinality: 'N:M',
-              through: {
-                table: 'userRole',
-                parentColumns: ['id'],
-                childColumns: ['userId'],
-              },
-              on: {
-                parentTable: 'user',
-                parentColumns: ['id'],
-                childTable: 'wrongTable',
-                childColumns: ['userId'],
-              },
-            }),
-          )
-          .build();
-      }).toThrow(/childTable.*does not match through.table/);
-    });
+    // TODO: The following 4 validation tests tested legacy chain builder validation logic
+    // (parentTable/childTable/through matching). In the new DSL, these constraints are
+    // enforced structurally by rel.belongsTo/hasMany/manyToMany and cannot be violated.
+    // Equivalent DSL validation tests exist in contract-builder.dsl.test.ts
+    // (e.g., "rejects belongsTo relations whose field arity does not match the target",
+    // "rejects hasMany relations whose child fields do not match the parent identity arity",
+    // "rejects many-to-many relations whose through mappings do not match anchor arity").
   });
 });

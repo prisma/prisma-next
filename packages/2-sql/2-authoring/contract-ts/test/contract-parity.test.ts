@@ -1,10 +1,17 @@
-import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
-import { defineContract } from '../src/contract-builder';
+import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
+
+const bareFamilyPack: FamilyPackRef<'sql'> = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  version: '0.0.1',
+};
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
@@ -15,17 +22,19 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 };
 
 describe('defineContract build output', () => {
-  it('defineContract().build() omits _generated', () => {
-    const built = defineContract()
-      .target(postgresTargetPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column })
-          .primaryKey(['id'])
-          .column('email', { type: textColumn }),
-      )
-      .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-      .build();
+  it('defineContract() omits _generated', () => {
+    const built = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     expect(built).not.toHaveProperty('_generated');
   });

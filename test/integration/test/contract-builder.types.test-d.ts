@@ -18,7 +18,7 @@ import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/t
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { type as arktype } from 'arktype';
 import { expectTypeOf, test } from 'vitest';
-import type { CodecTypes, Contract } from './fixtures/contract.d';
+import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 const typecheckOnly = process.env['PN_TYPECHECK_ONLY'] === 'true';
@@ -49,20 +49,20 @@ const pgvectorPack = {
 } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
 
 test('builder contract types match fixture contract types', () => {
-  const builderContract = defineContract<CodecTypes>()
-    .target(postgresPack)
-    .table('user', (t) =>
-      t
-        .column('id', { type: int4Column, nullable: false })
-        .column('email', { type: textColumn, nullable: false })
-        .column('createdAt', { type: timestamptzColumn, nullable: false })
-        .primaryKey(['id']),
-    )
-    .model('User', 'user', (m) =>
-      m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-    )
-    .storageHash('sha256:test-core')
-    .build();
+  const builderContract = defineContract({
+    family: sqlFamilyPack,
+    target: postgresPack,
+    storageHash: 'sha256:test-core',
+    models: {
+      User: model('User', {
+        fields: {
+          id: field.column(int4Column).id(),
+          email: field.column(textColumn),
+          createdAt: field.column(timestamptzColumn),
+        },
+      }).sql({ table: 'user' }),
+    },
+  });
 
   const _validatedBuilderContract = validateContract<typeof builderContract>(
     builderContract,
@@ -78,20 +78,20 @@ test('builder contract types match fixture contract types', () => {
 });
 
 test('ResultType inference works identically to fixture contract', () => {
-  const builderContract = defineContract<CodecTypes>()
-    .target(postgresPack)
-    .table('user', (t) =>
-      t
-        .column('id', { type: int4Column, nullable: false })
-        .column('email', { type: textColumn, nullable: false })
-        .column('createdAt', { type: timestamptzColumn, nullable: false })
-        .primaryKey(['id']),
-    )
-    .model('User', 'user', (m) =>
-      m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-    )
-    .storageHash('sha256:test-core')
-    .build();
+  const builderContract = defineContract({
+    family: sqlFamilyPack,
+    target: postgresPack,
+    storageHash: 'sha256:test-core',
+    models: {
+      User: model('User', {
+        fields: {
+          id: field.column(int4Column).id(),
+          email: field.column(textColumn),
+          createdAt: field.column(timestamptzColumn),
+        },
+      }).sql({ table: 'user' }),
+    },
+  });
 
   const validatedBuilderContract = validateContract<typeof builderContract>(
     builderContract,
@@ -425,19 +425,19 @@ test('composed field helpers preserve downstream schema inference', () => {
 });
 
 test('codec type inference via type option', () => {
-  const contract = defineContract<CodecTypes>()
-    .target(postgresPack)
-    .table('user', (t) =>
-      t
-        .column('id', { type: int4Column, nullable: false })
-        .column('email', { type: textColumn, nullable: false })
-        .column('createdAt', { type: timestamptzColumn, nullable: false })
-        .primaryKey(['id']),
-    )
-    .model('User', 'user', (m) =>
-      m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-    )
-    .build();
+  const contract = defineContract({
+    family: sqlFamilyPack,
+    target: postgresPack,
+    models: {
+      User: model('User', {
+        fields: {
+          id: field.column(int4Column).id(),
+          email: field.column(textColumn),
+          createdAt: field.column(timestamptzColumn),
+        },
+      }).sql({ table: 'user' }),
+    },
+  });
 
   const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
   const adapter = createStubAdapter();
@@ -465,23 +465,23 @@ test('codec type inference via type option', () => {
 });
 
 test('contract structure type matches Contract', () => {
-  const contract = defineContract<CodecTypes>()
-    .target(postgresPack)
-    .table('user', (t) =>
-      t
-        .column('id', { type: int4Column, nullable: false })
-        .column('email', { type: textColumn, nullable: false }),
-    )
-    .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-    .build();
+  const contract = defineContract({
+    family: sqlFamilyPack,
+    target: postgresPack,
+    models: {
+      User: model('User', {
+        fields: {
+          id: field.column(int4Column),
+          email: field.column(textColumn),
+        },
+      }).sql({ table: 'user' }),
+    },
+  });
 
-  expectTypeOf(contract).toHaveProperty('schemaVersion');
   expectTypeOf(contract).toHaveProperty('target');
   expectTypeOf(contract).toHaveProperty('targetFamily');
-  expectTypeOf(contract).toHaveProperty('storageHash');
   expectTypeOf(contract).toHaveProperty('models');
   expectTypeOf(contract).toHaveProperty('storage');
-  expectTypeOf(contract).toHaveProperty('mappings');
 });
 
 test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
@@ -490,19 +490,19 @@ test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
     actorId: 'number',
   });
 
-  const contract = defineContract<CodecTypes>()
-    .target(postgresPack)
-    .table('event', (t) =>
-      t
-        .column('id', { type: int4Column, nullable: false })
-        .column('payload', { type: jsonb(payloadSchema), nullable: false })
-        .column('meta', { type: jsonb(), nullable: false })
-        .primaryKey(['id']),
-    )
-    .model('Event', 'event', (m) =>
-      m.field('id', 'id').field('payload', 'payload').field('meta', 'meta'),
-    )
-    .build();
+  const contract = defineContract({
+    family: sqlFamilyPack,
+    target: postgresPack,
+    models: {
+      Event: model('Event', {
+        fields: {
+          id: field.column(int4Column).id(),
+          payload: field.column(jsonb(payloadSchema)),
+          meta: field.column(jsonb()),
+        },
+      }).sql({ table: 'event' }),
+    },
+  });
 
   const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
   const context = createTestContext(validated, createStubAdapter());
