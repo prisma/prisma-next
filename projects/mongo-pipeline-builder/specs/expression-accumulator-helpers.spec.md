@@ -114,10 +114,14 @@ Many of the missing operators use **named arguments** (e.g. `{ $dateToString: { 
 
 ## Non-goals
 
-- Accumulator output type precision refinement (`$sum` on int returning int instead of double) — deferred
-- `$accumulator` (custom JavaScript accumulator) — advanced feature, deferred
+- `$accumulator` (custom JavaScript accumulator) — advanced feature, not planned
 - New dedicated AST node classes for named-args operators — the generic `MongoAggOperator` with record args suffices
 - Removing existing dedicated AST nodes (`MongoAggArrayFilter`, `MongoAggMap`, `MongoAggReduce`, `MongoAggLet`) — they serve a purpose (variable binding semantics) and remain as-is
+
+## Known gaps
+
+- **`fn.literal` accepts `unknown`**: The `value` parameter is untyped, so `fn.literal<StringField>(42)` compiles without error. There is no constraint that the runtime value matches the codec implied by `F`. This is the main remaining hole in the type safety story.
+- **Accumulator output type precision**: `$sum` on an integer field returns `NumericField` (`mongo/double@1`) rather than preserving the input's integer codec. All numeric accumulators default to `double`.
 
 # Acceptance Criteria
 
@@ -180,4 +184,4 @@ No change from existing data access patterns.
 1. ~~**Namespace structure**~~ — Flat. `fn.year()`, `fn.substr()`, not `fn.date.year()`.
 2. ~~**Scope**~~ — All operators listed in the Linear ticket, except `$accumulator` (custom JS).
 3. ~~**Named-args operator representation**~~ — Extend `MongoAggOperator` and `MongoAggAccumulator` to support `Record<string, MongoAggExpr>` as args. Scalar options wrapped as `MongoAggLiteral`.
-4. ~~**Accumulator precision refinement**~~ — Deferred. Not in scope for this ticket.
+4. ~~**Accumulator precision refinement**~~ — Not addressed. Listed as a known gap above.
