@@ -38,14 +38,19 @@ Proves the full migration architecture works for MongoDB by cutting a thin verti
 - [ ] **1.5 Define `MongoSchemaIR` AST.** Following the class-based AST pattern from the SQL query AST, Mongo pipeline AST, and Mongo expression AST: base class with abstract `kind` discriminant + `freeze()` for immutability; intermediate abstract `MongoSchemaNode` with `accept(visitor)` for double dispatch; concrete frozen classes `MongoSchemaCollection` and `MongoSchemaIndex` with `readonly kind = '...' as const`; union type `AnyMongoSchemaNode`; visitor interface `MongoSchemaVisitor<R>` with one method per node type. Package placement: new package in `packages/2-mongo-family/` (tooling layer, migration plane). Write unit tests for AST construction, freeze behavior, and visitor dispatch.
 - [ ] **1.6 Implement `contractToSchema` for Mongo.** Synthesize a `MongoSchemaIR` from a `MongoContract`. When contract is `null` (new project), return empty IR. Lives in `packages/3-mongo-target/`. Write tests with hand-crafted contracts.
 
+**DDL command AST + operation types:**
+
+- [ ] **1.7a Add DDL commands and inspection commands to `@prisma-next/mongo-query-ast`.** Create DDL command AST classes extending `MongoAstNode`: `CreateIndexCommand`, `DropIndexCommand`. Create inspection command AST classes: `ListIndexesCommand`, `ListCollectionsCommand`. Add union types: `AnyMongoDdlCommand`, `AnyMongoInspectionCommand`. Split the package entrypoints into `/execution` (existing DML commands, `MongoQueryPlan`) and `/control` (DDL commands, inspection commands, migration check/step/operation types). Write unit tests for AST construction and freeze behavior.
+- [ ] **1.7b Define `MongoMigrationPlanOperation` as symmetric data envelope.** Define `MongoMigrationCheck` (source inspection command + `MongoFilterExpr` + expect), `MongoMigrationStep` (description + DDL command), and `MongoMigrationPlanOperation` (extends `MigrationPlanOperation` with `precheck[]`, `execute[]`, `postcheck[]`). No class hierarchy, no visitor — operations are plain data. Write unit tests for construction and JSON serialization round-trip.
+- [ ] **1.7c Implement client-side `FilterEvaluator`.** Implement `MongoFilterVisitor<boolean>` that evaluates `MongoFilterExpr` against in-memory JavaScript objects. Support `$eq` (with deep structural equality), `$ne`, `$gt`, `$lt`, `$gte`, `$lte`, `$in`, `$and`, `$or`, `$not`, `$exists`. Support dotted field paths. See [check-evaluator.spec.md](specs/check-evaluator.spec.md). Write thorough unit tests: operator semantics, logical combinators, deep equality, nested field access, edge cases.
+
 **Planner:**
 
-- [ ] **1.7 Define `MongoMigrationPlanOperation` AST classes.** Abstract base class `MongoMigrationOp` with `kind` discriminant, `freeze()`, and `MigrationPlanOperation` envelope fields (`id`, `label`, `operationClass`). Concrete frozen classes: `CreateIndexOp`, `DropIndexOp`. Union type `AnyMongoMigrationOp`. Visitor interface `MongoMigrationOpVisitor<R>` with one method per op type — the runner dispatches via `accept(visitor)` rather than switching on `kind`. Write unit tests for construction, freeze, envelope fields, and visitor dispatch.
-- [ ] **1.8 Implement `MongoMigrationPlanner`.** Diff destination contract against origin `MongoSchemaIR`. For M1: detect added indexes → `CreateIndexOp` (additive), removed indexes → `DropIndexOp` (destructive). Index identity by (collection + ordered fields + key types + semantic options), not by name. Returns `MigrationPlannerResult`. Write unit tests covering: add index, drop index, no-op (same indexes), index identity (same keys different name = equivalent).
+- [ ] **1.8 Implement `MongoMigrationPlanner`.** Diff destination contract against origin `MongoSchemaIR`. For M1: detect added indexes → `planCreateIndex` (additive), removed indexes → `planDropIndex` (destructive). Index identity by (collection + ordered fields + key types + semantic options), not by name. Planner convenience functions compose DDL commands, inspection commands, and filter-expression checks into `MongoMigrationPlanOperation` structures. Returns `MigrationPlannerResult`. Write unit tests covering: add index, drop index, no-op (same indexes), index identity (same keys different name = equivalent), correct precheck/execute/postcheck arrays.
 
 **Runner + wiring:**
 
-- [ ] **1.9 Implement `MongoMigrationRunner`.** Execute `CreateIndexOp` / `DropIndexOp` against a MongoDB instance via the Mongo driver. Pre-check: does the index already exist? Post-check: does the index now exist (or not)? Idempotent: if postcheck already satisfied, skip. Uses `mongodb-memory-server` for integration tests.
+- [ ] **1.9 Implement `MongoMigrationRunner`.** Generic three-phase loop mirroring the SQL runner: for each operation, evaluate prechecks (filter expressions against inspection results) → execute DDL commands (via command executor switch) → evaluate postchecks. Idempotency probe: if all postchecks already satisfied before execution, skip. Command executor maps each `AnyMongoDdlCommand.kind` to the corresponding MongoDB driver call. Uses `mongodb-memory-server` for integration tests.
 - [ ] **1.10 Implement marker and ledger in `_prisma_migrations`.** Marker document: `{ _id: "marker", coreHash, profileHash, updatedAt, ... }`. Ledger: append-only documents (one per applied edge). Compare-and-swap on marker via `findOneAndUpdate({ _id: "marker", coreHash: expectedFrom })`. Implement `readMarker()` on the Mongo control family instance. Integration tests with `mongodb-memory-server`.
 - [ ] **1.11 Wire Mongo target descriptor.** Add `migrations: { createPlanner, createRunner, contractToSchema }` to `@prisma-next/adapter-mongo`, implementing `TargetMigrationsCapability<'mongo', 'mongo'>`. Verify the CLI discovers and uses the capability.
 
@@ -67,14 +72,14 @@ Extends every layer to cover the full breadth of MongoDB server-side configurati
 **Validators:**
 
 - [ ] **2.3 Extend `MongoStorageCollection` with validator.** Add `validator?: { jsonSchema: Record<string, unknown>; validationLevel: 'strict' | 'moderate'; validationAction: 'error' | 'warn' }` to the contract type. Update Arktype schema. Type and validation tests.
-- [ ] **2.4 Extend schema IR and planner for validators.** Add validator representation to `MongoSchemaIR`. Planner generates `UpdateValidatorOp` (new op class) for validator changes. Classify: relaxing validation = `widening`, tightening = `destructive`. Tests for add/remove/change validator.
-- [ ] **2.5 Runner executes validator operations.** `collMod` with `$jsonSchema`, `validationLevel`, `validationAction`. Integration tests.
+- [ ] **2.4 Extend schema IR and planner for validators.** Add validator representation to `MongoSchemaIR`. Add `CollModCommand` DDL command class. Planner generates `collMod` operations with appropriate `MongoFilterExpr`-based postchecks against `listCollections` results. Classify: relaxing validation = `widening`, tightening = `destructive`. Tests for add/remove/change validator.
+- [ ] **2.5 Runner executes validator operations.** Command executor handles `CollModCommand` with `$jsonSchema`, `validationLevel`, `validationAction`. Integration tests.
 
 **Collection options:**
 
 - [ ] **2.6 Extend `MongoStorageCollection` with collection options.** Capped settings, time series configuration, collation, change stream pre/post images. Update Arktype schema. Tests.
-- [ ] **2.7 Extend schema IR and planner for collection options.** Add `CreateCollectionOp` (with options) and `UpdateCollectionOptionsOp` (via `collMod`) operation classes. Planner detects new collections and option changes. Tests.
-- [ ] **2.8 Runner executes collection option operations.** `db.createCollection()` with options, `collMod` for option changes. Integration tests.
+- [ ] **2.7 Extend schema IR and planner for collection options.** Add `CreateCollectionCommand` and `DropCollectionCommand` DDL command classes. Planner generates operations with `listCollections`-based checks for new collections and option changes. Tests.
+- [ ] **2.8 Runner executes collection option operations.** Command executor handles `CreateCollectionCommand` (with options), `DropCollectionCommand`, and `CollModCommand` for option changes. Integration tests.
 
 **Authoring + emitter:**
 
@@ -110,10 +115,16 @@ Auto-derives partial indexes for polymorphic (STI) collections. Depends on the c
 | `MongoContractSchema` validates indexes | Unit | 1.4 | Valid/invalid index shapes |
 | `MongoSchemaIR` AST represents index state | Unit | 1.5 | Construction, freeze, kind discriminant |
 | `contractToSchema` produces `MongoSchemaIR` | Unit | 1.6 | Hand-crafted contracts → expected IR |
-| Planner diffs and produces index operations | Unit | 1.8 | Add/drop/no-op/identity scenarios |
-| `MongoMigrationPlanOperation` AST classes | Unit | 1.7 | Construction, envelope fields, freeze |
+| DDL command AST (`CreateIndexCommand`, etc.) | Unit | 1.7a | Construction, freeze, kind discriminant |
+| Inspection commands (`ListIndexesCommand`, etc.) | Unit | 1.7a | Construction, freeze |
+| Package entrypoint split (`/execution`, `/control`) | Unit | 1.7a | Import paths, export separation |
+| `MongoMigrationPlanOperation` symmetric structure | Unit | 1.7b | Construction, JSON serialization round-trip |
+| `FilterEvaluator` operator semantics | Unit | 1.7c | `$eq`, `$ne`, `$gt`, `$in`, deep equality, dotted paths |
+| `FilterEvaluator` logical combinators | Unit | 1.7c | `$and`, `$or`, `$not`, `$exists` |
+| Planner diffs and produces index operations | Unit | 1.8 | Add/drop/no-op/identity, correct check arrays |
 | Runner applies `createIndex`/`dropIndex` | Integration | 1.9 | `mongodb-memory-server` |
-| Runner supports idempotency | Integration | 1.9 | Re-apply same operation, verify skip |
+| Runner generic three-phase loop | Integration | 1.9 | precheck → execute → postcheck flow |
+| Runner supports idempotency via postchecks | Integration | 1.9 | Re-apply, postcheck satisfied → skip |
 | Marker/ledger in `_prisma_migrations` | Integration | 1.10 | `mongodb-memory-server` |
 | Mongo target descriptor exposes migrations | Unit | 1.11 | Descriptor shape assertion |
 | CLI `migration plan` works with Mongo | Integration | 1.12 | End-to-end with hand-crafted contract |
