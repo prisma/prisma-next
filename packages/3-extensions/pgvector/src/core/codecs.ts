@@ -13,9 +13,10 @@ const pgVectorCodec = codec({
   traits: ['equality'],
   renderOutputType: (typeParams) => {
     const length = typeParams['length'];
-    if (typeof length !== 'number') {
+    if (length === undefined) return undefined;
+    if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
       throw new Error(
-        `renderOutputType: expected numeric "length" in typeParams for Vector, got ${typeof length}`,
+        `renderOutputType: expected positive integer "length" in typeParams for Vector, got ${String(length)}`,
       );
     }
     return `Vector<${length}>`;

@@ -55,11 +55,14 @@ const precisionParamsSchema = arktype({
   'precision?': 'number.integer >= 0 & number.integer <= 6',
 });
 
-function renderLength(typeName: string, typeParams: Record<string, unknown>): string {
+function renderLength(typeName: string, typeParams: Record<string, unknown>): string | undefined {
   const length = typeParams['length'];
-  if (typeof length !== 'number') {
+  if (length === undefined) {
+    return undefined;
+  }
+  if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
     throw new Error(
-      `renderOutputType: expected numeric "length" in typeParams for ${typeName}, got ${typeof length}`,
+      `renderOutputType: expected integer "length" in typeParams for ${typeName}, got ${String(length)}`,
     );
   }
   return `${typeName}<${length}>`;
@@ -70,9 +73,13 @@ function renderPrecision(typeName: string, typeParams: Record<string, unknown>):
   if (precision === undefined) {
     return typeName;
   }
-  if (typeof precision !== 'number') {
+  if (
+    typeof precision !== 'number' ||
+    !Number.isFinite(precision) ||
+    !Number.isInteger(precision)
+  ) {
     throw new Error(
-      `renderOutputType: expected numeric "precision" in typeParams for ${typeName}, got ${typeof precision}`,
+      `renderOutputType: expected integer "precision" in typeParams for ${typeName}, got ${String(precision)}`,
     );
   }
   return `${typeName}<${precision}>`;
@@ -237,9 +244,14 @@ const pgNumericCodec = codec<
   paramsSchema: numericParamsSchema,
   renderOutputType: (typeParams) => {
     const precision = typeParams['precision'];
-    if (typeof precision !== 'number') {
+    if (precision === undefined) return undefined;
+    if (
+      typeof precision !== 'number' ||
+      !Number.isFinite(precision) ||
+      !Number.isInteger(precision)
+    ) {
       throw new Error(
-        `renderOutputType: expected numeric "precision" in typeParams for Numeric, got ${typeof precision}`,
+        `renderOutputType: expected integer "precision" in typeParams for Numeric, got ${String(precision)}`,
       );
     }
     const scale = typeParams['scale'];
@@ -524,7 +536,9 @@ const pgEnumCodec = codec({
         `renderOutputType: expected array "values" in typeParams for enum, got ${typeof values}`,
       );
     }
-    return values.map((value) => `'${String(value).replace(/'/g, "\\'")}'`).join(' | ');
+    return values
+      .map((value) => `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
+      .join(' | ');
   },
 });
 
