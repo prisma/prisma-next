@@ -1,3 +1,4 @@
+export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
 export { parsePslDocument } from '../parser';
 export type {
   ParsePslDocumentInput,
