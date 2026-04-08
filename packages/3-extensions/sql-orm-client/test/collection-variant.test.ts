@@ -4,7 +4,7 @@ import { Collection } from '../src/collection';
 import type { TestContract } from './helpers';
 import { createMockRuntime, getTestContext, getTestContract } from './helpers';
 
-function getPolyContract(): TestContract {
+function getStiPolyContract(): TestContract {
   const base = getTestContract();
   const raw = JSON.parse(JSON.stringify(base));
   raw.models.User.fields.kind = {
@@ -17,12 +17,40 @@ function getPolyContract(): TestContract {
     Admin: { value: 'admin' },
     Regular: { value: 'regular' },
   };
+  raw.models.Admin = {
+    fields: { role: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
+    relations: {},
+    storage: { table: 'users', fields: { role: { column: 'role' } } },
+    base: 'User',
+  };
+  raw.models.Regular = {
+    fields: {
+      plan: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+    },
+    relations: {},
+    storage: { table: 'users', fields: { plan: { column: 'plan' } } },
+    base: 'User',
+  };
   raw.storage.tables.users.columns.kind = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
+  raw.storage.tables.users.columns.role = {
+    codecId: 'pg/text@1',
+    nativeType: 'text',
+    nullable: true,
+  };
+  raw.storage.tables.users.columns.plan = {
+    codecId: 'pg/text@1',
+    nativeType: 'text',
+    nullable: true,
+  };
   return raw as TestContract;
+}
+
+function getPolyContract(): TestContract {
+  return getStiPolyContract();
 }
 
 function createPolyCollection() {
@@ -31,7 +59,7 @@ function createPolyCollection() {
   const context = { ...baseContext, contract };
   const runtime = createMockRuntime();
   const collection = new Collection({ runtime, context }, 'User');
-  return { collection, runtime };
+  return { collection, runtime, contract };
 }
 
 describe('Collection.variant()', () => {
@@ -98,5 +126,59 @@ describe('Collection.variant()', () => {
     expect(second.state.filters).toHaveLength(2);
     const variantFilter = second.state.filters[1] as BinaryExpr;
     expect((variantFilter.right as LiteralExpr).value).toBe('regular');
+  });
+});
+
+describe('STI polymorphic query pipeline', () => {
+  it('base query maps mixed-variant rows into variant-specific shapes', async () => {
+    const { collection, runtime } = createPolyCollection();
+    runtime.setNextResults([
+      [
+        { id: 1, name: 'Alice', email: 'a@x', kind: 'admin', role: 'superadmin', plan: null },
+        { id: 2, name: 'Bob', email: 'b@x', kind: 'regular', role: null, plan: 'free' },
+      ],
+    ]);
+
+    const rows = await collection.all().toArray();
+
+    expect(rows).toHaveLength(2);
+    const admin = rows[0]!;
+    expect(admin).toEqual({
+      id: 1,
+      name: 'Alice',
+      email: 'a@x',
+      kind: 'admin',
+      role: 'superadmin',
+    });
+    expect(admin).not.toHaveProperty('plan');
+
+    const regular = rows[1]!;
+    expect(regular).toEqual({
+      id: 2,
+      name: 'Bob',
+      email: 'b@x',
+      kind: 'regular',
+      plan: 'free',
+    });
+    expect(regular).not.toHaveProperty('role');
+  });
+
+  it('variant query maps all rows with the specified variant shape', async () => {
+    const { collection, runtime } = createPolyCollection();
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', email: 'a@x', kind: 'admin', role: 'superadmin', plan: null }],
+    ]);
+
+    const rows = await (collection.variant('Admin' as never) as typeof collection).all().toArray();
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual({
+      id: 1,
+      name: 'Alice',
+      email: 'a@x',
+      kind: 'admin',
+      role: 'superadmin',
+    });
+    expect(rows[0]).not.toHaveProperty('plan');
   });
 });
