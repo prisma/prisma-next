@@ -293,3 +293,35 @@ describe('object helpers', () => {
     fn.setField({ field: b, input: d, value: d });
   });
 });
+
+describe('literal type inference', () => {
+  it('infers StringField from string value', () => {
+    expectTypeOf(fn.literal('hello')).toEqualTypeOf<TypedAggExpr<StringField>>();
+  });
+  it('infers NumericField from number value', () => {
+    expectTypeOf(fn.literal(42)).toEqualTypeOf<TypedAggExpr<NumericField>>();
+  });
+  it('infers BooleanField from boolean value', () => {
+    expectTypeOf(fn.literal(true)).toEqualTypeOf<TypedAggExpr<BooleanField>>();
+  });
+  it('infers DateField from Date value', () => {
+    expectTypeOf(fn.literal(new Date())).toEqualTypeOf<TypedAggExpr<DateField>>();
+  });
+
+  it('contextual inference constrains value — string literal in StringField position', () => {
+    expectTypeOf(fn.dateToString({ date: dt, format: fn.literal('%Y-%m-%d') })).toEqualTypeOf<
+      TypedAggExpr<StringField>
+    >();
+  });
+
+  it('rejects wrong value type in contextual position', () => {
+    // @ts-expect-error — format expects StringField, but 42 infers NumericField
+    fn.dateToString({ date: dt, format: fn.literal(42) });
+  });
+
+  it('allows explicit generic for custom field types', () => {
+    type CustomField = { readonly codecId: 'custom/bigint@1'; readonly nullable: false };
+    const custom = fn.literal<CustomField>(42n);
+    expectTypeOf(custom).toEqualTypeOf<TypedAggExpr<CustomField>>();
+  });
+});

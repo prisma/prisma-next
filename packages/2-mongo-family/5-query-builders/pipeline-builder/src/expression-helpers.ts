@@ -5,6 +5,7 @@ import type {
   BooleanField,
   DateField,
   DocField,
+  LiteralValue,
   NullableDocField,
   NumericField,
   StringField,
@@ -128,6 +129,15 @@ const DATE: DateField = { codecId: 'mongo/date@1', nullable: false } as DateFiel
 const ARRAY: ArrayField = { codecId: 'mongo/array@1', nullable: false } as ArrayField;
 const DOC: DocField = { codecId: 'mongo/document@1', nullable: false };
 
+function literal(value: string): TypedAggExpr<StringField>;
+function literal(value: number): TypedAggExpr<NumericField>;
+function literal(value: boolean): TypedAggExpr<BooleanField>;
+function literal(value: Date): TypedAggExpr<DateField>;
+function literal<F extends DocField>(value: LiteralValue<F>): TypedAggExpr<F>;
+function literal(value: unknown): TypedAggExpr<DocField> {
+  return { _field: undefined as never, node: MongoAggLiteral.of(value) };
+}
+
 // ---------------------------------------------------------------------------
 // Public helpers
 // ---------------------------------------------------------------------------
@@ -184,9 +194,7 @@ export const fn = {
     };
   },
 
-  literal<F extends DocField>(value: unknown): TypedAggExpr<F> {
-    return { _field: undefined as never, node: MongoAggLiteral.of(value) };
-  },
+  literal,
 
   // -- Date helpers ---------------------------------------------------------
 
