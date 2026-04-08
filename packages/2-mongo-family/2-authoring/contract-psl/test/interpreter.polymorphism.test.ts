@@ -145,6 +145,30 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       expect(ir.roots).toHaveProperty('tasks', 'Task');
       expect(Object.values(ir.roots)).not.toContain('Bug');
     });
+
+    it('restores base as root when variant explicitly @@map()s to same collection', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+          @@map("tasks")
+        }
+      `);
+
+      expect(ir.roots).toHaveProperty('tasks', 'Task');
+      expect(Object.values(ir.roots)).not.toContain('Bug');
+    });
   });
 
   describe('@@discriminator and @@base — diagnostics', () => {

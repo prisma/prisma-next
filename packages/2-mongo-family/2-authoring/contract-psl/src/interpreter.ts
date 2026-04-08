@@ -96,6 +96,16 @@ function collectPolymorphismDeclarations(
           });
           continue;
         }
+        const discField = pslModel.fields.find((f) => f.name === fieldName);
+        if (discField && discField.typeName !== 'String') {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `Discriminator field "${fieldName}" on model "${pslModel.name}" must be of type String, but is "${discField.typeName}"`,
+            sourceId,
+            span: attr.span,
+          });
+          continue;
+        }
         discriminatorDeclarations.set(pslModel.name, { fieldName, span: attr.span });
       }
       if (attr.name === 'base') {
@@ -248,9 +258,13 @@ function resolvePolymorphism(input: {
 
     const variantCollectionName = resolveCollectionName(variantPslModel);
     if (roots[variantCollectionName] === variantName) {
-      roots = Object.fromEntries(
-        Object.entries(roots).filter(([key]) => key !== variantCollectionName),
-      );
+      if (variantCollectionName === baseCollection && baseModel) {
+        roots = { ...roots, [variantCollectionName]: baseDecl.baseName };
+      } else {
+        roots = Object.fromEntries(
+          Object.entries(roots).filter(([key]) => key !== variantCollectionName),
+        );
+      }
     }
   }
 
