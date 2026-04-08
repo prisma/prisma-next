@@ -5,7 +5,14 @@
 Extend the migration system to manage MongoDB's server-side configuration (indexes, JSON Schema validators, collection options) through the same graph-based migration model used for SQL DDL. The project proves the migration architecture generalizes beyond SQL by implementing a Mongo planner, runner, schema IR, and target wiring — all against the existing family-agnostic migration SPI.
 
 **Spec:** `projects/mongo-schema-migrations/spec.md`
-**Linear:** [TML-2220](https://linear.app/prisma-company/issue/TML-2220/schema-migrations-for-mongodb)
+**Linear:** [TML-2220](https://linear.app/prisma-company/issue/TML-2220/schema-migrations-for-mongodb) (parent)
+
+| Milestone | Linear |
+|---|---|
+| M1: Family migration SPI + vertical slice | [TML-2230](https://linear.app/prisma-company/issue/TML-2230) |
+| M2: Full index vocabulary + validators + collection options | [TML-2231](https://linear.app/prisma-company/issue/TML-2231) |
+| M3: Polymorphic index generation | [TML-2232](https://linear.app/prisma-company/issue/TML-2232) |
+| M4: Online CLI commands + live introspection | [TML-2233](https://linear.app/prisma-company/issue/TML-2233) |
 
 ## Collaborators
 
@@ -95,6 +102,29 @@ Auto-derives partial indexes for polymorphic (STI) collections. Depends on the c
 - [ ] **3.1 Implement polymorphic partial index derivation.** When a collection holds multiple variants, variant-specific field indexes must use `partialFilterExpression` scoped to the discriminator value. The planner derives this automatically from the contract's `discriminator` + `variants` metadata. No user intervention. Unit tests with hand-crafted polymorphic contracts.
 - [ ] **3.2 End-to-end polymorphic proof.** Contract with a polymorphic collection (base + variants + discriminator) → planner generates partial indexes with correct `partialFilterExpression` → runner applies → partial indexes exist on MongoDB. Integration test with `mongodb-memory-server`.
 
+### Milestone 4: Online CLI commands + live introspection
+
+Adds Mongo support to all CLI commands that interact with a live database. The offline migration path (plan + apply) works after M1, but the remaining `db` and `migration` subcommands need live introspection and generalized wiring.
+
+**Tasks:**
+
+**Live introspection:**
+
+- [ ] **4.1 Implement `introspectSchema` for Mongo.** Read current indexes, validators, and collection options from a live MongoDB instance using `listIndexes` and `listCollections` inspection commands (from the AST built in 1.7a). Produce a `MongoSchemaIR` from the live state — symmetric to `contractToSchema` (1.6). Package placement: `packages/3-mongo-target/`. Integration tests with `mongodb-memory-server`.
+
+**Online `db` commands:**
+
+- [ ] **4.2 Wire `db init` for Mongo.** `db init` bootstraps a database to match the contract with additive-only operations. Generalize the SQL-specific DDL preview branch in `db-init.ts` (`if (familyInstance.familyId === 'sql')`). The planner + runner from M1 do the work; this task wires the CLI path. Integration test.
+- [ ] **4.3 Wire `db update` for Mongo.** `db update` reconciles a live database to the contract (additive + widening + destructive with interactive confirmation). Requires live introspection (4.1) to diff live state vs contract. Integration test.
+- [ ] **4.4 Wire `db verify` for Mongo.** `db verify` checks marker + live schema vs contract. `--marker-only` needs just the marker read (from 1.10). `--schema-only` and default need live introspection (4.1) to compare the live `MongoSchemaIR` against `contractToSchema` output. Support `--strict` mode. Integration test.
+- [ ] **4.5 Wire `db sign` for Mongo.** `db sign` verifies the live schema satisfies the contract, then writes/updates the signature marker. Needs live introspection (4.1) for verification, marker write (from 1.10) for signing. Integration test.
+- [ ] **4.6 Wire `db schema` for Mongo.** `db schema` provides read-only live schema introspection with tree or `--json` output. Needs live introspection (4.1) and a Mongo-specific schema formatter. Integration test.
+
+**Online `migration` commands:**
+
+- [ ] **4.7 Wire `migration status --db` for Mongo.** Show applied vs pending migrations against a live database. Needs marker read (from 1.10) and the migration graph (family-agnostic). Offline `migration status` (no `--db`) should already work. Integration test.
+- [ ] **4.8 Wire `migration show` for Mongo.** Generalize operation display for Mongo operations (extends work from 1.2). Mongo operations should render their DDL commands in a readable format. Unit test.
+
 ### Close-out
 
 - [ ] **C.1 Verify all acceptance criteria in `projects/mongo-schema-migrations/spec.md`.**
@@ -141,10 +171,19 @@ Auto-derives partial indexes for polymorphic (STI) collections. Depends on the c
 | Emitter populates enriched collections | Unit | 2.10 | PSL → contract verification |
 | Polymorphic partial indexes auto-generated | Unit | 3.1 | Discriminator → partialFilterExpression |
 | End-to-end polymorphic proof | Integration | 3.2 | `mongodb-memory-server` |
+| Live introspection produces `MongoSchemaIR` | Integration | 4.1 | `mongodb-memory-server` |
+| `db init` works with Mongo target | Integration | 4.2 | Additive-only bootstrap |
+| `db update` works with Mongo target | Integration | 4.3 | Interactive destructive confirmation |
+| `db verify` works with Mongo target | Integration | 4.4 | `--marker-only`, `--schema-only`, `--strict` |
+| `db sign` works with Mongo target | Integration | 4.5 | Verify + write marker |
+| `db schema` works with Mongo target | Integration | 4.6 | Tree + `--json` output |
+| `migration status --db` works with Mongo | Integration | 4.7 | Applied vs pending |
+| `migration show` displays Mongo operations | Unit | 4.8 | Readable DDL command rendering |
 
 ## Open Items
 
 - **SPI refactoring scope (1.1):** The spec says "refactor the existing migration SPI to follow the emission pipeline pattern." The investigation shows the existing SPI is already quite generic (`unknown` types, family-agnostic envelope). The refactoring may be smaller than anticipated — possibly just adding an operation formatter hook for CLI display. Determine actual scope early in M1.
-- **CLI `db init` SQL branch (1.2):** `db-init.ts` has `if (familyInstance.familyId === 'sql')` for DDL preview. Needs either generalization or a parallel Mongo branch.
 - **Package placement for schema IR (1.5):** Exact package name and layer for the Mongo schema IR AST. Options: new package under `packages/2-mongo-family/3-tooling/` (migration plane), or fold into an existing package. Decide at implementation time based on dependency graph.
 - **ORM consolidation dependency (M3):** Polymorphic index generation depends on the contract carrying discriminator/variants metadata. If that shape changes during ORM consolidation, M3 logic may need updating. Low risk: M3 is last and uses hand-crafted contracts for testing.
+- **M4 sequencing:** M4 can start after M1 (the offline path must work first). Live introspection (4.1) is the prerequisite for most M4 tasks. M4 tasks for commands that only need the marker (`db verify --marker-only`, `migration status` offline) could theoretically start alongside M1 completion.
+- **`contract infer` for Mongo:** The `contract infer` command (infer PSL from live DB) is not in scope. It requires a Mongo-to-PSL reverse mapping which is a separate project.
