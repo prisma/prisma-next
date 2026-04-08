@@ -726,6 +726,7 @@ export class Collection<
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
+      modelName: this.modelName,
       includes: this.state.includes,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
@@ -798,6 +799,7 @@ export class Collection<
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
+      modelName: this.modelName,
       includes: this.state.includes,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
@@ -880,6 +882,7 @@ export class Collection<
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
+      modelName: this.modelName,
       includes: this.state.includes,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
@@ -946,6 +949,7 @@ export class Collection<
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
+      modelName: this.modelName,
       includes: this.state.includes,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
@@ -1026,6 +1030,7 @@ export class Collection<
       runtime: this.ctx.runtime,
       state: resultState,
       tableName: this.tableName,
+      modelName: this.modelName,
     });
     return rows[0] ?? null;
   }
@@ -1095,6 +1100,7 @@ export class Collection<
       runtime: this.ctx.runtime,
       state: this.state,
       tableName: this.tableName,
+      modelName: this.modelName,
     });
   }
 }

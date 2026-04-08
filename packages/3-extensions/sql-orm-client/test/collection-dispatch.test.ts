@@ -64,6 +64,7 @@ describe('collection-dispatch', () => {
       runtime,
       state: collection.state,
       tableName: collection.tableName,
+      modelName: collection.modelName,
     }).toArray();
 
     expect(rows).toEqual([{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
@@ -85,6 +86,7 @@ describe('collection-dispatch', () => {
       runtime: runtimeWithConnection,
       state: scoped.state,
       tableName: scoped.tableName,
+      modelName: scoped.modelName,
     }).toArray();
 
     expect(rows).toEqual([]);
@@ -125,6 +127,7 @@ describe('collection-dispatch', () => {
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
+      modelName: scoped.modelName,
     }).toArray();
 
     expect(rows).toEqual([
@@ -171,6 +174,7 @@ describe('collection-dispatch', () => {
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
+      modelName: scoped.modelName,
     }).toArray();
 
     expect(rows).toEqual([
@@ -215,6 +219,7 @@ describe('collection-dispatch', () => {
       runtime: runtimeWithConnection,
       state: scoped.state,
       tableName: scoped.tableName,
+      modelName: scoped.modelName,
     }).toArray();
 
     expect(rows).toEqual([
@@ -241,6 +246,7 @@ describe('collection-dispatch', () => {
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
+      modelName: scoped.modelName,
     }).toArray();
 
     expect(rows).toEqual([]);
