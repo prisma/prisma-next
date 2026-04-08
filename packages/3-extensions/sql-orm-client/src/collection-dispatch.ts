@@ -39,7 +39,7 @@ export function dispatchCollectionRows<Row>(options: {
   const polyInfo = resolvePolymorphismInfo(contract, modelName);
 
   if (state.includes.length === 0) {
-    const compiled = compileSelect(contract, tableName, state);
+    const compiled = compileSelect(contract, tableName, state, modelName);
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
     const mapper = polyInfo
       ? (rawRow: Record<string, unknown>) =>
@@ -185,11 +185,16 @@ function dispatchWithMultiQueryIncludes<Row>(options: {
       const parentJoinColumns = state.includes.map((include) => include.localColumn);
       const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
         augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
-      const parentCompiled = compileSelect(contract, tableName, {
-        ...state,
-        includes: [],
-        selectedFields: parentSelectedForQuery,
-      });
+      const parentCompiled = compileSelect(
+        contract,
+        tableName,
+        {
+          ...state,
+          includes: [],
+          selectedFields: parentSelectedForQuery,
+        },
+        modelName,
+      );
       const parentRowsRaw = await executeQueryPlan<Record<string, unknown>>(
         scope,
         parentCompiled,
