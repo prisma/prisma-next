@@ -1,5 +1,4 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type { OperationRegistry } from '@prisma-next/operations';
 import { AsyncIterableResult } from './async-iterable-result';
 import { runtimeError } from './errors';
 import { computeSqlFingerprint } from './fingerprint';
@@ -29,7 +28,6 @@ export interface RuntimeCoreOptions<TContract = unknown, TAdapter = unknown, TDr
   readonly plugins?: readonly Plugin<TContract, TAdapter, TDriver>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
-  readonly operationRegistry: OperationRegistry;
 }
 
 export interface RuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = unknown>
@@ -41,7 +39,6 @@ export interface RuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = 
   connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
-  operations(): OperationRegistry;
 }
 
 export interface RuntimeConnection extends RuntimeQueryable {
@@ -99,7 +96,6 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
   private readonly plugins: readonly Plugin<TContract, TAdapter, TDriver>[];
   private readonly mode: 'strict' | 'permissive';
   private readonly verify: RuntimeVerifyOptions;
-  private readonly operationRegistry: OperationRegistry;
   private readonly pluginContext: PluginContext<TContract, TAdapter, TDriver>;
 
   private verified: boolean;
@@ -114,8 +110,6 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
     this.plugins = options.plugins ?? [];
     this.mode = options.mode ?? 'strict';
     this.verify = options.verify;
-    this.operationRegistry = options.operationRegistry;
-
     this.verified = options.verify.mode === 'startup' ? false : options.verify.mode === 'always';
     this.startupVerified = false;
     this._telemetry = null;
@@ -256,10 +250,6 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
 
   telemetry(): RuntimeTelemetryEvent | null {
     return this._telemetry;
-  }
-
-  operations(): OperationRegistry {
-    return this.operationRegistry;
   }
 
   close(): Promise<void> {

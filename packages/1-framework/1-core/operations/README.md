@@ -1,29 +1,28 @@
 # @prisma-next/operations
 
-Target-neutral operation registry and capability helpers for Prisma Next.
+Target-neutral operation registry for Prisma Next.
 
 ## Overview
 
-This package provides target-neutral operation registry types and capability checking utilities. It's part of the core ring and has no dependencies on target-specific packages.
+This package provides a generic, target-neutral operation registry. It's part of the core ring and has no dependencies on target-specific packages.
 
 ## Responsibilities
 
-- **Operation Registry**: Core operation registry interface and implementation
-  - `OperationRegistry`: Interface for registering and querying operations
-  - `createOperationRegistry()`: Factory function to create operation registries
-  - `OperationSignature`: Core operation signature type (target-neutral)
-  - `ArgSpec`, `ReturnSpec`: Type definitions for operation arguments and return values
-
-- **Capability Checking**: Target-neutral capability validation
-  - `hasAllCapabilities()`: Checks if all required capabilities are present in a contract
+- **Operation Registry**: Generic operation registry interface and implementation
+  - `OperationRegistry<T>`: Generic interface for registering and iterating operations, parameterized by entry type
+  - `createOperationRegistry<T>()`: Factory function to create operation registries
+  - `OperationEntry`: Base entry type with `args` and `returns`
+  - `OperationDescriptor<T>`: Entry plus a `method` name, used for registration
+  - `ParamSpec`: Describes an operation parameter (`codecId`, `nullable`), used for both arguments and return values
 
 ## Dependencies
 
-- **Note**: This package has no runtime dependencies. `OperationRegistry` is used by contract types, but operations package itself has no contract dependencies.
+
+- **Depends on**: Nothing (leaf package)
 - **Depended on by**:
   - `@prisma-next/sql-operations` (extends with SQL-specific lowering specs)
-  - `@prisma-next/sql-relational-core` (uses for capability checking)
-  - `@prisma-next/runtime` (uses for operation registry creation)
+  - `@prisma-next/sql-relational-core` (imports `ParamSpec` for AST and type definitions)
+  - `@prisma-next/runtime-executor` (uses for operation registry creation)
 
 ## Architecture
 
@@ -55,36 +54,37 @@ flowchart TD
 ### Creating an Operation Registry
 
 ```typescript
-import { createOperationRegistry, type OperationSignature } from '@prisma-next/operations';
+import { createOperationRegistry, type OperationDescriptor } from '@prisma-next/operations';
 
 const registry = createOperationRegistry();
 
-const signature: OperationSignature = {
-  forTypeId: 'pg/vector@1',
+const descriptor: OperationDescriptor = {
   method: 'cosineDistance',
-  args: [{ kind: 'typeId', type: 'pg/vector@1' }],
-  returns: { kind: 'builtin', type: 'number' },
+  args: [{ codecId: 'pg/vector@1', nullable: false }],
+  returns: { codecId: 'pg/float8@1', nullable: false },
 };
 
-registry.register(signature);
-const operations = registry.byType('pg/vector@1');
+registry.register(descriptor);
+const entries = registry.entries(); // Record<string, OperationEntry>
 ```
 
-### Checking Capabilities
+### Using a Custom Entry Type
 
 ```typescript
-import { hasAllCapabilities } from '@prisma-next/operations';
+import { createOperationRegistry, type OperationEntry, type OperationDescriptor } from '@prisma-next/operations';
 
-const contractCapabilities = {
-  pgvector: {
-    'index.ivfflat': true,
-  },
-};
+interface MyEntry extends OperationEntry {
+  readonly extra: string;
+}
 
-const hasCapability = hasAllCapabilities(
-  ['pgvector.index.ivfflat'],
-  contractCapabilities,
-);
+const registry = createOperationRegistry<MyEntry>();
+
+registry.register({
+  method: 'myMethod',
+  args: [],
+  returns: { codecId: 'pg/int4@1', nullable: false },
+  extra: 'custom data',
+});
 ```
 
 ## Package Location

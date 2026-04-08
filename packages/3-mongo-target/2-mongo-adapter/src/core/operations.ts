@@ -1,13 +1,12 @@
-import type { OperationSignature } from '@prisma-next/operations';
-import { MONGO_VECTOR_CODEC_ID } from './codec-ids';
+import type { OperationDescriptor } from '@prisma-next/operations';
+import { MONGO_INT32_CODEC_ID, MONGO_VECTOR_CODEC_ID } from './codec-ids';
 
 export const mongoVectorNearOperation = Object.freeze({
-  forTypeId: MONGO_VECTOR_CODEC_ID,
   method: 'near',
-  args: [{ kind: 'param' as const }],
-  returns: { kind: 'builtin' as const, type: 'number' as const },
-}) satisfies OperationSignature;
+  args: [{ codecId: MONGO_VECTOR_CODEC_ID, nullable: false }],
+  returns: { codecId: MONGO_INT32_CODEC_ID, nullable: false },
+}) satisfies OperationDescriptor;
 
-export const mongoVectorOperationSignatures: readonly OperationSignature[] = [
+export const mongoVectorOperationDescriptors: readonly OperationDescriptor[] = [
   mongoVectorNearOperation,
 ];

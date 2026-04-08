@@ -11,7 +11,6 @@ import { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError } from '../
 
 const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
   ...postgresAdapterDescriptorMeta,
-  operationSignatures: () => [],
   pslTypeDescriptors: () => ({
     scalarTypeDescriptors: createPostgresPslScalarTypeDescriptors(),
   }),

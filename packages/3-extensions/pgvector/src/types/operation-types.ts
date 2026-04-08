@@ -7,22 +7,11 @@ import type { SqlQueryOperationTypes } from '@prisma-next/sql-contract/types';
  * These types are imported by contract.d.ts files for compile-time type inference.
  */
 
-/**
- * Operation types for pgvector extension.
- * Maps typeId to operation methods.
- */
 export type OperationTypes = {
   readonly 'pg/vector@1': {
     readonly cosineDistance: {
-      readonly args: readonly [
-        {
-          readonly kind: 'param';
-        },
-      ];
-      readonly returns: {
-        readonly kind: 'builtin';
-        readonly type: 'number';
-      };
+      readonly args: readonly [{ readonly codecId: 'pg/vector@1'; readonly nullable: false }];
+      readonly returns: { readonly codecId: 'pg/float8@1'; readonly nullable: false };
       readonly lowering: {
         readonly targetFamily: 'sql';
         readonly strategy: 'function';
@@ -30,15 +19,8 @@ export type OperationTypes = {
       };
     };
     readonly cosineSimilarity: {
-      readonly args: readonly [
-        {
-          readonly kind: 'param';
-        },
-      ];
-      readonly returns: {
-        readonly kind: 'builtin';
-        readonly type: 'number';
-      };
+      readonly args: readonly [{ readonly codecId: 'pg/vector@1'; readonly nullable: false }];
+      readonly returns: { readonly codecId: 'pg/float8@1'; readonly nullable: false };
       readonly lowering: {
         readonly targetFamily: 'sql';
         readonly strategy: 'function';

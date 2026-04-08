@@ -16,7 +16,6 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
-import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -157,7 +156,6 @@ interface SqlTypeMetadata {
 type SqlTypeMetadataRegistry = Map<string, SqlTypeMetadata>;
 
 interface SqlFamilyInstanceState {
-  readonly operationRegistry: OperationRegistry;
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
@@ -284,7 +282,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     stack.extensionPacks as unknown as readonly (SqlControlExtensionDescriptor<TTargetId> &
       DescriptorWithStorageTypes)[];
 
-  const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } = stack;
+  const { codecTypeImports, operationTypeImports, extensionIds } = stack;
 
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
     target,
@@ -294,7 +292,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
   return {
     familyId: 'sql',
-    operationRegistry,
     codecTypeImports,
     operationTypeImports,
     extensionIds,

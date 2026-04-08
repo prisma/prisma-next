@@ -1,5 +1,6 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlOperationEntry } from '@prisma-next/sql-operations';
 import {
   AndExpr,
   type AnyExpression as AstExpression,
@@ -14,7 +15,6 @@ import type {
   AppliedMutationDefault,
   MutationDefaultsOptions,
 } from '@prisma-next/sql-relational-core/query-lane-context';
-import type { QueryOperationEntry } from '@prisma-next/sql-relational-core/query-operations';
 import type {
   AggregateFunctions,
   Expression,
@@ -74,7 +74,7 @@ export interface BuilderState {
 
 export interface BuilderContext {
   readonly capabilities: Record<string, Record<string, boolean>>;
-  readonly queryOperationTypes: Readonly<Record<string, QueryOperationEntry>>;
+  readonly queryOperationTypes: Readonly<Record<string, SqlOperationEntry>>;
   readonly target: string;
   readonly storageHash: string;
   readonly applyMutationDefaults: (

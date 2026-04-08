@@ -134,7 +134,6 @@ function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
     codecs: () => createCodecRegistry(),
-    operationSignatures: () => [],
     parameterizedCodecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
@@ -153,7 +152,6 @@ function createTestAdapterDescriptor(
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
     codecs: () => codecRegistry,
-    operationSignatures: () => [],
     parameterizedCodecs: () => [],
     create() {
       return Object.assign(
@@ -221,23 +219,7 @@ describe('createRuntime', () => {
     expect(runtime).toBeDefined();
     expect(runtime.execute).toBeDefined();
     expect(runtime.telemetry).toBeDefined();
-    expect(runtime.operations).toBeDefined();
     expect(runtime.close).toBeDefined();
-  });
-
-  it('returns operations registry', () => {
-    const { stackInstance, context, driver } = createTestSetup();
-
-    const runtime = createRuntime({
-      stackInstance,
-      context,
-      driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
-
-    const ops = runtime.operations();
-    expect(ops).toBeDefined();
-    expect(ops.byType).toBeDefined();
   });
 
   it('returns null telemetry when no events', () => {

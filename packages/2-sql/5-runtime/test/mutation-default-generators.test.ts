@@ -56,7 +56,6 @@ describe('composed runtime mutation default generators', () => {
       familyId: 'sql',
       targetId: 'postgres',
       codecs: () => createCodecRegistry(),
-      operationSignatures: () => [],
       parameterizedCodecs: () => [],
       mutationDefaultGenerators: () => [
         {
@@ -99,7 +98,6 @@ describe('composed runtime mutation default generators', () => {
       familyId: 'sql',
       targetId: 'postgres',
       codecs: () => createCodecRegistry(),
-      operationSignatures: () => [],
       parameterizedCodecs: () => [],
       mutationDefaultGenerators: () => [
         {
@@ -146,7 +144,6 @@ describe('composed runtime mutation default generators', () => {
       familyId: 'sql',
       targetId: 'postgres',
       codecs: () => createCodecRegistry(),
-      operationSignatures: () => [],
       parameterizedCodecs: () => [],
       mutationDefaultGenerators: () => [{ id: 'duplicate', generate: () => 'first' }],
       create() {
@@ -160,7 +157,6 @@ describe('composed runtime mutation default generators', () => {
       familyId: 'sql',
       targetId: 'postgres',
       codecs: () => createCodecRegistry(),
-      operationSignatures: () => [],
       parameterizedCodecs: () => [],
       mutationDefaultGenerators: () => [{ id: 'duplicate', generate: () => 'second' }],
       create() {

@@ -3,14 +3,12 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { ExtractCodecTypes } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { SelectAst } from '@prisma-next/sql-relational-core/ast';
-import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgresPack from '@prisma-next/target-postgres/pack';
@@ -135,37 +133,6 @@ describe('builder integration', () => {
     expect(contract.storage.tables.user).toBeDefined();
   });
 
-  it('contract works with schema() function', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('email', { type: textColumn, nullable: false })
-          .column('createdAt', { type: timestamptzColumn, nullable: false })
-          .primaryKey(['id']),
-      )
-      .model('User', 'user', (m) =>
-        m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
-      )
-      .storageHash('sha256:test-core')
-      .build();
-
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
-    const tables = schema<typeof contract>(context).tables;
-    const userTable = tables.user;
-    expect(userTable).toBeDefined();
-    expect(userTable?.columns).toMatchObject({
-      id: expect.anything(),
-      email: expect.anything(),
-      createdAt: expect.anything(),
-    });
-    // Type inference may widen literal types, so we verify the codec output type directly
-    type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
-    expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
-  });
-
   it('contract works with sql() function', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresPack)
@@ -184,9 +151,6 @@ describe('builder integration', () => {
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
-    const tables = schema<typeof contract>(context).tables;
-    const userTable = tables.user;
-    if (!userTable) throw new Error('user table not found');
 
     const db = sql<typeof contract>({ context });
     const plan = db.user.select('id', 'email').build();
@@ -197,8 +161,6 @@ describe('builder integration', () => {
 
     // Type checks - verify plan types are specific
     expectTypeOf(plan.meta.storageHash).toEqualTypeOf<string>();
-    // Note: plan.ast type checking is complex due to plan structure
-    // We verify it exists at runtime above
 
     // Verify ResultType inference works with specific types
     type Row = ResultType<typeof plan>;
@@ -206,7 +168,6 @@ describe('builder integration', () => {
     type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
     expectTypeOf<ContractCodecTypes['pg/text@1']['output']>().toEqualTypeOf<string>();
-    // Runtime check that Row has correct structure
     expectTypeOf<Row>().toHaveProperty('id');
     expectTypeOf<Row>().toHaveProperty('email');
   });
@@ -229,9 +190,6 @@ describe('builder integration', () => {
 
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
-    const tables = schema<typeof contract>(context).tables;
-    const userTable = tables.user;
-    if (!userTable) throw new Error('user table not found');
 
     const db = sql<typeof contract>({ context });
     const _plan = db.user.select('id', 'email', 'createdAt').build();
@@ -254,61 +212,6 @@ describe('builder integration', () => {
     type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
     expectTypeOf<ContractCodecTypes['pg/text@1']['output']>().toEqualTypeOf<string>();
-  });
-
-  it('refined object contract works with schema()', () => {
-    const UserBase = model('User', {
-      fields: {
-        id: field.column(int4Column).id(),
-        email: field.column(textColumn),
-        createdAt: field.column(timestamptzColumn),
-      },
-    });
-
-    const Post = model('Post', {
-      fields: {
-        id: field.column(int4Column).id(),
-        userId: field.column(int4Column),
-        title: field.column(textColumn),
-      },
-      relations: {
-        user: rel.belongsTo(UserBase, { from: 'userId', to: 'id' }),
-      },
-    }).sql(({ cols, constraints }) => ({
-      table: 'post',
-      foreignKeys: [constraints.foreignKey(cols.userId, UserBase.refs.id)],
-    }));
-
-    const User = UserBase.relations({
-      posts: rel.hasMany(() => Post, { by: 'userId' }),
-    }).sql({
-      table: 'user',
-    });
-
-    const contract = defineContract({
-      family: sqlFamilyPack,
-      target: postgresPack,
-      storageHash: 'sha256:test-refined',
-      models: {
-        User,
-        Post,
-      },
-    });
-
-    const adapter = createStubAdapter();
-    const context = createTestContext(contract, adapter);
-    const tables = schema<typeof contract>(context).tables;
-    const userTable = tables['user'];
-    expect(userTable).toBeDefined();
-    expectTypeOf<typeof contract.storage.tables>().toExtend<Record<string, unknown>>();
-    expectTypeOf(contract.models.User.storage.table).toExtend<string>();
-
-    if (!userTable) throw new Error('user table not found');
-    expect(userTable.columns).toMatchObject({
-      id: expect.anything(),
-      email: expect.anything(),
-      createdAt: expect.anything(),
-    });
   });
 
   it('contract structure matches fixture contract', () => {

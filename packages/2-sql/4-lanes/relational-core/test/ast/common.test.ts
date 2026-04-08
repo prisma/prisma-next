@@ -37,7 +37,6 @@ describe('ast/common', () => {
   it('creates operation expressions directly and through function helpers', () => {
     const explicit = new OperationExpr({
       method: 'concat',
-      forTypeId: 'pg/text@1',
       self: col('user', 'email'),
       args: [param(0, 'suffix')],
       returns: stringReturn,

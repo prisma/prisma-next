@@ -3,7 +3,6 @@ import type {
   TypeRenderEntry,
   TypesImportSpec,
 } from '@prisma-next/framework-components/emission';
-import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
@@ -56,12 +55,10 @@ describe('emitter', () => {
         },
       });
 
-      const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,
@@ -80,36 +77,6 @@ describe('emitter', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('does not validate codec namespaces against extensions', async () => {
-    const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'unknown/type@1', nativeType: 'unknown_type', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitStackInput = {
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    const result = await emit(ir, options, mockSqlHook);
-    expect(result.contractJson).toBeDefined();
-    expect(result.contractDts).toBeDefined();
-  });
-
   it('emits contract even when extension pack namespace does not match extensionIds', async () => {
     const ir = createTestContract({
       storage: {
@@ -126,12 +93,38 @@ describe('emitter', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitStackInput = {
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
+    };
+
+    const result = await emit(ir, options, mockSqlHook);
+    expect(result.contractJson).toBeDefined();
+    expect(result.contractDts).toBeDefined();
+  });
+
+  it('tolerates codec namespaces not registered in extensionIds', async () => {
+    const ir = createTestContract({
+      storage: {
+        tables: {
+          data: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              value: { codecId: 'unknown/type@1', nativeType: 'custom', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const options: EmitStackInput = {
+      codecTypeImports: [],
+      operationTypeImports: [],
+      extensionIds: ['some-other-extension'],
     };
 
     const result = await emit(ir, options, mockSqlHook);
@@ -155,9 +148,7 @@ describe('emitter', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitStackInput = {
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -184,9 +175,7 @@ describe('emitter', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitStackInput = {
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -199,24 +188,12 @@ describe('emitter', () => {
 
   it('omits sources from emitted contract artifact', async () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
+      sources: {
+        schema: { sourceId: 'schema.prisma' },
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const options: EmitStackInput = {
-      operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -237,7 +214,6 @@ describe('emitter', () => {
     });
 
     const options: EmitStackInput = {
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -272,7 +248,6 @@ describe('emitter', () => {
     });
 
     const options: EmitStackInput = {
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -294,7 +269,6 @@ describe('emitter', () => {
     const mockHookNoTypeValidation = createMockSpi();
 
     const options: EmitStackInput = {
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: ['postgres'],
@@ -311,7 +285,6 @@ describe('emitter', () => {
     });
 
     const options: EmitStackInput = {
-      operationRegistry: createOperationRegistry(),
       extensionIds: [],
     };
 
@@ -333,7 +306,6 @@ describe('emitter', () => {
     ];
 
     const options: EmitStackInput = {
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -356,7 +328,6 @@ describe('emitter', () => {
     });
 
     const options: EmitStackInput = {
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -376,7 +347,6 @@ describe('emitter', () => {
     });
 
     const options: EmitStackInput = {
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
@@ -413,7 +383,6 @@ describe('emitter', () => {
     parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
     const options: EmitStackInput = {
-      operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],

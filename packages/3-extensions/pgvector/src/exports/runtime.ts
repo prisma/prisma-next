@@ -6,11 +6,7 @@ import type {
 import { type as arktype } from 'arktype';
 import { codecDefinitions } from '../core/codecs';
 import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from '../core/constants';
-import {
-  pgvectorOperationSignatures,
-  pgvectorPackMeta,
-  pgvectorQueryOperations,
-} from '../core/descriptor-meta';
+import { pgvectorPackMeta, pgvectorQueryOperations } from '../core/descriptor-meta';
 
 const vectorParamsSchema = arktype({
   length: 'number',
@@ -49,7 +45,6 @@ const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   familyId: 'sql' as const,
   targetId: 'postgres' as const,
   codecs: createPgvectorCodecRegistry,
-  operationSignatures: () => pgvectorOperationSignatures,
   queryOperations: () => pgvectorQueryOperations,
   parameterizedCodecs: () => parameterizedCodecDescriptors,
   create() {

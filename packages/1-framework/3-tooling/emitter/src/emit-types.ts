@@ -1,5 +1,4 @@
 import type { TypeRenderEntry, TypesImportSpec } from '@prisma-next/framework-components/emission';
-import type { OperationRegistry } from '@prisma-next/operations';
 
 /**
  * The subset of ControlStack that emit() reads.
@@ -7,7 +6,6 @@ import type { OperationRegistry } from '@prisma-next/operations';
  * A full ControlStack satisfies this via structural typing.
  */
 export interface EmitStackInput {
-  readonly operationRegistry?: OperationRegistry;
   readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly operationTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly queryOperationTypeImports?: ReadonlyArray<TypesImportSpec>;

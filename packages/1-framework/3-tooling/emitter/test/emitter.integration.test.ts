@@ -1,5 +1,4 @@
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
-import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
@@ -52,12 +51,10 @@ describe('emitter integration', () => {
         },
       });
 
-      const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,
@@ -127,12 +124,10 @@ describe('emitter integration', () => {
         },
       });
 
-      const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,
@@ -190,12 +185,10 @@ describe('emitter integration', () => {
         },
       });
 
-      const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,

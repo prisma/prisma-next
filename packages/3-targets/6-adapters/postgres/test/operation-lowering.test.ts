@@ -51,10 +51,9 @@ describe('Operation lowering', () => {
   function distanceExpr() {
     return new OperationExpr({
       method: 'cosineDistance',
-      forTypeId: 'pg/vector@1',
       self: ColumnRef.of('user', 'vector'),
       args: [ParamRef.of([1, 2, 3], { name: 'other', codecId: 'pg/vector@1' })],
-      returns: { kind: 'builtin', type: 'number' },
+      returns: { codecId: 'core/float8', nullable: false },
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',
@@ -75,17 +74,20 @@ describe('Operation lowering', () => {
   });
 
   it('lowers function operations with multiple arguments', () => {
-    const operationExpr = OperationExpr.function({
+    const operationExpr = new OperationExpr({
       method: 'cosineSimilarity',
-      forTypeId: 'pg/vector@1',
       self: ColumnRef.of('user', 'vector'),
       args: [
         ColumnRef.of('user', 'otherVector'),
         ParamRef.of([1, 2, 3], { name: 'param', codecId: 'pg/vector@1' }),
         LiteralExpr.of(42),
       ],
-      returns: { kind: 'builtin', type: 'number' },
-      template: 'cosine_similarity({{self}}, {{arg0}}, {{arg1}}, {{arg2}})',
+      returns: { codecId: 'core/float8', nullable: false },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: 'cosine_similarity({{self}}, {{arg0}}, {{arg1}}, {{arg2}})',
+      },
     });
     const ast = SelectAst.from(TableSource.named('user')).withProjection([
       ProjectionItem.of('similarity', operationExpr),
@@ -117,10 +119,9 @@ describe('Operation lowering', () => {
   it('lowers operations with literal arguments', () => {
     const operationExpr = new OperationExpr({
       method: 'contains',
-      forTypeId: 'pg/text@1',
       self: ColumnRef.of('user', 'email'),
       args: [LiteralExpr.of("test'value")],
-      returns: { kind: 'builtin', type: 'boolean' },
+      returns: { codecId: 'core/bool', nullable: false },
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
