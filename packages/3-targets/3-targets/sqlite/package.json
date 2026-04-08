@@ -34,6 +34,7 @@
     "src"
   ],
   "exports": {
+    "./control": "./dist/control.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"

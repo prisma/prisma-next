@@ -14,4 +14,13 @@ export const sqliteAdapterDescriptorMeta = {
       enums: false,
     },
   },
+  types: {
+    codecTypes: {
+      import: {
+        package: '@prisma-next/adapter-sqlite/codec-types',
+        named: 'CodecTypes',
+        alias: 'SqliteTypes',
+      },
+    },
+  },
 } as const;
