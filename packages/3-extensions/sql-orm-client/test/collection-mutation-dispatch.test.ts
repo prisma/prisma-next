@@ -8,6 +8,7 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import {
   dispatchMutationRows,
+  dispatchSplitMutationRows,
   executeMutationReturningSingleRow,
 } from '../src/collection-mutation-dispatch';
 import { createCollectionFor } from './collection-fixtures';
@@ -266,6 +267,156 @@ describe('collection-mutation-dispatch', () => {
       name: 'Alice',
       email: 'alice@example.com',
       posts: [{ id: 10, title: 'Post A', userId: 1, views: 10 }],
+    });
+  });
+
+  describe('dispatchSplitMutationRows()', () => {
+    it('maps rows from multiple plans without includes', async () => {
+      const contract = getTestContract();
+      const runtime = createMockRuntime();
+      runtime.setNextResults([
+        [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
+        [{ id: 2, name: 'Bob', email: 'bob@example.com' }],
+      ]);
+
+      const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
+        contract,
+        runtime,
+        plans: [makeCompiled('insert batch 1'), makeCompiled('insert batch 2')],
+        tableName: 'users',
+        includes: [],
+        hiddenColumns: [],
+        mapRow: (mapped) => mapped,
+      }).toArray();
+
+      expect(rows).toEqual([
+        { id: 1, name: 'Alice', email: 'alice@example.com' },
+        { id: 2, name: 'Bob', email: 'bob@example.com' },
+      ]);
+      expect(runtime.executions).toHaveLength(2);
+    });
+
+    it('strips hidden fields without includes', async () => {
+      const contract = getTestContract();
+      const runtime = createMockRuntime();
+      runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
+
+      const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
+        contract,
+        runtime,
+        plans: [makeCompiled('insert ...')],
+        tableName: 'users',
+        includes: [],
+        hiddenColumns: ['email'],
+        mapRow: (mapped) => mapped,
+      }).toArray();
+
+      expect(rows).toEqual([{ id: 1, name: 'Alice' }]);
+    });
+
+    it('yields nothing when all plans return empty without includes', async () => {
+      const contract = getTestContract();
+      const runtime = createMockRuntime();
+      runtime.setNextResults([[], []]);
+
+      const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
+        contract,
+        runtime,
+        plans: [makeCompiled('insert batch 1'), makeCompiled('insert batch 2')],
+        tableName: 'users',
+        includes: [],
+        hiddenColumns: [],
+        mapRow: (mapped) => mapped,
+      }).toArray();
+
+      expect(rows).toEqual([]);
+      expect(runtime.executions).toHaveLength(2);
+    });
+
+    it('stitches includes from multiple plans, strips hidden fields, and releases scope', async () => {
+      const contract = getTestContract();
+      const runtime = createMockRuntime();
+      runtime.setNextResults([
+        [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
+        [{ id: 2, name: 'Bob', email: 'bob@example.com' }],
+        [
+          { id: 10, title: 'Post A', user_id: 1, views: 10 },
+          { id: 11, title: 'Post B', user_id: 2, views: 5 },
+        ],
+      ]);
+
+      let released = false;
+      const runtimeWithConnection = addConnection(runtime, () => {
+        released = true;
+      });
+
+      const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
+        contract,
+        runtime: runtimeWithConnection,
+        plans: [makeCompiled('insert batch 1'), makeCompiled('insert batch 2')],
+        tableName: 'users',
+        includes: usersPostsIncludes(contract),
+        hiddenColumns: ['email'],
+        mapRow: (mapped) => mapped,
+      }).toArray();
+
+      expect(rows).toEqual([
+        { id: 1, name: 'Alice', posts: [{ id: 10, title: 'Post A', userId: 1, views: 10 }] },
+        { id: 2, name: 'Bob', posts: [{ id: 11, title: 'Post B', userId: 2, views: 5 }] },
+      ]);
+      expect(released).toBe(true);
+    });
+
+    it('returns empty and releases scope when all plans yield no rows with includes', async () => {
+      const contract = getTestContract();
+      const runtime = createMockRuntime();
+      runtime.setNextResults([[], []]);
+
+      let released = false;
+      const runtimeWithConnection = addConnection(runtime, () => {
+        released = true;
+      });
+
+      const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
+        contract,
+        runtime: runtimeWithConnection,
+        plans: [makeCompiled('insert batch 1'), makeCompiled('insert batch 2')],
+        tableName: 'users',
+        includes: usersPostsIncludes(contract),
+        hiddenColumns: [],
+        mapRow: (mapped) => mapped,
+      }).toArray();
+
+      expect(rows).toEqual([]);
+      expect(released).toBe(true);
+    });
+
+    it('keeps all fields when no hidden columns in include mode', async () => {
+      const contract = getTestContract();
+      const runtime = createMockRuntime();
+      runtime.setNextResults([
+        [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
+        [{ id: 10, title: 'Post A', user_id: 1, views: 10 }],
+      ]);
+
+      const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
+        contract,
+        runtime,
+        plans: [makeCompiled('insert batch 1')],
+        tableName: 'users',
+        includes: usersPostsIncludes(contract),
+        hiddenColumns: [],
+        mapRow: (mapped) => mapped,
+      }).toArray();
+
+      expect(rows).toEqual([
+        {
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          posts: [{ id: 10, title: 'Post A', userId: 1, views: 10 }],
+        },
+      ]);
     });
   });
 });

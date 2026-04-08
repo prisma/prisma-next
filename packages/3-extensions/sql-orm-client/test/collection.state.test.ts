@@ -16,6 +16,7 @@ import {
   createCollection,
   createCollectionFor,
   createReturningCollectionFor,
+  createReturningCollectionWithoutDefaultInInsert,
 } from './collection-fixtures';
 
 describe('Collection', () => {
@@ -346,6 +347,37 @@ describe('Collection', () => {
         } as never),
       ).rejects.toThrow(/did not return a row/);
     }, 500);
+
+    it('createAll() uses split insert when defaultInInsert is absent', async () => {
+      const { collection, runtime } = createReturningCollectionWithoutDefaultInInsert('User');
+      runtime.setNextResults([
+        [{ id: 1, name: 'Alice', email: 'alice@example.com', invited_by_id: null, address: null }],
+        [{ id: 2, name: 'Bob', email: 'bob@example.com', invited_by_id: 1, address: null }],
+      ]);
+
+      const rows = await collection
+        .createAll([
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+        ])
+        .toArray();
+
+      expect(rows).toHaveLength(2);
+      expect(runtime.executions).toHaveLength(2);
+    });
+
+    it('createCount() uses split insert when defaultInInsert is absent', async () => {
+      const { collection, runtime } = createReturningCollectionWithoutDefaultInInsert('User');
+      runtime.setNextResults([[], []]);
+
+      const count = await collection.createCount([
+        { id: 1, name: 'Alice', email: 'alice@example.com' },
+        { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
+      ]);
+
+      expect(count).toBe(2);
+      expect(runtime.executions).toHaveLength(2);
+    });
 
     it('update() returns null when nested or scalar updates return no rows', async () => {
       const { collection: nestedCollection, runtime: nestedRuntime } =
