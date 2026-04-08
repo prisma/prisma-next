@@ -39,6 +39,7 @@ import type {
   // biome-ignore lint/correctness/noUnusedImports: used in `declare` property
   RowType,
   WithOrderByState,
+  WithVariantState,
   WithWhereState,
 } from './collection-internal-types';
 import {
@@ -88,7 +89,6 @@ import {
   type CollectionContext,
   type CollectionState,
   type CollectionTypeState,
-  type CreateInput,
   type DefaultCollectionTypeState,
   type DefaultModelRow,
   emptyState,
@@ -104,6 +104,7 @@ import {
   type NumericFieldNames,
   type RelatedModelName,
   type RelationNames,
+  type ResolvedCreateInput,
   type ShorthandWhereFilter,
   type UniqueConstraintCriterion,
   type VariantModelRow,
@@ -231,8 +232,9 @@ export class Collection<
     TContract,
     ModelName,
     VariantModelRow<TContract, ModelName, V>,
-    WithWhereState<State>
+    WithVariantState<WithWhereState<State>, V>
   > {
+    type ReturnState = WithVariantState<WithWhereState<State>, V>;
     const model = this.contract.models[this.modelName] as Record<string, unknown> | undefined;
     const discriminator = model?.['discriminator'] as { field: string } | undefined;
     const variants = model?.['variants'] as Record<string, { value: string }> | undefined;
@@ -242,7 +244,7 @@ export class Collection<
         TContract,
         ModelName,
         VariantModelRow<TContract, ModelName, V>,
-        WithWhereState<State>
+        ReturnState
       >;
     }
 
@@ -252,7 +254,7 @@ export class Collection<
         TContract,
         ModelName,
         VariantModelRow<TContract, ModelName, V>,
-        WithWhereState<State>
+        ReturnState
       >;
     }
 
@@ -274,7 +276,7 @@ export class Collection<
         )
       : this.state.filters;
 
-    return this.#cloneWithRow<VariantModelRow<TContract, ModelName, V>, WithWhereState<State>>({
+    return this.#cloneWithRow<VariantModelRow<TContract, ModelName, V>, ReturnState>({
       filters: [...filtersWithoutPreviousVariant, filter],
       variantName: variantName as string,
     });
@@ -659,11 +661,11 @@ export class Collection<
     return normalizeAggregateResult(aggregateSpec, rows[0] ?? {});
   }
 
-  async create(data: CreateInput<TContract, ModelName>): Promise<Row>;
+  async create(data: ResolvedCreateInput<TContract, ModelName, State['variantName']>): Promise<Row>;
   async create(data: MutationCreateInputWithRelations<TContract, ModelName>): Promise<Row>;
   async create(
     data:
-      | CreateInput<TContract, ModelName>
+      | ResolvedCreateInput<TContract, ModelName, State['variantName']>
       | MutationCreateInputWithRelations<TContract, ModelName>,
   ): Promise<Row> {
     assertReturningCapability(this.contract, 'create()');
@@ -686,7 +688,9 @@ export class Collection<
       return reloaded;
     }
 
-    const rows = await this.createAll([data as CreateInput<TContract, ModelName>]);
+    const rows = await this.createAll([
+      data as ResolvedCreateInput<TContract, ModelName, State['variantName']>,
+    ]);
     const created = rows[0];
     if (created) {
       return created;
@@ -695,7 +699,9 @@ export class Collection<
     throw new Error(`create() for model "${this.modelName}" did not return a row`);
   }
 
-  createAll(data: readonly CreateInput<TContract, ModelName>[]): AsyncIterableResult<Row> {
+  createAll(
+    data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
+  ): AsyncIterableResult<Row> {
     if (data.length === 0) {
       const generator = async function* (): AsyncGenerator<Row, void, unknown> {};
       return new AsyncIterableResult(generator());
@@ -703,12 +709,13 @@ export class Collection<
 
     assertReturningCapability(this.contract, 'createAll()');
 
+    const rows = data as readonly Record<string, unknown>[];
     const mtiContext = this.#resolveMtiCreateContext();
     if (mtiContext) {
-      return this.#executeMtiCreate(data, mtiContext);
+      return this.#executeMtiCreate(rows, mtiContext);
     }
 
-    const mappedRows = this.#mapCreateRows(data);
+    const mappedRows = this.#mapCreateRows(rows);
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
     const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
     const { selectedForQuery: selectedForInsert, hiddenColumns } = augmentSelectionForJoinColumns(
@@ -775,7 +782,7 @@ export class Collection<
   }
 
   #executeMtiCreate(
-    data: readonly CreateInput<TContract, ModelName>[],
+    data: readonly Record<string, unknown>[],
     mtiCtx: MtiCreateContext,
   ): AsyncIterableResult<Row> {
     const { polyInfo, variant, baseFieldToColumn, variantFieldToColumn, pkColumn } = mtiCtx;
@@ -845,7 +852,7 @@ export class Collection<
     return new AsyncIterableResult(generator());
   }
 
-  #mapCreateRows(data: readonly CreateInput<TContract, ModelName>[]): Record<string, unknown>[] {
+  #mapCreateRows(data: readonly Record<string, unknown>[]): Record<string, unknown>[] {
     const variantName = this.state.variantName;
     if (!variantName) {
       return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
@@ -877,12 +884,15 @@ export class Collection<
     });
   }
 
-  async createCount(data: readonly CreateInput<TContract, ModelName>[]): Promise<number> {
+  async createCount(
+    data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
+  ): Promise<number> {
     if (data.length === 0) {
       return 0;
     }
 
-    const mappedRows = this.#mapCreateRows(data);
+    const rows = data as readonly Record<string, unknown>[];
+    const mappedRows = this.#mapCreateRows(rows);
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
 
     if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
@@ -904,7 +914,7 @@ export class Collection<
    * so this method may issue a follow-up reload query to return the existing row.
    */
   async upsert(input: {
-    create: CreateInput<TContract, ModelName>;
+    create: ResolvedCreateInput<TContract, ModelName, State['variantName']>;
     update: Partial<DefaultModelRow<TContract, ModelName>>;
     conflictOn?: UniqueConstraintCriterion<TContract, ModelName>;
   }): Promise<Row> {
