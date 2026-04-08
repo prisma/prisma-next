@@ -41,12 +41,17 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly User: {
-    readonly id: number;
-    readonly email: string;
-    readonly createdAt: string;
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly email: CodecTypes['pg/text@1']['output'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
   };
 };
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes>;
+export type TypeMaps = TypeMapsType<
+  CodecTypes,
+  OperationTypes,
+  QueryOperationTypes,
+  FieldOutputTypes
+>;
 
 type ContractBase = ContractType<
   {
@@ -80,14 +85,6 @@ type ContractBase = ContractType<
   },
   {
     readonly User: {
-      readonly storage: {
-        readonly table: 'user';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly email: { readonly column: 'email' };
-          readonly createdAt: { readonly column: 'createdAt' };
-        };
-      };
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -102,7 +99,15 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
         };
       };
-      readonly relations: {};
+      readonly relations: Record<string, never>;
+      readonly storage: {
+        readonly table: 'user';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly email: { readonly column: 'email' };
+          readonly createdAt: { readonly column: 'createdAt' };
+        };
+      };
     };
   }
 > & {

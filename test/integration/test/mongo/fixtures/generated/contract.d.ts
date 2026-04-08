@@ -20,6 +20,34 @@ export type ProfileHash =
 export type CodecTypes = MongoCodecTypes;
 export type OperationTypes = Record<string, never>;
 
+export type FieldOutputTypes = {
+  readonly Address: {
+    readonly street: CodecTypes['mongo/string@1']['output'];
+    readonly city: CodecTypes['mongo/string@1']['output'];
+    readonly zip: CodecTypes['mongo/string@1']['output'];
+  };
+  readonly Bug: { readonly severity: CodecTypes['mongo/string@1']['output'] };
+  readonly Comment: {
+    readonly _id: CodecTypes['mongo/objectId@1']['output'];
+    readonly text: CodecTypes['mongo/string@1']['output'];
+    readonly createdAt: CodecTypes['mongo/date@1']['output'];
+  };
+  readonly Feature: {
+    readonly priority: CodecTypes['mongo/string@1']['output'];
+    readonly targetRelease: CodecTypes['mongo/string@1']['output'];
+  };
+  readonly Task: {
+    readonly _id: CodecTypes['mongo/objectId@1']['output'];
+    readonly title: CodecTypes['mongo/string@1']['output'];
+    readonly type: CodecTypes['mongo/string@1']['output'];
+    readonly assigneeId: CodecTypes['mongo/objectId@1']['output'];
+  };
+  readonly User: {
+    readonly _id: CodecTypes['mongo/objectId@1']['output'];
+    readonly name: CodecTypes['mongo/string@1']['output'];
+    readonly email: CodecTypes['mongo/string@1']['output'];
+  };
+};
 export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>;
 
 type ContractBase = ContractType<
