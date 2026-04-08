@@ -25,6 +25,7 @@ export function mongoCodec<
   decode: (wire: TWire) => TJs;
   encodeJson?: (value: TJs) => JsonValue;
   decodeJson?: (json: JsonValue) => TJs;
+  renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }): MongoCodec<Id, TTraits, TWire, TJs> {
   const traits = config.traits
     ? (Object.freeze([...config.traits]) as TTraits)
@@ -38,6 +39,7 @@ export function mongoCodec<
     encode: config.encode,
     encodeJson: (config.encodeJson ?? identity) as (value: TJs) => JsonValue,
     decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TJs,
+    ...(config.renderOutputType ? { renderOutputType: config.renderOutputType } : {}),
   };
 }
 

@@ -1,6 +1,7 @@
 import type { ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type {
+  ExtractMongoFieldOutputTypes,
   InferModelRow,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
@@ -10,6 +11,10 @@ type TestCodecTypes = {
   readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
   readonly 'mongo/string@1': { readonly input: string; readonly output: string };
   readonly 'mongo/int32@1': { readonly input: number; readonly output: number };
+};
+
+type TestFieldOutputTypes = {
+  readonly User: { readonly age: number };
 };
 
 type TestTypeMaps = MongoTypeMaps<TestCodecTypes>;
@@ -98,4 +103,37 @@ test('InferModelRow handles many: true value object fields', () => {
 test('InferModelRow still handles scalar fields alongside value objects', () => {
   type UserRow = InferModelRow<ContractWithVO, 'User'>;
   expectTypeOf<UserRow['_id']>().toEqualTypeOf<string>();
+});
+
+test('MongoTypeMaps accepts a fieldOutputTypes parameter', () => {
+  type TM = MongoTypeMaps<TestCodecTypes, Record<string, never>, TestFieldOutputTypes>;
+  expectTypeOf<TM['fieldOutputTypes']>().toEqualTypeOf<TestFieldOutputTypes>();
+});
+
+test('MongoTypeMaps defaults fieldOutputTypes to Record<string, Record<string, unknown>>', () => {
+  type TM = MongoTypeMaps<TestCodecTypes>;
+  expectTypeOf<TM['fieldOutputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
+});
+
+test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () => {
+  type TM = MongoTypeMaps<TestCodecTypes, Record<string, never>, TestFieldOutputTypes>;
+  type C = MongoContractWithTypeMaps<
+    {
+      readonly target: 'mongo';
+      readonly targetFamily: 'mongo';
+      readonly profileHash: ProfileHashBase<'sha256:test'>;
+      readonly capabilities: Record<string, never>;
+      readonly extensionPacks: Record<string, never>;
+      readonly meta: Record<string, never>;
+      readonly roots: Record<string, never>;
+      readonly models: Record<string, never>;
+      readonly valueObjects: Record<string, never>;
+      readonly storage: {
+        readonly collections: Record<string, never>;
+        readonly storageHash: StorageHashBase<'sha256:s'>;
+      };
+    },
+    TM
+  >;
+  expectTypeOf<ExtractMongoFieldOutputTypes<C>>().toEqualTypeOf<TestFieldOutputTypes>();
 });
