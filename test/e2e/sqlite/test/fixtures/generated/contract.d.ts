@@ -28,7 +28,48 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   ? CodecTypes[CodecId]['output']
   : _Encoded;
 
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
+export type FieldOutputTypes = {
+  readonly Comment: {
+    readonly id: CodecTypes['sqlite/integer@1']['output'];
+    readonly body: CodecTypes['sqlite/text@1']['output'];
+    readonly postId: CodecTypes['sqlite/integer@1']['output'];
+  };
+  readonly Item: {
+    readonly id: CodecTypes['sqlite/integer@1']['output'];
+    readonly name: CodecTypes['sqlite/text@1']['output'];
+    readonly label: CodecTypes['sqlite/text@1']['output'];
+  };
+  readonly Post: {
+    readonly id: CodecTypes['sqlite/integer@1']['output'];
+    readonly title: CodecTypes['sqlite/text@1']['output'];
+    readonly userId: CodecTypes['sqlite/integer@1']['output'];
+    readonly views: CodecTypes['sqlite/integer@1']['output'];
+  };
+  readonly Profile: {
+    readonly id: CodecTypes['sqlite/integer@1']['output'];
+    readonly userId: CodecTypes['sqlite/integer@1']['output'];
+    readonly bio: CodecTypes['sqlite/text@1']['output'];
+  };
+  readonly TypedRow: {
+    readonly id: CodecTypes['sqlite/integer@1']['output'];
+    readonly active: CodecTypes['sqlite/boolean@1']['output'];
+    readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
+    readonly metadata: CodecTypes['sqlite/json@1']['output'] | null;
+    readonly label: CodecTypes['sqlite/text@1']['output'];
+  };
+  readonly User: {
+    readonly id: CodecTypes['sqlite/integer@1']['output'];
+    readonly name: CodecTypes['sqlite/text@1']['output'];
+    readonly email: CodecTypes['sqlite/text@1']['output'];
+    readonly invitedById: CodecTypes['sqlite/integer@1']['output'] | null;
+  };
+};
+export type TypeMaps = TypeMapsType<
+  CodecTypes,
+  OperationTypes,
+  QueryOperationTypes,
+  FieldOutputTypes
+>;
 
 type ContractBase = ContractType<
   {
@@ -201,14 +242,6 @@ type ContractBase = ContractType<
   },
   {
     readonly Comment: {
-      readonly storage: {
-        readonly table: 'comments';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly body: { readonly column: 'body' };
-          readonly postId: { readonly column: 'post_id' };
-        };
-      };
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -223,17 +256,17 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/integer@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly Item: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'items';
+        readonly table: 'comments';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly name: { readonly column: 'name' };
-          readonly label: { readonly column: 'label' };
+          readonly body: { readonly column: 'body' };
+          readonly postId: { readonly column: 'post_id' };
         };
       };
+    };
+    readonly Item: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -248,18 +281,17 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly Post: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'posts';
+        readonly table: 'items';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly title: { readonly column: 'title' };
-          readonly userId: { readonly column: 'user_id' };
-          readonly views: { readonly column: 'views' };
+          readonly name: { readonly column: 'name' };
+          readonly label: { readonly column: 'label' };
         };
       };
+    };
+    readonly Post: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -296,16 +328,17 @@ type ContractBase = ContractType<
           };
         };
       };
-    };
-    readonly Profile: {
       readonly storage: {
-        readonly table: 'profiles';
+        readonly table: 'posts';
         readonly fields: {
           readonly id: { readonly column: 'id' };
+          readonly title: { readonly column: 'title' };
           readonly userId: { readonly column: 'user_id' };
-          readonly bio: { readonly column: 'bio' };
+          readonly views: { readonly column: 'views' };
         };
       };
+    };
+    readonly Profile: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -320,19 +353,17 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly TypedRow: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'typed_rows';
+        readonly table: 'profiles';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly active: { readonly column: 'active' };
-          readonly createdAt: { readonly column: 'created_at' };
-          readonly metadata: { readonly column: 'metadata' };
-          readonly label: { readonly column: 'label' };
+          readonly userId: { readonly column: 'user_id' };
+          readonly bio: { readonly column: 'bio' };
         };
       };
+    };
+    readonly TypedRow: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -355,18 +386,19 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly User: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'users';
+        readonly table: 'typed_rows';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly name: { readonly column: 'name' };
-          readonly email: { readonly column: 'email' };
-          readonly invitedById: { readonly column: 'invited_by_id' };
+          readonly active: { readonly column: 'active' };
+          readonly createdAt: { readonly column: 'created_at' };
+          readonly metadata: { readonly column: 'metadata' };
+          readonly label: { readonly column: 'label' };
         };
       };
+    };
+    readonly User: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -401,6 +433,15 @@ type ContractBase = ContractType<
             readonly localFields: readonly ['id'];
             readonly targetFields: readonly ['userId'];
           };
+        };
+      };
+      readonly storage: {
+        readonly table: 'users';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly name: { readonly column: 'name' };
+          readonly email: { readonly column: 'email' };
+          readonly invitedById: { readonly column: 'invited_by_id' };
         };
       };
     };
