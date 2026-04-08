@@ -5,6 +5,7 @@ import type {
   BooleanField,
   DateField,
   DocField,
+  NullableDocField,
   NumericField,
   StringField,
   TypedAggExpr,
@@ -133,17 +134,17 @@ describe('comparison helpers', () => {
 });
 
 describe('array helpers', () => {
-  it('arrayElemAt returns DocField', () => {
-    expectTypeOf(fn.arrayElemAt(d, d)).toEqualTypeOf<TypedAggExpr<DocField>>();
+  it('arrayElemAt returns NullableDocField', () => {
+    expectTypeOf(fn.arrayElemAt(d, d)).toEqualTypeOf<TypedAggExpr<NullableDocField>>();
   });
   it('concatArrays returns ArrayField', () => {
     expectTypeOf(fn.concatArrays(d, d)).toEqualTypeOf<TypedAggExpr<ArrayField>>();
   });
-  it('firstElem returns DocField', () => {
-    expectTypeOf(fn.firstElem(d)).toEqualTypeOf<TypedAggExpr<DocField>>();
+  it('firstElem returns NullableDocField', () => {
+    expectTypeOf(fn.firstElem(d)).toEqualTypeOf<TypedAggExpr<NullableDocField>>();
   });
-  it('lastElem returns DocField', () => {
-    expectTypeOf(fn.lastElem(d)).toEqualTypeOf<TypedAggExpr<DocField>>();
+  it('lastElem returns NullableDocField', () => {
+    expectTypeOf(fn.lastElem(d)).toEqualTypeOf<TypedAggExpr<NullableDocField>>();
   });
   it('isIn returns BooleanField', () => {
     expectTypeOf(fn.isIn(d, d)).toEqualTypeOf<TypedAggExpr<BooleanField>>();

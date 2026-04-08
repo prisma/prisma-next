@@ -16,6 +16,7 @@ export type {
   GroupedDocShape,
   GroupSpec,
   ModelToDocShape,
+  NullableDocField,
   NullableNumericField,
   NumericField,
   ProjectedShape,
