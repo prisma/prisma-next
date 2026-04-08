@@ -31,7 +31,11 @@ export type LiteralValue<F extends DocField> = F extends StringField
 
 export type DocShape = Record<string, DocField>;
 
-type ExtractCodecId<F> = F extends { type: { kind: 'scalar'; codecId: infer C } } ? C : string;
+type ExtractCodecId<F> = F extends { type: { kind: 'scalar'; codecId: infer C } }
+  ? C
+  : F extends { codecId: infer C extends string }
+    ? C
+    : string;
 
 export type ModelToDocShape<
   TContract extends MongoContract,
