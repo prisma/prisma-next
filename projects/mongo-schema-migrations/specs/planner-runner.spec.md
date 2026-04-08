@@ -1,5 +1,7 @@
 # Planner + Runner Design
 
+The **planner** compares desired state (a destination contract) against current state (a schema IR derived from the origin contract) and produces a list of migration operations — each containing DDL commands and pre/postchecks. The **runner** executes those operations against a live MongoDB database in a generic three-phase loop. This document covers both components.
+
 ## A migration, end to end
 
 Before any abstractions, here's one concrete migration from start to finish.
@@ -18,36 +20,7 @@ The planner converts the destination contract into a second schema IR, then diff
 - `users` exists in both IRs → not a new collection.
 - Index `{ email: 1, unique: true }` exists in the destination but not the origin → emit a `createIndex` operation.
 
-The planner returns a `MigrationPlan` containing one operation:
-
-```typescript
-[
-  {
-    id: 'index.users.create(email:1)',
-    label: 'Create index on users (email ascending)',
-    operationClass: 'additive',
-    precheck: [{
-      description: 'index does not already exist',
-      source: new ListIndexesCommand('users'),
-      filter: MongoFieldFilter.eq('key', { email: 1 }),
-      expect: 'notExists',
-    }],
-    execute: [{
-      description: 'create index',
-      command: new CreateIndexCommand('users', [{ field: 'email', direction: 1 }], { unique: true }),
-    }],
-    postcheck: [{
-      description: 'unique index exists',
-      source: new ListIndexesCommand('users'),
-      filter: MongoAndExpr.of([
-        MongoFieldFilter.eq('key', { email: 1 }),
-        MongoFieldFilter.eq('unique', true),
-      ]),
-      expect: 'exists',
-    }],
-  },
-]
-```
+The planner returns a `MigrationPlan` containing one operation with a precheck (index does not already exist), an execute step (`CreateIndexCommand`), and a postcheck (unique index exists). See [Operation Design](operation-ast.spec.md) for the full operation structure, DDL command AST, and check assertion format.
 
 **Runner.** The CLI calls `TargetMigrationsCapability.createRunner()` and passes the plan plus a Mongo driver instance. The runner:
 
@@ -311,86 +284,23 @@ This is structurally identical to the SQL runner's `applyPlan` loop. The only di
 
 ### Command executor
 
-The command executor maps each DDL command kind to a MongoDB driver call:
+The command executor maps each DDL command AST node to a MongoDB driver call. DDL command kinds are defined in [Operation Design](operation-ast.spec.md).
 
-```typescript
-async function executeDdlCommand(db: Db, command: AnyMongoDdlCommand): Promise<void> {
-  switch (command.kind) {
-    case 'createIndex': {
-      const keySpec: Record<string, number | string> = {};
-      for (const key of command.keys) {
-        keySpec[key.field] = key.direction;
-      }
-      const options: CreateIndexesOptions = {};
-      if (command.unique) options.unique = true;
-      if (command.sparse) options.sparse = true;
-      if (command.expireAfterSeconds != null) options.expireAfterSeconds = command.expireAfterSeconds;
-      if (command.partialFilterExpression) options.partialFilterExpression = command.partialFilterExpression;
-      if (command.name) options.name = command.name;
-      await db.collection(command.collection).createIndex(keySpec, options);
-      return;
-    }
-    case 'dropIndex': {
-      await db.collection(command.collection).dropIndex(command.name);
-      return;
-    }
-    case 'createCollection': {
-      const options: CreateCollectionOptions = {};
-      if (command.validator) options.validator = command.validator;
-      if (command.validationLevel) options.validationLevel = command.validationLevel;
-      if (command.validationAction) options.validationAction = command.validationAction;
-      await db.createCollection(command.collection, options);
-      return;
-    }
-    case 'dropCollection': {
-      await db.collection(command.collection).drop();
-      return;
-    }
-    case 'collMod': {
-      const cmd: Record<string, unknown> = { collMod: command.collection };
-      if (command.validator) cmd.validator = command.validator;
-      if (command.validationLevel) cmd.validationLevel = command.validationLevel;
-      if (command.validationAction) cmd.validationAction = command.validationAction;
-      await db.command(cmd);
-      return;
-    }
-    default:
-      throw new Error(`Unknown DDL command kind: ${(command as { kind: string }).kind}`);
-  }
-}
-```
+| Command kind       | MongoDB driver call                                  |
+|--------------------|------------------------------------------------------|
+| `createIndex`      | `collection.createIndex(keySpec, options)`            |
+| `dropIndex`        | `collection.dropIndex(name)`                         |
+| `createCollection` | `db.createCollection(name, options)`                  |
+| `dropCollection`   | `collection.drop()`                                  |
+| `collMod`          | `db.command({ collMod: name, validator: ..., ... })`  |
 
-The `default` branch ensures that unknown command kinds (e.g., from a future extension pack) fail loudly rather than silently.
+The executor switches on `command.kind` and translates each command's typed fields into the corresponding driver arguments. Unknown command kinds (e.g. from a future extension pack) throw loudly rather than silently no-oping.
 
 ### Check evaluation
 
-The runner evaluates checks by:
+The runner evaluates checks by running the inspection command (`listIndexes`, `listCollections`) against the database, then applying the check's `MongoFilterExpr` to each result document using a client-side filter evaluator. The expectation (`exists` = at least one match, `notExists` = no matches) determines whether the check passes.
 
-1. Running the inspection command (`listIndexes`, `listCollections`) against the database
-2. Applying the `MongoFilterExpr` to each result document using a client-side filter evaluator
-3. Checking the expectation (`exists` = at least one match, `notExists` = no matches)
-
-```typescript
-async function evaluateCheck(db: Db, check: MongoMigrationCheck): Promise<boolean> {
-  const results = await runInspectionCommand(db, check.source);
-  const evaluator = new FilterEvaluator();
-  const hasMatch = results.some(doc => evaluator.evaluate(check.filter, doc));
-  return check.expect === 'exists' ? hasMatch : !hasMatch;
-}
-
-async function runInspectionCommand(db: Db, source: AnyMongoInspectionCommand): Promise<Record<string, unknown>[]> {
-  switch (source.kind) {
-    case 'listIndexes':
-      return await db.collection(source.collection).listIndexes().toArray();
-    case 'listCollections':
-      return await db.listCollections().toArray();
-    default:
-      throw new Error(`Unknown inspection command kind: ${(source as { kind: string }).kind}`);
-  }
-}
-```
-
-The `FilterEvaluator` is a client-side interpreter for `MongoFilterExpr`. See the [Check Evaluator design](check-evaluator.spec.md) for full details.
+The `FilterEvaluator` is a client-side `MongoFilterVisitor<boolean>` that evaluates filter expressions against in-memory JavaScript objects. It supports core comparison operators (`$eq`, `$ne`, `$gt`, `$lt`, `$in`), logical combinators (`$and`, `$or`, `$not`), field existence (`$exists`), dotted field paths, and recursive deep equality for embedded documents. See [Check Evaluator design](check-evaluator.spec.md) for the full evaluator implementation, operator semantics, and testing strategy.
 
 ### Idempotency
 

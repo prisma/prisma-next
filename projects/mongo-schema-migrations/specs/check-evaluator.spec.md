@@ -1,5 +1,9 @@
 # Check Evaluator Design
 
+## Context
+
+Migration operations carry **prechecks** and **postchecks** — assertions about the state of the database before and after a DDL command runs. Each check is expressed as a MongoDB filter expression (`MongoFilterExpr`) applied against the results of an inspection command like `listIndexes` or `listCollections` (see [Operation AST design](operation-ast.spec.md) for how checks are authored and serialized). These inspection commands are MongoDB admin commands that return all results — they don't support server-side query filters. The check evaluator is the client-side interpreter that evaluates `MongoFilterExpr` against those plain JavaScript result documents, determining whether a check passes or fails.
+
 ## Grounding example
 
 The runner needs to verify that an index on `users.email` exists. The postcheck in the migration operation says:
@@ -43,6 +47,69 @@ No MongoDB server interaction happens during the evaluation itself — the filte
 3. **Deep equality for `$eq`.** When `MongoFieldFilter.eq('key', { email: 1 })` is evaluated, the evaluator performs recursive structural equality between the document's `key` field and the expected value `{ email: 1 }`. This matches MongoDB's own `$eq` semantics for embedded documents.
 
 4. **Inspection commands have known result shapes.** `listIndexes` returns index descriptors with fields `key`, `name`, `unique`, `sparse`, etc. `listCollections` returns collection info with fields `name`, `type`, `options`, etc. These shapes are well-defined by MongoDB and can be typed at authoring time.
+
+## Inspection command result shapes
+
+Each inspection command returns documents with a known shape. These shapes are defined by MongoDB and are stable across versions.
+
+### `listIndexes` result shape
+
+```typescript
+interface IndexInfoDocument {
+  readonly v: number;
+  readonly key: Record<string, number | string>;
+  readonly name: string;
+  readonly unique?: boolean;
+  readonly sparse?: boolean;
+  readonly expireAfterSeconds?: number;
+  readonly partialFilterExpression?: Record<string, unknown>;
+  readonly collation?: Record<string, unknown>;
+  readonly hidden?: boolean;
+}
+```
+
+### `listCollections` result shape
+
+```typescript
+interface CollectionInfoDocument {
+  readonly name: string;
+  readonly type: 'collection' | 'view';
+  readonly options: {
+    readonly validator?: Record<string, unknown>;
+    readonly validationLevel?: string;
+    readonly validationAction?: string;
+    readonly capped?: boolean;
+    readonly size?: number;
+    readonly max?: number;
+    readonly collation?: Record<string, unknown>;
+  };
+  readonly info: {
+    readonly readOnly: boolean;
+  };
+}
+```
+
+### Typed check construction
+
+At authoring time (in the planner), these shapes can be used to type-check filter expressions. A helper function could enforce that the filter field paths are valid for the inspection command's result type:
+
+```typescript
+function indexCheck(
+  collection: string,
+  filter: MongoFilterExpr,
+  expect: 'exists' | 'notExists',
+  description: string,
+): MongoMigrationCheck {
+  return {
+    description,
+    source: new ListIndexesCommand(collection),
+    filter,
+    expect,
+  };
+}
+```
+
+The planner code gets type safety from the known result shapes. The serialized JSON in `ops.json` doesn't carry type information — but the evaluator handles whatever filter expression it receives.
 
 ## Evaluator implementation
 
@@ -158,194 +225,24 @@ function deepEquals(a: unknown, b: unknown): boolean {
 }
 ```
 
-## Inspection command result shapes
+**Key-order sensitivity.** MongoDB's `$eq` is key-order-sensitive for object values: `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` are **not** equal. The `deepEquals` implementation above preserves this behavior by iterating `Object.keys(aObj)` and checking that each key at each position matches. This is significant for index key specs, where `{ email: 1, name: -1 }` is a different compound index from `{ name: -1, email: 1 }` — the field order determines the index's sort order and query coverage.
 
-Each inspection command returns documents with a known shape. These shapes are defined by MongoDB and are stable across versions.
+## Check examples
 
-### `listIndexes` result shape
+The following table summarizes how checks are constructed for common migration operations. The grounding example above shows the full TypeScript structure; the [Operation AST spec](operation-ast.spec.md#check-examples-by-operation) has the complete check table across all operation types.
 
-```typescript
-interface IndexInfoDocument {
-  readonly v: number;
-  readonly key: Record<string, number | string>;
-  readonly name: string;
-  readonly unique?: boolean;
-  readonly sparse?: boolean;
-  readonly expireAfterSeconds?: number;
-  readonly partialFilterExpression?: Record<string, unknown>;
-  readonly collation?: Record<string, unknown>;
-  readonly hidden?: boolean;
-}
-```
-
-### `listCollections` result shape
-
-```typescript
-interface CollectionInfoDocument {
-  readonly name: string;
-  readonly type: 'collection' | 'view';
-  readonly options: {
-    readonly validator?: Record<string, unknown>;
-    readonly validationLevel?: string;
-    readonly validationAction?: string;
-    readonly capped?: boolean;
-    readonly size?: number;
-    readonly max?: number;
-    readonly collation?: Record<string, unknown>;
-  };
-  readonly info: {
-    readonly readOnly: boolean;
-  };
-}
-```
-
-### Typed check construction
-
-At authoring time (in the planner), these shapes can be used to type-check filter expressions. A helper function could enforce that the filter field paths are valid for the inspection command's result type:
-
-```typescript
-function indexCheck(
-  collection: string,
-  filter: MongoFilterExpr,
-  expect: 'exists' | 'notExists',
-  description: string,
-): MongoMigrationCheck {
-  return {
-    description,
-    source: new ListIndexesCommand(collection),
-    filter,
-    expect,
-  };
-}
-```
-
-The planner code gets type safety from the known result shapes. The serialized JSON in `ops.json` doesn't carry type information — but the evaluator handles whatever filter expression it receives.
+| Scenario | Source | Filter | Expect |
+|---|---|---|---|
+| Create index precheck | `listIndexes('users')` | `key = { email: 1 }` | `notExists` |
+| Create index postcheck | `listIndexes('users')` | `key = { email: 1 } AND unique = true` | `exists` |
+| Drop index precheck | `listIndexes('users')` | `key = { email: 1 }` | `exists` |
+| Create collection postcheck | `listCollections()` | `name = 'orders'` | `exists` |
+| Update validator postcheck | `listCollections()` | `name = 'users' AND options.validator = {...}` | `exists` |
+| TTL index postcheck | `listIndexes('sessions')` | `key = { createdAt: 1 } AND expireAfterSeconds = 3600` | `exists` |
 
 ## Check evaluation in the runner
 
-The runner uses the evaluator in its three-phase loop:
-
-```typescript
-async function evaluateChecks(
-  db: Db,
-  checks: readonly MongoMigrationCheck[],
-): Promise<{ allSatisfied: boolean; firstFailure?: MongoMigrationCheck }> {
-  const evaluator = new FilterEvaluator();
-
-  for (const check of checks) {
-    const results = await runInspectionCommand(db, check.source);
-    const hasMatch = results.some(doc => evaluator.evaluate(check.filter, doc));
-    const satisfied = check.expect === 'exists' ? hasMatch : !hasMatch;
-
-    if (!satisfied) {
-      return { allSatisfied: false, firstFailure: check };
-    }
-  }
-  return { allSatisfied: true };
-}
-```
-
-The runner calls this for:
-
-1. **Idempotency probe** (before execution): if all postchecks are already satisfied, skip the operation.
-2. **Prechecks** (before execution): if any precheck fails, abort with `PRECHECK_FAILED`.
-3. **Postchecks** (after execution): if any postcheck fails, abort with `POSTCHECK_FAILED`.
-
-## Concrete check examples
-
-### Create index
-
-```typescript
-// Precheck: index on users.email does NOT exist
-{
-  source: new ListIndexesCommand('users'),
-  filter: MongoFieldFilter.eq('key', { email: 1 }),
-  expect: 'notExists',
-}
-
-// Postcheck: unique index on users.email DOES exist
-{
-  source: new ListIndexesCommand('users'),
-  filter: MongoAndExpr.of([
-    MongoFieldFilter.eq('key', { email: 1 }),
-    MongoFieldFilter.eq('unique', true),
-  ]),
-  expect: 'exists',
-}
-```
-
-### Drop index
-
-```typescript
-// Precheck: index on users.email DOES exist
-{
-  source: new ListIndexesCommand('users'),
-  filter: MongoFieldFilter.eq('key', { email: 1 }),
-  expect: 'exists',
-}
-
-// Postcheck: index on users.email does NOT exist
-{
-  source: new ListIndexesCommand('users'),
-  filter: MongoFieldFilter.eq('key', { email: 1 }),
-  expect: 'notExists',
-}
-```
-
-### Create collection
-
-```typescript
-// Precheck: collection 'orders' does NOT exist
-{
-  source: new ListCollectionsCommand(),
-  filter: MongoFieldFilter.eq('name', 'orders'),
-  expect: 'notExists',
-}
-
-// Postcheck: collection 'orders' DOES exist
-{
-  source: new ListCollectionsCommand(),
-  filter: MongoFieldFilter.eq('name', 'orders'),
-  expect: 'exists',
-}
-```
-
-### Update validator
-
-```typescript
-// Postcheck: validator on 'users' matches expected schema
-{
-  source: new ListCollectionsCommand(),
-  filter: MongoAndExpr.of([
-    MongoFieldFilter.eq('name', 'users'),
-    MongoFieldFilter.eq('options.validator', {
-      $jsonSchema: {
-        bsonType: 'object',
-        required: ['email', 'name'],
-        properties: {
-          email: { bsonType: 'string' },
-          name: { bsonType: 'string' },
-        },
-      },
-    }),
-  ]),
-  expect: 'exists',
-}
-```
-
-### TTL index
-
-```typescript
-// Postcheck: TTL index on sessions.createdAt exists with correct expiry
-{
-  source: new ListIndexesCommand('sessions'),
-  filter: MongoAndExpr.of([
-    MongoFieldFilter.eq('key', { createdAt: 1 }),
-    MongoFieldFilter.eq('expireAfterSeconds', 3600),
-  ]),
-  expect: 'exists',
-}
-```
+The runner uses the evaluator in three contexts: (1) **idempotency probe** — before executing an operation, evaluate all postchecks to detect if the operation was already applied and can be skipped; (2) **prechecks** — before execution, verify preconditions hold (abort with `PRECHECK_FAILED` if any fails); (3) **postchecks** — after execution, verify the DDL command had the expected effect (abort with `POSTCHECK_FAILED` if any fails). In each case, the runner calls the inspection command, feeds the results to `FilterEvaluator`, and interprets the match result against the check's `expect` field. See the [Planner + Runner design](planner-runner.spec.md#execution-flow) for the full three-phase execution loop.
 
 ## Package placement
 
