@@ -37,6 +37,13 @@ export type WithOrderByState<State extends CollectionTypeState> = Omit<State, 'h
   readonly hasOrderBy: true;
 };
 
+export type WithVariantState<State extends CollectionTypeState, V extends string> = Omit<
+  State,
+  'variantName'
+> & {
+  readonly variantName: V;
+};
+
 export type IncludedRelationsForRow<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,

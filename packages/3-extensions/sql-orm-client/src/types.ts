@@ -101,6 +101,7 @@ export interface CollectionTypeState {
   readonly hasOrderBy: boolean;
   readonly hasWhere: boolean;
   readonly hasUniqueFilter: boolean;
+  readonly variantName: string | undefined;
 }
 
 export type RelationCardinalityTag = '1:1' | 'N:1' | '1:N' | 'M:N';
@@ -109,6 +110,7 @@ export type DefaultCollectionTypeState = {
   readonly hasOrderBy: false;
   readonly hasWhere: false;
   readonly hasUniqueFilter: false;
+  readonly variantName: undefined;
 };
 
 // ---------------------------------------------------------------------------
@@ -752,6 +754,46 @@ export type CreateInput<TContract extends Contract<SqlStorage>, ModelName extend
     Pick<DefaultModelRow<TContract, ModelName>, OptionalCreateFieldNames<TContract, ModelName>>
   > &
   RelationMutationFields<TContract, ModelName>;
+
+// ---------------------------------------------------------------------------
+// Polymorphic write gating
+// ---------------------------------------------------------------------------
+
+type IsPolymorphicBase<TContract extends Contract<SqlStorage>, ModelName extends string> = ModelDef<
+  TContract,
+  ModelName
+> extends {
+  readonly discriminator: unknown;
+  readonly variants: Record<string, unknown>;
+}
+  ? true
+  : false;
+
+type DiscriminatorFieldName<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+> = ModelDef<TContract, ModelName> extends {
+  readonly discriminator: { readonly field: infer F extends string };
+}
+  ? F
+  : never;
+
+export type VariantCreateInput<
+  TContract extends Contract<SqlStorage>,
+  BaseModelName extends string,
+  VariantName extends string,
+> = Omit<CreateInput<TContract, BaseModelName>, DiscriminatorFieldName<TContract, BaseModelName>> &
+  CreateInput<TContract, VariantName>;
+
+export type ResolvedCreateInput<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  VName extends string | undefined,
+> = IsPolymorphicBase<TContract, ModelName> extends true
+  ? VName extends string
+    ? VariantCreateInput<TContract, ModelName, VName>
+    : never
+  : CreateInput<TContract, ModelName>;
 
 type ModelStorageTableDef<
   TContract extends Contract<SqlStorage>,

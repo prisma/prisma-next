@@ -2,7 +2,13 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type { Collection } from '../src/collection';
-import type { DefaultModelRow, InferRootRow } from '../src/types';
+import type {
+  CreateInput,
+  DefaultModelRow,
+  InferRootRow,
+  ResolvedCreateInput,
+  VariantCreateInput,
+} from '../src/types';
 
 interface PolyStorage {
   readonly tables: {
@@ -225,4 +231,45 @@ test('Collection default Row for non-polymorphic model equals DefaultModelRow', 
     : never;
   type Expected = DefaultModelRow<PolyContract, 'PlainModel'>;
   expectTypeOf<PlainRow>().toEqualTypeOf<Expected>();
+});
+
+// ---------------------------------------------------------------------------
+// Write gating: polymorphic base create = never, variant create excludes discriminator
+// ---------------------------------------------------------------------------
+
+test('ResolvedCreateInput for polymorphic base (no variant) is never', () => {
+  type BaseCreate = ResolvedCreateInput<PolyContract, 'Task', undefined>;
+  expectTypeOf<BaseCreate>().toBeNever();
+});
+
+test('CreateInput for non-polymorphic model is unchanged', () => {
+  type PlainCreate = CreateInput<PolyContract, 'PlainModel'>;
+  expectTypeOf<PlainCreate>().toHaveProperty('id');
+  expectTypeOf<PlainCreate>().toHaveProperty('name');
+});
+
+test('ResolvedCreateInput for non-polymorphic model equals CreateInput', () => {
+  type Resolved = ResolvedCreateInput<PolyContract, 'PlainModel', undefined>;
+  type Plain = CreateInput<PolyContract, 'PlainModel'>;
+  expectTypeOf<Resolved>().toEqualTypeOf<Plain>();
+});
+
+test('VariantCreateInput includes base + variant fields minus discriminator', () => {
+  type BugCreate = VariantCreateInput<PolyContract, 'Task', 'Bug'>;
+  expectTypeOf<BugCreate>().toHaveProperty('title');
+  expectTypeOf<BugCreate>().toHaveProperty('severity');
+  expectTypeOf<BugCreate>().not.toHaveProperty('type');
+});
+
+test('VariantCreateInput for MTI variant includes base + variant fields minus discriminator', () => {
+  type FeatureCreate = VariantCreateInput<PolyContract, 'Task', 'Feature'>;
+  expectTypeOf<FeatureCreate>().toHaveProperty('title');
+  expectTypeOf<FeatureCreate>().toHaveProperty('priority');
+  expectTypeOf<FeatureCreate>().not.toHaveProperty('type');
+});
+
+test('ResolvedCreateInput with variant name equals VariantCreateInput', () => {
+  type Resolved = ResolvedCreateInput<PolyContract, 'Task', 'Bug'>;
+  type Direct = VariantCreateInput<PolyContract, 'Task', 'Bug'>;
+  expectTypeOf<Resolved>().toEqualTypeOf<Direct>();
 });
