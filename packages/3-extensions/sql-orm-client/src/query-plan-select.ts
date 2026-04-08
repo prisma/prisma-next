@@ -22,6 +22,11 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import {
+  type PolymorphismInfo,
+  resolvePolymorphismInfo,
+  resolvePrimaryKeyColumn,
+} from './collection-contract';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import type { CollectionState, IncludeExpr } from './types';
 import { bindWhereExpr } from './where-binding';
@@ -372,15 +377,64 @@ function buildSelectAst(
   return ast;
 }
 
+function buildMtiJoins(
+  contract: Contract<SqlStorage>,
+  polyInfo: PolymorphismInfo,
+  variantName: string | undefined,
+): { joins: JoinAst[]; projection: ProjectionItem[] } {
+  const joins: JoinAst[] = [];
+  const projection: ProjectionItem[] = [];
+  const pkColumn = resolvePrimaryKeyColumn(contract, polyInfo.baseTable);
+
+  const variantsToJoin = variantName
+    ? polyInfo.mtiVariants.filter((v) => v.modelName === variantName)
+    : polyInfo.mtiVariants;
+
+  for (const variant of variantsToJoin) {
+    const joinType = variantName ? 'inner' : 'left';
+    const joinOn = EqColJoinOn.of(
+      ColumnRef.of(polyInfo.baseTable, pkColumn),
+      ColumnRef.of(variant.table, pkColumn),
+    );
+    const join =
+      joinType === 'inner'
+        ? JoinAst.inner(TableSource.named(variant.table), joinOn)
+        : JoinAst.left(TableSource.named(variant.table), joinOn);
+    joins.push(join);
+
+    const variantColumns = resolveTableColumns(contract, variant.table);
+    for (const col of variantColumns) {
+      if (col === pkColumn) continue;
+      projection.push(ProjectionItem.of(col, ColumnRef.of(variant.table, col)));
+    }
+  }
+
+  return { joins, projection };
+}
+
 export function compileSelect(
   contract: Contract<SqlStorage>,
   tableName: string,
   state: CollectionState,
+  modelName?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const ast = buildSelectAst(contract, tableName, {
-    ...state,
-    includes: [],
-  });
+  const polyInfo = modelName ? resolvePolymorphismInfo(contract, modelName) : undefined;
+  const mtiArtifacts =
+    polyInfo && polyInfo.mtiVariants.length > 0
+      ? buildMtiJoins(contract, polyInfo, state.variantName)
+      : undefined;
+
+  const ast = buildSelectAst(
+    contract,
+    tableName,
+    { ...state, includes: [] },
+    mtiArtifacts
+      ? {
+          joins: mtiArtifacts.joins,
+          includeProjection: mtiArtifacts.projection,
+        }
+      : undefined,
+  );
 
   const { params, paramDescriptors } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params, paramDescriptors);

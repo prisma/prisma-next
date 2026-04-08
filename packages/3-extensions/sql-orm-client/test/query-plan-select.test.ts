@@ -3,6 +3,7 @@ import {
   BinaryExpr,
   ColumnRef,
   DerivedTableSource,
+  EqColJoinOn,
   ListExpression,
   LiteralExpr,
   OperationExpr,
@@ -11,6 +12,7 @@ import {
   ParamRef,
   type SelectAst,
   SubqueryExpr,
+  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
@@ -18,9 +20,11 @@ import {
   compileSelect,
   compileSelectWithIncludeStrategy,
 } from '../src/query-plan-select';
+import { emptyState } from '../src/types';
 import { bindWhereExpr } from '../src/where-binding';
 import { baseContract, createCollection, createCollectionFor } from './collection-fixtures';
-import { isSelectAst } from './helpers';
+import type { TestContract } from './helpers';
+import { getTestContract, isSelectAst } from './helpers';
 
 function dslDescriptor(table: string, column: string) {
   const columnMeta = (
@@ -338,5 +342,120 @@ describe('compileSelectWithIncludeStrategy', () => {
     expect(() => compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral')).toThrow(
       'single-query include strategy does not support scalar include selectors or combine()',
     );
+  });
+});
+
+function buildMtiPolyContract(): TestContract {
+  const raw = JSON.parse(JSON.stringify(getTestContract()));
+  raw.models.Task = {
+    fields: {
+      id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+      title: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+      type: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+    },
+    relations: {},
+    storage: {
+      table: 'tasks',
+      fields: { id: { column: 'id' }, title: { column: 'title' }, type: { column: 'type' } },
+    },
+    discriminator: { field: 'type' },
+    variants: { Bug: { value: 'bug' }, Feature: { value: 'feature' } },
+  };
+  raw.models.Bug = {
+    fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
+    relations: {},
+    storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
+    base: 'Task',
+  };
+  raw.models.Feature = {
+    fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
+    relations: {},
+    storage: { table: 'features', fields: { priority: { column: 'priority' } } },
+    base: 'Task',
+  };
+  raw.storage.tables.tasks = {
+    columns: {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      type: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      severity: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+  raw.storage.tables.features = {
+    columns: {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+  return raw as TestContract;
+}
+
+describe('compileSelect MTI JOINs', () => {
+  it('base query LEFT JOINs MTI variant tables', () => {
+    const contract = buildMtiPolyContract();
+    const state = emptyState();
+
+    const plan = compileSelect(contract, 'tasks', state, 'Task');
+    expectSelectAst(plan.ast);
+
+    expect(plan.ast.joins).toHaveLength(1);
+    const join = plan.ast.joins![0]!;
+    expect(join.joinType).toBe('left');
+    expect(join.source).toEqual(TableSource.named('features'));
+    expect(join.on).toEqual(
+      EqColJoinOn.of(ColumnRef.of('tasks', 'id'), ColumnRef.of('features', 'id')),
+    );
+
+    const projectedAliases = plan.ast.projection.map((p) => p.alias);
+    expect(projectedAliases).toContain('priority');
+  });
+
+  it('variant query INNER JOINs the specific MTI variant table', () => {
+    const contract = buildMtiPolyContract();
+    const state = { ...emptyState(), variantName: 'Feature' };
+
+    const plan = compileSelect(contract, 'tasks', state, 'Task');
+    expectSelectAst(plan.ast);
+
+    expect(plan.ast.joins).toHaveLength(1);
+    const join = plan.ast.joins![0]!;
+    expect(join.joinType).toBe('inner');
+    expect(join.source).toEqual(TableSource.named('features'));
+  });
+
+  it('STI-only variant query produces no JOINs', () => {
+    const contract = buildMtiPolyContract();
+    const state = { ...emptyState(), variantName: 'Bug' };
+
+    const plan = compileSelect(contract, 'tasks', state, 'Task');
+    expectSelectAst(plan.ast);
+
+    expect(plan.ast.joins).toBeUndefined();
+  });
+
+  it('non-polymorphic model produces no JOINs', () => {
+    const plan = compileSelect(baseContract, 'users', emptyState(), 'User');
+    expectSelectAst(plan.ast);
+    expect(plan.ast.joins).toBeUndefined();
+  });
+
+  it('MTI projection excludes the shared PK column', () => {
+    const contract = buildMtiPolyContract();
+    const plan = compileSelect(contract, 'tasks', emptyState(), 'Task');
+    expectSelectAst(plan.ast);
+
+    const featureProjections = plan.ast.projection.filter(
+      (p) => p.expr.kind === 'column-ref' && p.expr.table === 'features',
+    );
+    expect(featureProjections).toHaveLength(1);
+    expect(featureProjections[0]!.alias).toBe('priority');
   });
 });
