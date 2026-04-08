@@ -3,7 +3,7 @@ import { field, model, rel } from '../src/contract-builder';
 import {
   emitTypedCrossModelFallbackWarnings,
   emitTypedNamedTypeFallbackWarnings,
-} from '../src/staged-contract-warnings';
+} from '../src/contract-warnings';
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const int4Column = columnDescriptor('pg/int4@1');
@@ -19,7 +19,7 @@ type RuntimeWarningCollection = Parameters<typeof emitTypedCrossModelFallbackWar
 
 function widenRuntimeModels<T extends Record<string, object>>(models: T): RuntimeWarningModels {
   // Warning helpers consume the erased runtime builder shape; tests keep narrower
-  // staged model inference and widen only at the helper boundary.
+  // model inference and widen only at the helper boundary.
   return models as RuntimeWarningModels;
 }
 
@@ -60,7 +60,7 @@ function captureWarnings(run: () => void) {
   }
 }
 
-describe('staged contract fallback warnings', () => {
+describe('contract fallback warnings', () => {
   it('skips warnings when the typed authoring surface is already in use', () => {
     const User = model('User', {
       fields: {
@@ -432,7 +432,7 @@ describe('staged contract fallback warnings', () => {
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]?.message).toContain(
-      '6 staged contract references use string fallbacks where typed alternatives are available.',
+      '6 contract references use string fallbacks where typed alternatives are available.',
     );
     expect(warnings[0]?.message).toContain('VectorRecord.first');
     expect(warnings[0]?.message).toContain('VectorRecord.sixth');

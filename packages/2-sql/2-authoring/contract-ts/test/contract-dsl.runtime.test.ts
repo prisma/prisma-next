@@ -3,13 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   applyNaming,
   field,
-  isStagedContractInput,
+  isContractInput,
   model,
   normalizeRelationFieldNames,
   rel,
   resolveRelationModelName,
   type TargetFieldRef,
-} from '../src/staged-contract-dsl';
+} from '../src/contract-dsl';
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
@@ -24,8 +24,8 @@ const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 const charColumn = columnDescriptor('sql/char@1', 'character');
 
-describe('staged contract DSL runtime helpers', () => {
-  it('normalizes defaults, generated descriptors, relation helpers, and staged-input detection', () => {
+describe('contract DSL runtime helpers', () => {
+  it('normalizes defaults, generated descriptors, relation helpers, and input detection', () => {
     const literalDefault = field.column(textColumn).default('draft').build();
     const functionDefault = field
       .column(textColumn)
@@ -64,12 +64,10 @@ describe('staged contract DSL runtime helpers', () => {
     expect(applyNaming('HTTPRequestLog', 'snake_case')).toBe('http_request_log');
     expect(applyNaming('UserProfile', 'identity')).toBe('UserProfile');
     const familyPack = { kind: 'family', id: 'sql', familyId: 'sql', version: '0.0.1' };
-    expect(isStagedContractInput({ family: familyPack, target: postgresTargetPack })).toBe(true);
-    expect(isStagedContractInput({ target: postgresTargetPack })).toBe(false);
-    expect(isStagedContractInput({ family: familyPack, target: { kind: 'extension' } })).toBe(
-      false,
-    );
-    expect(isStagedContractInput(null)).toBe(false);
+    expect(isContractInput({ family: familyPack, target: postgresTargetPack })).toBe(true);
+    expect(isContractInput({ target: postgresTargetPack })).toBe(false);
+    expect(isContractInput({ family: familyPack, target: { kind: 'extension' } })).toBe(false);
+    expect(isContractInput(null)).toBe(false);
   });
 
   it('rejects runtime-only misuse of model tokens and relation sql helpers', () => {
@@ -105,7 +103,7 @@ describe('staged contract DSL runtime helpers', () => {
     ).toThrow('relation.sql(...) is only supported for belongsTo relations.');
   });
 
-  it('builds staged sql specs with explicit options and validates target refs eagerly', () => {
+  it('builds sql specs with explicit options and validates target refs eagerly', () => {
     const User = model('User', {
       fields: {
         id: field.column(int4Column).id(),

@@ -199,7 +199,7 @@ function expectNoTypedFallbackWarnings(run: () => void): void {
   }
 }
 
-describe('staged contract DSL helper vocabulary', () => {
+describe('contract DSL helper vocabulary', () => {
   it('lowers portable scalar helpers and explicit uuidv4 primary keys via factory callback', () => {
     const contract = defineContract(
       {

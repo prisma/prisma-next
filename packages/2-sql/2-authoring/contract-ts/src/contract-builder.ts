@@ -48,25 +48,25 @@ import {
 export { buildSqlContractFromSemanticDefinition } from './build-contract';
 
 import {
+  type ContractInput,
+  type ContractModelBuilder,
   field,
-  isStagedContractInput,
+  isContractInput,
   type ModelAttributesSpec,
   model,
   type RelationBuilder,
+  type RelationState,
   rel,
   type ScalarFieldBuilder,
   type SqlStageSpec,
-  type StagedContractInput,
-  type StagedModelBuilder,
-  type RelationState as StagedRelationState,
-} from './staged-contract-dsl';
-import { buildStagedSemanticContractDefinition } from './staged-contract-lowering';
+} from './contract-dsl';
+import { buildSemanticContractDefinition } from './contract-lowering';
 import type {
   ExtractCodecTypesFromPack,
   MergeExtensionCodecTypes,
   MergeExtensionPackRefs,
   SqlContractResult,
-} from './staged-contract-types';
+} from './contract-types';
 
 type ColumnDefaultForCodec<
   CodecTypes extends Record<string, { output: unknown }>,
@@ -213,11 +213,11 @@ export interface ColumnBuilder<Name extends string, Nullable extends boolean, Ty
   build(): ColumnBuilderState<Name, Nullable, Type>;
 }
 
-type StagedModelLike = {
+type ModelLike = {
   readonly stageOne: {
     readonly modelName?: string;
     readonly fields: Record<string, ScalarFieldBuilder>;
-    readonly relations: Record<string, RelationBuilder<StagedRelationState>>;
+    readonly relations: Record<string, RelationBuilder<RelationState>>;
   };
   readonly __attributes: ModelAttributesSpec | undefined;
   readonly __sql: SqlStageSpec | undefined;
@@ -225,11 +225,11 @@ type StagedModelLike = {
   buildSqlSpec(): SqlStageSpec | undefined;
 };
 
-function buildStagedContract<Definition extends StagedContractInput>(
+function buildContractFromDsl<Definition extends ContractInput>(
   definition: Definition,
 ): SqlContractResult<Definition> {
   return buildSqlContractFromSemanticDefinition(
-    buildStagedSemanticContractDefinition(definition),
+    buildSemanticContractDefinition(definition),
   ) as unknown as SqlContractResult<Definition>;
 }
 
@@ -622,14 +622,14 @@ class SqlContractBuilder<
   }
 }
 
-type StagedContractDefinition<
+type ContractDefinition<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance>,
-  Models extends Record<string, StagedModelLike>,
+  Models extends Record<string, ModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined,
-  Naming extends StagedContractInput['naming'] | undefined,
+  Naming extends ContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
 > = {
@@ -644,12 +644,12 @@ type StagedContractDefinition<
   readonly models?: Models;
 };
 
-type StagedContractScaffold<
+type ContractScaffold<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined,
-  Naming extends StagedContractInput['naming'] | undefined,
+  Naming extends ContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
 > = {
@@ -662,11 +662,11 @@ type StagedContractScaffold<
   readonly capabilities?: Capabilities;
 };
 
-type StagedContractFactory<
+type ContractFactory<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance>,
-  Models extends Record<string, StagedModelLike>,
+  Models extends Record<string, ModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 > = (helpers: ComposedAuthoringHelpers<Family, Target, ExtensionPacks>) => {
   readonly types?: Types;
@@ -680,16 +680,16 @@ export function defineContract<
   const Family extends FamilyPackRef<string>,
   const Target extends TargetPackRef<'sql', string>,
   const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
-  const Models extends Record<string, StagedModelLike> = Record<never, never>,
+  const Models extends Record<string, ModelLike> = Record<never, never>,
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
     | undefined = undefined,
   const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
-  const Naming extends StagedContractInput['naming'] | undefined = undefined,
+  const Naming extends ContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
 >(
-  definition: StagedContractDefinition<
+  definition: ContractDefinition<
     Family,
     Target,
     Types,
@@ -701,7 +701,7 @@ export function defineContract<
     ForeignKeyDefaults
   >,
 ): SqlContractResult<
-  StagedContractDefinition<
+  ContractDefinition<
     Family,
     Target,
     Types,
@@ -717,16 +717,16 @@ export function defineContract<
   const Family extends FamilyPackRef<string>,
   const Target extends TargetPackRef<'sql', string>,
   const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
-  const Models extends Record<string, StagedModelLike> = Record<never, never>,
+  const Models extends Record<string, ModelLike> = Record<never, never>,
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
     | undefined = undefined,
   const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
-  const Naming extends StagedContractInput['naming'] | undefined = undefined,
+  const Naming extends ContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
 >(
-  definition: StagedContractScaffold<
+  definition: ContractScaffold<
     Family,
     Target,
     ExtensionPacks,
@@ -735,9 +735,9 @@ export function defineContract<
     StorageHash,
     ForeignKeyDefaults
   >,
-  factory: StagedContractFactory<Family, Target, Types, Models, ExtensionPacks>,
+  factory: ContractFactory<Family, Target, Types, Models, ExtensionPacks>,
 ): SqlContractResult<
-  StagedContractDefinition<
+  ContractDefinition<
     Family,
     Target,
     Types,
@@ -752,16 +752,16 @@ export function defineContract<
 export function defineContract<
   CodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
 >(
-  definition?: StagedContractInput,
-  factory?: StagedContractFactory<
+  definition?: ContractInput,
+  factory?: ContractFactory<
     FamilyPackRef<string>,
     TargetPackRef<'sql', string>,
     Record<string, StorageTypeInstance>,
-    Record<string, StagedModelLike>,
+    Record<string, ModelLike>,
     Record<string, ExtensionPackRef<'sql', string>> | undefined
   >,
-): SqlContractBuilder<CodecTypes> | SqlContractResult<StagedContractInput> {
-  if (definition && isStagedContractInput(definition)) {
+): SqlContractBuilder<CodecTypes> | SqlContractResult<ContractInput> {
+  if (definition && isContractInput(definition)) {
     if (factory) {
       const builtDefinition = {
         ...definition,
@@ -773,17 +773,12 @@ export function defineContract<
           }),
         ),
       };
-      return buildStagedContract(builtDefinition);
+      return buildContractFromDsl(builtDefinition);
     }
-    return buildStagedContract(definition);
+    return buildContractFromDsl(definition);
   }
   return new SqlContractBuilder<CodecTypes>();
 }
 
 export { field, model, rel };
-export type {
-  ComposedAuthoringHelpers,
-  StagedContractInput,
-  StagedModelBuilder,
-  ScalarFieldBuilder,
-};
+export type { ComposedAuthoringHelpers, ContractInput, ContractModelBuilder, ScalarFieldBuilder };

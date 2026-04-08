@@ -952,7 +952,7 @@ function findDuplicateRelationName(
   );
 }
 
-export class StagedModelBuilder<
+export class ContractModelBuilder<
   ModelName extends string | undefined,
   Fields extends Record<string, ScalarFieldBuilder>,
   Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
@@ -982,7 +982,7 @@ export class StagedModelBuilder<
 
   ref<FieldName extends keyof Fields & string>(
     this: ModelName extends string
-      ? StagedModelBuilder<ModelName, Fields, Relations, AttributesSpec, SqlSpec>
+      ? ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, SqlSpec>
       : never,
     fieldName: FieldName,
   ): TargetFieldRef<ModelName & string, FieldName> {
@@ -1001,7 +1001,7 @@ export class StagedModelBuilder<
 
   relations<const NextRelations extends Record<string, AnyRelationBuilder>>(
     relations: NextRelations,
-  ): StagedModelBuilder<ModelName, Fields, Relations & NextRelations, AttributesSpec, SqlSpec> {
+  ): ContractModelBuilder<ModelName, Fields, Relations & NextRelations, AttributesSpec, SqlSpec> {
     const duplicateRelationName = findDuplicateRelationName(this.stageOne.relations, relations);
     if (duplicateRelationName) {
       throw new Error(
@@ -1009,7 +1009,7 @@ export class StagedModelBuilder<
       );
     }
 
-    return new StagedModelBuilder(
+    return new ContractModelBuilder(
       {
         ...this.stageOne,
         relations: {
@@ -1027,19 +1027,19 @@ export class StagedModelBuilder<
       AttributeContext<Fields>,
       ValidateAttributesStageSpec<Fields, SqlSpec, NextAttributesSpec>
     >,
-  ): StagedModelBuilder<ModelName, Fields, Relations, NextAttributesSpec, SqlSpec> {
-    return new StagedModelBuilder(this.stageOne, specOrFactory, this.sqlFactory);
+  ): ContractModelBuilder<ModelName, Fields, Relations, NextAttributesSpec, SqlSpec> {
+    return new ContractModelBuilder(this.stageOne, specOrFactory, this.sqlFactory);
   }
 
   sql<const NextSqlSpec extends SqlStageSpec>(
     specOrFactory: StageInput<SqlContext<Fields>, NextSqlSpec>,
   ): [ValidateSqlStageSpec<Fields, AttributesSpec, NextSqlSpec>] extends [never]
-    ? StagedModelBuilder<ModelName, Fields, Relations, AttributesSpec, never>
-    : StagedModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec> {
+    ? ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, never>
+    : ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec> {
     // Conditional return type cannot be verified by the implementation; the
-    // runtime value is always a valid StagedModelBuilder regardless of the
+    // runtime value is always a valid ContractModelBuilder regardless of the
     // validation outcome (validation is type-level only).
-    return new StagedModelBuilder(this.stageOne, this.attributesFactory, specOrFactory) as never;
+    return new ContractModelBuilder(this.stageOne, this.attributesFactory, specOrFactory) as never;
   }
 
   buildAttributesSpec(): AttributesSpec {
@@ -1157,13 +1157,13 @@ function normalizeRelationModelSource(
   };
 }
 
-export type StagedContractInput<
+export type ContractInput<
   Family extends FamilyPackRef<string> = FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string> = TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   Models extends Record<
     string,
-    StagedModelBuilder<
+    ContractModelBuilder<
       string | undefined,
       Record<string, ScalarFieldBuilder>,
       Record<string, AnyRelationBuilder>,
@@ -1195,7 +1195,7 @@ export function model<
     readonly fields: Fields;
     readonly relations?: Relations;
   },
-): StagedModelBuilder<ModelName, Fields, Relations>;
+): ContractModelBuilder<ModelName, Fields, Relations>;
 
 export function model<
   Fields extends Record<string, ScalarFieldBuilder>,
@@ -1203,7 +1203,7 @@ export function model<
 >(input: {
   readonly fields: Fields;
   readonly relations?: Relations;
-}): StagedModelBuilder<undefined, Fields, Relations>;
+}): ContractModelBuilder<undefined, Fields, Relations>;
 
 export function model<
   const ModelName extends string,
@@ -1220,14 +1220,14 @@ export function model<
     readonly fields: Fields;
     readonly relations?: Relations;
   },
-): StagedModelBuilder<ModelName | undefined, Fields, Relations> {
+): ContractModelBuilder<ModelName | undefined, Fields, Relations> {
   const input = typeof modelNameOrInput === 'string' ? maybeInput : modelNameOrInput;
 
   if (!input) {
     throw new Error('model("ModelName", ...) requires a model definition.');
   }
 
-  return new StagedModelBuilder({
+  return new ContractModelBuilder({
     ...(typeof modelNameOrInput === 'string' ? { modelName: modelNameOrInput } : {}),
     fields: input.fields,
     relations: (input.relations ?? {}) as Relations,
@@ -1372,7 +1372,7 @@ export const field = {
   namedType: namedTypeField,
 };
 
-export function isStagedContractInput(value: unknown): value is StagedContractInput {
+export function isContractInput(value: unknown): value is ContractInput {
   if (typeof value !== 'object' || value === null || !('target' in value) || !('family' in value)) {
     return false;
   }
@@ -1437,7 +1437,7 @@ export type FieldStateOf<T> = T extends ScalarFieldBuilder<infer State> ? State 
 export type RelationStateOf<T> = T extends RelationBuilder<infer State> ? State : never;
 
 export type ModelFieldsOf<T> =
-  T extends StagedModelBuilder<
+  T extends ContractModelBuilder<
     string | undefined,
     infer Fields,
     Record<string, AnyRelationBuilder>,
@@ -1448,7 +1448,7 @@ export type ModelFieldsOf<T> =
     : never;
 
 export type ModelRelationsOf<T> =
-  T extends StagedModelBuilder<
+  T extends ContractModelBuilder<
     string | undefined,
     Record<string, ScalarFieldBuilder>,
     infer Relations,
@@ -1459,7 +1459,7 @@ export type ModelRelationsOf<T> =
     : never;
 
 export type ModelAttributesOf<T> =
-  T extends StagedModelBuilder<
+  T extends ContractModelBuilder<
     string | undefined,
     Record<string, ScalarFieldBuilder>,
     Record<string, AnyRelationBuilder>,
@@ -1470,7 +1470,7 @@ export type ModelAttributesOf<T> =
     : undefined;
 
 export type ModelSqlOf<T> =
-  T extends StagedModelBuilder<
+  T extends ContractModelBuilder<
     string | undefined,
     Record<string, ScalarFieldBuilder>,
     Record<string, AnyRelationBuilder>,

@@ -1,18 +1,18 @@
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
+  type ContractModelBuilder,
   type ModelAttributesSpec,
   normalizeRelationFieldNames,
   type RelationBuilder,
+  type RelationState,
   type ScalarFieldBuilder,
   type SqlStageSpec,
-  type StagedModelBuilder,
-  type RelationState as StagedRelationState,
-} from './staged-contract-dsl';
+} from './contract-dsl';
 
-type RuntimeStagedModel = StagedModelBuilder<
+type RuntimeModel = ContractModelBuilder<
   string | undefined,
   Record<string, ScalarFieldBuilder>,
-  Record<string, RelationBuilder<StagedRelationState>>,
+  Record<string, RelationBuilder<RelationState>>,
   ModelAttributesSpec | undefined,
   SqlStageSpec | undefined
 >;
@@ -20,20 +20,17 @@ type RuntimeStagedModel = StagedModelBuilder<
 type RuntimeModelSpec = {
   readonly modelName: string;
   readonly tableName: string;
-  readonly relations: Record<string, RelationBuilder<StagedRelationState>>;
+  readonly relations: Record<string, RelationBuilder<RelationState>>;
   readonly sqlSpec: SqlStageSpec | undefined;
 };
 
-type RuntimeStagedCollection = {
+type RuntimeCollection = {
   readonly storageTypes: Record<string, StorageTypeInstance>;
-  readonly models: Record<string, RuntimeStagedModel>;
+  readonly models: Record<string, RuntimeModel>;
   readonly modelSpecs: ReadonlyMap<string, RuntimeModelSpec>;
 };
 
-function hasNamedModelToken(
-  models: Record<string, RuntimeStagedModel>,
-  modelName: string,
-): boolean {
+function hasNamedModelToken(models: Record<string, RuntimeModel>, modelName: string): boolean {
   return models[modelName]?.stageOne.modelName === modelName;
 }
 
@@ -65,8 +62,8 @@ function formatConstraintsRefCall(modelName: string, fieldNames: readonly string
 
 function formatRelationModelDisplay(
   relationModel:
-    | StagedRelationState['toModel']
-    | Extract<StagedRelationState, { kind: 'manyToMany' }>['through'],
+    | RelationState['toModel']
+    | Extract<RelationState, { kind: 'manyToMany' }>['through'],
 ): string {
   if (relationModel.kind === 'lazyRelationModelName') {
     return `() => ${relationModel.resolve()}`;
@@ -77,7 +74,7 @@ function formatRelationModelDisplay(
     : relationModel.modelName;
 }
 
-function formatRelationCall(relation: StagedRelationState, targetModelDisplay: string): string {
+function formatRelationCall(relation: RelationState, targetModelDisplay: string): string {
   if (relation.kind === 'belongsTo') {
     const from = formatFieldSelection(normalizeRelationFieldNames(relation.from));
     const to = formatFieldSelection(normalizeRelationFieldNames(relation.to));
@@ -96,7 +93,7 @@ function formatRelationCall(relation: StagedRelationState, targetModelDisplay: s
 }
 
 function formatManyToManyCallWithThrough(
-  relation: Extract<StagedRelationState, { kind: 'manyToMany' }>,
+  relation: Extract<RelationState, { kind: 'manyToMany' }>,
   throughDisplay: string,
 ): string {
   const targetDisplay = formatRelationModelDisplay(relation.toModel);
@@ -120,7 +117,7 @@ function flushWarnings(warnings: readonly string[]): void {
   }
 
   process.emitWarning(
-    `${warnings.length} staged contract references use string fallbacks where typed alternatives are available. ` +
+    `${warnings.length} contract references use string fallbacks where typed alternatives are available. ` +
       'Use named model tokens and typed storage type refs for autocomplete and type safety.\n' +
       warnings.map((w) => `  - ${w}`).join('\n'),
     { code: 'PN_CONTRACT_TYPED_FALLBACK_AVAILABLE' },
@@ -129,13 +126,13 @@ function flushWarnings(warnings: readonly string[]): void {
 
 function formatFallbackWarning(location: string, current: string, suggested: string): string {
   return (
-    `Staged contract ${location} uses ${current}. ` +
+    `Contract ${location} uses ${current}. ` +
     `Use ${suggested} when the named model token is available in the same contract to keep typed relation targets and model refs.`
   );
 }
 
 export function emitTypedNamedTypeFallbackWarnings(
-  models: Record<string, RuntimeStagedModel>,
+  models: Record<string, RuntimeModel>,
   storageTypes: Record<string, StorageTypeInstance>,
 ): void {
   const warnings: string[] = [];
@@ -155,7 +152,7 @@ export function emitTypedNamedTypeFallbackWarnings(
       warnedFields.add(warningKey);
 
       warnings.push(
-        `Staged contract field "${modelName}.${fieldName}" uses field.namedType('${fieldState.typeRef}'). ` +
+        `Contract field "${modelName}.${fieldName}" uses field.namedType('${fieldState.typeRef}'). ` +
           `Use field.namedType(types.${fieldState.typeRef}) when the storage type is declared in the same contract to keep autocomplete and typed local refs.`,
       );
     }
@@ -164,7 +161,7 @@ export function emitTypedNamedTypeFallbackWarnings(
   flushWarnings(warnings);
 }
 
-export function emitTypedCrossModelFallbackWarnings(collection: RuntimeStagedCollection): void {
+export function emitTypedCrossModelFallbackWarnings(collection: RuntimeCollection): void {
   const warnings: string[] = [];
   const warnedKeys = new Set<string>();
 

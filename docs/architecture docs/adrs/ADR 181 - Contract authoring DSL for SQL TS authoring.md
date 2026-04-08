@@ -148,7 +148,7 @@ model() + field.* + rel.*                →  model builder instances
           ↓
 defineContract({ target, models, ... })
           ↓
-buildStagedSemanticContractDefinition()  →  SqlSemanticContractDefinition
+buildSemanticContractDefinition()  →  SqlSemanticContractDefinition
           ↓
 buildSqlContractFromSemanticDefinition() →  Contract<SqlStorage, SqlModelStorage>
 ```
@@ -193,4 +193,4 @@ Lowering validates the contract graph and produces actionable error messages for
 - [ADR 121 — Contract.d.ts structure and relation typing](ADR%20121%20-%20Contract.d.ts%20structure%20and%20relation%20typing.md) — emitted type structure this surface must continue to produce
 - [ADR 161 — Explicit foreign key constraint and index configuration](ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md) — FK constraint and index toggle design
 - [ADR 172 — Contract domain-storage separation](ADR%20172%20-%20Contract%20domain-storage%20separation.md) — the domain/storage separation that the model-first / SQL split reflects
-- [ADR 182 — Unified contract representation](ADR%20182%20-%20Unified%20contract%20representation.md) — implemented: the former `ContractIR` / `ContractBase` split is replaced by a single `Contract<Storage, ModelStorage>` type; `SqlSemanticContractDefinition` remains the staged TS seam before lowering to `Contract`
+- [ADR 182 — Unified contract representation](ADR%20182%20-%20Unified%20contract%20representation.md) — implemented: the former `ContractIR` / `ContractBase` split is replaced by a single `Contract<Storage, ModelStorage>` type; `SqlSemanticContractDefinition` remains the TS authoring seam before lowering to `Contract`

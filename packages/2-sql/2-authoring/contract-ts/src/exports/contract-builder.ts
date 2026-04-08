@@ -1,9 +1,9 @@
 export type {
   ColumnBuilder,
   ComposedAuthoringHelpers,
+  ContractInput,
+  ContractModelBuilder,
   ScalarFieldBuilder,
-  StagedContractInput,
-  StagedModelBuilder,
 } from '../contract-builder';
 export {
   buildSqlContractFromSemanticDefinition,

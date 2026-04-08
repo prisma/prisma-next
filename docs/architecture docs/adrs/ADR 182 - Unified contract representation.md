@@ -105,7 +105,7 @@ Three independent efforts — the staged DSL, the ORM client, and the Mongo fami
 
 ## Decision
 
-**Status:** Implemented. The codebase now uses the unified `Contract<Storage, ModelStorage>` type shown in [At a glance](#at-a-glance) as the canonical contract, replacing the former `ContractIR` storage-first intermediate and `ContractBase` reconstruction layer. Staged TS authoring may still build `SqlSemanticContractDefinition` before lowering to `Contract` ([ADR 181](ADR%20181%20-%20Staged%20contract%20DSL%20for%20SQL%20TS%20authoring.md)).
+**Status:** Implemented. The codebase now uses the unified `Contract<Storage, ModelStorage>` type shown in [At a glance](#at-a-glance) as the canonical contract, replacing the former `ContractIR` storage-first intermediate and `ContractBase` reconstruction layer. TS authoring may still build `SqlSemanticContractDefinition` before lowering to `Contract` ([ADR 181](ADR%20181%20-%20Contract%20authoring%20DSL%20for%20SQL%20TS%20authoring.md)).
 
 ### Each family defines its storage types
 
@@ -209,5 +209,5 @@ There are no external consumers of `contract.json`. The change is internal. Exis
 ## Related
 
 - [ADR 172 — Contract domain-storage separation](ADR%20172%20-%20Contract%20domain-storage%20separation.md) — designed the three-level structure (domain, bridge, storage) that this ADR formalizes as the canonical contract representation
-- [ADR 181 — Staged contract DSL for SQL TS authoring](ADR%20181%20-%20Staged%20contract%20DSL%20for%20SQL%20TS%20authoring.md) — introduced `SqlSemanticContractDefinition` as an intermediate form; lowering now targets `Contract<SqlStorage, SqlModelStorage>` directly (see ADR 181 for the current pipeline)
+- [ADR 181 — Contract authoring DSL for SQL TS authoring](ADR%20181%20-%20Contract%20authoring%20DSL%20for%20SQL%20TS%20authoring.md) — introduced `SqlSemanticContractDefinition` as an intermediate form; lowering now targets `Contract<SqlStorage, SqlModelStorage>` directly (see ADR 181 for the current pipeline)
 - [Architecture Overview — Domain-first surfaces](../../Architecture%20Overview.md) — the guiding principle that user-facing APIs speak in application-domain terms

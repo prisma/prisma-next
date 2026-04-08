@@ -1,8 +1,8 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import { field, model, rel } from '../src/contract-builder';
-import { ScalarFieldBuilder, StagedModelBuilder } from '../src/staged-contract-dsl';
-import { buildStagedSemanticContractDefinition } from '../src/staged-contract-lowering';
+import { ContractModelBuilder, ScalarFieldBuilder } from '../src/contract-dsl';
+import { buildSemanticContractDefinition } from '../src/contract-lowering';
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const bareFamilyPack: FamilyPackRef<'sql'> = {
@@ -24,19 +24,16 @@ const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 
 function buildSemantic(
-  definition: Omit<
-    Parameters<typeof buildStagedSemanticContractDefinition>[0],
-    'target' | 'family'
-  >,
+  definition: Omit<Parameters<typeof buildSemanticContractDefinition>[0], 'target' | 'family'>,
 ) {
-  return buildStagedSemanticContractDefinition({
+  return buildSemanticContractDefinition({
     family: bareFamilyPack,
     target: postgresTargetPack,
     ...definition,
   });
 }
 
-describe('staged semantic lowering runtime checks', () => {
+describe('semantic lowering runtime checks', () => {
   it('rejects missing and unknown named storage type references', () => {
     const localVector = {
       codecId: 'pg/vector@1',
@@ -78,7 +75,7 @@ describe('staged semantic lowering runtime checks', () => {
   });
 
   it('rejects scalar fields that never resolve to a storage descriptor', () => {
-    const Broken = new StagedModelBuilder({
+    const Broken = new ContractModelBuilder({
       modelName: 'Broken',
       fields: {
         mystery: new ScalarFieldBuilder({
@@ -382,7 +379,7 @@ describe('staged semantic lowering runtime checks', () => {
           UnknownLocalField,
         },
       }),
-    ).toThrow('Unknown field "UnknownLocalField.missing" in staged contract definition');
+    ).toThrow('Unknown field "UnknownLocalField.missing" in contract definition');
   });
 
   it('lowers optional unique, index, and foreign-key metadata when present', () => {

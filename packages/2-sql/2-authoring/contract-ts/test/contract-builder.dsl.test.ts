@@ -1,12 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import {
-  defineContract,
-  field,
-  model,
-  rel,
-  type StagedContractInput,
-} from '../src/contract-builder';
+import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
 
 import { columnDescriptor } from './helpers/column-descriptor';
 
@@ -31,9 +25,9 @@ const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 const timestamptzColumn = columnDescriptor('pg/timestamptz@1');
 
-function defineStagedContract<
-  const Definition extends Omit<StagedContractInput, 'target' | 'family'>,
->(definition: Definition) {
+function defineTestContract<const Definition extends Omit<ContractInput, 'target' | 'family'>>(
+  definition: Definition,
+) {
   return defineContract({
     family: bareFamilyPack,
     target: postgresTargetPack,
@@ -72,7 +66,7 @@ function buildOwnershipRelationContract(ownershipCase: OwnershipRelationCase) {
     },
   });
 
-  return defineStagedContract({
+  return defineTestContract({
     models: {
       User: User.relations({
         [ownershipCase.relationName]:
@@ -92,7 +86,7 @@ function buildOwnershipRelationContract(ownershipCase: OwnershipRelationCase) {
   });
 }
 
-describe('staged contract DSL authoring surface', () => {
+describe('contract DSL authoring surface', () => {
   it('lowers inline ids and uniques while keeping sql focused on table/index/fk concerns', () => {
     const types = {
       Role: {
@@ -142,8 +136,8 @@ describe('staged contract DSL authoring surface', () => {
       posts: rel.hasMany(() => Post, { by: 'userId' }),
     });
 
-    const contract = defineStagedContract({
-      storageHash: 'sha256:staged-contract-dsl',
+    const contract = defineTestContract({
+      storageHash: 'sha256:contract-dsl',
       foreignKeyDefaults: { constraint: true, index: false },
       types,
       models: {
@@ -261,7 +255,7 @@ describe('staged contract DSL authoring surface', () => {
       table: 'blog_post',
     });
 
-    const contract = defineStagedContract({
+    const contract = defineTestContract({
       foreignKeyDefaults: { constraint: true, index: false },
       models: {
         User,
@@ -369,7 +363,7 @@ describe('staged contract DSL authoring surface', () => {
       }),
     });
 
-    const contract = defineStagedContract({
+    const contract = defineTestContract({
       models: {
         Post,
         Tag,
@@ -406,7 +400,7 @@ describe('staged contract DSL authoring surface', () => {
     }));
 
     expect(() =>
-      defineStagedContract({
+      defineTestContract({
         models: {
           User,
         },
@@ -436,7 +430,7 @@ describe('staged contract DSL authoring surface', () => {
         table: 'membership',
       });
 
-    const contract = defineStagedContract({
+    const contract = defineTestContract({
       models: {
         Membership,
       },
@@ -471,7 +465,7 @@ describe('staged contract DSL authoring surface', () => {
       targetTable: 'user_profile',
       expectedCardinality: '1:1',
     },
-  ] as const)('lowers %s ownership relations through the staged relation pipeline', ({
+  ] as const)('lowers %s ownership relations through the relation pipeline', ({
     relationName,
     targetModelName,
     targetTable,
@@ -523,7 +517,7 @@ describe('staged contract DSL authoring surface', () => {
       indexes: [constraints.index(cols.authorId, { name: 'blog_post_author_identifier_idx' })],
     }));
 
-    const contract = defineStagedContract({
+    const contract = defineTestContract({
       naming: { tables: 'snake_case', columns: 'snake_case' },
       models: {
         BlogPost,
@@ -557,7 +551,7 @@ describe('staged contract DSL authoring surface', () => {
           },
         });
 
-        return defineStagedContract({
+        return defineTestContract({
           naming: { tables: 'snake_case' },
           models: {
             BlogPost,
@@ -578,7 +572,7 @@ describe('staged contract DSL authoring surface', () => {
           },
         });
 
-        return defineStagedContract({
+        return defineTestContract({
           naming: { columns: 'snake_case' },
           models: {
             BlogPost,
@@ -591,7 +585,7 @@ describe('staged contract DSL authoring surface', () => {
     expect(run).toThrow(error);
   });
 
-  it('rejects duplicate relation names when mixing model relations with staged .relations()', () => {
+  it('rejects duplicate relation names when mixing model relations with .relations()', () => {
     const User = model('User', {
       fields: {
         id: field.column(int4Column).id(),
@@ -634,7 +628,7 @@ describe('staged contract DSL authoring surface', () => {
     });
 
     expect(() =>
-      defineStagedContract({
+      defineTestContract({
         models: {
           User,
           Membership,
@@ -664,7 +658,7 @@ describe('staged contract DSL authoring surface', () => {
     }));
 
     expect(() =>
-      defineStagedContract({
+      defineTestContract({
         models: {
           User,
           Post,
@@ -702,7 +696,7 @@ describe('staged contract DSL authoring surface', () => {
     });
 
     expect(() =>
-      defineStagedContract({
+      defineTestContract({
         models: {
           Post,
           Tag,
@@ -809,7 +803,7 @@ describe('staged contract DSL authoring surface', () => {
     });
 
     expect(() =>
-      defineStagedContract({
+      defineTestContract({
         models: {
           Account: User,
         },
@@ -832,7 +826,7 @@ describe('self-referential and circular relations', () => {
       children: rel.hasMany(() => CategoryBase, { by: 'parentId' }),
     });
 
-    const contract = defineStagedContract({
+    const contract = defineTestContract({
       models: { Category },
     });
 
@@ -883,7 +877,7 @@ describe('self-referential and circular relations', () => {
       department: rel.belongsTo(() => Department, { from: 'departmentId', to: 'id' }),
     });
 
-    const contract = defineStagedContract({
+    const contract = defineTestContract({
       models: { Employee, Department },
     });
 
