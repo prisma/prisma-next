@@ -18,6 +18,7 @@ import {
   getColumnToFieldMap,
   getFieldToColumnMap,
   isToOneCardinality,
+  type PolymorphismInfo,
   resolveFieldToColumn,
   resolveIncludeRelation,
   resolveModelTableName,
@@ -45,7 +46,11 @@ import {
   dispatchSplitMutationRows,
   executeMutationReturningSingleRow,
 } from './collection-mutation-dispatch';
-import { augmentSelectionForJoinColumns, mapModelDataToStorageRow } from './collection-runtime';
+import {
+  augmentSelectionForJoinColumns,
+  mapModelDataToStorageRow,
+  mapPolymorphicRow,
+} from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { shorthandToWhereExpr } from './filters';
 import { GroupedCollection } from './grouped-collection';
@@ -139,6 +144,14 @@ function isWhereDirectInput(value: unknown): value is WhereDirectInput {
     (isWhereExpr(value) && typeof (value as { accept?: unknown }).accept === 'function') ||
     isToWhereExprInput(value)
   );
+}
+
+interface MtiCreateContext {
+  polyInfo: PolymorphismInfo;
+  variant: { modelName: string; value: string; table: string; strategy: 'mti' };
+  baseFieldToColumn: Record<string, string>;
+  variantFieldToColumn: Record<string, string>;
+  pkColumn: string;
 }
 
 export class Collection<
@@ -690,6 +703,11 @@ export class Collection<
 
     assertReturningCapability(this.contract, 'createAll()');
 
+    const mtiContext = this.#resolveMtiCreateContext();
+    if (mtiContext) {
+      return this.#executeMtiCreate(data, mtiContext);
+    }
+
     const mappedRows = this.#mapCreateRows(data);
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
     const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
@@ -731,6 +749,100 @@ export class Collection<
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
     });
+  }
+
+  #resolveMtiCreateContext(): MtiCreateContext | null {
+    const variantName = this.state.variantName;
+    if (!variantName) return null;
+
+    const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName);
+    if (!polyInfo) return null;
+
+    const variant = polyInfo.variants.get(variantName);
+    if (!variant || variant.strategy !== 'mti') return null;
+
+    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName);
+    const variantFieldToColumn = getFieldToColumnMap(this.contract, variant.modelName);
+    const pkColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
+
+    return {
+      polyInfo,
+      variant: variant as typeof variant & { strategy: 'mti' },
+      baseFieldToColumn,
+      variantFieldToColumn,
+      pkColumn,
+    };
+  }
+
+  #executeMtiCreate(
+    data: readonly CreateInput<TContract, ModelName>[],
+    mtiCtx: MtiCreateContext,
+  ): AsyncIterableResult<Row> {
+    const { polyInfo, variant, baseFieldToColumn, variantFieldToColumn, pkColumn } = mtiCtx;
+    const contract = this.contract;
+    const collectionCtx = this.ctx;
+    const runtime = collectionCtx.runtime;
+    const tableName = this.tableName;
+    const modelName = this.modelName;
+
+    const baseFieldColumns = new Set(Object.values(baseFieldToColumn));
+    const variantFieldColumns = new Set(Object.values(variantFieldToColumn));
+    const mergedFieldToColumn = { ...baseFieldToColumn, ...variantFieldToColumn };
+
+    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+      for (const row of data) {
+        const allMapped: Record<string, unknown> = {};
+        for (const [fieldName, value] of Object.entries(row as Record<string, unknown>)) {
+          if (value === undefined) continue;
+          const columnName = mergedFieldToColumn[fieldName] ?? fieldName;
+          allMapped[columnName] = value;
+        }
+        allMapped[polyInfo.discriminatorColumn] = variant.value;
+
+        const baseRow: Record<string, unknown> = {};
+        const variantRow: Record<string, unknown> = {};
+        for (const [col, val] of Object.entries(allMapped)) {
+          if (baseFieldColumns.has(col) || col === polyInfo.discriminatorColumn) {
+            baseRow[col] = val;
+          }
+          if (variantFieldColumns.has(col)) {
+            variantRow[col] = val;
+          }
+        }
+
+        applyCreateDefaults(collectionCtx, tableName, [baseRow]);
+        const baseCompiled = compileInsertReturning(contract, tableName, [baseRow], undefined);
+        const baseResult = await executeQueryPlan<Record<string, unknown>>(
+          runtime,
+          baseCompiled,
+        ).toArray();
+        const baseCreated = baseResult[0];
+        if (!baseCreated) {
+          throw new Error(`MTI base INSERT for model "${modelName}" did not return a row`);
+        }
+
+        const pkValue = baseCreated[pkColumn];
+        variantRow[pkColumn] = pkValue;
+        const variantCompiled = compileInsertReturning(
+          contract,
+          variant.table,
+          [variantRow],
+          undefined,
+        );
+        await executeQueryPlan<Record<string, unknown>>(runtime, variantCompiled).toArray();
+
+        const merged = mapPolymorphicRow(
+          contract,
+          modelName,
+          polyInfo,
+          { ...baseCreated, ...variantRow },
+          variant.modelName,
+        );
+        yield merged as Row;
+      }
+    };
+
+    return new AsyncIterableResult(generator());
   }
 
   #mapCreateRows(data: readonly CreateInput<TContract, ModelName>[]): Record<string, unknown>[] {

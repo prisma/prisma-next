@@ -348,3 +348,37 @@ describe('STI variant create (discriminator auto-injection)', () => {
     expect(firstRow['type']).toBeDefined();
   });
 });
+
+describe('MTI variant create (two-INSERT orchestration)', () => {
+  it('executes two INSERTs: base table then variant table', async () => {
+    const { collection, runtime } = createReturningMixedPolyCollection();
+    runtime.setNextResults([
+      [{ id: 10, title: 'Dark mode', type: 'feature' }],
+      [{ id: 10, priority: 1 }],
+    ]);
+
+    const narrowed = collection.variant('Feature' as never) as typeof collection;
+    await narrowed.createAll([{ title: 'Dark mode', priority: 1 } as never]).toArray();
+
+    expect(runtime.executions).toHaveLength(2);
+
+    const baseAst = runtime.executions[0]!.plan.ast as InsertAst;
+    expect(baseAst.kind).toBe('insert');
+    expect(baseAst.table.name).toBe('tasks');
+
+    const baseRow = baseAst.rows![0]!;
+    expect(baseRow['title']).toBeDefined();
+    expect(baseRow['type']).toBeDefined();
+    expect((baseRow['type'] as { value: unknown }).value).toBe('feature');
+    expect(baseRow['priority']).toBeUndefined();
+
+    const variantAst = runtime.executions[1]!.plan.ast as InsertAst;
+    expect(variantAst.kind).toBe('insert');
+    expect(variantAst.table.name).toBe('features');
+
+    const variantRow = variantAst.rows![0]!;
+    expect(variantRow['priority']).toBeDefined();
+    expect(variantRow['id']).toBeDefined();
+    expect((variantRow['id'] as { value: unknown }).value).toBe(10);
+  });
+});
