@@ -20,4 +20,6 @@ export type {
   ResolvedCreateInput,
   SimplifyDeep,
   VariantCreateInput,
+  VariantModelRow,
+  VariantNames,
 } from '../types';
