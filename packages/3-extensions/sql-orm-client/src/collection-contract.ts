@@ -7,8 +7,27 @@ type ModelEntry = {
   storage?: { table?: string; fields?: ModelStorageFields };
   relations?: Record<string, unknown>;
   fields?: Record<string, { type?: ContractFieldType }>;
+  discriminator?: { field: string };
+  variants?: Record<string, { value: string }>;
+  base?: string;
 };
 type ModelsMap = Record<string, ModelEntry>;
+
+export interface PolymorphismVariantInfo {
+  readonly modelName: string;
+  readonly value: string;
+  readonly table: string;
+  readonly strategy: 'sti' | 'mti';
+}
+
+export interface PolymorphismInfo {
+  readonly discriminatorField: string;
+  readonly discriminatorColumn: string;
+  readonly baseTable: string;
+  readonly variants: ReadonlyMap<string, PolymorphismVariantInfo>;
+  readonly variantsByValue: ReadonlyMap<string, PolymorphismVariantInfo>;
+  readonly mtiVariants: readonly PolymorphismVariantInfo[];
+}
 
 function modelsOf(contract: Contract<SqlStorage>): ModelsMap {
   return contract.models as ModelsMap;
@@ -21,6 +40,70 @@ export function modelOf(contract: Contract<SqlStorage>, name: string): ModelEntr
 const fieldToColumnCache = new WeakMap<object, Map<string, Record<string, string>>>();
 const columnToFieldCache = new WeakMap<object, Map<string, Record<string, string>>>();
 const tableToModelCache = new WeakMap<object, Map<string, string>>();
+const polymorphismCache = new WeakMap<object, Map<string, PolymorphismInfo | undefined>>();
+
+export function resolvePolymorphismInfo(
+  contract: Contract<SqlStorage>,
+  modelName: string,
+): PolymorphismInfo | undefined {
+  let perContract = polymorphismCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    polymorphismCache.set(contract, perContract);
+  }
+  if (perContract.has(modelName)) return perContract.get(modelName);
+
+  const models = modelsOf(contract);
+  const model = models[modelName];
+  if (!model?.discriminator || !model.variants) {
+    perContract.set(modelName, undefined);
+    return undefined;
+  }
+
+  const baseTable = model.storage?.table;
+  if (!baseTable) {
+    perContract.set(modelName, undefined);
+    return undefined;
+  }
+
+  const discriminatorField = model.discriminator.field;
+  const discriminatorColumn = resolveFieldToColumn(contract, modelName, discriminatorField);
+
+  const variants = new Map<string, PolymorphismVariantInfo>();
+  const variantsByValue = new Map<string, PolymorphismVariantInfo>();
+  const mtiVariants: PolymorphismVariantInfo[] = [];
+
+  for (const [variantModelName, variantEntry] of Object.entries(model.variants)) {
+    const variantModel = models[variantModelName];
+    const variantTable = variantModel?.storage?.table ?? baseTable;
+    const strategy = variantTable === baseTable ? 'sti' : 'mti';
+
+    const info: PolymorphismVariantInfo = {
+      modelName: variantModelName,
+      value: variantEntry.value,
+      table: variantTable,
+      strategy,
+    };
+
+    variants.set(variantModelName, info);
+    variantsByValue.set(variantEntry.value, info);
+    if (strategy === 'mti') {
+      mtiVariants.push(info);
+    }
+  }
+
+  const result: PolymorphismInfo = {
+    discriminatorField,
+    discriminatorColumn,
+    baseTable,
+    variants,
+    variantsByValue,
+    mtiVariants,
+  };
+
+  perContract.set(modelName, result);
+  return result;
+}
 
 export function resolveFieldToColumn(
   contract: Contract<SqlStorage>,

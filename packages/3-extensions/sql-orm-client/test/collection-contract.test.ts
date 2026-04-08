@@ -5,9 +5,11 @@ import {
   isToOneCardinality,
   resolveIncludeRelation,
   resolveModelTableName,
+  resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
   resolveUpsertConflictColumns,
 } from '../src/collection-contract';
+import type { TestContract } from './helpers';
 import { getTestContract } from './helpers';
 
 describe('collection-contract capability detection', () => {
@@ -233,5 +235,146 @@ describe('collection-contract capability detection', () => {
     expect(isToOneCardinality('1:N')).toBe(false);
     expect(isToOneCardinality('M:N')).toBe(false);
     expect(isToOneCardinality(undefined)).toBe(false);
+  });
+});
+
+function buildPolyContract(): TestContract {
+  const base = getTestContract();
+  const raw = JSON.parse(JSON.stringify(base));
+
+  raw.models.Task = {
+    fields: {
+      id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+      title: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+      type: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+    },
+    relations: {},
+    storage: {
+      table: 'tasks',
+      fields: {
+        id: { column: 'id' },
+        title: { column: 'title' },
+        type: { column: 'type' },
+      },
+    },
+    discriminator: { field: 'type' },
+    variants: {
+      Bug: { value: 'bug' },
+      Feature: { value: 'feature' },
+    },
+  };
+
+  raw.models.Bug = {
+    fields: {
+      severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+    },
+    relations: {},
+    storage: {
+      table: 'tasks',
+      fields: { severity: { column: 'severity' } },
+    },
+    base: 'Task',
+  };
+
+  raw.models.Feature = {
+    fields: {
+      priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+    },
+    relations: {},
+    storage: {
+      table: 'features',
+      fields: { priority: { column: 'priority' } },
+    },
+    base: 'Task',
+  };
+
+  raw.storage.tables.tasks = {
+    columns: {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      type: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      severity: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+
+  raw.storage.tables.features = {
+    columns: {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+
+  return raw as TestContract;
+}
+
+describe('resolvePolymorphismInfo()', () => {
+  it('returns undefined for non-polymorphic models', () => {
+    const contract = getTestContract();
+    expect(resolvePolymorphismInfo(contract, 'User')).toBeUndefined();
+  });
+
+  it('classifies Bug as STI (same table as Task)', () => {
+    const contract = buildPolyContract();
+    const info = resolvePolymorphismInfo(contract, 'Task');
+    expect(info).toBeDefined();
+    const bugVariant = info!.variants.get('Bug');
+    expect(bugVariant).toBeDefined();
+    expect(bugVariant!.strategy).toBe('sti');
+    expect(bugVariant!.table).toBe('tasks');
+    expect(bugVariant!.value).toBe('bug');
+  });
+
+  it('classifies Feature as MTI (different table from Task)', () => {
+    const contract = buildPolyContract();
+    const info = resolvePolymorphismInfo(contract, 'Task');
+    expect(info).toBeDefined();
+    const featureVariant = info!.variants.get('Feature');
+    expect(featureVariant).toBeDefined();
+    expect(featureVariant!.strategy).toBe('mti');
+    expect(featureVariant!.table).toBe('features');
+    expect(featureVariant!.value).toBe('feature');
+  });
+
+  it('resolves discriminator field and column', () => {
+    const contract = buildPolyContract();
+    const info = resolvePolymorphismInfo(contract, 'Task')!;
+    expect(info.discriminatorField).toBe('type');
+    expect(info.discriminatorColumn).toBe('type');
+    expect(info.baseTable).toBe('tasks');
+  });
+
+  it('populates variantsByValue keyed by discriminator value', () => {
+    const contract = buildPolyContract();
+    const info = resolvePolymorphismInfo(contract, 'Task')!;
+    expect(info.variantsByValue.get('bug')?.modelName).toBe('Bug');
+    expect(info.variantsByValue.get('feature')?.modelName).toBe('Feature');
+  });
+
+  it('populates mtiVariants with only MTI variants', () => {
+    const contract = buildPolyContract();
+    const info = resolvePolymorphismInfo(contract, 'Task')!;
+    expect(info.mtiVariants).toHaveLength(1);
+    expect(info.mtiVariants[0]!.modelName).toBe('Feature');
+  });
+
+  it('caches results per (contract, modelName)', () => {
+    const contract = buildPolyContract();
+    const first = resolvePolymorphismInfo(contract, 'Task');
+    const second = resolvePolymorphismInfo(contract, 'Task');
+    expect(first).toBe(second);
+  });
+
+  it('returns undefined for variant models themselves', () => {
+    const contract = buildPolyContract();
+    expect(resolvePolymorphismInfo(contract, 'Bug')).toBeUndefined();
+    expect(resolvePolymorphismInfo(contract, 'Feature')).toBeUndefined();
   });
 });
