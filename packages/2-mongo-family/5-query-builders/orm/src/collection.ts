@@ -145,11 +145,14 @@ class MongoCollectionImpl<
   ): MongoCollection<TContract, ModelName, TIncludes, V> {
     const model = this.#contract.models[this.#modelName] as MongoModelDefinition | undefined;
     if (!model?.discriminator || !model.variants) {
+      // No polymorphism metadata on this model — return unchanged. Cast required
+      // because TS cannot verify TVariant (the current variant) is assignable to V.
       return this as unknown as MongoCollection<TContract, ModelName, TIncludes, V>;
     }
 
     const variantEntry = model.variants[variantName as string];
     if (!variantEntry) {
+      // Unknown variant name at runtime — return unchanged. Same cast rationale.
       return this as unknown as MongoCollection<TContract, ModelName, TIncludes, V>;
     }
 
@@ -157,11 +160,10 @@ class MongoCollectionImpl<
       model.discriminator.field,
       new MongoParamRef(variantEntry.value),
     );
-    const clone = this.#clone({
-      filters: [...this.#state.filters, filter],
-    });
-    clone.#variantName = variantName as string;
-    return clone as unknown as MongoCollection<TContract, ModelName, TIncludes, V>;
+    return this.#cloneWithVariant<V>(
+      { filters: [...this.#state.filters, filter] },
+      variantName as string,
+    );
   }
 
   where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
@@ -568,6 +570,21 @@ class MongoCollectionImpl<
     instance.#state = { ...this.#state, ...overrides };
     instance.#collectionName = this.#collectionName;
     instance.#variantName = this.#variantName;
+    return instance;
+  }
+
+  #cloneWithVariant<VNew extends string>(
+    overrides: Partial<MongoCollectionState>,
+    variantName: string,
+  ): MongoCollectionImpl<TContract, ModelName, TIncludes, VNew> {
+    const instance = new MongoCollectionImpl<TContract, ModelName, TIncludes, VNew>(
+      this.#contract,
+      this.#modelName,
+      this.#executor,
+    );
+    instance.#state = { ...this.#state, ...overrides };
+    instance.#collectionName = this.#collectionName;
+    instance.#variantName = variantName;
     return instance;
   }
 }
