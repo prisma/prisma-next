@@ -29,13 +29,17 @@ import type { SqlContractResult } from './contract-types';
 
 export { buildSqlContractFromDefinition } from './build-contract';
 
-type ModelLike = ContractModelBuilder<
-  string | undefined,
-  Record<string, ScalarFieldBuilder>,
-  Record<string, RelationBuilder<RelationState>>,
-  ModelAttributesSpec | undefined,
-  SqlStageSpec | undefined
->;
+type ModelLike = {
+  readonly stageOne: {
+    readonly modelName?: string;
+    readonly fields: Record<string, ScalarFieldBuilder>;
+    readonly relations: Record<string, RelationBuilder<RelationState>>;
+  };
+  readonly __attributes: ModelAttributesSpec | undefined;
+  readonly __sql: SqlStageSpec | undefined;
+  buildAttributesSpec(): ModelAttributesSpec | undefined;
+  buildSqlSpec(): SqlStageSpec | undefined;
+};
 
 type ContractDefinition<
   Family extends FamilyPackRef<string>,
