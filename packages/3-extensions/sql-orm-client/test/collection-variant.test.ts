@@ -1,6 +1,12 @@
-import { BinaryExpr, ColumnRef, LiteralExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  ColumnRef,
+  type InsertAst,
+  LiteralExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
+import { withReturningCapability } from './collection-fixtures';
 import type { TestContract } from './helpers';
 import { createMockRuntime, getTestContext, getTestContract } from './helpers';
 
@@ -295,5 +301,50 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toEqual({ id: 2, title: 'Dark mode', type: 'feature', priority: 1 });
+  });
+});
+
+function createReturningMixedPolyCollection() {
+  const contract = withReturningCapability(buildMixedPolyContract());
+  const baseContext = getTestContext();
+  const context = { ...baseContext, contract };
+  const runtime = createMockRuntime();
+  const collection = new Collection({ runtime, context }, 'Task');
+  return { collection, runtime, contract };
+}
+
+describe('STI variant create (discriminator auto-injection)', () => {
+  it('injects discriminator column/value into INSERT for STI variant', async () => {
+    const { collection, runtime } = createReturningMixedPolyCollection();
+    runtime.setNextResults([[{ id: 1, title: 'Crash', type: 'bug', severity: 'critical' }]]);
+
+    const narrowed = collection.variant('Bug' as never) as typeof collection;
+    await narrowed.createAll([{ title: 'Crash', severity: 'critical' } as never]).toArray();
+
+    const execution = runtime.executions[0]!;
+    const ast = execution.plan.ast as InsertAst;
+    expect(ast.kind).toBe('insert');
+
+    const firstRow = ast.rows![0]!;
+    const typeParam = firstRow['type'];
+    expect(typeParam).toBeDefined();
+    expect(typeParam!.kind).toBe('param-ref');
+    expect((typeParam as { value: unknown }).value).toBe('bug');
+  });
+
+  it('maps variant fields through merged base+variant column map', async () => {
+    const { collection, runtime } = createReturningMixedPolyCollection();
+    runtime.setNextResults([[{ id: 1, title: 'Crash', type: 'bug', severity: 'critical' }]]);
+
+    const narrowed = collection.variant('Bug' as never) as typeof collection;
+    await narrowed.createAll([{ title: 'Crash', severity: 'critical' } as never]).toArray();
+
+    const execution = runtime.executions[0]!;
+    const ast = execution.plan.ast as InsertAst;
+    const firstRow = ast.rows![0]!;
+
+    expect(firstRow['title']).toBeDefined();
+    expect(firstRow['severity']).toBeDefined();
+    expect(firstRow['type']).toBeDefined();
   });
 });
