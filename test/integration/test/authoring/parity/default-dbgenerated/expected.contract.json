@@ -10,11 +10,11 @@
     "User": {
       "fields": {
         "id": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
-          },
-          "nullable": false
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -61,6 +61,7 @@
       "returning": true
     },
     "sql": {
+      "defaultInInsert": true,
       "enums": true,
       "returning": true
     }

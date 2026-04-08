@@ -10,14 +10,14 @@
     "User": {
       "fields": {
         "id": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
             "codecId": "sql/char@1",
+            "kind": "scalar",
             "typeParams": {
               "length": 16
             }
-          },
-          "nullable": false
+          }
         }
       },
       "relations": {},
@@ -83,6 +83,7 @@
       "returning": true
     },
     "sql": {
+      "defaultInInsert": true,
       "enums": true,
       "returning": true
     }
