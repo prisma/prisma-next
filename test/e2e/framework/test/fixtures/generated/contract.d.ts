@@ -64,12 +64,25 @@ export type FieldOutputTypes = {
     readonly metadata: CodecTypes['pg/jsonb@1']['output'];
     readonly tags: CodecTypes['pg/jsonb@1']['output'];
   };
+  readonly ParamTypes: {
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly name: Varchar<255> | null;
+    readonly code: Char<16> | null;
+    readonly price: Numeric<10, 2> | null;
+    readonly flags: Bit<8> | null;
+    readonly bits: VarBit<12> | null;
+    readonly createdAt: Timestamptz<3> | null;
+    readonly startsAt: Time<2> | null;
+    readonly startsAtTz: Timetz<2> | null;
+    readonly duration: Interval<6> | null;
+  };
   readonly Post: {
     readonly id: CodecTypes['pg/int4@1']['output'];
     readonly userId: CodecTypes['pg/int4@1']['output'];
     readonly title: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
     readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
+    readonly published: CodecTypes['pg/bool@1']['output'];
     readonly meta: CodecTypes['pg/json@1']['output'] | null;
   };
   readonly User: {
@@ -511,6 +524,102 @@ type ContractBase = ContractType<
         };
       };
     };
+    readonly ParamTypes: {
+      readonly fields: {
+        readonly id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly name: {
+          readonly nullable: true;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'sql/varchar@1';
+            readonly typeParams: { readonly length: 255 };
+          };
+        };
+        readonly code: {
+          readonly nullable: true;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'sql/char@1';
+            readonly typeParams: { readonly length: 16 };
+          };
+        };
+        readonly price: {
+          readonly nullable: true;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'pg/numeric@1';
+            readonly typeParams: { readonly precision: 10; readonly scale: 2 };
+          };
+        };
+        readonly flags: {
+          readonly nullable: true;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'pg/bit@1';
+            readonly typeParams: { readonly length: 8 };
+          };
+        };
+        readonly bits: {
+          readonly nullable: true;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'pg/varbit@1';
+            readonly typeParams: { readonly length: 12 };
+          };
+        };
+        readonly createdAt: {
+          readonly nullable: true;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly typeParams: { readonly precision: 3 };
+          };
+        };
+        readonly startsAt: {
+          readonly nullable: true;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'pg/time@1';
+            readonly typeParams: { readonly precision: 2 };
+          };
+        };
+        readonly startsAtTz: {
+          readonly nullable: true;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'pg/timetz@1';
+            readonly typeParams: { readonly precision: 2 };
+          };
+        };
+        readonly duration: {
+          readonly nullable: true;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'pg/interval@1';
+            readonly typeParams: { readonly precision: 6 };
+          };
+        };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: {
+        readonly table: 'param_types';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly name: { readonly column: 'name' };
+          readonly code: { readonly column: 'code' };
+          readonly price: { readonly column: 'price' };
+          readonly flags: { readonly column: 'flags' };
+          readonly bits: { readonly column: 'bits' };
+          readonly createdAt: { readonly column: 'created_at' };
+          readonly startsAt: { readonly column: 'starts_at' };
+          readonly startsAtTz: { readonly column: 'starts_at_tz' };
+          readonly duration: { readonly column: 'duration' };
+        };
+      };
+    };
     readonly Post: {
       readonly fields: {
         readonly id: {
@@ -533,6 +642,10 @@ type ContractBase = ContractType<
           readonly nullable: true;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
         };
+        readonly published: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+        };
         readonly meta: {
           readonly nullable: true;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/json@1' };
@@ -547,6 +660,7 @@ type ContractBase = ContractType<
           readonly title: { readonly column: 'title' };
           readonly createdAt: { readonly column: 'created_at' };
           readonly updatedAt: { readonly column: 'update_at' };
+          readonly published: { readonly column: 'published' };
           readonly meta: { readonly column: 'meta' };
         };
       };
@@ -598,6 +712,7 @@ type ContractBase = ContractType<
     readonly user: 'User';
     readonly post: 'Post';
     readonly comment: 'Comment';
+    readonly param_types: 'ParamTypes';
     readonly event: 'Event';
     readonly literal_defaults: 'LiteralDefaults';
   };

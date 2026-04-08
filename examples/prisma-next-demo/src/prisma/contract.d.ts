@@ -44,28 +44,33 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   ? CodecTypes[CodecId]['output']
   : _Encoded;
 export type Address = {
-  readonly street: string;
-  readonly city: string;
-  readonly zip: string | null;
-  readonly country: string;
+  readonly street: CodecTypes['pg/text@1']['output'];
+  readonly city: CodecTypes['pg/text@1']['output'];
+  readonly zip: CodecTypes['pg/text@1']['output'] | null;
+  readonly country: CodecTypes['pg/text@1']['output'];
 };
 export type FieldOutputTypes = {
   readonly Post: {
     readonly id: Char<36>;
-    readonly title: string;
-    readonly userId: string;
-    readonly createdAt: string;
-    readonly embedding: Vector<1536> | null;
+    readonly title: CodecTypes['pg/text@1']['output'];
+    readonly userId: CodecTypes['pg/text@1']['output'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+    readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
   };
   readonly User: {
     readonly id: Char<36>;
-    readonly email: string;
-    readonly createdAt: string;
-    readonly kind: 'admin' | 'user';
+    readonly email: CodecTypes['pg/text@1']['output'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+    readonly kind: CodecTypes['pg/enum@1']['output'];
     readonly address: Address | null;
   };
 };
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes>;
+export type TypeMaps = TypeMapsType<
+  CodecTypes,
+  OperationTypes,
+  QueryOperationTypes,
+  FieldOutputTypes
+>;
 
 type ContractBase = ContractType<
   {
@@ -166,18 +171,15 @@ type ContractBase = ContractType<
   },
   {
     readonly Post: {
-      readonly storage: {
-        readonly table: 'post';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly title: { readonly column: 'title' };
-          readonly userId: { readonly column: 'userId' };
-          readonly createdAt: { readonly column: 'createdAt' };
-          readonly embedding: { readonly column: 'embedding' };
-        };
-      };
       readonly fields: {
-        readonly id: Char<36>;
+        readonly id: {
+          readonly nullable: false;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'sql/char@1';
+            readonly typeParams: { readonly length: 36 };
+          };
+        };
         readonly title: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -190,7 +192,10 @@ type ContractBase = ContractType<
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
         };
-        readonly embedding: Vector<1536> | null;
+        readonly embedding: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1' };
+        };
       };
       readonly relations: {
         readonly user: {
@@ -202,20 +207,27 @@ type ContractBase = ContractType<
           };
         };
       };
-    };
-    readonly User: {
       readonly storage: {
-        readonly table: 'user';
+        readonly table: 'post';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly email: { readonly column: 'email' };
+          readonly title: { readonly column: 'title' };
+          readonly userId: { readonly column: 'userId' };
           readonly createdAt: { readonly column: 'createdAt' };
-          readonly kind: { readonly column: 'kind' };
-          readonly address: { readonly column: 'address' };
+          readonly embedding: { readonly column: 'embedding' };
         };
       };
+    };
+    readonly User: {
       readonly fields: {
-        readonly id: Char<36>;
+        readonly id: {
+          readonly nullable: false;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'sql/char@1';
+            readonly typeParams: { readonly length: 36 };
+          };
+        };
         readonly email: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -224,7 +236,10 @@ type ContractBase = ContractType<
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
         };
-        readonly kind: 'admin' | 'user';
+        readonly kind: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/enum@1' };
+        };
         readonly address: {
           readonly nullable: true;
           readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
@@ -238,6 +253,16 @@ type ContractBase = ContractType<
             readonly localFields: readonly ['id'];
             readonly targetFields: readonly ['userId'];
           };
+        };
+      };
+      readonly storage: {
+        readonly table: 'user';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly email: { readonly column: 'email' };
+          readonly createdAt: { readonly column: 'createdAt' };
+          readonly kind: { readonly column: 'kind' };
+          readonly address: { readonly column: 'address' };
         };
       };
     };
@@ -271,7 +296,6 @@ type ContractBase = ContractType<
             readonly named: 'CodecTypes';
             readonly package: '@prisma-next/extension-pgvector/codec-types';
           };
-          readonly parameterized: { readonly 'pg/vector@1': 'Vector<{{length}}>' };
           readonly typeImports: readonly [
             {
               readonly alias: 'Vector';
