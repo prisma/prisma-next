@@ -1567,6 +1567,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../../0-config/tsdown
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/0-foundation/utils
       '@types/pg':
         specifier: 'catalog:'
         version: 8.16.0
