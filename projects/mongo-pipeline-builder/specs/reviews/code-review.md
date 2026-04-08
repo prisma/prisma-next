@@ -3,7 +3,7 @@
 **Spec:** [expression-accumulator-helpers.spec.md](../expression-accumulator-helpers.spec.md)
 **Branch:** `tml-2217-complete-typed-expression-and-accumulator-helpers-for`
 **Base:** `origin/main`
-**Commit range:** `origin/main..HEAD` (10 commits, 21 files, +1566 −82)
+**Commit range:** `origin/main..HEAD` (20 commits, 23 files, +1964 −76)
 
 ## Summary
 
@@ -13,7 +13,9 @@ This branch extends the MongoDB pipeline builder's `fn` and `acc` helpers to cov
 
 - **AST widening** is minimal and correct. The `isRecordArgs` type guard, constructor freezing, and rewrite recursion all follow established patterns.
 - **Factory function pattern** in `expression-helpers.ts` is excellent — reduces ~65 helpers to one-liners that delegate to well-tested factories.
-- **Type test coverage** is thorough. Every new helper has a corresponding `expectTypeOf` test verifying its return type.
+- **Type test coverage** is thorough. Every new helper has a corresponding `expectTypeOf` test verifying its return type. Negative type tests verify wrong-type arguments are rejected.
+- **`fn.literal` overloads** — clean solution using overloaded signatures for known JS types (`string` → `StringField`, `number` → `NumericField`, etc.) plus `LiteralValue<F>` for contextual inference. The `fn.literal(42)` in a `StringField` position now correctly errors.
+- **`acc.sum` generics** — preserves input codec type, matching `min`/`max` semantics. `avg`/`stdDev*` correctly remain as double.
 - **Lowering** is updated correctly with tests for both record-arg operators and accumulators.
 - **Backward compatibility** is preserved — existing tests pass unchanged, type widening is additive.
 - **Documentation** — README.md and DEVELOPING.md are updated with full helper reference tables and the named-args design.

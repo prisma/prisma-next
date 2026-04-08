@@ -125,4 +125,4 @@ Wire all new exports, verify all tests pass, and update documentation.
 
 1. **Helper naming collisions with JS keywords/builtins.** Several MongoDB operators collide with JS: `$in` → `isIn`, `$type` → `typeOf`, `$toString` → `toString_`, `$first`/`$last` (array) → `firstElem`/`lastElem` (to avoid collision with accumulator `first`/`last`). These names were chosen pragmatically; if better names emerge during implementation, update.
 2. **`$accumulator` (custom JS) deferred.** The custom JavaScript accumulator is out of scope. It takes JS code strings and has a complex options shape.
-3. **Accumulator precision refinement deferred.** `$sum` on int returning int (not double) is tracked separately and not in scope.
+3. ~~**Accumulator precision refinement.**~~ Addressed — `acc.sum` is now generic, preserving the input field's codec type.

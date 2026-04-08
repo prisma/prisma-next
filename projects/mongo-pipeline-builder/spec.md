@@ -21,7 +21,7 @@ The core technical challenge is **tracking how the document shape transforms thr
 | M3: Core pipeline stage extensions | [TML-2210](https://linear.app/prisma-company/issue/TML-2210) | ✅ Complete |
 | **M4: Pipeline builder with shape tracking** | [TML-2211](https://linear.app/prisma-company/issue/TML-2211) | **In progress** |
 | M5: Remaining stages, pipeline-style updates | [TML-2212](https://linear.app/prisma-company/issue/TML-2212) | To-do |
-| Follow-up: Complete expression helpers | [TML-2217](https://linear.app/prisma-company/issue/TML-2217) | Backlog |
+| Follow-up: Complete expression helpers | [TML-2217](https://linear.app/prisma-company/issue/TML-2217) | ✅ Complete |
 
 # Requirements
 
@@ -88,7 +88,7 @@ Delivered by TML-2210. 14 typed stage classes in the `MongoReadStage` union, wit
 - Real-time change stream integration
 - Migration system integration
 - Nested field access in `FieldProxy` (deferred until value objects land — ADR 180)
-- Full expression/accumulator helper coverage at launch (follow-up: TML-2217)
+- ~~Full expression/accumulator helper coverage at launch~~ — Delivered by [TML-2217](https://linear.app/prisma-company/issue/TML-2217)
 - `execute()` on the builder itself (static builder produces plans only)
 
 # Acceptance Criteria
@@ -149,7 +149,7 @@ No change from existing Mongo data access patterns. The pipeline builder produce
 
 1. ~~**Builder entry point placement**~~ — Separate root constructor: `mongoPipeline<Contract>({ contractJson })`. Not on `MongoOrmClient`. Analogous to `postgres<Contract>({ contractJson })`.
 2. ~~**Nested field access in `FieldProxy`**~~ — Flat fields only for now. Deep/dot-path access deferred until value objects land (ADR 180).
-3. ~~**Expression helper coverage at launch**~~ — Starter set in TML-2211. Full coverage tracked as [TML-2217](https://linear.app/prisma-company/issue/TML-2217).
-4. ~~**Accumulator output type precision**~~ — Default to `'double'`. Precision refinement tracked in [TML-2217](https://linear.app/prisma-company/issue/TML-2217).
+3. ~~**Expression helper coverage at launch**~~ — Starter set in TML-2211. Full coverage delivered by [TML-2217](https://linear.app/prisma-company/issue/TML-2217).
+4. ~~**Accumulator output type precision**~~ — Addressed in [TML-2217](https://linear.app/prisma-company/issue/TML-2217). `acc.sum` is now generic, preserving input codec type. `avg`/`stdDev*` remain as double (correct for MongoDB).
 5. ~~**Builder runtime vs static**~~ — Static. `build()` returns `MongoQueryPlan`. No `execute()`.
 6. ~~**Package location**~~ — Restructure `5-query-builders/` into `orm/` and `pipeline-builder/`.
