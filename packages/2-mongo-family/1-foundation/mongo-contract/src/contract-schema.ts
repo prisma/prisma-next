@@ -1,9 +1,34 @@
 import { type } from 'arktype';
 
+const ScalarFieldTypeSchema = type({
+  '+': 'reject',
+  kind: "'scalar'",
+  codecId: 'string',
+  'typeParams?': 'Record<string, unknown>',
+});
+
+const ValueObjectFieldTypeSchema = type({
+  '+': 'reject',
+  kind: "'valueObject'",
+  name: 'string',
+});
+
+const UnionFieldTypeSchema = type({
+  '+': 'reject',
+  kind: "'union'",
+  members: ScalarFieldTypeSchema.or(ValueObjectFieldTypeSchema).array(),
+});
+
+const FieldTypeSchema = ScalarFieldTypeSchema.or(ValueObjectFieldTypeSchema).or(
+  UnionFieldTypeSchema,
+);
+
 const RawFieldSchema = type({
   '+': 'reject',
-  codecId: 'string',
+  type: FieldTypeSchema,
   'nullable?': 'boolean',
+  'many?': 'boolean',
+  'dict?': 'boolean',
 });
 
 const FieldSchema = RawFieldSchema.pipe((field) => ({
@@ -77,4 +102,7 @@ export const MongoContractSchema = type({
     'storageHash?': 'string',
   }),
   models: type({ '[string]': ModelDefinitionSchema }),
+  'valueObjects?': type({
+    '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
+  }),
 });

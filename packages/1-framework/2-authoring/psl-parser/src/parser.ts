@@ -5,6 +5,7 @@ import type {
   PslAttribute,
   PslAttributeArgument,
   PslAttributeTarget,
+  PslCompositeType,
   PslDiagnostic,
   PslDiagnosticCode,
   PslDocumentAst,
@@ -61,6 +62,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
 
   const models: PslModel[] = [];
   const enums: PslEnum[] = [];
+  const compositeTypes: PslCompositeType[] = [];
   let typesBlock: PslTypesBlock | undefined;
 
   let lineIndex = 0;
@@ -98,6 +100,19 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       continue;
     }
 
+    const compositeTypeMatch = line.match(/^type\s+([A-Za-z_]\w*)\s*\{$/);
+    if (compositeTypeMatch) {
+      const bounds = findBlockBounds(context, lineIndex);
+      const name = compositeTypeMatch[1] ?? '';
+      if (name.length === 0) {
+        lineIndex = bounds.endLine + 1;
+        continue;
+      }
+      compositeTypes.push(parseCompositeTypeBlock(context, name, bounds));
+      lineIndex = bounds.endLine + 1;
+      continue;
+    }
+
     if (/^types\s*\{$/.test(line)) {
       const bounds = findBlockBounds(context, lineIndex);
       typesBlock = parseTypesBlock(context, bounds);
@@ -130,6 +145,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
   );
   const modelNames = new Set(models.map((model) => model.name));
   const enumNames = new Set(enums.map((enumBlock) => enumBlock.name));
+  const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
   for (const declaration of typesBlock?.declarations ?? []) {
     if (SCALAR_TYPES.has(declaration.name)) {
       pushDiagnostic(context, {
@@ -168,6 +184,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
         hasRelationAttribute ||
         modelNames.has(field.typeName) ||
         enumNames.has(field.typeName) ||
+        compositeTypeNames.has(field.typeName) ||
         SCALAR_TYPES.has(field.typeName)
       ) {
         return field;
@@ -184,6 +201,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     sourceId: input.sourceId,
     models: normalizedModels,
     enums,
+    compositeTypes,
     ...ifDefined('types', typesBlock),
     span: {
       start: createPosition(context, 0, 0),
@@ -229,6 +247,44 @@ function parseModelBlock(context: ParserContext, name: string, bounds: BlockBoun
 
   return {
     kind: 'model',
+    name,
+    fields,
+    attributes,
+    span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
+  };
+}
+
+function parseCompositeTypeBlock(
+  context: ParserContext,
+  name: string,
+  bounds: BlockBounds,
+): PslCompositeType {
+  const fields: PslField[] = [];
+  const attributes: PslAttribute[] = [];
+
+  for (let lineIndex = bounds.startLine + 1; lineIndex < bounds.endLine; lineIndex += 1) {
+    const raw = context.lines[lineIndex] ?? '';
+    const line = stripInlineComment(raw).trim();
+    if (line.length === 0) {
+      continue;
+    }
+
+    if (line.startsWith('@@')) {
+      const attribute = parseModelAttribute(context, line, lineIndex);
+      if (attribute) {
+        attributes.push(attribute);
+      }
+      continue;
+    }
+
+    const field = parseField(context, line, lineIndex);
+    if (field) {
+      fields.push(field);
+    }
+  }
+
+  return {
+    kind: 'compositeType',
     name,
     fields,
     attributes,

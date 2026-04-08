@@ -13,8 +13,8 @@
  * Operation type signature for type-level tests.
  */
 export type OperationTypeSignature = {
-  readonly args: ReadonlyArray<{ readonly kind: string; readonly type?: string }>;
-  readonly returns: { readonly kind: string; readonly type: string };
+  readonly args: ReadonlyArray<{ readonly codecId: string; readonly nullable: boolean }>;
+  readonly returns: { readonly codecId: string; readonly nullable: boolean };
   readonly lowering: {
     readonly targetFamily: string;
     readonly strategy: string;
@@ -29,8 +29,8 @@ export type OperationTypeSignature = {
 export type PgVectorOperations = {
   readonly 'pg/vector@1': {
     readonly cosineDistance: {
-      readonly args: ReadonlyArray<{ readonly kind: 'typeId'; readonly type: 'pg/vector@1' }>;
-      readonly returns: { readonly kind: 'builtin'; readonly type: 'number' };
+      readonly args: ReadonlyArray<{ readonly codecId: 'pg/vector@1'; readonly nullable: false }>;
+      readonly returns: { readonly codecId: 'core/float8'; readonly nullable: false };
       readonly lowering: {
         readonly targetFamily: 'sql';
         readonly strategy: 'function';
@@ -38,8 +38,8 @@ export type PgVectorOperations = {
       };
     };
     readonly cosineSimilarity: {
-      readonly args: ReadonlyArray<{ readonly kind: 'typeId'; readonly type: 'pg/vector@1' }>;
-      readonly returns: { readonly kind: 'builtin'; readonly type: 'number' };
+      readonly args: ReadonlyArray<{ readonly codecId: 'pg/vector@1'; readonly nullable: false }>;
+      readonly returns: { readonly codecId: 'core/float8'; readonly nullable: false };
       readonly lowering: {
         readonly targetFamily: 'sql';
         readonly strategy: 'function';
@@ -47,8 +47,8 @@ export type PgVectorOperations = {
       };
     };
     readonly l2Distance: {
-      readonly args: ReadonlyArray<{ readonly kind: 'typeId'; readonly type: 'pg/vector@1' }>;
-      readonly returns: { readonly kind: 'builtin'; readonly type: 'number' };
+      readonly args: ReadonlyArray<{ readonly codecId: 'pg/vector@1'; readonly nullable: false }>;
+      readonly returns: { readonly codecId: 'core/float8'; readonly nullable: false };
       readonly lowering: {
         readonly targetFamily: 'sql';
         readonly strategy: 'function';
@@ -66,7 +66,7 @@ export type PgTextOperations = {
   readonly 'pg/text@1': {
     readonly length: {
       readonly args: ReadonlyArray<never>;
-      readonly returns: { readonly kind: 'builtin'; readonly type: 'number' };
+      readonly returns: { readonly codecId: 'core/float8'; readonly nullable: false };
       readonly lowering: {
         readonly targetFamily: 'sql';
         readonly strategy: 'function';

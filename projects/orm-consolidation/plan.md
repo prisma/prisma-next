@@ -111,6 +111,10 @@ End-to-end polymorphism in both SQL and Mongo ORM clients. This is the critical 
 
 **Spec:** [specs/embedded-documents-and-value-objects.spec.md](specs/embedded-documents-and-value-objects.spec.md)
 
+**Design:** [plans/value-objects-design.md](plans/value-objects-design.md)
+
+**Execution plan:** [plans/phase-1.75c-value-objects-plan.md](plans/phase-1.75c-value-objects-plan.md)
+
 End-to-end value objects and embedded documents. Value objects and embedded documents share the same ORM infrastructure (inlined in results, nested input types, dot-path filtering) and are best implemented together.
 
 **Scope:**
@@ -150,7 +154,7 @@ Extract `Collection<C, M>` base class, `CollectionState`, `InferModelRow`, and i
 - **Phase 1.6 depends on Phase 1.5** — codec interface changes touch the same contract loading and emission code; Phase 1.5 should land first to avoid conflicts.
 - **Phase 1.75a (typed JSON simplification)** — independent; no blockers beyond Phase 1.5 landing first.
 - **Phase 1.75b (polymorphism) depends on Phase 1.6** — discriminator values are encoded/decoded through the discriminator field's codec. Also depends on Phase 1.5 for write operations (variant-aware creates/updates). Requires coordination with Alexey for SQL STI.
-- **Phase 1.75c (value objects) depends on Phase 1.75a** — value object type rendering in the emitter uses the codec-dispatch infrastructure from the typed JSON simplification. Also depends on Phase 1.5 for nested create/update.
+- **Phase 1.75c (value objects) is independent of Phase 1.75a** — value object types in `contract.d.ts` are derived from contract field descriptors (recursive structural expansion), not from codec-dispatched `renderType`. Phase 1.5 (write operations) has landed.
 - **Phase 1.75a and 1.75b are independent** — they can run in parallel.
 - **Phase 2 depends on all three Phase 1.75 workstreams** — can't extract a meaningful shared interface until both implementations cover reads, writes, polymorphism, and embedded documents. Extracting without these features would miss the divergence points between families.
 - **Phase 2 requires coordination with Alexey** — extraction changes the SQL Collection's inheritance hierarchy.

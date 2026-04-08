@@ -54,11 +54,11 @@ describe('interpretPslDocumentToMongoContract', () => {
 
       expect(ir.models['Item']).toMatchObject({
         fields: {
-          _id: { codecId: 'mongo/objectId@1', nullable: false },
-          name: { codecId: 'mongo/string@1', nullable: false },
-          count: { codecId: 'mongo/int32@1', nullable: false },
-          active: { codecId: 'mongo/bool@1', nullable: false },
-          at: { codecId: 'mongo/date@1', nullable: false },
+          _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+          name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+          count: { type: { kind: 'scalar', codecId: 'mongo/int32@1' }, nullable: false },
+          active: { type: { kind: 'scalar', codecId: 'mongo/bool@1' }, nullable: false },
+          at: { type: { kind: 'scalar', codecId: 'mongo/date@1' }, nullable: false },
         },
       });
     });
@@ -112,30 +112,29 @@ describe('interpretPslDocumentToMongoContract', () => {
 
       expect(ir.models['Item']).toMatchObject({
         fields: {
-          _id: { codecId: 'custom/oid@2' },
-          name: { codecId: 'custom/text@2' },
+          _id: { type: { kind: 'scalar', codecId: 'custom/oid@2' }, nullable: false },
+          name: { type: { kind: 'scalar', codecId: 'custom/text@2' }, nullable: false },
         },
       });
     });
 
-    it('produces a diagnostic for scalar list fields', () => {
-      const result = interpret(`
+    it('emits many: true for scalar list fields', () => {
+      const ir = interpretOk(`
         model Item {
           id   ObjectId @id @map("_id")
           tags String[]
         }
       `);
 
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.failure.diagnostics).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            code: 'PSL_UNSUPPORTED_LIST_FIELD',
-            message: expect.stringContaining('tags'),
-          }),
-        ]),
-      );
+      expect(ir.models['Item']).toMatchObject({
+        fields: {
+          tags: {
+            type: { kind: 'scalar', codecId: 'mongo/string@1' },
+            nullable: false,
+            many: true,
+          },
+        },
+      });
     });
 
     it('produces a diagnostic for unsupported field types', () => {
@@ -546,6 +545,131 @@ describe('interpretPslDocumentToMongoContract', () => {
     });
   });
 
+  describe('value objects', () => {
+    it('emits composite types as valueObjects', () => {
+      const ir = interpretOk(`
+        type Address {
+          street String
+          city   String
+          zip    String
+        }
+
+        model User {
+          id   ObjectId @id @map("_id")
+          name String
+        }
+      `);
+
+      expect(ir.valueObjects).toEqual({
+        Address: {
+          fields: {
+            street: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+            city: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+            zip: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+          },
+        },
+      });
+    });
+
+    it('emits valueObject type for model fields referencing composite types', () => {
+      const ir = interpretOk(`
+        type Address {
+          street String
+          city   String
+        }
+
+        model User {
+          id          ObjectId @id @map("_id")
+          homeAddress Address?
+        }
+      `);
+
+      expect(ir.models['User']).toMatchObject({
+        fields: {
+          homeAddress: { type: { kind: 'valueObject', name: 'Address' }, nullable: true },
+        },
+      });
+    });
+
+    it('emits many: true for value object array fields', () => {
+      const ir = interpretOk(`
+        type Address {
+          street String
+          city   String
+        }
+
+        model User {
+          id        ObjectId  @id @map("_id")
+          addresses Address[]
+        }
+      `);
+
+      expect(ir.models['User']).toMatchObject({
+        fields: {
+          addresses: {
+            type: { kind: 'valueObject', name: 'Address' },
+            nullable: false,
+            many: true,
+          },
+        },
+      });
+    });
+
+    it('handles nested composite type references within composite types', () => {
+      const ir = interpretOk(
+        `
+        type GeoPoint {
+          lat Float
+          lng Float
+        }
+
+        type Address {
+          street   String
+          city     String
+          location GeoPoint
+        }
+
+        model User {
+          id      ObjectId @id @map("_id")
+          address Address?
+        }
+      `,
+        {
+          scalarTypeDescriptors: new Map([
+            ...createMongoScalarTypeDescriptors(),
+            ['Float', 'mongo/double@1'],
+          ]),
+        },
+      );
+
+      expect(ir.valueObjects).toEqual({
+        GeoPoint: {
+          fields: {
+            lat: { type: { kind: 'scalar', codecId: 'mongo/double@1' }, nullable: false },
+            lng: { type: { kind: 'scalar', codecId: 'mongo/double@1' }, nullable: false },
+          },
+        },
+        Address: {
+          fields: {
+            street: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+            city: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+            location: { type: { kind: 'valueObject', name: 'GeoPoint' }, nullable: false },
+          },
+        },
+      });
+    });
+
+    it('omits valueObjects from contract when no composite types exist', () => {
+      const ir = interpretOk(`
+        model Item {
+          id ObjectId @id @map("_id")
+        }
+      `);
+
+      expect(ir).not.toHaveProperty('valueObjects');
+    });
+  });
+
   describe('full blog schema', () => {
     it('produces the expected contract matching the demo contract', () => {
       const ir = interpretOk(`
@@ -580,10 +704,10 @@ describe('interpretPslDocumentToMongoContract', () => {
         models: {
           User: {
             fields: {
-              _id: { codecId: 'mongo/objectId@1', nullable: false },
-              name: { codecId: 'mongo/string@1', nullable: false },
-              email: { codecId: 'mongo/string@1', nullable: false },
-              bio: { codecId: 'mongo/string@1', nullable: true },
+              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+              email: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+              bio: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: true },
             },
             relations: {
               posts: {
@@ -596,11 +720,11 @@ describe('interpretPslDocumentToMongoContract', () => {
           },
           Post: {
             fields: {
-              _id: { codecId: 'mongo/objectId@1', nullable: false },
-              title: { codecId: 'mongo/string@1', nullable: false },
-              content: { codecId: 'mongo/string@1', nullable: false },
-              authorId: { codecId: 'mongo/objectId@1', nullable: false },
-              createdAt: { codecId: 'mongo/date@1', nullable: false },
+              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              title: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+              content: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+              authorId: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              createdAt: { type: { kind: 'scalar', codecId: 'mongo/date@1' }, nullable: false },
             },
             relations: {
               author: {

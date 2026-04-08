@@ -33,9 +33,18 @@ type ContractBase = ContractType<
   {
     readonly Address: {
       readonly fields: {
-        readonly street: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly city: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly zip: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly street: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly city: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly zip: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
       };
       readonly relations: Record<string, never>;
       readonly storage: Record<string, never>;
@@ -43,7 +52,10 @@ type ContractBase = ContractType<
     };
     readonly Bug: {
       readonly fields: {
-        readonly severity: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly severity: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'tasks' };
@@ -51,9 +63,18 @@ type ContractBase = ContractType<
     };
     readonly Comment: {
       readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly text: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
+        readonly _id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+        };
+        readonly text: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly createdAt: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/date@1' };
+        };
       };
       readonly relations: Record<string, never>;
       readonly storage: Record<string, never>;
@@ -61,8 +82,14 @@ type ContractBase = ContractType<
     };
     readonly Feature: {
       readonly fields: {
-        readonly priority: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly targetRelease: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly priority: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly targetRelease: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'tasks' };
@@ -70,10 +97,22 @@ type ContractBase = ContractType<
     };
     readonly Task: {
       readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly title: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly type: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly assigneeId: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
+        readonly _id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+        };
+        readonly title: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly type: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly assigneeId: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+        };
       };
       readonly relations: {
         readonly assignee: {
@@ -98,9 +137,18 @@ type ContractBase = ContractType<
     };
     readonly User: {
       readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly name: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly email: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly _id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+        };
+        readonly name: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly email: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
       };
       readonly relations: {
         readonly addresses: { readonly to: 'Address'; readonly cardinality: '1:N' };
@@ -117,6 +165,8 @@ type ContractBase = ContractType<
   readonly roots: { readonly tasks: 'Task'; readonly users: 'User' };
   readonly capabilities: {};
   readonly extensionPacks: {};
+  readonly meta: {};
+
   readonly profileHash: ProfileHash;
 };
 

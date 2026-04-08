@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ContractValidationError } from '../src/validate-contract';
+import type { DomainContractShape } from '../src/validate-domain';
 import { validateContractDomain } from '../src/validate-domain';
 
 function makeMinimalModel(overrides: Record<string, unknown> = {}) {
@@ -15,7 +16,7 @@ function makeValidContract(overrides: Record<string, unknown> = {}) {
     roots: { items: 'Item' },
     models: {
       Item: makeMinimalModel({
-        fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+        fields: { _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } } },
       }),
     },
     ...overrides,
@@ -56,7 +57,9 @@ describe('validateContractDomain()', () => {
         roots: { items: 'Item' },
         models: {
           Item: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             discriminator: { field: 'type' },
             variants: { SpecialItem: { value: 'special' } },
           }),
@@ -70,7 +73,9 @@ describe('validateContractDomain()', () => {
       const contract = makeValidContract({
         models: {
           Item: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             discriminator: { field: 'type' },
             variants: { Ghost: { value: 'ghost' } },
           }),
@@ -84,7 +89,9 @@ describe('validateContractDomain()', () => {
         roots: { items: 'Item' },
         models: {
           Item: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             discriminator: { field: 'type' },
             variants: { Child: { value: 'child' } },
           }),
@@ -101,12 +108,16 @@ describe('validateContractDomain()', () => {
         roots: { items: 'Item' },
         models: {
           Item: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             discriminator: { field: 'type' },
             variants: { Child: { value: 'child' } },
           }),
           Other: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             discriminator: { field: 'type' },
             variants: {},
           }),
@@ -123,7 +134,9 @@ describe('validateContractDomain()', () => {
         roots: { items: 'Item' },
         models: {
           Item: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             discriminator: { field: 'type' },
             variants: {},
           }),
@@ -200,7 +213,9 @@ describe('validateContractDomain()', () => {
       const contract = makeValidContract({
         models: {
           Item: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             discriminator: { field: 'type' },
           }),
         },
@@ -214,7 +229,9 @@ describe('validateContractDomain()', () => {
       const contract = makeValidContract({
         models: {
           Item: makeMinimalModel({
-            fields: { _id: { codecId: 'mongo/objectId@1', nullable: false } },
+            fields: {
+              _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+            },
             discriminator: { field: 'kind' },
             variants: { Special: { value: 'special' } },
           }),
@@ -231,7 +248,9 @@ describe('validateContractDomain()', () => {
         roots: { items: 'Item' },
         models: {
           Item: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             discriminator: { field: 'type' },
             variants: { Child: { value: 'child' } },
           }),
@@ -250,7 +269,9 @@ describe('validateContractDomain()', () => {
       const contract = makeValidContract({
         models: {
           Item: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             variants: { Special: { value: 'special' } },
           }),
           Special: makeMinimalModel({ base: 'Item' }),
@@ -266,7 +287,9 @@ describe('validateContractDomain()', () => {
         roots: { items: 'Item' },
         models: {
           Item: makeMinimalModel({
-            fields: { type: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             discriminator: { field: 'type' },
             variants: { Child: { value: 'child' } },
           }),
@@ -348,10 +371,13 @@ describe('validateContractDomain()', () => {
         models: {
           Task: makeMinimalModel({
             fields: {
-              _id: { codecId: 'mongo/objectId@1', nullable: false },
-              title: { codecId: 'mongo/string@1', nullable: false },
-              type: { codecId: 'mongo/string@1', nullable: false },
-              assigneeId: { codecId: 'mongo/objectId@1', nullable: false },
+              _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+              title: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+              type: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+              assigneeId: {
+                nullable: false,
+                type: { kind: 'scalar', codecId: 'mongo/objectId@1' },
+              },
             },
             relations: {
               assignee: {
@@ -371,21 +397,26 @@ describe('validateContractDomain()', () => {
             },
           }),
           Bug: makeMinimalModel({
-            fields: { severity: { codecId: 'mongo/string@1', nullable: false } },
+            fields: {
+              severity: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
             base: 'Task',
           }),
           Feature: makeMinimalModel({
             fields: {
-              priority: { codecId: 'mongo/string@1', nullable: false },
-              targetRelease: { codecId: 'mongo/string@1', nullable: false },
+              priority: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+              targetRelease: {
+                nullable: false,
+                type: { kind: 'scalar', codecId: 'mongo/string@1' },
+              },
             },
             base: 'Task',
           }),
           User: makeMinimalModel({
             fields: {
-              _id: { codecId: 'mongo/objectId@1', nullable: false },
-              name: { codecId: 'mongo/string@1', nullable: false },
-              email: { codecId: 'mongo/string@1', nullable: false },
+              _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+              name: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+              email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
             },
             relations: {
               addresses: {
@@ -396,23 +427,170 @@ describe('validateContractDomain()', () => {
           }),
           Address: makeMinimalModel({
             fields: {
-              street: { codecId: 'mongo/string@1', nullable: false },
-              city: { codecId: 'mongo/string@1', nullable: false },
-              zip: { codecId: 'mongo/string@1', nullable: false },
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+              city: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+              zip: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
             },
             owner: 'User',
           }),
           Comment: makeMinimalModel({
             fields: {
-              _id: { codecId: 'mongo/objectId@1', nullable: false },
-              text: { codecId: 'mongo/string@1', nullable: false },
-              createdAt: { codecId: 'mongo/date@1', nullable: false },
+              _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+              text: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+              createdAt: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/date@1' } },
             },
             owner: 'Task',
           }),
         },
       };
       expect(() => validateContractDomain(contract)).not.toThrow();
+    });
+  });
+
+  describe('value object reference validation', () => {
+    it('accepts valid value object references from model fields', () => {
+      const contract: DomainContractShape = {
+        roots: { users: 'User' },
+        models: {
+          User: makeMinimalModel({
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              homeAddress: { nullable: false, type: { kind: 'valueObject', name: 'Address' } },
+            },
+          }),
+        },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+              city: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            },
+          },
+        },
+      };
+      expect(() => validateContractDomain(contract)).not.toThrow();
+    });
+
+    it('rejects nonexistent value object reference from model field', () => {
+      const contract: DomainContractShape = {
+        roots: { users: 'User' },
+        models: {
+          User: makeMinimalModel({
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              addr: { nullable: false, type: { kind: 'valueObject', name: 'Missing' } },
+            },
+          }),
+        },
+      };
+      expect(() => validateContractDomain(contract)).toThrow(/Missing.*does not exist/);
+    });
+
+    it('accepts self-referencing value object', () => {
+      const contract: DomainContractShape = {
+        roots: {},
+        models: {},
+        valueObjects: {
+          TreeNode: {
+            fields: {
+              label: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+              child: { nullable: true, type: { kind: 'valueObject', name: 'TreeNode' } },
+            },
+          },
+        },
+      };
+      expect(() => validateContractDomain(contract)).not.toThrow();
+    });
+
+    it('rejects nonexistent value object reference from another value object', () => {
+      const contract: DomainContractShape = {
+        roots: {},
+        models: {},
+        valueObjects: {
+          Wrapper: {
+            fields: {
+              inner: { nullable: false, type: { kind: 'valueObject', name: 'Nonexistent' } },
+            },
+          },
+        },
+      };
+      expect(() => validateContractDomain(contract)).toThrow(/Nonexistent.*does not exist/);
+    });
+
+    it('rejects nonexistent value object reference inside union members', () => {
+      const contract: DomainContractShape = {
+        roots: { users: 'User' },
+        models: {
+          User: makeMinimalModel({
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              data: {
+                nullable: false,
+                type: {
+                  kind: 'union',
+                  members: [
+                    { kind: 'scalar', codecId: 'pg/text@1' },
+                    { kind: 'valueObject', name: 'Ghost' },
+                  ],
+                },
+              },
+            },
+          }),
+        },
+      };
+      expect(() => validateContractDomain(contract)).toThrow(/Ghost.*does not exist/);
+    });
+
+    it('accepts valid value object reference inside union members', () => {
+      const contract: DomainContractShape = {
+        roots: { users: 'User' },
+        models: {
+          User: makeMinimalModel({
+            fields: {
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              data: {
+                nullable: false,
+                type: {
+                  kind: 'union',
+                  members: [
+                    { kind: 'scalar', codecId: 'pg/text@1' },
+                    { kind: 'valueObject', name: 'Address' },
+                  ],
+                },
+              },
+            },
+          }),
+        },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            },
+          },
+        },
+      };
+      expect(() => validateContractDomain(contract)).not.toThrow();
+    });
+  });
+
+  describe('field modifier validation', () => {
+    it('rejects many + dict on the same field', () => {
+      const contract: DomainContractShape = {
+        roots: {},
+        models: {
+          User: makeMinimalModel({
+            fields: {
+              tags: {
+                nullable: false,
+                type: { kind: 'scalar', codecId: 'pg/text@1' },
+                many: true,
+                dict: true,
+              },
+            },
+          }),
+        },
+      };
+      expect(() => validateContractDomain(contract)).toThrow(/many.*dict|dict.*many/i);
     });
   });
 });

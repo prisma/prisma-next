@@ -5,7 +5,6 @@ import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm } from '@prisma-next/sql-orm-client';
-import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
@@ -26,8 +25,6 @@ export const context = createExecutionContext({
   stack,
 });
 
-export const schema = schemaBuilder(context);
-export const tables = schema.tables;
 export const sql = sqlBuilder<typeof contract>({ context });
 
 export function createOrmClient(runtime: Runtime) {

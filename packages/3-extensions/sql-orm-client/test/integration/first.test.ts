@@ -25,6 +25,7 @@ describe('integration/first', () => {
           name: 'Alice',
           email: 'alice2@example.com',
           invitedById: null,
+          address: null,
         });
         expect(missing).toBeNull();
       });
@@ -54,6 +55,7 @@ describe('integration/first', () => {
           name: 'Bob',
           email: 'bob-2@example.com',
           invitedById: null,
+          address: null,
         });
       });
     },

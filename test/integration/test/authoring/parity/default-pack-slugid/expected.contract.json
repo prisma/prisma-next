@@ -10,7 +10,10 @@
     "User": {
       "fields": {
         "id": {
-          "codecId": "pg/text@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/text@1"
+          },
           "nullable": false
         }
       },

@@ -1,7 +1,26 @@
-export type ContractField = {
-  readonly nullable: boolean;
+export type ScalarFieldType = {
+  readonly kind: 'scalar';
   readonly codecId: string;
   readonly typeParams?: Record<string, unknown>;
+};
+
+export type ValueObjectFieldType = {
+  readonly kind: 'valueObject';
+  readonly name: string;
+};
+
+export type UnionFieldType = {
+  readonly kind: 'union';
+  readonly members: ReadonlyArray<ScalarFieldType | ValueObjectFieldType>;
+};
+
+export type ContractFieldType = ScalarFieldType | ValueObjectFieldType | UnionFieldType;
+
+export type ContractField = {
+  readonly nullable: boolean;
+  readonly type: ContractFieldType;
+  readonly many?: true;
+  readonly dict?: true;
 };
 
 export type ContractRelationOn = {
@@ -28,6 +47,10 @@ export type ContractDiscriminator = {
 
 export type ContractVariantEntry = {
   readonly value: string;
+};
+
+export type ContractValueObject = {
+  readonly fields: Record<string, ContractField>;
 };
 
 export type ModelStorageBase = Readonly<Record<string, unknown>>;

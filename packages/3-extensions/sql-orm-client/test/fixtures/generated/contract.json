@@ -15,16 +15,25 @@
     "Article": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "reviewerId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "title": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -59,16 +68,25 @@
     "Comment": {
       "fields": {
         "body": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "postId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -90,20 +108,32 @@
     "Post": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "title": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "userId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "views": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -153,16 +183,25 @@
     "Profile": {
       "fields": {
         "bio": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "userId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -197,12 +236,18 @@
     "Tag": {
       "fields": {
         "id": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "name": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -220,21 +265,40 @@
     },
     "User": {
       "fields": {
+        "address": {
+          "nullable": true,
+          "type": {
+            "kind": "valueObject",
+            "name": "Address"
+          }
+        },
         "email": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "invitedById": {
-          "codecId": "pg/int4@1",
-          "nullable": true
+          "nullable": true,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "name": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -289,6 +353,9 @@
       },
       "storage": {
         "fields": {
+          "address": {
+            "column": "address"
+          },
           "email": {
             "column": "email"
           },
@@ -306,8 +373,35 @@
       }
     }
   },
+  "valueObjects": {
+    "Address": {
+      "fields": {
+        "city": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "street": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "zip": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      }
+    }
+  },
   "storage": {
-    "storageHash": "sha256:ab144af6db136b402ded009abf090ad827eb2e6c7201889b69fd1df30badaa8b",
+    "storageHash": "sha256:02cdff7f8d501bb78f0687a20ede35d9a7397239ea1bb503f1f58d035ad3cb72",
     "tables": {
       "articles": {
         "columns": {
@@ -494,6 +588,11 @@
       },
       "users": {
         "columns": {
+          "address": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": true
+          },
           "email": {
             "codecId": "pg/text@1",
             "nativeType": "text",

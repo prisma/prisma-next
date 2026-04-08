@@ -21,8 +21,8 @@ const baseContract = {
         },
       },
       fields: {
-        id: {},
-        email: {},
+        id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+        email: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
       },
       relations: {},
     },

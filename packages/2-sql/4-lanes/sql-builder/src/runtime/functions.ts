@@ -1,3 +1,4 @@
+import type { SqlOperationEntry } from '@prisma-next/sql-operations';
 import {
   AggregateExpr,
   AndExpr,
@@ -13,7 +14,6 @@ import {
   ParamRef,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import type { QueryOperationEntry } from '@prisma-next/sql-relational-core/query-operations';
 import type {
   AggregateFunctions,
   AggregateOnlyFunctions,
@@ -129,7 +129,7 @@ function createAggregateOnlyFunctions() {
 
 function createExtensionFunction(
   name: string,
-  entry: QueryOperationEntry,
+  entry: SqlOperationEntry,
 ): (...args: ExprOrVal[]) => ExpressionImpl {
   return (...args: ExprOrVal[]) => {
     const resolvedArgs = args.map((arg, i) => {
@@ -143,10 +143,9 @@ function createExtensionFunction(
     return new ExpressionImpl(
       new OperationExpr({
         method: name,
-        forTypeId: entry.args[0]?.codecId ?? 'unknown',
         self,
         args: restArgs.length > 0 ? restArgs : undefined,
-        returns: { kind: 'typeId', type: entry.returns.codecId },
+        returns: entry.returns,
         lowering: entry.lowering,
       }),
       entry.returns,
@@ -155,7 +154,7 @@ function createExtensionFunction(
 }
 
 export function createFunctions<QC extends QueryContext>(
-  queryOperationTypes: Readonly<Record<string, QueryOperationEntry>>,
+  queryOperationTypes: Readonly<Record<string, SqlOperationEntry>>,
 ): Functions<QC> {
   const builtins = createBuiltinFunctions();
 
@@ -174,7 +173,7 @@ export function createFunctions<QC extends QueryContext>(
 }
 
 export function createAggregateFunctions<QC extends QueryContext>(
-  queryOperationTypes: Readonly<Record<string, QueryOperationEntry>>,
+  queryOperationTypes: Readonly<Record<string, SqlOperationEntry>>,
 ): AggregateFunctions<QC> {
   const baseFns = createFunctions<QC>(queryOperationTypes);
   const aggregates = createAggregateOnlyFunctions();

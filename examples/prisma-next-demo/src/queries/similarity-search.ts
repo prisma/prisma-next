@@ -7,8 +7,8 @@ import { db } from '../prisma/db';
 export async function similaritySearch(queryVector: number[], limit = 10) {
   const plan = db.sql.post
     .select('id', 'title')
-    .select('distance', (f, fns) => fns['cosineDistance'](f.embedding, queryVector))
-    .orderBy((f, fns) => fns['cosineDistance'](f.embedding, queryVector), { direction: 'asc' })
+    .select('distance', (f, fns) => fns.cosineDistance(f.embedding, queryVector))
+    .orderBy((f, fns) => fns.cosineDistance(f.embedding, queryVector), { direction: 'asc' })
     .limit(limit)
     .build();
   return db.runtime().execute(plan);

@@ -14,12 +14,21 @@
     "Article": {
       "fields": {
         "id": {
-          "codecId": "sql/char@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
         },
         "title": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -38,16 +47,25 @@
     "Comment": {
       "fields": {
         "body": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "postId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -69,20 +87,32 @@
     "Post": {
       "fields": {
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "title": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "userId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "views": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -132,16 +162,25 @@
     "Profile": {
       "fields": {
         "bio": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "userId": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -163,20 +202,32 @@
     "User": {
       "fields": {
         "email": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "invitedById": {
-          "codecId": "pg/int4@1",
-          "nullable": true
+          "nullable": true,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "name": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {

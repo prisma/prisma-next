@@ -7,7 +7,7 @@ describe('unified contract types', () => {
   describe('ContractModel', () => {
     it('preserves polymorphism fields (discriminator, variants, base, owner)', () => {
       const model: ContractModel = {
-        fields: { type: { nullable: false, codecId: 'pg/text@1' } },
+        fields: { type: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
         relations: {},
         storage: {},
         discriminator: { field: 'type' },
@@ -37,7 +37,7 @@ describe('unified contract types', () => {
         roots: { users: 'User' },
         models: {
           User: {
-            fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+            fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
             relations: {},
             storage: {},
           },
@@ -94,8 +94,8 @@ describe('unified contract types', () => {
         models: {
           User: {
             fields: {
-              id: { nullable: false, codecId: 'pg/int4@1' },
-              email: { nullable: false, codecId: 'pg/text@1' },
+              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+              email: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
             },
             relations: {},
             storage: {},

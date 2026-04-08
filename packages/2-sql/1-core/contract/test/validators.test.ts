@@ -123,7 +123,9 @@ describe('SQL contract validators', () => {
     it('validates model without relations', () => {
       const modelWithoutRelations = {
         storage: { table: 'user', fields: { id: { column: 'id' } } },
-        fields: { id: {} },
+        fields: {
+          id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+        },
       };
       expect(() => validateModel(modelWithoutRelations)).not.toThrow();
     });

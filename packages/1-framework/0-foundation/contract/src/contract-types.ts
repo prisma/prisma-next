@@ -1,4 +1,4 @@
-import type { ContractModel, ContractModelBase } from './domain-types';
+import type { ContractModelBase, ContractValueObject } from './domain-types';
 import type {
   ExecutionHashBase,
   ExecutionMutationDefault,
@@ -45,6 +45,7 @@ export interface Contract<
   readonly targetFamily: string;
   readonly roots: Record<string, string>;
   readonly models: TModels;
+  readonly valueObjects?: Record<string, ContractValueObject>;
   readonly storage: TStorage;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;

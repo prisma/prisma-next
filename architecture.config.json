@@ -265,7 +265,13 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/2-mongo-family/5-query-builders/**",
+      "glob": "packages/2-mongo-family/5-query-builders/orm/**",
+      "domain": "mongo",
+      "layer": "query-builders",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/2-mongo-family/5-query-builders/pipeline-builder/**",
       "domain": "mongo",
       "layer": "query-builders",
       "plane": "runtime"

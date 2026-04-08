@@ -1,4 +1,4 @@
-import type { Contract, ContractModel } from '@prisma-next/contract/types';
+import type { Contract, ContractModel, ContractValueObject } from '@prisma-next/contract/types';
 import type {
   EmissionSpi,
   GenerateContractTypesOptions,
@@ -11,6 +11,8 @@ import {
   generateImportLines,
   generateModelsType,
   generateRootsType,
+  generateValueObjectsDescriptorType,
+  generateValueObjectTypeAliases,
   serializeExecutionType,
   serializeValue,
 } from './domain-type-generation';
@@ -60,6 +62,10 @@ export function generateContractDts(
 
   const rootsType = generateRootsType(contract.roots);
 
+  const valueObjects = contract.valueObjects as Record<string, ContractValueObject> | undefined;
+  const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects);
+  const valueObjectsDescriptor = generateValueObjectsDescriptorType(valueObjects);
+
   const executionClause =
     contract.execution !== undefined
       ? `\n  readonly execution: ${serializeExecutionType(contract.execution)};`
@@ -85,6 +91,7 @@ ${hashAliases}
 export type CodecTypes = ${codecTypes};
 export type OperationTypes = ${operationTypes};
 ${familyTypeAliases}
+${valueObjectTypeAliases}
 export type TypeMaps = ${typeMapsExpr};
 
 type ContractBase = ContractType<
@@ -96,6 +103,8 @@ ${modelsType}
   readonly roots: ${rootsType};
   readonly capabilities: ${serializeValue(contract.capabilities)};
   readonly extensionPacks: ${serializeValue(contract.extensionPacks)};${executionClause}
+  readonly meta: ${serializeValue(contract.meta)};
+  ${valueObjects ? `readonly valueObjects: ${valueObjectsDescriptor};` : ''}
   readonly profileHash: ProfileHash;
 };
 

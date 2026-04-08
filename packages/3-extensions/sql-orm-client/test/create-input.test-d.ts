@@ -49,11 +49,11 @@ type CreateInputContract = Contract<
         };
       };
       fields: {
-        id: { codecId: 'pg/int4@1'; nullable: false };
-        email: { codecId: 'pg/text@1'; nullable: false };
-        name: { codecId: 'pg/text@1'; nullable: true };
-        slug: { codecId: 'pg/text@1'; nullable: false };
-        createdAt: { codecId: 'pg/text@1'; nullable: false };
+        id: { type: { kind: 'scalar'; codecId: 'pg/int4@1' }; nullable: false };
+        email: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: false };
+        name: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: true };
+        slug: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: false };
+        createdAt: { type: { kind: 'scalar'; codecId: 'pg/text@1' }; nullable: false };
       };
       relations: Record<string, never>;
     };

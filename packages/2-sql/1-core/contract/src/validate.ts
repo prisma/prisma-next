@@ -1,6 +1,7 @@
 import type {
   ColumnDefaultLiteralInputValue,
   Contract,
+  ContractField,
   ContractModel,
   JsonValue,
 } from '@prisma-next/contract/types';
@@ -33,6 +34,22 @@ function validateModelStorageReferences(contract: SqlValidationContract): void {
       if (!columnNames.has(field.column)) {
         throw new ContractValidationError(
           `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${storageTable}"`,
+          'storage',
+        );
+      }
+    }
+
+    const JSON_NATIVE_TYPES = new Set(['json', 'jsonb']);
+    for (const [fieldName, domainField] of Object.entries(model.fields)) {
+      const f = domainField as ContractField;
+      if (f.type?.kind !== 'valueObject') continue;
+      const storageField = model.storage.fields[fieldName];
+      if (!storageField) continue;
+      const column = table.columns[storageField.column];
+      if (!column) continue;
+      if (!JSON_NATIVE_TYPES.has(column.nativeType)) {
+        throw new ContractValidationError(
+          `Model "${modelName}" field "${fieldName}" is a value object but storage column "${storageField.column}" has nativeType "${column.nativeType}" (expected json or jsonb)`,
           'storage',
         );
       }

@@ -12,7 +12,6 @@ import { sql } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgresPack from '@prisma-next/target-postgres/pack';
@@ -99,9 +98,6 @@ test('ResultType inference works identically to fixture contract', () => {
   );
   const adapter = createStubAdapter();
   const context = createTestContext(validatedBuilderContract, adapter);
-  const tables = schema(context).tables;
-  const userTable = tables['user'];
-  if (!userTable) throw new Error('user table not found');
 
   const db = sql({ context });
   const _plan = db.user.select('id', 'email', 'createdAt').build();
@@ -110,9 +106,6 @@ test('ResultType inference works identically to fixture contract', () => {
 
   const _fixtureContract = validateContract<Contract>(contractJson, emptyCodecLookup);
   const fixtureContext = createTestContext(_fixtureContract, adapter);
-  const fixtureTables = schema(fixtureContext).tables;
-  const fixtureUserTable = fixtureTables['user'];
-  if (!fixtureUserTable) throw new Error('fixture user table not found');
   const fixtureDb = sql({ context: fixtureContext });
   const _fixturePlan = fixtureDb.user.select('id', 'email', 'createdAt').build();
 
@@ -127,7 +120,7 @@ test('ResultType inference works identically to fixture contract', () => {
   expectTypeOf(_plan).toExtend<SqlQueryPlan<BuilderRow>>();
 });
 
-test('refined object contract preserves downstream schema and model token inference', () => {
+test('refined object contract preserves downstream model token inference', () => {
   const UserBase = model('User', {
     fields: {
       id: field.column(int4Column).id(),
@@ -167,11 +160,6 @@ test('refined object contract preserves downstream schema and model token infere
   });
 
   const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
-  const adapter = createStubAdapter();
-  const context = createTestContext(validated, adapter);
-  const tables = schema(context).tables;
-  const userTable = tables['user'];
-  if (!userTable) throw new Error('user table not found');
   type RefinedUserColumns = NonNullable<
     NonNullable<(typeof validated.storage.tables)['user']>['columns']
   >;
@@ -362,68 +350,6 @@ test('explicit generated id helpers stay typed', () => {
   );
 });
 
-test('composed field helpers preserve downstream schema inference', () => {
-  const contract = defineContract(
-    {
-      family: sqlFamilyPack,
-      target: postgresPack,
-      storageHash: 'sha256:test-refined-helpers',
-    },
-    ({ field, model }) => {
-      const UserBase = model('User', {
-        fields: {
-          id: field.id.uuidv7(),
-          email: field.text(),
-          createdAt: field.createdAt(),
-        },
-      });
-
-      const Post = model('Post', {
-        fields: {
-          id: field.id.uuidv7(),
-          authorId: field.uuid(),
-          title: field.text(),
-        },
-        relations: {
-          user: rel.belongsTo(UserBase, { from: 'authorId', to: 'id' }),
-        },
-      }).sql(({ cols, constraints }) => ({
-        table: 'post',
-        foreignKeys: [constraints.foreignKey(cols.authorId, UserBase.refs.id)],
-      }));
-
-      const User = UserBase.relations({
-        posts: rel.hasMany(() => Post, { by: 'authorId' }),
-      }).sql({
-        table: 'user',
-      });
-
-      return {
-        models: {
-          User,
-          Post,
-        },
-      };
-    },
-  );
-
-  const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
-  const adapter = createStubAdapter();
-  const context = createTestContext(validated, adapter);
-  const tables = schema(context).tables;
-  const userTable = tables['user'];
-  if (!userTable) throw new Error('user table not found');
-  type ComposedUserColumns = NonNullable<
-    NonNullable<(typeof validated.storage.tables)['user']>['columns']
-  >;
-  type ComposedPostColumns = NonNullable<
-    NonNullable<(typeof validated.storage.tables)['post']>['columns']
-  >;
-
-  expectTypeOf<ComposedUserColumns>().toExtend<Record<string, { readonly codecId: string }>>();
-  expectTypeOf<ComposedPostColumns>().toExtend<Record<string, { readonly codecId: string }>>();
-});
-
 test('codec type inference via type option', () => {
   const contract = defineContract({
     family: sqlFamilyPack,
@@ -440,11 +366,7 @@ test('codec type inference via type option', () => {
   });
 
   const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
-  const adapter = createStubAdapter();
-  const context = createTestContext(validated, adapter);
-  const tables = schema(context).tables;
-  const userTable = tables['user'];
-  if (!userTable) throw new Error('user table not found');
+  const context = createTestContext(validated, createStubAdapter());
 
   const db = sql({ context });
   const _plan = db.user.select('id', 'email', 'createdAt').build();
@@ -506,8 +428,6 @@ test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
 
   const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
   const context = createTestContext(validated, createStubAdapter());
-  const table = schema(context).tables['event'];
-  if (!table) throw new Error('event table not found');
 
   const db = sql({ context });
   const _plan = db.event.select('payload', 'meta').build();

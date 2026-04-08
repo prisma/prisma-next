@@ -29,6 +29,8 @@
  *                              groupBy().having().aggregate() example
  * - repo-upsert-user <id> <email> <kind>
  *                              upsert() example for id conflict
+ * - repo-create-user-address <id> <email> <kind>
+ *                              Create user with embedded Address value object
  * - users-paginate [cursor]    Cursor-based pagination
  * - similarity-search <vec>    Vector similarity search (pgvector)
  * - budget-violation           Demo budget enforcement error
@@ -40,6 +42,7 @@
  */
 import 'dotenv/config';
 import { loadAppConfig } from './app-config';
+import { ormClientCreateUserWithAddress } from './orm-client/create-user-with-address';
 import { ormClientFindUserByEmail } from './orm-client/find-user-by-email';
 import { ormClientGetAdminUsers } from './orm-client/get-admin-users';
 import { ormClientGetDashboardUsers } from './orm-client/get-dashboard-users';
@@ -183,6 +186,28 @@ async function main() {
       const user = await ormClientUpsertUser({ id, email, kind }, runtime);
 
       console.log(JSON.stringify(user, null, 2));
+    } else if (cmd === 'repo-create-user-address') {
+      const [id, email, kind] = args;
+      if (!id || !email || !kind) {
+        console.error('Usage: pnpm start -- repo-create-user-address <id> <email> <kind>');
+        process.exit(1);
+      }
+      if (kind !== 'admin' && kind !== 'user') {
+        console.error('repo-create-user-address kind must be "admin" or "user"');
+        process.exit(1);
+      }
+      const user = await ormClientCreateUserWithAddress(
+        {
+          id,
+          email,
+          kind,
+          createdAt: new Date(),
+          address: { street: '789 Elm Blvd', city: 'Austin', zip: '73301', country: 'US' },
+        },
+        runtime,
+      );
+
+      console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'users-paginate') {
       const [cursorStr, limitStr] = args;
       const cursor = cursorStr ?? null;
@@ -274,7 +299,8 @@ async function main() {
           'repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser] | ' +
           'repo-post-feed <postTitleTerm> [limit] | repo-users-cursor [cursor] [limit] | ' +
           'repo-latest-per-kind | repo-user-insights [limit] | repo-kind-breakdown [minUsers] | ' +
-          'repo-upsert-user <id> <email> <kind> | users-paginate [cursor] [limit] | ' +
+          'repo-upsert-user <id> <email> <kind> | repo-create-user-address <id> <email> <kind> | ' +
+          'users-paginate [cursor] [limit] | ' +
           'users-paginate-back <cursor> [limit] | similarity-search <vec> [limit] | ' +
           'budget-violation | guardrail-delete]',
       );

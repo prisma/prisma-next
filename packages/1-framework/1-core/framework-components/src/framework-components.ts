@@ -1,4 +1,3 @@
-import type { OperationSignature } from '@prisma-next/operations';
 import type { AuthoringContributions } from './framework-authoring';
 import type { TypeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types-import-spec';
@@ -96,16 +95,6 @@ export interface ComponentDescriptor<Kind extends string> extends ComponentMetad
 
   /** Unique identifier for this component (e.g., 'sql', 'postgres', 'pgvector') */
   readonly id: string;
-
-  /**
-   * Operation signatures contributed by this component.
-   * Used to build the framework-level operation registry during stack assembly.
-   *
-   * Lives on ComponentDescriptor (not ComponentMetadata) because it's an
-   * executable hook that only live descriptors should expose — PackRefBase
-   * extends ComponentMetadata and must remain JSON-serializable.
-   */
-  readonly operationSignatures?: () => ReadonlyArray<OperationSignature>;
 }
 
 export interface ContractComponentRequirementsCheckInput {

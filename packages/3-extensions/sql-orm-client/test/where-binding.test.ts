@@ -280,13 +280,16 @@ describe('bindWhereExpr', () => {
     });
 
     it('binds inner expressions of OperationExpr', () => {
-      const expr = OperationExpr.function({
+      const expr = new OperationExpr({
         method: 'contains',
-        forTypeId: 'pg/text@1',
         self: SubqueryExpr.of(subqueryWithLiteral()),
         args: [],
-        returns: { kind: 'builtin', type: 'boolean' },
-        template: 'position({1} in {0}) > 0',
+        returns: { codecId: 'core/bool', nullable: false },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: 'position({1} in {0}) > 0',
+        },
       });
       const bound = bindWhereExpr(contract, expr);
 

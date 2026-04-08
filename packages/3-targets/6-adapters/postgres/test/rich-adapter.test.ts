@@ -125,10 +125,9 @@ describe('Postgres rich AST lowering', () => {
   it('lowers typed operations and casts vector parameters', () => {
     const distance = new OperationExpr({
       method: 'cosineDistance',
-      forTypeId: 'pg/vector@1',
       self: ColumnRef.of('user', 'vector'),
       args: [ParamRef.of([1, 2, 3], { name: 'other', codecId: 'pg/vector@1' })],
-      returns: { kind: 'builtin', type: 'number' },
+      returns: { codecId: 'core/float8', nullable: false },
       lowering: {
         targetFamily: 'sql',
         strategy: 'infix',

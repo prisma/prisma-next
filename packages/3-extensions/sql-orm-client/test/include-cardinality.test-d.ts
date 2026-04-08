@@ -79,17 +79,21 @@ export type IncludeCardinalityTypeAssertions = [
   // 1:1 FK side with non-nullable FK → not nullable
   Assert<Equal<Extract<ProfilesWithUserRow['user'], null>, never>>,
   Assert<Equal<ProfilesWithUserRow['user'] extends readonly unknown[] ? true : false, false>>,
-  Assert<Equal<keyof ProfilesWithUserRow['user'], 'id' | 'name' | 'email' | 'invitedById'>>,
+  Assert<
+    Equal<keyof ProfilesWithUserRow['user'], 'id' | 'name' | 'email' | 'invitedById' | 'address'>
+  >,
   // N:1 with non-nullable FK → not nullable
   Assert<Equal<Extract<PostsWithAuthorRow['author'], null>, never>>,
   Assert<Equal<PostsWithAuthorRow['author'] extends readonly unknown[] ? true : false, false>>,
-  Assert<Equal<keyof PostsWithAuthorRow['author'], 'id' | 'name' | 'email' | 'invitedById'>>,
+  Assert<
+    Equal<keyof PostsWithAuthorRow['author'], 'id' | 'name' | 'email' | 'invitedById' | 'address'>
+  >,
   // N:1 with nullable FK → nullable
   Assert<Equal<Extract<UsersWithInvitedByRow['invitedBy'], null>, null>>,
   Assert<
     Equal<
       keyof NonNullable<UsersWithInvitedByRow['invitedBy']>,
-      'id' | 'name' | 'email' | 'invitedById'
+      'id' | 'name' | 'email' | 'invitedById' | 'address'
     >
   >,
   // N:1 with non-nullable column but no FK constraint → nullable
@@ -100,7 +104,7 @@ export type IncludeCardinalityTypeAssertions = [
   Assert<
     Equal<
       keyof NonNullable<ArticlesWithReviewerRow['reviewer']>,
-      'id' | 'name' | 'email' | 'invitedById'
+      'id' | 'name' | 'email' | 'invitedById' | 'address'
     >
   >,
 ];

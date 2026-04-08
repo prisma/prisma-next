@@ -15,7 +15,7 @@ import {
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { assembleOperationRegistry, getSqlDescriptorBundle } from '../utils/framework-components';
+import { getSqlDescriptorBundle } from '../utils/framework-components';
 
 const execFileAsync = promisify(execFile);
 
@@ -88,9 +88,12 @@ describe('contract.d.ts imports resolution', () => {
               },
             },
             fields: {
-              id: { codecId: 'pg/int4@1', nullable: false },
-              email: { codecId: 'pg/text@1', nullable: false },
-              createdAt: { codecId: 'pg/timestamptz@1', nullable: false },
+              id: { type: { kind: 'scalar' as const, codecId: 'pg/int4@1' }, nullable: false },
+              email: { type: { kind: 'scalar' as const, codecId: 'pg/text@1' }, nullable: false },
+              createdAt: {
+                type: { kind: 'scalar' as const, codecId: 'pg/timestamptz@1' },
+                nullable: false,
+              },
             },
             relations: {},
           },
@@ -104,9 +107,9 @@ describe('contract.d.ts imports resolution', () => {
               },
             },
             fields: {
-              id: { codecId: 'pg/int4@1', nullable: false },
-              title: { codecId: 'pg/text@1', nullable: false },
-              userId: { codecId: 'pg/int4@1', nullable: false },
+              id: { type: { kind: 'scalar' as const, codecId: 'pg/int4@1' }, nullable: false },
+              title: { type: { kind: 'scalar' as const, codecId: 'pg/text@1' }, nullable: false },
+              userId: { type: { kind: 'scalar' as const, codecId: 'pg/int4@1' }, nullable: false },
             },
             relations: {},
           },
@@ -144,12 +147,10 @@ describe('contract.d.ts imports resolution', () => {
       });
 
       const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
-      const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitStackInput = {
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,
@@ -257,8 +258,8 @@ type UserIdColumn = UserColumns['id'];
               },
             },
             fields: {
-              id: { codecId: 'pg/int4@1', nullable: false },
-              email: { codecId: 'pg/text@1', nullable: false },
+              id: { type: { kind: 'scalar' as const, codecId: 'pg/int4@1' }, nullable: false },
+              email: { type: { kind: 'scalar' as const, codecId: 'pg/text@1' }, nullable: false },
             },
             relations: {},
           },
@@ -280,12 +281,10 @@ type UserIdColumn = UserColumns['id'];
       });
 
       const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
-      const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitStackInput = {
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,

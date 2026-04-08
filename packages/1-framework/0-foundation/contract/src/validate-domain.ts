@@ -12,6 +12,7 @@ export interface DomainModelShape {
 export interface DomainContractShape {
   readonly roots: Record<string, string>;
   readonly models: Record<string, DomainModelShape>;
+  readonly valueObjects?: Record<string, { readonly fields: Record<string, unknown> }>;
 }
 
 export function validateContractDomain(contract: DomainContractShape): void {
@@ -23,6 +24,8 @@ export function validateContractDomain(contract: DomainContractShape): void {
   validateRelationTargets(contract, modelNames, errors);
   validateDiscriminators(contract, errors);
   validateOwnership(contract, modelNames, errors);
+  validateValueObjectReferences(contract, errors);
+  validateFieldModifiers(contract, errors);
 
   if (errors.length > 0) {
     throw new ContractValidationError(
@@ -162,4 +165,63 @@ function validateOwnership(
       }
     }
   }
+}
+
+interface FieldTypeLike {
+  readonly kind?: string;
+  readonly name?: string;
+  readonly members?: readonly FieldTypeLike[];
+}
+
+interface FieldLike {
+  readonly type?: FieldTypeLike;
+  readonly many?: boolean;
+  readonly dict?: boolean;
+}
+
+function forEachContractField(
+  contract: DomainContractShape,
+  callback: (field: unknown, location: string) => void,
+): void {
+  for (const [modelName, model] of Object.entries(contract.models)) {
+    for (const [fieldName, field] of Object.entries(model.fields)) {
+      callback(field, `Model "${modelName}" field "${fieldName}"`);
+    }
+  }
+  for (const [voName, vo] of Object.entries(contract.valueObjects ?? {})) {
+    for (const [fieldName, field] of Object.entries(vo.fields)) {
+      callback(field, `Value object "${voName}" field "${fieldName}"`);
+    }
+  }
+}
+
+function validateValueObjectReferences(contract: DomainContractShape, errors: string[]): void {
+  const voNames = new Set(Object.keys(contract.valueObjects ?? {}));
+
+  function checkType(type: FieldTypeLike | undefined, location: string): void {
+    if (!type) return;
+    if (type.kind === 'valueObject' && type.name && !voNames.has(type.name)) {
+      errors.push(
+        `${location} references value object "${type.name}" which does not exist in valueObjects`,
+      );
+      return;
+    }
+    if (type.kind === 'union') {
+      for (const member of type.members ?? []) checkType(member, location);
+    }
+  }
+
+  forEachContractField(contract, (field, location) => {
+    const f = field as FieldLike | undefined;
+    checkType(f?.type, location);
+  });
+}
+
+function validateFieldModifiers(contract: DomainContractShape, errors: string[]): void {
+  forEachContractField(contract, (field, location) => {
+    const f = field as FieldLike | undefined;
+    if (f?.many && f?.dict) {
+      errors.push(`${location} cannot have both "many" and "dict" modifiers`);
+    }
+  });
 }

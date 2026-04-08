@@ -32,6 +32,9 @@ export type ResolvedField = {
   readonly isUnique: boolean;
   readonly idName?: string;
   readonly uniqueName?: string;
+  readonly many?: true;
+  readonly valueObjectTypeName?: string;
+  readonly scalarCodecId?: string;
 };
 
 export type ModelNameMapping = {
@@ -47,6 +50,7 @@ export function collectResolvedFields(
   namedTypeDescriptors: Map<string, ColumnDescriptor>,
   namedTypeBaseTypes: Map<string, string>,
   modelNames: Set<string>,
+  compositeTypeNames: ReadonlySet<string>,
   composedExtensions: Set<string>,
   authoringContributions: AuthoringContributions | undefined,
   defaultFunctionRegistry: ControlMutationDefaultRegistry,
@@ -62,16 +66,7 @@ export function collectResolvedFields(
   ]);
 
   for (const field of model.fields) {
-    if (field.list) {
-      if (modelNames.has(field.typeName)) {
-        continue;
-      }
-      diagnostics.push({
-        code: 'PSL_UNSUPPORTED_FIELD_LIST',
-        message: `Field "${model.name}.${field.name}" uses a scalar/storage list type, which is not supported in SQL PSL provider v1. Model-typed lists are only supported as backrelation navigation fields when they match an FK-side relation.`,
-        sourceId,
-        span: field.span,
-      });
+    if (field.list && modelNames.has(field.typeName)) {
       continue;
     }
 
@@ -108,47 +103,87 @@ export function collectResolvedFields(
       continue;
     }
 
-    let descriptor = resolveColumnDescriptor(
-      field,
-      enumTypeDescriptors,
-      namedTypeDescriptors,
-      scalarTypeDescriptors,
-    );
-    const pgvectorColumnAttribute = getAttribute(field.attributes, 'pgvector.column');
-    if (pgvectorColumnAttribute) {
-      if (!composedExtensions.has('pgvector')) {
+    const isValueObjectField = compositeTypeNames.has(field.typeName);
+    const isListField = field.list;
+
+    const pgvectorOnJsonField = getAttribute(field.attributes, 'pgvector.column');
+    if (pgvectorOnJsonField && (isValueObjectField || isListField)) {
+      diagnostics.push({
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        message: `Field "${model.name}.${field.name}" uses @pgvector.column on a JSON-backed field (${isValueObjectField ? 'value object' : 'list'}). @pgvector.column is only supported on scalar Bytes fields.`,
+        sourceId,
+        span: pgvectorOnJsonField.span,
+      });
+      continue;
+    }
+
+    let descriptor: ColumnDescriptor | undefined;
+    let scalarCodecId: string | undefined;
+
+    if (isValueObjectField) {
+      descriptor = scalarTypeDescriptors.get('Json');
+    } else if (isListField) {
+      const originalDescriptor = resolveColumnDescriptor(
+        field,
+        enumTypeDescriptors,
+        namedTypeDescriptors,
+        scalarTypeDescriptors,
+      );
+      if (!originalDescriptor) {
         diagnostics.push({
-          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-          message:
-            'Attribute "@pgvector.column" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.',
+          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+          message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
           sourceId,
-          span: pgvectorColumnAttribute.span,
+          span: field.span,
         });
-      } else {
-        const isBytesBase =
-          field.typeName === 'Bytes' ||
-          namedTypeBaseTypes.get(field.typeRef ?? field.typeName) === 'Bytes';
-        if (!isBytesBase) {
+        continue;
+      }
+      scalarCodecId = originalDescriptor.codecId;
+      descriptor = scalarTypeDescriptors.get('Json');
+    } else {
+      descriptor = resolveColumnDescriptor(
+        field,
+        enumTypeDescriptors,
+        namedTypeDescriptors,
+        scalarTypeDescriptors,
+      );
+
+      const pgvectorColumnAttribute = getAttribute(field.attributes, 'pgvector.column');
+      if (pgvectorColumnAttribute) {
+        if (!composedExtensions.has('pgvector')) {
           diagnostics.push({
-            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Field "${model.name}.${field.name}" uses @pgvector.column on unsupported base type "${field.typeName}"`,
+            code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+            message:
+              'Attribute "@pgvector.column" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.',
             sourceId,
             span: pgvectorColumnAttribute.span,
           });
         } else {
-          const length = parsePgvectorLength({
-            attribute: pgvectorColumnAttribute,
-            diagnostics,
-            sourceId,
-          });
-          if (length !== undefined) {
-            descriptor = pgvectorVectorConstructor
-              ? instantiateAuthoringTypeConstructor(pgvectorVectorConstructor, [length])
-              : {
-                  codecId: 'pg/vector@1',
-                  nativeType: 'vector',
-                  typeParams: { length },
-                };
+          const isBytesBase =
+            field.typeName === 'Bytes' ||
+            namedTypeBaseTypes.get(field.typeRef ?? field.typeName) === 'Bytes';
+          if (!isBytesBase) {
+            diagnostics.push({
+              code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+              message: `Field "${model.name}.${field.name}" uses @pgvector.column on unsupported base type "${field.typeName}"`,
+              sourceId,
+              span: pgvectorColumnAttribute.span,
+            });
+          } else {
+            const length = parsePgvectorLength({
+              attribute: pgvectorColumnAttribute,
+              diagnostics,
+              sourceId,
+            });
+            if (length !== undefined) {
+              descriptor = pgvectorVectorConstructor
+                ? instantiateAuthoringTypeConstructor(pgvectorVectorConstructor, [length])
+                : {
+                    codecId: 'pg/vector@1',
+                    nativeType: 'vector',
+                    typeParams: { length },
+                  };
+            }
           }
         }
       }
@@ -229,6 +264,9 @@ export function collectResolvedFields(
       isUnique: Boolean(uniqueAttribute),
       ...ifDefined('idName', idName),
       ...ifDefined('uniqueName', uniqueName),
+      ...ifDefined('many', isListField ? (true as const) : undefined),
+      ...ifDefined('valueObjectTypeName', isValueObjectField ? field.typeName : undefined),
+      ...ifDefined('scalarCodecId', scalarCodecId),
     });
   }
 

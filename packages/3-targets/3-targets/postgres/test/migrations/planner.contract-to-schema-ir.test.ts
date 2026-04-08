@@ -657,7 +657,7 @@ function createPgvectorComponent(): SqlControlExtensionDescriptor<'postgres'> {
     familyId: 'sql',
     targetId: 'postgres',
     version: '0.0.0-test',
-    operationSignatures: () => [],
+
     databaseDependencies: { init: [pgvectorDependency] },
     create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
   };

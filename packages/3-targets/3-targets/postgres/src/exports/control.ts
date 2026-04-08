@@ -61,7 +61,6 @@ export function postgresRenderDefault(def: ColumnDefault, column: StorageColumn)
 const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =
   {
     ...postgresTargetDescriptorMeta,
-    operationSignatures: () => [],
     migrations: {
       createPlanner(_family: SqlControlFamilyInstance) {
         return createPostgresMigrationPlanner() as MigrationPlanner<'sql', 'postgres'>;

@@ -26,7 +26,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:ab144af6db136b402ded009abf090ad827eb2e6c7201889b69fd1df30badaa8b'>;
+  StorageHashBase<'sha256:02cdff7f8d501bb78f0687a20ede35d9a7397239ea1bb503f1f58d035ad3cb72'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:e216decd356eea44980cf151c6044d85fb936e1fad093fbfb93ca34b96cf5847'>;
 export type ProfileHash =
@@ -39,6 +39,11 @@ export type QueryOperationTypes = Record<string, never>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
+export type Address = {
+  readonly street: CodecTypes['pg/text@1']['output'];
+  readonly city: CodecTypes['pg/text@1']['output'];
+  readonly zip: CodecTypes['pg/text@1']['output'] | null;
+};
 export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
 
 type ContractBase = ContractType<
@@ -202,6 +207,11 @@ type ContractBase = ContractType<
             readonly codecId: 'pg/int4@1';
             readonly nullable: true;
           };
+          readonly address: {
+            readonly nativeType: 'jsonb';
+            readonly codecId: 'pg/jsonb@1';
+            readonly nullable: true;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [{ readonly columns: readonly ['email'] }];
@@ -230,9 +240,18 @@ type ContractBase = ContractType<
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly reviewerId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly title: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly reviewerId: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
       };
       readonly relations: {
         readonly reviewer: {
@@ -255,9 +274,18 @@ type ContractBase = ContractType<
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly body: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly postId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly body: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly postId: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
       };
       readonly relations: {};
     };
@@ -272,10 +300,22 @@ type ContractBase = ContractType<
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly userId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly views: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly title: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly userId: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly views: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
       };
       readonly relations: {
         readonly comments: {
@@ -306,9 +346,18 @@ type ContractBase = ContractType<
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly userId: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly bio: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly userId: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly bio: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
       };
       readonly relations: {
         readonly user: {
@@ -330,8 +379,14 @@ type ContractBase = ContractType<
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly name: { readonly codecId: 'pg/text@1'; readonly nullable: false };
+        readonly id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly name: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
       };
       readonly relations: {};
     };
@@ -343,13 +398,30 @@ type ContractBase = ContractType<
           readonly name: { readonly column: 'name' };
           readonly email: { readonly column: 'email' };
           readonly invitedById: { readonly column: 'invited_by_id' };
+          readonly address: { readonly column: 'address' };
         };
       };
       readonly fields: {
-        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
-        readonly name: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly email: { readonly codecId: 'pg/text@1'; readonly nullable: false };
-        readonly invitedById: { readonly codecId: 'pg/int4@1'; readonly nullable: true };
+        readonly id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly name: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly email: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly invitedById: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly address: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+        };
       };
       readonly relations: {
         readonly invitedUsers: {
@@ -418,6 +490,25 @@ type ContractBase = ContractType<
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
         },
       ];
+    };
+  };
+  readonly meta: {};
+  readonly valueObjects: {
+    readonly Address: {
+      readonly fields: {
+        readonly street: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly city: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly zip: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+      };
     };
   };
   readonly profileHash: ProfileHash;

@@ -74,7 +74,8 @@ function resolveFieldTraits(
   fieldName: string,
   context: ExecutionContext,
 ): readonly string[] {
-  const codecId = modelOf(contract, modelName)?.fields?.[fieldName]?.codecId;
+  const fieldType = modelOf(contract, modelName)?.fields?.[fieldName]?.type;
+  const codecId = fieldType?.kind === 'scalar' ? fieldType.codecId : undefined;
   if (!codecId) return [];
   return context.codecs.traitsOf(codecId);
 }

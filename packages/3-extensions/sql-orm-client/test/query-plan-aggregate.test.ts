@@ -223,13 +223,16 @@ describe('query plan aggregate', () => {
     });
 
     it('rejects OperationExpr', () => {
-      const op = OperationExpr.function({
+      const op = new OperationExpr({
         method: 'contains',
-        forTypeId: 'pg/text@1',
         self: ColumnRef.of('posts', 'title'),
         args: [LiteralExpr.of('test')],
-        returns: { kind: 'builtin', type: 'boolean' },
-        template: 'position({1} in {0}) > 0',
+        returns: { codecId: 'core/bool', nullable: false },
+        lowering: {
+          targetFamily: 'sql',
+          strategy: 'function',
+          template: 'position({1} in {0}) > 0',
+        },
       });
       expect(() => compileWithHaving(op)).toThrow(
         'Unsupported grouped having expression kind "operation"',

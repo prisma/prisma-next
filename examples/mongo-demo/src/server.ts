@@ -9,9 +9,19 @@ const DB_NAME = 'blog';
 
 async function seed(orm: Db['orm']) {
   const createdUsers = await orm.users.createAll([
-    { name: 'Alice Chen', email: 'alice@example.com', bio: 'Full-stack engineer and tech blogger' },
-    { name: 'Bob Kumar', email: 'bob@example.com', bio: 'DevOps enthusiast' },
-    { name: 'Carol Santos', email: 'carol@example.com', bio: null },
+    {
+      name: 'Alice Chen',
+      email: 'alice@example.com',
+      bio: 'Full-stack engineer and tech blogger',
+      address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
+    },
+    {
+      name: 'Bob Kumar',
+      email: 'bob@example.com',
+      bio: 'DevOps enthusiast',
+      address: { street: '456 Oak Ave', city: 'Portland', zip: null, country: 'US' },
+    },
+    { name: 'Carol Santos', email: 'carol@example.com', bio: null, address: null },
   ]);
   const alice = createdUsers[0];
   const bob = createdUsers[1];

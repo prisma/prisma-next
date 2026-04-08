@@ -4,7 +4,6 @@ import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgresPack from '@prisma-next/target-postgres/pack';
@@ -113,19 +112,6 @@ test('ResultType inference produces literal field keys', () => {
   type Row = ResultType<typeof plan>;
   expectTypeOf<Row>().toHaveProperty('id');
   expectTypeOf<Row>().toHaveProperty('email');
-});
-
-// -- schema() has literal keys ----------------------------------------------
-
-test('schema().tables has literal table keys', () => {
-  const validated = validateContract<typeof singleModelContract>(
-    singleModelContract,
-    emptyCodecLookup,
-  );
-  const context = createTestContext(validated, createStubAdapter());
-  const tables = schema(context).tables;
-
-  expectTypeOf<typeof tables>().toHaveProperty('user');
 });
 
 // -- Multi-model contract preserves all literals ----------------------------

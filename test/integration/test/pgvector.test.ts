@@ -3,14 +3,9 @@ import {
   extractCodecTypeImports,
   extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
-import { createOperationRegistry } from '@prisma-next/operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import {
-  assembleOperationRegistry,
-  getSqlDescriptorBundle,
-  pgvectorExtensionDescriptor,
-} from '../utils/framework-components';
+import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../utils/framework-components';
 
 describe('pgvector extension pack integration', () => {
   it('exposes pgvector descriptor metadata', () => {
@@ -57,22 +52,6 @@ describe('pgvector extension pack integration', () => {
     });
   });
 
-  it('assembles operation registry from descriptors', () => {
-    const { descriptors } = getSqlDescriptorBundle({
-      extensions: [pgvectorExtensionDescriptor],
-    });
-
-    const registry = assembleOperationRegistry(descriptors);
-
-    const operations = registry.byType('pg/vector@1');
-    expect(operations.length).toBe(2);
-    expect(operations.find((op) => op.method === 'cosineDistance')).toBeDefined();
-    expect(operations.find((op) => op.method === 'cosineSimilarity')).toBeDefined();
-    // Note: lowering is SQL-specific and not part of core OperationSignature
-    // The SQL family descriptor converts manifests to SqlOperationSignature with lowering
-    // but the registry returns core OperationSignature types
-  });
-
   it('descriptor provides codecs', () => {
     const codecs = pgvector.codecs();
     expect(codecs).toBeDefined();
@@ -83,16 +62,16 @@ describe('pgvector extension pack integration', () => {
     expect(vectorCodec?.targetTypes).toEqual(['vector']);
   });
 
-  it('descriptor provides operation signatures', () => {
-    const operations = pgvector.operationSignatures!();
+  it('descriptor provides query operations', () => {
+    const operations = pgvector.queryOperations!();
     expect(operations).toBeDefined();
     expect(operations.length).toBe(2);
 
     const cosineDistanceOp = operations.find((op) => op.method === 'cosineDistance');
-    expect(cosineDistanceOp?.forTypeId).toBe('pg/vector@1');
+    expect(cosineDistanceOp).toBeDefined();
 
     const cosineSimilarityOp = operations.find((op) => op.method === 'cosineSimilarity');
-    expect(cosineSimilarityOp?.forTypeId).toBe('pg/vector@1');
+    expect(cosineSimilarityOp).toBeDefined();
   });
 
   it('codecs can be registered in registry', { timeout: 1_000 }, () => {
@@ -107,20 +86,5 @@ describe('pgvector extension pack integration', () => {
     const vectorCodec = registry.get('pg/vector@1');
     expect(vectorCodec).toBeDefined();
     expect(vectorCodec?.id).toBe('pg/vector@1');
-  });
-
-  it('operations can be registered in registry', () => {
-    const operations = pgvector.operationSignatures!();
-    expect(operations).toBeDefined();
-
-    const registry = createOperationRegistry();
-    for (const op of operations) {
-      registry.register(op);
-    }
-
-    const registeredOps = registry.byType('pg/vector@1');
-    expect(registeredOps.length).toBe(2);
-    expect(registeredOps.find((op) => op.method === 'cosineDistance')).toBeDefined();
-    expect(registeredOps.find((op) => op.method === 'cosineSimilarity')).toBeDefined();
   });
 });

@@ -1,9 +1,15 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import type { ColumnTypeDescriptor } from '@prisma-next/sql-contract/types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-export const contract = defineContract<CodecTypes>()
+const jsonbColumn: ColumnTypeDescriptor = {
+  codecId: 'pg/jsonb@1',
+  nativeType: 'jsonb',
+};
+
+const baseContract = defineContract<CodecTypes>()
   .target(postgresPack)
   .table('users', (table) =>
     table
@@ -11,6 +17,7 @@ export const contract = defineContract<CodecTypes>()
       .column('name', { type: textColumn, nullable: false })
       .column('email', { type: textColumn, nullable: false })
       .column('invited_by_id', { type: int4Column, nullable: true })
+      .column('address', { type: jsonbColumn, nullable: true })
       .primaryKey(['id'])
       .unique(['email'])
       .foreignKey(['invited_by_id'], { table: 'users', columns: ['id'] }),
@@ -60,6 +67,7 @@ export const contract = defineContract<CodecTypes>()
       .field('name', 'name')
       .field('email', 'email')
       .field('invitedById', 'invited_by_id')
+      .field('address', 'address')
       .relation('invitedUsers', {
         toModel: 'User',
         toTable: 'users',
@@ -173,3 +181,40 @@ export const contract = defineContract<CodecTypes>()
   )
   .model('Tag', 'tags', (model) => model.field('id', 'id').field('name', 'name'))
   .build();
+
+const userModel = baseContract.models['User']!;
+
+export const contract = {
+  ...baseContract,
+  models: {
+    ...baseContract.models,
+    User: {
+      ...userModel,
+      fields: {
+        ...userModel.fields,
+        address: {
+          nullable: true as const,
+          type: { kind: 'valueObject' as const, name: 'Address' },
+        },
+      },
+    },
+  },
+  valueObjects: {
+    Address: {
+      fields: {
+        street: {
+          nullable: false as const,
+          type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+        },
+        city: {
+          nullable: false as const,
+          type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+        },
+        zip: {
+          nullable: true as const,
+          type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+        },
+      },
+    },
+  },
+};

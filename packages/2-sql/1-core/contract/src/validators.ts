@@ -135,9 +135,40 @@ const StorageSchema = type({
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isContractFieldType(value: unknown): boolean {
+  if (!isPlainRecord(value)) return false;
+  const kind = value['kind'];
+  if (kind === 'scalar') {
+    if (typeof value['codecId'] !== 'string') return false;
+    const typeParams = value['typeParams'];
+    if (typeParams !== undefined && !isPlainRecord(typeParams)) return false;
+    return true;
+  }
+  if (kind === 'valueObject') {
+    return typeof value['name'] === 'string';
+  }
+  if (kind === 'union') {
+    const members = value['members'];
+    if (!Array.isArray(members)) return false;
+    return members.every((m) => isContractFieldType(m));
+  }
+  return false;
+}
+
+const ContractFieldTypeSchema = type('unknown').narrow((value, ctx) =>
+  isContractFieldType(value) ? true : ctx.mustBe('scalar, valueObject, or union field type'),
+);
+
 const ModelFieldSchema = type({
-  'nullable?': 'boolean',
-  'codecId?': 'string',
+  '+': 'reject',
+  nullable: 'boolean',
+  type: ContractFieldTypeSchema,
+  'many?': 'true',
+  'dict?': 'true',
 });
 
 const ModelStorageFieldSchema = type({
@@ -176,6 +207,7 @@ const SqlContractSchema = type({
   'meta?': ContractMetaSchema,
   'roots?': 'Record<string, string>',
   models: type({ '[string]': ModelSchema }),
+  'valueObjects?': 'Record<string, unknown>',
   storage: StorageSchema,
   'execution?': ExecutionSchema,
 });

@@ -5,20 +5,9 @@ import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
-import type {
-  ExtractTypeMapsFromContract,
-  ResolveCodecTypes,
-  ResolveOperationTypes,
-  SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
-import type { SchemaHandle } from '@prisma-next/sql-relational-core/schema';
-import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
-import type {
-  OperationTypeSignature,
-  OperationTypes,
-} from '@prisma-next/sql-relational-core/types';
 import type {
   ExecutionContext,
   Plugin,
@@ -41,29 +30,11 @@ import {
   resolvePostgresBinding,
 } from './binding';
 
-type NormalizeOperationTypes<T> = {
-  [TypeId in keyof T]: {
-    [Method in keyof T[TypeId]]: T[TypeId][Method] extends OperationTypeSignature
-      ? T[TypeId][Method]
-      : OperationTypeSignature;
-  };
-};
-
-type ToSchemaOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationTypes<T>;
-
 export type PostgresTargetId = 'postgres';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
-export interface PostgresClient<
-  TContract extends Contract<SqlStorage>,
-  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
-> {
+export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
-  readonly schema: SchemaHandle<
-    TContract,
-    ResolveCodecTypes<TContract, TTypeMaps>,
-    ToSchemaOperationTypes<ResolveOperationTypes<TContract, TTypeMaps>>
-  >;
   readonly orm: OrmClient<TContract>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
@@ -140,21 +111,18 @@ function toRuntimeBinding<TContract extends Contract<SqlStorage>>(
  * Creates a lazy Postgres client from either `contractJson` or a TypeScript-authored `contract`.
  * Static query surfaces are available immediately, while `runtime()` instantiates the driver/pool on first call.
  *
- * - No-emit: infers TypeMaps from ContractWithTypeMaps. Example: postgres({ contract })
- * - Emitted: pass TypeMaps explicitly. Example: postgres<Contract, TypeMaps>({ contractJson, url })
+ * - No-emit: pass a TypeScript-authored contract. Example: postgres({ contract })
+ * - Emitted: pass Contract type explicitly. Example: postgres<Contract>({ contractJson, url })
  */
-export default function postgres<
-  TContract extends Contract<SqlStorage>,
-  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
->(options: PostgresOptionsWithContract<TContract>): PostgresClient<TContract, TTypeMaps>;
-export default function postgres<
-  TContract extends Contract<SqlStorage>,
-  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
->(options: PostgresOptionsWithContractJson<TContract>): PostgresClient<TContract, TTypeMaps>;
-export default function postgres<
-  TContract extends Contract<SqlStorage>,
-  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
->(options: PostgresOptions<TContract>): PostgresClient<TContract, TTypeMaps> {
+export default function postgres<TContract extends Contract<SqlStorage>>(
+  options: PostgresOptionsWithContract<TContract>,
+): PostgresClient<TContract>;
+export default function postgres<TContract extends Contract<SqlStorage>>(
+  options: PostgresOptionsWithContractJson<TContract>,
+): PostgresClient<TContract>;
+export default function postgres<TContract extends Contract<SqlStorage>>(
+  options: PostgresOptions<TContract>,
+): PostgresClient<TContract> {
   const contract = resolveContract(options);
   let binding = resolveOptionalPostgresBinding(options);
   const stack = createSqlExecutionStack({
@@ -169,7 +137,6 @@ export default function postgres<
     stack,
   });
 
-  const schema = schemaBuilder<TContract, TTypeMaps>(context);
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -244,7 +211,6 @@ export default function postgres<
 
   return {
     sql,
-    schema: schema as PostgresClient<TContract, TTypeMaps>['schema'],
     orm,
     context,
     stack,

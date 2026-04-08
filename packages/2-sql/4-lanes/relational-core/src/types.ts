@@ -4,249 +4,12 @@ import type {
   ExecutionPlan,
   PlanRefs,
 } from '@prisma-next/contract/types';
-import type { ArgSpec, ReturnSpec } from '@prisma-next/operations';
+import type { ParamSpec } from '@prisma-next/operations';
 import type { ExtractCodecTypes, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
-import type {
-  AnyExpression,
-  AnyQueryAst,
-  BinaryOp,
-  ColumnRef,
-  Direction,
-  ExpressionSource,
-  OperationExpr,
-  ParamRef,
-} from './ast/types';
+import type { AnyQueryAst, ColumnRef, ParamRef } from './ast/types';
 import type { SqlQueryPlan } from './plan';
 import type { ExecutionContext } from './query-lane-context';
-
-export interface ParamPlaceholder {
-  readonly kind: 'param-placeholder';
-  readonly name: string;
-}
-
-/**
- * ValueSource represents any value that can appear in a comparison or as an argument.
- * This includes:
- * - ParamPlaceholder: A parameter placeholder (e.g., `param('userId')`)
- * - ExpressionSource: Something that can be converted to an Expression (ColumnBuilder, ExpressionBuilder)
- */
-export type ValueSource = ParamPlaceholder | ExpressionSource;
-
-export interface OrderBuilder<
-  _ColumnName extends string = string,
-  _ColumnMeta extends StorageColumn = StorageColumn,
-  _JsType = unknown,
-> {
-  readonly kind: 'order';
-  readonly expr: AnyExpression;
-  readonly dir: Direction;
-}
-
-/**
- * Creates an OrderBuilder for use in orderBy clauses.
- */
-export function createOrderBuilder(
-  expr: AnyColumnBuilder | OperationExpr,
-  dir: Direction,
-): AnyOrderBuilder {
-  return { kind: 'order', expr, dir } as AnyOrderBuilder;
-}
-
-/**
- * ColumnBuilder with optional operation methods based on the column's typeId.
- * When Operations is provided and the column's typeId matches, operation methods are included.
- * Implements ExpressionSource to provide type-safe conversion to ColumnRef.
- *
- * For nullable columns (ColumnMeta['nullable'] extends true), includes isNull() and isNotNull() methods.
- */
-export type ColumnBuilder<
-  ColumnName extends string = string,
-  ColumnMeta extends StorageColumn = StorageColumn,
-  JsType = unknown,
-  Operations extends OperationTypes = Record<string, never>,
-> = {
-  readonly kind: 'column';
-  readonly table: string;
-  readonly column: ColumnName;
-  readonly columnMeta: ColumnMeta;
-  // Methods accept ValueSource (ParamPlaceholder or ExpressionSource)
-  eq(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  neq(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  gt(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  lt(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  gte(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  lte(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
-  desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
-  /** Converts this column builder to a ColumnRef expression */
-  toExpr(): ColumnRef;
-  // Helper property for type extraction (not used at runtime)
-  readonly __jsType: JsType;
-} & (ColumnMeta['codecId'] extends string
-  ? ColumnMeta['codecId'] extends keyof Operations
-    ? OperationMethods<
-        OperationsForTypeId<ColumnMeta['codecId'] & string, Operations>,
-        ColumnName,
-        StorageColumn,
-        JsType
-      >
-    : Record<string, never>
-  : Record<string, never>) &
-  (ColumnMeta['nullable'] extends true
-    ? NullableMethods<ColumnName, ColumnMeta, JsType>
-    : Record<string, never>);
-
-export interface BinaryBuilder<
-  _ColumnName extends string = string,
-  _ColumnMeta extends StorageColumn = StorageColumn,
-  _JsType = unknown,
-> {
-  readonly kind: 'binary';
-  readonly op: BinaryOp;
-  readonly left: AnyExpression;
-  readonly right: ValueSource;
-}
-
-/**
- * Builder for IS NULL / IS NOT NULL checks.
- * Used to build unary null check expressions in WHERE clauses.
- */
-export interface NullCheckBuilder<
-  _ColumnName extends string = string,
-  _ColumnMeta extends StorageColumn = StorageColumn,
-  _JsType = unknown,
-> {
-  readonly kind: 'nullCheck';
-  readonly expr: AnyExpression;
-  readonly isNull: boolean;
-}
-
-/**
- * Union type for unary builders (currently just NullCheckBuilder).
- * Extensible for future unary operators.
- */
-export type UnaryBuilder = NullCheckBuilder;
-
-// Forward declare AnyBinaryBuilder and AnyOrderBuilder for use in ExpressionBuilder
-export type AnyBinaryBuilder = BinaryBuilder;
-export type AnyOrderBuilder = OrderBuilder;
-export type AnyUnaryBuilder = UnaryBuilder;
-
-/**
- * Methods available only on nullable columns.
- * These are conditionally added to ColumnBuilder when ColumnMeta['nullable'] is true.
- * Note: Index signature is required for compatibility with AnyColumnBuilderBase's index signature.
- */
-export interface NullableMethods<
-  ColumnName extends string = string,
-  ColumnMeta extends StorageColumn = StorageColumn,
-  JsType = unknown,
-> {
-  /** Creates an IS NULL check for this column */
-  isNull(): NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
-  /** Creates an IS NOT NULL check for this column */
-  isNotNull(): NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
-  /** Index signature for compatibility with AnyColumnBuilderBase */
-  readonly [key: string]: unknown;
-}
-
-/**
- * ExpressionBuilder represents the result of an operation (e.g., col.distance(...)).
- * Unlike ColumnBuilder (which represents a column), ExpressionBuilder represents
- * an operation expression and provides the same DSL methods for chaining.
- *
- * Implements ExpressionSource to provide type-safe conversion to OperationExpr.
- */
-export interface ExpressionBuilder<JsType = unknown> extends ExpressionSource {
-  readonly kind: 'expression';
-  readonly expr: OperationExpr;
-  readonly columnMeta: StorageColumn;
-
-  // Methods accept ValueSource (ParamPlaceholder or ExpressionSource)
-  eq(value: ValueSource): AnyBinaryBuilder;
-  neq(value: ValueSource): AnyBinaryBuilder;
-  gt(value: ValueSource): AnyBinaryBuilder;
-  lt(value: ValueSource): AnyBinaryBuilder;
-  gte(value: ValueSource): AnyBinaryBuilder;
-  lte(value: ValueSource): AnyBinaryBuilder;
-  asc(): AnyOrderBuilder;
-  desc(): AnyOrderBuilder;
-
-  /** Converts this expression builder to the underlying OperationExpr */
-  toExpr(): OperationExpr;
-
-  // Helper property for type extraction (not used at runtime)
-  readonly __jsType: JsType;
-}
-
-// Helper aliases for usage sites where the specific column parameters are irrelevant
-// Accepts any ColumnBuilder regardless of its Operations parameter
-// Note: We use `any` here because TypeScript's variance rules don't allow us to express
-// "any type that extends OperationTypes" in a way that works for assignment.
-// Contract-specific OperationTypes (e.g., PgVectorOperationTypes) are not assignable
-// to the base OperationTypes in generic parameter position, even though they extend it structurally.
-// Helper type that accepts any ColumnBuilder regardless of its generic parameters
-// This is needed because conditional types in ColumnBuilder create incompatible intersection types
-// when Operations differs, even though structurally they're compatible
-export type AnyColumnBuilderBase = {
-  readonly kind: 'column';
-  readonly table: string;
-  readonly column: string;
-  readonly columnMeta: StorageColumn;
-  // Methods accept ValueSource (ParamPlaceholder or ExpressionSource)
-  eq(value: ValueSource): AnyBinaryBuilder;
-  neq(value: ValueSource): AnyBinaryBuilder;
-  gt(value: ValueSource): AnyBinaryBuilder;
-  lt(value: ValueSource): AnyBinaryBuilder;
-  gte(value: ValueSource): AnyBinaryBuilder;
-  lte(value: ValueSource): AnyBinaryBuilder;
-  asc(): AnyOrderBuilder;
-  desc(): AnyOrderBuilder;
-  toExpr(): ColumnRef;
-  readonly __jsType: unknown;
-  // Optional nullable methods (present when columnMeta.nullable is true)
-  isNull?(): AnyUnaryBuilder;
-  isNotNull?(): AnyUnaryBuilder;
-  // Allow any operation methods (from conditional type)
-  readonly [key: string]: unknown;
-};
-
-export type AnyColumnBuilder =
-  | ColumnBuilder<
-      string,
-      StorageColumn,
-      unknown,
-      // biome-ignore lint/suspicious/noExplicitAny: AnyColumnBuilder must accept column builders with any operation types
-      any
-    >
-  | AnyColumnBuilderBase;
-
-/**
- * Union type for any builder that can produce an Expression.
- * Used in DSL method signatures where either a column or operation result can be passed.
- */
-// TODO: do we still need this? can we just replace it with ExpressionSource
-export type AnyExpressionSource = AnyColumnBuilder | ExpressionBuilder;
-
-export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'kind' in value &&
-    (value as { kind: unknown }).kind === 'column'
-  );
-}
-
-export interface JoinOnBuilder {
-  eqCol(left: AnyColumnBuilder, right: AnyColumnBuilder): JoinOnPredicate;
-}
-
-export interface JoinOnPredicate {
-  readonly kind: 'join-on';
-  readonly left: AnyColumnBuilder;
-  readonly right: AnyColumnBuilder;
-}
 
 export type Expr = ColumnRef | ParamRef;
 
@@ -322,17 +85,63 @@ type ExtractFieldValue<
     : never
   : never;
 
+type ApplyNullability<T, Nullable> = Nullable extends true ? T | null : T;
+
+type ApplyFieldModifiers<T, FieldValue, Nullable> = FieldValue extends { readonly many: true }
+  ? ApplyNullability<T[], Nullable>
+  : FieldValue extends { readonly dict: true }
+    ? ApplyNullability<Record<string, T>, Nullable>
+    : ApplyNullability<T, Nullable>;
+
+type ExtractValueObject<
+  TContract extends Contract<SqlStorage>,
+  Name extends string,
+> = TContract extends { readonly valueObjects: infer VOs }
+  ? VOs extends Record<string, { readonly fields: Record<string, unknown> }>
+    ? Name extends keyof VOs
+      ? VOs[Name]
+      : never
+    : never
+  : never;
+
+type ExpandValueObjectFields<
+  TContract extends Contract<SqlStorage>,
+  Fields extends Record<string, unknown>,
+> = {
+  [K in keyof Fields & string]: ResolveModelFieldToJsType<TContract, Fields[K]>;
+};
+
+type ResolveValueObjectJsType<
+  TContract extends Contract<SqlStorage>,
+  Name extends string,
+> = ExtractValueObject<TContract, Name> extends infer VO
+  ? VO extends { readonly fields: infer F extends Record<string, unknown> }
+    ? ExpandValueObjectFields<TContract, F>
+    : never
+  : never;
+
 type ResolveModelFieldToJsType<
   TContract extends Contract<SqlStorage>,
   FieldValue,
-> = FieldValue extends { readonly codecId: infer Id extends string }
-  ? Id extends keyof ExtractCodecTypes<TContract>
-    ? ExtractCodecTypes<TContract>[Id] extends { readonly output: infer O }
-      ? FieldValue extends { readonly nullable: true }
-        ? O | null
-        : O
+> = FieldValue extends {
+  readonly nullable: infer Nullable;
+  readonly type: infer FT;
+}
+  ? FT extends { readonly kind: 'scalar'; readonly codecId: infer Id extends string }
+    ? Id extends keyof ExtractCodecTypes<TContract>
+      ? ExtractCodecTypes<TContract>[Id] extends { readonly output: infer O }
+        ? ApplyFieldModifiers<O, FieldValue, Nullable>
+        : never
       : never
-    : never
+    : FT extends { readonly kind: 'valueObject'; readonly name: infer Name extends string }
+      ? ResolveValueObjectJsType<TContract, Name> extends infer VOType
+        ? [VOType] extends [never]
+          ? unknown
+          : ApplyFieldModifiers<VOType, FieldValue, Nullable>
+        : unknown
+      : FT extends { readonly kind: 'union' }
+        ? unknown
+        : FieldValue
   : FieldValue;
 
 type ExtractColumnJsTypeFromModels<
@@ -396,11 +205,11 @@ type ExtractParameterizedCodecOutputType<
 
 /**
  * Type-level operation signature.
- * Represents an operation at the type level, similar to OperationSignature at runtime.
+ * Represents an operation at the type level for use in contract type maps.
  */
 export type OperationTypeSignature = {
-  readonly args: ReadonlyArray<ArgSpec>;
-  readonly returns: ReturnSpec;
+  readonly args: ReadonlyArray<ParamSpec>;
+  readonly returns: ParamSpec;
   readonly lowering: SqlLoweringSpec;
   readonly capabilities?: ReadonlyArray<string>;
 };
@@ -414,8 +223,8 @@ export type OperationTypeSignature = {
  * type MyOperations: OperationTypes = {
  *   'pg/vector@1': {
  *     cosineDistance: {
- *       args: [{ kind: 'typeId'; type: 'pg/vector@1' }];
- *       returns: { kind: 'builtin'; type: 'number' };
+ *       args: [{ codecId: 'pg/vector@1'; nullable: false }];
+ *       returns: { codecId: 'core/float8'; nullable: false };
  *       lowering: { targetFamily: 'sql'; strategy: 'function'; template: '...' };
  *     };
  *   };
@@ -456,65 +265,6 @@ export type OperationsForTypeId<
   : TypeId extends keyof Operations
     ? Operations[TypeId]
     : Record<string, never>;
-
-/**
- * Maps operation signatures to method signatures on ColumnBuilder.
- * Each operation becomes a method that returns a ColumnBuilder or BinaryBuilder
- * based on the return type.
- */
-type OperationMethods<
-  Ops extends Record<string, OperationTypeSignature>,
-  ColumnName extends string,
-  ColumnMeta extends StorageColumn,
-  JsType,
-> = {
-  [K in keyof Ops]: Ops[K] extends OperationTypeSignature
-    ? (
-        ...args: OperationArgs<Ops[K]['args']>
-      ) => OperationReturn<Ops[K]['returns'], ColumnName, ColumnMeta, JsType>
-    : never;
-};
-
-/**
- * Maps operation argument specs to TypeScript argument types.
- * - typeId args: ColumnBuilder (accepts base columns or operation results)
- * - param args: unknown (raw value; converted to ParamRef at operation build time)
- * - literal args: unknown (could be more specific in future)
- */
-type OperationArgs<Args extends ReadonlyArray<ArgSpec>> = Args extends readonly [
-  infer First,
-  ...infer Rest,
-]
-  ? First extends ArgSpec
-    ? [ArgToType<First>, ...(Rest extends ReadonlyArray<ArgSpec> ? OperationArgs<Rest> : [])]
-    : []
-  : [];
-
-type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
-  ? AnyExpressionSource
-  : unknown;
-
-/**
- * Maps operation return spec to return type.
- * Operations return ExpressionBuilder, not ColumnBuilder, because the result
- * represents an expression (OperationExpr) rather than a column reference.
- */
-type OperationReturn<
-  Returns extends ReturnSpec,
-  _ColumnName extends string,
-  _ColumnMeta extends StorageColumn,
-  _JsType,
-> = Returns extends { kind: 'builtin'; type: infer T }
-  ? T extends 'number'
-    ? ExpressionBuilder<number>
-    : T extends 'boolean'
-      ? ExpressionBuilder<boolean>
-      : T extends 'string'
-        ? ExpressionBuilder<string>
-        : ExpressionBuilder<unknown>
-  : Returns extends { kind: 'typeId' }
-    ? ExpressionBuilder<unknown>
-    : ExpressionBuilder<unknown>;
 
 /**
  * Computes JavaScript type for a column at column creation time.
@@ -573,99 +323,6 @@ export type ComputeColumnJsType<
       : unknown
     : FromModels
   : unknown;
-
-/**
- * Infers Row type from a projection object.
- * Maps Record<string, ColumnBuilder> to Record<string, JSType>
- *
- * Extracts the pre-computed JsType from each ColumnBuilder in the projection.
- */
-/**
- * Extracts the inferred JsType carried by a ColumnBuilder.
- */
-type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> =
-  CB extends ColumnBuilder<
-    infer _ColumnName extends string,
-    infer _ColumnMeta extends StorageColumn,
-    infer JsType,
-    infer _Ops
-  >
-    ? JsType
-    : never;
-
-export type InferProjectionRow<P extends Record<string, AnyColumnBuilder>> = {
-  [K in keyof P]: ExtractJsTypeFromColumnBuilder<P[K]>;
-};
-
-/**
- * Nested projection type - allows recursive nesting of ColumnBuilder, ExpressionBuilder, or nested objects.
- */
-export type NestedProjection = Record<
-  string,
-  | AnyExpressionSource
-  | Record<
-      string,
-      | AnyExpressionSource
-      | Record<
-          string,
-          | AnyExpressionSource
-          | Record<string, AnyExpressionSource | Record<string, AnyExpressionSource>>
-        >
-    >
->;
-
-/**
- * Helper type to extract include type from Includes map.
- * Returns the value type if K is a key of Includes, otherwise returns unknown.
- */
-type ExtractIncludeType<
-  K extends string,
-  Includes extends Record<string, unknown>,
-> = K extends keyof Includes ? Includes[K] : unknown;
-
-/**
- * Infers Row type from a nested projection object.
- * Recursively maps Record<string, ColumnBuilder | boolean | NestedProjection> to nested object types.
- *
- * Extracts the pre-computed JsType from each ColumnBuilder at leaves.
- * When a value is `true`, it represents an include reference and infers `Array<ChildShape>`
- * by looking up the include alias in the Includes type map.
- */
-export type InferNestedProjectionRow<
-  P extends Record<string, AnyExpressionSource | boolean | NestedProjection>,
-  CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
-  Includes extends Record<string, unknown> = Record<string, never>,
-> = {
-  [K in keyof P]: P[K] extends ExpressionBuilder<infer JsType>
-    ? JsType
-    : P[K] extends AnyColumnBuilder
-      ? ExtractJsTypeFromColumnBuilder<P[K]>
-      : P[K] extends true
-        ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
-        : P[K] extends NestedProjection
-          ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
-          : never;
-};
-
-/**
- * Infers Row type from a tuple of ColumnBuilders used in returning() clause.
- * Extracts column name and JsType from each ColumnBuilder and creates a Record.
- */
-export type InferReturningRow<Columns extends readonly AnyColumnBuilder[]> =
-  Columns extends readonly [infer First, ...infer Rest]
-    ? First extends ColumnBuilder<
-        infer Name,
-        infer _Meta,
-        infer JsType,
-        infer _Ops extends OperationTypes
-      >
-      ? Name extends string
-        ? Rest extends readonly AnyColumnBuilder[]
-          ? { [K in Name]: JsType } & InferReturningRow<Rest>
-          : { [K in Name]: JsType }
-        : never
-      : never
-    : Record<string, never>;
 
 /**
  * Utility type to check if a contract has the required capabilities for includeMany.

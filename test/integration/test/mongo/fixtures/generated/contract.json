@@ -11,16 +11,25 @@
     "Address": {
       "fields": {
         "city": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         },
         "street": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         },
         "zip": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         }
       },
       "owner": "User",
@@ -31,8 +40,11 @@
       "base": "Task",
       "fields": {
         "severity": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -43,16 +55,25 @@
     "Comment": {
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/objectId@1",
+            "kind": "scalar"
+          }
         },
         "createdAt": {
-          "codecId": "mongo/date@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/date@1",
+            "kind": "scalar"
+          }
         },
         "text": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         }
       },
       "owner": "Task",
@@ -63,12 +84,18 @@
       "base": "Task",
       "fields": {
         "priority": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         },
         "targetRelease": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -82,20 +109,32 @@
       },
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/objectId@1",
+            "kind": "scalar"
+          }
         },
         "assigneeId": {
-          "codecId": "mongo/objectId@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/objectId@1",
+            "kind": "scalar"
+          }
         },
         "title": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         },
         "type": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -136,16 +175,25 @@
     "User": {
       "fields": {
         "_id": {
-          "codecId": "mongo/objectId@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/objectId@1",
+            "kind": "scalar"
+          }
         },
         "email": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         },
         "name": {
-          "codecId": "mongo/string@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {

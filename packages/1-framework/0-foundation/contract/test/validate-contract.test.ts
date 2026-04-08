@@ -13,7 +13,7 @@ function minimalContract(overrides?: Partial<Contract>): Record<string, unknown>
     roots: { users: 'User' },
     models: {
       User: {
-        fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+        fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
         relations: {},
         storage: { table: 'user' },
       },
@@ -115,11 +115,23 @@ describe('validateContract', () => {
     }
   });
 
+  it('preserves valueObjects when present', () => {
+    const vo = {
+      Address: {
+        fields: {
+          street: { nullable: false, type: { kind: 'scalar' as const, codecId: 'pg/text@1' } },
+        },
+      },
+    };
+    const result = validateContract<Contract>(minimalContract({ valueObjects: vo }), noopValidator);
+    expect(result.valueObjects).toEqual(vo);
+  });
+
   it('does not reject orphaned models (advisory, not a load-time error)', () => {
     const raw = minimalContract({
       models: {
         User: {
-          fields: { id: { nullable: false, codecId: 'pg/int4@1' } },
+          fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
           relations: {},
           storage: { table: 'user' },
         },

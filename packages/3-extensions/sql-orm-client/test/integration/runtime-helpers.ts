@@ -120,7 +120,8 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
       id integer primary key,
       name text not null,
       email text not null,
-      invited_by_id integer
+      invited_by_id integer,
+      address jsonb
     )
   `);
 

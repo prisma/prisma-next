@@ -1,15 +1,24 @@
-import type { ContractModel } from '@prisma-next/contract/types';
+import type {
+  ContractField,
+  ContractModel,
+  ContractValueObject,
+} from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { describe, expect, it, vi } from 'vitest';
 import {
   deduplicateImports,
   generateCodecTypeIntersection,
+  generateContractFieldDescriptor,
+  generateFieldResolvedType,
   generateHashTypeAliases,
   generateImportLines,
   generateModelFieldsType,
   generateModelRelationsType,
   generateModelsType,
   generateRootsType,
+  generateValueObjectsDescriptorType,
+  generateValueObjectType,
+  generateValueObjectTypeAliases,
   serializeExecutionType,
   serializeObjectKey,
   serializeValue,
@@ -85,31 +94,31 @@ describe('generateModelFieldsType', () => {
     expect(generateModelFieldsType({})).toBe('Record<string, never>');
   });
 
-  it('generates field with codecId and nullable', () => {
+  it('generates field with type descriptor and nullable', () => {
     const result = generateModelFieldsType({
-      name: { codecId: 'sql/text@1', nullable: false },
+      name: { type: { kind: 'scalar', codecId: 'sql/text@1' }, nullable: false },
     });
     expect(result).toBe(
-      "{ readonly name: { readonly codecId: 'sql/text@1'; readonly nullable: false } }",
+      "{ readonly name: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'sql/text@1' } } }",
     );
   });
 
   it('generates multiple fields', () => {
     const result = generateModelFieldsType({
-      id: { codecId: 'sql/int4@1', nullable: false },
-      email: { codecId: 'sql/text@1', nullable: true },
+      id: { type: { kind: 'scalar', codecId: 'sql/int4@1' }, nullable: false },
+      email: { type: { kind: 'scalar', codecId: 'sql/text@1' }, nullable: true },
     });
     expect(result).toContain(
-      "readonly id: { readonly codecId: 'sql/int4@1'; readonly nullable: false }",
+      "readonly id: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'sql/int4@1' } }",
     );
     expect(result).toContain(
-      "readonly email: { readonly codecId: 'sql/text@1'; readonly nullable: true }",
+      "readonly email: { readonly nullable: true; readonly type: { readonly kind: 'scalar'; readonly codecId: 'sql/text@1' } }",
     );
   });
 
   it('quotes keys with special characters', () => {
     const result = generateModelFieldsType({
-      'field-name': { codecId: 'sql/text@1', nullable: false },
+      'field-name': { type: { kind: 'scalar', codecId: 'sql/text@1' }, nullable: false },
     });
     expect(result).toContain("readonly 'field-name':");
   });
@@ -134,7 +143,7 @@ describe('generateModelsType', () => {
   it('generates model with fields, relations, and storage', () => {
     const models: Record<string, ContractModel> = {
       User: makeModel({
-        fields: { name: { codecId: 'sql/text@1', nullable: false } },
+        fields: { name: { type: { kind: 'scalar', codecId: 'sql/text@1' }, nullable: false } },
         relations: { posts: { to: 'Post', cardinality: '1:N' } },
       }),
     };
@@ -422,5 +431,246 @@ describe('serializeExecutionType', () => {
     });
     expect(result).toContain('readonly mutations:');
     expect(result).toContain("readonly kind: 'autoIncrement'");
+  });
+});
+
+describe('generateFieldResolvedType', () => {
+  it('generates CodecTypes lookup for scalar fields', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+    };
+    expect(generateFieldResolvedType(field)).toBe("CodecTypes['mongo/string@1']['output']");
+  });
+
+  it('generates named type reference for value object fields', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'valueObject', name: 'Address' },
+    };
+    expect(generateFieldResolvedType(field)).toBe('Address');
+  });
+
+  it('wraps in ReadonlyArray for many: true', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'valueObject', name: 'Address' },
+      many: true,
+    };
+    expect(generateFieldResolvedType(field)).toBe('ReadonlyArray<Address>');
+  });
+
+  it('wraps in Readonly<Record> for dict: true', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+      dict: true,
+    };
+    expect(generateFieldResolvedType(field)).toBe(
+      "Readonly<Record<string, CodecTypes['mongo/string@1']['output']>>",
+    );
+  });
+
+  it('appends | null for nullable: true', () => {
+    const field: ContractField = {
+      nullable: true,
+      type: { kind: 'valueObject', name: 'Address' },
+    };
+    expect(generateFieldResolvedType(field)).toBe('Address | null');
+  });
+
+  it('combines many and nullable', () => {
+    const field: ContractField = {
+      nullable: true,
+      type: { kind: 'valueObject', name: 'Address' },
+      many: true,
+    };
+    expect(generateFieldResolvedType(field)).toBe('ReadonlyArray<Address> | null');
+  });
+
+  it('handles union types', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: {
+        kind: 'union',
+        members: [
+          { kind: 'scalar', codecId: 'mongo/string@1' },
+          { kind: 'valueObject', name: 'Address' },
+        ],
+      },
+    };
+    expect(generateFieldResolvedType(field)).toBe(
+      "CodecTypes['mongo/string@1']['output'] | Address",
+    );
+  });
+});
+
+describe('generateValueObjectType', () => {
+  const addressVo: ContractValueObject = {
+    fields: {
+      street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+      city: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+      zip: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+    },
+  };
+  const valueObjects: Record<string, ContractValueObject> = { Address: addressVo };
+
+  it('generates object type with all fields', () => {
+    const result = generateValueObjectType('Address', addressVo, valueObjects);
+    expect(result).toContain("readonly street: CodecTypes['mongo/string@1']['output']");
+    expect(result).toContain("readonly city: CodecTypes['mongo/string@1']['output']");
+    expect(result).toContain("readonly zip: CodecTypes['mongo/string@1']['output']");
+  });
+
+  it('handles value object field referencing another value object', () => {
+    const companyVo: ContractValueObject = {
+      fields: {
+        name: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        address: { nullable: false, type: { kind: 'valueObject', name: 'Address' } },
+      },
+    };
+    const vos = { ...valueObjects, Company: companyVo };
+    const result = generateValueObjectType('Company', companyVo, vos);
+    expect(result).toContain('readonly address: Address');
+  });
+
+  it('handles self-referencing value object (no infinite recursion)', () => {
+    const navItemVo: ContractValueObject = {
+      fields: {
+        label: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        children: {
+          nullable: false,
+          type: { kind: 'valueObject', name: 'NavItem' },
+          many: true,
+        },
+      },
+    };
+    const vos = { NavItem: navItemVo };
+    const result = generateValueObjectType('NavItem', navItemVo, vos);
+    expect(result).toContain('readonly children: ReadonlyArray<NavItem>');
+  });
+
+  it('returns Record<string, never> for empty value object', () => {
+    const emptyVo: ContractValueObject = { fields: {} };
+    expect(generateValueObjectType('Empty', emptyVo, {})).toBe('Record<string, never>');
+  });
+});
+
+describe('generateContractFieldDescriptor', () => {
+  it('generates scalar field descriptor', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/text@1' },
+    };
+    const result = generateContractFieldDescriptor('name', field);
+    expect(result).toBe(
+      "readonly name: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' } }",
+    );
+  });
+
+  it('generates value object field descriptor', () => {
+    const field: ContractField = {
+      nullable: true,
+      type: { kind: 'valueObject', name: 'Address' },
+    };
+    const result = generateContractFieldDescriptor('homeAddress', field);
+    expect(result).toBe(
+      "readonly homeAddress: { readonly nullable: true; readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' } }",
+    );
+  });
+
+  it('includes many modifier', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'valueObject', name: 'Address' },
+      many: true,
+    };
+    const result = generateContractFieldDescriptor('addresses', field);
+    expect(result).toContain('; readonly many: true');
+  });
+
+  it('includes dict modifier', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+      dict: true,
+    };
+    const result = generateContractFieldDescriptor('labels', field);
+    expect(result).toContain('; readonly dict: true');
+  });
+
+  it('includes typeParams for scalar fields', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/vector@1', typeParams: { length: 1536 } },
+    };
+    const result = generateContractFieldDescriptor('embedding', field);
+    expect(result).toContain('readonly typeParams: { readonly length: 1536 }');
+  });
+});
+
+describe('generateValueObjectsDescriptorType', () => {
+  it('returns Record<string, never> for undefined', () => {
+    expect(generateValueObjectsDescriptorType(undefined)).toBe('Record<string, never>');
+  });
+
+  it('returns Record<string, never> for empty', () => {
+    expect(generateValueObjectsDescriptorType({})).toBe('Record<string, never>');
+  });
+
+  it('generates descriptor with fields for each value object', () => {
+    const valueObjects: Record<string, ContractValueObject> = {
+      Address: {
+        fields: {
+          street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        },
+      },
+    };
+    const result = generateValueObjectsDescriptorType(valueObjects);
+    expect(result).toContain('readonly Address: { readonly fields:');
+    expect(result).toContain("readonly kind: 'scalar'");
+    expect(result).toContain("readonly codecId: 'mongo/string@1'");
+  });
+});
+
+describe('generateValueObjectTypeAliases', () => {
+  it('returns empty string for undefined', () => {
+    expect(generateValueObjectTypeAliases(undefined)).toBe('');
+  });
+
+  it('returns empty string for empty', () => {
+    expect(generateValueObjectTypeAliases({})).toBe('');
+  });
+
+  it('generates export type alias for each value object', () => {
+    const valueObjects: Record<string, ContractValueObject> = {
+      Address: {
+        fields: {
+          street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        },
+      },
+    };
+    const result = generateValueObjectTypeAliases(valueObjects);
+    expect(result).toContain('export type Address =');
+    expect(result).toContain("readonly street: CodecTypes['mongo/string@1']['output']");
+  });
+
+  it('generates multiple type aliases', () => {
+    const valueObjects: Record<string, ContractValueObject> = {
+      Address: {
+        fields: {
+          street: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        },
+      },
+      GeoPoint: {
+        fields: {
+          lat: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/double@1' } },
+          lng: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/double@1' } },
+        },
+      },
+    };
+    const result = generateValueObjectTypeAliases(valueObjects);
+    expect(result).toContain('export type Address =');
+    expect(result).toContain('export type GeoPoint =');
   });
 });

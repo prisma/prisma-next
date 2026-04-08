@@ -7,6 +7,7 @@ import type {
   Contract,
   ContractField,
   ContractReferenceRelation,
+  ContractValueObject,
 } from '@prisma-next/contract/types';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -58,6 +59,40 @@ function resolveFieldCodecId(
   return scalarTypeDescriptors.get(field.typeName);
 }
 
+function resolveNonRelationField(
+  field: PslField,
+  ownerName: string,
+  compositeTypeNames: ReadonlySet<string>,
+  scalarTypeDescriptors: ReadonlyMap<string, string>,
+  sourceId: string,
+  diagnostics: ContractSourceDiagnostic[],
+): ContractField | undefined {
+  if (compositeTypeNames.has(field.typeName)) {
+    const result: ContractField = {
+      type: { kind: 'valueObject', name: field.typeName },
+      nullable: field.optional,
+    };
+    return field.list ? { ...result, many: true } : result;
+  }
+
+  const codecId = resolveFieldCodecId(field, scalarTypeDescriptors);
+  if (!codecId) {
+    diagnostics.push({
+      code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+      message: `Field "${ownerName}.${field.name}" type "${field.typeName}" is not supported in Mongo PSL interpreter`,
+      sourceId,
+      span: field.span,
+    });
+    return undefined;
+  }
+
+  const result: ContractField = {
+    type: { kind: 'scalar', codecId },
+    nullable: field.optional,
+  };
+  return field.list ? { ...result, many: true } : result;
+}
+
 export function interpretPslDocumentToMongoContract(
   input: InterpretPslDocumentToMongoContractInput,
 ): Result<Contract, ContractSourceDiagnostics> {
@@ -65,6 +100,7 @@ export function interpretPslDocumentToMongoContract(
   const sourceId = document.ast.sourceId;
   const diagnostics: ContractSourceDiagnostic[] = [];
   const modelNames = new Set(document.ast.models.map((m) => m.name));
+  const compositeTypeNames = new Set(document.ast.compositeTypes.map((ct) => ct.name));
 
   interface MutableDomainModel {
     readonly fields: Record<string, ContractField>;
@@ -142,32 +178,18 @@ export function interpretPslDocumentToMongoContract(
         continue;
       }
 
-      if (field.list) {
-        diagnostics.push({
-          code: 'PSL_UNSUPPORTED_LIST_FIELD',
-          message: `Field "${pslModel.name}.${field.name}" is a scalar list (${field.typeName}[]). Scalar list fields are not yet supported in the Mongo interpreter.`,
-          sourceId,
-          span: field.span,
-        });
-        continue;
-      }
-
-      const codecId = resolveFieldCodecId(field, scalarTypeDescriptors);
-      if (!codecId) {
-        diagnostics.push({
-          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
-          message: `Field "${pslModel.name}.${field.name}" type "${field.typeName}" is not supported in Mongo PSL interpreter`,
-          sourceId,
-          span: field.span,
-        });
-        continue;
-      }
+      const resolved = resolveNonRelationField(
+        field,
+        pslModel.name,
+        compositeTypeNames,
+        scalarTypeDescriptors,
+        sourceId,
+        diagnostics,
+      );
+      if (!resolved) continue;
 
       const mappedName = fieldMappings.pslNameToMapped.get(field.name) ?? field.name;
-      fields[mappedName] = {
-        codecId,
-        nullable: field.optional,
-      };
+      fields[mappedName] = resolved;
     }
 
     const hasIdField = pslModel.fields.some((f) => getAttribute(f.attributes, 'id') !== undefined);
@@ -182,6 +204,24 @@ export function interpretPslDocumentToMongoContract(
     models[pslModel.name] = { fields, relations, storage: { collection: collectionName } };
     collections[collectionName] = {};
     roots[collectionName] = pslModel.name;
+  }
+
+  const valueObjects: Record<string, ContractValueObject> = {};
+  for (const compositeType of document.ast.compositeTypes) {
+    const fields: Record<string, ContractField> = {};
+    for (const field of compositeType.fields) {
+      const resolved = resolveNonRelationField(
+        field,
+        compositeType.name,
+        compositeTypeNames,
+        scalarTypeDescriptors,
+        sourceId,
+        diagnostics,
+      );
+      if (!resolved) continue;
+      fields[field.name] = resolved;
+    }
+    valueObjects[compositeType.name] = { fields };
   }
 
   const fkRelationsByPair = new Map<string, FkRelation[]>();
@@ -253,6 +293,7 @@ export function interpretPslDocumentToMongoContract(
     target,
     roots,
     models,
+    ...(Object.keys(valueObjects).length > 0 ? { valueObjects } : {}),
     storage: { ...storageWithoutHash, storageHash },
     extensionPacks: {},
     capabilities,

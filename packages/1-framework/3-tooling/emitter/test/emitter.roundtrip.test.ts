@@ -1,5 +1,4 @@
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
-import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
@@ -33,12 +32,10 @@ describe('emitter round-trip', () => {
         },
       });
 
-      const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,
@@ -73,20 +70,34 @@ describe('emitter round-trip', () => {
       const ir = createTestContract({
         models: {
           User: {
-            storage: { table: 'user' },
+            storage: {
+              table: 'user',
+              fields: {
+                id: { column: 'id' },
+                email: { column: 'email' },
+                name: { column: 'name' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              email: { column: 'email' },
-              name: { column: 'name' },
+              id: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false },
+              email: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+              name: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: true },
             },
             relations: {},
           },
           Post: {
-            storage: { table: 'post' },
+            storage: {
+              table: 'post',
+              fields: {
+                id: { column: 'id' },
+                title: { column: 'title' },
+                userId: { column: 'user_id' },
+              },
+            },
             fields: {
-              id: { column: 'id' },
-              title: { column: 'title' },
-              userId: { column: 'user_id' },
+              id: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false },
+              title: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+              userId: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false },
             },
             relations: {},
           },
@@ -128,12 +139,10 @@ describe('emitter round-trip', () => {
         },
       });
 
-      const operationRegistry = createOperationRegistry();
       const codecTypeImports: TypesImportSpec[] = [];
       const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres'];
       const options: EmitStackInput = {
-        operationRegistry,
         codecTypeImports,
         operationTypeImports,
         extensionIds,
@@ -185,12 +194,10 @@ describe('emitter round-trip', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const codecTypeImports: TypesImportSpec[] = [];
     const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres', 'pg'];
     const options: EmitStackInput = {
-      operationRegistry,
       codecTypeImports,
       operationTypeImports,
       extensionIds,
@@ -256,12 +263,10 @@ describe('emitter round-trip', () => {
       },
     });
 
-    const operationRegistry = createOperationRegistry();
     const codecTypeImports: TypesImportSpec[] = [];
     const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres', 'pg'];
     const options: EmitStackInput = {
-      operationRegistry,
       codecTypeImports,
       operationTypeImports,
       extensionIds,

@@ -553,7 +553,7 @@ describe('emit command', () => {
           join(testDirPsl, 'schema.prisma'),
           `model Post {
   id Int @id
-  tags String[]
+  data Unsupported
 }
 `,
           'utf-8',
@@ -581,13 +581,13 @@ describe('emit command', () => {
 
         expect(sourceResult.ok).toBe(false);
         if (sourceResult.ok) {
-          throw new Error('Expected source provider to fail for unsupported list field');
+          throw new Error('Expected source provider to fail for unsupported field type');
         }
         expect(sourceResult.failure.summary).toBe('PSL to SQL contract interpretation failed');
         expect(sourceResult.failure.diagnostics).toEqual(
           expect.arrayContaining([
             expect.objectContaining({
-              code: 'PSL_UNSUPPORTED_FIELD_LIST',
+              code: 'PSL_UNSUPPORTED_FIELD_TYPE',
               sourceId: './schema.prisma',
               span: expect.objectContaining({
                 start: expect.objectContaining({ line: 3 }),
@@ -608,7 +608,7 @@ describe('emit command', () => {
 
         const errorOutput = consoleErrors.join('\n');
         expect(errorOutput).toContain('PSL to SQL contract interpretation failed');
-        expect(errorOutput).toContain('PSL_UNSUPPORTED_FIELD_LIST');
+        expect(errorOutput).toContain('PSL_UNSUPPORTED_FIELD_TYPE');
         expect(errorOutput).toContain('schema.prisma');
       } finally {
         cleanupPsl();
@@ -713,8 +713,14 @@ model Post {
           models: {
             User: expect.objectContaining({
               fields: expect.objectContaining({
-                _id: { codecId: 'mongo/objectId@1', nullable: false },
-                name: { codecId: 'mongo/string@1', nullable: false },
+                _id: {
+                  type: { kind: 'scalar', codecId: 'mongo/objectId@1' },
+                  nullable: false,
+                },
+                name: {
+                  type: { kind: 'scalar', codecId: 'mongo/string@1' },
+                  nullable: false,
+                },
               }),
             }),
             Post: expect.objectContaining({

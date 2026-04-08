@@ -10,7 +10,13 @@
     "User": {
       "fields": {
         "id": {
-          "codecId": "sql/char@1",
+          "type": {
+            "kind": "scalar",
+            "codecId": "sql/char@1",
+            "typeParams": {
+              "length": 36
+            }
+          },
           "nullable": false
         }
       },

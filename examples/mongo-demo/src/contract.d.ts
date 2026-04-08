@@ -5,6 +5,7 @@ import type { CodecTypes as MongoCodecTypes } from '@prisma-next/adapter-mongo/c
 
 import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-contract';
 import type {
+  Contract as ContractType,
   ExecutionHashBase,
   ProfileHashBase,
   StorageHashBase,
@@ -18,43 +19,46 @@ export type ProfileHash =
 
 export type CodecTypes = MongoCodecTypes;
 export type OperationTypes = Record<string, never>;
+
+export type Address = {
+  readonly street: CodecTypes['mongo/string@1']['output'];
+  readonly city: CodecTypes['mongo/string@1']['output'];
+  readonly zip: CodecTypes['mongo/string@1']['output'] | null;
+  readonly country: CodecTypes['mongo/string@1']['output'];
+};
 export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes>;
 
-type ContractBase = {
-  readonly target: 'mongo';
-  readonly targetFamily: 'mongo';
-  readonly profileHash: ProfileHash;
-  readonly capabilities: {};
-  readonly extensionPacks: {};
-  readonly meta: {};
-  readonly roots: { readonly users: 'User'; readonly posts: 'Post' };
-  readonly models: {
-    readonly User: {
-      readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly name: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly email: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly bio: { readonly codecId: 'mongo/string@1'; readonly nullable: true };
-      };
-      readonly relations: {
-        readonly posts: {
-          readonly to: 'Post';
-          readonly cardinality: '1:N';
-          readonly on: {
-            readonly localFields: readonly ['_id'];
-            readonly targetFields: readonly ['authorId'];
-          };
-        };
-      };
-      readonly storage: { readonly collection: 'users' };
+type ContractBase = ContractType<
+  {
+    readonly collections: {
+      readonly users: Record<string, never>;
+      readonly posts: Record<string, never>;
     };
+    readonly storageHash: StorageHash;
+  },
+  {
     readonly Post: {
       readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly title: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly content: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly authorId: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
+        readonly _id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+        };
+        readonly title: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly content: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly authorId: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+        };
+        readonly createdAt: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/date@1' };
+        };
       };
       readonly relations: {
         readonly author: {
@@ -68,14 +72,72 @@ type ContractBase = {
       };
       readonly storage: { readonly collection: 'posts' };
     };
-  };
-  readonly storage: {
-    readonly collections: {
-      readonly users: Record<string, never>;
-      readonly posts: Record<string, never>;
+    readonly User: {
+      readonly fields: {
+        readonly _id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+        };
+        readonly name: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly email: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly bio: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly address: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+        };
+      };
+      readonly relations: {
+        readonly posts: {
+          readonly to: 'Post';
+          readonly cardinality: '1:N';
+          readonly on: {
+            readonly localFields: readonly ['_id'];
+            readonly targetFields: readonly ['authorId'];
+          };
+        };
+      };
+      readonly storage: { readonly collection: 'users' };
     };
-    readonly storageHash: StorageHash;
+  }
+> & {
+  readonly target: 'mongo';
+  readonly targetFamily: 'mongo';
+  readonly roots: { readonly users: 'User'; readonly posts: 'Post' };
+  readonly capabilities: {};
+  readonly extensionPacks: {};
+  readonly meta: {};
+  readonly valueObjects: {
+    readonly Address: {
+      readonly fields: {
+        readonly street: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly city: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly zip: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly country: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+      };
+    };
   };
+  readonly profileHash: ProfileHash;
 };
 
 export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;

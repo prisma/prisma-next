@@ -65,11 +65,26 @@ type GeneratedLikeContractBase = Contract<
         };
       };
       fields: {
-        id: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        name: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        email: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        active: { readonly nullable: false; readonly codecId: 'pg/bool@1' };
-        metadata: { readonly nullable: false; readonly codecId: 'pg/jsonb@1' };
+        id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        name: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        email: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        active: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+          readonly nullable: false;
+        };
+        metadata: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+          readonly nullable: false;
+        };
       };
       relations: {
         posts: {
@@ -92,9 +107,18 @@ type GeneratedLikeContractBase = Contract<
         };
       };
       fields: {
-        id: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        userId: { readonly nullable: false; readonly codecId: 'pg/text@1' };
-        title: { readonly nullable: false; readonly codecId: 'pg/text@1' };
+        id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        userId: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        title: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
       };
       relations: Record<string, never>;
     };
@@ -314,3 +338,125 @@ userCollection.where((u) => u.metadata.like('%'));
 userCollection.where((u) => u.metadata.ilike('%'));
 // @ts-expect-error jsonb has no order trait → asc not available
 userCollection.orderBy((u) => u.metadata.asc());
+
+// ---------------------------------------------------------------------------
+// Value object fields: row type resolves to expanded nested structure
+// ---------------------------------------------------------------------------
+
+type VOCodecTypes = {
+  'pg/int4@1': {
+    output: number;
+    traits: 'equality' | 'order' | 'numeric';
+  };
+  'pg/text@1': {
+    output: string;
+    traits: 'equality' | 'order' | 'textual';
+  };
+  'pg/jsonb@1': {
+    output: unknown;
+    traits: 'equality';
+  };
+};
+
+type VOTypeMaps = TypeMaps<VOCodecTypes>;
+
+type VOContractBase = Contract<
+  {
+    storageHash: StorageHashBase<string>;
+    tables: {
+      users: {
+        columns: {
+          id: { nativeType: 'int4'; codecId: 'pg/int4@1'; nullable: false };
+          name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+          home_address: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: true };
+          work_address: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
+        };
+        primaryKey: { columns: ['id'] };
+        uniques: [];
+        indexes: [];
+        foreignKeys: [];
+      };
+    };
+  },
+  {
+    User: {
+      storage: {
+        table: 'users';
+        fields: {
+          id: { column: 'id' };
+          name: { column: 'name' };
+          homeAddress: { column: 'home_address' };
+          workAddress: { column: 'work_address' };
+        };
+      };
+      fields: {
+        id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          readonly nullable: false;
+        };
+        name: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        homeAddress: {
+          readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+          readonly nullable: true;
+        };
+        workAddress: {
+          readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+          readonly nullable: false;
+        };
+      };
+      relations: Record<string, never>;
+    };
+  }
+> & {
+  readonly target: 'postgres';
+  readonly roots: { readonly users: 'User' };
+  readonly valueObjects: {
+    readonly Address: {
+      readonly fields: {
+        readonly street: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        readonly city: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        readonly zip: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+      };
+    };
+  };
+  readonly capabilities: Record<string, never>;
+  readonly extensionPacks: Record<string, never>;
+  readonly profileHash: string;
+};
+
+type VOContract = ContractWithTypeMaps<VOContractBase, VOTypeMaps>;
+
+type ExpectedAddressShape = { street: string; city: string; zip: string };
+
+type VOUserRow = import('../src/types').DefaultModelRow<VOContract, 'User'>;
+type VOCreateInput = import('../src/types').CreateInput<VOContract, 'User'>;
+type VOUpdateInput = import('../src/types').MutationUpdateInput<VOContract, 'User'>;
+
+export type ValueObjectTypeAssertions = [
+  Assert<Equal<VOUserRow['id'], number>>,
+  Assert<Equal<VOUserRow['name'], string>>,
+  Assert<Equal<VOUserRow['homeAddress'], ExpectedAddressShape | null>>,
+  Assert<Equal<VOUserRow['workAddress'], ExpectedAddressShape>>,
+];
+
+export type ValueObjectCreateInputAssertions = [
+  Assert<Equal<VOCreateInput['homeAddress'], ExpectedAddressShape | null | undefined>>,
+  Assert<Equal<VOCreateInput['workAddress'], ExpectedAddressShape>>,
+];
+
+export type ValueObjectUpdateInputAssertions = [
+  Assert<Equal<VOUpdateInput['homeAddress'], ExpectedAddressShape | null | undefined>>,
+  Assert<Equal<VOUpdateInput['workAddress'], ExpectedAddressShape | undefined>>,
+];

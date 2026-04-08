@@ -623,7 +623,7 @@ function createPlannerControlHookComponent(
     familyId: 'sql',
     targetId: 'postgres',
     version: '0.0.0-test',
-    operationSignatures: () => [],
+
     create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
     types: {
       codecTypes: {

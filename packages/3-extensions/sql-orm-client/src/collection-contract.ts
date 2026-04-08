@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractFieldType } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RelationCardinalityTag } from './types';
 
@@ -6,7 +6,7 @@ type ModelStorageFields = Record<string, { column?: string }>;
 type ModelEntry = {
   storage?: { table?: string; fields?: ModelStorageFields };
   relations?: Record<string, unknown>;
-  fields?: Record<string, { codecId?: string }>;
+  fields?: Record<string, { type?: ContractFieldType }>;
 };
 type ModelsMap = Record<string, ModelEntry>;
 

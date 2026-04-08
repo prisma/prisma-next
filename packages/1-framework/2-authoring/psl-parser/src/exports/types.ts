@@ -6,6 +6,7 @@ export type {
   PslAttributeNamedArgument,
   PslAttributePositionalArgument,
   PslAttributeTarget,
+  PslCompositeType,
   PslDefaultFunctionValue,
   PslDefaultLiteralValue,
   PslDefaultValue,

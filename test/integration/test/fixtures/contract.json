@@ -10,16 +10,25 @@
     "User": {
       "fields": {
         "createdAt": {
-          "codecId": "pg/timestamptz@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         },
         "email": {
-          "codecId": "pg/text@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "id": {
-          "codecId": "pg/int4@1",
-          "nullable": false
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
