@@ -1,6 +1,56 @@
 # MongoSchemaIR Design
 
-The Mongo Schema IR represents the expected server-side state of a MongoDB deployment. It is the Mongo equivalent of `SqlSchemaIR` — the "current database shape" that the planner diffs against the destination contract to produce migration operations.
+## What we're modeling
+
+A MongoDB `users` collection has a unique ascending index on `email` and a compound index on `{ lastName: 1, firstName: 1 }`. The `orders` collection has a TTL index that expires documents after 24 hours. We need a representation of this server-side state that the planner can diff.
+
+Here is the concrete IR for that scenario:
+
+```typescript
+const ir: MongoSchemaIR = {
+  collections: {
+    users: new MongoSchemaCollection({
+      name: 'users',
+      indexes: [
+        new MongoSchemaIndex({
+          keys: [{ field: 'email', direction: 1 }],
+          unique: true,
+        }),
+        new MongoSchemaIndex({
+          keys: [
+            { field: 'lastName', direction: 1 },
+            { field: 'firstName', direction: 1 },
+          ],
+        }),
+      ],
+    }),
+    orders: new MongoSchemaCollection({
+      name: 'orders',
+      indexes: [
+        new MongoSchemaIndex({
+          keys: [{ field: 'createdAt', direction: 1 }],
+          expireAfterSeconds: 86400,
+        }),
+      ],
+    }),
+  },
+};
+```
+
+## Decision
+
+We represent MongoDB server-side state as an immutable class-based AST — the `MongoSchemaIR`. This follows the pattern used by the SQL query AST, Mongo pipeline AST, and Mongo expression AST in this codebase.
+
+## MongoDB server-side state
+
+MongoDB has a small set of server-side objects that a migration system needs to manage. The IR models each of them:
+
+| MongoSchemaIR node | MongoDB server concept | How to read (future introspection) | How to write (runner) |
+|---|---|---|---|
+| `MongoSchemaCollection` | A collection | `db.listCollections()` | `db.createCollection()` |
+| `MongoSchemaIndex` | An index on a collection | `collection.listIndexes()` | `collection.createIndex()` / `dropIndex()` |
+| `MongoSchemaValidator` | `$jsonSchema` validator | `listCollections()` returns `options.validator` | `db.runCommand({ collMod, validator })` |
+| `MongoSchemaCollectionOptions` | Capped, timeseries, collation, etc. | `listCollections()` returns `options` | `db.createCollection(opts)` / `collMod` |
 
 ## Role in the migration pipeline
 
@@ -20,6 +70,15 @@ The IR serves two producers:
 
 Both produce the same `MongoSchemaIR`, so the planner doesn't know or care where the IR came from.
 
+## Contract types vs Schema IR
+
+The contract type `MongoStorageCollection` (in `@prisma-next/mongo-contract`) describes the **desired** state — what the user declared. The schema IR describes the **current** state — what exists (or should exist) on the server. They carry similar information but serve different purposes:
+
+- **Contract**: canonical, hash-stable, part of `contract.json`. Contains indexes, validator, options as declared by the user.
+- **Schema IR**: ephemeral, constructed for diffing. Contains the same structural information but in an AST form optimized for comparison.
+
+`contractToSchema()` bridges the two — it reads the contract's `storage.collections` and constructs a `MongoSchemaIR`. The planner then diffs this against the destination contract's schema IR.
+
 ## Design pattern
 
 Follows the class-based AST pattern proven in the SQL query AST (`AstNode`), Mongo pipeline AST (`MongoStageNode`), and Mongo expression AST (`MongoAggExprNode`):
@@ -29,15 +88,22 @@ Follows the class-based AST pattern proven in the SQL query AST (`AstNode`), Mon
 - **Union types** — `type AnyMongoSchemaNode = MongoSchemaCollection | MongoSchemaIndex | ...`
 - **Visitor interface** — `MongoSchemaVisitor<R>` with one method per concrete node type
 
-### Why classes (not plain types like `SqlSchemaIR`)
-
-`SqlSchemaIR` uses plain TypeScript types (`SqlTableIR`, `SqlColumnIR`, etc.). Mongo uses classes because:
-
-1. **Immutability guarantee.** `freeze()` is runtime-enforced, not just `readonly` annotations. This matters because schema IRs flow through diffing, planning, and serialization — accidental mutation during diffing would produce subtle bugs.
-2. **Visitor dispatch.** The planner diffs the IR structurally. Visitor dispatch via `accept()` is cleaner and more extensible than `switch (node.kind)` — adding a new node type is a compile error in every visitor, not a silent fallthrough.
-3. **Consistency.** Every other AST in the Mongo family uses this pattern. Developers working on the Mongo migration system encounter the same idioms they use for queries and expressions.
-
 ## Node types
+
+### `MongoIndexKey`
+
+The smallest building block — a single field in an index key specification:
+
+```typescript
+interface MongoIndexKey {
+  readonly field: string;
+  readonly direction: MongoIndexKeyDirection;
+}
+
+type MongoIndexKeyDirection = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
+```
+
+The `field` can be a dot-path (e.g. `"address.city"`) for indexes on nested document fields, or `"$**"` for wildcard indexes.
 
 ### `MongoSchemaNode` (abstract base)
 
@@ -55,7 +121,7 @@ abstract class MongoSchemaNode {
 
 ### `MongoSchemaIndex`
 
-Represents a single index on a collection. This is the primary node for M1.
+Represents a single index on a collection.
 
 ```typescript
 class MongoSchemaIndex extends MongoSchemaNode {
@@ -88,22 +154,9 @@ class MongoSchemaIndex extends MongoSchemaNode {
 }
 ```
 
-**`MongoIndexKey`** — represents a single field in an index key specification:
-
-```typescript
-interface MongoIndexKey {
-  readonly field: string;
-  readonly direction: MongoIndexKeyDirection;
-}
-
-type MongoIndexKeyDirection = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
-```
-
-The `field` can be a dot-path (e.g. `"address.city"`) for indexes on nested document fields, or `"$**"` for wildcard indexes.
-
 ### `MongoSchemaValidator`
 
-Represents a `$jsonSchema` validator on a collection. Added in M2.
+Represents a `$jsonSchema` validator on a collection (M2).
 
 ```typescript
 class MongoSchemaValidator extends MongoSchemaNode {
@@ -132,7 +185,7 @@ class MongoSchemaValidator extends MongoSchemaNode {
 
 ### `MongoSchemaCollectionOptions`
 
-Represents collection-level configuration. Added in M2.
+Represents collection-level configuration (M2).
 
 ```typescript
 class MongoSchemaCollectionOptions extends MongoSchemaNode {
@@ -152,7 +205,7 @@ class MongoSchemaCollectionOptions extends MongoSchemaNode {
 
 ### `MongoSchemaCollection`
 
-Represents a collection with all its server-side configuration. This is the "table" equivalent.
+Represents a collection with all its server-side configuration — the "table" equivalent.
 
 ```typescript
 class MongoSchemaCollection extends MongoSchemaNode {
@@ -194,7 +247,7 @@ interface MongoSchemaIR {
 
 An empty IR (for new projects) is `{ collections: {} }`.
 
-## Union and visitor types
+### Union and visitor types
 
 ```typescript
 type AnyMongoSchemaNode =
@@ -238,15 +291,6 @@ function indexesEquivalent(a: MongoSchemaIndex, b: MongoSchemaIndex): boolean {
 }
 ```
 
-## How it maps to MongoDB server-side state
-
-| MongoSchemaIR node | MongoDB server concept | How to read (future introspection) | How to write (runner) |
-|---|---|---|---|
-| `MongoSchemaCollection` | A collection | `db.listCollections()` | `db.createCollection()` |
-| `MongoSchemaIndex` | An index on a collection | `collection.listIndexes()` | `collection.createIndex()` / `dropIndex()` |
-| `MongoSchemaValidator` | `$jsonSchema` validator | `listCollections()` returns `options.validator` | `db.runCommand({ collMod, validator })` |
-| `MongoSchemaCollectionOptions` | Capped, timeseries, collation, etc. | `listCollections()` returns `options` | `db.createCollection(opts)` / `collMod` |
-
 ## Package placement
 
 New package: `@prisma-next/mongo-schema-ir` under `packages/2-mongo-family/` in the tooling layer, migration plane. This mirrors `@prisma-next/sql-schema-ir` in the SQL domain.
@@ -259,15 +303,16 @@ The package exports:
 - The `MongoIndexKey` type and `MongoIndexKeyDirection` type
 - The `indexesEquivalent` helper
 
-## Relationship to contract types
+## Alternatives considered
 
-The contract type `MongoStorageCollection` (in `@prisma-next/mongo-contract`) describes the **desired** state — what the user declared. The schema IR describes the **current** state — what exists (or should exist) on the server. They carry similar information but serve different purposes:
+### Plain types (like `SqlSchemaIR`)
 
-- **Contract**: canonical, hash-stable, part of `contract.json`. Contains indexes, validator, options as declared by the user.
-- **Schema IR**: ephemeral, constructed for diffing. Contains the same structural information but in an AST form optimized for comparison.
+`SqlSchemaIR` uses plain TypeScript types (`SqlTableIR`, `SqlColumnIR`, etc.). We considered the same approach for Mongo but chose classes because:
 
-`contractToSchema()` bridges the two — it reads the contract's `storage.collections` and constructs a `MongoSchemaIR`. The planner then diffs this against the destination contract's schema IR.
+1. **Immutability guarantee.** `freeze()` is runtime-enforced, not just `readonly` annotations. This matters because schema IRs flow through diffing, planning, and serialization — accidental mutation during diffing would produce subtle bugs.
+2. **Visitor dispatch.** The planner diffs the IR structurally. Visitor dispatch via `accept()` is cleaner and more extensible than `switch (node.kind)` — adding a new node type is a compile error in every visitor, not a silent fallthrough.
+3. **Consistency.** Every other AST in the Mongo family uses this pattern. Developers working on the Mongo migration system encounter the same idioms they use for queries and expressions.
 
 ## M1 scope
 
-For Milestone 1, only `MongoSchemaCollection` and `MongoSchemaIndex` are implemented. The visitor interface includes all methods from the start (returning `never` or throwing for unimplemented nodes) to ensure compile-time safety when M2 adds validators and options.
+Only `MongoSchemaCollection` and `MongoSchemaIndex` are implemented. The visitor interface includes all methods from the start (returning `never` or throwing for unimplemented nodes) to ensure compile-time safety when M2 adds validators and options.

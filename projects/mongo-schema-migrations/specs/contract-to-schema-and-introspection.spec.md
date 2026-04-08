@@ -1,22 +1,169 @@
 # Contract-to-Schema + Introspection Design
 
-The `MongoSchemaIR` has two producers: **`contractToSchema`** (offline, from a prior contract) and **live introspection** (from a running MongoDB instance). Both produce the same `MongoSchemaIR`, so the planner doesn't know or care where the IR came from. This doc covers both producers and the schema verification flow.
+## Grounding example
 
-## `contractToSchema` — offline IR construction
+A contract describes a `users` collection with one compound index:
 
-### Role
+```json
+{
+  "storage": {
+    "collections": {
+      "users": {
+        "indexes": [
+          {
+            "keys": [
+              { "field": "email", "direction": 1 },
+              { "field": "tenantId", "direction": 1 }
+            ],
+            "unique": true
+          }
+        ]
+      }
+    }
+  }
+}
+```
 
-`contractToSchema` is part of the `TargetMigrationsCapability` interface. The CLI calls it during `migration plan` to produce the "from" state:
+`contractToSchema` converts this into a `MongoSchemaIR` — the AST the planner diffs against:
+
+```typescript
+const ir: MongoSchemaIR = {
+  collections: {
+    users: new MongoSchemaCollection({
+      name: 'users',
+      indexes: [
+        new MongoSchemaIndex({
+          keys: [
+            { field: 'email', direction: 1 },
+            { field: 'tenantId', direction: 1 },
+          ],
+          unique: true,
+        }),
+      ],
+    }),
+  },
+};
+```
+
+The contract carries plain JSON; the IR carries frozen AST nodes ready for structural comparison. Everything in this doc is about how we get from one to the other — and how we extend the contract to carry enough server-side state to make that conversion complete.
+
+## Decision
+
+The contract carries the full server-side state (indexes, validators, collection options) in `storage.collections`. A target-specific `contractToSchema` function converts this into a `MongoSchemaIR` for the planner. Both the contract and introspection (future) produce the same IR, so the planner is source-agnostic.
 
 ```
 fromContract (prior contract, or null for new project)
     ↓ contractToSchema(fromContract)
-MongoSchemaIR (origin state)
+MongoSchemaIR (origin state)  ←  also producible by live introspection (future)
     ↓ passed to planner as schema
 Planner diffs origin vs destination contract
 ```
 
-### Implementation
+## Contract type extensions
+
+This is the core change — enriching `MongoStorageCollection` from an empty placeholder to a full description of server-side state.
+
+### Before / after
+
+Currently:
+
+```typescript
+type MongoStorageCollection = Record<string, never>;  // empty
+```
+
+After this project:
+
+```typescript
+interface MongoStorageCollection {
+  readonly indexes?: ReadonlyArray<MongoStorageIndex>;
+  readonly validator?: MongoStorageValidator;
+  readonly options?: MongoStorageCollectionOptions;
+}
+```
+
+### New types
+
+**`MongoStorageIndex`** — a single index definition as it appears in `contract.json`:
+
+```typescript
+interface MongoStorageIndex {
+  readonly keys: ReadonlyArray<MongoIndexKey>;
+  readonly unique?: boolean;
+  readonly sparse?: boolean;
+  readonly expireAfterSeconds?: number;
+  readonly partialFilterExpression?: Record<string, unknown>;
+}
+```
+
+**`MongoStorageValidator`** — the `$jsonSchema` validator and its policy:
+
+```typescript
+interface MongoStorageValidator {
+  readonly jsonSchema: Record<string, unknown>;
+  readonly validationLevel: 'strict' | 'moderate';
+  readonly validationAction: 'error' | 'warn';
+}
+```
+
+**`MongoStorageCollectionOptions`** — collection-level configuration:
+
+```typescript
+interface MongoStorageCollectionOptions {
+  readonly capped?: { size: number; max?: number };
+  readonly timeseries?: {
+    timeField: string;
+    metaField?: string;
+    granularity?: 'seconds' | 'minutes' | 'hours';
+  };
+  readonly collation?: Record<string, unknown>;
+  readonly changeStreamPreAndPostImages?: { enabled: boolean };
+}
+```
+
+These are **contract types** — plain interfaces, JSON-serializable, part of `contract.json`. They live in `@prisma-next/mongo-contract`. They are distinct from the **IR types** (AST classes, immutable, used for diffing) which live in `@prisma-next/mongo-schema-ir`. The emitter populates these contract types from authoring annotations (PSL `@@index`, `@@unique`, model field definitions), and the result flows into `contract.json`.
+
+### Arktype validation
+
+`MongoContractSchema` must be updated to validate the new structure. Currently `StorageCollectionSchema = type({ '+': 'reject' })` rejects all properties. After:
+
+```typescript
+const MongoIndexKeySchema = type({
+  '+': 'reject',
+  field: 'string',
+  direction: "1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed'",
+});
+
+const MongoStorageIndexSchema = type({
+  '+': 'reject',
+  keys: MongoIndexKeySchema.array(),
+  'unique?': 'boolean',
+  'sparse?': 'boolean',
+  'expireAfterSeconds?': 'number',
+  'partialFilterExpression?': 'Record<string, unknown>',
+});
+
+const MongoStorageValidatorSchema = type({
+  '+': 'reject',
+  jsonSchema: 'Record<string, unknown>',
+  validationLevel: "'strict' | 'moderate'",
+  validationAction: "'error' | 'warn'",
+});
+
+const StorageCollectionSchema = type({
+  '+': 'reject',
+  'indexes?': MongoStorageIndexSchema.array(),
+  'validator?': MongoStorageValidatorSchema,
+  'options?': MongoCollectionOptionsSchema,
+});
+```
+
+## `contractToSchema` implementation
+
+### Role
+
+`contractToSchema` is part of the `TargetMigrationsCapability` interface. The CLI calls it during `migration plan` to produce the "from" state (the origin `MongoSchemaIR` that the planner diffs against the destination contract).
+
+### Conversion logic
 
 ```typescript
 function contractToMongoSchemaIR(contract: MongoContract | null): MongoSchemaIR {
@@ -70,106 +217,25 @@ function convertValidator(v: MongoStorageValidator): MongoSchemaValidator {
 }
 ```
 
-### Symmetry with SQL
-
-The SQL equivalent is `contractToSchemaIR()` in `@prisma-next/family-sql/control`. It converts `Contract<SqlStorage>` → `SqlSchemaIR`. The Mongo version is simpler because:
-
-- **No column-to-field mapping**: MongoDB document fields match domain fields directly
-- **No native type expansion**: MongoDB doesn't have parameterized column types
-- **No FK-backing index synthesis**: MongoDB has no foreign keys
-- **No dependency resolution**: No database extensions to install
-
-The conversion is essentially a structural copy from contract types to IR classes.
+The conversion is a structural copy — contract types map 1:1 onto IR classes. This is intentionally simpler than the SQL equivalent (`contractToSchemaIR()` in `@prisma-next/family-sql/control`), which must handle column-to-field mapping, native type expansion, FK-backing index synthesis, and dependency resolution. MongoDB needs none of these because document fields match domain fields directly and there are no foreign keys or parameterized column types.
 
 ### Package placement
 
 Lives in `packages/3-mongo-target/` alongside the planner and runner, since it's target-specific (only the Mongo target needs it). Exposed via `TargetMigrationsCapability.contractToSchema`.
 
-## Contract types (`MongoStorageCollection`)
+## The `_id` index
 
-The contract type must be extended to carry the server-side state that `contractToSchema` reads. Currently:
+MongoDB automatically creates a unique index on `_id` for every collection. This index cannot be dropped and is not modeled in the contract or schema IR. Both `contractToSchema` and live introspection (future) filter it out. In the introspection code, this manifests as `filter(idx => idx.name !== '_id_')`.
 
-```typescript
-type MongoStorageCollection = Record<string, never>;  // empty
-```
+The `_id` index is invisible to the planner — it never appears in a diff, is never created or dropped by a migration, and is never reported as "missing" or "extra" by schema verification.
 
-After this project:
+## Future: Introspection and Verification
 
-```typescript
-interface MongoStorageIndex {
-  readonly keys: ReadonlyArray<MongoIndexKey>;
-  readonly unique?: boolean;
-  readonly sparse?: boolean;
-  readonly expireAfterSeconds?: number;
-  readonly partialFilterExpression?: Record<string, unknown>;
-}
+The `MongoSchemaIR` is designed to have two producers: `contractToSchema` (offline, implemented now) and live introspection (from a running MongoDB instance, future). This section sketches how live introspection and schema verification would work. Neither is in scope for this project.
 
-interface MongoStorageValidator {
-  readonly jsonSchema: Record<string, unknown>;
-  readonly validationLevel: 'strict' | 'moderate';
-  readonly validationAction: 'error' | 'warn';
-}
+### Live introspection
 
-interface MongoStorageCollectionOptions {
-  readonly capped?: { size: number; max?: number };
-  readonly timeseries?: {
-    timeField: string;
-    metaField?: string;
-    granularity?: 'seconds' | 'minutes' | 'hours';
-  };
-  readonly collation?: Record<string, unknown>;
-  readonly changeStreamPreAndPostImages?: { enabled: boolean };
-}
-
-interface MongoStorageCollection {
-  readonly indexes?: ReadonlyArray<MongoStorageIndex>;
-  readonly validator?: MongoStorageValidator;
-  readonly options?: MongoStorageCollectionOptions;
-}
-```
-
-These are **contract types** (plain interfaces, JSON-serializable, part of `contract.json`). They're distinct from the **IR types** (AST classes, immutable, used for diffing). The contract types live in `@prisma-next/mongo-contract`; the IR types live in `@prisma-next/mongo-schema-ir`.
-
-### Arktype validation
-
-`MongoContractSchema` must be updated to validate the new structure. Currently `StorageCollectionSchema = type({ '+': 'reject' })` rejects all properties. After:
-
-```typescript
-const MongoIndexKeySchema = type({
-  '+': 'reject',
-  field: 'string',
-  direction: "1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed'",
-});
-
-const MongoStorageIndexSchema = type({
-  '+': 'reject',
-  keys: MongoIndexKeySchema.array(),
-  'unique?': 'boolean',
-  'sparse?': 'boolean',
-  'expireAfterSeconds?': 'number',
-  'partialFilterExpression?': 'Record<string, unknown>',
-});
-
-const MongoStorageValidatorSchema = type({
-  '+': 'reject',
-  jsonSchema: 'Record<string, unknown>',
-  validationLevel: "'strict' | 'moderate'",
-  validationAction: "'error' | 'warn'",
-});
-
-const StorageCollectionSchema = type({
-  '+': 'reject',
-  'indexes?': MongoStorageIndexSchema.array(),
-  'validator?': MongoStorageValidatorSchema,
-  'options?': MongoCollectionOptionsSchema,
-});
-```
-
-## Live introspection (future)
-
-Live introspection reads the current server-side state from a running MongoDB instance and produces a `MongoSchemaIR`. This is a **non-goal** for the current project but the IR is designed to support it.
-
-### How it would work
+Live introspection reads the current server-side state from a running MongoDB instance and produces a `MongoSchemaIR`:
 
 ```typescript
 async function introspectMongo(db: Db): Promise<MongoSchemaIR> {
@@ -197,14 +263,14 @@ async function introspectMongo(db: Db): Promise<MongoSchemaIR> {
 }
 ```
 
-### Index introspection
+Index introspection maps `listIndexes()` output into `MongoSchemaIndex` nodes, filtering out the default `_id` index:
 
 ```typescript
 async function introspectIndexes(db: Db, collectionName: string): Promise<MongoSchemaIndex[]> {
   const rawIndexes = await db.collection(collectionName).listIndexes().toArray();
 
   return rawIndexes
-    .filter(idx => idx.name !== '_id_')  // skip the default _id index
+    .filter(idx => idx.name !== '_id_')
     .map(idx => {
       const keys: MongoIndexKey[] = Object.entries(idx.key).map(([field, dir]) => ({
         field,
@@ -222,14 +288,10 @@ async function introspectIndexes(db: Db, collectionName: string): Promise<MongoS
 }
 ```
 
-### Validator introspection
-
-`listCollections()` returns collection info with `options.validator` (the raw MongoDB validator object):
+Validator and collection options introspection read from `listCollections()` options:
 
 ```typescript
-function introspectValidator(
-  info: CollectionInfo,
-): MongoSchemaValidator | undefined {
+function introspectValidator(info: CollectionInfo): MongoSchemaValidator | undefined {
   const validator = info.options?.validator;
   if (!validator?.$jsonSchema) return undefined;
 
@@ -239,14 +301,8 @@ function introspectValidator(
     validationAction: info.options?.validationAction ?? 'error',
   });
 }
-```
 
-### Collection options introspection
-
-```typescript
-function introspectCollectionOptions(
-  info: CollectionInfo,
-): MongoSchemaCollectionOptions | undefined {
+function introspectCollectionOptions(info: CollectionInfo): MongoSchemaCollectionOptions | undefined {
   const opts = info.options;
   if (!opts) return undefined;
 
@@ -263,11 +319,9 @@ function introspectCollectionOptions(
 }
 ```
 
-## Schema verification (future)
+### Schema verification
 
 Schema verification compares the expected state (from the contract) against the actual state (from introspection) and reports issues. This is the Mongo equivalent of `verifySqlSchema()`.
-
-### How it would work
 
 ```typescript
 function verifyMongoSchema(options: {
@@ -293,43 +347,11 @@ function verifyMongoSchema(options: {
 }
 ```
 
-### Index verification
+Index verification uses structural equivalence — an expected index is "satisfied" if any actual index has the same keys and semantic options. Names are ignored.
 
-Index verification uses structural equivalence. An expected index is "satisfied" if any actual index has the same keys and semantic options. Names are ignored.
+Use cases: `db verify` (contract vs live database), `migration status` (detect drift), planner pre-validation (verify origin matches live state), post-apply verification (verify destination matches live state).
 
-```typescript
-function verifyIndexes(
-  collection: string,
-  expected: ReadonlyArray<MongoSchemaIndex>,
-  actual: ReadonlyArray<MongoSchemaIndex>,
-): SchemaIssue[] {
-  const issues: SchemaIssue[] = [];
-
-  for (const idx of expected) {
-    const satisfied = actual.some(a => indexesEquivalent(a, idx));
-    if (!satisfied) {
-      issues.push({
-        kind: 'index_missing',
-        collection,
-        index: formatIndexKeys(idx.keys),
-      });
-    }
-  }
-
-  return issues;
-}
-```
-
-### Use cases for schema verification
-
-1. **`db verify`** — compare contract expectations against a live database
-2. **`migration status`** — detect drift between the marker's contract and the live schema
-3. **Planner pre-validation** — verify the origin contract matches the live database before planning (optional safety check)
-4. **Post-apply verification** — verify the database matches the destination contract after applying migrations
-
-### Issue taxonomy
-
-Following the SQL pattern's `SchemaIssue` type:
+Issue taxonomy (following the SQL `SchemaIssue` pattern):
 
 | Issue kind | Severity | Description |
 |---|---|---|
@@ -341,9 +363,11 @@ Following the SQL pattern's `SchemaIssue` type:
 | `validator_missing` | Error | Expected validator not present |
 | `options_mismatch` | Warning | Collection options differ from contract |
 
-## The `_id` index
+## Alternatives considered
 
-MongoDB automatically creates a unique index on `_id` for every collection. This index cannot be dropped and is not modeled in the contract or schema IR. Both `contractToSchema` and live introspection filter it out (the introspection code above has `filter(idx => idx.name !== '_id_')`).
+**Why store `$jsonSchema` in the contract (not derive it at plan time)?** The contract is the unambiguous, hash-stable representation of required database state. If the `$jsonSchema` were derived at plan time, the same contract could produce different migration plans depending on the derivation logic version — breaking the guarantee that a contract hash uniquely identifies a database state. Storing the derived schema in the contract makes the planner a pure diff engine with no derivation responsibilities.
+
+**Why separate contract types from IR types?** Contract types (`MongoStorageIndex` etc.) are JSON-serializable plain interfaces — they must be stable, hash-friendly, and part of `contract.json`. IR types (`MongoSchemaIndex` etc.) are frozen AST classes optimized for structural comparison via visitor dispatch — they carry behavior (`.accept()`, `.freeze()`) and may evolve independently (e.g., adding computed properties for diffing). Merging them would either make the contract carry behavior it shouldn't, or make the IR lose the structural guarantees the planner depends on.
 
 ## M1 scope
 
