@@ -17,12 +17,12 @@ This package contains the SQL-specific TypeScript contract authoring surface for
 This package is part of the SQL family namespace (`packages/2-sql/2-authoring/contract-ts`) and provides:
 - SQL contract builder (`defineContract`) in two forms:
   - legacy chain builder
-  - staged contract DSL object-literal authoring with `model('User', { fields, relations }).attributes(...).sql(...)`
+  - contract DSL object-literal authoring with `model('User', { fields, relations }).attributes(...).sql(...)`
 - SQL contract JSON schema - JSON schema for validating contract structure
 
 ## Responsibilities
 
-- **SQL Contract Builder**: Provides both the existing chain builder and the staged contract DSL authoring surface for creating SQL contracts programmatically with type safety
+- **SQL Contract Builder**: Provides both the existing chain builder and the contract DSL authoring surface for creating SQL contracts programmatically with type safety
 - **Storage Type Authoring**: Supports `storage.types` declarations and `typeRef` columns via the SQL builder
 - **SQL Contract JSON Schema**: Provides JSON schema for validating contract structure in IDEs and tooling
 - **Composition Layer**: Composes the target-agnostic builder core from `@prisma-next/contract-authoring` with SQL-specific types and validation logic
@@ -60,7 +60,7 @@ This package is part of the package layering architecture:
 
 ### Building Contracts
 
-#### Staged Contract DSL
+#### Contract DSL
 
 The refined surface keeps domain meaning close to the model:
 - field-level `id()` and `unique()` for the common single-field case
@@ -68,7 +68,7 @@ The refined surface keeps domain meaning close to the model:
 - field-local `.sql({ column | id | unique })` and belongsTo-local `.sql({ fk })` overlays for one-off storage detail
 - an optional integrated callback form where `defineContract(config, ({ type, field, model, rel }) => ...)` exposes composition-shaped `type.*` and pack-owned `field.*` helper namespaces
 - `.attributes(...)` for compound `id` and compound `unique`
-- optional staged `.relations(...)` for mutually recursive model graphs
+- optional deferred `.relations(...)` for mutually recursive model graphs
 - model-level `.sql(...)` for table naming, indexes, and advanced fallback storage detail
 
 ```typescript
@@ -298,7 +298,7 @@ Integration tests that depend on both `sql-contract-ts` and `sql-query` are loca
 
 ## Migration Notes
 
-- **Staged contract DSL is the long-term direction**: `defineContract({ ... })` plus `model('User', { fields, relations }).sql(...)`
+- **Contract DSL is the primary surface**: `defineContract({ ... })` plus `model('User', { fields, relations }).sql(...)`
 - **The first slice keeps the helper vocabulary intentionally small**: prefer pack-provided descriptors over a large built-in preset surface for now
 - **Backward Compatibility**: `@prisma-next/sql-query` re-exports contract authoring functions for backward compatibility (will be removed in Slice 7)
 - **Import Path**: New code should import directly from `@prisma-next/sql-contract-ts`

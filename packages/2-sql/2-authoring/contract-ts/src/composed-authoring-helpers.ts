@@ -24,7 +24,7 @@ import type {
   TupleFromArgumentDescriptors,
   UnionToIntersection,
 } from './authoring-type-utils';
-import { buildFieldPreset, field, model, rel } from './staged-contract-dsl';
+import { buildFieldPreset, field, model, rel } from './contract-dsl';
 
 type ExtractTypeNamespaceFromPack<Pack> = Pack extends {
   readonly authoring?: { readonly type?: infer Namespace extends AuthoringTypeNamespace };

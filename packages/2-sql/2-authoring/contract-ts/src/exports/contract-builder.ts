@@ -1,24 +1,24 @@
 export type {
   ColumnBuilder,
   ComposedAuthoringHelpers,
+  ContractInput,
+  ContractModelBuilder,
   ScalarFieldBuilder,
-  StagedContractInput,
-  StagedModelBuilder,
 } from '../contract-builder';
 export {
-  buildSqlContractFromSemanticDefinition,
+  buildSqlContractFromDefinition,
   defineContract,
   field,
   model,
   rel,
 } from '../contract-builder';
 export type {
-  SqlSemanticContractDefinition,
-  SqlSemanticFieldNode,
-  SqlSemanticForeignKeyNode,
-  SqlSemanticIndexNode,
-  SqlSemanticModelNode,
-  SqlSemanticPrimaryKeyNode,
-  SqlSemanticRelationNode,
-  SqlSemanticUniqueConstraintNode,
-} from '../semantic-contract';
+  ContractDefinition,
+  FieldNode,
+  ForeignKeyNode,
+  IndexNode,
+  ModelNode,
+  PrimaryKeyNode,
+  RelationNode,
+  UniqueConstraintNode,
+} from '../contract-definition';

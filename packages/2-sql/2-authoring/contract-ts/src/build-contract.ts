@@ -35,11 +35,11 @@ import {
 import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
-  SqlSemanticContractDefinition,
-  SqlSemanticFieldNode,
-  SqlSemanticModelNode,
-  SqlSemanticValueObjectFieldNode,
-} from './semantic-contract';
+  ContractDefinition,
+  FieldNode,
+  ModelNode,
+  ValueObjectFieldNode,
+} from './contract-definition';
 
 type RuntimeTableState = TableBuilderState<
   string,
@@ -337,11 +337,11 @@ export function buildContract(
 }
 
 function assertKnownTargetModel(
-  modelsByName: ReadonlyMap<string, SqlSemanticModelNode>,
+  modelsByName: ReadonlyMap<string, ModelNode>,
   sourceModelName: string,
   targetModelName: string,
   context: string,
-): SqlSemanticModelNode {
+): ModelNode {
   const targetModel = modelsByName.get(targetModelName);
   if (!targetModel) {
     throw new Error(
@@ -353,7 +353,7 @@ function assertKnownTargetModel(
 
 function assertTargetTableMatches(
   sourceModelName: string,
-  targetModel: SqlSemanticModelNode,
+  targetModel: ModelNode,
   referencedTableName: string,
   context: string,
 ): void {
@@ -365,16 +365,16 @@ function assertTargetTableMatches(
 }
 
 function isValueObjectField(
-  field: SqlSemanticFieldNode | SqlSemanticValueObjectFieldNode,
-): field is SqlSemanticValueObjectFieldNode {
+  field: FieldNode | ValueObjectFieldNode,
+): field is ValueObjectFieldNode {
   return 'valueObjectName' in field;
 }
 
 const JSONB_CODEC_ID = 'pg/jsonb@1';
 const JSONB_NATIVE_TYPE = 'jsonb';
 
-export function buildSqlContractFromSemanticDefinition(
-  definition: SqlSemanticContractDefinition,
+export function buildSqlContractFromDefinition(
+  definition: ContractDefinition,
   codecLookup?: CodecLookup,
 ): Contract {
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));

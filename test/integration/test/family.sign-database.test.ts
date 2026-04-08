@@ -1,16 +1,16 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import sqlFamily from '@prisma-next/family-sql/pack';
 import { readMarker } from '@prisma-next/family-sql/verify';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SignDatabaseResult } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -27,16 +27,18 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
  * Creates a test contract for testing.
  */
 function createTestContract(): Contract<SqlStorage> {
-  const contractObj = defineContract<CodecTypes>()
-    .target(postgresPack)
-    .table('user', (t) =>
-      t
-        .column('id', { type: int4Column, nullable: false })
-        .column('email', { type: textColumn, nullable: false })
-        .primaryKey(['id']),
-    )
-    .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-    .build();
+  const contractObj = defineContract({
+    family: sqlFamily,
+    target: postgresPack,
+    models: {
+      User: model('User', {
+        fields: {
+          id: field.column(int4Column).id(),
+          email: field.column(textColumn),
+        },
+      }).sql({ table: 'user' }),
+    },
+  });
 
   return {
     ...contractObj,

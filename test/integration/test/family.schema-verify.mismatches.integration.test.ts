@@ -1,15 +1,15 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import sqlFamily from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
@@ -49,15 +49,18 @@ describe('family instance schemaVerify', () => {
           throw new Error('Connection string not set');
         }
 
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         const driver = await postgresDriver.create(connectionString);
         try {
@@ -123,15 +126,18 @@ describe('family instance schemaVerify', () => {
           throw new Error('Connection string not set');
         }
 
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         const driver = await postgresDriver.create(connectionString);
         try {
@@ -200,15 +206,18 @@ describe('family instance schemaVerify', () => {
           throw new Error('Connection string not set');
         }
 
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         const driver = await postgresDriver.create(connectionString);
         try {
@@ -283,24 +292,36 @@ describe('family instance schemaVerify', () => {
           throw new Error('Connection string not set');
         }
 
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .table('post', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('userId', { type: int4Column, nullable: false })
-              .column('title', { type: textColumn, nullable: false })
-              .primaryKey(['id'])
-              .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
-          )
-          .foreignKeyDefaults({ constraint: true, index: true })
-          .build();
+        const UserModel = model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn),
+          },
+        }).sql({ table: 'user' });
+
+        const PostModel = model('Post', {
+          fields: {
+            id: field.column(int4Column).id(),
+            userId: field.column(int4Column),
+            title: field.column(textColumn),
+          },
+          relations: {
+            user: rel.belongsTo(UserModel, { from: 'userId', to: 'id' }),
+          },
+        }).sql(({ cols, constraints }) => ({
+          table: 'post',
+          foreignKeys: [constraints.foreignKey(cols.userId, UserModel.refs.id)],
+        }));
+
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          foreignKeyDefaults: { constraint: true, index: true },
+          models: {
+            User: UserModel,
+            Post: PostModel,
+          },
+        });
 
         const driver = await postgresDriver.create(connectionString);
         try {

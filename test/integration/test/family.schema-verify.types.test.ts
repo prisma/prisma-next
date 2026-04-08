@@ -5,18 +5,20 @@
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  type CodecTypes,
   type Contract,
   createFamilyInstance,
   defineContract,
+  field,
   findNodeByStatusAndCode,
   int4Column,
+  model,
   pgvector,
   postgres,
   postgresAdapter,
   postgresPack,
   runSchemaVerify,
   type SqlStorage,
+  sqlFamily,
   textColumn,
   timeouts,
   useDevDatabase,
@@ -44,15 +46,18 @@ describe('family instance schemaVerify - types', () => {
     it(
       'returns ok=false with type_mismatch issue',
       async () => {
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
@@ -83,15 +88,18 @@ describe('family instance schemaVerify - types', () => {
     it(
       'returns ok=false with nullability_mismatch issue',
       async () => {
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
@@ -156,15 +164,18 @@ describe('family instance schemaVerify - types', () => {
         `);
         });
 
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
@@ -195,15 +206,18 @@ describe('family instance schemaVerify - types', () => {
 
         // Create a contract with a type ID that doesn't exist in the registry
         // We'll use a fake type ID to simulate missing metadata
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         // Modify contract to use a type ID not in the registry
         const contractWithUnknownType = {

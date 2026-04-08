@@ -21,7 +21,8 @@ export { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-typ
 export { postgresAdapter, postgresDriver, sql, postgres };
 export { validateContract };
 export type { Contract, SqlStorage };
-export { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+export { default as sqlFamily } from '@prisma-next/family-sql/pack';
+export { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 export { default as postgresPack } from '@prisma-next/target-postgres/pack';
 export { timeouts, withClient };
 export { pgvector } from './family.schema-verify.extensions';

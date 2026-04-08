@@ -13,11 +13,7 @@ import type {
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
 import type { UnionToIntersection } from './authoring-type-utils';
-import type {
-  AttributeStageIdFieldNames,
-  FieldStateOf,
-  ScalarFieldBuilder,
-} from './staged-contract-dsl';
+import type { AttributeStageIdFieldNames, FieldStateOf, ScalarFieldBuilder } from './contract-dsl';
 
 export type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
   ? C extends Record<string, { output: unknown }>
@@ -43,19 +39,19 @@ export type MergeExtensionPackRefs<
   Added extends Record<string, ExtensionPackRef<'sql', string>>,
 > = Existing extends Record<string, unknown> ? Existing & Added : Added;
 
-type StagedDefinitionExtensionPacks<Definition> = Definition extends {
+type DefinitionExtensionPacks<Definition> = Definition extends {
   readonly extensionPacks?: infer Packs extends Record<string, ExtensionPackRef<'sql', string>>;
 }
   ? Packs
   : Record<never, never>;
 
-type StagedDefinitionCapabilities<Definition> = Definition extends {
+type DefinitionCapabilities<Definition> = Definition extends {
   readonly capabilities?: infer Capabilities extends Record<string, Record<string, boolean>>;
 }
   ? Capabilities
   : undefined;
 
-type StagedDefinitionTargetId<Definition> = Definition extends {
+type DefinitionTargetId<Definition> = Definition extends {
   readonly target: TargetPackRef<'sql', infer Target>;
 }
   ? Target
@@ -63,12 +59,12 @@ type StagedDefinitionTargetId<Definition> = Definition extends {
 
 type Present<T> = Exclude<T, undefined>;
 
-type CodecTypesFromStagedDefinition<Definition> = ExtractCodecTypesFromPack<
+type CodecTypesFromDefinition<Definition> = ExtractCodecTypesFromPack<
   Definition extends { readonly target: infer Target } ? Target : never
 > &
-  MergeExtensionCodecTypesSafe<StagedDefinitionExtensionPacks<Definition>>;
+  MergeExtensionCodecTypesSafe<DefinitionExtensionPacks<Definition>>;
 
-type StagedDefinitionModels<Definition> = Definition extends {
+type DefinitionModels<Definition> = Definition extends {
   readonly models?: unknown;
 }
   ? Present<Definition['models']> extends Record<string, unknown>
@@ -76,7 +72,7 @@ type StagedDefinitionModels<Definition> = Definition extends {
     : Record<never, never>
   : Record<never, never>;
 
-type StagedDefinitionTypes<Definition> = Definition extends {
+type DefinitionTypes<Definition> = Definition extends {
   readonly types?: unknown;
 }
   ? Present<Definition['types']> extends Record<string, StorageTypeInstance>
@@ -84,13 +80,13 @@ type StagedDefinitionTypes<Definition> = Definition extends {
     : Record<never, never>
   : Record<never, never>;
 
-type StagedDefinitionTableNaming<Definition> = Definition extends {
+type DefinitionTableNaming<Definition> = Definition extends {
   readonly naming?: { readonly tables?: infer Strategy extends string };
 }
   ? Strategy
   : undefined;
 
-type StagedDefinitionColumnNaming<Definition> = Definition extends {
+type DefinitionColumnNaming<Definition> = Definition extends {
   readonly naming?: { readonly columns?: infer Strategy extends string };
 }
   ? Strategy
@@ -137,43 +133,44 @@ type ApplyNamingType<Name extends string, Strategy extends string | undefined> =
     ? SnakeCase<Name>
     : Name;
 
-type StagedModelNames<Definition> = keyof StagedDefinitionModels<Definition> & string;
+type ModelNames<Definition> = keyof DefinitionModels<Definition> & string;
 
-type StagedModelFields<
+type ModelFields<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
-> = StagedDefinitionModels<Definition>[ModelName] extends {
+  ModelName extends ModelNames<Definition>,
+> = DefinitionModels<Definition>[ModelName] extends {
   readonly stageOne: {
     readonly fields: Record<string, ScalarFieldBuilder>;
   };
 }
-  ? StagedDefinitionModels<Definition>[ModelName]['stageOne']['fields']
+  ? DefinitionModels<Definition>[ModelName]['stageOne']['fields']
   : Record<never, never>;
 
-type StagedModelFieldNames<
+type ModelFieldNames<Definition, ModelName extends ModelNames<Definition>> = keyof ModelFields<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
-> = keyof StagedModelFields<Definition, ModelName> & string;
+  ModelName
+> &
+  string;
 
-type StagedModelFieldState<
+type ModelFieldState<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
-  FieldName extends StagedModelFieldNames<Definition, ModelName>,
-> = FieldStateOf<StagedModelFields<Definition, ModelName>[FieldName]>;
+  ModelName extends ModelNames<Definition>,
+  FieldName extends ModelFieldNames<Definition, ModelName>,
+> = FieldStateOf<ModelFields<Definition, ModelName>[FieldName]>;
 
-type StagedModelSql<
+type ModelSql<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
-> = StagedDefinitionModels<Definition>[ModelName] extends {
+  ModelName extends ModelNames<Definition>,
+> = DefinitionModels<Definition>[ModelName] extends {
   readonly __sql: infer SqlSpec;
 }
   ? SqlSpec
   : undefined;
 
-type StagedModelAttributes<
+type ModelAttributes<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
-> = StagedDefinitionModels<Definition>[ModelName] extends {
+  ModelName extends ModelNames<Definition>,
+> = DefinitionModels<Definition>[ModelName] extends {
   readonly __attributes: infer AttributesSpec;
 }
   ? AttributesSpec
@@ -226,14 +223,14 @@ type DescriptorTypeRef<Descriptor> = Descriptor extends {
   : undefined;
 
 type LookupNamedStorageTypeKeyByValue<Definition, TypeRef extends StorageTypeInstance> = {
-  [TypeName in keyof StagedDefinitionTypes<Definition> & string]: [TypeRef] extends [
-    StagedDefinitionTypes<Definition>[TypeName],
+  [TypeName in keyof DefinitionTypes<Definition> & string]: [TypeRef] extends [
+    DefinitionTypes<Definition>[TypeName],
   ]
-    ? [StagedDefinitionTypes<Definition>[TypeName]] extends [TypeRef]
+    ? [DefinitionTypes<Definition>[TypeName]] extends [TypeRef]
       ? TypeName
       : never
     : never;
-}[keyof StagedDefinitionTypes<Definition> & string];
+}[keyof DefinitionTypes<Definition> & string];
 
 type ResolveNamedStorageTypeKey<Definition, TypeRef> = TypeRef extends string
   ? TypeRef
@@ -245,8 +242,8 @@ type ResolveNamedStorageTypeKey<Definition, TypeRef> = TypeRef extends string
 
 type ResolveNamedStorageType<Definition, TypeRef> =
   ResolveNamedStorageTypeKey<Definition, TypeRef> extends infer TypeName extends string
-    ? TypeName extends keyof StagedDefinitionTypes<Definition>
-      ? StagedDefinitionTypes<Definition>[TypeName]
+    ? TypeName extends keyof DefinitionTypes<Definition>
+      ? DefinitionTypes<Definition>[TypeName]
       : StorageTypeInstance
     : StorageTypeInstance;
 
@@ -268,98 +265,96 @@ type ResolveFieldColumnTypeParams<Definition, FieldState> = [
   ? undefined
   : DescriptorTypeParams<FieldDescriptorOf<FieldState>>;
 
-type StagedModelTableName<Definition, ModelName extends StagedModelNames<Definition>> = [
+type ModelTableName<Definition, ModelName extends ModelNames<Definition>> = [
   Present<
-    StagedModelSql<Definition, ModelName> extends { readonly table?: infer TableName }
-      ? TableName
-      : never
+    ModelSql<Definition, ModelName> extends { readonly table?: infer TableName } ? TableName : never
   >,
 ] extends [never]
-  ? ApplyNamingType<ModelName, StagedDefinitionTableNaming<Definition>>
+  ? ApplyNamingType<ModelName, DefinitionTableNaming<Definition>>
   : Present<
-        StagedModelSql<Definition, ModelName> extends { readonly table?: infer TableName }
+        ModelSql<Definition, ModelName> extends { readonly table?: infer TableName }
           ? TableName
           : never
       > extends infer ExplicitTableName extends string
     ? ExplicitTableName
-    : ApplyNamingType<ModelName, StagedDefinitionTableNaming<Definition>>;
+    : ApplyNamingType<ModelName, DefinitionTableNaming<Definition>>;
 
-type StagedModelColumnName<
+type ModelColumnName<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
-  FieldName extends StagedModelFieldNames<Definition, ModelName>,
-> = [FieldColumnOverrideOf<StagedModelFieldState<Definition, ModelName, FieldName>>] extends [never]
-  ? ApplyNamingType<FieldName, StagedDefinitionColumnNaming<Definition>>
+  ModelName extends ModelNames<Definition>,
+  FieldName extends ModelFieldNames<Definition, ModelName>,
+> = [FieldColumnOverrideOf<ModelFieldState<Definition, ModelName, FieldName>>] extends [never]
+  ? ApplyNamingType<FieldName, DefinitionColumnNaming<Definition>>
   : FieldColumnOverrideOf<
-        StagedModelFieldState<Definition, ModelName, FieldName>
+        ModelFieldState<Definition, ModelName, FieldName>
       > extends infer ExplicitColumnName extends string
     ? ExplicitColumnName
-    : ApplyNamingType<FieldName, StagedDefinitionColumnNaming<Definition>>;
+    : ApplyNamingType<FieldName, DefinitionColumnNaming<Definition>>;
 
-type StagedFieldNamesToColumnNames<
+type FieldNamesToColumnNames<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
+  ModelName extends ModelNames<Definition>,
   FieldNames extends readonly string[],
 > = FieldNames extends readonly []
   ? readonly []
   : FieldNames extends readonly [
-        infer First extends StagedModelFieldNames<Definition, ModelName>,
+        infer First extends ModelFieldNames<Definition, ModelName>,
         ...infer Rest extends readonly string[],
       ]
     ? readonly [
-        StagedModelColumnName<Definition, ModelName, First>,
-        ...StagedFieldNamesToColumnNames<Definition, ModelName, Rest>,
+        ModelColumnName<Definition, ModelName, First>,
+        ...FieldNamesToColumnNames<Definition, ModelName, Rest>,
       ]
     : readonly string[];
 
-type StagedInlineIdFieldName<Definition, ModelName extends StagedModelNames<Definition>> = {
-  [FieldName in StagedModelFieldNames<Definition, ModelName>]: [
-    FieldInlineIdSpecOf<StagedModelFieldState<Definition, ModelName, FieldName>>,
+type InlineIdFieldName<Definition, ModelName extends ModelNames<Definition>> = {
+  [FieldName in ModelFieldNames<Definition, ModelName>]: [
+    FieldInlineIdSpecOf<ModelFieldState<Definition, ModelName, FieldName>>,
   ] extends [never]
     ? never
     : FieldName;
-}[StagedModelFieldNames<Definition, ModelName>];
+}[ModelFieldNames<Definition, ModelName>];
 
-type StagedInlineIdFieldNames<Definition, ModelName extends StagedModelNames<Definition>> = [
-  StagedInlineIdFieldName<Definition, ModelName>,
+type InlineIdFieldNames<Definition, ModelName extends ModelNames<Definition>> = [
+  InlineIdFieldName<Definition, ModelName>,
 ] extends [never]
   ? undefined
-  : readonly [StagedInlineIdFieldName<Definition, ModelName>];
+  : readonly [InlineIdFieldName<Definition, ModelName>];
 
-type StagedInlineIdName<Definition, ModelName extends StagedModelNames<Definition>> = {
-  [FieldName in StagedModelFieldNames<Definition, ModelName>]: FieldInlineIdSpecOf<
-    StagedModelFieldState<Definition, ModelName, FieldName>
+type InlineIdName<Definition, ModelName extends ModelNames<Definition>> = {
+  [FieldName in ModelFieldNames<Definition, ModelName>]: FieldInlineIdSpecOf<
+    ModelFieldState<Definition, ModelName, FieldName>
   > extends { readonly name?: infer Name extends string }
     ? Name
     : never;
-}[StagedModelFieldNames<Definition, ModelName>];
+}[ModelFieldNames<Definition, ModelName>];
 
-type StagedAttributeIdFieldNames<
+type AttributeIdFieldNames<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
-> = AttributeStageIdFieldNames<StagedModelAttributes<Definition, ModelName>>;
+  ModelName extends ModelNames<Definition>,
+> = AttributeStageIdFieldNames<ModelAttributes<Definition, ModelName>>;
 
-type StagedAttributeIdName<Definition, ModelName extends StagedModelNames<Definition>> = Present<
-  StagedModelAttributes<Definition, ModelName> extends {
+type AttributeIdName<Definition, ModelName extends ModelNames<Definition>> = Present<
+  ModelAttributes<Definition, ModelName> extends {
     readonly id?: { readonly name?: infer Name extends string };
   }
     ? Name
     : never
 >;
 
-type StagedModelIdFieldNames<Definition, ModelName extends StagedModelNames<Definition>> = [
-  StagedAttributeIdFieldNames<Definition, ModelName>,
+type ModelIdFieldNames<Definition, ModelName extends ModelNames<Definition>> = [
+  AttributeIdFieldNames<Definition, ModelName>,
 ] extends [undefined]
-  ? StagedInlineIdFieldNames<Definition, ModelName>
-  : StagedAttributeIdFieldNames<Definition, ModelName>;
+  ? InlineIdFieldNames<Definition, ModelName>
+  : AttributeIdFieldNames<Definition, ModelName>;
 
-type StagedModelIdName<Definition, ModelName extends StagedModelNames<Definition>> = [
-  StagedAttributeIdName<Definition, ModelName>,
+type ModelIdName<Definition, ModelName extends ModelNames<Definition>> = [
+  AttributeIdName<Definition, ModelName>,
 ] extends [never]
-  ? Present<StagedInlineIdName<Definition, ModelName>>
-  : StagedAttributeIdName<Definition, ModelName>;
+  ? Present<InlineIdName<Definition, ModelName>>
+  : AttributeIdName<Definition, ModelName>;
 
-type StagedStorageColumn<
+type StorageColumn<
   CodecId extends string,
   Nullable extends boolean,
   NativeType extends string,
@@ -375,74 +370,65 @@ type StagedStorageColumn<
     ? { readonly typeParams: TypeParams }
     : Record<string, never>);
 
-type StagedModelStorageColumn<
+type ModelStorageColumn<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
+  ModelName extends ModelNames<Definition>,
   FieldName extends string,
-> = FieldName extends StagedModelFieldNames<Definition, ModelName>
-  ? StagedStorageColumn<
+> = FieldName extends ModelFieldNames<Definition, ModelName>
+  ? StorageColumn<
       DescriptorCodecId<
-        ResolveFieldDescriptor<Definition, StagedModelFieldState<Definition, ModelName, FieldName>>
+        ResolveFieldDescriptor<Definition, ModelFieldState<Definition, ModelName, FieldName>>
       >,
-      FieldNullableOf<StagedModelFieldState<Definition, ModelName, FieldName>>,
+      FieldNullableOf<ModelFieldState<Definition, ModelName, FieldName>>,
       DescriptorNativeType<
-        ResolveFieldDescriptor<Definition, StagedModelFieldState<Definition, ModelName, FieldName>>
+        ResolveFieldDescriptor<Definition, ModelFieldState<Definition, ModelName, FieldName>>
       >,
-      ResolveFieldColumnTypeRef<
-        Definition,
-        StagedModelFieldState<Definition, ModelName, FieldName>
-      >,
-      ResolveFieldColumnTypeParams<
-        Definition,
-        StagedModelFieldState<Definition, ModelName, FieldName>
-      >
+      ResolveFieldColumnTypeRef<Definition, ModelFieldState<Definition, ModelName, FieldName>>,
+      ResolveFieldColumnTypeParams<Definition, ModelFieldState<Definition, ModelName, FieldName>>
     >
   : never;
 
-type StagedBuiltModels<Definition> = {
-  readonly [ModelName in StagedModelNames<Definition>]: {
+type BuiltModels<Definition> = {
+  readonly [ModelName in ModelNames<Definition>]: {
     readonly storage: {
-      readonly table: StagedModelTableName<Definition, ModelName>;
+      readonly table: ModelTableName<Definition, ModelName>;
       readonly fields: {
-        readonly [FieldName in StagedModelFieldNames<Definition, ModelName>]: {
-          readonly column: StagedModelColumnName<Definition, ModelName, FieldName>;
+        readonly [FieldName in ModelFieldNames<Definition, ModelName>]: {
+          readonly column: ModelColumnName<Definition, ModelName, FieldName>;
         };
       };
     };
     readonly fields: {
-      readonly [FieldName in StagedModelFieldNames<Definition, ModelName>]: {
-        readonly codecId: StagedModelStorageColumn<Definition, ModelName, FieldName>['codecId'];
-        readonly nullable: StagedModelStorageColumn<Definition, ModelName, FieldName>['nullable'];
+      readonly [FieldName in ModelFieldNames<Definition, ModelName>]: {
+        readonly codecId: ModelStorageColumn<Definition, ModelName, FieldName>['codecId'];
+        readonly nullable: ModelStorageColumn<Definition, ModelName, FieldName>['nullable'];
       };
     };
     readonly relations: Record<string, ContractRelation>;
   };
 };
 
-type StagedBuiltModelColumnMappings<
+type BuiltModelColumnMappings<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
-> = StagedBuiltModels<Definition>[ModelName]['storage']['fields'];
+  ModelName extends ModelNames<Definition>,
+> = BuiltModels<Definition>[ModelName]['storage']['fields'];
 
-type StagedBuiltModelTableName<
+type BuiltModelTableName<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
-> = StagedBuiltModels<Definition>[ModelName]['storage']['table'];
+  ModelName extends ModelNames<Definition>,
+> = BuiltModels<Definition>[ModelName]['storage']['table'];
 
-type StagedBuiltStorageTableColumns<Definition, ModelName extends StagedModelNames<Definition>> = {
-  readonly [FieldName in keyof StagedBuiltModelColumnMappings<Definition, ModelName> &
-    string as StagedBuiltModelColumnMappings<
+type BuiltStorageTableColumns<Definition, ModelName extends ModelNames<Definition>> = {
+  readonly [FieldName in keyof BuiltModelColumnMappings<Definition, ModelName> &
+    string as BuiltModelColumnMappings<
     Definition,
     ModelName
-  >[FieldName]['column']]: StagedModelStorageColumn<Definition, ModelName, FieldName>;
+  >[FieldName]['column']]: ModelStorageColumn<Definition, ModelName, FieldName>;
 };
 
-type StagedBuiltStorageTables<Definition> = {
-  readonly [ModelName in StagedModelNames<Definition> as StagedBuiltModelTableName<
-    Definition,
-    ModelName
-  >]: {
-    readonly columns: StagedBuiltStorageTableColumns<Definition, ModelName>;
+type BuiltStorageTables<Definition> = {
+  readonly [ModelName in ModelNames<Definition> as BuiltModelTableName<Definition, ModelName>]: {
+    readonly columns: BuiltStorageTableColumns<Definition, ModelName>;
     readonly uniques: ReadonlyArray<{
       readonly columns: readonly string[];
       readonly name?: string;
@@ -457,40 +443,40 @@ type StagedBuiltStorageTables<Definition> = {
       readonly constraint: boolean;
       readonly index: boolean;
     }>;
-  } & (StagedModelIdFieldNames<Definition, ModelName> extends readonly string[]
+  } & (ModelIdFieldNames<Definition, ModelName> extends readonly string[]
     ? {
         readonly primaryKey: {
-          readonly columns: StagedFieldNamesToColumnNames<
+          readonly columns: FieldNamesToColumnNames<
             Definition,
             ModelName,
-            StagedModelIdFieldNames<Definition, ModelName>
+            ModelIdFieldNames<Definition, ModelName>
           >;
-          readonly name?: StagedModelIdName<Definition, ModelName>;
+          readonly name?: ModelIdName<Definition, ModelName>;
         };
       }
     : Record<string, never>);
 };
 
-type StagedBuiltStorage<Definition> = {
+type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
-  readonly tables: StagedBuiltStorageTables<Definition>;
-  readonly types: StagedDefinitionTypes<Definition>;
+  readonly tables: BuiltStorageTables<Definition>;
+  readonly types: DefinitionTypes<Definition>;
 };
 
 export type SqlContractResult<Definition> = ContractWithTypeMaps<
-  Contract<StagedBuiltStorage<Definition>, StagedBuiltModels<Definition>> & {
-    readonly target: StagedDefinitionTargetId<Definition>;
+  Contract<BuiltStorage<Definition>, BuiltModels<Definition>> & {
+    readonly target: DefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';
   } & {
-    readonly extensionPacks: keyof StagedDefinitionExtensionPacks<Definition> extends never
+    readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
       ? Record<string, never>
-      : StagedDefinitionExtensionPacks<Definition>;
-    readonly capabilities: StagedDefinitionCapabilities<Definition> extends Record<
+      : DefinitionExtensionPacks<Definition>;
+    readonly capabilities: DefinitionCapabilities<Definition> extends Record<
       string,
       Record<string, boolean>
     >
-      ? StagedDefinitionCapabilities<Definition>
+      ? DefinitionCapabilities<Definition>
       : Record<string, Record<string, boolean>>;
   },
-  TypeMaps<CodecTypesFromStagedDefinition<Definition>, Record<string, never>>
+  TypeMaps<CodecTypesFromDefinition<Definition>, Record<string, never>>
 >;

@@ -1,7 +1,7 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { PslAttribute, PslField, PslSpan } from '@prisma-next/psl-parser';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
-import type { SqlSemanticRelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
+import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
@@ -53,7 +53,7 @@ export type ModelBackrelationCandidate = {
   readonly relationName?: string;
 };
 
-type ModelRelationMetadata = SqlSemanticRelationNode;
+type ModelRelationMetadata = RelationNode;
 
 export function fkRelationPairKey(declaringModelName: string, targetModelName: string): string {
   // NOTE: We assume PSL model identifiers do not contain the `::` separator.

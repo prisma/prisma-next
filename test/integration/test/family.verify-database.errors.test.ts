@@ -1,19 +1,19 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import { emit } from '@prisma-next/emitter';
 import sql from '@prisma-next/family-sql/control';
+import sqlFamily from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { VerifyDatabaseResult } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -30,16 +30,18 @@ import { createIntegrationTestDir } from './utils/cli-test-helpers';
  * Creates a test contract for testing.
  */
 function createTestContract(): Contract<SqlStorage> {
-  const contractObj = defineContract<CodecTypes>()
-    .target(postgresPack)
-    .table('user', (t) =>
-      t
-        .column('id', { type: int4Column, nullable: false })
-        .column('email', { type: textColumn, nullable: false })
-        .primaryKey(['id']),
-    )
-    .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-    .build();
+  const contractObj = defineContract({
+    family: sqlFamily,
+    target: postgresPack,
+    models: {
+      User: model('User', {
+        fields: {
+          id: field.column(int4Column).id(),
+          email: field.column(textColumn),
+        },
+      }).sql({ table: 'user' }),
+    },
+  });
 
   return {
     ...contractObj,

@@ -1,7 +1,7 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
-import { buildSqlContractFromSemanticDefinition } from '../src/contract-builder';
+import { buildSqlContractFromDefinition } from '../src/contract-builder';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
@@ -11,9 +11,9 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   version: '0.0.1',
 };
 
-describe('value objects in semantic contract builder', () => {
+describe('value objects in contract definition builder', () => {
   it('emits valueObjects section with scalar fields', () => {
-    const contract = buildSqlContractFromSemanticDefinition({
+    const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       models: [
         {
@@ -69,7 +69,7 @@ describe('value objects in semantic contract builder', () => {
   });
 
   it('emits valueObject domain type for model fields referencing a value object', () => {
-    const contract = buildSqlContractFromSemanticDefinition({
+    const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       models: [
         {
@@ -125,7 +125,7 @@ describe('value objects in semantic contract builder', () => {
   });
 
   it('maps value object fields to JSONB storage columns', () => {
-    const contract = buildSqlContractFromSemanticDefinition({
+    const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       models: [
         {
@@ -178,7 +178,7 @@ describe('value objects in semantic contract builder', () => {
   });
 
   it('emits many: true for value object list fields', () => {
-    const contract = buildSqlContractFromSemanticDefinition({
+    const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       models: [
         {
@@ -230,7 +230,7 @@ describe('value objects in semantic contract builder', () => {
   });
 
   it('emits nested value-object references inside a parent value object', () => {
-    const contract = buildSqlContractFromSemanticDefinition({
+    const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       models: [
         {
@@ -308,7 +308,7 @@ describe('value objects in semantic contract builder', () => {
   });
 
   it('omits valueObjects from contract when none are defined', () => {
-    const contract = buildSqlContractFromSemanticDefinition({
+    const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       models: [
         {
@@ -331,7 +331,7 @@ describe('value objects in semantic contract builder', () => {
   });
 
   it('maps value object field to correct storage bridge entry', () => {
-    const contract = buildSqlContractFromSemanticDefinition({
+    const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       models: [
         {

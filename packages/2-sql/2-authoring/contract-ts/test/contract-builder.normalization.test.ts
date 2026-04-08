@@ -1,11 +1,17 @@
-import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
-import { defineContract } from '../src/contract-builder';
-import type { CodecTypes } from './fixtures/contract.d';
+import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
+
+const bareFamilyPack: FamilyPackRef<'sql'> = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  version: '0.0.1',
+};
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
@@ -17,69 +23,102 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 
 describe('contract builder normalization', () => {
   it('normalizes nullable to false when not provided', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
-      .model('User', 'user', (m) => m.field('id', 'id'))
-      .build();
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     expect(contract.storage.tables.user.columns.id.nullable).toBe(false);
   });
 
   it('normalizes nullable to provided value', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('email', { type: textColumn, nullable: true }),
-      )
-      .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-      .build();
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column),
+            email: field.column(textColumn).optional(),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     expect(contract.storage.tables.user.columns.id.nullable).toBe(false);
     expect(contract.storage.tables.user.columns.email.nullable).toBe(true);
   });
 
   it('normalizes uniques to empty array when not provided', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
-      .model('User', 'user', (m) => m.field('id', 'id'))
-      .build();
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     expect(contract.storage.tables.user.uniques).toEqual([]);
     expect(Array.isArray(contract.storage.tables.user.uniques)).toBe(true);
   });
 
   it('normalizes indexes to empty array when not provided', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
-      .model('User', 'user', (m) => m.field('id', 'id'))
-      .build();
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     expect(contract.storage.tables.user.indexes).toEqual([]);
     expect(Array.isArray(contract.storage.tables.user.indexes)).toBe(true);
   });
 
   it('normalizes foreignKeys to empty array when not provided', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
-      .model('User', 'user', (m) => m.field('id', 'id'))
-      .build();
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     expect(contract.storage.tables.user.foreignKeys).toEqual([]);
     expect(Array.isArray(contract.storage.tables.user.foreignKeys)).toBe(true);
   });
 
   it('normalizes relations to empty object when not provided', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
-      .model('User', 'user', (m) => m.field('id', 'id'))
-      .build();
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
 
     expect(contract.models.User).toHaveProperty('relations');
     const userModel = contract.models.User as { relations?: Record<string, unknown> };
@@ -89,23 +128,24 @@ describe('contract builder normalization', () => {
   });
 
   it('normalizes all required fields in a complete contract', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('email', { type: textColumn, nullable: false })
-          .primaryKey(['id']),
-      )
-      .table('post', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('userId', { type: int4Column, nullable: false })
-          .primaryKey(['id']),
-      )
-      .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-      .model('Post', 'post', (m) => m.field('id', 'id').field('userId', 'userId'))
-      .build();
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn),
+          },
+        }).sql({ table: 'user' }),
+        Post: model('Post', {
+          fields: {
+            id: field.column(int4Column).id(),
+            userId: field.column(int4Column),
+          },
+        }).sql({ table: 'post' }),
+      },
+    });
 
     // Verify all tables have normalized fields
     expect(contract.storage.tables.user.uniques).toEqual([]);
@@ -127,23 +167,30 @@ describe('contract builder normalization', () => {
   });
 
   it('passes through extension-owned index fields (using, config)', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('items', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('description', { type: textColumn, nullable: false })
-          .primaryKey(['id'])
-          .index(['description'], {
-            name: 'search_idx',
-            using: 'bm25',
-            config: {
-              keyField: 'id',
-              fields: [{ column: 'description', tokenizer: 'simple' }],
-            },
-          }),
-      )
-      .build();
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        Item: model('Item', {
+          fields: {
+            id: field.column(int4Column).id(),
+            description: field.column(textColumn),
+          },
+        }).sql(({ cols, constraints }) => ({
+          table: 'items',
+          indexes: [
+            constraints.index(cols.description, {
+              name: 'search_idx',
+              using: 'bm25',
+              config: {
+                keyField: 'id',
+                fields: [{ column: 'description', tokenizer: 'simple' }],
+              },
+            }),
+          ],
+        })),
+      },
+    });
 
     const indexes = contract.storage.tables.items.indexes;
     expect(indexes).toHaveLength(1);
@@ -159,29 +206,36 @@ describe('contract builder normalization', () => {
   });
 
   it('passes through extension index config with expression fields', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('items', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('description', { type: textColumn, nullable: false })
-          .primaryKey(['id'])
-          .index(['description'], {
-            using: 'bm25',
-            config: {
-              keyField: 'id',
-              fields: [
-                { column: 'description' },
-                {
-                  expression: "description || ' ' || category",
-                  alias: 'concat',
-                  tokenizer: 'simple',
-                },
-              ],
-            },
-          }),
-      )
-      .build();
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        Item: model('Item', {
+          fields: {
+            id: field.column(int4Column).id(),
+            description: field.column(textColumn),
+          },
+        }).sql(({ cols, constraints }) => ({
+          table: 'items',
+          indexes: [
+            constraints.index(cols.description, {
+              using: 'bm25',
+              config: {
+                keyField: 'id',
+                fields: [
+                  { column: 'description' },
+                  {
+                    expression: "description || ' ' || category",
+                    alias: 'concat',
+                    tokenizer: 'simple',
+                  },
+                ],
+              },
+            }),
+          ],
+        })),
+      },
+    });
 
     const idx = contract.storage.tables.items.indexes[0]!;
     expect(idx.using).toBe('bm25');
@@ -193,16 +247,21 @@ describe('contract builder normalization', () => {
   });
 
   it('preserves plain indexes without extension config', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .table('user', (t) =>
-        t
-          .column('id', { type: int4Column, nullable: false })
-          .column('email', { type: textColumn, nullable: false })
-          .primaryKey(['id'])
-          .index(['email']),
-      )
-      .build();
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn),
+          },
+        }).sql(({ cols, constraints }) => ({
+          table: 'user',
+          indexes: [constraints.index(cols.email)],
+        })),
+      },
+    });
 
     const idx = contract.storage.tables.user.indexes[0]!;
     expect(idx.columns).toEqual(['email']);
