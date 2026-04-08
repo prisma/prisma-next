@@ -7,20 +7,9 @@ import type {
   MongoProjectionValue,
   MongoWindowField,
 } from '@prisma-next/mongo-query-ast';
+import { isExprArray, isRecordArgs } from '@prisma-next/mongo-query-ast';
 import type { Document } from '@prisma-next/mongo-value';
 import { resolveValue } from './resolve-value';
-
-function isExprArray(
-  args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | Readonly<Record<string, MongoAggExpr>>,
-): args is ReadonlyArray<MongoAggExpr> {
-  return Array.isArray(args);
-}
-
-function isRecordArgs(
-  args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | Readonly<Record<string, MongoAggExpr>>,
-): args is Readonly<Record<string, MongoAggExpr>> {
-  return !Array.isArray(args) && typeof args === 'object' && !('accept' in args);
-}
 
 // Biome flags `{ then: ... }` as a thenable object (noThenProperty). Build via Object.fromEntries to avoid.
 const THEN_KEY = 'then';

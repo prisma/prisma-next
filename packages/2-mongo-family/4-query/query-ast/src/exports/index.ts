@@ -1,5 +1,7 @@
-export type { MongoAggExpr, MongoAggSwitchBranch } from '../aggregation-expressions';
+export type { AggRecordArgs, MongoAggExpr, MongoAggSwitchBranch } from '../aggregation-expressions';
 export {
+  isExprArray,
+  isRecordArgs,
   MongoAggAccumulator,
   MongoAggArrayFilter,
   MongoAggCond,
