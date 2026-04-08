@@ -15,6 +15,16 @@ const n = {} as TypedAggExpr<NumericField>;
 const s = {} as TypedAggExpr<StringField>;
 
 describe('accumulator helper types', () => {
+  it('sum preserves input field type', () => {
+    expectTypeOf(acc.sum(n)).toEqualTypeOf<TypedAccumulatorExpr<NumericField>>();
+  });
+
+  it('sum preserves non-double numeric codec', () => {
+    type IntField = { readonly codecId: 'mongo/int@1'; readonly nullable: false };
+    const intExpr = {} as TypedAggExpr<IntField>;
+    expectTypeOf(acc.sum(intExpr)).toEqualTypeOf<TypedAccumulatorExpr<IntField>>();
+  });
+
   it('stdDevPop returns NullableNumericField', () => {
     expectTypeOf(acc.stdDevPop(d)).toEqualTypeOf<TypedAccumulatorExpr<NullableNumericField>>();
   });
