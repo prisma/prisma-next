@@ -61,6 +61,31 @@ Resolved by introducing `NullableDocField` type alias and `nullableDocUnaryExpr`
 | F04 | No integration/e2e tests for new helpers against real MongoDB | Fixed | Added 4 representative integration tests: `fn.dateToString`, `fn.trim`, `fn.gt` in `$cond`, `acc.firstN` |
 | F05 / D02 | `docUnaryExpr` hardcodes `nullable: false` for nullable results | Fixed | Added `NullableDocField` type alias, `nullableDocUnaryExpr` factory. `firstElem`, `lastElem`, and `arrayElemAt` now return `TypedAggExpr<NullableDocField>`. |
 
+## Open Findings
+
+### F06 — `fn.literal` accepts `unknown`, bypassing type safety
+
+`fn.literal<F extends DocField>(value: unknown): TypedAggExpr<F>` has no constraint between `value` and `F`. This means `fn.literal<StringField>(42)` compiles without error — the narrowed named-args signatures (D01) guard the *expression type* flowing into an operator, but `fn.literal` is the main escape hatch that undermines them.
+
+**Severity:** Medium. This is the primary remaining type safety gap in the helper API.
+
+**Example:**
+```ts
+fn.dateToString({ date: dt, format: fn.literal(42) })
+// compiles — 42 inferred as StringField via context, but is nonsensical at runtime
+```
+
+### F07 — Accumulator output type precision defaults to `double`
+
+All numeric accumulators (`sum`, `avg`, `stdDevPop`, `stdDevSamp`) return `NumericField` (`mongo/double@1`) regardless of the input field's codec. `$sum` on an integer field should ideally preserve the integer type, but currently widens to double.
+
+**Severity:** Low. Correct behavior in most cases (MongoDB itself often returns doubles), but imprecise for integer-only aggregations.
+
+| # | Finding | Status | Notes |
+|---|---------|--------|-------|
+| F06 | `fn.literal` accepts `unknown`, bypassing type safety | Open | Main type safety gap — no constraint between runtime value and field type |
+| F07 | Accumulator output type precision defaults to `double` | Open | All numeric accumulators widen to `mongo/double@1` |
+
 ## Acceptance-Criteria Traceability
 
 ### AST changes
