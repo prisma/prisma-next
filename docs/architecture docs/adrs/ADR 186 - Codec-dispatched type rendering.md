@@ -230,4 +230,3 @@ Deferred. Most codecs don't parameterize their output type — the default (`Cod
 - [ADR 171 — Parameterized native types in contracts](ADR%20171%20-%20Parameterized%20native%20types%20in%20contracts.md) — established `typeParams` on storage columns
 - [ADR 168 — Postgres JSON and JSONB typed columns](ADR%20168%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md) — introduced typed JSON columns with Standard Schema
 - [ADR 185 — SPI types live at the lowest consuming layer](ADR%20185%20-%20SPI%20types%20live%20at%20the%20lowest%20consuming%20layer.md) — `EmissionSpi` placement and design
-- [Design spec: Codec-dispatched type rendering](../../../projects/orm-consolidation/specs/codec-dispatched-type-rendering.md) — detailed implementation spec with worked examples
