@@ -1,8 +1,6 @@
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import type {
-  TargetBoundComponentDescriptor,
-  TypeRenderer,
-} from '@prisma-next/framework-components/components';
+import type { Codec } from '@prisma-next/framework-components/codec';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { assertUniqueCodecOwner } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type {
@@ -19,7 +17,7 @@ export interface SqlControlDescriptorWithContributions extends SqlControlStaticC
   readonly types?: {
     readonly codecTypes?: {
       readonly import?: TypesImportSpec;
-      readonly parameterized?: Record<string, TypeRenderer>;
+      readonly codecInstances?: ReadonlyArray<Codec>;
       readonly typeImports?: ReadonlyArray<TypesImportSpec>;
     };
     readonly operationTypes?: { readonly import: TypesImportSpec };
