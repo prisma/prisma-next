@@ -122,33 +122,33 @@ Many of the missing operators use **named arguments** (e.g. `{ $dateToString: { 
 # Acceptance Criteria
 
 ### AST changes
-- [ ] `MongoAggOperator` accepts `Readonly<Record<string, MongoAggExpr>>` as args
-- [ ] `MongoAggAccumulator` accepts `Readonly<Record<string, MongoAggExpr>>` as arg
-- [ ] `rewrite()` recurses into record-form args on both classes
-- [ ] Adapter lowering produces `{ [op]: { key: lowered, ... } }` for record-form args
-- [ ] Lowering tests cover all three arg forms (single, array, record) for operators and both forms (single, record) for accumulators
+- [x] `MongoAggOperator` accepts `Readonly<Record<string, MongoAggExpr>>` as args
+- [x] `MongoAggAccumulator` accepts `Readonly<Record<string, MongoAggExpr>>` as arg
+- [x] `rewrite()` recurses into record-form args on both classes
+- [x] Adapter lowering produces `{ [op]: { key: lowered, ... } }` for record-form args
+- [x] Lowering tests cover all three arg forms (single, array, record) for operators and both forms (single, record) for accumulators
 
 ### Expression helpers
-- [ ] All 13 date helpers exist on `fn` with correct return types
-- [ ] All 13 string helpers exist on `fn` with correct return types
-- [ ] All 11 array helpers exist on `fn` with correct return types
-- [ ] All 7 set helpers exist on `fn` with correct return types
-- [ ] All 10 type helpers exist on `fn` with correct return types
-- [ ] All 4 object helpers exist on `fn` with correct return types
-- [ ] All 7 comparison helpers exist on `fn` with correct return types
-- [ ] Type tests verify `TypedAggExpr<F>` output type for every new helper
+- [x] All 13 date helpers exist on `fn` with correct return types
+- [x] All 13 string helpers exist on `fn` with correct return types
+- [x] All 11 array helpers exist on `fn` with correct return types
+- [x] All 7 set helpers exist on `fn` with correct return types
+- [x] All 10 type helpers exist on `fn` with correct return types
+- [x] All 4 object helpers exist on `fn` with correct return types
+- [x] All 7 comparison helpers exist on `fn` with correct return types
+- [x] Type tests verify `TypedAggExpr<F>` output type for every new helper
 
 ### Accumulator helpers
-- [ ] `stdDevPop` and `stdDevSamp` exist on `acc` with `NullableNumericField` return
-- [ ] `firstN`, `lastN`, `maxN`, `minN` exist on `acc` with named args and `ArrayField` return
-- [ ] `top`, `bottom`, `topN`, `bottomN` exist on `acc` with named args
-- [ ] Type tests verify `TypedAccumulatorExpr<F>` output type for every new helper
+- [x] `stdDevPop` and `stdDevSamp` exist on `acc` with `NullableNumericField` return
+- [x] `firstN`, `lastN`, `maxN`, `minN` exist on `acc` with named args and `ArrayField` return
+- [x] `top`, `bottom`, `topN`, `bottomN` exist on `acc` with named args
+- [x] Type tests verify `TypedAccumulatorExpr<F>` output type for every new helper
 
 ### Backward compatibility
-- [ ] All existing expression helper tests pass unchanged
-- [ ] All existing accumulator helper tests pass unchanged
-- [ ] All existing builder tests pass unchanged
-- [ ] All existing lowering tests pass unchanged
+- [x] All existing expression helper tests pass unchanged
+- [x] All existing accumulator helper tests pass unchanged
+- [x] All existing builder tests pass unchanged
+- [x] All existing lowering tests pass unchanged
 
 # Other Considerations
 
