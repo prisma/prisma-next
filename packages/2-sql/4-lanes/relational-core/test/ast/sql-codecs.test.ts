@@ -205,9 +205,13 @@ describe('sql-codecs', () => {
       expect(sqlCodecDefinitions.char.codec.renderOutputType!({ length: 36 })).toBe('Char<36>');
     });
 
-    it('sql/char@1 throws on missing length', () => {
-      expect(() => sqlCodecDefinitions.char.codec.renderOutputType!({})).toThrow(
-        /expected numeric "length"/,
+    it('sql/char@1 returns undefined when length absent', () => {
+      expect(sqlCodecDefinitions.char.codec.renderOutputType!({})).toBeUndefined();
+    });
+
+    it('sql/char@1 throws on invalid length type', () => {
+      expect(() => sqlCodecDefinitions.char.codec.renderOutputType!({ length: 'bad' })).toThrow(
+        /expected integer "length"/,
       );
     });
 
@@ -217,9 +221,13 @@ describe('sql-codecs', () => {
       );
     });
 
-    it('sql/varchar@1 throws on missing length', () => {
-      expect(() => sqlCodecDefinitions.varchar.codec.renderOutputType!({})).toThrow(
-        /expected numeric "length"/,
+    it('sql/varchar@1 returns undefined when length absent', () => {
+      expect(sqlCodecDefinitions.varchar.codec.renderOutputType!({})).toBeUndefined();
+    });
+
+    it('sql/varchar@1 throws on invalid length type', () => {
+      expect(() => sqlCodecDefinitions.varchar.codec.renderOutputType!({ length: 'bad' })).toThrow(
+        /expected integer "length"/,
       );
     });
 
@@ -236,7 +244,7 @@ describe('sql-codecs', () => {
     it('sql/timestamp@1 throws on invalid precision type', () => {
       expect(() =>
         sqlCodecDefinitions.timestamp.codec.renderOutputType!({ precision: 'bad' }),
-      ).toThrow(/expected numeric "precision"/);
+      ).toThrow(/expected integer "precision"/);
     });
 
     it('sql/int@1 has no renderOutputType', () => {

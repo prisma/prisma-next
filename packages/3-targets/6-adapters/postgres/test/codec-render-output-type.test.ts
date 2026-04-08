@@ -9,8 +9,12 @@ describe('codec renderOutputType', () => {
       expect(codec.renderOutputType!({ length: 36 })).toBe('Char<36>');
     });
 
-    it('throws when length is missing', () => {
-      expect(() => codec.renderOutputType!({})).toThrow(/expected numeric "length"/);
+    it('returns undefined when length is absent', () => {
+      expect(codec.renderOutputType!({})).toBeUndefined();
+    });
+
+    it('throws on invalid length type', () => {
+      expect(() => codec.renderOutputType!({ length: 'bad' })).toThrow(/expected integer "length"/);
     });
   });
 
@@ -21,8 +25,12 @@ describe('codec renderOutputType', () => {
       expect(codec.renderOutputType!({ length: 255 })).toBe('Varchar<255>');
     });
 
-    it('throws when length is missing', () => {
-      expect(() => codec.renderOutputType!({})).toThrow(/expected numeric "length"/);
+    it('returns undefined when length is absent', () => {
+      expect(codec.renderOutputType!({})).toBeUndefined();
+    });
+
+    it('throws on invalid length type', () => {
+      expect(() => codec.renderOutputType!({ length: 'bad' })).toThrow(/expected integer "length"/);
     });
   });
 
@@ -53,8 +61,8 @@ describe('codec renderOutputType', () => {
       expect(codec.renderOutputType!({ precision: 10 })).toBe('Numeric<10>');
     });
 
-    it('throws when precision is missing', () => {
-      expect(() => codec.renderOutputType!({})).toThrow(/expected numeric "precision"/);
+    it('returns undefined when precision is absent', () => {
+      expect(codec.renderOutputType!({})).toBeUndefined();
     });
   });
 
@@ -65,8 +73,8 @@ describe('codec renderOutputType', () => {
       expect(codec.renderOutputType!({ length: 8 })).toBe('Bit<8>');
     });
 
-    it('throws when length is missing', () => {
-      expect(() => codec.renderOutputType!({})).toThrow(/expected numeric "length"/);
+    it('returns undefined when length is absent', () => {
+      expect(codec.renderOutputType!({})).toBeUndefined();
     });
   });
 
@@ -131,6 +139,12 @@ describe('codec renderOutputType', () => {
 
     it('renders literal union from values', () => {
       expect(codec.renderOutputType!({ values: ['USER', 'ADMIN'] })).toBe("'USER' | 'ADMIN'");
+    });
+
+    it('escapes backslashes before single quotes', () => {
+      expect(codec.renderOutputType!({ values: ["it's", 'back\\slash'] })).toBe(
+        "'it\\'s' | 'back\\\\slash'",
+      );
     });
 
     it('throws when values is missing', () => {

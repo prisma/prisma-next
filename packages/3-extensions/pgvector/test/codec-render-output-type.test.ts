@@ -12,7 +12,13 @@ describe('pgvector codec renderOutputType', () => {
     expect(codec.renderOutputType!({ length: 3 })).toBe('Vector<3>');
   });
 
-  it('throws when length is missing', () => {
-    expect(() => codec.renderOutputType!({})).toThrow(/expected numeric "length"/);
+  it('returns undefined when length is absent', () => {
+    expect(codec.renderOutputType!({})).toBeUndefined();
+  });
+
+  it('throws on NaN length', () => {
+    expect(() => codec.renderOutputType!({ length: Number.NaN })).toThrow(
+      /expected positive integer "length"/,
+    );
   });
 });
