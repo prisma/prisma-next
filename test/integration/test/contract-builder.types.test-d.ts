@@ -107,17 +107,12 @@ test('ResultType inference works identically to fixture contract', () => {
   const _fixtureContract = validateContract<Contract>(contractJson, emptyCodecLookup);
   const fixtureContext = createTestContext(_fixtureContract, adapter);
   const fixtureDb = sql({ context: fixtureContext });
-  const _fixturePlan = fixtureDb.user.select('id', 'email', 'createdAt').build();
+  const _fixturePlan = fixtureDb['user']!.select('id', 'email', 'createdAt').build();
 
   type FixtureRow = ResultType<typeof _fixturePlan>;
 
-  expectTypeOf<BuilderRow>().toHaveProperty('id');
-  expectTypeOf<BuilderRow>().toHaveProperty('email');
-  expectTypeOf<BuilderRow>().toHaveProperty('createdAt');
-  expectTypeOf<FixtureRow>().toHaveProperty('id');
-  expectTypeOf<FixtureRow>().toHaveProperty('email');
-  expectTypeOf<FixtureRow>().toHaveProperty('createdAt');
-  expectTypeOf(_plan).toExtend<SqlQueryPlan<BuilderRow>>();
+  expectTypeOf<BuilderRow>().toEqualTypeOf<FixtureRow>();
+  expectTypeOf(_plan).toExtend<SqlQueryPlan<FixtureRow>>();
 });
 
 test('refined object contract preserves downstream model token inference', () => {

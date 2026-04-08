@@ -32,7 +32,7 @@ All changes are within:
 - `packages/2-sql/2-authoring/contract-ts/src/` (4 files renamed, ~6 files with import updates)
 - `packages/2-sql/2-authoring/contract-ts/test/` (8 files renamed)
 - `packages/2-sql/2-authoring/contract-ts/README.md`
-- `docs/architecture docs/adrs/ADR 181 - Staged contract DSL for SQL TS authoring.md` (filename + content)
+- `docs/architecture docs/adrs/ADR 181 - Contract authoring DSL for SQL TS authoring.md` (renamed file + content)
 - `docs/architecture docs/adrs/ADR 182 - Unified contract representation.md` (2 references to ADR 181 filename)
 - `projects/ts-contract-authoring-redesign/` (entire directory deleted)
 
@@ -42,7 +42,7 @@ No cross-package type/function renames — the "staged" names don't leak outside
 
 - **No behavioral changes**: Pure rename + deletion. The emitted contract, runtime behavior, and public API shape are unchanged.
 - **Import paths are package-internal**: All `staged-contract-*` imports are within `contract-ts/src/`. The `exports/contract-builder.ts` barrel re-exports the renamed types.
-- **Backward compatibility**: The plan.md explicitly states backward compatibility will be removed in Slice 7. No re-exports of old names needed.
+- **Backward compatibility**: No re-exports of old names needed.
 - **ADR 181 filename change**: ADR 182 references ADR 181 by filename in 2 places — must update those links.
 - **Coverage HTML files**: Auto-generated, will regenerate on next test run. Not committed.
 
@@ -78,7 +78,7 @@ Rename the 4 source files, then update all type names and function names within 
 
 | Current | New |
 |---------|-----|
-| `StagedModelBuilder` | `ModelBuilder` |
+| `StagedModelBuilder` | `ContractModelBuilder` |
 | `StagedContractInput` | `ContractInput` |
 | `isStagedContractInput()` | `isContractInput()` |
 
@@ -135,7 +135,7 @@ Update imports in files that reference the renamed source files:
 
 **Content updates in each test file:**
 - Import paths updated to new source file names
-- Type references updated to new names (e.g., `StagedModelBuilder` → `ModelBuilder`)
+- Type references updated to new names (e.g., `StagedModelBuilder` → `ContractModelBuilder`)
 - Function references updated (e.g., `buildStagedSemanticContractDefinition` → `buildSemanticContractDefinition`)
 - `describe()` and `it()` strings: drop "staged" (e.g., "staged contract DSL authoring surface" → "contract DSL authoring surface")
 - Fixture `storageHash` strings: drop "staged" (e.g., `sha256:staged-contract-dsl` → `sha256:contract-dsl`)
@@ -202,7 +202,6 @@ Well under the 2000-line target.
 
 ## References
 
-- Project plan: `projects/ts-contract-authoring-redesign/plan.md` (Milestone 3)
-- Project spec: `projects/ts-contract-authoring-redesign/spec.md`
-- ADR 181: `docs/architecture docs/adrs/ADR 181 - Staged contract DSL for SQL TS authoring.md`
+- This closeout plan is the remaining Milestone 3 artifact after Phase 6 removes `projects/ts-contract-authoring-redesign/`.
+- ADR 181: `docs/architecture docs/adrs/ADR 181 - Contract authoring DSL for SQL TS authoring.md`
 - ADR 182: `docs/architecture docs/adrs/ADR 182 - Unified contract representation.md`
