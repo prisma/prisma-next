@@ -12,6 +12,11 @@ import type {
 } from '../src/types';
 
 const d = {} as TypedAggExpr<DocField>;
+const s = {} as TypedAggExpr<StringField>;
+const n = {} as TypedAggExpr<NumericField>;
+const dt = {} as TypedAggExpr<DateField>;
+const b = {} as TypedAggExpr<BooleanField>;
+const arr = {} as TypedAggExpr<ArrayField>;
 
 describe('date helpers', () => {
   it('year returns NumericField', () => {
@@ -36,30 +41,42 @@ describe('date helpers', () => {
     expectTypeOf(fn.millisecond(d)).toEqualTypeOf<TypedAggExpr<NumericField>>();
   });
   it('dateToString returns StringField', () => {
-    expectTypeOf(fn.dateToString({ date: d, format: d })).toEqualTypeOf<
+    expectTypeOf(fn.dateToString({ date: dt, format: s })).toEqualTypeOf<
       TypedAggExpr<StringField>
     >();
   });
+  it('dateToString accepts optional keys', () => {
+    expectTypeOf(fn.dateToString({ date: dt })).toEqualTypeOf<TypedAggExpr<StringField>>();
+  });
   it('dateFromString returns DateField', () => {
-    expectTypeOf(fn.dateFromString({ dateString: d })).toEqualTypeOf<TypedAggExpr<DateField>>();
+    expectTypeOf(fn.dateFromString({ dateString: s })).toEqualTypeOf<TypedAggExpr<DateField>>();
   });
   it('dateDiff returns NumericField', () => {
-    expectTypeOf(fn.dateDiff({ startDate: d, endDate: d, unit: d })).toEqualTypeOf<
+    expectTypeOf(fn.dateDiff({ startDate: dt, endDate: dt, unit: s })).toEqualTypeOf<
       TypedAggExpr<NumericField>
     >();
   });
   it('dateAdd returns DateField', () => {
-    expectTypeOf(fn.dateAdd({ startDate: d, unit: d, amount: d })).toEqualTypeOf<
+    expectTypeOf(fn.dateAdd({ startDate: dt, unit: s, amount: n })).toEqualTypeOf<
       TypedAggExpr<DateField>
     >();
   });
   it('dateSubtract returns DateField', () => {
-    expectTypeOf(fn.dateSubtract({ startDate: d, unit: d, amount: d })).toEqualTypeOf<
+    expectTypeOf(fn.dateSubtract({ startDate: dt, unit: s, amount: n })).toEqualTypeOf<
       TypedAggExpr<DateField>
     >();
   });
   it('dateTrunc returns DateField', () => {
-    expectTypeOf(fn.dateTrunc({ date: d, unit: d })).toEqualTypeOf<TypedAggExpr<DateField>>();
+    expectTypeOf(fn.dateTrunc({ date: dt, unit: s })).toEqualTypeOf<TypedAggExpr<DateField>>();
+  });
+
+  it('rejects wrong type for dateToString date key', () => {
+    // @ts-expect-error — date requires DateField, not StringField
+    fn.dateToString({ date: s });
+  });
+  it('rejects wrong type for dateAdd amount key', () => {
+    // @ts-expect-error — amount requires NumericField, not StringField
+    fn.dateAdd({ startDate: dt, unit: s, amount: s });
   });
 });
 
@@ -71,13 +88,13 @@ describe('string helpers', () => {
     expectTypeOf(fn.substrBytes(d, d, d)).toEqualTypeOf<TypedAggExpr<StringField>>();
   });
   it('trim returns StringField', () => {
-    expectTypeOf(fn.trim({ input: d })).toEqualTypeOf<TypedAggExpr<StringField>>();
+    expectTypeOf(fn.trim({ input: s })).toEqualTypeOf<TypedAggExpr<StringField>>();
   });
   it('ltrim returns StringField', () => {
-    expectTypeOf(fn.ltrim({ input: d })).toEqualTypeOf<TypedAggExpr<StringField>>();
+    expectTypeOf(fn.ltrim({ input: s })).toEqualTypeOf<TypedAggExpr<StringField>>();
   });
   it('rtrim returns StringField', () => {
-    expectTypeOf(fn.rtrim({ input: d })).toEqualTypeOf<TypedAggExpr<StringField>>();
+    expectTypeOf(fn.rtrim({ input: s })).toEqualTypeOf<TypedAggExpr<StringField>>();
   });
   it('split returns ArrayField', () => {
     expectTypeOf(fn.split(d, d)).toEqualTypeOf<TypedAggExpr<ArrayField>>();
@@ -89,23 +106,32 @@ describe('string helpers', () => {
     expectTypeOf(fn.strLenBytes(d)).toEqualTypeOf<TypedAggExpr<NumericField>>();
   });
   it('regexMatch returns BooleanField', () => {
-    expectTypeOf(fn.regexMatch({ input: d, regex: d })).toEqualTypeOf<TypedAggExpr<BooleanField>>();
+    expectTypeOf(fn.regexMatch({ input: s, regex: s })).toEqualTypeOf<TypedAggExpr<BooleanField>>();
   });
   it('regexFind returns DocField', () => {
-    expectTypeOf(fn.regexFind({ input: d, regex: d })).toEqualTypeOf<TypedAggExpr<DocField>>();
+    expectTypeOf(fn.regexFind({ input: s, regex: s })).toEqualTypeOf<TypedAggExpr<DocField>>();
   });
   it('regexFindAll returns ArrayField', () => {
-    expectTypeOf(fn.regexFindAll({ input: d, regex: d })).toEqualTypeOf<TypedAggExpr<ArrayField>>();
+    expectTypeOf(fn.regexFindAll({ input: s, regex: s })).toEqualTypeOf<TypedAggExpr<ArrayField>>();
   });
   it('replaceOne returns StringField', () => {
-    expectTypeOf(fn.replaceOne({ input: d, find: d, replacement: d })).toEqualTypeOf<
+    expectTypeOf(fn.replaceOne({ input: s, find: s, replacement: s })).toEqualTypeOf<
       TypedAggExpr<StringField>
     >();
   });
   it('replaceAll returns StringField', () => {
-    expectTypeOf(fn.replaceAll({ input: d, find: d, replacement: d })).toEqualTypeOf<
+    expectTypeOf(fn.replaceAll({ input: s, find: s, replacement: s })).toEqualTypeOf<
       TypedAggExpr<StringField>
     >();
+  });
+
+  it('rejects wrong type for trim input key', () => {
+    // @ts-expect-error — input requires StringField, not NumericField
+    fn.trim({ input: n });
+  });
+  it('rejects wrong type for regexMatch input key', () => {
+    // @ts-expect-error — input requires StringField, not DateField
+    fn.regexMatch({ input: dt, regex: s });
   });
 });
 
@@ -162,10 +188,15 @@ describe('array helpers', () => {
     expectTypeOf(fn.slice(d, d)).toEqualTypeOf<TypedAggExpr<ArrayField>>();
   });
   it('zip returns ArrayField', () => {
-    expectTypeOf(fn.zip({ inputs: d })).toEqualTypeOf<TypedAggExpr<ArrayField>>();
+    expectTypeOf(fn.zip({ inputs: arr })).toEqualTypeOf<TypedAggExpr<ArrayField>>();
   });
   it('range returns ArrayField', () => {
     expectTypeOf(fn.range(d, d, d)).toEqualTypeOf<TypedAggExpr<ArrayField>>();
+  });
+
+  it('rejects wrong type for zip inputs key', () => {
+    // @ts-expect-error — inputs requires ArrayField, not StringField
+    fn.zip({ inputs: s });
   });
 });
 
@@ -198,7 +229,10 @@ describe('type helpers', () => {
     expectTypeOf(fn.typeOf(d)).toEqualTypeOf<TypedAggExpr<StringField>>();
   });
   it('convert returns DocField', () => {
-    expectTypeOf(fn.convert({ input: d, to: d })).toEqualTypeOf<TypedAggExpr<DocField>>();
+    expectTypeOf(fn.convert({ input: d, to: s })).toEqualTypeOf<TypedAggExpr<DocField>>();
+  });
+  it('convert accepts NumericField for to', () => {
+    expectTypeOf(fn.convert({ input: d, to: n })).toEqualTypeOf<TypedAggExpr<DocField>>();
   });
   it('toInt returns NumericField', () => {
     expectTypeOf(fn.toInt(d)).toEqualTypeOf<TypedAggExpr<NumericField>>();
@@ -224,6 +258,11 @@ describe('type helpers', () => {
   it('toDate returns DateField', () => {
     expectTypeOf(fn.toDate(d)).toEqualTypeOf<TypedAggExpr<DateField>>();
   });
+
+  it('rejects wrong type for convert to key', () => {
+    // @ts-expect-error — to requires StringField | NumericField, not DateField
+    fn.convert({ input: d, to: dt });
+  });
 });
 
 describe('object helpers', () => {
@@ -234,11 +273,23 @@ describe('object helpers', () => {
     expectTypeOf(fn.arrayToObject(d)).toEqualTypeOf<TypedAggExpr<DocField>>();
   });
   it('getField returns DocField', () => {
-    expectTypeOf(fn.getField({ field: d, input: d })).toEqualTypeOf<TypedAggExpr<DocField>>();
+    expectTypeOf(fn.getField({ field: s, input: d })).toEqualTypeOf<TypedAggExpr<DocField>>();
+  });
+  it('getField accepts optional input', () => {
+    expectTypeOf(fn.getField({ field: s })).toEqualTypeOf<TypedAggExpr<DocField>>();
   });
   it('setField returns DocField', () => {
-    expectTypeOf(fn.setField({ field: d, input: d, value: d })).toEqualTypeOf<
+    expectTypeOf(fn.setField({ field: s, input: d, value: d })).toEqualTypeOf<
       TypedAggExpr<DocField>
     >();
+  });
+
+  it('rejects wrong type for getField field key', () => {
+    // @ts-expect-error — field requires StringField, not NumericField
+    fn.getField({ field: n });
+  });
+  it('rejects wrong type for setField field key', () => {
+    // @ts-expect-error — field requires StringField, not BooleanField
+    fn.setField({ field: b, input: d, value: d });
   });
 });
