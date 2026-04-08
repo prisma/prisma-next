@@ -16,38 +16,60 @@ Before any abstractions, here's one concrete migration from start to finish.
 The planner converts the destination contract into a second schema IR, then diffs the two structurally:
 
 - `users` exists in both IRs → not a new collection.
-- Index `{ email: 1, unique: true }` exists in the destination but not the origin → emit `CreateIndexOp`.
+- Index `{ email: 1, unique: true }` exists in the destination but not the origin → emit a `createIndex` operation.
 
 The planner returns a `MigrationPlan` containing one operation:
 
 ```typescript
 [
-  CreateIndexOp({
-    collection: 'users',
-    keys: [{ field: 'email', direction: 1 }],
-    unique: true,
-  }),
+  {
+    id: 'index.users.create(email:1)',
+    label: 'Create index on users (email ascending)',
+    operationClass: 'additive',
+    precheck: [{
+      description: 'index does not already exist',
+      source: new ListIndexesCommand('users'),
+      filter: MongoFieldFilter.eq('key', { email: 1 }),
+      expect: 'notExists',
+    }],
+    execute: [{
+      description: 'create index',
+      command: new CreateIndexCommand('users', [{ field: 'email', direction: 1 }], { unique: true }),
+    }],
+    postcheck: [{
+      description: 'unique index exists',
+      source: new ListIndexesCommand('users'),
+      filter: MongoAndExpr.of([
+        MongoFieldFilter.eq('key', { email: 1 }),
+        MongoFieldFilter.eq('unique', true),
+      ]),
+      expect: 'exists',
+    }],
+  },
 ]
 ```
 
 **Runner.** The CLI calls `TargetMigrationsCapability.createRunner()` and passes the plan plus a Mongo driver instance. The runner:
 
 1. Reads the marker from `_prisma_migrations` — the marker's `coreHash` matches the plan's origin hash. Proceed.
-2. Deserializes the plan's operations into AST nodes.
-3. Dispatches `CreateIndexOp` through the visitor. The visitor calls `db.collection('users').createIndex({ email: 1 }, { unique: true })`.
-4. Updates the marker via compare-and-swap: `findOneAndUpdate({ _id: 'marker', coreHash: v1Hash }, { $set: { coreHash: v2Hash } })`. The CAS succeeds (no other runner changed it).
+2. Deserializes the plan's operations from JSON (reconstructing DDL command and filter expression AST nodes).
+3. For the single operation, runs the three-phase loop:
+   - **Idempotency probe**: evaluates the postcheck filter against `listIndexes('users')` results. No matching index → not yet applied, proceed.
+   - **Precheck**: evaluates the precheck filter. No matching index → precondition satisfied.
+   - **Execute**: dispatches `CreateIndexCommand` → calls `db.collection('users').createIndex({ email: 1 }, { unique: true })`.
+   - **Postcheck**: evaluates the postcheck filter. Index now exists with `unique: true` → postcondition satisfied.
+4. Updates the marker via compare-and-swap: `findOneAndUpdate({ _id: 'marker', coreHash: v1Hash }, { $set: { coreHash: v2Hash } })`. The CAS succeeds.
 5. Writes a ledger entry recording the edge from v1 → v2.
 
-The database now has the index. The marker reflects v2. The ledger has a permanent record of what happened.
+The database now has the index. The marker reflects v2. The ledger has a permanent record.
 
 ## Decisions
 
-These are the key design choices. Each is elaborated in the sections below and justified in "Alternatives considered" at the end.
-
 - **Structural index matching.** The planner compares indexes by keys and options, not by name. Two indexes are "the same" if they cover the same fields with the same direction and the same options (unique, sparse, TTL, partial filter). Names are ignored.
-- **Visitor dispatch.** The runner dispatches operations through a typed visitor (`MongoMigrationOpVisitor`), not a switch statement. Each operation kind maps to exactly one visitor method.
+- **Generic three-phase runner.** The runner executes the same loop for every operation: evaluate prechecks → execute commands → evaluate postchecks. It does not dispatch by operation kind. This mirrors the SQL runner's loop exactly.
+- **Filter-expression checks.** Pre/postchecks use `MongoFilterExpr` — the same filter expression AST from `@prisma-next/mongo-query-ast` — evaluated client-side against inspection command results. No purpose-built check vocabulary.
 - **Compare-and-swap marker.** Concurrency safety comes from a CAS on the marker document — no advisory locks, no distributed locking. If two runners race, one wins and the other gets a hash mismatch.
-- **Single `_prisma_migrations` collection.** Both the marker (singleton, `_id: 'marker'`) and the ledger (append-only entries) live in the same collection. Fewer moving parts.
+- **Single `_prisma_migrations` collection.** Both the marker (singleton, `_id: 'marker'`) and the ledger (append-only entries) live in the same collection.
 
 ## Architecture overview
 
@@ -63,10 +85,11 @@ TargetMigrationsCapability                TargetMigrationsCapability
 MongoMigrationPlanner                       .execute(plan, driver)
   .plan(contract, schema, policy)                 │
        │                                          ├─ read marker (CAS check)
-       ▼                                          ├─ deserialize ops → AST
-       MigrationPlannerResult                     ├─ dispatch via visitor
-       (success → MigrationPlan)                  ├─ execute MongoDB commands
-       (failure → conflicts[])                    ├─ update marker (CAS)
+       ▼                                          ├─ deserialize ops (JSON → AST)
+       MigrationPlannerResult                     ├─ for each op: precheck → execute → postcheck
+       (success → MigrationPlan)                  │     ├─ evaluate checks (filter expressions)
+       (failure → conflicts[])                    │     └─ dispatch DDL commands
+                                                  ├─ update marker (CAS)
                                                   └─ write ledger entry
 ```
 
@@ -111,6 +134,76 @@ The planner converts the destination contract into a schema IR, then diffs the t
 4. Policy gate: filter operations by allowed classes
    - If disallowed operations exist → return failure with conflicts
 5. Return success with ordered operations
+```
+
+### Operation construction
+
+The planner uses convenience functions that compose DDL commands and checks into `MongoMigrationPlanOperation` structures:
+
+```typescript
+function planCreateIndex(
+  collection: string,
+  keys: ReadonlyArray<MongoIndexKey>,
+  options: { unique?: boolean; sparse?: boolean; expireAfterSeconds?: number; partialFilterExpression?: Record<string, unknown> },
+): MongoMigrationPlanOperation {
+  const name = defaultMongoIndexName(keys);
+  const keyFilter = MongoFieldFilter.eq('key', keysToKeySpec(keys));
+  const fullFilter = options.unique
+    ? MongoAndExpr.of([keyFilter, MongoFieldFilter.eq('unique', true)])
+    : keyFilter;
+
+  return {
+    id: buildIndexOpId('create', collection, keys),
+    label: `Create index on ${collection} (${formatKeys(keys)})`,
+    operationClass: 'additive',
+    precheck: [{
+      description: `index does not already exist on ${collection}`,
+      source: new ListIndexesCommand(collection),
+      filter: keyFilter,
+      expect: 'notExists',
+    }],
+    execute: [{
+      description: `create index on ${collection}`,
+      command: new CreateIndexCommand(collection, keys, { ...options, name }),
+    }],
+    postcheck: [{
+      description: `index exists on ${collection}`,
+      source: new ListIndexesCommand(collection),
+      filter: fullFilter,
+      expect: 'exists',
+    }],
+  };
+}
+
+function planDropIndex(
+  collection: string,
+  keys: ReadonlyArray<MongoIndexKey>,
+  indexName: string,
+): MongoMigrationPlanOperation {
+  const keyFilter = MongoFieldFilter.eq('key', keysToKeySpec(keys));
+
+  return {
+    id: buildIndexOpId('drop', collection, keys),
+    label: `Drop index on ${collection} (${formatKeys(keys)})`,
+    operationClass: 'destructive',
+    precheck: [{
+      description: `index exists on ${collection}`,
+      source: new ListIndexesCommand(collection),
+      filter: keyFilter,
+      expect: 'exists',
+    }],
+    execute: [{
+      description: `drop index on ${collection}`,
+      command: new DropIndexCommand(collection, indexName),
+    }],
+    postcheck: [{
+      description: `index no longer exists on ${collection}`,
+      source: new ListIndexesCommand(collection),
+      filter: keyFilter,
+      expect: 'notExists',
+    }],
+  };
+}
 ```
 
 ### Index diffing (detail)
@@ -190,78 +283,120 @@ class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
 ### Execution flow
 
 ```
-1. Deserialize operations from plan (JSON → AST nodes)
+1. Deserialize operations from plan (JSON → MongoMigrationPlanOperation[])
 2. Read marker from _prisma_migrations collection
 3. Validate marker matches plan.origin (if origin is set)
    - If mismatch → return failure (contract/hash-mismatch)
    - If origin is null (db update mode) → skip validation
 4. For each operation:
    a. Notify callback: onOperationStart
-   b. If executionChecks.prechecks:
-      - Run precheck (e.g., does index already exist?)
-   c. If executionChecks.idempotencyChecks:
-      - Run postcheck — if already satisfied, skip execution
-   d. Execute the MongoDB command
+   b. If executionChecks.postchecks && executionChecks.idempotencyChecks:
+      - Evaluate all postcheck filters against inspection results
+      - If ALL postchecks already satisfied → skip (already applied)
+   c. If executionChecks.prechecks:
+      - Evaluate all precheck filters against inspection results
+      - If any fails → return failure (PRECHECK_FAILED)
+   d. For each execute step:
+      - Dispatch the DDL command to the command executor
    e. If executionChecks.postchecks:
-      - Run postcheck (e.g., does index now exist?)
-      - If failed → return failure (postcondition/failed)
+      - Evaluate all postcheck filters against inspection results
+      - If any fails → return failure (POSTCHECK_FAILED)
    f. Notify callback: onOperationComplete
 5. Update marker via compare-and-swap
 6. Write ledger entry
 7. Return success with operation counts
 ```
 
-### Operation dispatch (visitor)
+This is structurally identical to the SQL runner's `applyPlan` loop. The only difference is the execution substrate: SQL runs SQL strings, Mongo dispatches DDL command AST nodes and evaluates filter expressions.
 
-The runner implements `MongoMigrationOpVisitor<Promise<void>>`:
+### Command executor
+
+The command executor maps each DDL command kind to a MongoDB driver call:
 
 ```typescript
-class MongoOpExecutor implements MongoMigrationOpVisitor<Promise<void>> {
-  constructor(private readonly db: Db) {}
-
-  async createIndex(op: CreateIndexOp): Promise<void> {
-    const keySpec: Record<string, number | string> = {};
-    for (const key of op.keys) {
-      keySpec[key.field] = key.direction;
+async function executeDdlCommand(db: Db, command: AnyMongoDdlCommand): Promise<void> {
+  switch (command.kind) {
+    case 'createIndex': {
+      const keySpec: Record<string, number | string> = {};
+      for (const key of command.keys) {
+        keySpec[key.field] = key.direction;
+      }
+      const options: CreateIndexesOptions = {};
+      if (command.unique) options.unique = true;
+      if (command.sparse) options.sparse = true;
+      if (command.expireAfterSeconds != null) options.expireAfterSeconds = command.expireAfterSeconds;
+      if (command.partialFilterExpression) options.partialFilterExpression = command.partialFilterExpression;
+      if (command.name) options.name = command.name;
+      await db.collection(command.collection).createIndex(keySpec, options);
+      return;
     }
-    const options: CreateIndexesOptions = {};
-    if (op.unique) options.unique = true;
-    if (op.sparse) options.sparse = true;
-    if (op.expireAfterSeconds != null) options.expireAfterSeconds = op.expireAfterSeconds;
-    if (op.partialFilterExpression) options.partialFilterExpression = op.partialFilterExpression;
-    if (op.indexName) options.name = op.indexName;
-
-    await this.db.collection(op.collection).createIndex(keySpec, options);
+    case 'dropIndex': {
+      await db.collection(command.collection).dropIndex(command.name);
+      return;
+    }
+    case 'createCollection': {
+      const options: CreateCollectionOptions = {};
+      if (command.validator) options.validator = command.validator;
+      if (command.validationLevel) options.validationLevel = command.validationLevel;
+      if (command.validationAction) options.validationAction = command.validationAction;
+      await db.createCollection(command.collection, options);
+      return;
+    }
+    case 'dropCollection': {
+      await db.collection(command.collection).drop();
+      return;
+    }
+    case 'collMod': {
+      const cmd: Record<string, unknown> = { collMod: command.collection };
+      if (command.validator) cmd.validator = command.validator;
+      if (command.validationLevel) cmd.validationLevel = command.validationLevel;
+      if (command.validationAction) cmd.validationAction = command.validationAction;
+      await db.command(cmd);
+      return;
+    }
+    default:
+      throw new Error(`Unknown DDL command kind: ${(command as { kind: string }).kind}`);
   }
-
-  async dropIndex(op: DropIndexOp): Promise<void> {
-    const name = op.indexName ?? defaultMongoIndexName(op.collection, op.keys);
-    await this.db.collection(op.collection).dropIndex(name);
-  }
-
-  async createCollection(op: CreateCollectionOp): Promise<void> { ... }
-  async dropCollection(op: DropCollectionOp): Promise<void> { ... }
-  async updateValidator(op: UpdateValidatorOp): Promise<void> { ... }
-  async updateCollectionOptions(op: UpdateCollectionOptionsOp): Promise<void> { ... }
 }
 ```
 
-### Pre/post checks (idempotency)
+The `default` branch ensures that unknown command kinds (e.g., from a future extension pack) fail loudly rather than silently.
 
-Each operation kind has its own pre and post checks:
+### Check evaluation
 
-| Operation | Precheck | Postcheck |
-|-----------|----------|-----------|
-| `createIndex` | Index does not exist | Index exists |
-| `dropIndex` | Index exists | Index does not exist |
-| `createCollection` | Collection does not exist | Collection exists |
-| `dropCollection` | Collection exists | Collection does not exist |
-| `updateValidator` | — | Validator matches expected |
-| `updateCollectionOptions` | — | Options match expected |
+The runner evaluates checks by:
 
-"Index exists" is checked via `collection.listIndexes()` and structural comparison (same keys + options). "Collection exists" is checked via `db.listCollections({ name })`.
+1. Running the inspection command (`listIndexes`, `listCollections`) against the database
+2. Applying the `MongoFilterExpr` to each result document using a client-side filter evaluator
+3. Checking the expectation (`exists` = at least one match, `notExists` = no matches)
 
-**Idempotency**: if the postcheck is already satisfied before execution, the operation is skipped. This means re-running `migration apply` after a partial failure is safe — already-applied operations are detected and skipped.
+```typescript
+async function evaluateCheck(db: Db, check: MongoMigrationCheck): Promise<boolean> {
+  const results = await runInspectionCommand(db, check.source);
+  const evaluator = new FilterEvaluator();
+  const hasMatch = results.some(doc => evaluator.evaluate(check.filter, doc));
+  return check.expect === 'exists' ? hasMatch : !hasMatch;
+}
+
+async function runInspectionCommand(db: Db, source: AnyMongoInspectionCommand): Promise<Record<string, unknown>[]> {
+  switch (source.kind) {
+    case 'listIndexes':
+      return await db.collection(source.collection).listIndexes().toArray();
+    case 'listCollections':
+      return await db.listCollections().toArray();
+    default:
+      throw new Error(`Unknown inspection command kind: ${(source as { kind: string }).kind}`);
+  }
+}
+```
+
+The `FilterEvaluator` is a client-side interpreter for `MongoFilterExpr`. See the [Check Evaluator design](check-evaluator.spec.md) for full details.
+
+### Idempotency
+
+If all postchecks are already satisfied before execution, the operation is skipped. This means re-running `migration apply` after a partial failure is safe — already-applied operations are detected and skipped via their postchecks.
+
+This is identical to the SQL runner's idempotency probe, which checks if all postcheck SQL already returns `true` before executing.
 
 ## Marker and ledger
 
@@ -384,14 +519,18 @@ This is the same shape as `postgresTargetDescriptor.migrations` in `packages/3-t
 
 - **Planner**: `packages/3-mongo-target/` (target-specific, implements the framework interface)
 - **Runner**: `packages/3-mongo-target/` (target-specific, uses the Mongo driver)
+- **Command executor**: `packages/3-mongo-target/` (maps DDL commands to driver calls)
+- **Check evaluator**: `packages/3-mongo-target/` (evaluates filter expressions client-side)
 - **Marker/ledger I/O**: `packages/3-mongo-target/` (part of the runner, uses the Mongo driver)
-- **Op deserializer**: `packages/3-mongo-target/` (runner-specific)
+- **Op deserializer**: `packages/3-mongo-target/` (reconstructs AST nodes from JSON)
 
 All concretions live in the target, consistent with how Postgres puts its planner and runner under `packages/3-targets/3-targets/postgres/src/core/migrations/`.
 
 ## Testing strategy
 
-- **Planner**: unit tests with hand-crafted contracts and schema IRs. Cover add/drop/no-op/identity for indexes, validators, options. Cover policy gating and conflict detection.
+- **Planner**: unit tests with hand-crafted contracts and schema IRs. Cover add/drop/no-op/identity for indexes, validators, options. Cover policy gating and conflict detection. Verify that generated operations have correct precheck/execute/postcheck arrays.
+- **Command executor**: unit tests verifying each DDL command kind maps to the correct MongoDB driver call.
+- **Check evaluator**: unit tests with hand-crafted inspection results and filter expressions. See [Check Evaluator design](check-evaluator.spec.md).
 - **Runner**: integration tests with `mongodb-memory-server`. Cover each operation kind, idempotency (re-apply), CAS on marker, ledger writes.
 - **End-to-end**: integration tests through the CLI command surface. Hand-crafted contracts → `migration plan` → `migration apply` → verify MongoDB state.
 
@@ -402,3 +541,7 @@ All concretions live in the target, consistent with how Postgres puts its planne
 **Single collection instead of separate marker + ledger collections.** The marker is one document; the ledger is a modest number of append-only documents. Splitting them into two collections would mean two collections to create, two to query, and two to reason about during setup and introspection — with no meaningful benefit. A single `_prisma_migrations` collection is simpler to provision, easier to inspect (`db._prisma_migrations.find()`), and mirrors the single-table pattern Postgres uses for its migration metadata.
 
 **Structural index matching instead of name-based.** MongoDB auto-generates index names from keys (e.g. `email_1`), and users can override them. If we matched by name, renaming an index would appear as a drop + create, potentially causing downtime on a large collection. Structural matching — comparing keys, direction, and options — reflects the actual behavior of the index. Two indexes with different names but identical keys and options are functionally identical, and the planner correctly treats them as a no-op. The trade-off is that intentional name changes require a manual migration, but that's a rare operation and a reasonable cost.
+
+**Visitor dispatch on operations instead of generic three-phase loop.** An earlier design had each migration operation as its own class with a visitor interface. The runner would call `op.accept(executor)` and dispatch to a per-operation handler. We chose the generic loop because it makes the runner structurally identical to the SQL runner, makes pre/postchecks data (not behavior), and means adding a new DDL command requires only a new case in the command executor — not a new operation class, visitor method, and deserializer branch.
+
+**Purpose-built check DSL instead of filter expressions.** We could have defined check-specific types like `IndexExistsCheck`, `CollectionExistsCheck`. We chose `MongoFilterExpr` because the filter expression AST already exists, users know the syntax from MongoDB queries, and it's far more expressive than any purpose-built vocabulary. The trade-off is a client-side evaluator, which is straightforward and also useful for testing.
