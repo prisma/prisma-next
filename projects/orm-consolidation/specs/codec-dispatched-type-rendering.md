@@ -265,6 +265,24 @@ const payloadSchema = arktype({ action: 'string', actorId: 'number' });
 2. Emitted d.ts field: `{ readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' } }`
 3. Emitted `FieldOutputTypes`: `readonly email: string` (resolved via `CodecTypes` reference)
 
+## Acceptance criteria
+
+1. `renderOutputType` on the `Codec` interface, implemented on all parameterized codecs.
+2. `FieldOutputTypes` map emitted in `contract.d.ts`, wired into `TypeMaps`.
+3. `ComputeColumnJsType` reads from `FieldOutputTypes` — no `CodecTypes` dispatch.
+4. `EmissionSpi.generateModelsType?` override removed (hard criterion).
+5. `parameterizedOutput` removed from `CodecTypes`.
+6. `typeParams` in `contract.d.ts` matches `contract.json` (no phantom types).
+7. Legacy renderer infrastructure deleted (`TypeRenderer`, `parameterized` maps, `parameterizedRenderers` threading, `parameterizedTypeImports`).
+8. No-emit path produces `FieldOutputTypes` via `StagedFieldOutputTypes`.
+9. `isSafeTypeExpression` guards all `renderOutputType` output before embedding in `.d.ts`.
+10. `codecInstances` contribution point populated by postgres adapter and pgvector extension descriptors.
+11. E2e emission tests verify `FieldOutputTypes` for at least:
+    - A vector column with `typeParams: { length: N }` → `Vector<N>`
+    - A jsonb column with a Standard Schema → narrowed object type (e.g. `{ name: string }`)
+    - An enum column with `typeParams: { values: [...] }` → literal union
+12. `renderOutputType` throws on malformed `typeParams` (params present but missing required keys) rather than silently returning `undefined`.
+
 ## Open questions
 
 ### `isSafeTypeExpression` for `renderOutputType`
