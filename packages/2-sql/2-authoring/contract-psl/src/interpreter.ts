@@ -814,6 +814,16 @@ function collectPolymorphismDeclarations(
           });
           continue;
         }
+        const discField = model.fields.find((f) => f.name === fieldName);
+        if (discField && discField.typeName !== 'String') {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `Discriminator field "${fieldName}" on model "${model.name}" must be of type String, but is "${discField.typeName}"`,
+            sourceId,
+            span: attr.span,
+          });
+          continue;
+        }
         discriminatorDeclarations.set(model.name, { fieldName, span: attr.span });
       }
 
