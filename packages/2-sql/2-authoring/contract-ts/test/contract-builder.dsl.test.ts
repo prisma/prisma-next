@@ -87,6 +87,24 @@ function buildOwnershipRelationContract(ownershipCase: OwnershipRelationCase) {
 }
 
 describe('contract DSL authoring surface', () => {
+  it('preserves the typed contract result at the defineContract boundary', () => {
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+          },
+        }).sql({ table: 'user' }),
+      },
+    });
+
+    expectTypeOf(contract.target).toEqualTypeOf<'postgres'>();
+    expectTypeOf(contract.targetFamily).toEqualTypeOf<'sql'>();
+    expectTypeOf(contract.models.User.storage.table).toEqualTypeOf<'user'>();
+  });
+
   it('lowers inline ids and uniques while keeping sql focused on table/index/fk concerns', () => {
     const types = {
       Role: {

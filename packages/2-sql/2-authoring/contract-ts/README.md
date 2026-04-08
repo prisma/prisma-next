@@ -24,7 +24,7 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 
 - **SQL contract authoring**: Build SQL contracts programmatically with type safety
 - **Pack-composed helper vocabulary**: Merge family, target, and extension authoring contributions into the callback helper namespaces
-- **Lowering pipeline**: Lower authored model definitions into `ContractDefinition`, then into `Contract<SqlStorage>`
+- **Lowering pipeline**: Turn authored model definitions into the canonical SQL contract artifacts consumed by the rest of the stack
 - **Config helper**: Provide `typescriptContract(...)` for `prisma-next.config.ts`
 - **Schema export**: Publish the SQL JSON schema used by editors and tooling
 
@@ -36,8 +36,10 @@ This is the current SQL TypeScript authoring implementation. Shared descriptor t
 
 - **Base DSL**: `./contract-builder` exports the stable structural DSL (`defineContract`, `field`, `model`, `rel`)
 - **Composed helper namespaces**: `defineContract(config, (helpers) => ...)` synthesizes `helpers.field.*` and `helpers.type.*` from the selected family, target, and extension packs
-- **SQL-specific lowering**: `buildContractDefinition()` resolves names, relations, indexes, and FK materialization; `buildSqlContractFromDefinition()` produces the canonical SQL contract value
+- **SQL resolution and contract generation**: internal resolution normalizes names, relations, indexes, and FK materialization before producing the canonical SQL contract artifacts
 - **Shared descriptor layer**: `@prisma-next/contract-authoring` provides the target-neutral descriptor types used by the DSL and by authoring-adjacent packs
+
+Contributor-facing lowering notes and detailed warning semantics live in [DEVELOPING.md](./DEVELOPING.md).
 
 ```mermaid
 flowchart LR
@@ -187,12 +189,11 @@ const Membership = model('Membership', {
 
 ### Helper Notes
 
-- Direct imports expose the structural helpers: `field.column(...)`, `field.generated(...)`, and `field.namedType(...)`
-- The callback overload exposes pack-composed helper presets such as `field.id.uuidv4()`, `field.id.uuidv7()`, `field.id.nanoid({ size })`, `field.uuid()`, `field.text()`, `field.timestamp()`, `field.createdAt()`, and `type.*`
-- Use `field.sql({ column | id | unique })` and belongsTo-local `.sql({ fk })` when a storage override belongs next to one field or one FK
-- Use `field.namedType(types.Role)` when you have a local named storage type; `field.namedType('Role')` remains available as a fallback
-- Use named model tokens plus `User.refs.id` or `User.ref('id')` for typed cross-model references in constraint DSLs; string fallbacks still work but emit warnings when a typed alternative is available
-- Duplicate named primary keys, uniques, indexes, and foreign keys are rejected during build and validation instead of silently overriding each other
+- Structural helpers: `field.column(...)`, `field.generated(...)`, `field.namedType(...)`, plus `model(...)` and `rel.*`
+- Callback helper presets: `field.id.uuidv4()`, `field.id.uuidv7()`, `field.id.nanoid({ size })`, `field.uuid()`, `field.text()`, `field.timestamp()`, `field.createdAt()`, and `type.*`
+- Keep field-local and FK-local storage overrides next to the authoring site with `field.sql(...)` and `rel.belongsTo(...).sql({ fk })`
+- Prefer typed local refs such as `field.namedType(types.Role)`, `User.refs.id`, and `User.ref('id')` when those tokens are available
+- See [DEVELOPING.md](./DEVELOPING.md#validation-and-warnings) for duplicate-name validation rules and typed-fallback warning behavior
 
 ### Foreign Key Defaults
 

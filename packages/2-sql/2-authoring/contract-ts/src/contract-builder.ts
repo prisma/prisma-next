@@ -142,14 +142,18 @@ function validateExtensionPackRefs(
 
 function buildContractFromDsl<Definition extends ContractInput>(
   definition: Definition,
-): SqlContractResult<Definition> {
+): SqlContractResult<Definition>;
+
+function buildContractFromDsl(
+  definition: ContractInput,
+): ReturnType<typeof buildSqlContractFromDefinition> {
   validateTargetPackRef(definition.family, definition.target);
   validateExtensionPackRefs(definition.target, definition.extensionPacks);
 
   return buildSqlContractFromDefinition(
     buildContractDefinition(definition),
     definition.codecLookup,
-  ) as unknown as SqlContractResult<Definition>;
+  );
 }
 
 export function defineContract<

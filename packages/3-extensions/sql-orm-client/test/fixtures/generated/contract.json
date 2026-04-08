@@ -404,7 +404,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:8d1a3775ef861e96e34b97180819bca84f50a397346541915a1019f7e624eedf",
+    "storageHash": "sha256:9e609b1aeac0d980cf6cc7bc7cf78e310c104c235cf766344fbe730673cbcd2c",
     "tables": {
       "articles": {
         "columns": {
@@ -559,7 +559,13 @@
             "id"
           ]
         },
-        "uniques": []
+        "uniques": [
+          {
+            "columns": [
+              "user_id"
+            ]
+          }
+        ]
       },
       "tags": {
         "columns": {
