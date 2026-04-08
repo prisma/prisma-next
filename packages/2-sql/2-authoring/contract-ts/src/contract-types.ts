@@ -154,8 +154,8 @@ type ModelFieldNames<Definition, ModelName extends ModelNames<Definition>> = key
 
 type StagedModelRelations<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
-> = StagedDefinitionModels<Definition>[ModelName] extends {
+  ModelName extends ModelNames<Definition>,
+> = DefinitionModels<Definition>[ModelName] extends {
   readonly stageOne: { readonly relations: infer R };
 }
   ? R extends Record<string, unknown>
@@ -165,7 +165,7 @@ type StagedModelRelations<
 
 type StagedModelRelationNames<
   Definition,
-  ModelName extends StagedModelNames<Definition>,
+  ModelName extends ModelNames<Definition>,
 > = keyof StagedModelRelations<Definition, ModelName> & string;
 
 type ModelFieldState<
