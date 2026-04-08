@@ -31,12 +31,7 @@ describe('accumulator helpers — named-args', () => {
     ['lastN', '$lastN', { input: d, n }],
     ['maxN', '$maxN', { input: d, n }],
     ['minN', '$minN', { input: d, n }],
-    ['top', '$top', { output: d, sortBy: d }],
-    ['bottom', '$bottom', { output: d, sortBy: d }],
-    ['topN', '$topN', { output: d, sortBy: d, n }],
-    ['bottomN', '$bottomN', { output: d, sortBy: d, n }],
   ] as const)('acc.%s produces accumulator %s with record arg containing correct keys', (helperName, expectedOp, args) => {
-    // narrowed signatures make the union incompatible with a generic Record parameter; cast through unknown
     const helper = acc[helperName] as unknown as (a: Record<string, TypedAggExpr<DocField>>) => {
       node: MongoAggAccumulator;
     };
@@ -48,5 +43,28 @@ describe('accumulator helpers — named-args', () => {
     for (const key of Object.keys(args)) {
       expect(recordArg).toHaveProperty(key);
     }
+  });
+});
+
+describe('accumulator helpers — sortBy accumulators', () => {
+  const sortBy = { score: -1 as const };
+
+  it.each([
+    ['top', '$top', { output: d, sortBy }],
+    ['bottom', '$bottom', { output: d, sortBy }],
+    ['topN', '$topN', { output: d, sortBy, n }],
+    ['bottomN', '$bottomN', { output: d, sortBy, n }],
+  ] as const)('acc.%s produces accumulator %s with sortBy as literal', (helperName, expectedOp, args) => {
+    const helper = acc[helperName] as unknown as (a: Record<string, unknown>) => {
+      node: MongoAggAccumulator;
+    };
+    const result = helper(args);
+    expect(result.node).toBeInstanceOf(MongoAggAccumulator);
+    expect(result.node.op).toBe(expectedOp);
+    expect(isRecordArgs(result.node.arg!)).toBe(true);
+    const recordArg = result.node.arg as Readonly<Record<string, unknown>>;
+    expect(recordArg).toHaveProperty('output');
+    expect(recordArg).toHaveProperty('sortBy');
+    expect(recordArg['sortBy']).toBeInstanceOf(MongoAggLiteral);
   });
 });

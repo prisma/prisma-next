@@ -128,7 +128,6 @@ describe('expression helpers — named-args', () => {
     ['regexFindAll', '$regexFindAll', { input: s, regex: s }],
     ['replaceOne', '$replaceOne', { input: s, find: s, replacement: s }],
     ['replaceAll', '$replaceAll', { input: s, find: s, replacement: s }],
-    ['zip', '$zip', { inputs: arr }],
     ['convert', '$convert', { input: d, to: s }],
     ['getField', '$getField', { field: s, input: d }],
     ['setField', '$setField', { field: s, input: d, value: d }],
@@ -146,5 +145,17 @@ describe('expression helpers — named-args', () => {
     for (const key of Object.keys(args)) {
       expect(recordArgs).toHaveProperty(key);
     }
+  });
+
+  it('fn.zip produces $zip with inputs as array of expressions', () => {
+    const result = fn.zip({ inputs: [arr, arr] });
+    expect(result.node).toBeInstanceOf(MongoAggOperator);
+    const op = result.node as MongoAggOperator;
+    expect(op.op).toBe('$zip');
+    expect(isRecordArgs(op.args)).toBe(true);
+    const recordArgs = op.args as Readonly<Record<string, unknown>>;
+    expect(recordArgs).toHaveProperty('inputs');
+    expect(Array.isArray(recordArgs['inputs'])).toBe(true);
+    expect((recordArgs['inputs'] as unknown[]).length).toBe(2);
   });
 });
