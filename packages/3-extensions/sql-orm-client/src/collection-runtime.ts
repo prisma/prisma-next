@@ -5,6 +5,7 @@ import {
   findModelNameForTable,
   getColumnToFieldMap,
   getFieldToColumnMap,
+  type PolymorphismInfo,
 } from './collection-contract';
 import type { CollectionContext, RuntimeConnection, RuntimeScope } from './types';
 
@@ -91,6 +92,62 @@ export function mapStorageRowToModelFields(
   const mapped: Record<string, unknown> = {};
   for (const [columnName, value] of Object.entries(row)) {
     mapped[columnToField[columnName] ?? columnName] = value;
+  }
+  return mapped;
+}
+
+const mergedColumnToFieldCache = new WeakMap<object, Map<string, Record<string, string>>>();
+
+function getMergedColumnToFieldMap(
+  contract: Contract<SqlStorage>,
+  baseModelName: string,
+  variantModelName: string,
+): Record<string, string> {
+  const cacheKey = `${baseModelName}:${variantModelName}`;
+  let perContract = mergedColumnToFieldCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    mergedColumnToFieldCache.set(contract, perContract);
+  }
+  const cached = perContract.get(cacheKey);
+  if (cached) return cached;
+
+  const baseMap = getColumnToFieldMap(contract, baseModelName);
+  const variantMap = getColumnToFieldMap(contract, variantModelName);
+  const merged = { ...baseMap, ...variantMap };
+  perContract.set(cacheKey, merged);
+  return merged;
+}
+
+export function mapPolymorphicRow(
+  contract: Contract<SqlStorage>,
+  baseModelName: string,
+  polyInfo: PolymorphismInfo,
+  row: Record<string, unknown>,
+  variantName?: string,
+): Record<string, unknown> {
+  const resolvedVariantName = variantName;
+  const variant = resolvedVariantName
+    ? polyInfo.variants.get(resolvedVariantName)
+    : polyInfo.variantsByValue.get(row[polyInfo.discriminatorColumn] as string);
+
+  if (!variant) {
+    const baseMap = getColumnToFieldMap(contract, baseModelName);
+    const mapped: Record<string, unknown> = {};
+    for (const [col, val] of Object.entries(row)) {
+      if (col in baseMap) {
+        mapped[baseMap[col]!] = val;
+      }
+    }
+    return mapped;
+  }
+
+  const mergedMap = getMergedColumnToFieldMap(contract, baseModelName, variant.modelName);
+  const mapped: Record<string, unknown> = {};
+  for (const [col, val] of Object.entries(row)) {
+    if (col in mergedMap) {
+      mapped[mergedMap[col]!] = val;
+    }
   }
   return mapped;
 }
