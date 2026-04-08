@@ -24,10 +24,10 @@ Extend `MongoAggOperator` and `MongoAggAccumulator` to accept named arguments (`
 
 **Tasks:**
 
-- [ ] 1.1 — Widen `MongoAggOperator.args` type to `MongoAggExpr | ReadonlyArray<MongoAggExpr> | Readonly<Record<string, MongoAggExpr>>`. Update constructor to freeze record args. Update `rewrite()` to recurse into record entries. Update `MongoAggOperator.of()` signature.
-- [ ] 1.2 — Widen `MongoAggAccumulator.arg` type to `MongoAggExpr | Readonly<Record<string, MongoAggExpr>> | null`. Update constructor, `rewrite()`, and `MongoAggAccumulator.of()`.
-- [ ] 1.3 — Update adapter lowering (`lowering.ts`): add record-args branch to `operator()` and `accumulator()` visitors. Each record value lowered via `lowerAggExpr()`.
-- [ ] 1.4 — Tests: unit tests for `MongoAggOperator` with record args (construction, freezing, rewrite). Unit tests for `MongoAggAccumulator` with record args. Lowering tests for all three operator forms and both accumulator forms. Verify existing tests pass unchanged.
+- [x] 1.1 — Widen `MongoAggOperator.args` type to `MongoAggExpr | ReadonlyArray<MongoAggExpr> | Readonly<Record<string, MongoAggExpr>>`. Update constructor to freeze record args. Update `rewrite()` to recurse into record entries. Update `MongoAggOperator.of()` signature.
+- [x] 1.2 — Widen `MongoAggAccumulator.arg` type to `MongoAggExpr | Readonly<Record<string, MongoAggExpr>> | null`. Update constructor, `rewrite()`, and `MongoAggAccumulator.of()`.
+- [x] 1.3 — Update adapter lowering (`lowering.ts`): add record-args branch to `operator()` and `accumulator()` visitors. Each record value lowered via `lowerAggExpr()`.
+- [x] 1.4 — Tests: unit tests for `MongoAggOperator` with record args (construction, freezing, rewrite). Unit tests for `MongoAggAccumulator` with record args. Lowering tests for all three operator forms and both accumulator forms. Verify existing tests pass unchanged.
 
 ### Milestone 2: New field types and expression helper infrastructure
 
@@ -37,9 +37,9 @@ Add `BooleanField` and `DateField` type aliases, and internal factory functions 
 
 **Tasks:**
 
-- [ ] 2.1 — Add `BooleanField` and `DateField` type aliases to `types.ts`. Export from package index.
-- [ ] 2.2 — Add internal factory functions to `expression-helpers.ts`: `booleanExpr(op, args)`, `dateExpr(op, args)`, `numericUnaryExpr(op, arg)`, `namedArgsExpr(op, args, field)` (builds `MongoAggOperator` with record args). These follow the existing `numericExpr`, `stringExpr`, `stringUnaryExpr` patterns.
-- [ ] 2.3 — Type tests: verify `BooleanField` and `DateField` resolve correctly in `ResolveRow` (boolean → `boolean`, date → `Date`).
+- [x] 2.1 — Add `BooleanField` and `DateField` type aliases to `types.ts`. Export from package index.
+- [x] 2.2 — Add internal factory functions to `expression-helpers.ts`: `booleanExpr(op, args)`, `dateExpr(op, args)`, `numericUnaryExpr(op, arg)`, `namedArgsExpr(op, args, field)` (builds `MongoAggOperator` with record args). These follow the existing `numericExpr`, `stringExpr`, `stringUnaryExpr` patterns.
+- [x] 2.3 — Type tests: verify `BooleanField` and `DateField` resolve correctly in `ResolveRow` (boolean → `boolean`, date → `Date`).
 
 ### Milestone 3: Expression helpers — date, string, comparison
 
@@ -49,9 +49,9 @@ Add the first batch of expression helpers covering the three most commonly neede
 
 **Tasks:**
 
-- [ ] 3.1 — Date helpers: `year`, `month`, `dayOfMonth`, `hour`, `minute`, `second`, `millisecond` (numeric unary), `dateToString` (named args → `StringField`), `dateFromString` (named args → `DateField`), `dateDiff` (named args → `NumericField`), `dateAdd`, `dateSubtract` (named args → `DateField`), `dateTrunc` (named args → `DateField`). Type tests for each.
-- [ ] 3.2 — String helpers: `substr`, `substrBytes` (positional → `StringField`), `trim`, `ltrim`, `rtrim` (named args → `StringField`), `split` (positional → `ArrayField`), `strLenCP`, `strLenBytes` (unary → `NumericField`), `regexMatch` (named args → `BooleanField`), `regexFind` (named args → `DocField`), `regexFindAll` (named args → `ArrayField`), `replaceOne`, `replaceAll` (named args → `StringField`). Type tests for each.
-- [ ] 3.3 — Comparison helpers: `cmp` (positional → `NumericField`), `eq`, `ne`, `gt`, `gte`, `lt`, `lte` (positional → `BooleanField`). Type tests for each. Note: these are the aggregation expression forms, distinct from the filter operators.
+- [x] 3.1 — Date helpers: `year`, `month`, `dayOfMonth`, `hour`, `minute`, `second`, `millisecond` (numeric unary), `dateToString` (named args → `StringField`), `dateFromString` (named args → `DateField`), `dateDiff` (named args → `NumericField`), `dateAdd`, `dateSubtract` (named args → `DateField`), `dateTrunc` (named args → `DateField`). Type tests for each.
+- [x] 3.2 — String helpers: `substr`, `substrBytes` (positional → `StringField`), `trim`, `ltrim`, `rtrim` (named args → `StringField`), `split` (positional → `ArrayField`), `strLenCP`, `strLenBytes` (unary → `NumericField`), `regexMatch` (named args → `BooleanField`), `regexFind` (named args → `DocField`), `regexFindAll` (named args → `ArrayField`), `replaceOne`, `replaceAll` (named args → `StringField`). Type tests for each.
+- [x] 3.3 — Comparison helpers: `cmp` (positional → `NumericField`), `eq`, `ne`, `gt`, `gte`, `lt`, `lte` (positional → `BooleanField`). Type tests for each. Note: these are the aggregation expression forms, distinct from the filter operators.
 
 ### Milestone 4: Expression helpers — array, set, type, object
 
@@ -61,10 +61,10 @@ Add the remaining expression helper categories.
 
 **Tasks:**
 
-- [ ] 4.1 — Array helpers: `arrayElemAt` (positional → `DocField`), `concatArrays` (positional → `ArrayField`), `firstElem`, `lastElem` (unary → `DocField`; named `firstElem`/`lastElem` to avoid collision with accumulator `first`/`last`), `isIn` (positional → `BooleanField`; named `isIn` to avoid collision with JS keyword), `indexOfArray` (positional → `NumericField`), `isArray` (unary → `BooleanField`), `reverseArray` (unary → `ArrayField`), `slice` (positional → `ArrayField`), `zip` (named args → `ArrayField`), `range` (positional → `ArrayField`). Type tests for each.
-- [ ] 4.2 — Set helpers: `setUnion`, `setIntersection`, `setDifference` (positional → `ArrayField`), `setEquals`, `setIsSubset` (positional → `BooleanField`), `anyElementTrue`, `allElementsTrue` (unary → `BooleanField`). Type tests for each.
-- [ ] 4.3 — Type helpers: `typeOf` (unary → `StringField`; named `typeOf` to avoid collision with JS keyword), `convert` (named args → `DocField`), `toInt`, `toLong`, `toDouble`, `toDecimal` (unary → `NumericField`), `toString_` (unary → `StringField`; trailing underscore to avoid collision with `Object.toString`), `toObjectId` (unary → `DocField`), `toBool` (unary → `BooleanField`), `toDate` (unary → `DateField`). Type tests for each.
-- [ ] 4.4 — Object helpers: `objectToArray` (unary → `ArrayField`), `arrayToObject` (unary → `DocField`), `getField` (named args → `DocField`), `setField` (named args → `DocField`). Type tests for each.
+- [x] 4.1 — Array helpers: `arrayElemAt` (positional → `DocField`), `concatArrays` (positional → `ArrayField`), `firstElem`, `lastElem` (unary → `DocField`; named `firstElem`/`lastElem` to avoid collision with accumulator `first`/`last`), `isIn` (positional → `BooleanField`; named `isIn` to avoid collision with JS keyword), `indexOfArray` (positional → `NumericField`), `isArray` (unary → `BooleanField`), `reverseArray` (unary → `ArrayField`), `slice` (positional → `ArrayField`), `zip` (named args → `ArrayField`), `range` (positional → `ArrayField`). Type tests for each.
+- [x] 4.2 — Set helpers: `setUnion`, `setIntersection`, `setDifference` (positional → `ArrayField`), `setEquals`, `setIsSubset` (positional → `BooleanField`), `anyElementTrue`, `allElementsTrue` (unary → `BooleanField`). Type tests for each.
+- [x] 4.3 — Type helpers: `typeOf` (unary → `StringField`; named `typeOf` to avoid collision with JS keyword), `convert` (named args → `DocField`), `toInt`, `toLong`, `toDouble`, `toDecimal` (unary → `NumericField`), `toString_` (unary → `StringField`; trailing underscore to avoid collision with `Object.toString`), `toObjectId` (unary → `DocField`), `toBool` (unary → `BooleanField`), `toDate` (unary → `DateField`). Type tests for each.
+- [x] 4.4 — Object helpers: `objectToArray` (unary → `ArrayField`), `arrayToObject` (unary → `DocField`), `getField` (named args → `DocField`), `setField` (named args → `DocField`). Type tests for each.
 
 ### Milestone 5: Accumulator helpers
 
@@ -74,9 +74,9 @@ Add the remaining accumulator helpers, including those that use named args on th
 
 **Tasks:**
 
-- [ ] 5.1 — Simple accumulators: `stdDevPop`, `stdDevSamp` (single expression → `NullableNumericField`). Add static methods to `MongoAggAccumulator`. Type tests.
-- [ ] 5.2 — N-variant accumulators: `firstN`, `lastN`, `maxN`, `minN` (named args `{ input, n }` → `ArrayField`). Type tests.
-- [ ] 5.3 — Top/bottom accumulators: `top`, `bottom` (named args `{ output, sortBy }` → `DocField`), `topN`, `bottomN` (named args `{ output, sortBy, n }` → `ArrayField`). Type tests.
+- [x] 5.1 — Simple accumulators: `stdDevPop`, `stdDevSamp` (single expression → `NullableNumericField`). Add static methods to `MongoAggAccumulator`. Type tests.
+- [x] 5.2 — N-variant accumulators: `firstN`, `lastN`, `maxN`, `minN` (named args `{ input, n }` → `ArrayField`). Type tests.
+- [x] 5.3 — Top/bottom accumulators: `top`, `bottom` (named args `{ output, sortBy }` → `DocField`), `topN`, `bottomN` (named args `{ output, sortBy, n }` → `ArrayField`). Type tests.
 
 ### Milestone 6: Export wiring and final verification
 
@@ -86,10 +86,10 @@ Wire all new exports, verify all tests pass, and update documentation.
 
 **Tasks:**
 
-- [ ] 6.1 — Update `exports/index.ts` to re-export `BooleanField`, `DateField` types.
-- [ ] 6.2 — Verify all new `fn.*` and `acc.*` helpers are accessible from the package's public API (they are already on the `fn` and `acc` objects, which are exported).
-- [ ] 6.3 — Run full test suite: `pnpm test` in pipeline-builder, `pnpm test` in query-ast, `pnpm test` in mongo-adapter (lowering). Verify `pnpm lint:deps` passes.
-- [ ] 6.4 — Update `DEVELOPING.md` and `README.md` for the pipeline-builder package to document the full helper set.
+- [x] 6.1 — Update `exports/index.ts` to re-export `BooleanField`, `DateField` types.
+- [x] 6.2 — Verify all new `fn.*` and `acc.*` helpers are accessible from the package's public API (they are already on the `fn` and `acc` objects, which are exported).
+- [x] 6.3 — Run full test suite: `pnpm test` in pipeline-builder, `pnpm test` in query-ast, `pnpm test` in mongo-adapter (lowering). Verify `pnpm lint:deps` passes.
+- [x] 6.4 — Update `DEVELOPING.md` and `README.md` for the pipeline-builder package to document the full helper set.
 
 ### Close-out
 
