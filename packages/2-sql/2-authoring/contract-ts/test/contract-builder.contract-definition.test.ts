@@ -1,3 +1,4 @@
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
@@ -172,6 +173,59 @@ describe('shared contract definition lowering', () => {
     });
     expect(models['Post']?.storage.fields['authorId']).toEqual({
       column: 'author_id',
+    });
+  });
+
+  it('encodes literal defaults through codecLookup during storage lowering', () => {
+    const codecLookup: CodecLookup = {
+      get: (id) => {
+        if (id !== 'pg/timestamptz@1') {
+          return undefined;
+        }
+
+        return {
+          id,
+          targetTypes: ['timestamptz'],
+          traits: ['equality', 'order'] as const,
+          decode: (wire: unknown) => wire,
+          encodeJson: (value: unknown) =>
+            value instanceof Date ? value.toISOString() : (value as string),
+          decodeJson: (json: unknown) => new Date(json as string),
+        };
+      },
+    };
+
+    const contract = buildSqlContractFromDefinition(
+      {
+        target: postgresTargetPack,
+        models: [
+          {
+            modelName: 'Event',
+            tableName: 'event',
+            fields: [
+              {
+                fieldName: 'scheduledAt',
+                columnName: 'scheduled_at',
+                descriptor: {
+                  codecId: 'pg/timestamptz@1',
+                  nativeType: 'timestamptz',
+                },
+                nullable: false,
+                default: {
+                  kind: 'literal',
+                  value: new Date('2025-01-01T00:00:00.000Z'),
+                },
+              },
+            ],
+          },
+        ],
+      },
+      codecLookup,
+    );
+
+    expect(contract.storage.tables['event']?.columns['scheduled_at']?.default).toEqual({
+      kind: 'literal',
+      value: '2025-01-01T00:00:00.000Z',
     });
   });
 

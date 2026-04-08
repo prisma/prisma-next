@@ -171,7 +171,7 @@ function buildDomainField(
 export function buildSqlContractFromDefinition(
   definition: ContractDefinition,
   codecLookup?: CodecLookup,
-): Contract {
+): Contract<SqlStorage> {
   const target = definition.target.targetId;
   const targetFamily = 'sql';
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
