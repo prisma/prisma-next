@@ -5,6 +5,7 @@
 Extend the migration system to manage MongoDB's server-side configuration (indexes, JSON Schema validators, collection options) through the same graph-based migration model used for SQL DDL. The project proves the migration architecture generalizes beyond SQL by implementing a Mongo planner, runner, schema IR, and target wiring — all against the existing family-agnostic migration SPI.
 
 **Spec:** `projects/mongo-schema-migrations/spec.md`
+**Linear:** [TML-2220](https://linear.app/prisma-company/issue/TML-2220/schema-migrations-for-mongodb)
 
 ## Collaborators
 
@@ -34,12 +35,12 @@ Proves the full migration architecture works for MongoDB by cutting a thin verti
 
 **Schema IR:**
 
-- [ ] **1.5 Define `MongoSchemaIR` AST.** Following the `MongoAstNode` pattern from `@prisma-next/mongo-query-ast`: abstract base class with `kind` discriminant and `freeze()`, concrete classes `MongoSchemaCollection` and `MongoSchemaIndex`. Union types for matching. Package placement: new package in `packages/2-mongo-family/` (tooling layer, migration plane). Write unit tests for AST construction and freeze behavior.
+- [ ] **1.5 Define `MongoSchemaIR` AST.** Following the class-based AST pattern from the SQL query AST, Mongo pipeline AST, and Mongo expression AST: base class with abstract `kind` discriminant + `freeze()` for immutability; intermediate abstract `MongoSchemaNode` with `accept(visitor)` for double dispatch; concrete frozen classes `MongoSchemaCollection` and `MongoSchemaIndex` with `readonly kind = '...' as const`; union type `AnyMongoSchemaNode`; visitor interface `MongoSchemaVisitor<R>` with one method per node type. Package placement: new package in `packages/2-mongo-family/` (tooling layer, migration plane). Write unit tests for AST construction, freeze behavior, and visitor dispatch.
 - [ ] **1.6 Implement `contractToSchema` for Mongo.** Synthesize a `MongoSchemaIR` from a `MongoContract`. When contract is `null` (new project), return empty IR. Lives in `packages/3-mongo-target/`. Write tests with hand-crafted contracts.
 
 **Planner:**
 
-- [ ] **1.7 Define `MongoMigrationPlanOperation` AST classes.** Concrete classes per operation kind: `CreateIndexOp`, `DropIndexOp`. Each extends a common base with the `MigrationPlanOperation` envelope fields (`id`, `label`, `operationClass`) and carries the MongoDB command representation. Following `MongoAstNode` pattern. Write unit tests.
+- [ ] **1.7 Define `MongoMigrationPlanOperation` AST classes.** Abstract base class `MongoMigrationOp` with `kind` discriminant, `freeze()`, and `MigrationPlanOperation` envelope fields (`id`, `label`, `operationClass`). Concrete frozen classes: `CreateIndexOp`, `DropIndexOp`. Union type `AnyMongoMigrationOp`. Visitor interface `MongoMigrationOpVisitor<R>` with one method per op type — the runner dispatches via `accept(visitor)` rather than switching on `kind`. Write unit tests for construction, freeze, envelope fields, and visitor dispatch.
 - [ ] **1.8 Implement `MongoMigrationPlanner`.** Diff destination contract against origin `MongoSchemaIR`. For M1: detect added indexes → `CreateIndexOp` (additive), removed indexes → `DropIndexOp` (destructive). Index identity by (collection + ordered fields + key types + semantic options), not by name. Returns `MigrationPlannerResult`. Write unit tests covering: add index, drop index, no-op (same indexes), index identity (same keys different name = equivalent).
 
 **Runner + wiring:**
