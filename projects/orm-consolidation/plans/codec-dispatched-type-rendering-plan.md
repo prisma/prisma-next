@@ -367,6 +367,133 @@ Grep for: `parameterizedRenderers`, `TypeRenderEntry`, `NormalizedTypeRenderer`,
 
 ---
 
+## Milestone 6: E2e coverage for vector and JSON+schema parameterized types
+
+Add pgvector and jsonb-with-schema columns to the e2e contract fixture so the full emission pipeline (not just unit tests) proves `FieldOutputTypes` renders correctly for these parameterized types.
+
+### 6.1 Wire pgvector into e2e emission config
+
+**File:** `test/e2e/framework/test/fixtures/prisma-next.config.ts`
+
+Add `pgvector` to `extensionPacks` so the emitter knows about `pg/vector@1`.
+
+### 6.2 Add vector and jsonb-with-schema columns to the e2e contract
+
+**File:** `test/e2e/framework/test/fixtures/contract.ts` (and re-emit)
+
+Add:
+- A `pg/vector@1` column with `typeParams: { length: 1536 }` → expect `Vector<1536>` in emitted `FieldOutputTypes`
+- A `pg/jsonb@1` column with `typeParams: { schemaJson: ... }` → expect narrowed object type in emitted `FieldOutputTypes`
+
+Re-emit the fixture (`pnpm emit`) and verify the generated `contract.d.ts` contains the expected `FieldOutputTypes` entries.
+
+### 6.3 Tests
+
+- Regenerated `contract.d.ts` contains `Vector<1536>` for the vector column
+- Regenerated `contract.d.ts` contains the narrowed schema type for the jsonb column
+- Existing e2e tests continue to pass
+
+### Packages touched
+
+| Package | Change |
+|---------|--------|
+| `test/e2e/framework` | Add pgvector to config, add vector + jsonb columns to fixture, re-emit |
+
+---
+
+## Milestone 7: Mongo family `FieldOutputTypes` support
+
+Bring the mongo family in line with ADR 186 by adding `fieldOutputTypes` to `MongoTypeMaps` and wiring the structural plumbing. Includes at least one `renderOutputType` implementation (`mongo/vector@1` with length) to exercise the codepath end-to-end.
+
+### 7.1 Add `fieldOutputTypes` to `MongoTypeMaps`
+
+**File:** `packages/2-mongo-family/1-foundation/mongo-contract/src/contract-types.ts`
+
+Extend `MongoTypeMaps` with a third type parameter:
+
+```typescript
+export type MongoTypeMaps<
+  TCodecTypes extends Record<string, { output: unknown }> = Record<string, { output: unknown }>,
+  TOperationTypes extends Record<string, unknown> = Record<string, never>,
+  TFieldOutputTypes extends Record<string, Record<string, unknown>> = Record<string, never>,
+> = {
+  readonly codecTypes: TCodecTypes;
+  readonly operationTypes: TOperationTypes;
+  readonly fieldOutputTypes: TFieldOutputTypes;
+};
+```
+
+Add `ExtractMongoFieldOutputTypes<T>` alongside the existing extractors.
+
+### 7.2 Implement `renderOutputType` on `mongoVectorCodec`
+
+**File:** `packages/3-mongo-target/2-mongo-adapter/src/core/codecs.ts`
+
+Add `renderOutputType` to `mongoVectorCodec`: when `typeParams.length` is present and a valid positive integer, return `Vector<${length}>`, otherwise return `undefined`.
+
+### 7.3 Wire `FieldOutputTypes` through mongo emission
+
+**File:** `packages/2-mongo-family/3-tooling/emitter/src/index.ts`
+
+Update `getTypeMapsExpression()` to include the `FieldOutputTypes` parameter:
+```typescript
+getTypeMapsExpression(): string {
+  return 'MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes>';
+}
+```
+
+Ensure the framework emitter's `generateFieldOutputTypesMap` (already implemented in Milestone 2) is invoked for mongo contracts — this is handled by the framework emitter generically, but verify that the mongo emission's `CodecLookup` is populated.
+
+### 7.4 Add `codecInstances` to mongo adapter descriptor
+
+**File:** `packages/3-mongo-target/2-mongo-adapter/src/core/descriptor-meta.ts` (or equivalent)
+
+Populate `types.codecTypes.codecInstances` with the mongo codec array so `extractCodecLookup` can find them.
+
+### 7.5 Update emitted mongo contract fixtures
+
+Re-emit the mongo demo contract and any mongo test fixtures so they include `FieldOutputTypes`.
+
+### 7.6 Tests
+
+- Unit test: `mongoVectorCodec.renderOutputType({ length: 1536 })` → `'Vector<1536>'`
+- Unit test: `mongoVectorCodec.renderOutputType({})` → `undefined`
+- Type test: `MongoTypeMaps` accepts a `fieldOutputTypes` parameter
+- Emitted mongo `contract.d.ts` includes `FieldOutputTypes` export
+- Existing mongo tests pass
+
+### Packages touched
+
+| Package | Change |
+|---------|--------|
+| `@prisma-next/mongo-contract` | Add `fieldOutputTypes` to `MongoTypeMaps`, add `ExtractMongoFieldOutputTypes` |
+| `@prisma-next/mongo-adapter` | Add `renderOutputType` to `mongoVectorCodec`, populate `codecInstances` |
+| `@prisma-next/mongo-emitter` | Update `getTypeMapsExpression()` |
+| `examples/mongo-demo` | Re-emit contract |
+
+---
+
+## Milestone 8: No-emit path parameterized output types *(deferred)*
+
+**Status:** Deferred — not in scope for PR #312.
+
+The no-emit path (`StagedFieldOutputTypes`) currently resolves every field to `CodecTypes[codecId]['output']`, ignoring `typeParams`. This means:
+- `vector(1536)` resolves to `number[]` instead of `Vector<1536>`
+- `char(36)` resolves to `string` instead of `Char<36>`
+- `jsonb(schema)` resolves to `JsonValue` instead of the narrowed schema type
+
+On `origin/main`, a `parameterizedOutput` type-level mechanism existed on `CodecTypes` that could resolve parameterized types at compile time. This was removed in this PR along with the runtime `parameterizedRenderers`.
+
+Restoring type-level parameterized output for the no-emit path requires:
+
+1. A type-level mechanism on codec type declarations (e.g., `parameterizedOutput` conditional type or similar) that maps `typeParams` → refined output type
+2. `StagedFieldOutputType` invoking this mechanism when `typeParams` are present
+3. Handling JSON Schema → TypeScript type resolution at the type level (which may need a different approach, e.g., user-supplied type parameter)
+
+This is a separate design problem that warrants its own spec and milestone.
+
+---
+
 ## Test coverage summary
 
 | Acceptance criterion | Test type | Milestone |
@@ -389,6 +516,14 @@ Grep for: `parameterizedRenderers`, `TypeRenderEntry`, `NormalizedTypeRenderer`,
 | All existing tests pass | Full suite | 5 |
 | `pnpm build` succeeds | Build | 5 |
 | `pnpm typecheck` succeeds | Typecheck | 5 |
+| E2e vector column → `Vector<1536>` in `FieldOutputTypes` | E2e | 6 |
+| E2e jsonb-with-schema column → narrowed type in `FieldOutputTypes` | E2e | 6 |
+| `MongoTypeMaps` includes `fieldOutputTypes` | Type test | 7 |
+| `mongoVectorCodec.renderOutputType` produces correct type string | Unit | 7 |
+| Emitted mongo `contract.d.ts` includes `FieldOutputTypes` | Snapshot | 7 |
+| No-emit `vector(1536)` → `Vector<1536>` (type-level) | Type test | 8 (deferred) |
+| No-emit `char(36)` → `Char<36>` (type-level) | Type test | 8 (deferred) |
+| No-emit `jsonb(schema)` → narrowed type (type-level) | Type test | 8 (deferred) |
 
 ## Packages touched (summary)
 
@@ -403,3 +538,7 @@ Grep for: `parameterizedRenderers`, `TypeRenderEntry`, `NormalizedTypeRenderer`,
 | `@prisma-next/sql-relational-core` | sql/lanes | Simplify `ComputeColumnJsType` to read from `FieldOutputTypes`. Delete `ExtractParameterizedCodecOutputType`. |
 | `@prisma-next/adapter-postgres` | targets/adapters | Implement `renderOutputType` on codecs. Delete `parameterized` from descriptor, `parameterizedOutput` from codec-types, phantom `schema` from column-types, `renderJsonTypeExpression`/`isSafeTypeExpression` from descriptor-meta. |
 | `@prisma-next/extension-pgvector` | extensions | Implement `renderOutputType` on codec. Delete `parameterized` from descriptor, `parameterizedOutput` from codec-types. |
+| `test/e2e/framework` | e2e | Add pgvector to config, add vector + jsonb columns to fixture, re-emit (M6). |
+| `@prisma-next/mongo-contract` | mongo/core | Add `fieldOutputTypes` to `MongoTypeMaps`, add `ExtractMongoFieldOutputTypes` (M7). |
+| `@prisma-next/mongo-adapter` | mongo-target | Add `renderOutputType` to `mongoVectorCodec`, populate `codecInstances` (M7). |
+| `@prisma-next/mongo-emitter` | mongo/tooling | Update `getTypeMapsExpression()` (M7). |
