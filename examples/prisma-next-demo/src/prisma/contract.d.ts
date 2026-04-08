@@ -50,12 +50,29 @@ export type Address = {
   readonly country: CodecTypes['pg/text@1']['output'];
 };
 export type FieldOutputTypes = {
+  readonly Bug: {
+    readonly severity: CodecTypes['pg/text@1']['output'];
+    readonly stepsToRepro: CodecTypes['pg/text@1']['output'] | null;
+  };
+  readonly Feature: {
+    readonly priority: CodecTypes['pg/text@1']['output'];
+    readonly targetRelease: CodecTypes['pg/text@1']['output'] | null;
+  };
   readonly Post: {
     readonly id: Char<36>;
     readonly title: CodecTypes['pg/text@1']['output'];
     readonly userId: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
     readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
+  };
+  readonly Task: {
+    readonly id: Char<36>;
+    readonly title: CodecTypes['pg/text@1']['output'];
+    readonly description: CodecTypes['pg/text@1']['output'] | null;
+    readonly status: CodecTypes['pg/text@1']['output'];
+    readonly type: CodecTypes['pg/text@1']['output'];
+    readonly userId: CodecTypes['pg/text@1']['output'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
   };
   readonly User: {
     readonly id: Char<36>;
@@ -261,13 +278,6 @@ type ContractBase = ContractType<
   },
   {
     readonly Bug: {
-      readonly storage: {
-        readonly table: 'bug';
-        readonly fields: {
-          readonly severity: { readonly column: 'severity' };
-          readonly stepsToRepro: { readonly column: 'stepsToRepro' };
-        };
-      };
       readonly fields: {
         readonly severity: {
           readonly nullable: false;
@@ -278,17 +288,17 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         };
       };
-      readonly relations: {};
+      readonly relations: Record<string, never>;
+      readonly storage: {
+        readonly table: 'bug';
+        readonly fields: {
+          readonly severity: { readonly column: 'severity' };
+          readonly stepsToRepro: { readonly column: 'stepsToRepro' };
+        };
+      };
       readonly base: 'Task';
     };
     readonly Feature: {
-      readonly storage: {
-        readonly table: 'feature';
-        readonly fields: {
-          readonly priority: { readonly column: 'priority' };
-          readonly targetRelease: { readonly column: 'targetRelease' };
-        };
-      };
       readonly fields: {
         readonly priority: {
           readonly nullable: false;
@@ -299,7 +309,14 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         };
       };
-      readonly relations: {};
+      readonly relations: Record<string, never>;
+      readonly storage: {
+        readonly table: 'feature';
+        readonly fields: {
+          readonly priority: { readonly column: 'priority' };
+          readonly targetRelease: { readonly column: 'targetRelease' };
+        };
+      };
       readonly base: 'Task';
     };
     readonly Post: {
@@ -352,7 +369,14 @@ type ContractBase = ContractType<
     };
     readonly Task: {
       readonly fields: {
-        readonly id: Char<36>;
+        readonly id: {
+          readonly nullable: false;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'sql/char@1';
+            readonly typeParams: { readonly length: 36 };
+          };
+        };
         readonly title: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
