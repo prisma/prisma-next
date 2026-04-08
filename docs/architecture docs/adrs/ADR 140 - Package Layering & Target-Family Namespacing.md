@@ -30,8 +30,8 @@ packages/
     plan/                (plan helpers, diagnostics, shared errors)
     operations/          (target-neutral op registry + capability helpers)
   authoring/
-    contract-authoring/  (TS builders, canonicalization, schema DSL)
-    contract-ts/         (TS authoring surface, if split further)
+    contract-authoring/  (shared authoring descriptors/types)
+    contract-ts/         (family-specific TS authoring surface, if split further)
     contract-psl/        (PSL parser + IR, future)
   targets/
     sql/

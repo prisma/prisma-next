@@ -5,50 +5,59 @@
 A User and Post contract authored with the contract DSL. The model definition speaks in application-domain terms first — fields, relations, identity — and falls back to SQL details only when the author needs something storage-specific.
 
 ```ts
-import { defineContract, field, model, rel, type } from '@prisma-next/sql-contract-ts/contract-builder';
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-const User = model('User', {
-  fields: {
-    id: field.id.uuidv7(),                // ← pack-provided preset: UUID v7 primary key
-    email: field.text().unique(),          // ← inline unique constraint
-    createdAt: field.createdAt(),          // ← pack-provided preset: timestamp with default
+export const contract = defineContract(
+  {
+    family: sqlFamily,
+    target: postgresPack,
+    naming: { tables: 'snake_case', columns: 'snake_case' },
   },
-  relations: {
-    posts: rel.hasMany('Post', { by: 'authorId' }),  // ← reverse side, no FK authored here
-  },
-});
+  ({ field, model, rel }) => {
+    const User = model('User', {
+      fields: {
+        id: field.id.uuidv7(),                 // ← pack-provided preset: UUID v7 primary key
+        email: field.text().unique(),          // ← inline unique constraint
+        createdAt: field.createdAt(),          // ← pack-provided preset: timestamp with default
+      },
+    });
 
-const Post = model('Post', {
-  fields: {
-    id: field.id.uuidv7(),
-    authorId: field.uuid(),
-    title: field.text(),
-    body: field.text().optional(),
-  },
-  relations: {
-    author: rel.belongsTo(User, {         // ← typed model token, not a string
-      from: 'authorId',
-      to: User.ref('id'),                 // ← typed cross-model field ref
-    }).sql({
-      fk: { name: 'post_author_id_fkey', onDelete: 'cascade' },
-    }),
-  },
-}).sql(({ cols, constraints }) => ({      // ← SQL overlay: only storage-specific details
-  table: 'blog_post',
-  indexes: [constraints.index(cols.authorId, { name: 'post_author_id_idx' })],
-}));
+    const Post = model('Post', {
+      fields: {
+        id: field.id.uuidv7(),
+        authorId: field.uuid(),
+        title: field.text(),
+        body: field.text().optional(),
+      },
+    });
 
-export const contract = defineContract({
-  target: postgresPack,
-  naming: { tables: 'snake_case', columns: 'snake_case' },
-  models: { User, Post },
-});
+    return {
+      models: {
+        User: User.relations({
+          posts: rel.hasMany(Post, { by: 'authorId' }), // ← reverse side, no FK authored here
+        }),
+        Post: Post.relations({
+          author: rel.belongsTo(User, {                 // ← typed model token, not a string
+            from: 'authorId',
+            to: 'id',
+          }).sql({
+            fk: { name: 'post_author_id_fkey', onDelete: 'cascade' },
+          }),
+        }).sql(({ cols, constraints }) => ({            // ← SQL overlay: only storage-specific details
+          table: 'blog_post',
+          indexes: [constraints.index(cols.authorId, { name: 'post_author_id_idx' })],
+        })),
+      },
+    };
+  },
+);
 ```
 
 Three things to notice:
 
-1. **No table or column layer.** The author writes `field.text()`, not `t.column('email', textColumn)`. Column names come from the field keys via a naming strategy. The author only touches storage names when overriding.
+1. **No table or column layer.** Inside the callback helper namespace, the author writes `field.text()`, not `t.column('email', textColumn)`. Column names come from the field keys via a naming strategy. The author only touches storage names when overriding.
 2. **Semantic intent, then SQL.** Identity (`field.id.uuidv7()`), uniqueness (`.unique()`), and relations (`rel.belongsTo(User, ...)`) are expressed in the model definition. The `.sql()` block is reserved for table mapping, indexes, and constraint names.
 3. **Typed references.** `User` is a model token, not a string. `User.ref('id')` is a typed field reference. The lowering pipeline validates these at build time.
 
@@ -100,6 +109,8 @@ Explicit column names on every field are the single biggest source of boilerplat
 
 ```ts
 defineContract({
+  family: sqlFamily,
+  target: postgresPack,
   naming: { tables: 'snake_case', columns: 'snake_case' },
   ...
 });
@@ -146,7 +157,7 @@ The contract DSL lowers through an intermediate representation called `ContractD
 ```text
 model() + field.* + rel.*                →  model builder instances
           ↓
-defineContract({ target, models, ... })
+defineContract({ family, target, models, ... })
           ↓
 buildContractDefinition()  →  ContractDefinition
           ↓
