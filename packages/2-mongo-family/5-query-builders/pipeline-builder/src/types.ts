@@ -19,6 +19,16 @@ export type BooleanField = { readonly codecId: 'mongo/bool@1'; readonly nullable
 export type DateField = { readonly codecId: 'mongo/date@1'; readonly nullable: false };
 export type NullableDocField = { readonly codecId: string; readonly nullable: true };
 
+export type LiteralValue<F extends DocField> = F extends StringField
+  ? string
+  : F extends NumericField
+    ? number
+    : F extends BooleanField
+      ? boolean
+      : F extends DateField
+        ? Date
+        : unknown;
+
 export type DocShape = Record<string, DocField>;
 
 type ExtractCodecId<F> = F extends { type: { kind: 'scalar'; codecId: infer C } } ? C : string;

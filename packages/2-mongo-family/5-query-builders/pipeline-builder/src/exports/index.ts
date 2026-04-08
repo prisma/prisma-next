@@ -15,6 +15,7 @@ export type {
   FilterProxy,
   GroupedDocShape,
   GroupSpec,
+  LiteralValue,
   ModelToDocShape,
   NullableDocField,
   NullableNumericField,
