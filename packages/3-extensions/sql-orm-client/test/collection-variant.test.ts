@@ -182,3 +182,118 @@ describe('STI polymorphic query pipeline', () => {
     expect(rows[0]).not.toHaveProperty('plan');
   });
 });
+
+function buildMixedPolyContract(): TestContract {
+  const base = getTestContract();
+  const raw = JSON.parse(JSON.stringify(base));
+
+  raw.models.Task = {
+    fields: {
+      id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+      title: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+      type: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+    },
+    relations: {},
+    storage: {
+      table: 'tasks',
+      fields: { id: { column: 'id' }, title: { column: 'title' }, type: { column: 'type' } },
+    },
+    discriminator: { field: 'type' },
+    variants: { Bug: { value: 'bug' }, Feature: { value: 'feature' } },
+  };
+
+  raw.models.Bug = {
+    fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
+    relations: {},
+    storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
+    base: 'Task',
+  };
+
+  raw.models.Feature = {
+    fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
+    relations: {},
+    storage: { table: 'features', fields: { priority: { column: 'priority' } } },
+    base: 'Task',
+  };
+
+  raw.storage.tables.tasks = {
+    columns: {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      type: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      severity: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+
+  raw.storage.tables.features = {
+    columns: {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+
+  return raw as TestContract;
+}
+
+function createMixedPolyCollection() {
+  const contract = buildMixedPolyContract();
+  const baseContext = getTestContext();
+  const context = { ...baseContext, contract };
+  const runtime = createMockRuntime();
+  const collection = new Collection({ runtime, context }, 'Task');
+  return { collection, runtime };
+}
+
+describe('Mixed STI+MTI polymorphic query pipeline', () => {
+  it('base query maps Bug (STI) and Feature (MTI) rows to variant-specific shapes', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([
+      [
+        { id: 1, title: 'Crash', type: 'bug', severity: 'critical', priority: null },
+        { id: 2, title: 'Dark mode', type: 'feature', severity: null, priority: 1 },
+      ],
+    ]);
+
+    const rows = await collection.all().toArray();
+
+    expect(rows).toHaveLength(2);
+
+    const bug = rows[0]!;
+    expect(bug).toEqual({ id: 1, title: 'Crash', type: 'bug', severity: 'critical' });
+    expect(bug).not.toHaveProperty('priority');
+
+    const feature = rows[1]!;
+    expect(feature).toEqual({ id: 2, title: 'Dark mode', type: 'feature', priority: 1 });
+    expect(feature).not.toHaveProperty('severity');
+  });
+
+  it('variant(Bug) query maps Bug STI rows only', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([[{ id: 1, title: 'Crash', type: 'bug', severity: 'critical' }]]);
+
+    const rows = await (collection.variant('Bug' as never) as typeof collection).all().toArray();
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual({ id: 1, title: 'Crash', type: 'bug', severity: 'critical' });
+  });
+
+  it('variant(Feature) query maps Feature MTI rows only', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([[{ id: 2, title: 'Dark mode', type: 'feature', priority: 1 }]]);
+
+    const rows = await (collection.variant('Feature' as never) as typeof collection)
+      .all()
+      .toArray();
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual({ id: 2, title: 'Dark mode', type: 'feature', priority: 1 });
+  });
+});
