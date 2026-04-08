@@ -51,8 +51,8 @@ graph TD
   PSL(schema.psl) --> AST(PslDocumentAst)
   TS_STAGED(contract.ts - staged) --> SCI(StagedInput)
   TS_CHAIN(contract.ts - chain) --> CBS(BuilderState)
-  SCI --> SSCD(SqlSemanticContractDef)
-  SSCD -->|lower| IR
+  SCI --> SCD(SqlContractDef)
+  SCD -->|lower| IR
   AST -->|interpret| IR
   CBS -->|.build| IR
   IR(Contract)
@@ -87,9 +87,9 @@ At runtime, consumers needed model-first structure. The ORM client needed to tra
 
 The result is a round-trip: **model-first → storage-first → model-first**. An intermediate representation exists solely to bridge the authoring-side conversion:
 
-- **SqlSemanticContractDefinition** — the staged TS authoring DSL produced model-first data, but could not emit it directly as the canonical form. So it built this SQL-specific intermediate, then converted *down* to `ContractIR`. This type mirrors the ORM client's type definitions — both organize data around models, fields, and relations, because both describe the contract from the user's semantic perspective.
+- **ContractDefinition** — the staged TS authoring DSL produced model-first data, but could not emit it directly as the canonical form. So it built this SQL-specific intermediate, then converted *down* to `ContractIR`. This type mirrors the ORM client's type definitions — both organize data around models, fields, and relations, because both describe the contract from the user's semantic perspective.
 
-Some of the most egregious symptoms had already been addressed on main before this ADR: the top-level `relations` section and the materialized `mappings` section (`modelToTable`, `fieldToColumn`, etc.) were removed. Relations now live on each model, and mappings are derived at runtime. But the core problem remained: `ContractIR` was storage-first, `SqlSemanticContractDefinition` existed as a stepping stone down to it, and `ContractBase` reconstructed domain structure on the way back up.
+Some of the most egregious symptoms had already been addressed on main before this ADR: the top-level `relations` section and the materialized `mappings` section (`modelToTable`, `fieldToColumn`, etc.) were removed. Relations now live on each model, and mappings are derived at runtime. But the core problem remained: `ContractIR` was storage-first, `ContractDefinition` existed as a stepping stone down to it, and `ContractBase` reconstructed domain structure on the way back up.
 
 Meanwhile, `MongoContract` — designed from scratch with [ADR 172](ADR%20172%20-%20Contract%20domain-storage%20separation.md)'s domain/storage separation — is already model-first. It doesn't use `ContractIR` at all. And `ContractIR` is nominally family-agnostic, but in practice it's just the SQL contract with `Record<string, unknown>` escape hatches — Mongo never adopted it.
 
@@ -105,7 +105,7 @@ Three independent efforts — the staged DSL, the ORM client, and the Mongo fami
 
 ## Decision
 
-**Status:** Implemented. The codebase now uses the unified `Contract<Storage, ModelStorage>` type shown in [At a glance](#at-a-glance) as the canonical contract, replacing the former `ContractIR` storage-first intermediate and `ContractBase` reconstruction layer. TS authoring may still build `SqlSemanticContractDefinition` before lowering to `Contract` ([ADR 181](ADR%20181%20-%20Contract%20authoring%20DSL%20for%20SQL%20TS%20authoring.md)).
+**Status:** Implemented. The codebase now uses the unified `Contract<Storage, ModelStorage>` type shown in [At a glance](#at-a-glance) as the canonical contract, replacing the former `ContractIR` storage-first intermediate and `ContractBase` reconstruction layer. TS authoring may still build `ContractDefinition` before lowering to `Contract` ([ADR 181](ADR%20181%20-%20Contract%20authoring%20DSL%20for%20SQL%20TS%20authoring.md)).
 
 ### Each family defines its storage types
 
@@ -181,7 +181,7 @@ These are authoring-time representations. They exist because authoring ergonomic
 | --- | --- |
 | `ContractIR` (storage-first intermediate) | `Contract<Storage, ModelStorage>` |
 | `SqlContract<S, M>` (SQL instantiation extending ContractBase) | `Contract<SqlStorage, SqlModelStorage>` |
-| `SqlSemanticContractDefinition` (authoring intermediate) | Authoring surfaces lower directly to `Contract<SqlStorage, SqlModelStorage>` |
+| `ContractDefinition` (TS authoring intermediate) | TS authoring lowers through `ContractDefinition` before `Contract<SqlStorage, SqlModelStorage>` |
 | `ContractBase` (framework base with emission-time fields) | `Contract<Storage, ModelStorage>` — domain layer is built in, emission-time fields are orthogonal |
 | `DomainModel` (model-level reconstruction) | `ContractModel<ModelStorage>` — the domain layer is already there |
 | `MongoContract` (already model-first) | `Contract<MongoStorage, MongoModelStorage>` — minimal change |
@@ -200,7 +200,7 @@ These are authoring-time representations. They exist because authoring ergonomic
 
 - **SQL consumers must adapt.** Code that read `ContractIR`-shaped data (storage as the primary key, models as a secondary section) had to change to read model-first `Contract` data. That affected the emitter, both builders, and the three query lane surfaces (schema, sql, orm). The top-level `relations` and `mappings` sections had already been removed; the remaining work was restructuring the `models` ↔ `storage` relationship.
 - **Emitter changes.** The SQL emitter previously produced `contract.json` in the storage-first `ContractIR` shape; it now emits the unified model-first `Contract` shape. The emitted `contract.d.ts` reflects model-first types.
-- **Builder changes.** The staged lowering pipeline produces `Contract<SqlStorage, SqlModelStorage>` (via `SqlSemanticContractDefinition` where applicable) instead of ending at `ContractIR`.
+- **Builder changes.** The staged lowering pipeline produces `Contract<SqlStorage, SqlModelStorage>` (via `ContractDefinition` where applicable) instead of ending at `ContractIR`.
 
 ### Migration
 
@@ -209,5 +209,5 @@ There are no external consumers of `contract.json`. The change is internal. Exis
 ## Related
 
 - [ADR 172 — Contract domain-storage separation](ADR%20172%20-%20Contract%20domain-storage%20separation.md) — designed the three-level structure (domain, bridge, storage) that this ADR formalizes as the canonical contract representation
-- [ADR 181 — Contract authoring DSL for SQL TS authoring](ADR%20181%20-%20Contract%20authoring%20DSL%20for%20SQL%20TS%20authoring.md) — introduced `SqlSemanticContractDefinition` as an intermediate form; lowering now targets `Contract<SqlStorage, SqlModelStorage>` directly (see ADR 181 for the current pipeline)
+- [ADR 181 — Contract authoring DSL for SQL TS authoring](ADR%20181%20-%20Contract%20authoring%20DSL%20for%20SQL%20TS%20authoring.md) — introduced `ContractDefinition` as the TS authoring lowering seam before `Contract<SqlStorage, SqlModelStorage>` (see ADR 181 for the current pipeline)
 - [Architecture Overview — Domain-first surfaces](../../Architecture%20Overview.md) — the guiding principle that user-facing APIs speak in application-domain terms

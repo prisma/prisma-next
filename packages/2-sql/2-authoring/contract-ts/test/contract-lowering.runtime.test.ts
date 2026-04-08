@@ -2,7 +2,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import { describe, expect, it } from 'vitest';
 import { field, model, rel } from '../src/contract-builder';
 import { ContractModelBuilder, ScalarFieldBuilder } from '../src/contract-dsl';
-import { buildSemanticContractDefinition } from '../src/contract-lowering';
+import { buildContractDefinition } from '../src/contract-lowering';
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const bareFamilyPack: FamilyPackRef<'sql'> = {
@@ -23,17 +23,17 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 
-function buildSemantic(
-  definition: Omit<Parameters<typeof buildSemanticContractDefinition>[0], 'target' | 'family'>,
+function buildDefinition(
+  definition: Omit<Parameters<typeof buildContractDefinition>[0], 'target' | 'family'>,
 ) {
-  return buildSemanticContractDefinition({
+  return buildContractDefinition({
     family: bareFamilyPack,
     target: postgresTargetPack,
     ...definition,
   });
 }
 
-describe('semantic lowering runtime checks', () => {
+describe('contract definition lowering runtime checks', () => {
   it('rejects missing and unknown named storage type references', () => {
     const localVector = {
       codecId: 'pg/vector@1',
@@ -56,7 +56,7 @@ describe('semantic lowering runtime checks', () => {
     });
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           Embedded,
         },
@@ -66,7 +66,7 @@ describe('semantic lowering runtime checks', () => {
     );
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           External,
         },
@@ -87,7 +87,7 @@ describe('semantic lowering runtime checks', () => {
     });
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           Broken,
         },
@@ -95,7 +95,7 @@ describe('semantic lowering runtime checks', () => {
     ).toThrow('Field "Broken.mystery" does not resolve to a storage descriptor');
   });
 
-  it('rejects invalid identity shapes before semantic lowering continues', () => {
+  it('rejects invalid identity shapes before contract lowering continues', () => {
     const DuplicateInlineId = model('DuplicateInlineId', {
       fields: {
         orgId: field.column(int4Column).id(),
@@ -123,7 +123,7 @@ describe('semantic lowering runtime checks', () => {
     });
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           DuplicateInlineId,
         },
@@ -133,7 +133,7 @@ describe('semantic lowering runtime checks', () => {
     );
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           MixedIdentity,
         },
@@ -143,7 +143,7 @@ describe('semantic lowering runtime checks', () => {
     );
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           EmptyIdentity,
         },
@@ -166,7 +166,7 @@ describe('semantic lowering runtime checks', () => {
     });
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           EmptyUnique,
         },
@@ -191,14 +191,14 @@ describe('semantic lowering runtime checks', () => {
       },
     });
 
-    const semantic = buildSemantic({
+    const definition = buildDefinition({
       models: {
         User,
         Post,
       },
     });
 
-    expect(semantic.models[0]?.relations).toEqual([
+    expect(definition.models[0]?.relations).toEqual([
       {
         fieldName: 'posts',
         toModel: 'Post',
@@ -231,7 +231,7 @@ describe('semantic lowering runtime checks', () => {
     });
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           Tenant,
           Post,
@@ -281,7 +281,7 @@ describe('semantic lowering runtime checks', () => {
     });
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           MissingBelongsToTarget,
         },
@@ -289,7 +289,7 @@ describe('semantic lowering runtime checks', () => {
     ).toThrow('Relation "MissingBelongsToTarget.user" references unknown model "User"');
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           MissingOwnershipTarget,
         },
@@ -297,7 +297,7 @@ describe('semantic lowering runtime checks', () => {
     ).toThrow('Relation "MissingOwnershipTarget.profile" references unknown model "Profile"');
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           Post,
           Tag,
@@ -306,7 +306,7 @@ describe('semantic lowering runtime checks', () => {
     ).toThrow('Relation "Post.tags" references unknown through model "PostTag"');
   });
 
-  it('rejects malformed foreign keys before they become semantic nodes', () => {
+  it('rejects malformed foreign keys before they become contract nodes', () => {
     const RelationForeignKey = model('RelationForeignKey', {
       fields: {
         userId: field.column(int4Column),
@@ -357,7 +357,7 @@ describe('semantic lowering runtime checks', () => {
     });
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           RelationForeignKey,
         },
@@ -365,7 +365,7 @@ describe('semantic lowering runtime checks', () => {
     ).toThrow('Relation "RelationForeignKey.user" references unknown model "User"');
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           SqlForeignKey,
         },
@@ -373,7 +373,7 @@ describe('semantic lowering runtime checks', () => {
     ).toThrow('Foreign key on "SqlForeignKey" references unknown model "User"');
 
     expect(() =>
-      buildSemantic({
+      buildDefinition({
         models: {
           User,
           UnknownLocalField,
@@ -417,14 +417,14 @@ describe('semantic lowering runtime checks', () => {
       ],
     }));
 
-    const semantic = buildSemantic({
+    const definition = buildDefinition({
       models: {
         User,
         Membership,
       },
     });
 
-    const membership = semantic.models.find(
+    const membership = definition.models.find(
       (currentModel) => currentModel.modelName === 'Membership',
     );
     expect(membership?.uniques).toEqual([{ columns: ['slug'] }]);

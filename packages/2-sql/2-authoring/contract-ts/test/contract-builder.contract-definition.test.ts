@@ -1,6 +1,6 @@
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
-import { buildSqlContractFromSemanticDefinition } from '../src/contract-builder';
+import { buildSqlContractFromDefinition } from '../src/contract-builder';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
@@ -10,9 +10,9 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   version: '0.0.1',
 };
 
-describe('shared semantic contract lowering', () => {
-  it('builds SQL contract IR from semantic model nodes', () => {
-    const contract = buildSqlContractFromSemanticDefinition({
+describe('shared contract definition lowering', () => {
+  it('builds SQL contract IR from contract model nodes', () => {
+    const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       storageTypes: {
         Role: {
@@ -177,7 +177,7 @@ describe('shared semantic contract lowering', () => {
 
   it('rejects generated fields that also declare storage defaults', () => {
     expect(() =>
-      buildSqlContractFromSemanticDefinition({
+      buildSqlContractFromDefinition({
         target: postgresTargetPack,
         models: [
           {
@@ -210,7 +210,7 @@ describe('shared semantic contract lowering', () => {
 
   it('rejects generated fields that are still marked nullable', () => {
     expect(() =>
-      buildSqlContractFromSemanticDefinition({
+      buildSqlContractFromDefinition({
         target: postgresTargetPack,
         models: [
           {
@@ -239,7 +239,7 @@ describe('shared semantic contract lowering', () => {
 
   it('rejects nullable identity fields', () => {
     expect(() =>
-      buildSqlContractFromSemanticDefinition({
+      buildSqlContractFromDefinition({
         target: postgresTargetPack,
         models: [
           {

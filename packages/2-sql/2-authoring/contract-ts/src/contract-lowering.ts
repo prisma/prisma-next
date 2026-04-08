@@ -1,5 +1,15 @@
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type {
+  ContractDefinition,
+  FieldNode,
+  ForeignKeyNode,
+  IndexNode,
+  ModelNode,
+  PrimaryKeyNode,
+  RelationNode,
+  UniqueConstraintNode,
+} from './contract-definition';
 import {
   applyNaming,
   type ContractInput,
@@ -20,16 +30,6 @@ import {
   emitTypedCrossModelFallbackWarnings,
   emitTypedNamedTypeFallbackWarnings,
 } from './contract-warnings';
-import type {
-  SqlSemanticContractDefinition,
-  SqlSemanticFieldNode,
-  SqlSemanticForeignKeyNode,
-  SqlSemanticIndexNode,
-  SqlSemanticModelNode,
-  SqlSemanticPrimaryKeyNode,
-  SqlSemanticRelationNode,
-  SqlSemanticUniqueConstraintNode,
-} from './semantic-contract';
 
 type RuntimeModel = ContractModelBuilder<
   string | undefined,
@@ -297,7 +297,7 @@ function lowerBelongsToRelation(
   relation: Extract<RelationState, { kind: 'belongsTo' }>,
   currentSpec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
-): SqlSemanticRelationNode {
+): RelationNode {
   const targetModelName = resolveRelationModelName(relation.toModel);
   const targetSpec = allSpecs.get(targetModelName);
   if (!targetSpec) {
@@ -344,7 +344,7 @@ function lowerHasOwnershipRelation(
   relation: Extract<RelationState, { kind: 'hasMany' | 'hasOne' }>,
   currentSpec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
-): SqlSemanticRelationNode {
+): RelationNode {
   const targetModelName = resolveRelationModelName(relation.toModel);
   const targetSpec = allSpecs.get(targetModelName);
   if (!targetSpec) {
@@ -391,7 +391,7 @@ function lowerManyToManyRelation(
   relation: Extract<RelationState, { kind: 'manyToMany' }>,
   currentSpec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
-): SqlSemanticRelationNode {
+): RelationNode {
   const targetModelName = resolveRelationModelName(relation.toModel);
   const targetSpec = allSpecs.get(targetModelName);
   if (!targetSpec) {
@@ -456,12 +456,12 @@ function lowerManyToManyRelation(
   };
 }
 
-function resolveSemanticRelationNode(
+function resolveRelationNode(
   relationName: string,
   relation: RelationState,
   currentSpec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
-): SqlSemanticRelationNode {
+): RelationNode {
   if (relation.kind === 'belongsTo') {
     return lowerBelongsToRelation(relationName, relation, currentSpec, allSpecs);
   }
@@ -485,7 +485,7 @@ function lowerForeignKeyNode(
     readonly constraint?: boolean | undefined;
     readonly index?: boolean | undefined;
   },
-): SqlSemanticForeignKeyNode {
+): ForeignKeyNode {
   return {
     columns: mapFieldNamesToColumnNames(spec.modelName, foreignKey.fields, spec.fieldToColumn),
     references: {
@@ -505,10 +505,10 @@ function lowerForeignKeyNode(
   };
 }
 
-function resolveSemanticForeignKeyNodes(
+function resolveForeignKeyNodes(
   spec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
-): readonly SqlSemanticForeignKeyNode[] {
+): readonly ForeignKeyNode[] {
   const relationForeignKeys = resolveRelationForeignKeys(spec, allSpecs).map((foreignKey) => {
     const targetSpec = allSpecs.get(foreignKey.targetModel);
     if (!targetSpec) {
@@ -534,13 +534,13 @@ function resolveSemanticForeignKeyNodes(
   return [...relationForeignKeys, ...sqlForeignKeys];
 }
 
-function resolveSemanticModelNode(
+function resolveModelNode(
   spec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
   storageTypes: Record<string, StorageTypeInstance>,
   storageTypeReverseLookup: ReadonlyMap<StorageTypeInstance, string>,
-): SqlSemanticModelNode {
-  const fields: SqlSemanticFieldNode[] = [];
+): ModelNode {
+  const fields: FieldNode[] = [];
 
   for (const [fieldName, fieldBuilder] of Object.entries(spec.fieldBuilders)) {
     const fieldState = fieldBuilder.build();
@@ -570,16 +570,16 @@ function resolveSemanticModelNode(
   const uniques = resolveModelUniqueConstraints(spec).map((unique) => ({
     columns: mapFieldNamesToColumnNames(spec.modelName, unique.fields, spec.fieldToColumn),
     ...(unique.name ? { name: unique.name } : {}),
-  })) satisfies readonly SqlSemanticUniqueConstraintNode[];
+  })) satisfies readonly UniqueConstraintNode[];
   const indexes = (spec.sqlSpec?.indexes ?? []).map((index) => ({
     columns: mapFieldNamesToColumnNames(spec.modelName, index.fields, spec.fieldToColumn),
     ...(index.name ? { name: index.name } : {}),
     ...(index.using ? { using: index.using } : {}),
     ...(index.config ? { config: index.config } : {}),
-  })) satisfies readonly SqlSemanticIndexNode[];
-  const foreignKeys = resolveSemanticForeignKeyNodes(spec, allSpecs);
+  })) satisfies readonly IndexNode[];
+  const foreignKeys = resolveForeignKeyNodes(spec, allSpecs);
   const relations = Object.entries(spec.relations).map(([relationName, relationBuilder]) =>
-    resolveSemanticRelationNode(relationName, relationBuilder.build(), spec, allSpecs),
+    resolveRelationNode(relationName, relationBuilder.build(), spec, allSpecs),
   );
 
   return {
@@ -595,7 +595,7 @@ function resolveSemanticModelNode(
               spec.fieldToColumn,
             ),
             ...(idConstraint.name ? { name: idConstraint.name } : {}),
-          } satisfies SqlSemanticPrimaryKeyNode,
+          } satisfies PrimaryKeyNode,
         }
       : {}),
     ...(uniques.length > 0 ? { uniques } : {}),
@@ -671,12 +671,12 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
   };
 }
 
-function lowerSemanticModels(collection: RuntimeCollection): readonly SqlSemanticModelNode[] {
+function lowerModels(collection: RuntimeCollection): readonly ModelNode[] {
   emitTypedCrossModelFallbackWarnings(collection);
 
   const storageTypeReverseLookup = buildStorageTypeReverseLookup(collection.storageTypes);
   return Array.from(collection.modelSpecs.values()).map((spec) =>
-    resolveSemanticModelNode(
+    resolveModelNode(
       spec,
       collection.modelSpecs,
       collection.storageTypes,
@@ -685,11 +685,9 @@ function lowerSemanticModels(collection: RuntimeCollection): readonly SqlSemanti
   );
 }
 
-export function buildSemanticContractDefinition(
-  definition: ContractInput,
-): SqlSemanticContractDefinition {
+export function buildContractDefinition(definition: ContractInput): ContractDefinition {
   const collection = collectRuntimeModelSpecs(definition);
-  const models = lowerSemanticModels(collection);
+  const models = lowerModels(collection);
 
   return {
     target: definition.target,

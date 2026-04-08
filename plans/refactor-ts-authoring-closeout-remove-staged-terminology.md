@@ -96,7 +96,7 @@ All ~25 `Staged*` type aliases lose the `Staged` prefix:
 
 | Current | New |
 |---------|-----|
-| `buildStagedSemanticContractDefinition()` | `buildSemanticContractDefinition()` |
+| `buildStagedSemanticContractDefinition()` | `buildContractDefinition()` |
 | `RuntimeStagedModel` | `RuntimeModel` |
 | `RuntimeStagedCollection` | `RuntimeCollection` |
 
@@ -136,7 +136,7 @@ Update imports in files that reference the renamed source files:
 **Content updates in each test file:**
 - Import paths updated to new source file names
 - Type references updated to new names (e.g., `StagedModelBuilder` → `ContractModelBuilder`)
-- Function references updated (e.g., `buildStagedSemanticContractDefinition` → `buildSemanticContractDefinition`)
+- Function references updated (e.g., `buildStagedSemanticContractDefinition` → `buildContractDefinition`)
 - `describe()` and `it()` strings: drop "staged" (e.g., "staged contract DSL authoring surface" → "contract DSL authoring surface")
 - Fixture `storageHash` strings: drop "staged" (e.g., `sha256:staged-contract-dsl` → `sha256:contract-dsl`)
 

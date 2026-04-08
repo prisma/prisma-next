@@ -27,11 +27,11 @@ import type {
 } from '@prisma-next/psl-parser';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
-  buildSqlContractFromSemanticDefinition,
-  type SqlSemanticForeignKeyNode,
-  type SqlSemanticIndexNode,
-  type SqlSemanticModelNode,
-  type SqlSemanticUniqueConstraintNode,
+  buildSqlContractFromDefinition,
+  type ForeignKeyNode,
+  type IndexNode,
+  type ModelNode,
+  type UniqueConstraintNode,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -330,7 +330,7 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
   return { storageTypes, namedTypeDescriptors, namedTypeBaseTypes };
 }
 
-interface BuildSemanticModelInput {
+interface BuildModelNodeInput {
   readonly model: PslModel;
   readonly mapping: ModelNameMapping;
   readonly modelMappings: ReadonlyMap<string, ModelNameMapping>;
@@ -348,14 +348,14 @@ interface BuildSemanticModelInput {
   readonly diagnostics: ContractSourceDiagnostic[];
 }
 
-interface BuildSemanticModelResult {
-  readonly semanticModel: SqlSemanticModelNode;
+interface BuildModelNodeResult {
+  readonly modelNode: ModelNode;
   readonly fkRelationMetadata: FkRelationMetadata[];
   readonly backrelationCandidates: ModelBackrelationCandidate[];
   readonly resolvedFields: readonly ResolvedField[];
 }
 
-function buildSemanticModelFromPsl(input: BuildSemanticModelInput): BuildSemanticModelResult {
+function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult {
   const { model, mapping, sourceId, diagnostics } = input;
   const tableName = mapping.tableName;
 
@@ -454,14 +454,14 @@ function buildSemanticModelFromPsl(input: BuildSemanticModelInput): BuildSemanti
     .filter((entry): entry is { field: PslField; relation: PslAttribute } =>
       Boolean(entry.relation),
     );
-  const uniqueConstraints: SqlSemanticUniqueConstraintNode[] = resolvedFields
+  const uniqueConstraints: UniqueConstraintNode[] = resolvedFields
     .filter((field) => field.isUnique)
     .map((field) => ({
       columns: [field.columnName],
       ...ifDefined('name', field.uniqueName),
     }));
-  const indexNodes: SqlSemanticIndexNode[] = [];
-  const foreignKeyNodes: SqlSemanticForeignKeyNode[] = [];
+  const indexNodes: IndexNode[] = [];
+  const foreignKeyNodes: ForeignKeyNode[] = [];
 
   for (const modelAttribute of model.attributes) {
     if (modelAttribute.name === 'map') {
@@ -657,7 +657,7 @@ function buildSemanticModelFromPsl(input: BuildSemanticModelInput): BuildSemanti
   }
 
   return {
-    semanticModel: {
+    modelNode: {
       modelName: model.name,
       tableName,
       fields: resolvedFields.map((resolvedField) => ({
@@ -837,7 +837,7 @@ export function interpretPslDocumentToSqlContract(
   const storageTypes = { ...enumResult.storageTypes, ...namedTypeResult.storageTypes };
 
   const modelMappings = buildModelMappings(input.document.ast.models, diagnostics, sourceId);
-  const semanticModels: SqlSemanticModelNode[] = [];
+  const modelNodes: ModelNode[] = [];
   const fkRelationMetadata: FkRelationMetadata[] = [];
   const backrelationCandidates: ModelBackrelationCandidate[] = [];
   const modelResolvedFields = new Map<string, readonly ResolvedField[]>();
@@ -847,7 +847,7 @@ export function interpretPslDocumentToSqlContract(
     if (!mapping) {
       continue;
     }
-    const result = buildSemanticModelFromPsl({
+    const result = buildModelNodeFromPsl({
       model,
       mapping,
       modelMappings,
@@ -864,7 +864,7 @@ export function interpretPslDocumentToSqlContract(
       sourceId,
       diagnostics,
     });
-    semanticModels.push(result.semanticModel);
+    modelNodes.push(result.modelNode);
     fkRelationMetadata.push(...result.fkRelationMetadata);
     backrelationCandidates.push(...result.backrelationCandidates);
     modelResolvedFields.set(model.name, result.resolvedFields);
@@ -898,7 +898,7 @@ export function interpretPslDocumentToSqlContract(
     });
   }
 
-  const contract = buildSqlContractFromSemanticDefinition({
+  const contract = buildSqlContractFromDefinition({
     target: input.target,
     ...ifDefined(
       'extensionPacks',
@@ -909,7 +909,7 @@ export function interpretPslDocumentToSqlContract(
       ),
     ),
     ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
-    models: semanticModels.map((model) => ({
+    models: modelNodes.map((model) => ({
       ...model,
       ...(modelRelations.has(model.modelName)
         ? {

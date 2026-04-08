@@ -6,7 +6,7 @@ import type {
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { ReferentialAction, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 
-export interface SqlSemanticFieldNode {
+export interface FieldNode {
   readonly fieldName: string;
   readonly columnName: string;
   readonly descriptor: ColumnTypeDescriptor;
@@ -16,24 +16,24 @@ export interface SqlSemanticFieldNode {
   readonly many?: boolean;
 }
 
-export interface SqlSemanticPrimaryKeyNode {
+export interface PrimaryKeyNode {
   readonly columns: readonly string[];
   readonly name?: string;
 }
 
-export interface SqlSemanticUniqueConstraintNode {
+export interface UniqueConstraintNode {
   readonly columns: readonly string[];
   readonly name?: string;
 }
 
-export interface SqlSemanticIndexNode {
+export interface IndexNode {
   readonly columns: readonly string[];
   readonly name?: string;
   readonly using?: string;
   readonly config?: Record<string, unknown>;
 }
 
-export interface SqlSemanticForeignKeyNode {
+export interface ForeignKeyNode {
   readonly columns: readonly string[];
   readonly references: {
     readonly model: string;
@@ -47,7 +47,7 @@ export interface SqlSemanticForeignKeyNode {
   readonly index?: boolean;
 }
 
-export interface SqlSemanticRelationNode {
+export interface RelationNode {
   readonly fieldName: string;
   readonly toModel: string;
   readonly toTable: string;
@@ -65,7 +65,7 @@ export interface SqlSemanticRelationNode {
   };
 }
 
-export interface SqlSemanticValueObjectFieldNode {
+export interface ValueObjectFieldNode {
   readonly fieldName: string;
   readonly columnName: string;
   readonly valueObjectName: string;
@@ -75,29 +75,29 @@ export interface SqlSemanticValueObjectFieldNode {
   readonly many?: boolean;
 }
 
-export interface SqlSemanticValueObjectNode {
+export interface ValueObjectNode {
   readonly name: string;
-  readonly fields: readonly (SqlSemanticFieldNode | SqlSemanticValueObjectFieldNode)[];
+  readonly fields: readonly (FieldNode | ValueObjectFieldNode)[];
 }
 
-export interface SqlSemanticModelNode {
+export interface ModelNode {
   readonly modelName: string;
   readonly tableName: string;
-  readonly fields: readonly (SqlSemanticFieldNode | SqlSemanticValueObjectFieldNode)[];
-  readonly id?: SqlSemanticPrimaryKeyNode;
-  readonly uniques?: readonly SqlSemanticUniqueConstraintNode[];
-  readonly indexes?: readonly SqlSemanticIndexNode[];
-  readonly foreignKeys?: readonly SqlSemanticForeignKeyNode[];
-  readonly relations?: readonly SqlSemanticRelationNode[];
+  readonly fields: readonly (FieldNode | ValueObjectFieldNode)[];
+  readonly id?: PrimaryKeyNode;
+  readonly uniques?: readonly UniqueConstraintNode[];
+  readonly indexes?: readonly IndexNode[];
+  readonly foreignKeys?: readonly ForeignKeyNode[];
+  readonly relations?: readonly RelationNode[];
 }
 
-export interface SqlSemanticContractDefinition {
+export interface ContractDefinition {
   readonly target: TargetPackRef<'sql', string>;
   readonly extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>;
   readonly capabilities?: Record<string, Record<string, boolean>>;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
   readonly storageTypes?: Record<string, StorageTypeInstance>;
-  readonly models: readonly SqlSemanticModelNode[];
-  readonly valueObjects?: readonly SqlSemanticValueObjectNode[];
+  readonly models: readonly ModelNode[];
+  readonly valueObjects?: readonly ValueObjectNode[];
 }

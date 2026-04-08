@@ -37,7 +37,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import {
   buildContract,
-  buildSqlContractFromSemanticDefinition,
+  buildSqlContractFromDefinition,
   type RuntimeBuilderState,
 } from './build-contract';
 import {
@@ -45,7 +45,7 @@ import {
   createComposedAuthoringHelpers,
 } from './composed-authoring-helpers';
 
-export { buildSqlContractFromSemanticDefinition } from './build-contract';
+export { buildSqlContractFromDefinition } from './build-contract';
 
 import {
   type ContractInput,
@@ -60,7 +60,7 @@ import {
   type ScalarFieldBuilder,
   type SqlStageSpec,
 } from './contract-dsl';
-import { buildSemanticContractDefinition } from './contract-lowering';
+import { buildContractDefinition } from './contract-lowering';
 import type {
   ExtractCodecTypesFromPack,
   MergeExtensionCodecTypes,
@@ -228,8 +228,8 @@ type ModelLike = {
 function buildContractFromDsl<Definition extends ContractInput>(
   definition: Definition,
 ): SqlContractResult<Definition> {
-  return buildSqlContractFromSemanticDefinition(
-    buildSemanticContractDefinition(definition),
+  return buildSqlContractFromDefinition(
+    buildContractDefinition(definition),
     definition.codecLookup,
   ) as unknown as SqlContractResult<Definition>;
 }
@@ -623,7 +623,7 @@ class SqlContractBuilder<
   }
 }
 
-type ContractDefinition<
+type ContractDslDefinition<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance>,
@@ -692,7 +692,7 @@ export function defineContract<
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
 >(
-  definition: ContractDefinition<
+  definition: ContractDslDefinition<
     Family,
     Target,
     Types,
@@ -704,7 +704,7 @@ export function defineContract<
     ForeignKeyDefaults
   >,
 ): SqlContractResult<
-  ContractDefinition<
+  ContractDslDefinition<
     Family,
     Target,
     Types,
@@ -740,7 +740,7 @@ export function defineContract<
   >,
   factory: ContractFactory<Family, Target, Types, Models, ExtensionPacks>,
 ): SqlContractResult<
-  ContractDefinition<
+  ContractDslDefinition<
     Family,
     Target,
     Types,

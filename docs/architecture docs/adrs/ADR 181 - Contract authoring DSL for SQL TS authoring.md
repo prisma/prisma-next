@@ -141,24 +141,24 @@ A foreign key column physically exists on one side of a relationship — the sid
 
 ## How lowering works
 
-The contract DSL lowers through an intermediate representation called `SqlSemanticContractDefinition`; `buildSqlContractFromSemanticDefinition()` then produces the canonical `Contract<SqlStorage, SqlModelStorage>` (see [ADR 182](ADR%20182%20-%20Unified%20contract%20representation.md)).
+The contract DSL lowers through an intermediate representation called `ContractDefinition`; `buildSqlContractFromDefinition()` then produces the canonical `Contract<SqlStorage, SqlModelStorage>` (see [ADR 182](ADR%20182%20-%20Unified%20contract%20representation.md)).
 
 ```text
 model() + field.* + rel.*                →  model builder instances
           ↓
 defineContract({ target, models, ... })
           ↓
-buildSemanticContractDefinition()  →  SqlSemanticContractDefinition
+buildContractDefinition()  →  ContractDefinition
           ↓
-buildSqlContractFromSemanticDefinition() →  Contract<SqlStorage, SqlModelStorage>
+buildSqlContractFromDefinition() →  Contract<SqlStorage, SqlModelStorage>
 ```
 
-`SqlSemanticContractDefinition` is a flat, well-typed interface that captures each model's resolved fields (with column names, codecs, defaults), relations (with cardinality and join coordinates), and constraints (PKs, uniques, indexes, FKs). It creates a clean seam between the authoring surface and the serialization machinery in `SqlContractBuilder`.
+`ContractDefinition` is a flat, well-typed interface that captures each model's resolved fields (with column names, codecs, defaults), relations (with cardinality and join coordinates), and constraints (PKs, uniques, indexes, FKs). It creates a clean seam between the authoring surface and the serialization machinery in `SqlContractBuilder`.
 
 This seam matters for two reasons:
 
-1. **Decoupled authoring from serialization.** The contract DSL can evolve without touching the builder internals that lower to `Contract`. Alternative authoring surfaces can target the same semantic definition.
-2. **Shared lowering target.** PSL can lower to `SqlSemanticContractDefinition` instead of duplicating graph resolution, making TS ↔ PSL parity structural rather than fixture-tested. [ADR 182](ADR%20182%20-%20Unified%20contract%20representation.md) unified the former `ContractIR` storage-first type with this model-first `Contract` shape; that unification is now implemented.
+1. **Decoupled authoring from serialization.** The contract DSL can evolve without touching the builder internals that lower to `Contract`. Alternative authoring surfaces can target the same contract definition.
+2. **Shared lowering target.** PSL can lower to `ContractDefinition` instead of duplicating graph resolution, making TS ↔ PSL parity structural rather than fixture-tested. [ADR 182](ADR%20182%20-%20Unified%20contract%20representation.md) unified the former `ContractIR` storage-first type with this model-first `Contract` shape; that unification is now implemented.
 
 Lowering validates the contract graph and produces actionable error messages for:
 - Duplicate PK or unique specifications on the same field
@@ -179,7 +179,7 @@ Lowering validates the contract graph and produces actionable error messages for
 - **Visible intent.** The contract reads as a model graph first, SQL details second. A developer scanning the contract sees application concepts, not storage choreography.
 - **Type-safe references.** Model tokens and typed `cols` provide autocompletion and compile-time validation for constraint authoring and cross-model FK targets.
 - **Portability.** Switching a contract from Postgres to SQLite means changing the target import and any target-specific `.sql()` details. The model layer stays unchanged — measured at <10% source change for average portable contracts.
-- **Shared TS/PSL foundation.** Both authoring surfaces can lower to `SqlSemanticContractDefinition`, making parity structural rather than fixture-tested.
+- **Shared TS/PSL foundation.** Both authoring surfaces can lower to `ContractDefinition`, making parity structural rather than fixture-tested.
 
 ### Costs
 
@@ -193,4 +193,4 @@ Lowering validates the contract graph and produces actionable error messages for
 - [ADR 121 — Contract.d.ts structure and relation typing](ADR%20121%20-%20Contract.d.ts%20structure%20and%20relation%20typing.md) — emitted type structure this surface must continue to produce
 - [ADR 161 — Explicit foreign key constraint and index configuration](ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md) — FK constraint and index toggle design
 - [ADR 172 — Contract domain-storage separation](ADR%20172%20-%20Contract%20domain-storage%20separation.md) — the domain/storage separation that the model-first / SQL split reflects
-- [ADR 182 — Unified contract representation](ADR%20182%20-%20Unified%20contract%20representation.md) — implemented: the former `ContractIR` / `ContractBase` split is replaced by a single `Contract<Storage, ModelStorage>` type; `SqlSemanticContractDefinition` remains the TS authoring seam before lowering to `Contract`
+- [ADR 182 — Unified contract representation](ADR%20182%20-%20Unified%20contract%20representation.md) — implemented: the former `ContractIR` / `ContractBase` split is replaced by a single `Contract<Storage, ModelStorage>` type; `ContractDefinition` remains the TS authoring seam before lowering to `Contract`
