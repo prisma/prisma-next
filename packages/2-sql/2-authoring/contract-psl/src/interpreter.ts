@@ -43,7 +43,6 @@ import type {
 import {
   getAttribute,
   getPositionalArgument,
-  lowerFirst,
   mapFieldNamesToColumns,
   parseAttributeFieldList,
   parseConstraintMapArgument,

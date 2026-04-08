@@ -411,7 +411,8 @@ export function interpretPslDocumentToMongoContract(
     }
 
     const baseModel = models[baseDecl.baseName];
-    const variantPslModel = document.ast.models.find((m) => m.name === variantName)!;
+    const variantPslModel = document.ast.models.find((m) => m.name === variantName);
+    if (!variantPslModel) continue;
     const hasExplicitMap = getMapName(variantPslModel.attributes) !== undefined;
 
     if (hasExplicitMap && baseModel && baseDecl.collectionName !== baseModel.storage.collection) {
