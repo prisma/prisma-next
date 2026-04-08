@@ -1,6 +1,53 @@
 # Planner + Runner Design
 
-The planner produces migration operations by diffing two schema states. The runner executes those operations against a live MongoDB instance. Together they implement `TargetMigrationsCapability<'mongo', 'mongo'>` — the interface the CLI calls.
+## A migration, end to end
+
+Before any abstractions, here's one concrete migration from start to finish.
+
+**Starting state.** Contract v1 describes a `users` collection with no indexes. The database matches — `_prisma_migrations` has a marker whose `coreHash` equals v1's hash.
+
+**Destination state.** Contract v2 adds a unique index on `email`.
+
+**Planner.** The CLI calls `TargetMigrationsCapability.createPlanner()` and passes it:
+
+- `schema` (origin): the schema IR derived from contract v1 — a `users` collection, no indexes.
+- `contract` (destination): contract v2.
+
+The planner converts the destination contract into a second schema IR, then diffs the two structurally:
+
+- `users` exists in both IRs → not a new collection.
+- Index `{ email: 1, unique: true }` exists in the destination but not the origin → emit `CreateIndexOp`.
+
+The planner returns a `MigrationPlan` containing one operation:
+
+```typescript
+[
+  CreateIndexOp({
+    collection: 'users',
+    keys: [{ field: 'email', direction: 1 }],
+    unique: true,
+  }),
+]
+```
+
+**Runner.** The CLI calls `TargetMigrationsCapability.createRunner()` and passes the plan plus a Mongo driver instance. The runner:
+
+1. Reads the marker from `_prisma_migrations` — the marker's `coreHash` matches the plan's origin hash. Proceed.
+2. Deserializes the plan's operations into AST nodes.
+3. Dispatches `CreateIndexOp` through the visitor. The visitor calls `db.collection('users').createIndex({ email: 1 }, { unique: true })`.
+4. Updates the marker via compare-and-swap: `findOneAndUpdate({ _id: 'marker', coreHash: v1Hash }, { $set: { coreHash: v2Hash } })`. The CAS succeeds (no other runner changed it).
+5. Writes a ledger entry recording the edge from v1 → v2.
+
+The database now has the index. The marker reflects v2. The ledger has a permanent record of what happened.
+
+## Decisions
+
+These are the key design choices. Each is elaborated in the sections below and justified in "Alternatives considered" at the end.
+
+- **Structural index matching.** The planner compares indexes by keys and options, not by name. Two indexes are "the same" if they cover the same fields with the same direction and the same options (unique, sparse, TTL, partial filter). Names are ignored.
+- **Visitor dispatch.** The runner dispatches operations through a typed visitor (`MongoMigrationOpVisitor`), not a switch statement. Each operation kind maps to exactly one visitor method.
+- **Compare-and-swap marker.** Concurrency safety comes from a CAS on the marker document — no advisory locks, no distributed locking. If two runners race, one wins and the other gets a hash mismatch.
+- **Single `_prisma_migrations` collection.** Both the marker (singleton, `_id: 'marker'`) and the ledger (append-only entries) live in the same collection. Fewer moving parts.
 
 ## Architecture overview
 
@@ -216,11 +263,11 @@ Each operation kind has its own pre and post checks:
 
 **Idempotency**: if the postcheck is already satisfied before execution, the operation is skipped. This means re-running `migration apply` after a partial failure is safe — already-applied operations are detected and skipped.
 
-## Marker and ledger (`_prisma_migrations` collection)
+## Marker and ledger
+
+The `_prisma_migrations` collection is the runner's durable state. It stores two kinds of documents: a single **marker** that records the current schema hash, and append-only **ledger** entries that record the history of applied migrations.
 
 ### Collection structure
-
-A single collection `_prisma_migrations` in the target database stores both the marker and ledger:
 
 ```
 _prisma_migrations
@@ -230,9 +277,8 @@ _prisma_migrations
 └── ...
 ```
 
-### Marker operations
+### Read marker
 
-**Read marker:**
 ```typescript
 async function readMarker(db: Db): Promise<ContractMarkerRecord | null> {
   const doc = await db.collection('_prisma_migrations').findOne({ _id: 'marker' });
@@ -241,7 +287,8 @@ async function readMarker(db: Db): Promise<ContractMarkerRecord | null> {
 }
 ```
 
-**Write marker (compare-and-swap):**
+### Write marker (compare-and-swap)
+
 ```typescript
 async function updateMarker(
   db: Db,
@@ -265,7 +312,8 @@ async function updateMarker(
 
 If the `findOneAndUpdate` returns `null`, the marker was changed by another process (CAS failure). The runner reports `contract/hash-mismatch`.
 
-**Initial marker (first migration):**
+### Initial marker (first migration)
+
 ```typescript
 async function initMarker(
   db: Db,
@@ -281,9 +329,8 @@ async function initMarker(
 }
 ```
 
-### Ledger operations
+### Ledger
 
-**Write ledger entry (append-only):**
 ```typescript
 async function writeLedgerEntry(
   db: Db,
@@ -299,24 +346,17 @@ async function writeLedgerEntry(
 }
 ```
 
-### No advisory locking
+The ledger is append-only. Each entry records a directed edge from one contract hash to another, forming a history of applied migrations.
+
+### Why no advisory locks
 
 MongoDB operations (`createIndex`, `collMod`, `createCollection`) have their own atomicity guarantees. The compare-and-swap on the marker document provides sufficient concurrency protection for the marker update. If two runners race, one will succeed and the other will get a CAS failure and report `contract/hash-mismatch`.
 
 This is simpler than Postgres's advisory lock approach and sufficient for the migration use case where concurrent applies are rare and detectable.
 
-## Package placement
+## Wiring
 
-- **Planner**: `packages/3-mongo-target/` (target-specific, implements the framework interface)
-- **Runner**: `packages/3-mongo-target/` (target-specific, uses the Mongo driver)
-- **Marker/ledger I/O**: `packages/3-mongo-target/` (part of the runner, uses the Mongo driver)
-- **Op deserializer**: `packages/3-mongo-target/` (runner-specific)
-
-All concretions live in the target, consistent with how Postgres puts its planner and runner under `packages/3-targets/3-targets/postgres/src/core/migrations/`.
-
-## Wiring: `TargetMigrationsCapability`
-
-The Mongo adapter descriptor gains a `migrations` property:
+The Mongo adapter descriptor gains a `migrations` property that plugs the planner and runner into the framework:
 
 ```typescript
 const mongoTargetDescriptor: MongoControlTargetDescriptor = {
@@ -340,8 +380,25 @@ const mongoTargetDescriptor: MongoControlTargetDescriptor = {
 
 This is the same shape as `postgresTargetDescriptor.migrations` in `packages/3-targets/3-targets/postgres/src/exports/control.ts`.
 
+### Package placement
+
+- **Planner**: `packages/3-mongo-target/` (target-specific, implements the framework interface)
+- **Runner**: `packages/3-mongo-target/` (target-specific, uses the Mongo driver)
+- **Marker/ledger I/O**: `packages/3-mongo-target/` (part of the runner, uses the Mongo driver)
+- **Op deserializer**: `packages/3-mongo-target/` (runner-specific)
+
+All concretions live in the target, consistent with how Postgres puts its planner and runner under `packages/3-targets/3-targets/postgres/src/core/migrations/`.
+
 ## Testing strategy
 
 - **Planner**: unit tests with hand-crafted contracts and schema IRs. Cover add/drop/no-op/identity for indexes, validators, options. Cover policy gating and conflict detection.
 - **Runner**: integration tests with `mongodb-memory-server`. Cover each operation kind, idempotency (re-apply), CAS on marker, ledger writes.
 - **End-to-end**: integration tests through the CLI command surface. Hand-crafted contracts → `migration plan` → `migration apply` → verify MongoDB state.
+
+## Alternatives considered
+
+**CAS instead of advisory locks.** MongoDB has no native advisory lock primitive equivalent to Postgres's `pg_advisory_lock`. We could simulate one with a lock document and TTL, but that adds complexity (lock expiry, stale lock cleanup, retry loops) for a scenario — concurrent `migration apply` — that is rare in practice. CAS on the marker is simpler: the `findOneAndUpdate` with the expected `coreHash` in the filter atomically detects races. The losing runner gets a clean `contract/hash-mismatch` error and can retry.
+
+**Single collection instead of separate marker + ledger collections.** The marker is one document; the ledger is a modest number of append-only documents. Splitting them into two collections would mean two collections to create, two to query, and two to reason about during setup and introspection — with no meaningful benefit. A single `_prisma_migrations` collection is simpler to provision, easier to inspect (`db._prisma_migrations.find()`), and mirrors the single-table pattern Postgres uses for its migration metadata.
+
+**Structural index matching instead of name-based.** MongoDB auto-generates index names from keys (e.g. `email_1`), and users can override them. If we matched by name, renaming an index would appear as a drop + create, potentially causing downtime on a large collection. Structural matching — comparing keys, direction, and options — reflects the actual behavior of the index. Two indexes with different names but identical keys and options are functionally identical, and the planner correctly treats them as a no-op. The trade-off is that intentional name changes require a manual migration, but that's a rare operation and a reasonable cost.

@@ -1,26 +1,72 @@
 # Operation AST + JSON Serialization Design
 
-Migration operations are the output of the planner and the input of the runner. Each operation describes a single MongoDB command to execute. This doc covers the AST design, the JSON serialization format (how ops land in `ops.json`), and how the runner reconstructs live AST nodes from persisted JSON.
+## Grounding example
 
-## Role in the migration pipeline
+You add a unique index on `users.email`. The planner diffs the origin schema IR against the destination contract and produces a `CreateIndexOp`:
 
-```
-Planner diffs origin IR vs destination contract
-    ↓
-MongoMigrationPlanOperation[] (AST nodes)
-    ↓ serialize to ops.json (JSON.stringify)
-ops.json on disk (plain JSON array)
-    ↓ deserialize (reconstruct AST nodes)
-MongoMigrationPlanOperation[] (AST nodes)
-    ↓ runner.execute() dispatches via visitor
-MongoDB commands executed
+```typescript
+const op = new CreateIndexOp({
+  collection: 'users',
+  keys: [{ field: 'email', direction: 1 }],
+  unique: true,
+});
 ```
 
-## Design pattern
+The framework serializes the operation array to `ops.json` via `JSON.stringify`. Because every property on the frozen AST node is plain JSON-serializable data, the output is:
 
-Same class-based AST pattern as the schema IR and query ASTs.
+```json
+[
+  {
+    "kind": "createIndex",
+    "id": "index.users.create(email:1)",
+    "label": "Create index on users (email ascending)",
+    "operationClass": "additive",
+    "collection": "users",
+    "keys": [{ "field": "email", "direction": 1 }],
+    "unique": true
+  }
+]
+```
 
-### Base class
+At apply time, the runner loads `ops.json`, passes the plain JSON objects through a deserializer that reconstructs live AST nodes, and dispatches each one via visitor:
+
+```typescript
+op.accept(executor);
+// executor.createIndex(op) calls:
+//   db.users.createIndex({ email: 1 }, { unique: true })
+```
+
+That's the full lifecycle — planner produces AST nodes, they serialize naturally to JSON, the runner deserializes them back to AST nodes and dispatches via visitor. The rest of this doc explains the design decisions behind each step.
+
+## Key decisions
+
+1. **Class-per-operation.** Each MongoDB command gets its own class (`CreateIndexOp`, `DropIndexOp`, etc.) with typed fields specific to that command. This is unlike the SQL migration system, which uses generic step arrays of SQL strings.
+
+2. **Visitor dispatch.** The runner calls `op.accept(executor)`, which dispatches to `executor.createIndex(this)` or `executor.dropIndex(this)` etc. This avoids `switch(op.kind)` in the runner and gives the type system exhaustiveness checking.
+
+3. **Natural JSON serialization.** All operation properties are JSON-serializable primitives, arrays, or plain objects. No custom serializer is needed — `JSON.stringify` produces the persisted format directly, and a deserializer reconstructs class instances on the read path.
+
+## Why class-per-operation
+
+SQL migrations use a flat structure with step arrays:
+
+```typescript
+interface SqlMigrationPlanOperation {
+  id: string;
+  label: string;
+  operationClass: MigrationOperationClass;
+  target: PostgresPlanTargetDetails;
+  precheck: SqlMigrationPlanOperationStep[];   // { description, sql }
+  execute: SqlMigrationPlanOperationStep[];     // { description, sql }
+  postcheck: SqlMigrationPlanOperationStep[];   // { description, sql }
+}
+```
+
+This works because every SQL operation is fundamentally "execute this SQL string." The step is the unit of execution, and the operation is just an envelope.
+
+MongoDB commands are structurally different from each other — `createIndex` takes keys, uniqueness flags, and TTL options; `collMod` takes a validator document and validation level; `createCollection` takes a name and options. A generic step array would lose that structure and push validation to the runner. The class-per-op design gives type safety at the runner boundary: each visitor method receives the correct concrete type with the right fields.
+
+## Base class
 
 ```typescript
 abstract class MongoMigrationOp {
@@ -40,9 +86,11 @@ abstract class MongoMigrationOp {
 
 The three envelope fields (`id`, `label`, `operationClass`) satisfy the framework's `MigrationPlanOperation` interface. This means every `MongoMigrationOp` is a valid `MigrationPlanOperation` — the framework-level CLI and migration-tools code can work with them without knowing they're Mongo-specific.
 
-### Concrete operations
+## Concrete operations
 
-#### M1: Index operations
+### M1: Index operations
+
+These are fully specified — index management is the first milestone.
 
 ```typescript
 class CreateIndexOp extends MongoMigrationOp {
@@ -110,7 +158,9 @@ class DropIndexOp extends MongoMigrationOp {
 }
 ```
 
-#### M2: Collection, validator, and options operations
+### M2: Collection, validator, and options operations (sketched)
+
+These will be fully specified when M2 begins. Shapes shown here to illustrate the pattern's extensibility.
 
 ```typescript
 class CreateCollectionOp extends MongoMigrationOp {
@@ -144,7 +194,9 @@ class UpdateCollectionOptionsOp extends MongoMigrationOp {
 }
 ```
 
-### Union and visitor types
+## Union and visitor types
+
+The discriminated union covers all operation kinds. The visitor interface has one method per kind — the type system enforces exhaustiveness at compile time.
 
 ```typescript
 type AnyMongoMigrationOp =
@@ -190,21 +242,7 @@ Examples:
 
 ### Write path
 
-The framework writes `ops.json` via `JSON.stringify(ops, null, 2)`. Since `MongoMigrationOp` instances are frozen plain objects (no methods survive `JSON.stringify` — `freeze()` doesn't affect serialization), the JSON output contains all enumerable properties:
-
-```json
-[
-  {
-    "kind": "createIndex",
-    "id": "index.users.create(email:1)",
-    "label": "Create index on users (email ascending)",
-    "operationClass": "additive",
-    "collection": "users",
-    "keys": [{ "field": "email", "direction": 1 }],
-    "unique": true
-  }
-]
-```
+The framework writes `ops.json` via `JSON.stringify(ops, null, 2)`. Since `MongoMigrationOp` instances are frozen plain objects (no methods survive `JSON.stringify` — `freeze()` doesn't affect serialization), the JSON output contains all enumerable properties. The example from the grounding scenario above is the actual on-disk format.
 
 The three envelope fields (`id`, `label`, `operationClass`) are validated by `@prisma-next/migration-tools` on read; the rest of the object is opaque to the framework. This is the existing design — no changes needed.
 
@@ -214,7 +252,7 @@ The `migrationId` hash is computed over the full canonicalized ops array (sorted
 
 ### Read path (deserialization)
 
-When `migration apply` loads `ops.json`, it gets plain JSON objects, not class instances. The runner needs AST nodes (for `accept(visitor)` dispatch). A **deserializer** reconstructs class instances from JSON:
+When `migration apply` loads `ops.json`, it gets plain JSON objects, not class instances. The runner needs AST nodes (for `accept(visitor)` dispatch). A deserializer reconstructs class instances from JSON:
 
 ```typescript
 function deserializeMongoOp(json: Record<string, unknown>): AnyMongoMigrationOp {
@@ -242,29 +280,7 @@ This lives in the target package (`@prisma-next/adapter-mongo` or the target pac
 
 **Validation**: The deserializer should validate the JSON shape before constructing the AST node. Use Arktype schemas per-op-kind to fail fast on corrupt or hand-edited `ops.json` files.
 
-### Why not a rewriter on ops?
-
-Unlike query ASTs where expressions are rewritten during compilation, migration operations are produced once by the planner and consumed once by the runner. There is no rewriting step. The visitor is sufficient — the runner dispatches each op to its handler. If rewriting is needed later (e.g., for operation merging or optimization), `MongoMigrationOp` can gain `rewrite(rewriter)` following the same pattern as the query ASTs.
-
-## Relationship to `SqlMigrationPlanOperation`
-
-SQL uses a flat structure with step arrays:
-
-```typescript
-interface SqlMigrationPlanOperation {
-  id: string;
-  label: string;
-  operationClass: MigrationOperationClass;
-  target: PostgresPlanTargetDetails;
-  precheck: SqlMigrationPlanOperationStep[];   // { description, sql }
-  execute: SqlMigrationPlanOperationStep[];     // { description, sql }
-  postcheck: SqlMigrationPlanOperationStep[];   // { description, sql }
-}
-```
-
-Mongo uses discrete classes per operation kind instead of generic "step" arrays. This is because MongoDB commands are structurally different from each other (`createIndex` vs `collMod` vs `createCollection`), while SQL operations are all "execute this SQL string." The class-per-op design gives type safety at the runner — each visitor method receives the correct concrete type with the right fields.
-
-## `indexName` — deterministic naming
+## Deterministic index naming
 
 When creating an index, MongoDB auto-assigns a name if none is provided. For reproducibility and drop-by-name support, the planner assigns a deterministic name following the spirit of [ADR 009](../../../docs/architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md):
 
@@ -279,3 +295,17 @@ This matches MongoDB's own default naming convention. The name is stored in `Cre
 ## Package placement
 
 The operation AST classes and visitor interface live in the same package as the schema IR (`@prisma-next/mongo-schema-ir`) or a sibling package under `packages/2-mongo-family/` in the tooling layer, migration plane. The deserializer lives in the target package since it's runner-specific.
+
+## Alternatives considered
+
+### Why not step arrays like SQL?
+
+SQL migrations model every operation as "execute this SQL string" — a flat list of steps works because the unit of execution is uniform. MongoDB commands are structurally diverse (`createIndex` vs `collMod` vs `createCollection`), and a generic step array would erase the typed structure that gives the runner compile-time safety. Class-per-op preserves the full shape of each command.
+
+### Why not `switch(kind)` dispatch?
+
+A `switch` statement on `op.kind` in the runner would work, but the type system can't enforce exhaustiveness across multiple consumers. The visitor pattern (`op.accept(executor)`) pushes exhaustiveness into the `MongoMigrationOpVisitor` interface — if a new op kind is added, every visitor implementation must handle it or the code won't compile.
+
+### Why no rewriter?
+
+Unlike query ASTs where expressions are rewritten during compilation, migration operations are produced once by the planner and consumed once by the runner. There is no rewriting step. The visitor is sufficient — the runner dispatches each op to its handler. If rewriting is needed later (e.g., for operation merging or optimization), `MongoMigrationOp` can gain `rewrite(rewriter)` following the same pattern as the query ASTs.
