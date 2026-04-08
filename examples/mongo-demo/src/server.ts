@@ -1,5 +1,7 @@
-import { createServer } from 'node:http';
+import { createServer, type ServerResponse } from 'node:http';
 import type { SimplifyDeep } from '@prisma-next/mongo-orm';
+import { acc, fn } from '@prisma-next/mongo-pipeline-builder';
+import { MongoCountStage, MongoLimitStage, MongoSortStage } from '@prisma-next/mongo-query-ast';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import type { Db } from './db';
 import { createClient } from './db';
@@ -57,6 +59,10 @@ async function seed(orm: Db['orm']) {
   ]);
 }
 
+// ---------------------------------------------------------------------------
+// ORM queries
+// ---------------------------------------------------------------------------
+
 export async function getPosts(orm: Db['orm']) {
   return orm.posts.include('author').all();
 }
@@ -68,7 +74,77 @@ export async function getUsers(orm: Db['orm']) {
 export type PostsResponse = SimplifyDeep<Awaited<ReturnType<typeof getPosts>>>;
 export type UsersResponse = SimplifyDeep<Awaited<ReturnType<typeof getUsers>>>;
 
-function jsonResponse(res: import('node:http').ServerResponse, data: unknown, status = 200) {
+// ---------------------------------------------------------------------------
+// Pipeline DSL queries — type-safe aggregation pipelines
+// ---------------------------------------------------------------------------
+
+export async function getAuthorLeaderboard(pipeline: Db['pipeline'], runtime: Db['runtime']) {
+  const plan = pipeline
+    .from('posts')
+    .group((f) => ({
+      _id: f.authorId,
+      postCount: acc.count(),
+      latestPost: acc.max(f.createdAt),
+    }))
+    .sort({ postCount: -1 })
+    .lookup({
+      from: 'users',
+      localField: '_id',
+      foreignField: '_id',
+      as: 'author',
+    })
+    .build();
+
+  return runtime.execute(plan);
+}
+
+export async function getRecentPostSummaries(pipeline: Db['pipeline'], runtime: Db['runtime']) {
+  const plan = pipeline
+    .from('posts')
+    .sort({ createdAt: -1 })
+    .limit(3)
+    .addFields((f) => ({
+      titleUpper: fn.toUpper(f.title),
+    }))
+    .project('title', 'titleUpper', 'authorId', 'createdAt')
+    .build();
+
+  return runtime.execute(plan);
+}
+
+export async function getPostsWithAuthors(pipeline: Db['pipeline'], runtime: Db['runtime']) {
+  const plan = pipeline
+    .from('posts')
+    .lookup({
+      from: 'users',
+      localField: 'authorId',
+      foreignField: '_id',
+      as: 'authorInfo',
+    })
+    .sort({ createdAt: -1 })
+    .build();
+
+  return runtime.execute(plan);
+}
+
+export async function getDashboard(pipeline: Db['pipeline'], runtime: Db['runtime']) {
+  const plan = pipeline
+    .from('posts')
+    .facet({
+      totalPosts: [new MongoCountStage('count')],
+      recentPosts: [new MongoSortStage({ createdAt: -1 }), new MongoLimitStage(2)],
+      postsByAuthor: [new MongoSortStage({ authorId: 1 })],
+    })
+    .build();
+
+  return runtime.execute(plan);
+}
+
+// ---------------------------------------------------------------------------
+// HTTP server
+// ---------------------------------------------------------------------------
+
+function jsonResponse(res: ServerResponse, data: unknown, status = 200) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
 }
@@ -81,7 +157,7 @@ async function main() {
   const uri = replSet.getUri();
   console.log(`MongoDB ready at ${uri}`);
 
-  const { orm, runtime } = await createClient(uri, DB_NAME);
+  const { orm, runtime, pipeline } = await createClient(uri, DB_NAME);
 
   console.log('Seeding data...');
   await seed(orm);
@@ -90,11 +166,17 @@ async function main() {
   const server = createServer(async (req, res) => {
     try {
       if (req.method === 'GET' && req.url === '/api/posts') {
-        const posts = await getPosts(orm);
-        jsonResponse(res, posts);
+        jsonResponse(res, await getPosts(orm));
       } else if (req.method === 'GET' && req.url === '/api/users') {
-        const users = await getUsers(orm);
-        jsonResponse(res, users);
+        jsonResponse(res, await getUsers(orm));
+      } else if (req.method === 'GET' && req.url === '/api/pipeline/leaderboard') {
+        jsonResponse(res, await getAuthorLeaderboard(pipeline, runtime));
+      } else if (req.method === 'GET' && req.url === '/api/pipeline/recent') {
+        jsonResponse(res, await getRecentPostSummaries(pipeline, runtime));
+      } else if (req.method === 'GET' && req.url === '/api/pipeline/posts-with-authors') {
+        jsonResponse(res, await getPostsWithAuthors(pipeline, runtime));
+      } else if (req.method === 'GET' && req.url === '/api/pipeline/dashboard') {
+        jsonResponse(res, await getDashboard(pipeline, runtime));
       } else {
         jsonResponse(res, { error: 'Not found' }, 404);
       }
@@ -109,6 +191,11 @@ async function main() {
     console.log('Endpoints:');
     console.log(`  GET http://localhost:${PORT}/api/posts`);
     console.log(`  GET http://localhost:${PORT}/api/users`);
+    console.log('Pipeline DSL endpoints:');
+    console.log(`  GET http://localhost:${PORT}/api/pipeline/leaderboard`);
+    console.log(`  GET http://localhost:${PORT}/api/pipeline/recent`);
+    console.log(`  GET http://localhost:${PORT}/api/pipeline/posts-with-authors`);
+    console.log(`  GET http://localhost:${PORT}/api/pipeline/dashboard`);
   });
 
   process.on('SIGINT', async () => {

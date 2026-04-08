@@ -12,7 +12,7 @@ export {
   MongoAggReduce,
   MongoAggSwitch,
 } from '../aggregation-expressions';
-export type { AggregatePipelineEntry, AnyMongoCommand } from '../commands';
+export type { AnyMongoCommand, MongoUpdateSpec } from '../commands';
 export {
   AggregateCommand,
   DeleteManyCommand,
@@ -46,22 +46,44 @@ export {
   RawUpdateManyCommand,
   RawUpdateOneCommand,
 } from '../raw-commands';
-export type { MongoGroupId, MongoProjectionValue, MongoReadStage } from '../stages';
+export type {
+  MongoDensifyRange,
+  MongoFillOutput,
+  MongoGroupId,
+  MongoPipelineStage,
+  MongoProjectionValue,
+  MongoUpdatePipelineStage,
+  MongoWindowField,
+} from '../stages';
 export {
   MongoAddFieldsStage,
+  MongoBucketAutoStage,
+  MongoBucketStage,
   MongoCountStage,
+  MongoDensifyStage,
+  MongoFacetStage,
+  MongoFillStage,
+  MongoGeoNearStage,
+  MongoGraphLookupStage,
   MongoGroupStage,
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
+  MongoMergeStage,
+  MongoOutStage,
   MongoProjectStage,
   MongoRedactStage,
   MongoReplaceRootStage,
   MongoSampleStage,
+  MongoSearchMetaStage,
+  MongoSearchStage,
+  MongoSetWindowFieldsStage,
   MongoSkipStage,
   MongoSortByCountStage,
   MongoSortStage,
+  MongoUnionWithStage,
   MongoUnwindStage,
+  MongoVectorSearchStage,
 } from '../stages';
 export type {
   MongoAggExprRewriter,

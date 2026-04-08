@@ -8,26 +8,45 @@ import type {
 import type {
   MongoAggAccumulator,
   MongoAggExpr,
+  MongoDensifyRange,
+  MongoFillOutput,
   MongoFilterExpr,
+  MongoPipelineStage,
   MongoProjectionValue,
   MongoQueryPlan,
-  MongoReadStage,
+  MongoUpdatePipelineStage,
+  MongoWindowField,
 } from '@prisma-next/mongo-query-ast';
 import {
   AggregateCommand,
   MongoAddFieldsStage,
+  MongoBucketAutoStage,
+  MongoBucketStage,
   MongoCountStage,
+  MongoDensifyStage,
+  MongoFacetStage,
+  MongoFillStage,
+  MongoGeoNearStage,
+  MongoGraphLookupStage,
   MongoGroupStage,
   MongoLimitStage,
   MongoLookupStage,
   MongoMatchStage,
+  MongoMergeStage,
+  MongoOutStage,
   MongoProjectStage,
+  MongoRedactStage,
   MongoReplaceRootStage,
   MongoSampleStage,
+  MongoSearchMetaStage,
+  MongoSearchStage,
+  MongoSetWindowFieldsStage,
   MongoSkipStage,
   MongoSortByCountStage,
   MongoSortStage,
+  MongoUnionWithStage,
   MongoUnwindStage,
+  MongoVectorSearchStage,
 } from '@prisma-next/mongo-query-ast';
 import { createFieldProxy } from './field-proxy';
 import { createFilterProxy } from './filter-proxy';
@@ -48,7 +67,7 @@ import type {
 
 interface PipelineBuilderState {
   readonly collection: string;
-  readonly stages: ReadonlyArray<MongoReadStage>;
+  readonly stages: ReadonlyArray<MongoPipelineStage>;
   readonly storageHash: string;
 }
 
@@ -65,7 +84,7 @@ export class PipelineBuilder<
   }
 
   #withStage<NewShape extends DocShape>(
-    stage: MongoReadStage,
+    stage: MongoPipelineStage,
   ): PipelineBuilder<TContract, NewShape> {
     return new PipelineBuilder<TContract, NewShape>(this.#contract, {
       ...this.#state,
@@ -221,10 +240,12 @@ export class PipelineBuilder<
     return this.#withStage(new MongoCountStage(field));
   }
 
-  sortByCount(fn: (fields: FieldProxy<Shape>) => TypedAggExpr<DocField>): PipelineBuilder<
+  sortByCount<F extends DocField>(
+    fn: (fields: FieldProxy<Shape>) => TypedAggExpr<F>,
+  ): PipelineBuilder<
     TContract,
     {
-      _id: DocField;
+      _id: F;
       count: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
     }
   > {
@@ -233,12 +254,156 @@ export class PipelineBuilder<
     return this.#withStage(new MongoSortByCountStage(expr.node));
   }
 
+  // --- Filter stages ---
+
+  redact(
+    fn: (fields: FieldProxy<Shape>) => TypedAggExpr<DocField>,
+  ): PipelineBuilder<TContract, Shape> {
+    const proxy = createFieldProxy<Shape>();
+    const expr = fn(proxy);
+    return this.#withStage<Shape>(new MongoRedactStage(expr.node));
+  }
+
+  // --- Output stages ---
+
+  out(collection: string, db?: string): PipelineBuilder<TContract, Shape> {
+    return this.#withStage<Shape>(new MongoOutStage(collection, db));
+  }
+
+  merge(options: {
+    into: string | { db: string; coll: string };
+    on?: string | ReadonlyArray<string>;
+    whenMatched?: string | ReadonlyArray<MongoUpdatePipelineStage>;
+    whenNotMatched?: string;
+  }): PipelineBuilder<TContract, Shape> {
+    return this.#withStage<Shape>(new MongoMergeStage(options));
+  }
+
+  // --- Union stages ---
+
+  unionWith(
+    collection: string,
+    pipeline?: ReadonlyArray<MongoPipelineStage>,
+  ): PipelineBuilder<TContract, Shape> {
+    return this.#withStage<Shape>(new MongoUnionWithStage(collection, pipeline));
+  }
+
+  // --- Bucketing stages ---
+
+  bucket(options: {
+    groupBy: MongoAggExpr;
+    boundaries: ReadonlyArray<unknown>;
+    default_?: unknown;
+    output?: Record<string, MongoAggAccumulator>;
+  }): PipelineBuilder<TContract, DocShape> {
+    return this.#withStage<DocShape>(new MongoBucketStage(options));
+  }
+
+  bucketAuto(options: {
+    groupBy: MongoAggExpr;
+    buckets: number;
+    output?: Record<string, MongoAggAccumulator>;
+    granularity?: string;
+  }): PipelineBuilder<TContract, DocShape> {
+    return this.#withStage<DocShape>(new MongoBucketAutoStage(options));
+  }
+
+  // --- Geo stages ---
+
+  geoNear(options: {
+    near: unknown;
+    distanceField: string;
+    spherical?: boolean;
+    maxDistance?: number;
+    minDistance?: number;
+    query?: MongoFilterExpr;
+    key?: string;
+    distanceMultiplier?: number;
+    includeLocs?: string;
+  }): PipelineBuilder<TContract, DocShape> {
+    return this.#withStage<DocShape>(new MongoGeoNearStage(options));
+  }
+
+  // --- Multi-facet stages ---
+
+  facet(
+    facets: Record<string, ReadonlyArray<MongoPipelineStage>>,
+  ): PipelineBuilder<TContract, DocShape> {
+    return this.#withStage<DocShape>(new MongoFacetStage(facets));
+  }
+
+  // --- Graph stages ---
+
+  graphLookup(options: {
+    from: string;
+    startWith: MongoAggExpr;
+    connectFromField: string;
+    connectToField: string;
+    as: string;
+    maxDepth?: number;
+    depthField?: string;
+    restrictSearchWithMatch?: MongoFilterExpr;
+  }): PipelineBuilder<TContract, DocShape> {
+    return this.#withStage<DocShape>(new MongoGraphLookupStage(options));
+  }
+
+  // --- Window stages ---
+
+  setWindowFields(options: {
+    partitionBy?: MongoAggExpr;
+    sortBy?: Record<string, 1 | -1>;
+    output: Record<string, MongoWindowField>;
+  }): PipelineBuilder<TContract, DocShape> {
+    return this.#withStage<DocShape>(new MongoSetWindowFieldsStage(options));
+  }
+
+  densify(options: {
+    field: string;
+    partitionByFields?: ReadonlyArray<string>;
+    range: MongoDensifyRange;
+  }): PipelineBuilder<TContract, Shape> {
+    return this.#withStage<Shape>(new MongoDensifyStage(options));
+  }
+
+  fill(options: {
+    partitionBy?: MongoAggExpr;
+    partitionByFields?: ReadonlyArray<string>;
+    sortBy?: Record<string, 1 | -1>;
+    output: Record<string, MongoFillOutput>;
+  }): PipelineBuilder<TContract, Shape> {
+    return this.#withStage<Shape>(new MongoFillStage(options));
+  }
+
+  // --- Search stages ---
+
+  search(config: Record<string, unknown>, index?: string): PipelineBuilder<TContract, Shape> {
+    return this.#withStage<Shape>(new MongoSearchStage(config, index));
+  }
+
+  searchMeta(
+    config: Record<string, unknown>,
+    index?: string,
+  ): PipelineBuilder<TContract, DocShape> {
+    return this.#withStage<DocShape>(new MongoSearchMetaStage(config, index));
+  }
+
+  vectorSearch(options: {
+    index: string;
+    path: string;
+    queryVector: ReadonlyArray<number>;
+    numCandidates: number;
+    limit: number;
+    filter?: Record<string, unknown>;
+  }): PipelineBuilder<TContract, Shape> {
+    return this.#withStage<Shape>(new MongoVectorSearchStage(options));
+  }
+
   // --- Escape hatch ---
 
-  pipe(stage: MongoReadStage): PipelineBuilder<TContract, Shape>;
-  pipe<NewShape extends DocShape>(stage: MongoReadStage): PipelineBuilder<TContract, NewShape>;
+  pipe(stage: MongoPipelineStage): PipelineBuilder<TContract, Shape>;
+  pipe<NewShape extends DocShape>(stage: MongoPipelineStage): PipelineBuilder<TContract, NewShape>;
   pipe<NewShape extends DocShape = Shape>(
-    stage: MongoReadStage,
+    stage: MongoPipelineStage,
   ): PipelineBuilder<TContract, NewShape> {
     return this.#withStage<NewShape>(stage);
   }
