@@ -209,6 +209,14 @@ export class MongoAggAccumulator extends MongoAggExprNode {
     return new MongoAggAccumulator('$count', null);
   }
 
+  static stdDevPop(expr: MongoAggExpr): MongoAggAccumulator {
+    return new MongoAggAccumulator('$stdDevPop', expr);
+  }
+
+  static stdDevSamp(expr: MongoAggExpr): MongoAggAccumulator {
+    return new MongoAggAccumulator('$stdDevSamp', expr);
+  }
+
   accept<R>(visitor: MongoAggExprVisitor<R>): R {
     return visitor.accumulator(this);
   }

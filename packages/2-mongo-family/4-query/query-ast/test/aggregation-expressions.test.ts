@@ -190,6 +190,8 @@ describe('MongoAggAccumulator', () => {
     ['last', '$last'],
     ['push', '$push'],
     ['addToSet', '$addToSet'],
+    ['stdDevPop', '$stdDevPop'],
+    ['stdDevSamp', '$stdDevSamp'],
   ] as const)('%s() sets op to %s', (method, expectedOp) => {
     const acc = MongoAggAccumulator[method](MongoAggFieldRef.of('x'));
     expect(acc.op).toBe(expectedOp);
