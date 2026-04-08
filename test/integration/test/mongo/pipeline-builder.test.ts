@@ -5,12 +5,17 @@ import type {
 } from '@prisma-next/mongo-contract';
 import { acc, fn, mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
 import {
+  MongoAggAccumulator,
+  MongoAggCond,
   MongoAggFieldRef,
+  MongoAggLiteral,
+  MongoAggOperator,
   MongoCountStage,
   MongoFieldFilter,
   MongoLimitStage,
   MongoMatchStage,
   type MongoQueryPlan,
+  MongoRedactStage,
   MongoSortStage,
 } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
@@ -470,6 +475,110 @@ describeWithMongoDB('Pipeline builder integration (mongoPipeline DSL)', (ctx) =>
 
       const docs = await db.collection('summary').find().toArray();
       expect(docs.length).toBeGreaterThanOrEqual(4);
+    });
+  });
+
+  // ---------- Bucketing (auto) ----------
+
+  describe('bucketAuto', () => {
+    it('distributes documents into equal-sized buckets', async () => {
+      await seed();
+
+      const plan = products()
+        .bucketAuto({
+          groupBy: MongoAggFieldRef.of('price'),
+          buckets: 3,
+        })
+        .build();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(3);
+      for (const bucket of results) {
+        expect(bucket).toHaveProperty('_id');
+        expect(bucket).toHaveProperty('count');
+      }
+    });
+  });
+
+  // ---------- Redact ----------
+
+  describe('redact', () => {
+    it('prunes documents not matching condition', async () => {
+      await seed();
+
+      const plan = products()
+        .pipe(
+          new MongoRedactStage(
+            new MongoAggCond(
+              MongoAggOperator.of('$eq', [
+                MongoAggFieldRef.of('category'),
+                MongoAggLiteral.of('electronics'),
+              ]),
+              MongoAggFieldRef.of('$KEEP'),
+              MongoAggFieldRef.of('$PRUNE'),
+            ),
+          ),
+        )
+        .build();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(2);
+      for (const row of results) {
+        expect(row).toMatchObject({ category: 'electronics' });
+      }
+    });
+  });
+
+  // ---------- Graph traversal ----------
+
+  describe('graphLookup', () => {
+    it('self-joins orders by productName', async () => {
+      await seed();
+
+      const plan = orders()
+        .match((f) => f.productName.eq('Laptop'))
+        .graphLookup({
+          from: 'orders',
+          startWith: MongoAggFieldRef.of('productName'),
+          connectFromField: 'productName',
+          connectToField: 'productName',
+          as: 'relatedOrders',
+          maxDepth: 0,
+        })
+        .build();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(2);
+      for (const row of results) {
+        const related = (row as Row)['relatedOrders'] as Row[];
+        expect(related).toHaveLength(2);
+      }
+    });
+  });
+
+  // ---------- Window functions ----------
+
+  describe('setWindowFields', () => {
+    it('computes running total over sorted documents', async () => {
+      await seed();
+
+      const plan = products()
+        .setWindowFields({
+          sortBy: { price: 1 },
+          output: {
+            runningTotal: {
+              operator: MongoAggAccumulator.sum(MongoAggFieldRef.of('price')),
+              window: { documents: ['unbounded' as unknown as number, 0] as [number, number] },
+            },
+          },
+        })
+        .build();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(5);
+      expect((results[0] as Row)['runningTotal']).toBe(5);
+      const lastRow = results[results.length - 1] as Row;
+      expect(lastRow['runningTotal']).toBe(5 + 150 + 250 + 699 + 999);
     });
   });
 
