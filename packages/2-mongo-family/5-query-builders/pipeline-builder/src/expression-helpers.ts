@@ -109,12 +109,14 @@ function nullableDocUnaryExpr(
 
 function namedArgsExpr<F extends DocField>(
   op: string,
-  args: Record<string, TypedAggExpr<DocField>>,
+  args: Readonly<Record<string, TypedAggExpr<DocField> | undefined>>,
   _field: F,
 ): TypedAggExpr<F> {
   const nodeArgs: Record<string, MongoAggExpr> = {};
   for (const [key, val] of Object.entries(args)) {
-    nodeArgs[key] = val.node;
+    if (val !== undefined) {
+      nodeArgs[key] = val.node;
+    }
   }
   return { _field, node: MongoAggOperator.of(op, nodeArgs) };
 }
@@ -209,22 +211,55 @@ export const fn = {
   millisecond(a: TypedAggExpr<DocField>): TypedAggExpr<NumericField> {
     return numericUnaryExpr('$millisecond', a);
   },
-  dateToString(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<StringField> {
+  dateToString(args: {
+    date: TypedAggExpr<DateField>;
+    format?: TypedAggExpr<StringField>;
+    timezone?: TypedAggExpr<StringField>;
+    onNull?: TypedAggExpr<DocField>;
+  }): TypedAggExpr<StringField> {
     return namedArgsExpr('$dateToString', args, STRING);
   },
-  dateFromString(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<DateField> {
+  dateFromString(args: {
+    dateString: TypedAggExpr<StringField>;
+    format?: TypedAggExpr<StringField>;
+    timezone?: TypedAggExpr<StringField>;
+    onError?: TypedAggExpr<DocField>;
+    onNull?: TypedAggExpr<DocField>;
+  }): TypedAggExpr<DateField> {
     return namedArgsExpr('$dateFromString', args, DATE);
   },
-  dateDiff(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<NumericField> {
+  dateDiff(args: {
+    startDate: TypedAggExpr<DateField>;
+    endDate: TypedAggExpr<DateField>;
+    unit: TypedAggExpr<StringField>;
+    timezone?: TypedAggExpr<StringField>;
+    startOfWeek?: TypedAggExpr<StringField>;
+  }): TypedAggExpr<NumericField> {
     return namedArgsExpr('$dateDiff', args, NUMERIC);
   },
-  dateAdd(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<DateField> {
+  dateAdd(args: {
+    startDate: TypedAggExpr<DateField>;
+    unit: TypedAggExpr<StringField>;
+    amount: TypedAggExpr<NumericField>;
+    timezone?: TypedAggExpr<StringField>;
+  }): TypedAggExpr<DateField> {
     return namedArgsExpr('$dateAdd', args, DATE);
   },
-  dateSubtract(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<DateField> {
+  dateSubtract(args: {
+    startDate: TypedAggExpr<DateField>;
+    unit: TypedAggExpr<StringField>;
+    amount: TypedAggExpr<NumericField>;
+    timezone?: TypedAggExpr<StringField>;
+  }): TypedAggExpr<DateField> {
     return namedArgsExpr('$dateSubtract', args, DATE);
   },
-  dateTrunc(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<DateField> {
+  dateTrunc(args: {
+    date: TypedAggExpr<DateField>;
+    unit: TypedAggExpr<StringField>;
+    binSize?: TypedAggExpr<NumericField>;
+    timezone?: TypedAggExpr<StringField>;
+    startOfWeek?: TypedAggExpr<StringField>;
+  }): TypedAggExpr<DateField> {
     return namedArgsExpr('$dateTrunc', args, DATE);
   },
 
@@ -244,13 +279,22 @@ export const fn = {
   ): TypedAggExpr<StringField> {
     return stringExpr('$substrBytes', [str, start, count]);
   },
-  trim(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<StringField> {
+  trim(args: {
+    input: TypedAggExpr<StringField>;
+    chars?: TypedAggExpr<StringField>;
+  }): TypedAggExpr<StringField> {
     return namedArgsExpr('$trim', args, STRING);
   },
-  ltrim(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<StringField> {
+  ltrim(args: {
+    input: TypedAggExpr<StringField>;
+    chars?: TypedAggExpr<StringField>;
+  }): TypedAggExpr<StringField> {
     return namedArgsExpr('$ltrim', args, STRING);
   },
-  rtrim(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<StringField> {
+  rtrim(args: {
+    input: TypedAggExpr<StringField>;
+    chars?: TypedAggExpr<StringField>;
+  }): TypedAggExpr<StringField> {
     return namedArgsExpr('$rtrim', args, STRING);
   },
   split(str: TypedAggExpr<DocField>, delimiter: TypedAggExpr<DocField>): TypedAggExpr<ArrayField> {
@@ -262,19 +306,39 @@ export const fn = {
   strLenBytes(a: TypedAggExpr<DocField>): TypedAggExpr<NumericField> {
     return numericUnaryExpr('$strLenBytes', a);
   },
-  regexMatch(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<BooleanField> {
+  regexMatch(args: {
+    input: TypedAggExpr<StringField>;
+    regex: TypedAggExpr<StringField>;
+    options?: TypedAggExpr<StringField>;
+  }): TypedAggExpr<BooleanField> {
     return namedArgsExpr('$regexMatch', args, BOOLEAN);
   },
-  regexFind(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<DocField> {
+  regexFind(args: {
+    input: TypedAggExpr<StringField>;
+    regex: TypedAggExpr<StringField>;
+    options?: TypedAggExpr<StringField>;
+  }): TypedAggExpr<DocField> {
     return namedArgsExpr('$regexFind', args, DOC);
   },
-  regexFindAll(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<ArrayField> {
+  regexFindAll(args: {
+    input: TypedAggExpr<StringField>;
+    regex: TypedAggExpr<StringField>;
+    options?: TypedAggExpr<StringField>;
+  }): TypedAggExpr<ArrayField> {
     return namedArgsExpr('$regexFindAll', args, ARRAY);
   },
-  replaceOne(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<StringField> {
+  replaceOne(args: {
+    input: TypedAggExpr<StringField>;
+    find: TypedAggExpr<StringField>;
+    replacement: TypedAggExpr<StringField>;
+  }): TypedAggExpr<StringField> {
     return namedArgsExpr('$replaceOne', args, STRING);
   },
-  replaceAll(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<StringField> {
+  replaceAll(args: {
+    input: TypedAggExpr<StringField>;
+    find: TypedAggExpr<StringField>;
+    replacement: TypedAggExpr<StringField>;
+  }): TypedAggExpr<StringField> {
     return namedArgsExpr('$replaceAll', args, STRING);
   },
 
@@ -341,7 +405,11 @@ export const fn = {
   slice(arr: TypedAggExpr<DocField>, ...rest: TypedAggExpr<DocField>[]): TypedAggExpr<ArrayField> {
     return arrayExpr('$slice', [arr, ...rest]);
   },
-  zip(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<ArrayField> {
+  zip(args: {
+    inputs: TypedAggExpr<ArrayField>;
+    useLongestLength?: TypedAggExpr<BooleanField>;
+    defaults?: TypedAggExpr<ArrayField>;
+  }): TypedAggExpr<ArrayField> {
     return namedArgsExpr('$zip', args, ARRAY);
   },
   range(
@@ -381,7 +449,12 @@ export const fn = {
   typeOf(a: TypedAggExpr<DocField>): TypedAggExpr<StringField> {
     return stringUnaryExpr('$type', a);
   },
-  convert(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<DocField> {
+  convert(args: {
+    input: TypedAggExpr<DocField>;
+    to: TypedAggExpr<StringField | NumericField>;
+    onError?: TypedAggExpr<DocField>;
+    onNull?: TypedAggExpr<DocField>;
+  }): TypedAggExpr<DocField> {
     return namedArgsExpr('$convert', args, DOC);
   },
   toInt(a: TypedAggExpr<DocField>): TypedAggExpr<NumericField> {
@@ -417,10 +490,17 @@ export const fn = {
   arrayToObject(a: TypedAggExpr<DocField>): TypedAggExpr<DocField> {
     return docUnaryExpr('$arrayToObject', a);
   },
-  getField(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<DocField> {
+  getField(args: {
+    field: TypedAggExpr<StringField>;
+    input?: TypedAggExpr<DocField>;
+  }): TypedAggExpr<DocField> {
     return namedArgsExpr('$getField', args, DOC);
   },
-  setField(args: Record<string, TypedAggExpr<DocField>>): TypedAggExpr<DocField> {
+  setField(args: {
+    field: TypedAggExpr<StringField>;
+    input: TypedAggExpr<DocField>;
+    value: TypedAggExpr<DocField>;
+  }): TypedAggExpr<DocField> {
     return namedArgsExpr('$setField', args, DOC);
   },
 };
