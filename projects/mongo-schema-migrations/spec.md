@@ -109,6 +109,26 @@ Extend each layer to cover the full breadth of MongoDB server-side configuration
 
 20. **End-to-end polymorphic proof.** A contract with a polymorphic collection (base + variants with discriminator) → planner generates partial indexes with correct `partialFilterExpression` → runner applies them → indexes exist on the MongoDB instance scoped to the correct discriminator values.
 
+### Milestone 4: Online CLI commands + live introspection
+
+Enable all CLI commands that interact with a live MongoDB instance. Requires implementing live schema introspection.
+
+21. **Implement live schema introspection for Mongo.** Read current indexes, validators, and collection options from a live MongoDB instance using the inspection command AST (`ListIndexesCommand`, `ListCollectionsCommand`). Produce a `MongoSchemaIR` from live state — symmetric to `contractToSchema`.
+
+22. **Wire `db init` for Mongo.** Bootstrap a database to match the contract with additive-only operations. Generalize the existing SQL-specific DDL preview branch.
+
+23. **Wire `db update` for Mongo.** Reconcile a live database to the contract. Uses live introspection to diff current state against the contract. Supports additive, widening, and destructive operations with interactive confirmation.
+
+24. **Wire `db verify` for Mongo.** Check marker and/or live schema against the contract. Supports `--marker-only` (marker read only), `--schema-only` (live introspection), `--strict`, and default (both).
+
+25. **Wire `db sign` for Mongo.** Verify the live schema satisfies the contract, then write/update the signature marker.
+
+26. **Wire `db schema` for Mongo.** Read-only live schema introspection with tree or `--json` output. Mongo-specific formatter for indexes, validators, and collection options.
+
+27. **Wire `migration status --db` for Mongo.** Show applied vs pending migrations against a live database.
+
+28. **Wire `migration show` for Mongo.** Generalize operation display so Mongo migration operations render their DDL commands in a readable format.
+
 ## Non-Functional Requirements
 
 - **Index identity by properties.** Following [ADR 009](../../docs/architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md), indexes are identified by (collection + ordered fields with key types + semantic options), not by name. Name differences are ignored for matching; names are for DDL/diagnostics.
@@ -121,7 +141,7 @@ Extend each layer to cover the full breadth of MongoDB server-side configuration
 - **Data migrations for MongoDB.** Document content transformations (field renames, type changes) are a separate project ([April milestone P1 item 5](../../docs/planning/april-milestone.md)). The schema migration infrastructure is a prerequisite.
 - **Atlas-specific operations.** Atlas Search indexes and Vector Search indexes use a different API (Atlas Admin API). Whether these belong in core or in an extension pack is deferred.
 - **Rolling index build monitoring.** Progress reporting for long-running index builds on large collections is deferred.
-- **Introspection from live MongoDB.** Reading current indexes/validators/options from a live MongoDB instance (for `migration status` / drift detection) is valuable but not required for the proof. Can be added after offline planning works.
+- **`contract infer` for Mongo.** Inferring PSL from a live MongoDB instance requires a Mongo-to-PSL reverse mapping which is a separate project.
 - **Refactoring SQL migration internals.** SQL's internal migration implementation (`SqlMigrationPlanner`, `SqlSchemaIR` diffing, `SqlMigrationPlanOperation`) stays as-is. Only the SPI surface is refactored; SQL implements the refactored surface without changing its internals.
 - **Mongo-native locking.** MongoDB lacks advisory locks. The runner uses optimistic concurrency on the marker record (check-and-update) rather than exclusive locking. Production-grade concurrent apply protection is deferred.
 
@@ -157,6 +177,17 @@ Extend each layer to cover the full breadth of MongoDB server-side configuration
 ### Milestone 3: Polymorphic indexes
 - [ ] Polymorphic collections auto-generate partial indexes with `partialFilterExpression` derived from discriminator/variants
 - [ ] End-to-end: polymorphic contract → plan → apply → partial indexes exist on MongoDB scoped to discriminator values
+
+### Milestone 4: Online CLI commands + live introspection
+- [ ] Live schema introspection reads current indexes, validators, and collection options from a live MongoDB instance
+- [ ] `introspectSchema` produces a `MongoSchemaIR` from live database state
+- [ ] `db init` works with a Mongo target (additive-only bootstrap)
+- [ ] `db update` works with a Mongo target (reconcile with interactive destructive confirmation)
+- [ ] `db verify` works with a Mongo target (`--marker-only`, `--schema-only`, `--strict`)
+- [ ] `db sign` works with a Mongo target (verify + write marker)
+- [ ] `db schema` works with a Mongo target (tree + `--json` output)
+- [ ] `migration status --db` works with a Mongo target (applied vs pending)
+- [ ] `migration show` renders Mongo operations in a readable format
 
 ### End-to-end proof (from April milestone)
 - [ ] A contract diff between two Mongo contract states produces correct index creation/deletion operations
