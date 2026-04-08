@@ -1,9 +1,10 @@
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { setupTestDirectoryFromFixtures, withTempDir } from './utils/cli-test-helpers';
+import { replaceInFileOrThrow } from './utils/contract-fixture-editing';
 
 const fixtureSubdir = 'vite-plugin';
 
@@ -98,12 +99,11 @@ withTempDir(({ createTempDir }) => {
         await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Modify contract.ts - add a new column
-        const originalContractContent = readFileSync(contractPath, 'utf-8');
-        const modifiedContractContent = originalContractContent.replace(
-          ".column('email', { type: textColumn, nullable: false })",
-          ".column('email', { type: textColumn, nullable: false })\n      .column('name', { type: textColumn, nullable: true })",
+        replaceInFileOrThrow(
+          contractPath,
+          '        email: field.column(textColumn),\n',
+          '        email: field.column(textColumn),\n        name: field.column(textColumn).optional(),\n',
         );
-        writeFileSync(contractPath, modifiedContractContent, 'utf-8');
 
         // Trigger HMR by invalidating the module
         const contractModuleId = contractPath;

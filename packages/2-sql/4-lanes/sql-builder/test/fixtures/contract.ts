@@ -53,7 +53,7 @@ const Article = model('Article', {
 }).sql({ table: 'articles' });
 
 const User = UserBase.relations({
-  invitedUsers: rel.hasMany(() => User, { by: 'invitedById' }),
+  invitedUsers: rel.hasMany(() => UserBase, { by: 'invitedById' }),
   invitedBy: rel.belongsTo(UserBase, { from: 'invitedById', to: 'id' }),
   posts: rel.hasMany(() => Post, { by: 'userId' }),
   profile: rel.hasOne(Profile, { by: 'userId' }),

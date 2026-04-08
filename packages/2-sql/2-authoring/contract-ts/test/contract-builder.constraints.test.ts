@@ -21,8 +21,23 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   version: '0.0.1',
 };
 
-function defineTestContract<const Definition extends Omit<ContractInput, 'family' | 'target'>>(
-  definition: Definition,
+function defineTestContract<
+  const Types extends NonNullable<ContractInput['types']> = Record<never, never>,
+  const Models extends NonNullable<ContractInput['models']> = Record<never, never>,
+  const ExtensionPacks extends NonNullable<ContractInput['extensionPacks']> | undefined = undefined,
+  const Capabilities extends NonNullable<ContractInput['capabilities']> | undefined = undefined,
+>(
+  definition: Omit<
+    ContractInput<
+      typeof bareFamilyPack,
+      typeof postgresTargetPack,
+      Types,
+      Models,
+      ExtensionPacks,
+      Capabilities
+    >,
+    'family' | 'target'
+  >,
 ) {
   return defineContract({
     family: bareFamilyPack,

@@ -1,4 +1,4 @@
-import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
@@ -10,6 +10,7 @@ import {
   setupCommandMocks,
   withTempDir,
 } from './utils/cli-test-helpers';
+import { replaceInFileOrThrow } from './utils/contract-fixture-editing';
 import { runDbInit } from './utils/db-init-test-helpers';
 import {
   runDbUpdate,
@@ -20,13 +21,11 @@ import {
 const fixtureSubdir = 'db-init';
 
 function addNicknameColumnToContract(testDir: string): void {
-  const contractPath = join(testDir, 'contract.ts');
-  const contractSource = readFileSync(contractPath, 'utf-8');
-  const updatedSource = contractSource.replace(
-    ".column('email', { type: textColumn, nullable: false })",
-    ".column('email', { type: textColumn, nullable: false })\n      .column('nickname', { type: textColumn, nullable: true })",
+  replaceInFileOrThrow(
+    join(testDir, 'contract.ts'),
+    '        email: field.column(textColumn),\n',
+    '        email: field.column(textColumn),\n        nickname: field.column(textColumn).optional(),\n',
   );
-  writeFileSync(contractPath, updatedSource, 'utf-8');
 }
 
 withTempDir(({ createTempDir }) => {

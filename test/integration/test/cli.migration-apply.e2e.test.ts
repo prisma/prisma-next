@@ -1,4 +1,3 @@
-import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import type { MigrationApplyResult } from '@prisma-next/cli/commands/migration-apply';
@@ -15,6 +14,7 @@ import {
   setupTestDirectoryFromFixtures,
   withTempDir,
 } from './utils/cli-test-helpers';
+import { replaceInFileOrThrow } from './utils/contract-fixture-editing';
 
 const fixtureSubdir = 'migration-apply';
 const workspaceRoot = resolve(__dirname, '../../..');
@@ -187,12 +187,11 @@ withTempDir(({ createTempDir }) => {
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
             // Change contract and re-emit without planning a new migration.
-            const contractSrc = readFileSync(contractPath!, 'utf-8');
-            const modified = contractSrc.replace(
-              `.primaryKey(['id'])`,
-              `.column('nickname', { type: textColumn, nullable: true })\n      .primaryKey(['id'])`,
+            replaceInFileOrThrow(
+              contractPath!,
+              '        email: field.column(textColumn),\n',
+              '        email: field.column(textColumn),\n        nickname: field.column(textColumn).optional(),\n',
             );
-            writeFileSync(contractPath!, modified, 'utf-8');
             await emitContract(testDir, configPath);
 
             consoleOutput.length = 0;
@@ -240,12 +239,11 @@ withTempDir(({ createTempDir }) => {
             ]);
 
             // Modify contract: add a column
-            const contractSrc = readFileSync(contractPath!, 'utf-8');
-            const modified = contractSrc.replace(
-              `.primaryKey(['id'])`,
-              `.column('name', { type: textColumn, nullable: true })\n      .primaryKey(['id'])`,
+            replaceInFileOrThrow(
+              contractPath!,
+              '        email: field.column(textColumn),\n',
+              '        email: field.column(textColumn),\n        name: field.column(textColumn).optional(),\n',
             );
-            writeFileSync(contractPath!, modified, 'utf-8');
 
             // Second migration: add name column
             consoleOutput.length = 0;
@@ -325,12 +323,11 @@ withTempDir(({ createTempDir }) => {
             // The UNIQUE constraint prevents the planner's temporary-default
             // strategy (a uniform default would violate uniqueness), so the
             // planner falls back to an empty-table precheck that fails here.
-            const contractSrc = readFileSync(contractPath!, 'utf-8');
-            const modified = contractSrc.replace(
-              `.primaryKey(['id'])`,
-              `.column('required_name', { type: textColumn, nullable: false })\n      .primaryKey(['id'])\n      .unique(['required_name'], 'user_required_name_key')`,
+            replaceInFileOrThrow(
+              contractPath!,
+              '        email: field.column(textColumn),\n',
+              `        email: field.column(textColumn),\n        required_name: field.column(textColumn).unique({ name: 'user_required_name_key' }),\n`,
             );
-            writeFileSync(contractPath!, modified, 'utf-8');
 
             await emitContract(testDir, configPath);
             await runMigrationPlan(testDir, [
@@ -464,11 +461,7 @@ withTempDir(({ createTempDir }) => {
             });
 
             // Remove the email column from the contract
-            const contractSrc = readFileSync(contractPath!, 'utf-8');
-            const modified = contractSrc
-              .replace(/\.column\('email'[^)]*\)\s*\n/, '')
-              .replace(/\.field\('email'[^)]*\)/, '');
-            writeFileSync(contractPath!, modified, 'utf-8');
+            replaceInFileOrThrow(contractPath!, '        email: field.column(textColumn),\n', '');
 
             // Re-emit and plan the destructive migration
             await emitContract(testDir, configPath);
@@ -535,12 +528,11 @@ withTempDir(({ createTempDir }) => {
             ]);
 
             // Add a column, then remove email — two sequential changes
-            const contractSrc = readFileSync(contractPath!, 'utf-8');
-            const withName = contractSrc.replace(
-              `.primaryKey(['id'])`,
-              `.column('name', { type: textColumn, nullable: true })\n      .primaryKey(['id'])`,
+            replaceInFileOrThrow(
+              contractPath!,
+              '        email: field.column(textColumn),\n',
+              '        email: field.column(textColumn),\n        name: field.column(textColumn).optional(),\n',
             );
-            writeFileSync(contractPath!, withName, 'utf-8');
             await emitContract(testDir, configPath);
             await runMigrationPlan(testDir, [
               '--config',
@@ -550,11 +542,7 @@ withTempDir(({ createTempDir }) => {
               '--no-color',
             ]);
 
-            const withNameSrc = readFileSync(contractPath!, 'utf-8');
-            const withoutEmail = withNameSrc
-              .replace(/\.column\('email'[^)]*\)\s*\n/, '')
-              .replace(/\.field\('email'[^)]*\)/, '');
-            writeFileSync(contractPath!, withoutEmail, 'utf-8');
+            replaceInFileOrThrow(contractPath!, '        email: field.column(textColumn),\n', '');
             await emitContract(testDir, configPath);
             await runMigrationPlan(testDir, [
               '--config',

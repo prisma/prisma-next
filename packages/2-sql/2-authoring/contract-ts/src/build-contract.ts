@@ -109,7 +109,7 @@ const JSONB_CODEC_ID = 'pg/jsonb@1';
 const JSONB_NATIVE_TYPE = 'jsonb';
 
 function buildStorageColumn(
-  field: SqlSemanticFieldNode | SqlSemanticValueObjectFieldNode,
+  field: FieldNode | ValueObjectFieldNode,
   codecLookup?: CodecLookup,
 ): StorageColumn {
   if (isValueObjectField(field)) {
@@ -146,7 +146,7 @@ function buildStorageColumn(
 }
 
 function buildDomainField(
-  field: SqlSemanticFieldNode | SqlSemanticValueObjectFieldNode,
+  field: FieldNode | ValueObjectFieldNode,
   column: StorageColumn,
 ): ContractField {
   if (isValueObjectField(field)) {
@@ -299,8 +299,8 @@ export function buildSqlContractFromDefinition(
     // --- Build contract model ---
 
     const storageFields: Record<string, { readonly column: string }> = {};
-    for (const fieldName in fieldToColumn) {
-      storageFields[fieldName] = { column: fieldToColumn[fieldName]! };
+    for (const [fieldName, columnName] of Object.entries(fieldToColumn)) {
+      storageFields[fieldName] = { column: columnName };
     }
 
     const columnToField = new Map(
