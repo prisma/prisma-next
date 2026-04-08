@@ -34,6 +34,7 @@ type PipelineContract = MongoContract & {
         readonly category: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
         readonly price: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
         readonly tags: { readonly codecId: 'mongo/array@1'; readonly nullable: false };
+        readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'products' };
@@ -57,6 +58,8 @@ type TestCodecTypes = {
   readonly 'mongo/string@1': { readonly output: string };
   readonly 'mongo/double@1': { readonly output: number };
   readonly 'mongo/array@1': { readonly output: unknown[] };
+  readonly 'mongo/date@1': { readonly output: Date };
+  readonly 'mongo/bool@1': { readonly output: boolean };
 };
 
 type TestTypeMaps = MongoTypeMaps<TestCodecTypes>;
@@ -74,6 +77,7 @@ const contractJson = {
         category: { codecId: 'mongo/string@1', nullable: false },
         price: { codecId: 'mongo/double@1', nullable: false },
         tags: { codecId: 'mongo/array@1', nullable: false },
+        createdAt: { codecId: 'mongo/date@1', nullable: false },
       },
       relations: {},
       storage: { collection: 'products' },
@@ -113,11 +117,41 @@ function orders() {
 type Row = Record<string, unknown>;
 
 const PRODUCTS = [
-  { name: 'Laptop', category: 'electronics', price: 999, tags: ['tech', 'portable'] },
-  { name: 'Phone', category: 'electronics', price: 699, tags: ['tech', 'mobile'] },
-  { name: 'Desk', category: 'furniture', price: 250, tags: ['office'] },
-  { name: 'Chair', category: 'furniture', price: 150, tags: ['office', 'ergonomic'] },
-  { name: 'Notebook', category: 'stationery', price: 5, tags: ['paper'] },
+  {
+    name: 'Laptop',
+    category: 'electronics',
+    price: 999,
+    tags: ['tech', 'portable'],
+    createdAt: new Date('2024-01-15T00:00:00Z'),
+  },
+  {
+    name: 'Phone',
+    category: 'electronics',
+    price: 699,
+    tags: ['tech', 'mobile'],
+    createdAt: new Date('2024-03-20T00:00:00Z'),
+  },
+  {
+    name: 'Desk',
+    category: 'furniture',
+    price: 250,
+    tags: ['office'],
+    createdAt: new Date('2024-02-10T00:00:00Z'),
+  },
+  {
+    name: 'Chair',
+    category: 'furniture',
+    price: 150,
+    tags: ['office', 'ergonomic'],
+    createdAt: new Date('2024-06-01T00:00:00Z'),
+  },
+  {
+    name: 'Notebook',
+    category: 'stationery',
+    price: 5,
+    tags: ['paper'],
+    createdAt: new Date('2024-12-25T00:00:00Z'),
+  },
 ];
 
 const ORDERS = [
@@ -624,6 +658,85 @@ describeWithMongoDB('Pipeline builder integration (mongoPipeline DSL)', (ctx) =>
         expect(product).toBeDefined();
         expect(product).toHaveProperty('category');
       }
+    });
+  });
+
+  // ---------- Named-args expression helpers ----------
+
+  describe('named-args expression helpers', () => {
+    it('fn.dateToString formats a date field', async () => {
+      await seed();
+
+      const plan = products()
+        .match((f) => f.name.eq('Laptop'))
+        .addFields((f) => ({
+          dateStr: fn.dateToString({ date: f.createdAt, format: fn.literal('%Y-%m-%d') }),
+        }))
+        .build();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(1);
+      expect(results[0]!['dateStr']).toBe('2024-01-15');
+    });
+
+    it('fn.trim removes whitespace via named-args string operator', async () => {
+      await seed();
+
+      const plan = products()
+        .match((f) => f.name.eq('Laptop'))
+        .addFields((_f) => ({
+          trimmed: fn.trim({ input: fn.literal('  electronics  ') }),
+        }))
+        .build();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(1);
+      expect(results[0]!['trimmed']).toBe('electronics');
+    });
+
+    it('fn.gt in a $cond labels products by price', async () => {
+      await seed();
+
+      const plan = products()
+        .addFields((f) => ({
+          priceLabel: fn.cond(
+            fn.gt(f.price, fn.literal(500)).node,
+            fn.literal('expensive'),
+            fn.literal('affordable'),
+          ),
+        }))
+        .sort({ price: -1 })
+        .build();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(5);
+      expect(results[0]).toMatchObject({ name: 'Laptop', priceLabel: 'expensive' });
+      expect(results[1]).toMatchObject({ name: 'Phone', priceLabel: 'expensive' });
+      expect(results[2]).toMatchObject({ name: 'Desk', priceLabel: 'affordable' });
+    });
+  });
+
+  // ---------- Named-args accumulator helpers ----------
+
+  describe('named-args accumulator helpers', () => {
+    it('acc.firstN returns first N items per group', async () => {
+      await seed();
+
+      const plan = products()
+        .sort({ name: 1 })
+        .group((f) => ({
+          _id: f.category,
+          firstTwo: acc.firstN({ input: f.name, n: fn.literal(2) }),
+        }))
+        .sort({ _id: 1 })
+        .build();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(3);
+      const electronics = results.find((r) => r['_id'] === 'electronics');
+      expect(electronics!['firstTwo']).toEqual(['Laptop', 'Phone']);
+      const furniture = results.find((r) => r['_id'] === 'furniture');
+      expect(furniture!['firstTwo']).toEqual(['Chair', 'Desk']);
     });
   });
 });
