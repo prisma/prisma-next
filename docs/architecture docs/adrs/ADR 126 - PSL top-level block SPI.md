@@ -208,7 +208,7 @@ const contract = defineContract({
 })
 ```
 
-- TS-first builders emit identical canonical JSON to PSL for the same inputs
+- TS-authored contracts emit identical canonical JSON to PSL for the same inputs
 - Lint rules enforce determinism and forbid dynamic values in TS-first authoring per ADR 096
 
 ## Consequences

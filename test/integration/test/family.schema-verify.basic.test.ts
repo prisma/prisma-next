@@ -4,11 +4,14 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  type CodecTypes,
   defineContract,
+  field,
   int4Column,
+  model,
   postgresPack,
+  rel,
   runSchemaVerify,
+  sqlFamily,
   textColumn,
   timeouts,
   useDevDatabase,
@@ -45,25 +48,37 @@ describe('family instance schemaVerify - basic', () => {
     it(
       'returns ok=true with all pass nodes',
       async () => {
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id'])
-              .unique(['email']),
-          )
-          .table('post', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('userId', { type: int4Column, nullable: false })
-              .column('title', { type: textColumn, nullable: false })
-              .primaryKey(['id'])
-              .foreignKey(['userId'], { table: 'user', columns: ['id'] })
-              .index(['userId']),
-          )
-          .build();
+        const User = model('User', {
+          fields: {
+            id: field.column(int4Column).id(),
+            email: field.column(textColumn).unique(),
+          },
+        }).sql({ table: 'user' });
+
+        const Post = model('Post', {
+          fields: {
+            id: field.column(int4Column).id(),
+            userId: field.column(int4Column),
+            title: field.column(textColumn),
+          },
+          relations: {
+            user: rel.belongsTo(User, { from: 'userId', to: 'id' }).sql({ fk: {} }),
+          },
+        }).sql(({ cols, constraints }) => ({
+          table: 'post',
+          indexes: [constraints.index(cols.userId)],
+        }));
+
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: User.relations({
+              posts: rel.hasMany(Post, { by: 'userId' }),
+            }),
+            Post,
+          },
+        });
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
@@ -97,21 +112,24 @@ describe('family instance schemaVerify - basic', () => {
     it(
       'returns ok=false with missing_table issue',
       async () => {
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .table('post', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('title', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+            Post: model('Post', {
+              fields: {
+                id: field.column(int4Column).id(),
+                title: field.column(textColumn),
+              },
+            }).sql({ table: 'post' }),
+          },
+        });
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
@@ -148,15 +166,18 @@ describe('family instance schemaVerify - basic', () => {
     it(
       'returns ok=false with missing_column issue',
       async () => {
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 

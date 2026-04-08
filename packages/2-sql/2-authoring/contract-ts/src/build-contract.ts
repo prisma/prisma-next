@@ -109,7 +109,7 @@ export function buildContract(
   codecLookup?: CodecLookup,
 ): Contract<SqlStorage> {
   if (!state.target) {
-    throw new Error('target is required. Call .target() before .build()');
+    throw new Error('target is required when building a SQL contract.');
   }
 
   const target = state.target;

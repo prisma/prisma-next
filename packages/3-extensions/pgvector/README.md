@@ -66,23 +66,27 @@ export default defineConfig({
 Add vector columns to your contract and enable the namespace via pack refs:
 
 ```typescript
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import postgres from '@prisma-next/target-postgres/pack';
 
-export const contract = defineContract()
-  .target(postgres)
-  .extensionPacks({ pgvector })
-  .table('post', (t) =>
-    t
-      .column('id', { type: int4Column, nullable: false })
-      .column('title', { type: textColumn, nullable: false })
-      .column('embedding', { type: vectorColumn, nullable: true })
-      .primaryKey(['id']),
-  )
-  .build();
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgres,
+  extensionPacks: { pgvector },
+  models: {
+    Post: model('Post', {
+      fields: {
+        id: field.column(int4Column).id(),
+        title: field.column(textColumn),
+        embedding: field.column(vectorColumn).optional(),
+      },
+    }).sql({ table: 'post' }),
+  },
+});
 ```
 
 ### Runtime Setup
@@ -198,4 +202,3 @@ The extension declares the following capabilities:
 - [Extension Packs Guide](../../../docs/reference/Extension-Packs-Naming-and-Layout.md)
 
 Pack refs (`@prisma-next/extension-pgvector/pack`) are pure data objects generated from the hydrated manifest (`src/core/manifest.ts`), so TypeScript contract builders can enable the pgvector namespace in both emit and no-emit workflows without touching the filesystem.
-

@@ -5,11 +5,11 @@
 Today, the TS authoring surface can already express “id column with UUID generation” as a single helper call:
 
 ```ts
-.table('user', (t) =>
-  t
-    .generated('id', uuidv4())
-    .primaryKey(['id'])
-)
+model('User', {
+  fields: {
+    id: field.generated(uuidv4()).id(),
+  },
+}).sql({ table: 'user' })
 ```
 
 The current PSL surface expresses the same idea by spreading the meaning across the base type and attributes:
@@ -25,9 +25,11 @@ What we want after this work is for both surfaces to lead with the same idea: th
 Illustrative TS shape after this work:
 
 ```ts
-.table('user', (t, column) =>
-  t.column('id', column.uuid())
-)
+model('User', {
+  fields: {
+    id: field.id.uuidv4(),
+  },
+}).sql({ table: 'user' })
 ```
 
 Illustrative PSL shape after this work:
@@ -168,4 +170,3 @@ This is the main reason to do this as a shared architecture decision instead of 
 - ADR 158 — Execution mutation defaults
 - ADR 169 — Declared applicability for mutation default generators (mutation defaults are one output that presets can configure; ADR 169 owns the default-specific registry and applicability model)
 - ADR 171 — Parameterized native types in contracts (how contracts represent parameterized storage types)
-

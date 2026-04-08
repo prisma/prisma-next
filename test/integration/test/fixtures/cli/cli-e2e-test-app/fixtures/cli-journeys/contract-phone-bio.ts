@@ -1,19 +1,19 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-export const contract = defineContract<CodecTypes>()
-  .target(postgresPack)
-  .table('user', (t) =>
-    t
-      .column('id', { type: int4Column, nullable: false })
-      .column('email', { type: textColumn, nullable: false })
-      .column('phone', { type: textColumn, nullable: true })
-      .column('bio', { type: textColumn, nullable: true })
-      .primaryKey(['id']),
-  )
-  .model('User', 'user', (m) =>
-    m.field('id', 'id').field('email', 'email').field('phone', 'phone').field('bio', 'bio'),
-  )
-  .build();
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgresPack,
+  models: {
+    User: model('User', {
+      fields: {
+        id: field.column(int4Column).id(),
+        email: field.column(textColumn),
+        phone: field.column(textColumn).optional(),
+        bio: field.column(textColumn).optional(),
+      },
+    }).sql({ table: 'user' }),
+  },
+});

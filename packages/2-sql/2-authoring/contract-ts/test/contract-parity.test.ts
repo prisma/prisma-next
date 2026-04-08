@@ -22,7 +22,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 };
 
 describe('defineContract build output', () => {
-  it('defineContract() omits _generated', () => {
+  it('omits _generated', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,

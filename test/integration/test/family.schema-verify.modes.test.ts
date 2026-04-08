@@ -3,12 +3,14 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  type CodecTypes,
   defineContract,
+  field,
   int4Column,
+  model,
   pgvector,
   postgresPack,
   runSchemaVerify,
+  sqlFamily,
   textColumn,
   timeouts,
   useDevDatabase,
@@ -34,16 +36,19 @@ describe('family instance schemaVerify - modes', () => {
     it(
       'returns ok=false with dependency_missing issue',
       async () => {
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .extensionPacks({ pgvector })
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          extensionPacks: { pgvector },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         const result = await runSchemaVerify(getConnectionString(), contract, {
           extensions: [pgvector],
@@ -81,15 +86,18 @@ describe('family instance schemaVerify - modes', () => {
     it(
       'returns ok=false in strict mode with extra_column issue',
       async () => {
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         const result = await runSchemaVerify(getConnectionString(), contract, { strict: true });
 
@@ -114,15 +122,18 @@ describe('family instance schemaVerify - modes', () => {
     it(
       'returns ok=true in permissive mode with extra column',
       async () => {
-        const contract = defineContract<CodecTypes>()
-          .target(postgresPack)
-          .table('user', (t) =>
-            t
-              .column('id', { type: int4Column, nullable: false })
-              .column('email', { type: textColumn, nullable: false })
-              .primaryKey(['id']),
-          )
-          .build();
+        const contract = defineContract({
+          family: sqlFamily,
+          target: postgresPack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(int4Column).id(),
+                email: field.column(textColumn),
+              },
+            }).sql({ table: 'user' }),
+          },
+        });
 
         const result = await runSchemaVerify(getConnectionString(), contract, { strict: false });
 

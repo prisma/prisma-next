@@ -803,8 +803,11 @@ export function interpretPslDocumentToSqlContract(
   }
 
   const diagnostics: ContractSourceDiagnostic[] = mapParserDiagnostics(input.document);
-  const modelNames = new Set(input.document.ast.models.map((model) => model.name));
-  const compositeTypeNames = new Set(input.document.ast.compositeTypes.map((ct) => ct.name));
+  const models = input.document.ast.models ?? [];
+  const enums = input.document.ast.enums ?? [];
+  const compositeTypes = input.document.ast.compositeTypes ?? [];
+  const modelNames = new Set(models.map((model) => model.name));
+  const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
   const defaultFunctionRegistry =
     input.controlMutationDefaults?.defaultFunctionRegistry ?? new Map<string, never>();
@@ -815,7 +818,7 @@ export function interpretPslDocumentToSqlContract(
   }
 
   const enumResult = processEnumDeclarations({
-    enums: input.document.ast.enums,
+    enums,
     sourceId,
     enumTypeConstructor: getAuthoringTypeConstructor(input.authoringContributions, ['enum']),
     diagnostics,
@@ -836,13 +839,13 @@ export function interpretPslDocumentToSqlContract(
 
   const storageTypes = { ...enumResult.storageTypes, ...namedTypeResult.storageTypes };
 
-  const modelMappings = buildModelMappings(input.document.ast.models, diagnostics, sourceId);
+  const modelMappings = buildModelMappings(models, diagnostics, sourceId);
   const modelNodes: ModelNode[] = [];
   const fkRelationMetadata: FkRelationMetadata[] = [];
   const backrelationCandidates: ModelBackrelationCandidate[] = [];
   const modelResolvedFields = new Map<string, readonly ResolvedField[]>();
 
-  for (const model of input.document.ast.models) {
+  for (const model of models) {
     const mapping = modelMappings.get(model.name);
     if (!mapping) {
       continue;
@@ -922,7 +925,7 @@ export function interpretPslDocumentToSqlContract(
   });
 
   const valueObjects = buildValueObjects(
-    input.document.ast.compositeTypes,
+    compositeTypes,
     enumResult.enumTypeDescriptors,
     namedTypeResult.namedTypeDescriptors,
     input.scalarTypeDescriptors,

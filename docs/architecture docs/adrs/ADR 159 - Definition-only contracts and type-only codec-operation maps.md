@@ -12,7 +12,7 @@ sequenceDiagram
   participant Ctx as createExecutionContext
 
   alt No-emit (TS authoring)
-    App->>TS: defineContract().target(pack).extensionPacks(packs).…build()
+    App->>TS: defineContract({ family, target, extensionPacks, models, ... })
     TS-->>App: Contract value (definition-only)\n+ ContractWithTypeMaps phantom for inference
   else Emit (JSON + .d.ts)
     App->>JSON: import contract.json
@@ -39,7 +39,7 @@ sequenceDiagram
 Prisma Next uses a contract-first architecture:
 
 - `contract.json` is a **canonical, hashable** artifact (and will later be produced from PSL parsing).
-- In no-emit workflows, developers author the contract directly in TypeScript via `defineContract()`.
+- In no-emit workflows, developers author the contract directly in TypeScript via `defineContract({ family, target, models, ... })`.
 - Because JSON imports lose important literal and branded type information, we emit a types-only `contract.d.ts` alongside the JSON.
 
 Query lanes and the demo visualization want a **single predictable “contract” object** they can traverse and inspect at runtime.
@@ -124,8 +124,8 @@ Key properties:
 
 In TS authoring (no-emit), developers already provide a single point of configuration by selecting:
 
-- a target pack (`.target(postgresPack)`)
-- extension packs (`.extensionPacks({ pgvector })`)
+- a target pack (`target: postgresPack`)
+- extension packs (`extensionPacks: { pgvector }`)
 
 The codec/operation **type maps** used for inference are therefore derivable from those pack refs at compile time. We should not require users to manually write unions/intersections like:
 
@@ -227,4 +227,3 @@ Rationale: we want an explicit signal that these maps are for TypeScript inferen
 
 - Demo visualization (`examples/prisma-next-demo/src/app/`) renders directly from `validateContract<Contract>(contractJson)` output using React. Uses the `Contract` type directly for rendering and HMR (no separate IR-only alias).
 - Demo emitted workflow (`examples/prisma-next-demo/src/prisma/db.ts`) uses `postgres<Contract, TypeMaps>({ contractJson, ... })` with explicit `TypeMaps` from `contract.d.ts`.
-

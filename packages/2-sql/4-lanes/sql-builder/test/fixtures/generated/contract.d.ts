@@ -230,6 +230,7 @@ type ContractBase = ContractType<
           readonly title: { readonly column: 'title' };
           readonly userId: { readonly column: 'user_id' };
           readonly views: { readonly column: 'views' };
+          readonly embedding: { readonly column: 'embedding' };
         };
       };
       readonly fields: {
@@ -248,6 +249,10 @@ type ContractBase = ContractType<
         readonly views: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly embedding: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1' };
         };
       };
       readonly relations: {

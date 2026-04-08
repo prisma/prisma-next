@@ -1,32 +1,30 @@
 # @prisma-next/contract-authoring
 
-**Status:** Phase 2 - Target-agnostic contract authoring core extracted
+**Status:** Shared authoring state/types for target-specific contract DSLs
 
-This package contains the target-agnostic contract authoring builder core for Prisma Next.
+This package contains the target-agnostic authoring state and descriptor types shared by Prisma Next contract authoring packages.
 
 ## Overview
 
-This package provides generic builder primitives that can be composed with target-family specific types (e.g., SQL) to create contract authoring surfaces. It is part of the authoring ring and depends only on `@prisma-next/contract` and core packages.
+This package provides the shared state shapes and descriptor types used by target-family specific contract authoring packages. It is part of the authoring ring and depends only on `@prisma-next/contract` and core packages.
 
 ## Responsibilities
 
-- **Generic Builder Core**: Provides target-agnostic builder state types and builder classes (`TableBuilder`, `ModelBuilder`, `ContractBuilder`)
-- **State Management**: Manages builder state for tables, columns, models, and relations without target-specific logic
+- **Authoring State Types**: Defines target-agnostic state shapes for columns, tables, models, relations, storage types, and contract metadata
 - **Storage Type State**: Captures target-agnostic storage type entries and column `typeRef` metadata for family-specific composition
-- **Type Helpers**: Provides generic type-level helpers for transforming builder states into contract structures
-- **Composition Surface**: Enables target-family specific packages (e.g., `@prisma-next/sql-contract-ts`) to compose generic core with family-specific types
+- **Descriptor Types**: Provides shared descriptor contracts such as `ColumnTypeDescriptor`, `IndexDef`, and foreign-key metadata
+- **Composition Surface**: Enables target-family specific packages (e.g., `@prisma-next/sql-contract-ts`) to share common authoring data structures
 - **Defaults**: Reuses shared contract `ColumnDefault` for db-agnostic defaults (literal, function, and client-generated descriptors)
-- **Foreign Keys Configuration**: Provides a `foreignKeys()` method on the base `ContractBuilder` to configure FK constraint and index emission behavior
+- **Foreign Keys Configuration**: Defines the shared `ForeignKeyDefaultsState` used by authoring surfaces that materialize FK defaults
 
 ## Package Status
 
-This package was created in Phase 2 of the contract authoring extraction. It contains the extracted target-neutral builder core from `@prisma-next/sql-contract-ts`. The SQL layer (`@prisma-next/sql-contract-ts`) composes this generic core with SQL-specific types.
+This package was created during the contract authoring extraction. It now exists only to share target-neutral authoring state and descriptor types. The SQL layer (`@prisma-next/sql-contract-ts`) consumes these types for lowering and validation.
 
 ## Architecture
 
 - **Builder state types**: Generic state types (`ColumnBuilderState`, `TableBuilderState`, `ModelBuilderState`, `ContractBuilderState`) that don't reference any target-family specific types
-- **Builder classes**: Generic builder classes (`TableBuilder`, `ModelBuilder`, `ContractBuilder`) that handle state management
-- **Type helpers**: Generic type-level helpers for transforming builder states into contract structures
+- **Descriptor types**: Shared descriptor contracts (`ColumnTypeDescriptor`, `IndexDef`, `ForeignKeyDef`) used by authoring packages, targets, and extensions
 - **No target-specific logic**: This package must remain target-family agnostic and cannot import from `@prisma-next/sql-*` or other family-specific modules
 
 ## Dependencies
@@ -36,14 +34,12 @@ This package was created in Phase 2 of the contract authoring extraction. It con
 
 ## Exports
 
-- Builder state types: `ColumnBuilderState`, `TableBuilderState`, `ModelBuilderState`, `ContractBuilderState`, `ForeignKeysConfigState`, `RelationDefinition`, `ColumnBuilder`
-- Builder classes: `TableBuilder`, `ModelBuilder`, `ContractBuilder`
-- Type helpers: `BuildStorageColumn`, `BuildStorage`, `BuildModels`, extract helpers, `Mutable`
-- Factory function: `defineContract()` (generic)
+- Authoring state types: `ColumnBuilderState`, `TableBuilderState`, `ModelBuilderState`, `ContractBuilderState`, `ForeignKeyDefaultsState`, `RelationDefinition`
+- Shared descriptor types: `ColumnTypeDescriptor`, `IndexDef`, `ForeignKeyDef`, `ForeignKeyOptions`, `UniqueConstraintDef`
 
 ## Usage
 
-This package is intended for use by target-family specific authoring packages (e.g., `@prisma-next/sql-contract-ts`). End users should import from the target-family specific packages, not directly from this package.
+This package is intended for use by target-family specific authoring packages (e.g., `@prisma-next/sql-contract-ts`) and by target/extension packages that need shared authoring descriptor types. End users should import from the target-family specific packages, not directly from this package.
 
 ## See Also
 

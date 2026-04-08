@@ -206,7 +206,7 @@
       },
       "relations": {
         "user": {
-          "cardinality": "1:1",
+          "cardinality": "N:1",
           "on": {
             "localFields": [
               "userId"
@@ -238,8 +238,11 @@
         "id": {
           "nullable": false,
           "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
           }
         },
         "name": {
@@ -401,7 +404,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:02cdff7f8d501bb78f0687a20ede35d9a7397239ea1bb503f1f58d035ad3cb72",
+    "storageHash": "sha256:8d1a3775ef861e96e34b97180819bca84f50a397346541915a1019f7e624eedf",
     "tables": {
       "articles": {
         "columns": {
@@ -561,9 +564,12 @@
       "tags": {
         "columns": {
           "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
           },
           "name": {
             "codecId": "pg/text@1",

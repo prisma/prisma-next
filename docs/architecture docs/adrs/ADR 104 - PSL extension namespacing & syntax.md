@@ -164,29 +164,29 @@ Errors map to `RuntimeError` codes per ADR 027 and ADR 068.
 
 ### TS-first parity
 
-The TS builder exposes the same namespace vocabulary via pack refs, and extension-specific column/type helpers are provided by the corresponding extension package.
+The TypeScript contract DSL exposes the same namespace vocabulary via pack refs, and extension-specific column/type helpers are provided by the corresponding extension package.
 
 ```typescript
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column } from '@prisma-next/adapter-postgres/column-types';
-import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
+import sqlFamily from '@prisma-next/family-sql/pack';
 import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/target-postgres/pack';
 
-type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
-
-export const contract = defineContract<AllCodecTypes>()
-  .target(postgres)
-  .extensionPacks({ pgvector })
-  .table('document', (t) =>
-    t
-      .column('id', { type: int4Column, nullable: false })
-      .column('embedding', { type: vector(1536), nullable: false })
-      .primaryKey(['id']),
-  )
-  .build();
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgres,
+  extensionPacks: { pgvector },
+  models: {
+    Document: model('Document', {
+      fields: {
+        id: field.column(int4Column).id(),
+        embedding: field.column(vector(1536)),
+      },
+    }).sql({ table: 'document' }),
+  },
+});
 ```
 
 - Emitted `contract.json` must be byte-for-byte identical to PSL-first for the same inputs

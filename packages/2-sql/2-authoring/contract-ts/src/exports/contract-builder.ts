@@ -1,5 +1,4 @@
 export type {
-  ColumnBuilder,
   ComposedAuthoringHelpers,
   ContractInput,
   ContractModelBuilder,

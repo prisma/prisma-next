@@ -31,14 +31,24 @@ flowchart LR
 ## Usage
 
 ```ts
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { textColumn } from '@prisma-next/adapter-postgres/column-types';
+import sqlFamily from '@prisma-next/family-sql/pack';
 import { uuidv4 } from '@prisma-next/ids';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
 
-export const contract = defineContract()
-  .table('user', (t) =>
-    t.generated('id', uuidv4()).column('email', { type: { codecId: 'pg/text@1', nativeType: 'text' } }),
-  )
-  .build();
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgresPack,
+  models: {
+    User: model('User', {
+      fields: {
+        id: field.generated(uuidv4()).id(),
+        email: field.column(textColumn),
+      },
+    }).sql({ table: 'user' }),
+  },
+});
 ```
 
 Pass generator options directly (for helpers whose `uniku` implementation supports them):

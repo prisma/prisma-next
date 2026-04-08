@@ -86,6 +86,13 @@
     },
     "Post": {
       "fields": {
+        "embedding": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/vector@1",
+            "kind": "scalar"
+          }
+        },
         "id": {
           "nullable": false,
           "type": {
@@ -143,6 +150,9 @@
       },
       "storage": {
         "fields": {
+          "embedding": {
+            "column": "embedding"
+          },
           "id": {
             "column": "id"
           },

@@ -15,32 +15,31 @@ This package contains the SQL-specific TypeScript contract authoring surface for
 ## Overview
 
 This package is part of the SQL family namespace (`packages/2-sql/2-authoring/contract-ts`) and provides:
-- SQL contract builder (`defineContract`) in two forms:
-  - legacy chain builder
-  - contract DSL object-literal authoring with `model('User', { fields, relations }).attributes(...).sql(...)`
-- SQL contract JSON schema - JSON schema for validating contract structure
+- the SQL contract DSL centered on `defineContract({ ... })`
+- `field`, `model`, and `rel` helpers for typed TypeScript authoring
+- a SQL contract JSON schema for validating contract structure in IDEs and tooling
 
 ## Responsibilities
 
-- **SQL Contract Builder**: Provides both the existing chain builder and the contract DSL authoring surface for creating SQL contracts programmatically with type safety
-- **Storage Type Authoring**: Supports `storage.types` declarations and `typeRef` columns via the SQL builder
+- **SQL Contract Authoring**: Provides the current contract DSL authoring surface for creating SQL contracts programmatically with type safety
+- **Storage Type Authoring**: Supports `storage.types` declarations and `typeRef` columns via the contract DSL
 - **SQL Contract JSON Schema**: Provides JSON schema for validating contract structure in IDEs and tooling
-- **Composition Layer**: Composes the target-agnostic builder core from `@prisma-next/contract-authoring` with SQL-specific types and validation logic
+- **Composition Layer**: Composes shared authoring state/descriptor types from `@prisma-next/contract-authoring` with SQL-specific lowering and validation logic
 - **Generated Defaults**: Supports client-generated defaults via `ColumnDefault.kind = 'generated'` in contract authoring
 
 ## Package Status
 
-This package was created in Phase 1 and refactored in Phase 2. It now composes the target-agnostic builder core from `@prisma-next/contract-authoring` with SQL-specific types and validation logic.
+This package was created in Phase 1 and refactored in Phase 2. It now composes shared authoring state/descriptor types from `@prisma-next/contract-authoring` with SQL-specific lowering and validation logic.
 
 ## Architecture
 
-- **Composes generic core**: Uses `@prisma-next/contract-authoring` for generic builder state management (`TableBuilder`, `ModelBuilder`, `ContractBuilder` base class)
+- **Composes shared authoring state**: Uses `@prisma-next/contract-authoring` for target-neutral state and descriptor types
 - **SQL-specific types**: Provides SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlModelStorage`) from `@prisma-next/sql-contract/types`
-- **SQL-specific build()**: Implements SQL-specific `build()` method in `SqlContractBuilder` that constructs `SqlContract` instances with SQL-specific structure (uniques, indexes, foreignKeys arrays)
+- **SQL-specific lowering**: Lowers TypeScript-authored contract definitions into SQL contract structures with SQL-specific indexes, foreign keys, and storage metadata
 
 ```mermaid
 flowchart LR
-  builderInput[TS builder calls] --> sqlContractTs[@prisma-next/sql-contract-ts]
+  builderInput[TypeScript contract input] --> sqlContractTs[@prisma-next/sql-contract-ts]
   sqlContractTs --> authoringCore[@prisma-next/contract-authoring]
   sqlContractTs --> sqlTypes[@prisma-next/sql-contract/types]
   sqlContractTs --> contract[SQL Contract]
@@ -52,7 +51,7 @@ This package is part of the package layering architecture:
 
 ## Exports
 
-- `./contract-builder` - Contract builder API (`defineContract`, `field`, `model`, `rel`, `ColumnBuilder`)
+- `./contract-builder` - Contract DSL API (`defineContract`, `field`, `model`, `rel`)
 - `./config-types` - TypeScript contract config helper (`typescriptContract`)
 - `./schema-sql` - SQL contract JSON schema (`data-contract-sql-v1.json`)
 
@@ -192,70 +191,22 @@ This first slice now includes a small portable helper vocabulary:
 - use inline `.unique()` for single-field uniqueness and `.attributes(({ fields, constraints }) => ({ uniques: [constraints.unique([...])] }))` for compound uniqueness
 - duplicate named primary keys, uniques, indexes, and foreign keys are rejected during build/validation instead of silently overriding each other
 
-#### Legacy Chain Builder
+#### Foreign Key Defaults
+
+Use the root-level `foreignKeyDefaults` option when a contract wants non-default FK materialization:
 
 ```typescript
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
-import pgvector from '@prisma-next/extension-pgvector/pack';
-import { enumColumn, enumType, int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
-
-const contract = defineContract()
-  .target(postgresPack)
-  .extensionPacks({ pgvector })
-  .storageType('Role', enumType('role', ['USER', 'ADMIN']))
-  .table('user', (t) =>
-    t
-      .column('id', { type: int4Column, nullable: false })
-      .column('email', { type: textColumn, nullable: false })
-      .column('role', { type: enumColumn('Role', 'role') })
-      .primaryKey(['id'], 'user_pkey')           // Named primary key
-      .unique(['email'], 'user_email_unique')    // Named unique constraint
-      .index(['email'], 'user_email_idx'),       // Named index
-  )
-  .table('post', (t) =>
-    t
-      .column('id', { type: int4Column, nullable: false })
-      .column('userId', { type: int4Column, nullable: false })
-      .column('title', { type: textColumn, nullable: false })
-      .primaryKey(['id'])
-      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey'),  // Named FK
-  )
-  .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-  .model('Post', 'post', (m) => m.field('id', 'id').field('userId', 'userId').field('title', 'title'))
-  .foreignKeys({ constraints: true, indexes: false })  // Optional FK config
-  .build();
+const contract = defineContract({
+  family: sqlFamily,
+  target: postgresPack,
+  foreignKeyDefaults: { constraint: true, index: false },
+  models: {
+    // ...
+  },
+});
 ```
 
-#### Table Builder Methods
-
-The table builder supports the following constraint methods:
-
-| Method | Description |
-|--------|-------------|
-| `.primaryKey(columns, name?)` | Define primary key with optional name |
-| `.unique(columns, name?)` | Add unique constraint with optional name |
-| `.index(columns, name?)` | Add index with optional name |
-| `.foreignKey(columns, references, name?)` | Add foreign key with optional name |
-
-#### Contract-Level Foreign Key Configuration
-
-The builder supports a `.foreignKeys()` method to control FK constraint and index emission:
-
-```typescript
-const contract = defineContract<CodecTypes>()
-  .target(postgresPack)
-  // ...tables and models...
-  .foreignKeys({ constraints: true, indexes: false })  // Emit FK constraints but skip backing indexes
-  .build();
-```
-
-| Config | Default | Description |
-|--------|---------|-------------|
-| `constraints` | `true` | Emit `FOREIGN KEY` constraints in DDL |
-| `indexes` | `true` | Emit FK-backing indexes (e.g., `CREATE INDEX ... ON post (user_id)`) |
-
-When `.foreignKeys()` is not called, defaults to `{ constraints: true, indexes: true }`. See [ADR 161](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md).
+Per-FK overrides still live next to the FK authoring site, either via `constraints.foreignKey(...)` inside model `.sql(...)` or via `rel.belongsTo(...).sql({ fk: ... })`. See [ADR 161](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md).
 
 ### Validating Contracts
 
@@ -285,7 +236,7 @@ export default defineConfig({
 
 ## Dependencies
 
-- **`@prisma-next/contract-authoring`** - Target-agnostic builder core (builder state types, builder classes, type helpers)
+- **`@prisma-next/contract-authoring`** - Target-neutral authoring state and descriptor types
 - **`@prisma-next/contract`** - Core contract types (`ContractBase`)
 - **`@prisma-next/framework-components`** - Contract config types used by `typescriptContract` (via `./control`)
 - **`@prisma-next/sql-contract`** - SQL contract types (`SqlContract`, `SqlStorage`, `SqlModelStorage`)

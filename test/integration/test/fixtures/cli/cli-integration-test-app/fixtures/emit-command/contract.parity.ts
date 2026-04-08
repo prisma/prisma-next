@@ -1,7 +1,5 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import {
   boolColumn,
-  enumColumn,
   enumType,
   float8Column,
   int4Column,
@@ -9,75 +7,58 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-const emailColumn = {
-  codecId: 'pg/text@1',
-  nativeType: 'text',
-  typeRef: 'Email',
-} as const;
-
-export const contract = defineContract<CodecTypes>()
-  .target(postgresPack)
-  .storageType('Email', {
+const types = {
+  Email: {
     codecId: 'pg/text@1',
     nativeType: 'text',
     typeParams: {},
-  })
-  .storageType('Role', enumType('Role', ['USER', 'ADMIN']))
-  .table('user', (t) =>
-    t
-      .column('id', {
-        type: int4Column,
-        nullable: false,
-        default: { kind: 'function', expression: 'autoincrement()' },
-      })
-      .column('email', { type: emailColumn, nullable: false })
-      .unique(['email'])
-      .column('role', { type: enumColumn('Role', 'Role'), nullable: false })
-      .column('createdAt', {
-        type: timestamptzColumn,
-        nullable: false,
-        default: { kind: 'function', expression: 'now()' },
-      })
-      .column('isActive', {
-        type: boolColumn,
-        nullable: false,
-        default: { kind: 'literal', value: true },
-      })
-      .column('profile', { type: jsonbColumn, nullable: true })
-      .primaryKey(['id']),
-  )
-  .table('post', (t) =>
-    t
-      .column('id', {
-        type: int4Column,
-        nullable: false,
-        default: { kind: 'function', expression: 'autoincrement()' },
-      })
-      .column('userId', { type: int4Column, nullable: false })
-      .column('title', { type: textColumn, nullable: false })
-      .column('rating', { type: float8Column, nullable: true })
-      .index(['userId'])
-      .unique(['title', 'userId'])
-      .foreignKey(
-        ['userId'],
-        { table: 'user', columns: ['id'] },
-        { onDelete: 'cascade', onUpdate: 'cascade' },
-      )
-      .primaryKey(['id']),
-  )
-  .model('User', 'user', (m) =>
-    m
-      .field('id', 'id')
-      .field('email', 'email')
-      .field('role', 'role')
-      .field('createdAt', 'createdAt')
-      .field('isActive', 'isActive')
-      .field('profile', 'profile'),
-  )
-  .model('Post', 'post', (m) =>
-    m.field('id', 'id').field('userId', 'userId').field('title', 'title').field('rating', 'rating'),
-  )
-  .build();
+  },
+  Role: enumType('Role', ['USER', 'ADMIN']),
+} as const;
+
+const User = model('User', {
+  fields: {
+    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    email: field.namedType(types.Email).unique(),
+    role: field.namedType(types.Role),
+    createdAt: field.column(timestamptzColumn).defaultSql('now()'),
+    isActive: field.column(boolColumn).default(true),
+    profile: field.column(jsonbColumn).optional(),
+  },
+}).sql({ table: 'user' });
+
+const Post = model('Post', {
+  fields: {
+    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    userId: field.column(int4Column),
+    title: field.column(textColumn),
+    rating: field.column(float8Column).optional(),
+  },
+})
+  .attributes(({ fields, constraints }) => ({
+    uniques: [constraints.unique([fields.title, fields.userId])],
+  }))
+  .sql(({ cols, constraints }) => ({
+    table: 'post',
+    indexes: [constraints.index(cols.userId)],
+    foreignKeys: [
+      constraints.foreignKey(cols.userId, User.refs.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    ],
+  }));
+
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgresPack,
+  types,
+  models: {
+    User,
+    Post,
+  },
+});

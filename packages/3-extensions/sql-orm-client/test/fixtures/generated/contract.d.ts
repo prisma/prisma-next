@@ -26,7 +26,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:02cdff7f8d501bb78f0687a20ede35d9a7397239ea1bb503f1f58d035ad3cb72'>;
+  StorageHashBase<'sha256:8d1a3775ef861e96e34b97180819bca84f50a397346541915a1019f7e624eedf'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:e216decd356eea44980cf151c6044d85fb936e1fad093fbfb93ca34b96cf5847'>;
 export type ProfileHash =
@@ -170,9 +170,10 @@ type ContractBase = ContractType<
       readonly tags: {
         columns: {
           readonly id: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
+            readonly nativeType: 'character';
+            readonly codecId: 'sql/char@1';
             readonly nullable: false;
+            readonly typeParams: { readonly length: 36 };
           };
           readonly name: {
             readonly nativeType: 'text';
@@ -362,7 +363,7 @@ type ContractBase = ContractType<
       readonly relations: {
         readonly user: {
           readonly to: 'User';
-          readonly cardinality: '1:1';
+          readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
             readonly targetFields: readonly ['id'];
@@ -379,10 +380,7 @@ type ContractBase = ContractType<
         };
       };
       readonly fields: {
-        readonly id: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
+        readonly id: Char<36>;
         readonly name: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };

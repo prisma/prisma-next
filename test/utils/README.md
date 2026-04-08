@@ -82,7 +82,8 @@ Adapter-agnostic column type descriptors for test fixtures. These match common P
 ```typescript
 import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 import type { TargetPackRef } from '@prisma-next/contract/framework-components';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 
 const postgresPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
@@ -93,15 +94,18 @@ const postgresPack: TargetPackRef<'sql', 'postgres'> = {
   capabilities: {},
 };
 
-const contract = defineContract<Record<string, never>>()
-  .target(postgresPack)
-  .table('user', (t) =>
-    t
-      .column('id', { type: int4Column, nullable: false })
-      .column('email', { type: textColumn, nullable: false })
-      .primaryKey(['id']),
-  )
-  .build();
+const contract = defineContract({
+  family: sqlFamily,
+  target: postgresPack,
+  models: {
+    User: model('User', {
+      fields: {
+        id: field.column(int4Column).id(),
+        email: field.column(textColumn),
+      },
+    }).sql({ table: 'user' }),
+  },
+});
 ```
 
 **Note**: These descriptors are dependency-free and match the `ColumnTypeDescriptor` shape from `@prisma-next/contract-authoring`, but are defined locally to keep test-utils dependency-free.
@@ -312,4 +316,3 @@ import { loadContractFromDisk, emitAndVerifyContract } from './utils';
 - `./operation-descriptors`: Adapter-agnostic operation type descriptors for type-level test fixtures
 - `./timeouts`: Centralized timeout values (also available from main export)
 - `./typed-expectations`: Type-safe assertion helpers that wrap Vitest's `expect` API. **Must be imported from this path, not from the main export** (see "Vitest Import Pattern" above)
-
