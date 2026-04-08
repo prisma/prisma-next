@@ -119,14 +119,14 @@ header h1 {
   padding: 1rem 1.25rem;
 }
 
-.card-bug {
-  border-left: 3px solid var(--bug);
-  background: var(--bug-bg);
-}
-
-.card-feature {
+.card-article {
   border-left: 3px solid var(--feature);
   background: var(--feature-bg);
+}
+
+.card-tutorial {
+  border-left: 3px solid var(--low);
+  background: #111d15;
 }
 
 .card-header {
@@ -151,14 +151,32 @@ header h1 {
   flex-shrink: 0;
 }
 
-.type-bug {
-  background: var(--bug);
+.type-article {
+  background: var(--feature);
   color: white;
 }
 
-.type-feature {
-  background: var(--feature);
+.type-tutorial {
+  background: var(--low);
   color: white;
+}
+
+.card-summary {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+
+.badge-difficulty {
+  color: var(--medium);
+  border-color: color-mix(in srgb, var(--medium) 30%, transparent);
+  text-transform: capitalize;
+}
+
+.badge-duration {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 /* Badges */
