@@ -1,5 +1,8 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { PslAttribute, PslSpan } from '@prisma-next/psl-parser';
+import { getPositionalArgument, parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+
+export { getPositionalArgument, parseQuotedStringLiteral };
 
 export function lowerFirst(value: string): string {
   if (value.length === 0) return value;
@@ -16,15 +19,6 @@ export function getAttribute(
 export function getNamedArgument(attribute: PslAttribute, name: string): string | undefined {
   const entry = attribute.args.find((arg) => arg.kind === 'named' && arg.name === name);
   if (!entry || entry.kind !== 'named') {
-    return undefined;
-  }
-  return entry.value;
-}
-
-export function getPositionalArgument(attribute: PslAttribute, index = 0): string | undefined {
-  const entries = attribute.args.filter((arg) => arg.kind === 'positional');
-  const entry = entries[index];
-  if (!entry || entry.kind !== 'positional') {
     return undefined;
   }
   return entry.value;
@@ -50,17 +44,6 @@ export function unquoteStringLiteral(value: string): string {
   const match = trimmed.match(/^(['"])(.*)\1$/);
   if (!match) {
     return trimmed;
-  }
-  return match[2] ?? '';
-}
-
-export function parseQuotedStringLiteral(value: string): string | undefined {
-  const trimmed = value.trim();
-  // This intentionally accepts either '...' or "..." and relies on PSL's
-  // own string literal rules to disallow unescaped interior delimiters.
-  const match = trimmed.match(/^(['"])(.*)\1$/);
-  if (!match) {
-    return undefined;
   }
   return match[2] ?? '';
 }
