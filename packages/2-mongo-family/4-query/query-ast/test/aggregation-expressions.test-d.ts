@@ -147,13 +147,15 @@ test('rewrite returns MongoAggExpr', () => {
 
 test('MongoAggOperator.args accepts all three forms', () => {
   expectTypeOf<MongoAggOperator['args']>().toEqualTypeOf<
-    MongoAggExpr | ReadonlyArray<MongoAggExpr> | Readonly<Record<string, MongoAggExpr>>
+    | MongoAggExpr
+    | ReadonlyArray<MongoAggExpr>
+    | Readonly<Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>>>
   >();
 });
 
 test('MongoAggAccumulator.arg accepts MongoAggExpr, record, or null', () => {
   expectTypeOf<MongoAggAccumulator['arg']>().toEqualTypeOf<
-    MongoAggExpr | Readonly<Record<string, MongoAggExpr>> | null
+    MongoAggExpr | Readonly<Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>>> | null
   >();
 });
 

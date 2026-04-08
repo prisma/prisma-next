@@ -1,7 +1,7 @@
 import { MongoAstNode } from './ast-node';
 import type { MongoAggExprRewriter, MongoAggExprVisitor } from './visitors';
 
-export type AggRecordArgs = Readonly<Record<string, MongoAggExpr>>;
+export type AggRecordArgs = Readonly<Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>>>;
 
 export function isExprArray(
   args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | AggRecordArgs,
@@ -16,9 +16,13 @@ export function isRecordArgs(
 }
 
 function rewriteRecordArgs(record: AggRecordArgs, rewriter: MongoAggExprRewriter): AggRecordArgs {
-  const result: Record<string, MongoAggExpr> = {};
+  const result: Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>> = {};
   for (const [key, val] of Object.entries(record)) {
-    result[key] = val.rewrite(rewriter);
+    if (Array.isArray(val)) {
+      result[key] = val.map((v: MongoAggExpr) => v.rewrite(rewriter));
+    } else {
+      result[key] = (val as MongoAggExpr).rewrite(rewriter);
+    }
   }
   return result;
 }

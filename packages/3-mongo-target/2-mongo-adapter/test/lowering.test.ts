@@ -479,6 +479,16 @@ describe('lowerAggExpr', () => {
     });
   });
 
+  it('lowers record-arg operator with array values', () => {
+    const expr = MongoAggOperator.of('$zip', {
+      inputs: [MongoAggFieldRef.of('a'), MongoAggFieldRef.of('b')],
+      useLongestLength: MongoAggLiteral.of(true),
+    });
+    expect(lowerAggExpr(expr)).toEqual({
+      $zip: { inputs: ['$a', '$b'], useLongestLength: true },
+    });
+  });
+
   it('lowers record-arg accumulator', () => {
     const expr = MongoAggAccumulator.of('$topN', {
       output: MongoAggFieldRef.of('score'),

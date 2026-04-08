@@ -167,10 +167,16 @@ function lowerGroupId(groupId: MongoGroupId): unknown {
   return lowerExprRecord(groupId);
 }
 
-function lowerExprRecord(fields: Readonly<Record<string, MongoAggExpr>>): Record<string, unknown> {
+function lowerExprRecord(
+  fields: Readonly<Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>>>,
+): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(fields)) {
-    result[key] = lowerAggExpr(val);
+    if (Array.isArray(val)) {
+      result[key] = val.map((v: MongoAggExpr) => lowerAggExpr(v));
+    } else {
+      result[key] = lowerAggExpr(val as MongoAggExpr);
+    }
   }
   return result;
 }

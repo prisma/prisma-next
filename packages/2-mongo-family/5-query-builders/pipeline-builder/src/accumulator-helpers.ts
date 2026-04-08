@@ -1,5 +1,5 @@
 import type { MongoAggExpr } from '@prisma-next/mongo-query-ast';
-import { MongoAggAccumulator } from '@prisma-next/mongo-query-ast';
+import { MongoAggAccumulator, MongoAggLiteral } from '@prisma-next/mongo-query-ast';
 import type {
   ArrayField,
   DocField,
@@ -116,43 +116,57 @@ export const acc = {
 
   top(args: {
     output: TypedAggExpr<DocField>;
-    sortBy: TypedAggExpr<DocField>;
+    sortBy: Readonly<Record<string, 1 | -1>>;
   }): TypedAccumulatorExpr<DocField> {
     return {
       _field: undefined as never,
-      node: MongoAggAccumulator.of('$top', namedAccumulatorArgs(args)),
+      node: MongoAggAccumulator.of('$top', {
+        output: args.output.node,
+        sortBy: MongoAggLiteral.of(args.sortBy),
+      }),
     };
   },
 
   bottom(args: {
     output: TypedAggExpr<DocField>;
-    sortBy: TypedAggExpr<DocField>;
+    sortBy: Readonly<Record<string, 1 | -1>>;
   }): TypedAccumulatorExpr<DocField> {
     return {
       _field: undefined as never,
-      node: MongoAggAccumulator.of('$bottom', namedAccumulatorArgs(args)),
+      node: MongoAggAccumulator.of('$bottom', {
+        output: args.output.node,
+        sortBy: MongoAggLiteral.of(args.sortBy),
+      }),
     };
   },
 
   topN(args: {
     output: TypedAggExpr<DocField>;
-    sortBy: TypedAggExpr<DocField>;
+    sortBy: Readonly<Record<string, 1 | -1>>;
     n: TypedAggExpr<NumericField>;
   }): TypedAccumulatorExpr<ArrayField> {
     return {
       _field: undefined as never,
-      node: MongoAggAccumulator.of('$topN', namedAccumulatorArgs(args)),
+      node: MongoAggAccumulator.of('$topN', {
+        output: args.output.node,
+        sortBy: MongoAggLiteral.of(args.sortBy),
+        n: args.n.node,
+      }),
     };
   },
 
   bottomN(args: {
     output: TypedAggExpr<DocField>;
-    sortBy: TypedAggExpr<DocField>;
+    sortBy: Readonly<Record<string, 1 | -1>>;
     n: TypedAggExpr<NumericField>;
   }): TypedAccumulatorExpr<ArrayField> {
     return {
       _field: undefined as never,
-      node: MongoAggAccumulator.of('$bottomN', namedAccumulatorArgs(args)),
+      node: MongoAggAccumulator.of('$bottomN', {
+        output: args.output.node,
+        sortBy: MongoAggLiteral.of(args.sortBy),
+        n: args.n.node,
+      }),
     };
   },
 };
