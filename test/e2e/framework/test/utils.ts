@@ -6,6 +6,7 @@ import { type ControlClient, createControlClient } from '@prisma-next/cli/contro
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
+import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import sql from '@prisma-next/family-sql/control';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
@@ -193,8 +194,12 @@ export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
 
     await withClient(connectionString, async (client: Client) => {
       const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter);
-      const runtime = await createTestRuntimeFromClient(contract, client);
+      const context = createTestContext(contract, adapter, {
+        extensionPacks: [pgvectorRuntime],
+      });
+      const runtime = await createTestRuntimeFromClient(contract, client, {
+        extensionPacks: [pgvectorRuntime],
+      });
 
       try {
         const db = sqlBuilder<TContract>({ context });

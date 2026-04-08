@@ -23,6 +23,13 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           PRIMARY KEY ("id")
         );
 
+        CREATE TABLE "public"."embedding" (
+          "embedding" vector(1536) NOT NULL,
+          "id" SERIAL NOT NULL,
+          "profile" jsonb NOT NULL,
+          PRIMARY KEY ("id")
+        );
+
         CREATE TABLE "public"."event" (
           "created_at" timestamptz DEFAULT (now()) NOT NULL,
           "id" character(36) NOT NULL,

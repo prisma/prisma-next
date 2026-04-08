@@ -17,13 +17,28 @@ import {
   varcharColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import { vector } from '@prisma-next/extension-pgvector/column-types';
+import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { uuidv7 } from '@prisma-next/ids';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-const postgresCodecLookup = extractCodecLookup([postgresAdapter]);
+const postgresCodecLookup = extractCodecLookup([postgresAdapter, pgvectorPack]);
+
+const profileSchema = {
+  '~standard': {
+    jsonSchema: {
+      output: () => ({
+        type: 'object',
+        properties: { name: { type: 'string' }, age: { type: 'number' } },
+        required: ['name', 'age'],
+      }),
+    },
+  },
+  expression: '{ name: string; age: number }',
+};
 
 export const contract = defineContract({
   family: sqlFamily,
@@ -113,5 +128,13 @@ export const contract = defineContract({
         tags: field.column(jsonb()).default(['alpha', 'beta']),
       },
     }).sql({ table: 'literal_defaults' }),
+
+    Embedding: model('Embedding', {
+      fields: {
+        id: field.column(int4Column).defaultSql('autoincrement()').id(),
+        embedding: field.column(vector(1536)),
+        profile: field.column(jsonb(profileSchema)),
+      },
+    }).sql({ table: 'embedding' }),
   },
 });
