@@ -1,8 +1,22 @@
 # Operation Design: DDL Commands + Data-Driven Checks
 
+## Problem
+
+MongoDB migrations need to express three things for each schema change: what to check before mutating, what mutation to perform, and what to verify afterward. These operations must serialize to a self-describing JSON plan file (`ops.json`) that a generic runner can load and execute without any operation-specific dispatch logic.
+
+This spec defines the AST node vocabulary for MongoDB DDL commands, inspection commands, and check assertions — and how they compose into migration operations.
+
 ## Grounding example
 
-You add a unique index on `users.email`. The planner diffs the origin schema IR against the destination contract and produces a migration operation:
+Consider adding a unique index on `users.email`. Conceptually, the operation has three phases:
+
+1. **Precheck** — query the database to confirm the index doesn't already exist
+2. **Execute** — run the `createIndex` DDL command
+3. **Postcheck** — query the database to confirm the unique index now exists
+
+Each phase is expressed as data: the checks combine an inspection command (what to query), a filter expression (what to match in the results), and an expectation (should a match exist or not). The execute step wraps a DDL command AST node.
+
+In TypeScript:
 
 ```typescript
 const op: MongoMigrationPlanOperation = {
@@ -37,52 +51,50 @@ const op: MongoMigrationPlanOperation = {
 };
 ```
 
-The framework serializes the operation to `ops.json` via `JSON.stringify`. Every piece — the DDL command, the inspection commands, the filter expressions — is a frozen `MongoAstNode` with JSON-serializable properties. The output:
+Every piece — the DDL command, the inspection commands, the filter expressions — is a frozen `MongoAstNode` with JSON-serializable properties. `JSON.stringify(ops, null, 2)` produces the persisted format directly:
 
 ```json
-[
-  {
-    "id": "index.users.create(email:1)",
-    "label": "Create index on users (email ascending)",
-    "operationClass": "additive",
-    "precheck": [
-      {
-        "description": "index does not already exist",
-        "source": { "kind": "listIndexes", "collection": "users" },
-        "filter": { "kind": "field", "field": "key", "op": "$eq", "value": { "email": 1 } },
-        "expect": "notExists"
+{
+  "id": "index.users.create(email:1)",
+  "label": "Create index on users (email ascending)",
+  "operationClass": "additive",
+  "precheck": [
+    {
+      "description": "index does not already exist",
+      "source": { "kind": "listIndexes", "collection": "users" },
+      "filter": { "kind": "field", "field": "key", "op": "$eq", "value": { "email": 1 } },
+      "expect": "notExists"
+    }
+  ],
+  "execute": [
+    {
+      "description": "create index",
+      "command": {
+        "kind": "createIndex",
+        "collection": "users",
+        "keys": [{ "field": "email", "direction": 1 }],
+        "unique": true
       }
-    ],
-    "execute": [
-      {
-        "description": "create index",
-        "command": {
-          "kind": "createIndex",
-          "collection": "users",
-          "keys": [{ "field": "email", "direction": 1 }],
-          "unique": true
-        }
-      }
-    ],
-    "postcheck": [
-      {
-        "description": "unique index exists",
-        "source": { "kind": "listIndexes", "collection": "users" },
-        "filter": {
-          "kind": "and",
-          "exprs": [
-            { "kind": "field", "field": "key", "op": "$eq", "value": { "email": 1 } },
-            { "kind": "field", "field": "unique", "op": "$eq", "value": true }
-          ]
-        },
-        "expect": "exists"
-      }
-    ]
-  }
-]
+    }
+  ],
+  "postcheck": [
+    {
+      "description": "unique index exists",
+      "source": { "kind": "listIndexes", "collection": "users" },
+      "filter": {
+        "kind": "and",
+        "exprs": [
+          { "kind": "field", "field": "key", "op": "$eq", "value": { "email": 1 } },
+          { "kind": "field", "field": "unique", "op": "$eq", "value": true }
+        ]
+      },
+      "expect": "exists"
+    }
+  ]
+}
 ```
 
-At apply time, the runner loads `ops.json`, deserializes the command AST nodes, and executes them generically. No visitor dispatch on the operation — the runner iterates the `precheck`, `execute`, and `postcheck` arrays, executing each step through a command dispatcher. The plan file is completely self-describing.
+At apply time, the runner loads `ops.json`, deserializes the command AST nodes, and executes them generically — iterating the `precheck`, `execute`, and `postcheck` arrays through a command dispatcher. No visitor dispatch on the operation. The plan file is completely self-describing.
 
 ## Key decisions
 
@@ -92,9 +104,9 @@ At apply time, the runner loads `ops.json`, deserializes the command AST nodes, 
 
 3. **Filter expressions for checks.** Pre/postchecks use the existing `MongoFilterExpr` AST — the same filter expressions used in query `$match` stages. A client-side evaluator interprets them against inspection command results. This reuses the full filter vocabulary (`$eq`, `$and`, `$or`, `$not`, `$exists`, `$gt`, `$in`, etc.) without inventing a new check DSL.
 
-4. **Operations are data, not classes.** Migration operations have no `kind`, no visitor, no class hierarchy. They're plain data envelopes containing command and check arrays. The semantic richness lives in the commands and filter expressions inside, not in the operation wrapper.
-
 ## Operation structure
+
+The operation envelope is a plain data structure — no `kind` discriminant, no visitor, no class hierarchy. The semantic richness lives in the commands and filter expressions inside, not in the wrapper.
 
 ```typescript
 interface MongoMigrationCheck {
@@ -118,9 +130,9 @@ interface MongoMigrationPlanOperation extends MigrationPlanOperation {
 
 The three envelope fields (`id`, `label`, `operationClass`) satisfy the framework's `MigrationPlanOperation` interface, so the CLI and migration-tools code can work with these operations without knowing they're Mongo-specific.
 
-## DDL command AST
+## DDL commands
 
-DDL commands extend `MongoAstNode` — the same base class from `@prisma-next/mongo-query-ast`. Each command is a frozen, immutable, JSON-serializable data structure with a `kind` discriminant.
+DDL commands are the mutation primitives — they go in the `execute` array. Each extends `MongoAstNode` (the same base class from `@prisma-next/mongo-query-ast`), making them frozen, immutable, JSON-serializable data structures with a `kind` discriminant.
 
 ### M1: Index commands
 
@@ -213,7 +225,7 @@ type AnyMongoDdlCommand =
 
 ## Inspection commands
 
-Inspection commands are read-only AST nodes used in check assertions. They represent MongoDB introspection operations.
+Inspection commands are read-only AST nodes that appear as the `source` in check assertions. They represent MongoDB introspection operations — the runner executes them to produce a result set that checks filter against.
 
 ```typescript
 class ListIndexesCommand extends MongoAstNode {
@@ -245,11 +257,13 @@ Each inspection command has a known result document shape, enabling typed filter
 
 ## Check assertions
 
-Each check composes an inspection command with a `MongoFilterExpr` and an expectation:
+Checks are the glue between inspection commands and expectations. Each check composes three pieces:
 
 - **`source`**: which inspection command to run (e.g., `listIndexes('users')`)
-- **`filter`**: a filter expression applied to the results — reusing the existing `MongoFilterExpr` AST from `@prisma-next/mongo-query-ast`
+- **`filter`**: a `MongoFilterExpr` applied to the results — reusing the existing AST from `@prisma-next/mongo-query-ast`
 - **`expect`**: `'exists'` (at least one result matches) or `'notExists'` (no results match)
+
+This reuses the full filter vocabulary (`$eq`, `$and`, `$or`, `$not`, `$exists`, `$gt`, `$in`, etc.) rather than inventing a purpose-built check DSL. The filter expressions are the same `MongoFieldFilter`, `MongoAndExpr`, `MongoExistsExpr` etc. from the query AST.
 
 ### Check examples by operation
 
@@ -263,11 +277,9 @@ Each check composes an inspection command with a `MongoFilterExpr` and an expect
 | `createCollection(users)` | postcheck | `{ name: 'users' }` | `exists` |
 | `collMod(users, validator)` | postcheck | `{ name: 'users', options.validator.$jsonSchema: ... }` | `exists` |
 
-The filter expressions are the same `MongoFieldFilter`, `MongoAndExpr`, `MongoExistsExpr` etc. from the query AST — no new expression types needed.
-
 ## Operation identity
 
-Each operation has a deterministic `id` derived from its content, not from ordering or user input. The planner computes the ID from the operation's execute commands:
+Each operation needs a deterministic `id` so that the migration graph can track which operations have been applied. The ID is derived from the operation's content (its execute commands), not from ordering or user input:
 
 ```typescript
 function buildIndexOpId(
@@ -290,9 +302,9 @@ Examples:
 
 ### Write path
 
-The framework writes `ops.json` via `JSON.stringify(ops, null, 2)`. All components — DDL commands, inspection commands, filter expressions — are frozen `MongoAstNode` instances whose properties are JSON-serializable. `JSON.stringify` produces the persisted format directly.
+The grounding example above shows the serialized format. Because all components — DDL commands, inspection commands, filter expressions — are frozen `MongoAstNode` instances with JSON-serializable properties, `JSON.stringify(ops, null, 2)` produces the persisted format directly. No custom serializer is needed.
 
-The three envelope fields (`id`, `label`, `operationClass`) are validated by `@prisma-next/migration-tools` on read; the command and check content is opaque to the framework. This is the existing design — no changes needed.
+The three envelope fields (`id`, `label`, `operationClass`) are validated by `@prisma-next/migration-tools` on read; the command and check content is opaque to the framework.
 
 ### Attestation
 
@@ -300,13 +312,7 @@ The `migrationId` hash is computed over the full canonicalized ops array (sorted
 
 ### Read path (deserialization)
 
-When `migration apply` loads `ops.json`, it gets plain JSON objects. The runner needs:
-
-1. **DDL command AST nodes** — reconstructed from the `kind` discriminant in each `execute[].command`
-2. **Inspection command AST nodes** — reconstructed from the `kind` discriminant in each `check.source`
-3. **Filter expression AST nodes** — reconstructed from the `kind` discriminant in each `check.filter`
-
-A deserializer walks the JSON structure and reconstructs class instances:
+When `migration apply` loads `ops.json`, it gets plain JSON objects. The runner needs to reconstruct class instances from the `kind` discriminant in each node:
 
 ```typescript
 function deserializeMongoOp(json: Record<string, unknown>): MongoMigrationPlanOperation {
@@ -341,7 +347,7 @@ function deserializeCheck(json: Record<string, unknown>): MongoMigrationCheck {
 
 ## Deterministic index naming
 
-When creating an index, MongoDB auto-assigns a name if none is provided. For reproducibility and drop-by-name support, the planner assigns a deterministic name following the spirit of [ADR 009](../../../docs/architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md):
+MongoDB auto-assigns an index name if none is provided. For reproducibility and drop-by-name support, the planner assigns a deterministic name following the spirit of [ADR 009](../../../docs/architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md):
 
 ```typescript
 function defaultMongoIndexName(keys: ReadonlyArray<MongoIndexKey>): string {
