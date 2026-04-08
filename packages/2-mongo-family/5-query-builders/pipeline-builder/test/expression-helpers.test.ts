@@ -1,11 +1,38 @@
 import { isRecordArgs, MongoAggLiteral, MongoAggOperator } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { fn } from '../src/expression-helpers';
-import type { DocField, TypedAggExpr } from '../src/types';
+import type {
+  ArrayField,
+  DateField,
+  DocField,
+  NumericField,
+  StringField,
+  TypedAggExpr,
+} from '../src/types';
 
 const d: TypedAggExpr<DocField> = {
   _field: { codecId: 'mongo/string@1', nullable: false },
   node: MongoAggLiteral.of('x'),
+};
+
+const s: TypedAggExpr<StringField> = {
+  _field: { codecId: 'mongo/string@1', nullable: false } as StringField,
+  node: MongoAggLiteral.of('x'),
+};
+
+const n: TypedAggExpr<NumericField> = {
+  _field: { codecId: 'mongo/double@1', nullable: false } as NumericField,
+  node: MongoAggLiteral.of(1),
+};
+
+const dt: TypedAggExpr<DateField> = {
+  _field: { codecId: 'mongo/date@1', nullable: false } as DateField,
+  node: MongoAggLiteral.of('2024-01-01'),
+};
+
+const arr: TypedAggExpr<ArrayField> = {
+  _field: { codecId: 'mongo/array@1', nullable: false } as ArrayField,
+  node: MongoAggLiteral.of([]),
 };
 
 describe('expression helpers — unary', () => {
@@ -87,26 +114,27 @@ describe('expression helpers — positional multi-arg', () => {
 
 describe('expression helpers — named-args', () => {
   it.each([
-    ['dateToString', '$dateToString', { date: d, format: d }],
-    ['dateFromString', '$dateFromString', { dateString: d }],
-    ['dateDiff', '$dateDiff', { startDate: d, endDate: d, unit: d }],
-    ['dateAdd', '$dateAdd', { startDate: d, unit: d, amount: d }],
-    ['dateSubtract', '$dateSubtract', { startDate: d, unit: d, amount: d }],
-    ['dateTrunc', '$dateTrunc', { date: d, unit: d }],
-    ['trim', '$trim', { input: d }],
-    ['ltrim', '$ltrim', { input: d }],
-    ['rtrim', '$rtrim', { input: d }],
-    ['regexMatch', '$regexMatch', { input: d, regex: d }],
-    ['regexFind', '$regexFind', { input: d, regex: d }],
-    ['regexFindAll', '$regexFindAll', { input: d, regex: d }],
-    ['replaceOne', '$replaceOne', { input: d, find: d, replacement: d }],
-    ['replaceAll', '$replaceAll', { input: d, find: d, replacement: d }],
-    ['zip', '$zip', { inputs: d }],
-    ['convert', '$convert', { input: d, to: d }],
-    ['getField', '$getField', { field: d, input: d }],
-    ['setField', '$setField', { field: d, input: d, value: d }],
+    ['dateToString', '$dateToString', { date: dt, format: s }],
+    ['dateFromString', '$dateFromString', { dateString: s }],
+    ['dateDiff', '$dateDiff', { startDate: dt, endDate: dt, unit: s }],
+    ['dateAdd', '$dateAdd', { startDate: dt, unit: s, amount: n }],
+    ['dateSubtract', '$dateSubtract', { startDate: dt, unit: s, amount: n }],
+    ['dateTrunc', '$dateTrunc', { date: dt, unit: s }],
+    ['trim', '$trim', { input: s }],
+    ['ltrim', '$ltrim', { input: s }],
+    ['rtrim', '$rtrim', { input: s }],
+    ['regexMatch', '$regexMatch', { input: s, regex: s }],
+    ['regexFind', '$regexFind', { input: s, regex: s }],
+    ['regexFindAll', '$regexFindAll', { input: s, regex: s }],
+    ['replaceOne', '$replaceOne', { input: s, find: s, replacement: s }],
+    ['replaceAll', '$replaceAll', { input: s, find: s, replacement: s }],
+    ['zip', '$zip', { inputs: arr }],
+    ['convert', '$convert', { input: d, to: s }],
+    ['getField', '$getField', { field: s, input: d }],
+    ['setField', '$setField', { field: s, input: d, value: d }],
   ] as const)('fn.%s produces operator %s with record args containing correct keys', (helperName, expectedOp, args) => {
-    const helper = fn[helperName] as (
+    // narrowed signatures make the union incompatible with a generic Record parameter; cast through unknown
+    const helper = fn[helperName] as unknown as (
       a: Record<string, TypedAggExpr<DocField>>,
     ) => TypedAggExpr<DocField>;
     const result = helper(args);

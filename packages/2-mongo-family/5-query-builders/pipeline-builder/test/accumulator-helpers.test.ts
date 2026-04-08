@@ -1,11 +1,16 @@
 import { isRecordArgs, MongoAggAccumulator, MongoAggLiteral } from '@prisma-next/mongo-query-ast';
 import { describe, expect, it } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
-import type { DocField, TypedAggExpr } from '../src/types';
+import type { DocField, NumericField, TypedAggExpr } from '../src/types';
 
 const d: TypedAggExpr<DocField> = {
   _field: { codecId: 'mongo/string@1', nullable: false },
   node: MongoAggLiteral.of('x'),
+};
+
+const n: TypedAggExpr<NumericField> = {
+  _field: { codecId: 'mongo/double@1', nullable: false } as NumericField,
+  node: MongoAggLiteral.of(1),
 };
 
 describe('accumulator helpers — single-expr', () => {
@@ -22,16 +27,17 @@ describe('accumulator helpers — single-expr', () => {
 
 describe('accumulator helpers — named-args', () => {
   it.each([
-    ['firstN', '$firstN', { input: d, n: d }],
-    ['lastN', '$lastN', { input: d, n: d }],
-    ['maxN', '$maxN', { input: d, n: d }],
-    ['minN', '$minN', { input: d, n: d }],
+    ['firstN', '$firstN', { input: d, n }],
+    ['lastN', '$lastN', { input: d, n }],
+    ['maxN', '$maxN', { input: d, n }],
+    ['minN', '$minN', { input: d, n }],
     ['top', '$top', { output: d, sortBy: d }],
     ['bottom', '$bottom', { output: d, sortBy: d }],
-    ['topN', '$topN', { output: d, sortBy: d, n: d }],
-    ['bottomN', '$bottomN', { output: d, sortBy: d, n: d }],
+    ['topN', '$topN', { output: d, sortBy: d, n }],
+    ['bottomN', '$bottomN', { output: d, sortBy: d, n }],
   ] as const)('acc.%s produces accumulator %s with record arg containing correct keys', (helperName, expectedOp, args) => {
-    const helper = acc[helperName] as (a: Record<string, TypedAggExpr<DocField>>) => {
+    // narrowed signatures make the union incompatible with a generic Record parameter; cast through unknown
+    const helper = acc[helperName] as unknown as (a: Record<string, TypedAggExpr<DocField>>) => {
       node: MongoAggAccumulator;
     };
     const result = helper(args);
