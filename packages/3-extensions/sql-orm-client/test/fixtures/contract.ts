@@ -1,15 +1,9 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import { int4Column, jsonb, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
-import type { ColumnTypeDescriptor } from '@prisma-next/sql-contract/types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
-
-const jsonbColumn: ColumnTypeDescriptor = {
-  codecId: 'pg/jsonb@1',
-  nativeType: 'jsonb',
-};
 
 const baseContract = defineContract<CodecTypes>()
   .target(postgresPack)
@@ -20,7 +14,7 @@ const baseContract = defineContract<CodecTypes>()
       .column('name', { type: textColumn, nullable: false })
       .column('email', { type: textColumn, nullable: false })
       .column('invited_by_id', { type: int4Column, nullable: true })
-      .column('address', { type: jsonbColumn, nullable: true })
+      .column('address', { type: jsonb(), nullable: true })
       .primaryKey(['id'])
       .unique(['email'])
       .foreignKey(['invited_by_id'], { table: 'users', columns: ['id'] }),
