@@ -1,3 +1,4 @@
+import type { MongoAggExpr } from '@prisma-next/mongo-query-ast';
 import { MongoAggAccumulator } from '@prisma-next/mongo-query-ast';
 import type {
   ArrayField,
@@ -8,75 +9,122 @@ import type {
   TypedAggExpr,
 } from './types';
 
+function namedAccumulatorArgs(
+  args: Record<string, TypedAggExpr<DocField>>,
+): Record<string, MongoAggExpr> {
+  const result: Record<string, MongoAggExpr> = {};
+  for (const [key, val] of Object.entries(args)) {
+    result[key] = val.node;
+  }
+  return result;
+}
+
 export const acc = {
   sum(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<NumericField> {
-    return {
-      _field: undefined as never,
-      node: MongoAggAccumulator.sum(expr.node),
-    };
+    return { _field: undefined as never, node: MongoAggAccumulator.sum(expr.node) };
   },
 
   avg(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<NullableNumericField> {
-    return {
-      _field: undefined as never,
-      node: MongoAggAccumulator.avg(expr.node),
-    };
+    return { _field: undefined as never, node: MongoAggAccumulator.avg(expr.node) };
   },
 
   min<F extends DocField>(
     expr: TypedAggExpr<F>,
   ): TypedAccumulatorExpr<{ readonly codecId: F['codecId']; readonly nullable: true }> {
-    return {
-      _field: undefined as never,
-      node: MongoAggAccumulator.min(expr.node),
-    };
+    return { _field: undefined as never, node: MongoAggAccumulator.min(expr.node) };
   },
 
   max<F extends DocField>(
     expr: TypedAggExpr<F>,
   ): TypedAccumulatorExpr<{ readonly codecId: F['codecId']; readonly nullable: true }> {
-    return {
-      _field: undefined as never,
-      node: MongoAggAccumulator.max(expr.node),
-    };
+    return { _field: undefined as never, node: MongoAggAccumulator.max(expr.node) };
   },
 
   first<F extends DocField>(
     expr: TypedAggExpr<F>,
   ): TypedAccumulatorExpr<{ readonly codecId: F['codecId']; readonly nullable: true }> {
-    return {
-      _field: undefined as never,
-      node: MongoAggAccumulator.first(expr.node),
-    };
+    return { _field: undefined as never, node: MongoAggAccumulator.first(expr.node) };
   },
 
   last<F extends DocField>(
     expr: TypedAggExpr<F>,
   ): TypedAccumulatorExpr<{ readonly codecId: F['codecId']; readonly nullable: true }> {
-    return {
-      _field: undefined as never,
-      node: MongoAggAccumulator.last(expr.node),
-    };
+    return { _field: undefined as never, node: MongoAggAccumulator.last(expr.node) };
   },
 
   push(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<ArrayField> {
-    return {
-      _field: undefined as never,
-      node: MongoAggAccumulator.push(expr.node),
-    };
+    return { _field: undefined as never, node: MongoAggAccumulator.push(expr.node) };
   },
 
   addToSet(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<ArrayField> {
-    return {
-      _field: undefined as never,
-      node: MongoAggAccumulator.addToSet(expr.node),
-    };
+    return { _field: undefined as never, node: MongoAggAccumulator.addToSet(expr.node) };
   },
 
   count(): TypedAccumulatorExpr<NumericField> {
+    return { _field: undefined as never, node: MongoAggAccumulator.count() };
+  },
+
+  stdDevPop(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<NullableNumericField> {
+    return { _field: undefined as never, node: MongoAggAccumulator.stdDevPop(expr.node) };
+  },
+
+  stdDevSamp(expr: TypedAggExpr<DocField>): TypedAccumulatorExpr<NullableNumericField> {
+    return { _field: undefined as never, node: MongoAggAccumulator.stdDevSamp(expr.node) };
+  },
+
+  firstN(args: Record<string, TypedAggExpr<DocField>>): TypedAccumulatorExpr<ArrayField> {
     return {
       _field: undefined as never,
-      node: MongoAggAccumulator.count(),
+      node: MongoAggAccumulator.of('$firstN', namedAccumulatorArgs(args)),
+    };
+  },
+
+  lastN(args: Record<string, TypedAggExpr<DocField>>): TypedAccumulatorExpr<ArrayField> {
+    return {
+      _field: undefined as never,
+      node: MongoAggAccumulator.of('$lastN', namedAccumulatorArgs(args)),
+    };
+  },
+
+  maxN(args: Record<string, TypedAggExpr<DocField>>): TypedAccumulatorExpr<ArrayField> {
+    return {
+      _field: undefined as never,
+      node: MongoAggAccumulator.of('$maxN', namedAccumulatorArgs(args)),
+    };
+  },
+
+  minN(args: Record<string, TypedAggExpr<DocField>>): TypedAccumulatorExpr<ArrayField> {
+    return {
+      _field: undefined as never,
+      node: MongoAggAccumulator.of('$minN', namedAccumulatorArgs(args)),
+    };
+  },
+
+  top(args: Record<string, TypedAggExpr<DocField>>): TypedAccumulatorExpr<DocField> {
+    return {
+      _field: undefined as never,
+      node: MongoAggAccumulator.of('$top', namedAccumulatorArgs(args)),
+    };
+  },
+
+  bottom(args: Record<string, TypedAggExpr<DocField>>): TypedAccumulatorExpr<DocField> {
+    return {
+      _field: undefined as never,
+      node: MongoAggAccumulator.of('$bottom', namedAccumulatorArgs(args)),
+    };
+  },
+
+  topN(args: Record<string, TypedAggExpr<DocField>>): TypedAccumulatorExpr<ArrayField> {
+    return {
+      _field: undefined as never,
+      node: MongoAggAccumulator.of('$topN', namedAccumulatorArgs(args)),
+    };
+  },
+
+  bottomN(args: Record<string, TypedAggExpr<DocField>>): TypedAccumulatorExpr<ArrayField> {
+    return {
+      _field: undefined as never,
+      node: MongoAggAccumulator.of('$bottomN', namedAccumulatorArgs(args)),
     };
   },
 };
