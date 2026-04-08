@@ -410,6 +410,36 @@ type ContractBase = ContractType<
       };
       readonly relations: {};
     };
+    readonly ParamTypes: {
+      readonly storage: {
+        readonly table: 'param_types';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly name: { readonly column: 'name' };
+          readonly code: { readonly column: 'code' };
+          readonly price: { readonly column: 'price' };
+          readonly flags: { readonly column: 'flags' };
+          readonly bits: { readonly column: 'bits' };
+          readonly createdAt: { readonly column: 'created_at' };
+          readonly startsAt: { readonly column: 'starts_at' };
+          readonly startsAtTz: { readonly column: 'starts_at_tz' };
+          readonly duration: { readonly column: 'duration' };
+        };
+      };
+      readonly fields: {
+        readonly id: { readonly codecId: 'pg/int4@1'; readonly nullable: false };
+        readonly name: Varchar<255> | null;
+        readonly code: Char<16> | null;
+        readonly price: Numeric<10, 2> | null;
+        readonly flags: Bit<8> | null;
+        readonly bits: VarBit<12> | null;
+        readonly createdAt: Timestamptz<3> | null;
+        readonly startsAt: Time<2> | null;
+        readonly startsAtTz: Timetz<2> | null;
+        readonly duration: Interval<6> | null;
+      };
+      readonly relations: {};
+    };
     readonly Post: {
       readonly storage: {
         readonly table: 'post';
@@ -419,6 +449,7 @@ type ContractBase = ContractType<
           readonly title: { readonly column: 'title' };
           readonly createdAt: { readonly column: 'created_at' };
           readonly updatedAt: { readonly column: 'update_at' };
+          readonly published: { readonly column: 'published' };
           readonly meta: { readonly column: 'meta' };
         };
       };
@@ -428,6 +459,7 @@ type ContractBase = ContractType<
         readonly title: { readonly codecId: 'pg/text@1'; readonly nullable: false };
         readonly createdAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: false };
         readonly updatedAt: { readonly codecId: 'pg/timestamptz@1'; readonly nullable: true };
+        readonly published: { readonly codecId: 'pg/bool@1'; readonly nullable: false };
         readonly meta: { readonly codecId: 'pg/json@1'; readonly nullable: true };
       };
       readonly relations: {};
@@ -460,6 +492,7 @@ type ContractBase = ContractType<
     readonly user: 'User';
     readonly post: 'Post';
     readonly comment: 'Comment';
+    readonly param_types: 'ParamTypes';
     readonly event: 'Event';
     readonly literal_defaults: 'LiteralDefaults';
   };

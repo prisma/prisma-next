@@ -230,6 +230,7 @@ function buildContractFromDsl<Definition extends ContractInput>(
 ): SqlContractResult<Definition> {
   return buildSqlContractFromSemanticDefinition(
     buildSemanticContractDefinition(definition),
+    definition.codecLookup,
   ) as unknown as SqlContractResult<Definition>;
 }
 
@@ -642,6 +643,7 @@ type ContractDefinition<
   readonly capabilities?: Capabilities;
   readonly types?: Types;
   readonly models?: Models;
+  readonly codecLookup?: CodecLookup;
 };
 
 type ContractScaffold<
@@ -660,6 +662,7 @@ type ContractScaffold<
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly capabilities?: Capabilities;
+  readonly codecLookup?: CodecLookup;
 };
 
 type ContractFactory<

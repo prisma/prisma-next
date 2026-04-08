@@ -9,6 +9,7 @@ import type {
 } from '@prisma-next/contract-authoring';
 import type { AuthoringFieldPresetDescriptor } from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringFieldPreset } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   ExtensionPackRef,
   FamilyPackRef,
@@ -1183,6 +1184,7 @@ export type ContractInput<
   readonly capabilities?: Capabilities;
   readonly types?: Types;
   readonly models?: Models;
+  readonly codecLookup?: CodecLookup;
 };
 
 export function model<

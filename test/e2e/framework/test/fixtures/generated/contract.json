@@ -7,6 +7,7 @@
     "comment": "Comment",
     "event": "Event",
     "literal_defaults": "LiteralDefaults",
+    "param_types": "ParamTypes",
     "post": "Post",
     "user": "User"
   },
@@ -160,6 +161,86 @@
         "table": "literal_defaults"
       }
     },
+    "ParamTypes": {
+      "fields": {
+        "bits": {
+          "codecId": "pg/varbit@1",
+          "nullable": true
+        },
+        "code": {
+          "codecId": "sql/char@1",
+          "nullable": true
+        },
+        "createdAt": {
+          "codecId": "pg/timestamptz@1",
+          "nullable": true
+        },
+        "duration": {
+          "codecId": "pg/interval@1",
+          "nullable": true
+        },
+        "flags": {
+          "codecId": "pg/bit@1",
+          "nullable": true
+        },
+        "id": {
+          "codecId": "pg/int4@1",
+          "nullable": false
+        },
+        "name": {
+          "codecId": "sql/varchar@1",
+          "nullable": true
+        },
+        "price": {
+          "codecId": "pg/numeric@1",
+          "nullable": true
+        },
+        "startsAt": {
+          "codecId": "pg/time@1",
+          "nullable": true
+        },
+        "startsAtTz": {
+          "codecId": "pg/timetz@1",
+          "nullable": true
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "bits": {
+            "column": "bits"
+          },
+          "code": {
+            "column": "code"
+          },
+          "createdAt": {
+            "column": "created_at"
+          },
+          "duration": {
+            "column": "duration"
+          },
+          "flags": {
+            "column": "flags"
+          },
+          "id": {
+            "column": "id"
+          },
+          "name": {
+            "column": "name"
+          },
+          "price": {
+            "column": "price"
+          },
+          "startsAt": {
+            "column": "starts_at"
+          },
+          "startsAtTz": {
+            "column": "starts_at_tz"
+          }
+        },
+        "table": "param_types"
+      }
+    },
     "Post": {
       "fields": {
         "createdAt": {
@@ -173,6 +254,10 @@
         "meta": {
           "codecId": "pg/json@1",
           "nullable": true
+        },
+        "published": {
+          "codecId": "pg/bool@1",
+          "nullable": false
         },
         "title": {
           "codecId": "pg/text@1",
@@ -198,6 +283,9 @@
           },
           "meta": {
             "column": "meta"
+          },
+          "published": {
+            "column": "published"
           },
           "title": {
             "column": "title"
