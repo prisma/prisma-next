@@ -120,8 +120,9 @@ Many of the missing operators use **named arguments** (e.g. `{ $dateToString: { 
 
 ## Known gaps
 
-- **`fn.literal` accepts `unknown`**: The `value` parameter is untyped, so `fn.literal<StringField>(42)` compiles without error. There is no constraint that the runtime value matches the codec implied by `F`. This is the main remaining hole in the type safety story.
-- **Accumulator output type precision**: `$sum` on an integer field returns `NumericField` (`mongo/double@1`) rather than preserving the input's integer codec. All numeric accumulators default to `double`.
+None. All originally-identified gaps have been addressed:
+- `fn.literal` now uses overloaded signatures and `LiteralValue<F>` to constrain values to match their field type.
+- `acc.sum` is now generic, preserving the input field's codec type.
 
 # Acceptance Criteria
 
@@ -184,4 +185,4 @@ No change from existing data access patterns.
 1. ~~**Namespace structure**~~ — Flat. `fn.year()`, `fn.substr()`, not `fn.date.year()`.
 2. ~~**Scope**~~ — All operators listed in the Linear ticket, except `$accumulator` (custom JS).
 3. ~~**Named-args operator representation**~~ — Extend `MongoAggOperator` and `MongoAggAccumulator` to support `Record<string, MongoAggExpr>` as args. Scalar options wrapped as `MongoAggLiteral`.
-4. ~~**Accumulator precision refinement**~~ — Not addressed. Listed as a known gap above.
+4. ~~**Accumulator precision refinement**~~ — Addressed. `acc.sum` is now generic, preserving the input field's codec type.

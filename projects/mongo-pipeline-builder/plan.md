@@ -44,7 +44,7 @@ Build the fluent `PipelineBuilder<TContract, DocShape>` that tracks document sha
 - **Entry point:** `mongoPipeline<Contract>({ contractJson }).from('collectionName')` — a one-liner root constructor, analogous to `postgres<Contract>({ contractJson })`. Sufficient for this branch; a convenience function that wires builder + runtime is a later concern.
 - **Flat fields only.** `FieldProxy` and `FilterProxy` support top-level field access. Nested/dot-path access (ADR 180) deferred until value objects land.
 - **Starter expression helpers.** Arithmetic, `$concat`, `$cond`, `$literal`, `$toLower`/`$toUpper`, `$size`. Full operator coverage is a follow-up: [TML-2217](https://linear.app/prisma-company/issue/TML-2217).
-- **Accumulator output types default to `'double'`.** Precision refinement deferred to [TML-2217](https://linear.app/prisma-company/issue/TML-2217).
+- **Accumulator output types default to `'double'`.** Precision refinement addressed in [TML-2217](https://linear.app/prisma-company/issue/TML-2217) — `acc.sum` is now generic, preserving input codec type.
 
 **Worked example — type safety through shape transformations:**
 
@@ -138,7 +138,7 @@ Complete AST coverage for all MongoDB pipeline stages, add pipeline-style update
 
 ### Follow-up: Complete expression and accumulator helpers ([TML-2217](https://linear.app/prisma-company/issue/TML-2217))
 
-Expand `ExpressionHelpers` and `AccumulatorHelpers` to cover the full MongoDB aggregation operator set. TML-2211 ships with a starter set; this ticket fills in the long tail (date, string, array, set, type, object, comparison operators; additional accumulators). Known gaps remaining after this ticket: `fn.literal` accepts `unknown` (no codec input type validation), accumulator output type precision defaults to `double`.
+Expand `ExpressionHelpers` and `AccumulatorHelpers` to cover the full MongoDB aggregation operator set. TML-2211 ships with a starter set; this ticket fills in the long tail (date, string, array, set, type, object, comparison operators; additional accumulators; `fn.literal` type safety; `acc.sum` codec preservation).
 
 ### Close-out
 
@@ -176,7 +176,7 @@ Expand `ExpressionHelpers` and `AccumulatorHelpers` to cover the full MongoDB ag
 1. ~~**Builder entry point**~~ — **Resolved.** Separate root constructor: `mongoPipeline<Contract>({ contractJson })`. Not on `MongoOrmClient`. Analogous to `postgres<Contract>({ contractJson })`.
 2. ~~**Nested field access in FieldProxy**~~ — **Resolved.** Flat fields only for now. Deep/dot-path access deferred until value objects land (ADR 180).
 3. ~~**Expression helper coverage**~~ — **Resolved.** Starter set in TML-2211. Full coverage tracked as [TML-2217](https://linear.app/prisma-company/issue/TML-2217).
-4. ~~**Accumulator output type precision**~~ — **Known gap.** Defaults to `'double'`. Not addressed in TML-2217. Tracked as a known gap in the [task spec](specs/expression-accumulator-helpers.spec.md#known-gaps).
+4. ~~**Accumulator output type precision**~~ — **Resolved.** `acc.sum` is now generic, preserving input codec type. `avg`/`stdDev*` remain as double (correct for MongoDB).
 
 ## Open Items
 
