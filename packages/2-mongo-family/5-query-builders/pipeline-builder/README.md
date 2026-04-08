@@ -65,10 +65,33 @@ const plan = p
 | `sortByCount(fn)` | Replaces shape with `{ _id, count }` |
 | `pipe(stage)` | Escape hatch — preserves or asserts new shape |
 
-### Helpers
+### Expression helpers (`fn`)
 
-- **`fn`** — Expression helpers: `add`, `subtract`, `multiply`, `divide`, `concat`, `toLower`, `toUpper`, `size`, `cond`, `literal`
-- **`acc`** — Accumulator helpers: `sum`, `avg`, `min`, `max`, `first`, `last`, `push`, `addToSet`, `count`
+| Category | Helpers |
+|----------|---------|
+| Arithmetic | `add`, `subtract`, `multiply`, `divide` |
+| String | `concat`, `toLower`, `toUpper`, `substr`, `substrBytes`, `trim`, `ltrim`, `rtrim`, `split`, `strLenCP`, `strLenBytes`, `replaceOne`, `replaceAll` |
+| Regex | `regexMatch`, `regexFind`, `regexFindAll` |
+| Date | `year`, `month`, `dayOfMonth`, `hour`, `minute`, `second`, `millisecond`, `dateToString`, `dateFromString`, `dateDiff`, `dateAdd`, `dateSubtract`, `dateTrunc` |
+| Comparison | `cmp`, `eq`, `ne`, `gt`, `gte`, `lt`, `lte` |
+| Array | `size`, `arrayElemAt`, `concatArrays`, `firstElem`, `lastElem`, `isIn`, `indexOfArray`, `isArray`, `reverseArray`, `slice`, `zip`, `range` |
+| Set | `setUnion`, `setIntersection`, `setDifference`, `setEquals`, `setIsSubset`, `anyElementTrue`, `allElementsTrue` |
+| Type | `typeOf`, `convert`, `toInt`, `toLong`, `toDouble`, `toDecimal`, `toString_`, `toObjectId`, `toBool`, `toDate` |
+| Object | `objectToArray`, `arrayToObject`, `getField`, `setField` |
+| Control flow | `cond`, `literal` |
+
+Named-argument operators (e.g. `dateToString`, `trim`, `regexMatch`) accept a record of `TypedAggExpr` values. Scalar options like format strings or unit names should be passed via `fn.literal(...)`.
+
+### Accumulator helpers (`acc`)
+
+| Category | Helpers |
+|----------|---------|
+| Basic | `sum`, `avg`, `min`, `max`, `first`, `last`, `push`, `addToSet`, `count` |
+| Deviation | `stdDevPop`, `stdDevSamp` |
+| N-variant | `firstN`, `lastN`, `maxN`, `minN` |
+| Top/bottom | `top`, `bottom`, `topN`, `bottomN` |
+
+N-variant and top/bottom accumulators accept a record of `TypedAggExpr` values (e.g. `{ input, n }` or `{ output, sortBy, n }`).
 
 ### Terminal
 
