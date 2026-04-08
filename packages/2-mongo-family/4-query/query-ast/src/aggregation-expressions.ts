@@ -1,15 +1,15 @@
 import { MongoAstNode } from './ast-node';
 import type { MongoAggExprRewriter, MongoAggExprVisitor } from './visitors';
 
-type AggRecordArgs = Readonly<Record<string, MongoAggExpr>>;
+export type AggRecordArgs = Readonly<Record<string, MongoAggExpr>>;
 
-function isExprArray(
+export function isExprArray(
   args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | AggRecordArgs,
 ): args is ReadonlyArray<MongoAggExpr> {
   return Array.isArray(args);
 }
 
-function isRecordArgs(
+export function isRecordArgs(
   args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | AggRecordArgs,
 ): args is AggRecordArgs {
   return !Array.isArray(args) && typeof args === 'object' && !('accept' in args);
