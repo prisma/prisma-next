@@ -42,6 +42,7 @@
   "exports": {
     "./config-types": "./dist/config-types.mjs",
     "./contract-builder": "./dist/contract-builder.mjs",
+    "./schema-sql": "./schemas/data-contract-sql-v1.json",
     "./package.json": "./package.json"
   },
   "repository": {
