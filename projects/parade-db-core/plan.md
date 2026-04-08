@@ -21,7 +21,7 @@ Implement the contract authoring foundation for ParadeDB BM25 full-text search i
   - Add `using?: IndexAccessMethod` to `Index`
   - Add `Bm25FieldConfig` type with `column?`, `expression?`, `tokenizer`, `tokenizerParams`, `alias`
   - Add `keyField?: string` and `fieldConfigs?: readonly Bm25FieldConfig[]` to `Index`
-- [ ] **1.2** Add `IndexDef` extensions in `packages/1-framework/2-authoring/contract/src/builder-state.ts`
+- [ ] **1.2** Add `IndexDef` extensions in `packages/1-framework/2-authoring/contract/src/descriptors.ts`
   - Mirror the IR changes in the builder state types
 - [ ] **1.3** Add factory functions in `packages/2-sql/1-core/contract/src/factories.ts`
   - `bm25Index(opts)` — creates an `Index` with `using: 'bm25'`

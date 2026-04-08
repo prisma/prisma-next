@@ -284,7 +284,7 @@ packages/
       execution-plane/   # execution plane types
       operations/        # target-neutral operation registry + helpers
     2-authoring/
-      contract/          # TS builders, canonicalization, schema DSL
+      contract/          # shared authored storage descriptor types
     3-tooling/
       cli/               # framework CLI (config-only, family-agnostic)
       emitter/           # contract emitter with family hooks

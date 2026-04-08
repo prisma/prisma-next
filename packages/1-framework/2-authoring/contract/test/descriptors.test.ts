@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ColumnTypeDescriptor, ForeignKeyDefaultsState } from '../src';
 
-describe('builder-state exports', () => {
+describe('descriptor exports', () => {
   it('keeps column descriptors as plain data', () => {
     const descriptor: ColumnTypeDescriptor = {
       codecId: 'pg/text@1',
