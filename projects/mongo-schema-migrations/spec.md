@@ -42,7 +42,15 @@ Define the SPI first, then build a thin slice through every layer proving the fu
 
 **Schema IR:**
 
-5. **Define `MongoSchemaIR` as a proper AST with classes.** The representation of "current database state" for diffing — what indexes exist on which collections. Analogous to `SqlSchemaIR`. Follow the `MongoAstNode` pattern from `@prisma-next/mongo-query-ast`: abstract base class with `kind` discriminant and `freeze()`, concrete classes per node type (`MongoSchemaCollection`, `MongoSchemaIndex`), and union types for matching. Start with indexes only.
+5. **Define `MongoSchemaIR` as a proper AST with classes.** The representation of "current database state" for diffing — what indexes exist on which collections. Analogous to `SqlSchemaIR` but following the class-based AST pattern proven in the SQL query AST (`AstNode`), Mongo pipeline AST (`MongoAstNode` / `MongoStageNode`), and Mongo expression AST (`MongoAggExprNode`):
+
+   - **Base class** with abstract `kind` discriminant and `freeze()` for immutability (following `MongoAstNode`)
+   - **Intermediate abstract class** (e.g. `MongoSchemaNode`) where traversal or visitor dispatch is needed, defining `accept(visitor)` and optionally `rewrite(rewriter)`
+   - **Concrete frozen classes** per node type (`MongoSchemaCollection`, `MongoSchemaIndex`, and later `MongoSchemaValidator`, `MongoSchemaCollectionOptions`), each with `readonly kind = '...' as const`, constructor + `freeze()`
+   - **Union types** for matching: `type AnyMongoSchemaNode = MongoSchemaCollection | MongoSchemaIndex | ...`
+   - **Visitor interface** with one method per concrete node type for double dispatch (e.g. `MongoSchemaVisitor<R>` with `collection(node)`, `index(node)`)
+
+   Start with indexes only; the AST grows as M2 adds validators and collection options.
 
 6. **Implement `contractToSchema` for the Mongo target.** Synthesize a `MongoSchemaIR` from a prior contract for offline planning. When the prior contract is `null` (new project), return an empty IR.
 
@@ -50,7 +58,14 @@ Define the SPI first, then build a thin slice through every layer proving the fu
 
 7. **Implement `MongoMigrationPlanner`.** Diff desired contract state against current `MongoSchemaIR`. For the vertical slice: generate `createIndex` / `dropIndex` operations for added/removed indexes. Classify as `additive` or `destructive`.
 
-8. **Define `MongoMigrationPlanOperation` using the AST class pattern.** The Mongo-specific operation shape, following the same `MongoAstNode` pattern as the schema IR and query AST. Concrete classes per operation kind (`CreateIndexOp`, `DropIndexOp`), extending a common base with the `MigrationPlanOperation` envelope fields (`id`, `label`, `operationClass`). Carries the MongoDB command representation. Analogous to `SqlMigrationPlanOperation`.
+8. **Define `MongoMigrationPlanOperation` using the AST class pattern.** The Mongo-specific operation shape, following the same class-based AST pattern as the schema IR and query ASTs:
+
+   - **Abstract base class** `MongoMigrationOp` with `kind` discriminant, `freeze()`, and the `MigrationPlanOperation` envelope fields (`id`, `label`, `operationClass`)
+   - **Concrete frozen classes** per operation kind: `CreateIndexOp`, `DropIndexOp` (M1); `CreateCollectionOp`, `UpdateValidatorOp`, `UpdateCollectionOptionsOp`, `DropCollectionOp` (M2)
+   - **Union type**: `AnyMongoMigrationOp = CreateIndexOp | DropIndexOp | ...`
+   - **Visitor interface** `MongoMigrationOpVisitor<R>` with one method per operation type — the runner dispatches via `accept(visitor)` rather than switching on `kind`
+
+   Analogous to `SqlMigrationPlanOperation` but with the structural discipline of the query ASTs.
 
 **Runner + wiring:**
 
