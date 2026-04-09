@@ -61,6 +61,8 @@ flowchart LR
 
 Direct imports expose the base structural helpers. Use this surface when you want to author with explicit column descriptors, explicit generators, or named storage types.
 
+Built-in ID helpers from `@prisma-next/ids` already return the generated-field spec accepted by `field.generated(...)`, so `field.generated(uuidv4())` is a valid structural DSL call.
+
 ```typescript
 import { textColumn, timestamptzColumn } from '@prisma-next/adapter-postgres/column-types';
 import sqlFamily from '@prisma-next/family-sql/pack';
@@ -193,7 +195,7 @@ const Membership = model('Membership', {
 - Callback helper presets: `field.id.uuidv4()`, `field.id.uuidv7()`, `field.id.nanoid({ size })`, `field.uuid()`, `field.text()`, `field.timestamp()`, `field.createdAt()`, and `type.*`
 - Keep field-local and FK-local storage overrides next to the authoring site with `field.sql(...)` and `rel.belongsTo(...).sql({ fk })`
 - Prefer typed local refs such as `field.namedType(types.Role)`, `User.refs.id`, and `User.ref('id')` when those tokens are available
-- See [DEVELOPING.md](./DEVELOPING.md#validation-and-warnings) for duplicate-name validation rules and typed-fallback warning behavior
+- See [API.md](./API.md) for generated-field spec semantics, validation rules, and typed-reference warning behavior
 
 ### Foreign Key Defaults
 
