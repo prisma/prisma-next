@@ -66,7 +66,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('insert into users ... returning *'),
-      tableName: 'users',
+
       modelName: 'User',
       includes: [],
       hiddenColumns: ['email'],
@@ -90,7 +90,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime: runtimeWithConnection,
       compiled: makeCompiled('update users set ... returning *'),
-      tableName: 'users',
+
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: [],
@@ -113,7 +113,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
-      tableName: 'users',
+
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: ['email'],
@@ -141,7 +141,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
-      tableName: 'users',
+
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: [],
@@ -167,7 +167,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('delete from users returning *'),
-      tableName: 'users',
+
       modelName: 'User',
       includes: [],
       hiddenColumns: ['email'],
@@ -187,7 +187,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
-      tableName: 'users',
+
       modelName: 'User',
       includes: [],
       hiddenColumns: ['email'],
@@ -207,7 +207,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
-      tableName: 'users',
+
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: [],
@@ -235,7 +235,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime: runtimeWithConnection,
       compiled: makeCompiled('update users set ... returning *'),
-      tableName: 'users',
+
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: ['email'],
@@ -263,7 +263,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
-      tableName: 'users',
+
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: [],
