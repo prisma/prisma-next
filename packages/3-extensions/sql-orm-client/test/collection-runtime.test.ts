@@ -11,8 +11,7 @@ import {
   mapStorageRowToModelFields,
   stripHiddenMappedFields,
 } from '../src/collection-runtime';
-import type { TestContract } from './helpers';
-import { getTestContract } from './helpers';
+import { buildMixedPolyContract, getTestContract } from './helpers';
 
 describe('collection-runtime', () => {
   const contract = getTestContract();
@@ -161,77 +160,9 @@ describe('collection-runtime', () => {
   });
 });
 
-function buildPolyContract(): TestContract {
-  const base = getTestContract();
-  const raw = JSON.parse(JSON.stringify(base));
-
-  raw.models.Task = {
-    fields: {
-      id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
-      title: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
-      type: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
-    },
-    relations: {},
-    storage: {
-      table: 'tasks',
-      fields: {
-        id: { column: 'id' },
-        title: { column: 'title' },
-        type: { column: 'type' },
-      },
-    },
-    discriminator: { field: 'type' },
-    variants: { Bug: { value: 'bug' }, Feature: { value: 'feature' } },
-  };
-
-  raw.models.Bug = {
-    fields: {
-      severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
-    },
-    relations: {},
-    storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
-    base: 'Task',
-  };
-
-  raw.models.Feature = {
-    fields: {
-      priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
-    },
-    relations: {},
-    storage: { table: 'features', fields: { priority: { column: 'priority' } } },
-    base: 'Task',
-  };
-
-  raw.storage.tables.tasks = {
-    columns: {
-      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-      type: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-      severity: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-    },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  raw.storage.tables.features = {
-    columns: {
-      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-    },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  return raw as TestContract;
-}
-
 describe('mapPolymorphicRow()', () => {
   it('maps STI Bug row: includes base + Bug fields, excludes Feature fields', () => {
-    const contract = buildPolyContract();
+    const contract = buildMixedPolyContract();
     const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
 
     const row = { id: 1, title: 'Crash', type: 'bug', severity: 'critical' };
@@ -241,7 +172,7 @@ describe('mapPolymorphicRow()', () => {
   });
 
   it('maps STI row and strips non-matching variant columns (NULL for other STI variants)', () => {
-    const contract = buildPolyContract();
+    const contract = buildMixedPolyContract();
     const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
 
     const row = { id: 1, title: 'Crash', type: 'bug', severity: 'critical', priority: null };
@@ -252,7 +183,7 @@ describe('mapPolymorphicRow()', () => {
   });
 
   it('maps MTI Feature row: includes base + Feature fields', () => {
-    const contract = buildPolyContract();
+    const contract = buildMixedPolyContract();
     const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
 
     const row = { id: 2, title: 'Dark mode', type: 'feature', severity: null, priority: 1 };
@@ -263,7 +194,7 @@ describe('mapPolymorphicRow()', () => {
   });
 
   it('maps row with known variant using variantName override', () => {
-    const contract = buildPolyContract();
+    const contract = buildMixedPolyContract();
     const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
 
     const row = { id: 1, title: 'Crash', type: 'bug', severity: 'high' };
@@ -273,7 +204,7 @@ describe('mapPolymorphicRow()', () => {
   });
 
   it('falls back to base-only mapping for unknown discriminator values', () => {
-    const contract = buildPolyContract();
+    const contract = buildMixedPolyContract();
     const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
 
     const row = { id: 3, title: 'Unknown', type: 'epic', severity: null, priority: null };
