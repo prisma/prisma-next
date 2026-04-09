@@ -1,6 +1,17 @@
 export type { MongoIndexKey, MongoIndexKeyDirection } from '@prisma-next/mongo-contract';
-export type { AnyMongoDdlCommand, CreateIndexOptions } from '../ddl-commands';
-export { CreateIndexCommand, DropIndexCommand } from '../ddl-commands';
+export type {
+  AnyMongoDdlCommand,
+  CollModOptions,
+  CreateCollectionOptions,
+  CreateIndexOptions,
+} from '../ddl-commands';
+export {
+  CollModCommand,
+  CreateCollectionCommand,
+  CreateIndexCommand,
+  DropCollectionCommand,
+  DropIndexCommand,
+} from '../ddl-commands';
 export type { MongoDdlCommandVisitor, MongoInspectionCommandVisitor } from '../ddl-visitors';
 export type { MongoFilterExpr } from '../filter-expressions';
 export {
