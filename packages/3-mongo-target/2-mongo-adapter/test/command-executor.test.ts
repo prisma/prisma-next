@@ -51,6 +51,38 @@ describe('MongoCommandExecutor', () => {
     expect(emailIndex?.['unique']).toBe(true);
   });
 
+  it('createIndex passes expireAfterSeconds and sparse options', async () => {
+    await db.createCollection('sessions');
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CreateIndexCommand('sessions', [{ field: 'createdAt', direction: 1 }], {
+      expireAfterSeconds: 3600,
+      sparse: true,
+    });
+
+    await cmd.accept(executor);
+
+    const indexes = await db.collection('sessions').listIndexes().toArray();
+    const ttlIndex = indexes.find((idx) => idx['key']?.['createdAt'] === 1);
+    expect(ttlIndex).toBeDefined();
+    expect(ttlIndex?.['expireAfterSeconds']).toBe(3600);
+    expect(ttlIndex?.['sparse']).toBe(true);
+  });
+
+  it('createIndex passes partialFilterExpression option', async () => {
+    await db.createCollection('logs');
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CreateIndexCommand('logs', [{ field: 'level', direction: 1 }], {
+      partialFilterExpression: { active: true },
+    });
+
+    await cmd.accept(executor);
+
+    const indexes = await db.collection('logs').listIndexes().toArray();
+    const partialIndex = indexes.find((idx) => idx['key']?.['level'] === 1);
+    expect(partialIndex).toBeDefined();
+    expect(partialIndex?.['partialFilterExpression']).toEqual({ active: true });
+  });
+
   it('dropIndex drops an existing index', async () => {
     await db.createCollection('posts');
     await db.collection('posts').createIndex({ title: 1 }, { name: 'title_1' });
@@ -79,6 +111,29 @@ describe('MongoInspectionExecutor', () => {
     expect(results.length).toBeGreaterThanOrEqual(2);
     const skuIndex = results.find((doc) => doc['key']?.['sku'] === 1);
     expect(skuIndex).toBeDefined();
+  });
+
+  it('listIndexes returns empty array for non-existent collection', async () => {
+    const executor = new MongoInspectionExecutor(db);
+    const cmd = new ListIndexesCommand('nonexistent_collection');
+
+    const results = await cmd.accept(executor);
+    expect(results).toEqual([]);
+  });
+
+  it('listIndexes re-throws non-NamespaceNotFound errors', async () => {
+    const fakeDb = {
+      collection: () => ({
+        listIndexes: () => ({
+          toArray: () => Promise.reject(new Error('connection lost')),
+        }),
+      }),
+    } as unknown as Db;
+
+    const executor = new MongoInspectionExecutor(fakeDb);
+    const cmd = new ListIndexesCommand('any');
+
+    await expect(cmd.accept(executor)).rejects.toThrow('connection lost');
   });
 
   it('listCollections returns collection documents', async () => {

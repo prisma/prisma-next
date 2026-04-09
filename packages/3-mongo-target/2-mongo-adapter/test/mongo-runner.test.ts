@@ -313,3 +313,23 @@ describe('MongoMigrationRunner', () => {
     expect(ledgerEntries).toHaveLength(1);
   });
 });
+
+describe('MongoControlDriver', () => {
+  it('query() throws because MongoDB does not support SQL', () => {
+    const driver = createMongoControlDriver(db, client);
+    expect(() => driver.query('SELECT 1')).toThrow(
+      'MongoDB control driver does not support SQL queries',
+    );
+  });
+
+  it('close() delegates to the underlying MongoClient', async () => {
+    const closeClient = new MongoClient(replSet.getUri());
+    await closeClient.connect();
+    const closeDb = closeClient.db('close_test');
+    const driver = createMongoControlDriver(closeDb, closeClient);
+
+    await driver.close();
+
+    await expect(closeClient.db('close_test').command({ ping: 1 })).rejects.toThrow();
+  });
+});
