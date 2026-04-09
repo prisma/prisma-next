@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { indexesEquivalent } from '../src/index-equivalence';
 import { MongoSchemaCollection } from '../src/schema-collection';
+import { MongoSchemaCollectionOptionsNode } from '../src/schema-collection-options';
 import { MongoSchemaIndex } from '../src/schema-index';
+import { MongoSchemaValidator } from '../src/schema-validator';
 import type { MongoSchemaVisitor } from '../src/visitor';
 
 describe('MongoSchemaIndex', () => {
@@ -109,6 +111,116 @@ describe('MongoSchemaCollection', () => {
       collectionOptions: () => 'collectionOptions',
     };
     expect(coll.accept(visitor)).toBe('collection:users');
+  });
+});
+
+describe('MongoSchemaValidator', () => {
+  it('constructs with required fields', () => {
+    const v = new MongoSchemaValidator({
+      jsonSchema: { bsonType: 'object', properties: { name: { bsonType: 'string' } } },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+    expect(v.kind).toBe('validator');
+    expect(v.jsonSchema).toEqual({
+      bsonType: 'object',
+      properties: { name: { bsonType: 'string' } },
+    });
+    expect(v.validationLevel).toBe('strict');
+    expect(v.validationAction).toBe('error');
+  });
+
+  it('is frozen after construction', () => {
+    const v = new MongoSchemaValidator({
+      jsonSchema: {},
+      validationLevel: 'moderate',
+      validationAction: 'warn',
+    });
+    expect(Object.isFrozen(v)).toBe(true);
+  });
+
+  it('dispatches via visitor', () => {
+    const v = new MongoSchemaValidator({
+      jsonSchema: {},
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+    const visitor: MongoSchemaVisitor<string> = {
+      collection: () => 'collection',
+      index: () => 'index',
+      validator: (node) => `validator:${node.validationLevel}`,
+      collectionOptions: () => 'collectionOptions',
+    };
+    expect(v.accept(visitor)).toBe('validator:strict');
+  });
+});
+
+describe('MongoSchemaCollectionOptionsNode', () => {
+  it('constructs with no options', () => {
+    const opts = new MongoSchemaCollectionOptionsNode({});
+    expect(opts.kind).toBe('collectionOptions');
+    expect(opts.capped).toBeUndefined();
+    expect(opts.timeseries).toBeUndefined();
+    expect(opts.collation).toBeUndefined();
+    expect(opts.changeStreamPreAndPostImages).toBeUndefined();
+    expect(opts.clusteredIndex).toBeUndefined();
+  });
+
+  it('constructs with all options', () => {
+    const opts = new MongoSchemaCollectionOptionsNode({
+      capped: { size: 1048576, max: 1000 },
+      timeseries: { timeField: 'ts', metaField: 'meta', granularity: 'hours' },
+      collation: { locale: 'en' },
+      changeStreamPreAndPostImages: { enabled: true },
+      clusteredIndex: { name: 'myCluster' },
+    });
+    expect(opts.capped).toEqual({ size: 1048576, max: 1000 });
+    expect(opts.timeseries).toEqual({ timeField: 'ts', metaField: 'meta', granularity: 'hours' });
+    expect(opts.collation).toEqual({ locale: 'en' });
+    expect(opts.changeStreamPreAndPostImages).toEqual({ enabled: true });
+    expect(opts.clusteredIndex).toEqual({ name: 'myCluster' });
+  });
+
+  it('is frozen after construction', () => {
+    const opts = new MongoSchemaCollectionOptionsNode({});
+    expect(Object.isFrozen(opts)).toBe(true);
+  });
+
+  it('dispatches via visitor', () => {
+    const opts = new MongoSchemaCollectionOptionsNode({ capped: { size: 100 } });
+    const visitor: MongoSchemaVisitor<string> = {
+      collection: () => 'collection',
+      index: () => 'index',
+      validator: () => 'validator',
+      collectionOptions: () => 'collectionOptions',
+    };
+    expect(opts.accept(visitor)).toBe('collectionOptions');
+  });
+});
+
+describe('MongoSchemaCollection with validator and options', () => {
+  it('constructs with validator and options', () => {
+    const validator = new MongoSchemaValidator({
+      jsonSchema: { bsonType: 'object' },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+    const options = new MongoSchemaCollectionOptionsNode({
+      capped: { size: 1048576 },
+    });
+    const coll = new MongoSchemaCollection({
+      name: 'users',
+      validator,
+      options,
+    });
+    expect(coll.validator).toBe(validator);
+    expect(coll.options).toBe(options);
+  });
+
+  it('defaults validator and options to undefined', () => {
+    const coll = new MongoSchemaCollection({ name: 'users' });
+    expect(coll.validator).toBeUndefined();
+    expect(coll.options).toBeUndefined();
   });
 });
 
