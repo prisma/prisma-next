@@ -847,10 +847,19 @@ export class Collection<
             [variantRow],
             undefined,
           );
-          await executeQueryPlan<Record<string, unknown>>(scope, variantCompiled).toArray();
+          const variantResult = await executeQueryPlan<Record<string, unknown>>(
+            scope,
+            variantCompiled,
+          ).toArray();
+          const variantCreated = variantResult[0];
+          if (!variantCreated) {
+            throw new Error(
+              `MTI variant INSERT for model "${modelName}" into "${variant.table}" did not return a row`,
+            );
+          }
 
           const prefixedVariant: Record<string, unknown> = {};
-          for (const [col, val] of Object.entries(variantRow)) {
+          for (const [col, val] of Object.entries(variantCreated)) {
             if (col === pkColumn) continue;
             prefixedVariant[`${variant.table}__${col}`] = val;
           }
@@ -942,7 +951,7 @@ export class Collection<
     assertReturningCapability(this.contract, 'upsert()');
     this.#assertNotMtiVariant('upsert()');
 
-    const createValues = mapModelDataToStorageRow(this.contract, this.modelName, input.create);
+    const createValues = this.#mapCreateRows([input.create as Record<string, unknown>])[0]!;
     applyCreateDefaults(this.ctx, this.tableName, [createValues]);
     const updateValues = mapModelDataToStorageRow(this.contract, this.modelName, input.update);
     const hasUpdateValues = Object.keys(updateValues).length > 0;

@@ -3,6 +3,7 @@ import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   getColumnToFieldMap,
+  getCompleteColumnToFieldMap,
   getFieldToColumnMap,
   type PolymorphismInfo,
 } from './collection-contract';
@@ -103,8 +104,8 @@ function getMergedColumnToFieldMap(
   const cached = perContract.get(cacheKey);
   if (cached) return cached;
 
-  const baseMap = getColumnToFieldMap(contract, baseModelName);
-  const variantMap = getColumnToFieldMap(contract, variantModelName);
+  const baseMap = getCompleteColumnToFieldMap(contract, baseModelName);
+  const variantMap = getCompleteColumnToFieldMap(contract, variantModelName);
 
   const merged: Record<string, string> = { ...baseMap };
   for (const [col, field] of Object.entries(variantMap)) {
@@ -131,7 +132,7 @@ export function mapPolymorphicRow(
     : polyInfo.variantsByValue.get(row[polyInfo.discriminatorColumn] as string);
 
   if (!variant) {
-    const baseMap = getColumnToFieldMap(contract, baseModelName);
+    const baseMap = getCompleteColumnToFieldMap(contract, baseModelName);
     const mapped: Record<string, unknown> = {};
     for (const [col, val] of Object.entries(row)) {
       const field = baseMap[col];

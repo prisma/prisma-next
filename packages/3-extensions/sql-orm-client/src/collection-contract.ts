@@ -74,7 +74,12 @@ export function resolvePolymorphismInfo(
 
   for (const [variantModelName, variantEntry] of Object.entries(model.variants)) {
     const variantModel = models[variantModelName];
-    const variantTable = variantModel?.storage?.table ?? baseTable;
+    if (!variantModel) {
+      throw new Error(
+        `Model "${modelName}" declares variant "${variantModelName}", but that model is missing from the contract`,
+      );
+    }
+    const variantTable = variantModel.storage?.table ?? baseTable;
     const strategy = variantTable === baseTable ? 'sti' : 'mti';
 
     const info: PolymorphismVariantInfo = {
@@ -149,6 +154,33 @@ export function getColumnToFieldMap(
   cached = {};
   for (const [f, s] of Object.entries(storageFields)) {
     if (s?.column) cached[s.column] = f;
+  }
+  perContract.set(modelName, cached);
+  return cached;
+}
+
+const completeColumnToFieldCache = new WeakMap<object, Map<string, Record<string, string>>>();
+
+/**
+ * Like getColumnToFieldMap but includes identity-mapped fields (where field name equals column
+ * name). getColumnToFieldMap only returns explicit remaps; this returns ALL column→field entries.
+ */
+export function getCompleteColumnToFieldMap(
+  contract: Contract<SqlStorage>,
+  modelName: string,
+): Record<string, string> {
+  let perContract = completeColumnToFieldCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    completeColumnToFieldCache.set(contract, perContract);
+  }
+  let cached = perContract.get(modelName);
+  if (cached) return cached;
+
+  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
+  cached = {};
+  for (const [f, s] of Object.entries(storageFields)) {
+    cached[s?.column ?? f] = f;
   }
   perContract.set(modelName, cached);
   return cached;

@@ -299,4 +299,12 @@ describe('resolvePolymorphismInfo()', () => {
     expect(resolvePolymorphismInfo(contract, 'Bug')).toBeUndefined();
     expect(resolvePolymorphismInfo(contract, 'Feature')).toBeUndefined();
   });
+
+  it('throws when a declared variant model is missing from the contract', () => {
+    const contract = buildMixedPolyContract();
+    delete (contract.models as Record<string, unknown>)['Bug'];
+    expect(() => resolvePolymorphismInfo(contract, 'Task')).toThrow(
+      /declares variant "Bug", but that model is missing/,
+    );
+  });
 });
