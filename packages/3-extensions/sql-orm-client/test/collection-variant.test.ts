@@ -158,8 +158,8 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     const { collection, runtime } = createMixedPolyCollection();
     runtime.setNextResults([
       [
-        { id: 1, title: 'Crash', type: 'bug', severity: 'critical', priority: null },
-        { id: 2, title: 'Dark mode', type: 'feature', severity: null, priority: 1 },
+        { id: 1, title: 'Crash', type: 'bug', severity: 'critical', features__priority: null },
+        { id: 2, title: 'Dark mode', type: 'feature', severity: null, features__priority: 1 },
       ],
     ]);
 
@@ -188,7 +188,9 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
 
   it('variant(Feature) query maps Feature MTI rows only', async () => {
     const { collection, runtime } = createMixedPolyCollection();
-    runtime.setNextResults([[{ id: 2, title: 'Dark mode', type: 'feature', priority: 1 }]]);
+    runtime.setNextResults([
+      [{ id: 2, title: 'Dark mode', type: 'feature', features__priority: 1 }],
+    ]);
 
     const rows = await (collection.variant('Feature' as never) as typeof collection)
       .all()

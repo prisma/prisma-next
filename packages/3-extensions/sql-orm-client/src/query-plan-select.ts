@@ -405,7 +405,8 @@ function buildMtiJoins(
     const variantColumns = resolveTableColumns(contract, variant.table);
     for (const col of variantColumns) {
       if (col === pkColumn) continue;
-      projection.push(ProjectionItem.of(col, ColumnRef.of(variant.table, col)));
+      const alias = `${variant.table}__${col}`;
+      projection.push(ProjectionItem.of(alias, ColumnRef.of(variant.table, col)));
     }
   }
 

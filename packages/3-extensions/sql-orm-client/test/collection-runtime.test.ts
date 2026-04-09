@@ -182,11 +182,17 @@ describe('mapPolymorphicRow()', () => {
     expect(result).not.toHaveProperty('priority');
   });
 
-  it('maps MTI Feature row: includes base + Feature fields', () => {
+  it('maps MTI Feature row: includes base + Feature fields via table-qualified aliases', () => {
     const contract = buildMixedPolyContract();
     const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
 
-    const row = { id: 2, title: 'Dark mode', type: 'feature', severity: null, priority: 1 };
+    const row = {
+      id: 2,
+      title: 'Dark mode',
+      type: 'feature',
+      severity: null,
+      features__priority: 1,
+    };
     const result = mapPolymorphicRow(contract, 'Task', polyInfo, row);
 
     expect(result).toEqual({ id: 2, title: 'Dark mode', type: 'feature', priority: 1 });
@@ -207,7 +213,13 @@ describe('mapPolymorphicRow()', () => {
     const contract = buildMixedPolyContract();
     const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
 
-    const row = { id: 3, title: 'Unknown', type: 'epic', severity: null, priority: null };
+    const row = {
+      id: 3,
+      title: 'Unknown',
+      type: 'epic',
+      severity: null,
+      features__priority: null,
+    };
     const result = mapPolymorphicRow(contract, 'Task', polyInfo, row);
 
     expect(result).toEqual({ id: 3, title: 'Unknown', type: 'epic' });

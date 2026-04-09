@@ -361,7 +361,7 @@ describe('compileSelect MTI JOINs', () => {
     );
 
     const projectedAliases = plan.ast.projection.map((p) => p.alias);
-    expect(projectedAliases).toContain('priority');
+    expect(projectedAliases).toContain('features__priority');
   });
 
   it('variant query INNER JOINs the specific MTI variant table', () => {
@@ -402,6 +402,6 @@ describe('compileSelect MTI JOINs', () => {
       (p) => p.expr.kind === 'column-ref' && p.expr.table === 'features',
     );
     expect(featureProjections).toHaveLength(1);
-    expect(featureProjections[0]!.alias).toBe('priority');
+    expect(featureProjections[0]!.alias).toBe('features__priority');
   });
 });
