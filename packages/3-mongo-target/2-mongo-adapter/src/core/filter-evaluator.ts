@@ -7,7 +7,8 @@ import type {
   MongoFilterVisitor,
   MongoNotExpr,
   MongoOrExpr,
-} from '@prisma-next/mongo-query-ast/execution';
+} from '@prisma-next/mongo-query-ast/control';
+import { deepEqual } from '@prisma-next/mongo-schema-ir';
 import type { MongoValue } from '@prisma-next/mongo-value';
 
 function getNestedField(doc: Record<string, unknown>, path: string): unknown {
@@ -22,38 +23,12 @@ function getNestedField(doc: Record<string, unknown>, path: string): unknown {
   return current;
 }
 
-function deepEquals(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a === null || b === null) return false;
-  if (typeof a !== typeof b) return false;
-
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    return a.every((val, i) => deepEquals(val, b[i]));
-  }
-
-  if (typeof a === 'object' && typeof b === 'object') {
-    const aObj = a as Record<string, unknown>;
-    const bObj = b as Record<string, unknown>;
-    const aKeys = Object.keys(aObj);
-    const bKeys = Object.keys(bObj);
-    if (aKeys.length !== bKeys.length) return false;
-    for (let i = 0; i < aKeys.length; i++) {
-      if (aKeys[i] !== bKeys[i]) return false;
-      if (!deepEquals(aObj[aKeys[i]!], bObj[bKeys[i]!])) return false;
-    }
-    return true;
-  }
-
-  return false;
-}
-
 function evaluateFieldOp(op: string, actual: unknown, expected: MongoValue): boolean {
   switch (op) {
     case '$eq':
-      return deepEquals(actual, expected);
+      return deepEqual(actual, expected);
     case '$ne':
-      return !deepEquals(actual, expected);
+      return !deepEqual(actual, expected);
     case '$gt':
       return typeof actual === typeof expected && (actual as number) > (expected as number);
     case '$gte':
@@ -63,7 +38,7 @@ function evaluateFieldOp(op: string, actual: unknown, expected: MongoValue): boo
     case '$lte':
       return typeof actual === typeof expected && (actual as number) <= (expected as number);
     case '$in':
-      return Array.isArray(expected) && expected.some((v) => deepEquals(actual, v));
+      return Array.isArray(expected) && expected.some((v) => deepEqual(actual, v));
     default:
       throw new Error(`Unsupported filter operator in migration check: ${op}`);
   }

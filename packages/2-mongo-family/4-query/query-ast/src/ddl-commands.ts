@@ -1,12 +1,6 @@
+import type { MongoIndexKey } from '@prisma-next/mongo-contract';
 import { MongoAstNode } from './ast-node';
 import type { MongoDdlCommandVisitor } from './ddl-visitors';
-
-export type MongoIndexKeyDirection = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
-
-export interface MongoIndexKey {
-  readonly field: string;
-  readonly direction: MongoIndexKeyDirection;
-}
 
 export interface CreateIndexOptions {
   readonly unique?: boolean;

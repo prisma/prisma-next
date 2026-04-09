@@ -20,6 +20,7 @@
     "@prisma-next/mongo-codec": "workspace:*",
     "@prisma-next/mongo-lowering": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
+    "@prisma-next/mongo-schema-ir": "workspace:*",
     "@prisma-next/mongo-value": "workspace:*",
     "@prisma-next/mongo-wire": "workspace:*",
     "@prisma-next/operations": "workspace:*",
