@@ -18,7 +18,7 @@ The migration system must figure out what changed. It has two inputs: a **prior 
 
 The problem is that these two inputs come from different places. Today, the prior state comes from a stored contract. In the future, it may come from introspecting a live database via `listIndexes()` and `listCollections()`. Those sources have different shapes. To diff them, both must be normalized into the same representation.
 
-That representation is the `**MongoSchemaIR`**.
+That representation is the **`MongoSchemaIR`**.
 
 Here is what the IR looks like for the prior state (one collection, one index):
 

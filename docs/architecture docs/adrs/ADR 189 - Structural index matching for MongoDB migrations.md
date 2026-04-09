@@ -68,10 +68,10 @@ Each component is included because it changes the index's behavior at the databa
 
 - **Key fields and order.** `{ a: 1, b: 1 }` and `{ b: 1, a: 1 }` are different compound indexes with different query optimization characteristics. MongoDB treats them as distinct.
 - **Direction.** `{ a: 1 }` (ascending) and `{ a: -1 }` (descending) are different indexes. Direction matters for sort-order optimization in compound indexes.
-- `**unique`.** A unique index enforces a constraint; a non-unique index does not.
-- `**sparse`.** A sparse index omits documents missing the indexed field.
-- `**expireAfterSeconds`.** A TTL index with a 24-hour expiry is different from one with a 7-day expiry.
-- `**partialFilterExpression`.** A partial index scoped to `{ status: "active" }` is different from one scoped to `{ status: "archived" }`.
+- **`unique`**. A unique index enforces a constraint; a non-unique index does not.
+- **`sparse`**. A sparse index omits documents missing the indexed field.
+- **`expireAfterSeconds`**. A TTL index with a 24-hour expiry is different from one with a 7-day expiry.
+- **`partialFilterExpression`**. A partial index scoped to `{ status: "active" }` is different from one scoped to `{ status: "archived" }`.
 
 ### What the lookup key excludes
 
