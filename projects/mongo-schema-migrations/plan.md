@@ -68,6 +68,10 @@ Proves the full migration architecture works for MongoDB by cutting a thin verti
 
 - [ ] **1.12 End-to-end test: plan + apply single index.** Hand-crafted contract with one ascending index on one collection. Verify: `migration plan` produces a `createIndex` operation → `migration apply` creates the index on a real MongoDB instance (via `mongodb-memory-server`). Second contract removing the index → plan produces `dropIndex` → apply drops it.
 
+**Demo app:**
+
+- [ ] **1.13 Add migrations to `examples/mongo-demo`.** Update the demo app's contract to include index definitions and demonstrate the migration workflow. Add a unique index on a commonly queried field (e.g., `email`). Update `README.md` with migration commands (`migration plan`, `migration apply`). Verify the demo works end-to-end against a local MongoDB instance.
+
 ### Milestone 2: Full index vocabulary + validators + collection options
 
 Extends every layer to cover the full breadth of MongoDB server-side configuration. Still validates with hand-crafted contracts for indexes/validators/options, plus adds authoring + emitter support.
@@ -77,7 +81,7 @@ Extends every layer to cover the full breadth of MongoDB server-side configurati
 **Full index vocabulary:**
 
 - [ ] **2.1 Extend index key types.** Support compound indexes, descending (`-1`), text (`"text"`), geospatial (`"2dsphere"`), wildcard (`"$**"`). Update `MongoStorageIndex` type, schema IR, Arktype validation, planner diffing, and runner execution. Tests for each key type.
-- [ ] **2.2 Extend index options.** Support `sparse`, `expireAfterSeconds` (TTL), `partialFilterExpression` (partial indexes). Update types, IR, validation, planner, runner. Tests for each option. Include index identity tests: same keys + different options = different index.
+- [ ] **2.2 Extend index options.** Support `sparse`, `expireAfterSeconds` (TTL), `partialFilterExpression` (partial indexes). Update types, IR, validation, planner, runner. Tests for each option. Include index identity tests: same keys + different options = different index. **Note:** `buildIndexLookupKey` in the planner uses `JSON.stringify` for `partialFilterExpression`, which is key-order dependent. Replace with canonical serialization so that structurally equivalent partial filter expressions with different key ordering produce the same lookup key (important when comparing contract-derived IR against live-introspected IR in M4).
 
 **Validators:**
 
