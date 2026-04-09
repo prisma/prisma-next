@@ -58,6 +58,7 @@ export type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer Code
 type MongoCodecTypes = {
   readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
   readonly 'mongo/string@1': { readonly input: string; readonly output: string };
+  readonly 'mongo/double@1': { readonly input: number; readonly output: number };
   readonly 'mongo/int32@1': { readonly input: number; readonly output: number };
   readonly 'mongo/bool@1': { readonly input: boolean; readonly output: boolean };
   readonly 'mongo/date@1': { readonly input: Date; readonly output: Date };
@@ -370,7 +371,7 @@ type MaybeDiscriminator<Discriminator> = [Discriminator] extends [undefined]
   : { readonly discriminator: Discriminator & { readonly field: string } };
 type MaybeVariants<Variants> = [Variants] extends [undefined]
   ? EmptyObject
-  : { readonly variants: Variants & Record<string, VariantSpec> };
+  : { readonly variants: Variants };
 
 type ContractModelFromBuilder<TBuilder> =
   TBuilder extends NamedModelBuilder<

@@ -45,10 +45,54 @@ const contract = defineContract({
   valueObjects: { Address },
 });
 
+const Task = model('Task', {
+  collection: 'tasks',
+  fields: {
+    _id: field.objectId(),
+    type: field.string(),
+  },
+  discriminator: {
+    field: 'type',
+    variants: {
+      Bug: { value: 'bug' },
+      Feature: { value: 'feature' },
+    },
+  },
+});
+
+const Bug = model('Bug', {
+  collection: 'tasks',
+  base: Task,
+  fields: {
+    severity: field.string(),
+  },
+});
+
+const Feature = model('Feature', {
+  collection: 'tasks',
+  base: Task,
+  fields: {
+    priority: field.string(),
+  },
+});
+
+const polymorphicContract = defineContract({
+  family: mongoFamilyPack,
+  target: mongoTargetPack,
+  models: { Task, Bug, Feature },
+});
+
 type UserRow = InferModelRow<typeof contract, 'User'>;
 
 test('contract roots stay specific', () => {
   expectTypeOf(contract.roots.users).toEqualTypeOf<'User'>();
+});
+
+test('polymorphic variants keep literal model keys', () => {
+  type VariantKeys = keyof NonNullable<typeof polymorphicContract.models.Task.variants>;
+
+  expectTypeOf<VariantKeys>().toEqualTypeOf<'Bug' | 'Feature'>();
+  expectTypeOf(polymorphicContract.models.Task.variants.Bug.value).toEqualTypeOf<'bug'>();
 });
 
 test('value object rows flow through InferModelRow', () => {

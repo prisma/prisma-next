@@ -1,6 +1,7 @@
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { acc, mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
+import { ObjectId } from 'mongodb';
 import { expect, expectTypeOf, it } from 'vitest';
 import { contract } from './fixtures/contract';
 import { describeWithMongoDB } from './setup';
@@ -10,19 +11,23 @@ type PlanRow<TPlan> = TPlan extends MongoQueryPlan<infer Row> ? Row : never;
 describeWithMongoDB('Mongo no-emit integration', (ctx) => {
   it('mongoOrm executes with a builder-authored contract directly', async () => {
     const db = ctx.client.db(ctx.dbName);
+    const userId = new ObjectId();
+    const taskId = new ObjectId();
+    const commentId = new ObjectId();
+
     await db.collection('users').insertOne({
-      _id: 'u1',
+      _id: userId,
       name: 'Alice',
       email: 'alice@example.com',
       addresses: [],
     });
     await db.collection('tasks').insertOne({
-      _id: 't1',
+      _id: taskId,
       title: 'Fix bug',
       type: 'bug',
-      assigneeId: 'u1',
+      assigneeId: userId,
       severity: 'high',
-      comments: [{ _id: 'c1', text: 'Investigating', createdAt: new Date('2025-01-01') }],
+      comments: [{ _id: commentId, text: 'Investigating', createdAt: new Date('2025-01-01') }],
     });
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
@@ -49,26 +54,28 @@ describeWithMongoDB('Mongo no-emit integration', (ctx) => {
 
   it('mongoPipeline executes with a builder-authored contract directly', async () => {
     const db = ctx.client.db(ctx.dbName);
+    const userId = new ObjectId();
+
     await db.collection('users').insertOne({
-      _id: 'u1',
+      _id: userId,
       name: 'Alice',
       email: 'alice@example.com',
       addresses: [],
     });
     await db.collection('tasks').insertMany([
       {
-        _id: 't1',
+        _id: new ObjectId(),
         title: 'Fix crash',
         type: 'bug',
-        assigneeId: 'u1',
+        assigneeId: userId,
         severity: 'critical',
         comments: [],
       },
       {
-        _id: 't2',
+        _id: new ObjectId(),
         title: 'Fix typo',
         type: 'bug',
-        assigneeId: 'u1',
+        assigneeId: userId,
         severity: 'low',
         comments: [],
       },
