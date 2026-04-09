@@ -22,7 +22,7 @@ catalogs:
       specifier: ^4.0.3
       version: 4.0.3
     mongodb:
-      specifier: ^6.16.0
+      specifier: ^6.21.0
       version: 6.21.0
     pg:
       specifier: 8.16.3
@@ -1253,6 +1253,9 @@ importers:
       '@prisma-next/target-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/1-mongo-target
+      mongodb:
+        specifier: 'catalog:'
+        version: 6.21.0
     devDependencies:
       '@prisma-next/mongo-contract-ts':
         specifier: workspace:*
@@ -2101,6 +2104,9 @@ importers:
       '@prisma-next/config':
         specifier: workspace:*
         version: link:../../1-framework/1-core/config
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/contract
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
@@ -2135,9 +2141,6 @@ importers:
         specifier: 'catalog:'
         version: 6.21.0
     devDependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../1-framework/0-foundation/contract
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
@@ -2147,6 +2150,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../0-config/tsdown
+      mongodb-memory-server:
+        specifier: ^10.4.3
+        version: 10.4.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
