@@ -41,23 +41,42 @@ export type ModelNameMapping = {
   readonly fieldColumns: Map<string, string>;
 };
 
-export function collectResolvedFields(
-  model: PslModel,
-  mapping: ModelNameMapping,
-  enumTypeDescriptors: Map<string, ColumnDescriptor>,
-  namedTypeDescriptors: Map<string, ColumnDescriptor>,
-  modelNames: Set<string>,
-  compositeTypeNames: ReadonlySet<string>,
-  composedExtensions: Set<string>,
-  authoringContributions: AuthoringContributions | undefined,
-  familyId: string,
-  targetId: string,
-  defaultFunctionRegistry: ControlMutationDefaultRegistry,
-  generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>,
-  diagnostics: ContractSourceDiagnostic[],
-  sourceId: string,
-  scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
-): ResolvedField[] {
+export interface CollectResolvedFieldsInput {
+  readonly model: PslModel;
+  readonly mapping: ModelNameMapping;
+  readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
+  readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
+  readonly modelNames: Set<string>;
+  readonly compositeTypeNames: ReadonlySet<string>;
+  readonly composedExtensions: Set<string>;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly familyId: string;
+  readonly targetId: string;
+  readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
+  readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+}
+
+export function collectResolvedFields(input: CollectResolvedFieldsInput): ResolvedField[] {
+  const {
+    model,
+    mapping,
+    enumTypeDescriptors,
+    namedTypeDescriptors,
+    modelNames,
+    compositeTypeNames,
+    composedExtensions,
+    authoringContributions,
+    familyId,
+    targetId,
+    defaultFunctionRegistry,
+    generatorDescriptorById,
+    diagnostics,
+    sourceId,
+    scalarTypeDescriptors,
+  } = input;
   const resolvedFields: ResolvedField[] = [];
 
   for (const field of model.fields) {
@@ -105,23 +124,24 @@ export function collectResolvedFields(
 
     let descriptor: ColumnDescriptor | undefined;
     let scalarCodecId: string | undefined;
+    const resolveInput = {
+      field,
+      enumTypeDescriptors,
+      namedTypeDescriptors,
+      scalarTypeDescriptors,
+      authoringContributions,
+      composedExtensions,
+      familyId,
+      targetId,
+      diagnostics,
+      sourceId,
+      entityLabel: `Field "${model.name}.${field.name}"`,
+    };
 
     if (isValueObjectField) {
       descriptor = scalarTypeDescriptors.get('Json');
     } else if (isListField) {
-      const originalDescriptor = resolveFieldTypeDescriptor({
-        field,
-        enumTypeDescriptors,
-        namedTypeDescriptors,
-        scalarTypeDescriptors,
-        authoringContributions,
-        composedExtensions,
-        familyId,
-        targetId,
-        diagnostics,
-        sourceId,
-        entityLabel: `Field "${model.name}.${field.name}"`,
-      });
+      const originalDescriptor = resolveFieldTypeDescriptor(resolveInput);
       if (!originalDescriptor) {
         if (!field.typeConstructor) {
           diagnostics.push({
@@ -136,19 +156,7 @@ export function collectResolvedFields(
       scalarCodecId = originalDescriptor.codecId;
       descriptor = scalarTypeDescriptors.get('Json');
     } else {
-      descriptor = resolveFieldTypeDescriptor({
-        field,
-        enumTypeDescriptors,
-        namedTypeDescriptors,
-        scalarTypeDescriptors,
-        authoringContributions,
-        composedExtensions,
-        familyId,
-        targetId,
-        diagnostics,
-        sourceId,
-        entityLabel: `Field "${model.name}.${field.name}"`,
-      });
+      descriptor = resolveFieldTypeDescriptor(resolveInput);
     }
 
     if (!descriptor) {

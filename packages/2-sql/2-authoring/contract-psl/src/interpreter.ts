@@ -378,23 +378,23 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   const { model, mapping, sourceId, diagnostics } = input;
   const tableName = mapping.tableName;
 
-  const resolvedFields = collectResolvedFields(
+  const resolvedFields = collectResolvedFields({
     model,
     mapping,
-    input.enumTypeDescriptors,
-    input.namedTypeDescriptors,
-    input.modelNames,
-    input.compositeTypeNames,
-    input.composedExtensions,
-    input.authoringContributions,
-    input.familyId,
-    input.targetId,
-    input.defaultFunctionRegistry,
-    input.generatorDescriptorById,
+    enumTypeDescriptors: input.enumTypeDescriptors,
+    namedTypeDescriptors: input.namedTypeDescriptors,
+    modelNames: input.modelNames,
+    compositeTypeNames: input.compositeTypeNames,
+    composedExtensions: input.composedExtensions,
+    authoringContributions: input.authoringContributions,
+    familyId: input.familyId,
+    targetId: input.targetId,
+    defaultFunctionRegistry: input.defaultFunctionRegistry,
+    generatorDescriptorById: input.generatorDescriptorById,
     diagnostics,
     sourceId,
-    input.scalarTypeDescriptors,
-  );
+    scalarTypeDescriptors: input.scalarTypeDescriptors,
+  });
 
   const primaryKeyFields = resolvedFields.filter((field) => field.isId);
   const primaryKeyColumns = primaryKeyFields.map((field) => field.columnName);
@@ -714,18 +714,32 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   };
 }
 
-function buildValueObjects(
-  compositeTypes: readonly PslCompositeType[],
-  enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
-  namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
-  scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
-  composedExtensions: ReadonlySet<string>,
-  familyId: string,
-  targetId: string,
-  authoringContributions: AuthoringContributions | undefined,
-  diagnostics: ContractSourceDiagnostic[],
-  sourceId: string,
-): Record<string, ContractValueObject> {
+interface BuildValueObjectsInput {
+  readonly compositeTypes: readonly PslCompositeType[];
+  readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly familyId: string;
+  readonly targetId: string;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+}
+
+function buildValueObjects(input: BuildValueObjectsInput): Record<string, ContractValueObject> {
+  const {
+    compositeTypes,
+    enumTypeDescriptors,
+    namedTypeDescriptors,
+    scalarTypeDescriptors,
+    composedExtensions,
+    familyId,
+    targetId,
+    authoringContributions,
+    diagnostics,
+    sourceId,
+  } = input;
   const valueObjects: Record<string, ContractValueObject> = {};
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
 
@@ -1167,18 +1181,18 @@ export function interpretPslDocumentToSqlContract(
     })),
   });
 
-  const valueObjects = buildValueObjects(
+  const valueObjects = buildValueObjects({
     compositeTypes,
-    enumResult.enumTypeDescriptors,
-    namedTypeResult.namedTypeDescriptors,
-    input.scalarTypeDescriptors,
+    enumTypeDescriptors: enumResult.enumTypeDescriptors,
+    namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
+    scalarTypeDescriptors: input.scalarTypeDescriptors,
     composedExtensions,
-    input.target.familyId,
-    input.target.targetId,
-    input.authoringContributions,
+    familyId: input.target.familyId,
+    targetId: input.target.targetId,
+    authoringContributions: input.authoringContributions,
     diagnostics,
     sourceId,
-  );
+  });
 
   let patchedModels = patchModelDomainFields(
     contract.models as Record<string, ContractModel>,
