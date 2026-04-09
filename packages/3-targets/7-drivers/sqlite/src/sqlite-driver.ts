@@ -1,5 +1,6 @@
 import type { SQLInputValue } from 'node:sqlite';
 import { DatabaseSync } from 'node:sqlite';
+import type { RuntimeDriverInstance } from '@prisma-next/framework-components/execution';
 import type {
   SqlConnection,
   SqlDriver,
@@ -12,6 +13,42 @@ import type {
 import { normalizeSqliteError } from './normalize-error';
 
 export type SqliteBinding = { readonly kind: 'path'; readonly path: string };
+
+export type SqliteRuntimeDriver = RuntimeDriverInstance<'sql', 'sqlite'> & SqlDriver<SqliteBinding>;
+
+interface DriverRuntimeError extends Error {
+  readonly code:
+    | 'DRIVER.NOT_CONNECTED'
+    | 'DRIVER.ALREADY_CONNECTED'
+    | 'DRIVER.EXPLAIN_NOT_SUPPORTED';
+  readonly category: 'RUNTIME';
+  readonly severity: 'error';
+  readonly details?: Record<string, unknown>;
+}
+
+function driverError(
+  code: DriverRuntimeError['code'],
+  message: string,
+  details?: Record<string, unknown>,
+): DriverRuntimeError {
+  const error = new Error(message) as DriverRuntimeError;
+  Object.defineProperty(error, 'name', {
+    value: 'RuntimeError',
+    configurable: true,
+  });
+  return Object.assign(error, {
+    code,
+    category: 'RUNTIME' as const,
+    severity: 'error' as const,
+    message,
+    details,
+  });
+}
+
+const NOT_CONNECTED_MESSAGE =
+  'SQLite driver not connected. Call connect(binding) before acquireConnection or execute.';
+const ALREADY_CONNECTED_MESSAGE =
+  'SQLite driver already connected. Call close() before reconnecting with a new binding.';
 
 function toSqliteParams(params: readonly unknown[] | undefined): SQLInputValue[] {
   return (params ?? []) as SQLInputValue[];
@@ -157,7 +194,10 @@ interface ConnectedState {
 
 type DriverState = { readonly kind: 'unbound' } | ConnectedState | { readonly kind: 'closed' };
 
-export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
+export class SqliteDriver implements SqliteRuntimeDriver {
+  readonly familyId = 'sql' as const;
+  readonly targetId = 'sqlite' as const;
+
   #state: DriverState;
 
   constructor(initialState?: ConnectedState) {
@@ -166,7 +206,7 @@ export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
 
   #requireConnected(): ConnectedState {
     if (this.#state.kind !== 'connected') {
-      throw new Error('SQLite driver not connected. Call connect(binding) first.');
+      throw driverError('DRIVER.NOT_CONNECTED', NOT_CONNECTED_MESSAGE);
     }
     return this.#state;
   }
@@ -176,13 +216,16 @@ export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
   }
 
   async connect(binding: SqliteBinding): Promise<void> {
-    if (this.#state.kind !== 'connected') {
-      this.#state = {
-        kind: 'connected',
-        path: binding.path,
-        conn: new SqliteConnectionImpl(openConnection(binding.path)),
-      };
+    if (this.#state.kind === 'connected') {
+      throw driverError('DRIVER.ALREADY_CONNECTED', ALREADY_CONNECTED_MESSAGE, {
+        bindingKind: binding.kind,
+      });
     }
+    this.#state = {
+      kind: 'connected',
+      path: binding.path,
+      conn: new SqliteConnectionImpl(openConnection(binding.path)),
+    };
   }
 
   async acquireConnection(): Promise<SqliteConnectionImpl> {
@@ -197,8 +240,19 @@ export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
     await conn.release();
   }
 
-  async *execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
-    yield* this.#requireConnected().conn.execute<Row>(request);
+  execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
+    if (this.#state.kind !== 'connected') {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next() {
+              throw driverError('DRIVER.NOT_CONNECTED', NOT_CONNECTED_MESSAGE);
+            },
+          };
+        },
+      };
+    }
+    return this.#state.conn.execute<Row>(request);
   }
 
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
@@ -213,8 +267,8 @@ export class SqliteBoundDriver implements SqlDriver<SqliteBinding> {
   }
 }
 
-export function createBoundDriverFromBinding(binding: SqliteBinding): SqlDriver<SqliteBinding> {
-  return new SqliteBoundDriver({
+export function createBoundDriverFromBinding(binding: SqliteBinding): SqliteDriver {
+  return new SqliteDriver({
     kind: 'connected',
     path: binding.path,
     conn: new SqliteConnectionImpl(openConnection(binding.path)),
