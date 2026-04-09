@@ -951,7 +951,8 @@ export class Collection<
     assertReturningCapability(this.contract, 'upsert()');
     this.#assertNotMtiVariant('upsert()');
 
-    const createValues = this.#mapCreateRows([input.create as Record<string, unknown>])[0]!;
+    const mappedCreateRows = this.#mapCreateRows([input.create as Record<string, unknown>]);
+    const createValues = mappedCreateRows[0] ?? {};
     applyCreateDefaults(this.ctx, this.tableName, [createValues]);
     const updateValues = mapModelDataToStorageRow(this.contract, this.modelName, input.update);
     const hasUpdateValues = Object.keys(updateValues).length > 0;
