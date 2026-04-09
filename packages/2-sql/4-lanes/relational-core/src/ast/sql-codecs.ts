@@ -43,6 +43,16 @@ const sqlCharCodec = codec<
   decode: (wire: string): string => wire.trimEnd(),
   paramsSchema: lengthParamsSchema,
   init: createLengthTypeHelper('fixed'),
+  renderOutputType: (typeParams) => {
+    const length = typeParams['length'];
+    if (length === undefined) return undefined;
+    if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
+      throw new Error(
+        `renderOutputType: expected integer "length" in typeParams for Char, got ${String(length)}`,
+      );
+    }
+    return `Char<${length}>`;
+  },
 });
 
 const sqlVarcharCodec = codec<
@@ -58,6 +68,16 @@ const sqlVarcharCodec = codec<
   decode: (wire: string): string => wire,
   paramsSchema: lengthParamsSchema,
   init: createLengthTypeHelper('variable'),
+  renderOutputType: (typeParams) => {
+    const length = typeParams['length'];
+    if (length === undefined) return undefined;
+    if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
+      throw new Error(
+        `renderOutputType: expected integer "length" in typeParams for Varchar, got ${String(length)}`,
+      );
+    }
+    return `Varchar<${length}>`;
+  },
 });
 
 const sqlIntCodec = codec({
@@ -91,6 +111,22 @@ const sqlTimestampCodec = codec({
   encode: (value: string | Date): string => (value instanceof Date ? value.toISOString() : value),
   decode: (wire: string | Date): string => (wire instanceof Date ? wire.toISOString() : wire),
   paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => {
+    const precision = typeParams['precision'];
+    if (precision === undefined) {
+      return 'Timestamp';
+    }
+    if (
+      typeof precision !== 'number' ||
+      !Number.isFinite(precision) ||
+      !Number.isInteger(precision)
+    ) {
+      throw new Error(
+        `renderOutputType: expected integer "precision" in typeParams for Timestamp, got ${String(precision)}`,
+      );
+    }
+    return `Timestamp<${precision}>`;
+  },
 });
 
 const codecs = defineCodecs()

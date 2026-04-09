@@ -995,6 +995,12 @@ importers:
       '@prisma-next/adapter-mongo':
         specifier: workspace:*
         version: link:../../../3-mongo-target/2-mongo-adapter
+      '@prisma-next/driver-mongo':
+        specifier: workspace:*
+        version: link:../../../3-mongo-target/3-mongo-driver
+      '@prisma-next/mongo-runtime':
+        specifier: workspace:*
+        version: link:../../7-runtime
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -1004,6 +1010,12 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../../0-config/tsdown
+      mongodb:
+        specifier: 'catalog:'
+        version: 6.21.0
+      mongodb-memory-server:
+        specifier: ^10.4.0
+        version: 10.4.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
@@ -1554,6 +1566,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../../0-config/tsdown
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/0-foundation/utils
       '@types/pg':
         specifier: 'catalog:'
         version: 8.16.0
@@ -1856,12 +1871,18 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
+      '@prisma-next/operations':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/operations
       '@prisma-next/runtime-executor':
         specifier: workspace:*
         version: link:../../1-framework/4-runtime/runtime-executor
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../2-sql/1-core/contract
+      '@prisma-next/sql-operations':
+        specifier: workspace:*
+        version: link:../../2-sql/1-core/operations
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../2-sql/4-lanes/relational-core
@@ -1878,6 +1899,12 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/cli
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/7-drivers/postgres
+      '@prisma-next/extension-pgvector':
+        specifier: workspace:*
+        version: link:../pgvector
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../2-sql/9-family

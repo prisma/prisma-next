@@ -2,18 +2,20 @@ import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type {
   ExtractCodecTypes,
+  ExtractQueryOperationTypes,
   SqlStorage,
   StorageColumn,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
-import type { AnyExpression } from '@prisma-next/sql-relational-core/ast';
 import {
+  type AnyExpression,
   BinaryExpr,
+  type BinaryOp,
   type CodecTrait,
-  type ColumnRef,
   ListExpression,
-  LiteralExpr,
   NullCheckExpr,
+  OrderByItem,
+  ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -23,13 +25,6 @@ import type { RowSelection } from './collection-internal-types';
 // ---------------------------------------------------------------------------
 // Comparison / Filter / Order / Include
 // ---------------------------------------------------------------------------
-
-export interface OrderExpr {
-  readonly column: string;
-  readonly direction: 'asc' | 'desc';
-}
-
-export type OrderByDirective = OrderExpr;
 
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
@@ -77,13 +72,14 @@ export interface IncludeExpr {
 export interface CollectionState {
   readonly filters: readonly AnyExpression[];
   readonly includes: readonly IncludeExpr[];
-  readonly orderBy: readonly OrderExpr[] | undefined;
+  readonly orderBy: readonly OrderByItem[] | undefined;
   readonly cursor: Readonly<Record<string, unknown>> | undefined;
   readonly distinct: readonly string[] | undefined;
   readonly distinctOn: readonly string[] | undefined;
   readonly selectedFields: readonly string[] | undefined;
   readonly limit: number | undefined;
   readonly offset: number | undefined;
+  readonly variantName: string | undefined;
 }
 
 export function emptyState(): CollectionState {
@@ -97,6 +93,7 @@ export function emptyState(): CollectionState {
     selectedFields: undefined,
     limit: undefined,
     offset: undefined,
+    variantName: undefined,
   };
 }
 
@@ -161,8 +158,8 @@ export type ComparisonMethodFns<T> = {
   notIn(values: readonly T[]): AnyExpression;
   isNull(): AnyExpression;
   isNotNull(): AnyExpression;
-  asc(): OrderByDirective;
-  desc(): OrderByDirective;
+  asc(): OrderByItem;
+  desc(): OrderByItem;
 };
 
 /**
@@ -178,30 +175,115 @@ export type ComparisonMethods<T, Traits> = {
 };
 
 // ---------------------------------------------------------------------------
+// Extension operation result — returned by calling an extension method
+// ---------------------------------------------------------------------------
+
+type QueryOperationReturnTraits<
+  Returns,
+  TCodecTypes extends Record<string, unknown>,
+> = Returns extends { readonly codecId: infer Id extends string }
+  ? Id extends keyof TCodecTypes
+    ? TCodecTypes[Id] extends { readonly traits: infer Traits }
+      ? Traits
+      : never
+    : never
+  : never;
+
+type QueryOperationReturnJsType<
+  Returns,
+  TCodecTypes extends Record<string, unknown>,
+> = Returns extends { readonly codecId: infer Id extends string; readonly nullable: infer N }
+  ? Id extends keyof TCodecTypes
+    ? TCodecTypes[Id] extends { readonly output: infer O }
+      ? N extends true
+        ? O | null
+        : O
+      : unknown
+    : unknown
+  : unknown;
+
+type CodecArgJsType<Arg, TCodecTypes extends Record<string, unknown>> = Arg extends {
+  readonly codecId: infer CId extends string;
+  readonly nullable: infer N;
+}
+  ? CId extends keyof TCodecTypes
+    ? TCodecTypes[CId] extends { readonly output: infer O }
+      ? N extends true
+        ? O | null
+        : O
+      : unknown
+    : unknown
+  : unknown;
+
+type MapArgsToJsTypes<
+  Args extends readonly unknown[],
+  TCodecTypes extends Record<string, unknown>,
+> = Args extends readonly [infer Head, ...infer Tail]
+  ? [CodecArgJsType<Head, TCodecTypes>, ...MapArgsToJsTypes<Tail, TCodecTypes>]
+  : [];
+
+type QueryOperationMethod<Op, TCodecTypes extends Record<string, unknown>> = Op extends {
+  readonly args: readonly [unknown, ...infer UserArgs];
+  readonly returns: infer Returns;
+}
+  ? (
+      ...args: MapArgsToJsTypes<UserArgs, TCodecTypes>
+    ) => ComparisonMethods<
+      QueryOperationReturnJsType<Returns, TCodecTypes>,
+      QueryOperationReturnTraits<Returns, TCodecTypes>
+    >
+  : never;
+
+type FieldOperations<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = FieldCodecId<TContract, ModelName, FieldName> extends infer CodecId extends string
+  ? ExtractQueryOperationTypes<TContract> extends infer AllOps
+    ? {
+        [OpName in keyof AllOps & string as AllOps[OpName] extends {
+          readonly args: readonly [{ readonly codecId: CodecId }, ...(readonly unknown[])];
+        }
+          ? OpName
+          : never]: QueryOperationMethod<AllOps[OpName], ExtractCodecTypes<TContract>>;
+      }
+    : unknown
+  : unknown;
+
+// ---------------------------------------------------------------------------
 // COMPARISON_METHODS_META — single source of truth for traits + factories
 // ---------------------------------------------------------------------------
 
-function literal(value: unknown): LiteralExpr {
-  return LiteralExpr.of(value);
+function param(codecId: string | undefined, value: unknown): ParamRef {
+  return codecId ? ParamRef.of(value, { codecId }) : ParamRef.of(value);
 }
 
-function listLiteral(values: readonly unknown[]): ListExpression {
-  return ListExpression.fromValues(values);
-}
-
-function bin(op: BinaryExpr['op'], column: ColumnRef, right: BinaryExpr['right']): BinaryExpr {
-  return new BinaryExpr(op, column, right);
+function paramList(codecId: string | undefined, values: readonly unknown[]): ListExpression {
+  return ListExpression.of(values.map((value) => param(codecId, value)));
 }
 
 // never[] is intentional: factories have heterogeneous signatures (value: unknown,
 // values: readonly unknown[], pattern: string, etc.) but are only called through
 // the typed ComparisonMethodFns interface, never through this type directly.
-type MethodFactory = (column: ColumnRef) => (...args: never[]) => unknown;
+type MethodFactory = (
+  left: AnyExpression,
+  codecId: string | undefined,
+) => (...args: never[]) => unknown;
 
 type ComparisonMethodMeta = {
   readonly traits: readonly CodecTrait[];
   readonly create: MethodFactory;
 };
+
+function scalarComparisonMethod(op: BinaryOp) {
+  return ((left, codecId) => (value: unknown) =>
+    new BinaryExpr(op, left, param(codecId, value))) satisfies MethodFactory;
+}
+
+function listComparisonMethod(op: BinaryOp) {
+  return ((left, codecId) => (values: readonly unknown[]) =>
+    new BinaryExpr(op, left, paramList(codecId, values))) satisfies MethodFactory;
+}
 
 /**
  * Declares trait requirements and runtime factory for each comparison method.
@@ -212,59 +294,59 @@ type ComparisonMethodMeta = {
 export const COMPARISON_METHODS_META = {
   eq: {
     traits: ['equality'],
-    create: (column) => (value: unknown) => bin('eq', column, literal(value)),
+    create: scalarComparisonMethod('eq'),
   },
   neq: {
     traits: ['equality'],
-    create: (column) => (value: unknown) => bin('neq', column, literal(value)),
+    create: scalarComparisonMethod('neq'),
   },
   in: {
     traits: ['equality'],
-    create: (column) => (values: readonly unknown[]) => bin('in', column, listLiteral(values)),
+    create: listComparisonMethod('in'),
   },
   notIn: {
     traits: ['equality'],
-    create: (column) => (values: readonly unknown[]) => bin('notIn', column, listLiteral(values)),
+    create: listComparisonMethod('notIn'),
   },
   gt: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('gt', column, literal(value)),
+    create: scalarComparisonMethod('gt'),
   },
   lt: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('lt', column, literal(value)),
+    create: scalarComparisonMethod('lt'),
   },
   gte: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('gte', column, literal(value)),
+    create: scalarComparisonMethod('gte'),
   },
   lte: {
     traits: ['order'],
-    create: (column) => (value: unknown) => bin('lte', column, literal(value)),
+    create: scalarComparisonMethod('lte'),
   },
   like: {
     traits: ['textual'],
-    create: (column) => (pattern: string) => bin('like', column, literal(pattern)),
+    create: scalarComparisonMethod('like'),
   },
   ilike: {
     traits: ['textual'],
-    create: (column) => (pattern: string) => bin('ilike', column, literal(pattern)),
+    create: scalarComparisonMethod('ilike'),
   },
   asc: {
     traits: ['order'],
-    create: (column) => () => ({ column: column.column, direction: 'asc' as const }),
+    create: (left) => () => OrderByItem.asc(left),
   },
   desc: {
     traits: ['order'],
-    create: (column) => () => ({ column: column.column, direction: 'desc' as const }),
+    create: (left) => () => OrderByItem.desc(left),
   },
   isNull: {
     traits: [],
-    create: (column) => () => NullCheckExpr.isNull(column),
+    create: (left) => () => NullCheckExpr.isNull(left),
   },
   isNotNull: {
     traits: [],
-    create: (column) => () => NullCheckExpr.isNotNull(column),
+    create: (left) => () => NullCheckExpr.isNotNull(left),
   },
 } as const satisfies Record<keyof ComparisonMethodFns<unknown>, ComparisonMethodMeta>;
 
@@ -292,7 +374,8 @@ type ScalarModelAccessor<TContract extends Contract<SqlStorage>, ModelName exten
   [K in keyof FieldsOf<TContract, ModelName> & string]: ComparisonMethods<
     FieldJsType<TContract, ModelName, K>,
     FieldTraits<TContract, ModelName, K>
-  >;
+  > &
+    FieldOperations<TContract, ModelName, K>;
 };
 
 type RelationModelAccessor<TContract extends Contract<SqlStorage>, ModelName extends string> = {
@@ -314,6 +397,65 @@ export type ModelAccessor<
 export type DefaultModelRow<TContract extends Contract<SqlStorage>, ModelName extends string> = {
   [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
 };
+
+// ---------------------------------------------------------------------------
+// InferRootRow — discriminated union for polymorphic base models
+// ---------------------------------------------------------------------------
+
+type Simplify<T> = { [K in keyof T]: T[K] } & {};
+
+type VariantRow<TContract extends Contract<SqlStorage>, ModelName extends string> = ModelDef<
+  TContract,
+  ModelName
+> extends {
+  readonly discriminator: { readonly field: infer DiscField extends string };
+  readonly variants: infer V;
+}
+  ? V extends Record<string, { readonly value: string }>
+    ? {
+        [VK in keyof V]: VK extends string & keyof ModelsOf<TContract>
+          ? Simplify<
+              Omit<DefaultModelRow<TContract, ModelName>, DiscField> &
+                DefaultModelRow<TContract, VK> &
+                Record<DiscField, V[VK]['value']>
+            >
+          : never;
+      }[keyof V]
+    : DefaultModelRow<TContract, ModelName>
+  : DefaultModelRow<TContract, ModelName>;
+
+export type InferRootRow<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+> = VariantRow<TContract, ModelName>;
+
+export type VariantNames<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+> = ModelDef<TContract, ModelName> extends {
+  readonly variants: infer V extends Record<string, unknown>;
+}
+  ? keyof V & string
+  : never;
+
+export type VariantModelRow<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  VariantName extends string,
+> = ModelDef<TContract, ModelName> extends {
+  readonly discriminator: { readonly field: infer DiscField extends string };
+  readonly variants: infer V;
+}
+  ? V extends Record<string, { readonly value: string }>
+    ? VariantName extends keyof V & string & keyof ModelsOf<TContract>
+      ? Simplify<
+          Omit<DefaultModelRow<TContract, ModelName>, DiscField> &
+            DefaultModelRow<TContract, VariantName> &
+            Record<DiscField, V[VariantName]['value']>
+        >
+      : DefaultModelRow<TContract, ModelName>
+    : DefaultModelRow<TContract, ModelName>
+  : DefaultModelRow<TContract, ModelName>;
 
 declare const aggregateResultBrand: unique symbol;
 

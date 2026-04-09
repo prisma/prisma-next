@@ -180,12 +180,26 @@ describe('enrichContract', () => {
     });
   });
 
-  it('strips controlPlaneHooks from extension pack metadata', () => {
+  it('strips controlPlaneHooks and codecInstances from extension pack metadata', () => {
     const extension = makeExtension({
       types: {
         codecTypes: {
           controlPlaneHooks: { 'pg/vector@1': { expandNativeType: () => 'vector' } },
-          parameterized: { 'pg/vector@1': () => 'Vector' },
+          codecInstances: [
+            {
+              id: 'pg/vector@1',
+              targetTypes: ['vector'],
+              encode: (v: unknown) => v,
+              decode: (v: unknown) => v,
+              encodeJson: () => null,
+              decodeJson: () => null,
+            },
+          ],
+          import: {
+            package: '@ext/pgvector',
+            named: 'PgvectorCodecTypes',
+            alias: 'PgvectorCodecTypes',
+          },
         },
       },
     });
@@ -196,7 +210,8 @@ describe('enrichContract', () => {
     const codecTypes = types['codecTypes'] as Record<string, unknown>;
 
     expect(codecTypes).not.toHaveProperty('controlPlaneHooks');
-    expect(codecTypes['parameterized']).toBeDefined();
+    expect(codecTypes).not.toHaveProperty('codecInstances');
+    expect(codecTypes['import']).toBeDefined();
   });
 
   it('does not create extension pack entries for non-extension components', () => {

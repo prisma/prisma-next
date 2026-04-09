@@ -29,8 +29,8 @@ import {
   SQL_TIMESTAMP_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
 } from './codec-ids';
+import { codecDefinitions } from './codecs';
 import { pgEnumControlHooks } from './enum-control-hooks';
-import { renderTypeScriptTypeFromJsonSchema } from './json-schema-type-expression';
 
 // ============================================================================
 // Helper functions for reducing boilerplate
@@ -42,16 +42,6 @@ const codecTypeImport = (named: string) =>
     package: '@prisma-next/adapter-postgres/codec-types',
     named,
     alias: named,
-  }) as const;
-
-/** Creates a precision-based TypeScript type renderer for temporal types */
-const precisionRenderer = (typeName: string) =>
-  ({
-    kind: 'function',
-    render: (params: Record<string, unknown>) => {
-      const precision = params['precision'];
-      return typeof precision === 'number' ? `${typeName}<${precision}>` : typeName;
-    },
   }) as const;
 
 function isPositiveInteger(value: unknown): value is number {
@@ -133,34 +123,6 @@ const precisionHooks: CodecControlHooks = { expandNativeType: expandPrecision };
 const numericHooks: CodecControlHooks = { expandNativeType: expandNumeric };
 const identityHooks: CodecControlHooks = { expandNativeType: ({ nativeType }) => nativeType };
 
-/**
- * Validates that a type expression string is safe to embed in generated .d.ts files.
- * Rejects expressions containing patterns that could inject executable code.
- */
-function isSafeTypeExpression(expr: string): boolean {
-  return !/import\s*\(|require\s*\(|declare\s|export\s|eval\s*\(/.test(expr);
-}
-
-function renderJsonTypeExpression(params: Record<string, unknown>): string {
-  const typeName = params['type'];
-  if (typeof typeName === 'string' && typeName.trim().length > 0) {
-    const trimmed = typeName.trim();
-    if (!isSafeTypeExpression(trimmed)) {
-      return 'JsonValue';
-    }
-    return trimmed;
-  }
-  const schema = params['schemaJson'];
-  if (schema && typeof schema === 'object') {
-    const rendered = renderTypeScriptTypeFromJsonSchema(schema);
-    if (!isSafeTypeExpression(rendered)) {
-      return 'JsonValue';
-    }
-    return rendered;
-  }
-  return 'JsonValue';
-}
-
 // ============================================================================
 // Descriptor metadata
 // ============================================================================
@@ -186,55 +148,11 @@ export const postgresAdapterDescriptorMeta = {
   },
   types: {
     codecTypes: {
+      codecInstances: Object.values(codecDefinitions).map((def) => def.codec),
       import: {
         package: '@prisma-next/adapter-postgres/codec-types',
         named: 'CodecTypes',
         alias: 'PgTypes',
-      },
-      parameterized: {
-        [SQL_CHAR_CODEC_ID]: 'Char<{{length}}>',
-        [SQL_VARCHAR_CODEC_ID]: 'Varchar<{{length}}>',
-        [SQL_TIMESTAMP_CODEC_ID]: precisionRenderer('Timestamp'),
-        [PG_CHAR_CODEC_ID]: 'Char<{{length}}>',
-        [PG_VARCHAR_CODEC_ID]: 'Varchar<{{length}}>',
-        [PG_NUMERIC_CODEC_ID]: {
-          kind: 'function',
-          render: (params: Record<string, unknown>) => {
-            const precision = params['precision'];
-            if (typeof precision !== 'number') {
-              throw new Error('pg/numeric@1 renderer expects precision');
-            }
-            const scale = params['scale'];
-            return typeof scale === 'number'
-              ? `Numeric<${precision}, ${scale}>`
-              : `Numeric<${precision}>`;
-          },
-        },
-        [PG_BIT_CODEC_ID]: 'Bit<{{length}}>',
-        [PG_VARBIT_CODEC_ID]: 'VarBit<{{length}}>',
-        [PG_TIMESTAMP_CODEC_ID]: precisionRenderer('Timestamp'),
-        [PG_TIMESTAMPTZ_CODEC_ID]: precisionRenderer('Timestamptz'),
-        [PG_TIME_CODEC_ID]: precisionRenderer('Time'),
-        [PG_TIMETZ_CODEC_ID]: precisionRenderer('Timetz'),
-        [PG_INTERVAL_CODEC_ID]: precisionRenderer('Interval'),
-        [PG_ENUM_CODEC_ID]: {
-          kind: 'function',
-          render: (params: Record<string, unknown>) => {
-            const values = params['values'];
-            if (!Array.isArray(values)) {
-              throw new Error('pg/enum@1 renderer expects values array');
-            }
-            return values.map((value) => `'${String(value).replace(/'/g, "\\'")}'`).join(' | ');
-          },
-        },
-        [PG_JSON_CODEC_ID]: {
-          kind: 'function',
-          render: renderJsonTypeExpression,
-        },
-        [PG_JSONB_CODEC_ID]: {
-          kind: 'function',
-          render: renderJsonTypeExpression,
-        },
       },
       typeImports: [
         {

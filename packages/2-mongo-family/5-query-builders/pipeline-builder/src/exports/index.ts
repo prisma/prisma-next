@@ -4,6 +4,9 @@ export { fn } from '../expression-helpers';
 export type { PipelineRoot } from '../pipeline';
 export { mongoPipeline } from '../pipeline';
 export type {
+  ArrayField,
+  BooleanField,
+  DateField,
   DocField,
   DocShape,
   ExtractDocShape,
@@ -12,10 +15,15 @@ export type {
   FilterProxy,
   GroupedDocShape,
   GroupSpec,
+  LiteralValue,
   ModelToDocShape,
+  NullableDocField,
+  NullableNumericField,
+  NumericField,
   ProjectedShape,
   ResolveRow,
   SortSpec,
+  StringField,
   TypedAccumulatorExpr,
   TypedAggExpr,
   UnwoundShape,

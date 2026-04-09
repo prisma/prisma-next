@@ -21,6 +21,7 @@ model User {
   kind      user_type
   address   Address?
   posts     Post[]
+  tasks     Task[]
 
   @@map("user")
 }
@@ -35,5 +36,34 @@ model Post {
   user User @relation(fields: [userId], references: [id])
 
   @@map("post")
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  status      String   @default("open")
+  type        String
+  userId      String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@discriminator(type)
+  @@map("task")
+}
+
+model Bug {
+  severity    String
+  stepsToRepro String?
+  @@base(Task, "bug")
+  @@map("bug")
+}
+
+model Feature {
+  priority    String
+  targetRelease String?
+  @@base(Task, "feature")
+  @@map("feature")
 }
 

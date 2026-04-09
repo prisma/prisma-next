@@ -1,5 +1,6 @@
 import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import { pgvectorAuthoringTypes } from './authoring';
+import { codecDefinitions } from './codecs';
 
 const pgvectorTypeId = 'pg/vector@1' as const;
 
@@ -48,6 +49,7 @@ export const pgvectorPackMeta = {
   },
   types: {
     codecTypes: {
+      codecInstances: Object.values(codecDefinitions).map((def) => def.codec),
       import: {
         package: '@prisma-next/extension-pgvector/codec-types',
         named: 'CodecTypes',
@@ -60,9 +62,6 @@ export const pgvectorPackMeta = {
           alias: 'Vector',
         },
       ],
-      parameterized: {
-        [pgvectorTypeId]: 'Vector<{{length}}>',
-      },
     },
     operationTypes: {
       import: {

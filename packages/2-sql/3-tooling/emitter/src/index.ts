@@ -1,7 +1,6 @@
-import type { Contract, ContractField, ContractModel } from '@prisma-next/contract/types';
+import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import {
   generateCodecTypeIntersection,
-  generateContractFieldDescriptor,
   serializeObjectKey,
   serializeValue,
 } from '@prisma-next/emitter/domain-type-generation';
@@ -23,14 +22,6 @@ function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined)
   }
 
   return `{ ${entries.join('; ')} }`;
-}
-
-function isNonScalarField(field: unknown): field is ContractField {
-  if (typeof field !== 'object' || field === null) return false;
-  const f = field as Record<string, unknown>;
-  if (typeof f['type'] !== 'object' || f['type'] === null) return false;
-  const t = f['type'] as Record<string, unknown>;
-  return t['kind'] !== 'scalar';
 }
 
 export const sqlEmission = {
@@ -307,130 +298,6 @@ export const sqlEmission = {
     return `{ ${storageParts.join('; ')} }`;
   },
 
-  generateModelsType(contract: Contract, options?: GenerateContractTypesOptions): string {
-    const storage = contract.storage as unknown as SqlStorage;
-    const models = contract.models as Record<string, ContractModel<SqlModelStorage>> | undefined;
-
-    if (!models || Object.keys(models).length === 0) {
-      return 'Record<string, never>';
-    }
-
-    const modelTypes: string[] = [];
-    for (const [modelName, model] of Object.entries(models).sort(([a], [b]) =>
-      a.localeCompare(b),
-    )) {
-      const fields: string[] = [];
-      const storageFieldParts: string[] = [];
-      const tableName = model.storage.table;
-      const table = storage.tables[tableName];
-
-      const storageFields = model.storage.fields ?? {};
-      const domainFields = model.fields as Record<string, ContractField> | undefined;
-      if (table) {
-        for (const [fieldName, field] of Object.entries(storageFields)) {
-          storageFieldParts.push(
-            `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
-          );
-
-          const domainField = domainFields?.[fieldName];
-          if (isNonScalarField(domainField)) {
-            fields.push(generateContractFieldDescriptor(fieldName, domainField));
-            continue;
-          }
-
-          const column = table.columns[field.column];
-          if (!column) {
-            fields.push(
-              `readonly ${fieldName}: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'unknown' } }`,
-            );
-            continue;
-          }
-
-          const nullable = column.nullable ?? false;
-          const resolvedTypeParams =
-            column.typeParams && Object.keys(column.typeParams).length > 0
-              ? column.typeParams
-              : column.typeRef
-                ? storage.types?.[column.typeRef]?.typeParams
-                : undefined;
-          const renderer = options?.parameterizedRenderers?.get(column.codecId);
-          if (renderer && resolvedTypeParams && Object.keys(resolvedTypeParams).length > 0) {
-            const renderedType = renderer.render(resolvedTypeParams, {
-              codecTypesName: 'CodecTypes',
-            });
-            const nullSuffix = nullable ? ' | null' : '';
-            fields.push(`readonly ${fieldName}: ${renderedType}${nullSuffix}`);
-          } else {
-            const fieldTypeParamsSpec =
-              resolvedTypeParams && Object.keys(resolvedTypeParams).length > 0
-                ? `; readonly typeParams: ${serializeTypeParamsLiteral(resolvedTypeParams)}`
-                : '';
-            fields.push(
-              `readonly ${fieldName}: { readonly nullable: ${nullable}; readonly type: { readonly kind: 'scalar'; readonly codecId: ${serializeValue(column.codecId)}${fieldTypeParamsSpec} } }`,
-            );
-          }
-        }
-      } else {
-        for (const [fieldName, field] of Object.entries(storageFields)) {
-          storageFieldParts.push(
-            `readonly ${fieldName}: { readonly column: ${serializeValue(field.column)} }`,
-          );
-
-          const domainField = domainFields?.[fieldName];
-          if (isNonScalarField(domainField)) {
-            fields.push(generateContractFieldDescriptor(fieldName, domainField));
-            continue;
-          }
-
-          fields.push(
-            `readonly ${fieldName}: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'unknown' } }`,
-          );
-        }
-      }
-
-      const relations: string[] = [];
-      const modelRels = model.relations as Record<string, unknown>;
-      for (const [relName, rel] of Object.entries(modelRels)) {
-        if (typeof rel !== 'object' || rel === null) continue;
-        const relObj = rel as Record<string, unknown>;
-        const relParts: string[] = [];
-        if (relObj['to']) relParts.push(`readonly to: '${relObj['to']}'`);
-        if (relObj['cardinality'])
-          relParts.push(`readonly cardinality: '${relObj['cardinality']}'`);
-        const on = relObj['on'] as { localFields?: string[]; targetFields?: string[] } | undefined;
-        if (on?.localFields && on.targetFields) {
-          const localFields = on.localFields.map((f) => serializeValue(f)).join(', ');
-          const targetFields = on.targetFields.map((f) => serializeValue(f)).join(', ');
-          relParts.push(
-            `readonly on: { readonly localFields: readonly [${localFields}]; readonly targetFields: readonly [${targetFields}] }`,
-          );
-        }
-        if (relParts.length > 0) {
-          relations.push(`readonly ${relName}: { ${relParts.join('; ')} }`);
-        }
-      }
-
-      const storageParts = [`readonly table: '${tableName}'`];
-      if (storageFieldParts.length > 0) {
-        storageParts.push(`readonly fields: { ${storageFieldParts.join('; ')} }`);
-      }
-
-      const modelParts: string[] = [
-        `readonly storage: { ${storageParts.join('; ')} }`,
-        `readonly fields: { ${fields.join('; ')} }`,
-        `readonly relations: { ${relations.join('; ')} }`,
-      ];
-
-      if (model.owner) {
-        modelParts.push(`owner: ${serializeValue(model.owner)}`);
-      }
-
-      modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
-    }
-
-    return `{ ${modelTypes.join('; ')} }`;
-  },
-
   getFamilyImports(): string[] {
     return [
       'import type {',
@@ -458,7 +325,7 @@ export const sqlEmission = {
   },
 
   getTypeMapsExpression(): string {
-    return 'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>';
+    return 'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes>';
   },
 
   getContractWrapper(contractBaseName: string, typeMapsName: string): string {

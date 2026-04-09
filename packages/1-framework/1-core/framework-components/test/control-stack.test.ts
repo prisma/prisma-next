@@ -3,11 +3,10 @@ import type { CreateControlStackInput } from '../src/control-stack';
 import {
   assembleAuthoringContributions,
   createControlStack,
+  extractCodecLookup,
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,
-  extractParameterizedRenderers,
-  extractParameterizedTypeImports,
   extractQueryOperationTypeImports,
 } from '../src/control-stack';
 import type { ComponentDescriptor } from '../src/framework-components';
@@ -138,198 +137,6 @@ describe('extractComponentIds', () => {
   });
 });
 
-describe('extractParameterizedRenderers', () => {
-  it('returns empty map when no descriptors have parameterized renderers', () => {
-    const result = extractParameterizedRenderers([createDescriptor()]);
-    expect(result.size).toBe(0);
-  });
-
-  it('extracts and normalizes template renderers', () => {
-    const renderers = extractParameterizedRenderers([
-      createDescriptor({
-        types: {
-          codecTypes: {
-            parameterized: {
-              'test/vector@1': { kind: 'template', template: 'Vector<{{length}}>' },
-            },
-          },
-        },
-      }),
-    ]);
-    expect(renderers.size).toBe(1);
-    const r = renderers.get('test/vector@1');
-    expect(r?.render({ length: 1536 }, { codecTypesName: 'CodecTypes' })).toBe('Vector<1536>');
-  });
-
-  it('extracts and normalizes raw string template renderers', () => {
-    const renderers = extractParameterizedRenderers([
-      createDescriptor({
-        types: {
-          codecTypes: {
-            parameterized: {
-              'pg/vector@1': 'Vector<{{length}}>',
-            },
-          },
-        },
-      }),
-    ]);
-    expect(renderers.size).toBe(1);
-    const r = renderers.get('pg/vector@1');
-    expect(r?.render({ length: 1536 }, { codecTypesName: 'CodecTypes' })).toBe('Vector<1536>');
-  });
-
-  it('extracts and normalizes raw function renderers', () => {
-    const renderers = extractParameterizedRenderers([
-      createDescriptor({
-        types: {
-          codecTypes: {
-            parameterized: {
-              'test/custom@1': (params: Record<string, unknown>, ctx: { codecTypesName: string }) =>
-                `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
-            },
-          },
-        },
-      }),
-    ]);
-    expect(renderers.size).toBe(1);
-    const r = renderers.get('test/custom@1');
-    expect(r?.render({ precision: 10 }, { codecTypesName: 'CodecTypes' })).toBe(
-      'Custom<10, CodecTypes>',
-    );
-  });
-
-  it('extracts structured function-based renderers', () => {
-    const renderers = extractParameterizedRenderers([
-      createDescriptor({
-        types: {
-          codecTypes: {
-            parameterized: {
-              'test/custom@1': {
-                kind: 'function',
-                render: (params: Record<string, unknown>, ctx: { codecTypesName: string }) =>
-                  `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
-              },
-            },
-          },
-        },
-      }),
-    ]);
-    expect(renderers.size).toBe(1);
-    const r = renderers.get('test/custom@1');
-    expect(r?.render({ precision: 10 }, { codecTypesName: 'CodecTypes' })).toBe(
-      'Custom<10, CodecTypes>',
-    );
-  });
-
-  it('collects renderers from multiple descriptors', () => {
-    const renderers = extractParameterizedRenderers([
-      createDescriptor({
-        id: 'adapter',
-        types: {
-          codecTypes: {
-            parameterized: {
-              'pg/numeric@1': { kind: 'template', template: 'Decimal<{{precision}}, {{scale}}>' },
-            },
-          },
-        },
-      }),
-      createDescriptor({
-        id: 'ext',
-        types: {
-          codecTypes: {
-            parameterized: {
-              'pg/vector@1': { kind: 'template', template: 'Vector<{{length}}>' },
-            },
-          },
-        },
-      }),
-    ]);
-    expect(Array.from(renderers.keys())).toEqual(['pg/numeric@1', 'pg/vector@1']);
-  });
-
-  it('throws on duplicate codecId across descriptors', () => {
-    expect(() =>
-      extractParameterizedRenderers([
-        createDescriptor({
-          id: 'first',
-          types: {
-            codecTypes: {
-              parameterized: { 'dup@1': 'T<{{x}}>' },
-            },
-          },
-        }),
-        createDescriptor({
-          id: 'second',
-          types: {
-            codecTypes: {
-              parameterized: { 'dup@1': 'T<{{x}}>' },
-            },
-          },
-        }),
-      ]),
-    ).toThrow(/Duplicate.*"dup@1".*"second" conflicts with "first"/);
-  });
-
-  it('interpolates {{CodecTypes}} placeholder with context value', () => {
-    const renderers = extractParameterizedRenderers([
-      createDescriptor({
-        types: {
-          codecTypes: {
-            parameterized: {
-              'test/custom@1': {
-                kind: 'template',
-                template: "{{CodecTypes}}['test/custom@1']['output'] & { length: {{length}} }",
-              },
-            },
-          },
-        },
-      }),
-    ]);
-    const r = renderers.get('test/custom@1');
-    expect(r?.render({ length: 256 }, { codecTypesName: 'MyCodecTypes' })).toBe(
-      "MyCodecTypes['test/custom@1']['output'] & { length: 256 }",
-    );
-  });
-
-  it('throws for missing template parameter', () => {
-    const renderers = extractParameterizedRenderers([
-      createDescriptor({
-        types: {
-          codecTypes: {
-            parameterized: {
-              'test/vector@1': { kind: 'template', template: 'Vector<{{length}}>' },
-            },
-          },
-        },
-      }),
-    ]);
-    const r = renderers.get('test/vector@1')!;
-    expect(() => r.render({}, { codecTypesName: 'CodecTypes' })).toThrow(
-      /Missing template parameter "length" in template "Vector<\{\{length\}\}>"/,
-    );
-  });
-});
-
-describe('extractParameterizedTypeImports', () => {
-  it('returns empty array for descriptors without type imports', () => {
-    const result = extractParameterizedTypeImports([createDescriptor()]);
-    expect(result).toEqual([]);
-  });
-
-  it('extracts type imports from codec types', () => {
-    const result = extractParameterizedTypeImports([
-      createDescriptor({
-        types: {
-          codecTypes: {
-            typeImports: [{ package: '@test/vec', named: 'Vector', alias: 'V' }],
-          },
-        },
-      }),
-    ]);
-    expect(result).toEqual([{ package: '@test/vec', named: 'Vector', alias: 'V' }]);
-  });
-});
-
 describe('assembleAuthoringContributions', () => {
   it('returns empty namespaces for descriptors without authoring', () => {
     const result = assembleAuthoringContributions([createDescriptor()]);
@@ -380,6 +187,44 @@ describe('assembleAuthoringContributions', () => {
   });
 });
 
+describe('extractCodecLookup', () => {
+  const stubCodec = (id: string) =>
+    ({
+      id,
+      targetTypes: [],
+      decode: (w: unknown) => w,
+      encodeJson: (v: unknown) => v,
+      decodeJson: (j: unknown) => j,
+    }) as unknown as import('../src/codec-types').Codec;
+
+  it('builds a lookup from codec instances across descriptors', () => {
+    const codec1 = stubCodec('a@1');
+    const codec2 = stubCodec('b@1');
+    const lookup = extractCodecLookup([
+      { id: 'desc-1', types: { codecTypes: { codecInstances: [codec1] } } },
+      { id: 'desc-2', types: { codecTypes: { codecInstances: [codec2] } } },
+    ]);
+    expect(lookup.get('a@1')).toBe(codec1);
+    expect(lookup.get('b@1')).toBe(codec2);
+  });
+
+  it('returns undefined for unknown codec ids', () => {
+    const lookup = extractCodecLookup([
+      { id: 'desc', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
+    ]);
+    expect(lookup.get('z@1')).toBeUndefined();
+  });
+
+  it('throws on duplicate codec ids from different descriptors', () => {
+    expect(() =>
+      extractCodecLookup([
+        { id: 'desc-1', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
+        { id: 'desc-2', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
+      ]),
+    ).toThrow(/Duplicate codec instance for codecId "a@1"/);
+  });
+});
+
 describe('createControlStack', () => {
   it('assembles all component state from family + target + adapter + extensions', () => {
     const state = createControlStack(
@@ -399,7 +244,6 @@ describe('createControlStack', () => {
           id: 'adapter',
           types: {
             codecTypes: {
-              parameterized: { 'test/p@1': 'P<{{n}}>' },
               typeImports: [{ package: '@test/param', named: 'P', alias: 'TP' }],
             },
             operationTypes: {
@@ -426,8 +270,6 @@ describe('createControlStack', () => {
     expect(state.operationTypeImports).toHaveLength(1);
     expect(state.queryOperationTypeImports).toHaveLength(1);
     expect(state.extensionIds).toEqual(['sql', 'target', 'adapter']);
-    expect(state.parameterizedRenderers.size).toBe(1);
-    expect(state.parameterizedTypeImports).toHaveLength(1);
     expect(Object.keys(state.authoringContributions.type)).toEqual(['myType']);
   });
 
@@ -469,7 +311,6 @@ describe('createControlStack', () => {
     expect(state.codecTypeImports).toHaveLength(1);
     expect(state.extensionIds).toEqual(['mongo']);
     expect(state.operationTypeImports).toEqual([]);
-    expect(state.parameterizedRenderers.size).toBe(0);
   });
 
   it('returns empty state when descriptors have no types', () => {
@@ -483,8 +324,6 @@ describe('createControlStack', () => {
     expect(state.operationTypeImports).toEqual([]);
     expect(state.queryOperationTypeImports).toEqual([]);
     expect(state.extensionIds).toEqual(['fam', 'tgt']);
-    expect(state.parameterizedRenderers.size).toBe(0);
-    expect(state.parameterizedTypeImports).toEqual([]);
     expect(state.authoringContributions).toEqual({ field: {}, type: {} });
   });
 });

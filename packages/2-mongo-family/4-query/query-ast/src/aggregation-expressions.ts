@@ -1,10 +1,38 @@
 import { MongoAstNode } from './ast-node';
 import type { MongoAggExprRewriter, MongoAggExprVisitor } from './visitors';
 
-function isExprArray(
-  args: MongoAggExpr | ReadonlyArray<MongoAggExpr>,
+export type AggRecordArgs = Readonly<Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>>>;
+
+export function isExprArray(
+  args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | AggRecordArgs,
 ): args is ReadonlyArray<MongoAggExpr> {
   return Array.isArray(args);
+}
+
+export function isRecordArgs(
+  args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | AggRecordArgs,
+): args is AggRecordArgs {
+  return !Array.isArray(args) && typeof args === 'object' && !('accept' in args);
+}
+
+function freezeRecordArgs(record: AggRecordArgs): AggRecordArgs {
+  const frozen: Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>> = {};
+  for (const [key, val] of Object.entries(record)) {
+    frozen[key] = Array.isArray(val) ? Object.freeze([...val]) : val;
+  }
+  return Object.freeze(frozen);
+}
+
+function rewriteRecordArgs(record: AggRecordArgs, rewriter: MongoAggExprRewriter): AggRecordArgs {
+  const result: Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>> = {};
+  for (const [key, val] of Object.entries(record)) {
+    if (Array.isArray(val)) {
+      result[key] = val.map((v: MongoAggExpr) => v.rewrite(rewriter));
+    } else {
+      result[key] = (val as MongoAggExpr).rewrite(rewriter);
+    }
+  }
+  return result;
 }
 
 abstract class MongoAggExprNode extends MongoAstNode {
@@ -64,16 +92,25 @@ export class MongoAggLiteral extends MongoAggExprNode {
 export class MongoAggOperator extends MongoAggExprNode {
   readonly kind = 'operator' as const;
   readonly op: string;
-  readonly args: MongoAggExpr | ReadonlyArray<MongoAggExpr>;
+  readonly args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | AggRecordArgs;
 
-  constructor(op: string, args: MongoAggExpr | ReadonlyArray<MongoAggExpr>) {
+  constructor(op: string, args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | AggRecordArgs) {
     super();
     this.op = op;
-    this.args = Array.isArray(args) ? Object.freeze([...args]) : args;
+    if (Array.isArray(args)) {
+      this.args = Object.freeze([...args]);
+    } else if (isRecordArgs(args)) {
+      this.args = freezeRecordArgs(args);
+    } else {
+      this.args = args;
+    }
     this.freeze();
   }
 
-  static of(op: string, args: MongoAggExpr | ReadonlyArray<MongoAggExpr>): MongoAggOperator {
+  static of(
+    op: string,
+    args: MongoAggExpr | ReadonlyArray<MongoAggExpr> | AggRecordArgs,
+  ): MongoAggOperator {
     return new MongoAggOperator(op, args);
   }
 
@@ -115,9 +152,14 @@ export class MongoAggOperator extends MongoAggExprNode {
 
   rewrite(rewriter: MongoAggExprRewriter): MongoAggExpr {
     const { args } = this;
-    const rewrittenArgs = isExprArray(args)
-      ? args.map((a) => a.rewrite(rewriter))
-      : args.rewrite(rewriter);
+    let rewrittenArgs: MongoAggExpr | ReadonlyArray<MongoAggExpr> | AggRecordArgs;
+    if (isExprArray(args)) {
+      rewrittenArgs = args.map((a) => a.rewrite(rewriter));
+    } else if (isRecordArgs(args)) {
+      rewrittenArgs = rewriteRecordArgs(args, rewriter);
+    } else {
+      rewrittenArgs = args.rewrite(rewriter);
+    }
     const rebuilt = new MongoAggOperator(this.op, rewrittenArgs);
     return rewriter.operator ? rewriter.operator(rebuilt) : rebuilt;
   }
@@ -126,16 +168,20 @@ export class MongoAggOperator extends MongoAggExprNode {
 export class MongoAggAccumulator extends MongoAggExprNode {
   readonly kind = 'accumulator' as const;
   readonly op: string;
-  readonly arg: MongoAggExpr | null;
+  readonly arg: MongoAggExpr | AggRecordArgs | null;
 
-  constructor(op: string, arg: MongoAggExpr | null) {
+  constructor(op: string, arg: MongoAggExpr | AggRecordArgs | null) {
     super();
     this.op = op;
-    this.arg = arg;
+    if (arg !== null && isRecordArgs(arg)) {
+      this.arg = freezeRecordArgs(arg);
+    } else {
+      this.arg = arg;
+    }
     this.freeze();
   }
 
-  static of(op: string, arg: MongoAggExpr | null): MongoAggAccumulator {
+  static of(op: string, arg: MongoAggExpr | AggRecordArgs | null): MongoAggAccumulator {
     return new MongoAggAccumulator(op, arg);
   }
 
@@ -175,12 +221,27 @@ export class MongoAggAccumulator extends MongoAggExprNode {
     return new MongoAggAccumulator('$count', null);
   }
 
+  static stdDevPop(expr: MongoAggExpr): MongoAggAccumulator {
+    return new MongoAggAccumulator('$stdDevPop', expr);
+  }
+
+  static stdDevSamp(expr: MongoAggExpr): MongoAggAccumulator {
+    return new MongoAggAccumulator('$stdDevSamp', expr);
+  }
+
   accept<R>(visitor: MongoAggExprVisitor<R>): R {
     return visitor.accumulator(this);
   }
 
   rewrite(rewriter: MongoAggExprRewriter): MongoAggExpr {
-    const rewrittenArg = this.arg ? this.arg.rewrite(rewriter) : null;
+    let rewrittenArg: MongoAggExpr | AggRecordArgs | null;
+    if (this.arg === null) {
+      rewrittenArg = null;
+    } else if (isRecordArgs(this.arg)) {
+      rewrittenArg = rewriteRecordArgs(this.arg, rewriter);
+    } else {
+      rewrittenArg = this.arg.rewrite(rewriter);
+    }
     const rebuilt = new MongoAggAccumulator(this.op, rewrittenArg);
     return rewriter.accumulator ? rewriter.accumulator(rebuilt) : rebuilt;
   }

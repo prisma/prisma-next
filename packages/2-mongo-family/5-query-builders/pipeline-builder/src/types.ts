@@ -15,10 +15,27 @@ export type NumericField = { readonly codecId: 'mongo/double@1'; readonly nullab
 export type NullableNumericField = { readonly codecId: 'mongo/double@1'; readonly nullable: true };
 export type StringField = { readonly codecId: 'mongo/string@1'; readonly nullable: false };
 export type ArrayField = { readonly codecId: 'mongo/array@1'; readonly nullable: false };
+export type BooleanField = { readonly codecId: 'mongo/bool@1'; readonly nullable: false };
+export type DateField = { readonly codecId: 'mongo/date@1'; readonly nullable: false };
+export type NullableDocField = { readonly codecId: string; readonly nullable: true };
+
+export type LiteralValue<F extends DocField> = F extends StringField
+  ? string
+  : F extends NumericField
+    ? number
+    : F extends BooleanField
+      ? boolean
+      : F extends DateField
+        ? Date
+        : unknown;
 
 export type DocShape = Record<string, DocField>;
 
-type ExtractCodecId<F> = F extends { type: { kind: 'scalar'; codecId: infer C } } ? C : string;
+type ExtractCodecId<F> = F extends { type: { kind: 'scalar'; codecId: infer C } }
+  ? C
+  : F extends { codecId: infer C extends string }
+    ? C
+    : string;
 
 export type ModelToDocShape<
   TContract extends MongoContract,

@@ -51,10 +51,9 @@ export {
   assembleAuthoringContributions,
   assertUniqueCodecOwner,
   createControlStack,
+  extractCodecLookup,
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,
-  extractParameterizedRenderers,
-  extractParameterizedTypeImports,
   extractQueryOperationTypeImports,
 } from '../control-stack';

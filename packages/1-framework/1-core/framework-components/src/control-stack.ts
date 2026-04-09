@@ -1,3 +1,4 @@
+import type { CodecLookup } from './codec-types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -13,8 +14,6 @@ import type {
   AuthoringTypeNamespace,
 } from './framework-authoring';
 import type { ComponentMetadata } from './framework-components';
-import type { NormalizedTypeRenderer, TypeRenderer } from './type-renderers';
-import { normalizeRenderer } from './type-renderers';
 import type { TypesImportSpec } from './types-import-spec';
 
 export interface AssembledAuthoringContributions {
@@ -36,8 +35,7 @@ export interface ControlStack<
   readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly queryOperationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
-  readonly parameterizedRenderers: Map<string, NormalizedTypeRenderer>;
-  readonly parameterizedTypeImports: ReadonlyArray<TypesImportSpec>;
+  readonly codecLookup: CodecLookup;
   readonly authoringContributions: AssembledAuthoringContributions;
 }
 
@@ -148,48 +146,6 @@ export function extractComponentIds(
   return ids;
 }
 
-export function extractParameterizedRenderers(
-  descriptors: ReadonlyArray<Pick<ComponentMetadata, 'types'> & { readonly id: string }>,
-): Map<string, NormalizedTypeRenderer> {
-  const renderers = new Map<string, NormalizedTypeRenderer>();
-  const owners = new Map<string, string>();
-
-  for (const descriptor of descriptors) {
-    const codecTypes = descriptor.types?.codecTypes;
-    if (!codecTypes?.parameterized) continue;
-
-    const parameterized: Record<string, TypeRenderer> = codecTypes.parameterized;
-    for (const [codecId, renderer] of Object.entries(parameterized)) {
-      assertUniqueCodecOwner({
-        codecId,
-        owners,
-        descriptorId: descriptor.id,
-        entityLabel: 'parameterized renderer',
-        entityOwnershipLabel: 'renderer',
-      });
-      renderers.set(codecId, normalizeRenderer(codecId, renderer));
-      owners.set(codecId, descriptor.id);
-    }
-  }
-
-  return renderers;
-}
-
-export function extractParameterizedTypeImports(
-  descriptors: ReadonlyArray<Pick<ComponentMetadata, 'types'>>,
-): ReadonlyArray<TypesImportSpec> {
-  const imports: TypesImportSpec[] = [];
-
-  for (const descriptor of descriptors) {
-    const typeImports = descriptor.types?.codecTypes?.typeImports;
-    if (typeImports) {
-      imports.push(...typeImports);
-    }
-  }
-
-  return imports;
-}
-
 function isTypeConstructorDescriptor(value: unknown): value is AuthoringTypeConstructorDescriptor {
   return (
     typeof value === 'object' &&
@@ -288,6 +244,30 @@ export function assembleAuthoringContributions(
   };
 }
 
+export function extractCodecLookup(
+  descriptors: ReadonlyArray<Pick<ComponentMetadata & { id?: string }, 'types' | 'id'>>,
+): CodecLookup {
+  const byId = new Map<string, import('./codec-types').Codec>();
+  const owners = new Map<string, string>();
+  for (const descriptor of descriptors) {
+    const codecInstances = descriptor.types?.codecTypes?.codecInstances;
+    if (!codecInstances) continue;
+    const descriptorId = descriptor.id ?? '<unknown>';
+    for (const codec of codecInstances) {
+      assertUniqueCodecOwner({
+        codecId: codec.id,
+        owners,
+        descriptorId,
+        entityLabel: 'codec instance',
+        entityOwnershipLabel: 'codec instance provider',
+      });
+      owners.set(codec.id, descriptorId);
+      byId.set(codec.id, codec);
+    }
+  }
+  return { get: (id) => byId.get(id) };
+}
+
 export function createControlStack<TFamilyId extends string, TTargetId extends string>(
   input: CreateControlStackInput<TFamilyId, TTargetId>,
 ): ControlStack<TFamilyId, TTargetId> {
@@ -306,8 +286,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     operationTypeImports: extractOperationTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
     extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
-    parameterizedRenderers: extractParameterizedRenderers(allDescriptors),
-    parameterizedTypeImports: extractParameterizedTypeImports(allDescriptors),
+    codecLookup: extractCodecLookup(allDescriptors),
     authoringContributions: assembleAuthoringContributions(allDescriptors),
   };
 }

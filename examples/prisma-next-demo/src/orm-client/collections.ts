@@ -36,3 +36,17 @@ export class PostCollection extends Collection<Contract, 'Post'> {
     return this.orderBy((post) => post.createdAt.desc());
   }
 }
+
+export class TaskCollection extends Collection<Contract, 'Task'> {
+  bugs() {
+    return this.variant('Bug');
+  }
+
+  features() {
+    return this.variant('Feature');
+  }
+
+  forUser(userId: string) {
+    return this.where({ userId });
+  }
+}

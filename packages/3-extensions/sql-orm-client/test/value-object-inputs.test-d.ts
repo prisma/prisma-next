@@ -2,7 +2,7 @@ import { expectTypeOf, test } from 'vitest';
 import type { CreateInput, DefaultModelRow, MutationUpdateInput } from '../src/types';
 import type { Contract } from './fixtures/generated/contract';
 
-type AddressShape = { street: string; city: string; zip: string | null };
+type AddressShape = { readonly street: string; readonly city: string; readonly zip: string | null };
 
 test('DefaultModelRow expands value object to inline structure', () => {
   type Row = DefaultModelRow<Contract, 'User'>;

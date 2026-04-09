@@ -55,4 +55,12 @@ export const mongoVectorCodec = mongoCodec({
   traits: ['equality'],
   decode: (wire: readonly number[]) => wire,
   encode: (value: readonly number[]) => value,
+  renderOutputType: (typeParams) => {
+    const length = typeParams['length'];
+    if (length === undefined) return undefined;
+    if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
+      throw new Error('renderOutputType: expected positive integer "length" for Vector');
+    }
+    return `Vector<${length}>`;
+  },
 });

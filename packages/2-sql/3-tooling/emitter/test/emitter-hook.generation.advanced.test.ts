@@ -1,6 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
-import type { NormalizedTypeRenderer } from '@prisma-next/framework-components/components';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
@@ -47,6 +46,9 @@ describe('sql-target-family-hook', () => {
               id: { column: 'id' },
             },
           },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+          },
           relations: {
             posts: {
               to: 'Post',
@@ -65,6 +67,10 @@ describe('sql-target-family-hook', () => {
               id: { column: 'id' },
               userId: { column: 'userId' },
             },
+          },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+            userId: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
           },
           relations: {},
         },
@@ -237,6 +243,9 @@ describe('sql-target-family-hook', () => {
               id: { column: 'id' },
             },
           },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+          },
           relations: {
             posts: {
               to: 'Post',
@@ -263,6 +272,10 @@ describe('sql-target-family-hook', () => {
               id: { column: 'id' },
               userId: { column: 'userId' },
             },
+          },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+            userId: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
           },
           relations: {},
         },
@@ -312,6 +325,9 @@ describe('sql-target-family-hook', () => {
               id: { column: 'id' },
             },
           },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+          },
           relations: {},
         },
       },
@@ -345,6 +361,11 @@ describe('sql-target-family-hook', () => {
               email: { column: 'email' },
               name: { column: 'name' },
             },
+          },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+            email: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            name: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
           },
           relations: {},
         },
@@ -393,6 +414,9 @@ describe('sql-target-family-hook', () => {
               id: { column: 'id' },
             },
           },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+          },
           relations: {},
         },
         Post: {
@@ -402,6 +426,10 @@ describe('sql-target-family-hook', () => {
               id: { column: 'id' },
               userId: { column: 'userId' },
             },
+          },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+            userId: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
           },
           relations: {},
         },
@@ -464,7 +492,7 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('storageHash: StorageHash');
   });
 
-  it('generates models type with relations missing on/cols properties', () => {
+  it('generates models type with relation missing on property', () => {
     const ir = createContract({
       models: {
         User: {
@@ -472,9 +500,9 @@ describe('sql-target-family-hook', () => {
             table: 'user',
             fields: {},
           },
+          fields: {},
           relations: {
             partialRel: { to: 'Post' },
-            invalidRel: { on: { childCols: ['id'] } },
           },
         },
       },
@@ -492,7 +520,6 @@ describe('sql-target-family-hook', () => {
 
     const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
     expect(types).toContain("readonly partialRel: { readonly to: 'Post' }");
-    expect(types).not.toContain('invalidRel');
   });
 
   it('generates models with empty fields object when model has no fields', () => {
@@ -503,6 +530,7 @@ describe('sql-target-family-hook', () => {
             table: 'user',
             fields: {},
           },
+          fields: {},
           relations: {},
         },
       },
@@ -524,7 +552,7 @@ describe('sql-target-family-hook', () => {
     const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
     expect(types).toContain('readonly User: {');
     expect(types).toContain("storage: { readonly table: 'user'");
-    expect(types).toContain('fields: {  }');
+    expect(types).toContain('readonly fields: Record<string, never>');
     expect(types).not.toContain('fieldToColumn');
     expect(types).not.toContain('columnToField');
   });
@@ -627,115 +655,6 @@ describe('sql-target-family-hook', () => {
     ]);
   });
 
-  it('renders column type using inline typeParams with parameterized renderer', () => {
-    const ir = createContract({
-      models: {
-        Embedding: {
-          storage: {
-            table: 'embedding',
-            fields: {
-              id: { column: 'id' },
-              vector: { column: 'vector' },
-            },
-          },
-          relations: {},
-        },
-      },
-      storage: {
-        tables: {
-          embedding: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              vector: {
-                nativeType: 'vector(1536)',
-                codecId: 'pg/vector@1',
-                nullable: false,
-                typeParams: { length: 1536 },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    const parameterizedRenderers = new Map<string, NormalizedTypeRenderer>();
-    parameterizedRenderers.set('pg/vector@1', {
-      codecId: 'pg/vector@1',
-      render: (params, ctx) =>
-        `${ctx.codecTypesName}['pg/vector@1']['output'] & { length: ${params['length']} }`,
-    });
-
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes, {
-      parameterizedRenderers,
-    });
-
-    expect(types).toContain(
-      "readonly vector: CodecTypes['pg/vector@1']['output'] & { length: 1536 }",
-    );
-  });
-
-  it('renders column type using typeRef with parameterized renderer', () => {
-    const ir = createContract({
-      models: {
-        Embedding: {
-          storage: {
-            table: 'embedding',
-            fields: {
-              id: { column: 'id' },
-              vector: { column: 'vector' },
-            },
-          },
-          relations: {},
-        },
-      },
-      storage: {
-        tables: {
-          embedding: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              vector: {
-                nativeType: 'vector(1536)',
-                codecId: 'pg/vector@1',
-                nullable: false,
-                typeRef: 'Vector1536',
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-        types: {
-          Vector1536: {
-            codecId: 'pg/vector@1',
-            nativeType: 'vector(1536)',
-            typeParams: { length: 1536 },
-          },
-        },
-      },
-    });
-
-    const parameterizedRenderers = new Map<string, NormalizedTypeRenderer>();
-    parameterizedRenderers.set('pg/vector@1', {
-      codecId: 'pg/vector@1',
-      render: (params, ctx) =>
-        `${ctx.codecTypesName}['pg/vector@1']['output'] & { length: ${params['length']} }`,
-    });
-
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes, {
-      parameterizedRenderers,
-    });
-
-    expect(types).toContain(
-      "readonly vector: CodecTypes['pg/vector@1']['output'] & { length: 1536 }",
-    );
-  });
-
   it('generates model storage type via generateModelStorageType', () => {
     const model = {
       storage: {
@@ -762,6 +681,9 @@ describe('sql-target-family-hook', () => {
           storage: {
             table: 'user',
             fields: { id: { column: 'id' } },
+          },
+          fields: {
+            id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
           },
           relations: {},
           owner: { kind: 'system' },

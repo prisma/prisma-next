@@ -7,14 +7,9 @@ import type {
   MongoProjectionValue,
   MongoWindowField,
 } from '@prisma-next/mongo-query-ast';
+import { isExprArray, isRecordArgs } from '@prisma-next/mongo-query-ast';
 import type { Document } from '@prisma-next/mongo-value';
 import { resolveValue } from './resolve-value';
-
-function isExprArray(
-  args: MongoAggExpr | ReadonlyArray<MongoAggExpr>,
-): args is ReadonlyArray<MongoAggExpr> {
-  return Array.isArray(args);
-}
 
 // Biome flags `{ then: ... }` as a thenable object (noThenProperty). Build via Object.fromEntries to avoid.
 const THEN_KEY = 'then';
@@ -45,12 +40,25 @@ const aggExprLoweringVisitor: MongoAggExprVisitor<unknown> = {
 
   operator(expr) {
     const { args } = expr;
-    const loweredArgs = isExprArray(args) ? args.map((a) => lowerAggExpr(a)) : lowerAggExpr(args);
+    let loweredArgs: unknown;
+    if (isExprArray(args)) {
+      loweredArgs = args.map((a) => lowerAggExpr(a));
+    } else if (isRecordArgs(args)) {
+      loweredArgs = lowerExprRecord(args);
+    } else {
+      loweredArgs = lowerAggExpr(args);
+    }
     return { [expr.op]: loweredArgs };
   },
 
   accumulator(expr) {
-    return { [expr.op]: expr.arg ? lowerAggExpr(expr.arg) : {} };
+    if (expr.arg === null) {
+      return { [expr.op]: {} };
+    }
+    if (isRecordArgs(expr.arg)) {
+      return { [expr.op]: lowerExprRecord(expr.arg) };
+    }
+    return { [expr.op]: lowerAggExpr(expr.arg) };
   },
 
   cond(expr) {
@@ -159,10 +167,16 @@ function lowerGroupId(groupId: MongoGroupId): unknown {
   return lowerExprRecord(groupId);
 }
 
-function lowerExprRecord(fields: Readonly<Record<string, MongoAggExpr>>): Record<string, unknown> {
+function lowerExprRecord(
+  fields: Readonly<Record<string, MongoAggExpr | ReadonlyArray<MongoAggExpr>>>,
+): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(fields)) {
-    result[key] = lowerAggExpr(val);
+    if (Array.isArray(val)) {
+      result[key] = val.map((v: MongoAggExpr) => lowerAggExpr(v));
+    } else {
+      result[key] = lowerAggExpr(val as MongoAggExpr);
+    }
   }
   return result;
 }

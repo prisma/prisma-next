@@ -44,7 +44,37 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   ? CodecTypes[CodecId]['output']
   : _Encoded;
 
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
+export type FieldOutputTypes = {
+  readonly Article: { readonly id: Char<36>; readonly title: CodecTypes['pg/text@1']['output'] };
+  readonly Comment: {
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly body: CodecTypes['pg/text@1']['output'];
+    readonly postId: CodecTypes['pg/int4@1']['output'];
+  };
+  readonly Post: {
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly title: CodecTypes['pg/text@1']['output'];
+    readonly userId: CodecTypes['pg/int4@1']['output'];
+    readonly views: CodecTypes['pg/int4@1']['output'];
+  };
+  readonly Profile: {
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly userId: CodecTypes['pg/int4@1']['output'];
+    readonly bio: CodecTypes['pg/text@1']['output'];
+  };
+  readonly User: {
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly name: CodecTypes['pg/text@1']['output'];
+    readonly email: CodecTypes['pg/text@1']['output'];
+    readonly invitedById: CodecTypes['pg/int4@1']['output'] | null;
+  };
+};
+export type TypeMaps = TypeMapsType<
+  CodecTypes,
+  OperationTypes,
+  QueryOperationTypes,
+  FieldOutputTypes
+>;
 
 type ContractBase = ContractType<
   {
@@ -181,6 +211,21 @@ type ContractBase = ContractType<
   },
   {
     readonly Article: {
+      readonly fields: {
+        readonly id: {
+          readonly nullable: false;
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'sql/char@1';
+            readonly typeParams: { readonly length: 36 };
+          };
+        };
+        readonly title: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+      };
+      readonly relations: Record<string, never>;
       readonly storage: {
         readonly table: 'articles';
         readonly fields: {
@@ -188,24 +233,8 @@ type ContractBase = ContractType<
           readonly title: { readonly column: 'title' };
         };
       };
-      readonly fields: {
-        readonly id: Char<36>;
-        readonly title: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-      };
-      readonly relations: {};
     };
     readonly Comment: {
-      readonly storage: {
-        readonly table: 'comments';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly body: { readonly column: 'body' };
-          readonly postId: { readonly column: 'post_id' };
-        };
-      };
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -220,19 +249,18 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly Post: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'posts';
+        readonly table: 'comments';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly title: { readonly column: 'title' };
-          readonly userId: { readonly column: 'user_id' };
-          readonly views: { readonly column: 'views' };
+          readonly body: { readonly column: 'body' };
+          readonly postId: { readonly column: 'post_id' };
           readonly embedding: { readonly column: 'embedding' };
         };
       };
+    };
+    readonly Post: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -273,16 +301,17 @@ type ContractBase = ContractType<
           };
         };
       };
-    };
-    readonly Profile: {
       readonly storage: {
-        readonly table: 'profiles';
+        readonly table: 'posts';
         readonly fields: {
           readonly id: { readonly column: 'id' };
+          readonly title: { readonly column: 'title' };
           readonly userId: { readonly column: 'user_id' };
-          readonly bio: { readonly column: 'bio' };
+          readonly views: { readonly column: 'views' };
         };
       };
+    };
+    readonly Profile: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -297,18 +326,17 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly User: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'users';
+        readonly table: 'profiles';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly name: { readonly column: 'name' };
-          readonly email: { readonly column: 'email' };
-          readonly invitedById: { readonly column: 'invited_by_id' };
+          readonly userId: { readonly column: 'user_id' };
+          readonly bio: { readonly column: 'bio' };
         };
       };
+    };
+    readonly User: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -361,6 +389,15 @@ type ContractBase = ContractType<
           };
         };
       };
+      readonly storage: {
+        readonly table: 'users';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly name: { readonly column: 'name' };
+          readonly email: { readonly column: 'email' };
+          readonly invitedById: { readonly column: 'invited_by_id' };
+        };
+      };
     };
   }
 > & {
@@ -411,7 +448,6 @@ type ContractBase = ContractType<
             readonly named: 'CodecTypes';
             readonly package: '@prisma-next/extension-pgvector/codec-types';
           };
-          readonly parameterized: { readonly 'pg/vector@1': 'Vector<{{length}}>' };
           readonly typeImports: readonly [
             {
               readonly alias: 'Vector';

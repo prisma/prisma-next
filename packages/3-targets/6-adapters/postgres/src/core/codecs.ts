@@ -40,6 +40,7 @@ import {
   PG_VARBIT_CODEC_ID,
   PG_VARCHAR_CODEC_ID,
 } from './codec-ids';
+import { renderTypeScriptTypeFromJsonSchema } from './json-schema-type-expression';
 
 const lengthParamsSchema = arktype({
   length: 'number.integer > 0',
@@ -53,6 +54,50 @@ const numericParamsSchema = arktype({
 const precisionParamsSchema = arktype({
   'precision?': 'number.integer >= 0 & number.integer <= 6',
 });
+
+function renderLength(typeName: string, typeParams: Record<string, unknown>): string | undefined {
+  const length = typeParams['length'];
+  if (length === undefined) {
+    return undefined;
+  }
+  if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
+    throw new Error(
+      `renderOutputType: expected integer "length" in typeParams for ${typeName}, got ${String(length)}`,
+    );
+  }
+  return `${typeName}<${length}>`;
+}
+
+function renderPrecision(typeName: string, typeParams: Record<string, unknown>): string {
+  const precision = typeParams['precision'];
+  if (precision === undefined) {
+    return typeName;
+  }
+  if (
+    typeof precision !== 'number' ||
+    !Number.isFinite(precision) ||
+    !Number.isInteger(precision)
+  ) {
+    throw new Error(
+      `renderOutputType: expected integer "precision" in typeParams for ${typeName}, got ${String(precision)}`,
+    );
+  }
+  return `${typeName}<${precision}>`;
+}
+
+function renderJsonOutputType(typeParams: Record<string, unknown>): string {
+  const typeName = typeParams['type'];
+  if (typeof typeName === 'string' && typeName.trim().length > 0) {
+    return typeName.trim();
+  }
+  const schema = typeParams['schemaJson'];
+  if (schema && typeof schema === 'object') {
+    return renderTypeScriptTypeFromJsonSchema(schema);
+  }
+  throw new Error(
+    `renderOutputType: JSON codec typeParams must contain "type" (string) or "schemaJson" (object), got keys: ${Object.keys(typeParams).join(', ')}`,
+  );
+}
 
 function aliasCodec<
   Id extends string,
@@ -77,6 +122,7 @@ function aliasCodec<
     ...ifDefined('init', base.init),
     ...ifDefined('encode', base.encode),
     ...ifDefined('traits', base.traits),
+    ...ifDefined('renderOutputType', base.renderOutputType),
     decode: base.decode,
     encodeJson: base.encodeJson,
     decodeJson: base.decodeJson,
@@ -196,6 +242,21 @@ const pgNumericCodec = codec<
     return wire;
   },
   paramsSchema: numericParamsSchema,
+  renderOutputType: (typeParams) => {
+    const precision = typeParams['precision'];
+    if (precision === undefined) return undefined;
+    if (
+      typeof precision !== 'number' ||
+      !Number.isFinite(precision) ||
+      !Number.isInteger(precision)
+    ) {
+      throw new Error(
+        `renderOutputType: expected integer "precision" in typeParams for Numeric, got ${String(precision)}`,
+      );
+    }
+    const scale = typeParams['scale'];
+    return typeof scale === 'number' ? `Numeric<${precision}, ${scale}>` : `Numeric<${precision}>`;
+  },
   meta: {
     db: {
       sql: {
@@ -305,6 +366,7 @@ const pgTimestampCodec = codec<
     return date;
   },
   paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Timestamp', typeParams),
   meta: {
     db: {
       sql: {
@@ -346,6 +408,7 @@ const pgTimestamptzCodec = codec<
     return date;
   },
   paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Timestamptz', typeParams),
   meta: {
     db: {
       sql: {
@@ -364,6 +427,7 @@ const pgTimeCodec = codec<typeof PG_TIME_CODEC_ID, readonly ['equality', 'order'
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Time', typeParams),
   meta: {
     db: {
       sql: {
@@ -387,6 +451,7 @@ const pgTimetzCodec = codec<
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Timetz', typeParams),
   meta: {
     db: {
       sql: {
@@ -422,6 +487,7 @@ const pgBitCodec = codec<typeof PG_BIT_CODEC_ID, readonly ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: lengthParamsSchema,
+  renderOutputType: (typeParams) => renderLength('Bit', typeParams),
   meta: {
     db: {
       sql: {
@@ -445,6 +511,7 @@ const pgVarbitCodec = codec<
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: lengthParamsSchema,
+  renderOutputType: (typeParams) => renderLength('VarBit', typeParams),
   meta: {
     db: {
       sql: {
@@ -462,6 +529,17 @@ const pgEnumCodec = codec({
   traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
+  renderOutputType: (typeParams) => {
+    const values = typeParams['values'];
+    if (!Array.isArray(values)) {
+      throw new Error(
+        `renderOutputType: expected array "values" in typeParams for enum, got ${typeof values}`,
+      );
+    }
+    return values
+      .map((value) => `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
+      .join(' | ');
+  },
 });
 
 const pgIntervalCodec = codec<
@@ -479,6 +557,7 @@ const pgIntervalCodec = codec<
     return JSON.stringify(wire);
   },
   paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Interval', typeParams),
   meta: {
     db: {
       sql: {
@@ -497,6 +576,7 @@ const pgJsonCodec = codec({
   encode: (value: string | JsonValue): string => JSON.stringify(value),
   decode: (wire: string | JsonValue): JsonValue =>
     typeof wire === 'string' ? JSON.parse(wire) : wire,
+  renderOutputType: renderJsonOutputType,
   meta: {
     db: {
       sql: {
@@ -515,6 +595,7 @@ const pgJsonbCodec = codec({
   encode: (value: string | JsonValue): string => JSON.stringify(value),
   decode: (wire: string | JsonValue): JsonValue =>
     typeof wire === 'string' ? JSON.parse(wire) : wire,
+  renderOutputType: renderJsonOutputType,
   meta: {
     db: {
       sql: {

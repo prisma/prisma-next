@@ -30,10 +30,14 @@ async function seed(orm: Db['orm']) {
   const carol = createdUsers[2];
   if (!alice || !bob || !carol) throw new Error('Failed to seed users');
 
-  await orm.posts.createAll([
+  const articles = orm.posts.variant('Article');
+  const tutorials = orm.posts.variant('Tutorial');
+
+  await articles.createAll([
     {
       title: 'Getting Started with Prisma Next',
       content: 'Learn how to build contract-first data access layers with Prisma Next and MongoDB.',
+      summary: 'A comprehensive introduction to contract-first data layers.',
       authorId: alice._id as string,
       createdAt: new Date('2026-01-15'),
     },
@@ -41,18 +45,26 @@ async function seed(orm: Db['orm']) {
       title: 'Contract-First Development',
       content:
         'Why contract-first architecture leads to better type safety and developer experience.',
+      summary: 'The benefits of contract-first over code-first approaches.',
       authorId: alice._id as string,
       createdAt: new Date('2026-02-01'),
     },
+  ]);
+
+  await tutorials.createAll([
     {
-      title: 'MongoDB Best Practices',
-      content: 'Tips and tricks for designing efficient MongoDB schemas.',
+      title: 'Build a REST API with Prisma Next',
+      content: 'Step-by-step tutorial for building a REST API with Prisma Next and MongoDB.',
+      difficulty: 'intermediate',
+      duration: 45,
       authorId: bob._id as string,
       createdAt: new Date('2026-02-20'),
     },
     {
-      title: 'The Future of ORMs',
-      content: 'How modern ORMs are evolving to support multiple database paradigms.',
+      title: 'Advanced Query Patterns',
+      content: 'Deep dive into advanced query patterns for MongoDB.',
+      difficulty: 'advanced',
+      duration: 90,
       authorId: carol._id as string,
       createdAt: new Date('2026-03-10'),
     },
@@ -67,11 +79,21 @@ export async function getPosts(orm: Db['orm']) {
   return orm.posts.include('author').all();
 }
 
+export async function getArticles(orm: Db['orm']) {
+  return orm.posts.variant('Article').all();
+}
+
+export async function getTutorials(orm: Db['orm']) {
+  return orm.posts.variant('Tutorial').all();
+}
+
 export async function getUsers(orm: Db['orm']) {
   return orm.users.all();
 }
 
 export type PostsResponse = SimplifyDeep<Awaited<ReturnType<typeof getPosts>>>;
+export type ArticlesResponse = SimplifyDeep<Awaited<ReturnType<typeof getArticles>>>;
+export type TutorialsResponse = SimplifyDeep<Awaited<ReturnType<typeof getTutorials>>>;
 export type UsersResponse = SimplifyDeep<Awaited<ReturnType<typeof getUsers>>>;
 
 // ---------------------------------------------------------------------------
@@ -167,6 +189,10 @@ async function main() {
     try {
       if (req.method === 'GET' && req.url === '/api/posts') {
         jsonResponse(res, await getPosts(orm));
+      } else if (req.method === 'GET' && req.url === '/api/posts/articles') {
+        jsonResponse(res, await getArticles(orm));
+      } else if (req.method === 'GET' && req.url === '/api/posts/tutorials') {
+        jsonResponse(res, await getTutorials(orm));
       } else if (req.method === 'GET' && req.url === '/api/users') {
         jsonResponse(res, await getUsers(orm));
       } else if (req.method === 'GET' && req.url === '/api/pipeline/leaderboard') {
@@ -190,6 +216,8 @@ async function main() {
     console.log(`API server listening on http://localhost:${PORT}`);
     console.log('Endpoints:');
     console.log(`  GET http://localhost:${PORT}/api/posts`);
+    console.log(`  GET http://localhost:${PORT}/api/posts/articles   (variant: Article)`);
+    console.log(`  GET http://localhost:${PORT}/api/posts/tutorials  (variant: Tutorial)`);
     console.log(`  GET http://localhost:${PORT}/api/users`);
     console.log('Pipeline DSL endpoints:');
     console.log(`  GET http://localhost:${PORT}/api/pipeline/leaderboard`);

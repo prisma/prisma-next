@@ -78,7 +78,14 @@ export type { CodecTypes };
 // Operation types (empty for now, can be extended by extension packs)
 export type OperationTypes = Record<string, never>;
 
-export type TypeMaps = { readonly codecTypes: CodecTypes; readonly operationTypes: OperationTypes };
+export type FieldOutputTypes = {
+  readonly User: {
+    readonly id: number;
+    readonly email: string;
+    readonly createdAt: string;
+  };
+};
+export type TypeMaps = { readonly codecTypes: CodecTypes; readonly operationTypes: OperationTypes; readonly queryOperationTypes: Record<string, never>; readonly fieldOutputTypes: FieldOutputTypes };
 
 // Direct model exports for easy importing: import type { User } from './contract.d'
 export type User = Contract['models']['User'];

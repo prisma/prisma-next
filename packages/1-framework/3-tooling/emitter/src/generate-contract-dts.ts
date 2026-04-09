@@ -1,4 +1,5 @@
 import type { Contract, ContractModel, ContractValueObject } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   EmissionSpi,
   GenerateContractTypesOptions,
@@ -7,6 +8,7 @@ import type {
 import {
   deduplicateImports,
   generateCodecTypeIntersection,
+  generateFieldOutputTypesMap,
   generateHashTypeAliases,
   generateImportLines,
   generateModelsType,
@@ -28,11 +30,9 @@ export function generateContractDts(
     readonly profileHash: string;
   },
   options?: GenerateContractTypesOptions,
+  codecLookup?: CodecLookup,
 ): string {
   const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
-  if (options?.parameterizedTypeImports) {
-    allImports.push(...options.parameterizedTypeImports);
-  }
   if (options?.queryOperationTypeImports) {
     allImports.push(...options.queryOperationTypeImports);
   }
@@ -52,13 +52,10 @@ export function generateContractDts(
 
   const storageType = emitter.generateStorageType(contract, 'StorageHash');
 
-  const modelsType = emitter.generateModelsType
-    ? emitter.generateModelsType(contract, options)
-    : generateModelsType(
-        // Contract.models defaults to ContractModelBase, but at emit time fields are always ContractField
-        contract.models as Record<string, ContractModel>,
-        (name, model) => emitter.generateModelStorageType(name, model),
-      );
+  const modelsType = generateModelsType(
+    contract.models as Record<string, ContractModel>,
+    (name, model) => emitter.generateModelStorageType(name, model),
+  );
 
   const rootsType = generateRootsType(contract.roots);
 
@@ -70,6 +67,11 @@ export function generateContractDts(
     contract.execution !== undefined
       ? `\n  readonly execution: ${serializeExecutionType(contract.execution)};`
       : '';
+
+  const fieldOutputTypesMap = generateFieldOutputTypesMap(
+    contract.models as Record<string, ContractModel> | undefined,
+    codecLookup,
+  );
 
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');
 
@@ -92,6 +94,7 @@ export type CodecTypes = ${codecTypes};
 export type OperationTypes = ${operationTypes};
 ${familyTypeAliases}
 ${valueObjectTypeAliases}
+export type FieldOutputTypes = ${fieldOutputTypesMap};
 export type TypeMaps = ${typeMapsExpr};
 
 type ContractBase = ContractType<

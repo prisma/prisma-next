@@ -13,6 +13,10 @@ import type { Timestamptz } from '@prisma-next/adapter-postgres/codec-types';
 import type { Time } from '@prisma-next/adapter-postgres/codec-types';
 import type { Timetz } from '@prisma-next/adapter-postgres/codec-types';
 import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
+import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
+import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
+import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
+import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
 import type {
   ContractWithTypeMaps,
@@ -26,16 +30,16 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:9e609b1aeac0d980cf6cc7bc7cf78e310c104c235cf766344fbe730673cbcd2c'>;
+  StorageHashBase<'sha256:319804686c1aba50fc4508c05ecc509bfdc2f250324fb929ea313eceafc650c0'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:e216decd356eea44980cf151c6044d85fb936e1fad093fbfb93ca34b96cf5847'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
-export type CodecTypes = PgTypes;
-export type OperationTypes = Record<string, never>;
+export type CodecTypes = PgTypes & PgVectorTypes;
+export type OperationTypes = PgVectorOperationTypes;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = Record<string, never>;
+export type QueryOperationTypes = PgVectorQueryOperationTypes;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
@@ -44,7 +48,47 @@ export type Address = {
   readonly city: CodecTypes['pg/text@1']['output'];
   readonly zip: CodecTypes['pg/text@1']['output'] | null;
 };
-export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes>;
+export type FieldOutputTypes = {
+  readonly Article: {
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly title: CodecTypes['pg/text@1']['output'];
+    readonly reviewerId: CodecTypes['pg/int4@1']['output'];
+  };
+  readonly Comment: {
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly body: CodecTypes['pg/text@1']['output'];
+    readonly postId: CodecTypes['pg/int4@1']['output'];
+  };
+  readonly Post: {
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly title: CodecTypes['pg/text@1']['output'];
+    readonly userId: CodecTypes['pg/int4@1']['output'];
+    readonly views: CodecTypes['pg/int4@1']['output'];
+    readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
+  };
+  readonly Profile: {
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly userId: CodecTypes['pg/int4@1']['output'];
+    readonly bio: CodecTypes['pg/text@1']['output'];
+  };
+  readonly Tag: {
+    readonly id: CodecTypes['pg/text@1']['output'];
+    readonly name: CodecTypes['pg/text@1']['output'];
+  };
+  readonly User: {
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly name: CodecTypes['pg/text@1']['output'];
+    readonly email: CodecTypes['pg/text@1']['output'];
+    readonly invitedById: CodecTypes['pg/int4@1']['output'] | null;
+    readonly address: Address | null;
+  };
+};
+export type TypeMaps = TypeMapsType<
+  CodecTypes,
+  OperationTypes,
+  QueryOperationTypes,
+  FieldOutputTypes
+>;
 
 type ContractBase = ContractType<
   {
@@ -124,6 +168,11 @@ type ContractBase = ContractType<
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
           };
+          readonly embedding: {
+            readonly nativeType: 'vector';
+            readonly codecId: 'pg/vector@1';
+            readonly nullable: true;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
@@ -156,7 +205,7 @@ type ContractBase = ContractType<
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [{ readonly columns: readonly ['user_id'] }];
+        uniques: readonly [];
         indexes: readonly [];
         foreignKeys: readonly [
           {
@@ -170,10 +219,9 @@ type ContractBase = ContractType<
       readonly tags: {
         columns: {
           readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
             readonly nullable: false;
-            readonly typeParams: { readonly length: 36 };
           };
           readonly name: {
             readonly nativeType: 'text';
@@ -232,14 +280,6 @@ type ContractBase = ContractType<
   },
   {
     readonly Article: {
-      readonly storage: {
-        readonly table: 'articles';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly title: { readonly column: 'title' };
-          readonly reviewerId: { readonly column: 'reviewer_id' };
-        };
-      };
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -264,16 +304,16 @@ type ContractBase = ContractType<
           };
         };
       };
-    };
-    readonly Comment: {
       readonly storage: {
-        readonly table: 'comments';
+        readonly table: 'articles';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly body: { readonly column: 'body' };
-          readonly postId: { readonly column: 'post_id' };
+          readonly title: { readonly column: 'title' };
+          readonly reviewerId: { readonly column: 'reviewer_id' };
         };
       };
+    };
+    readonly Comment: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -288,18 +328,17 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
         };
       };
-      readonly relations: {};
-    };
-    readonly Post: {
+      readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'posts';
+        readonly table: 'comments';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly title: { readonly column: 'title' };
-          readonly userId: { readonly column: 'user_id' };
-          readonly views: { readonly column: 'views' };
+          readonly body: { readonly column: 'body' };
+          readonly postId: { readonly column: 'post_id' };
         };
       };
+    };
+    readonly Post: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -316,6 +355,10 @@ type ContractBase = ContractType<
         readonly views: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        };
+        readonly embedding: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1' };
         };
       };
       readonly relations: {
@@ -336,16 +379,18 @@ type ContractBase = ContractType<
           };
         };
       };
-    };
-    readonly Profile: {
       readonly storage: {
-        readonly table: 'profiles';
+        readonly table: 'posts';
         readonly fields: {
           readonly id: { readonly column: 'id' };
+          readonly title: { readonly column: 'title' };
           readonly userId: { readonly column: 'user_id' };
-          readonly bio: { readonly column: 'bio' };
+          readonly views: { readonly column: 'views' };
+          readonly embedding: { readonly column: 'embedding' };
         };
       };
+    };
+    readonly Profile: {
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -363,15 +408,34 @@ type ContractBase = ContractType<
       readonly relations: {
         readonly user: {
           readonly to: 'User';
-          readonly cardinality: 'N:1';
+          readonly cardinality: '1:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
             readonly targetFields: readonly ['id'];
           };
         };
       };
+      readonly storage: {
+        readonly table: 'profiles';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly userId: { readonly column: 'user_id' };
+          readonly bio: { readonly column: 'bio' };
+        };
+      };
     };
     readonly Tag: {
+      readonly fields: {
+        readonly id: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+        readonly name: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        };
+      };
+      readonly relations: Record<string, never>;
       readonly storage: {
         readonly table: 'tags';
         readonly fields: {
@@ -379,26 +443,8 @@ type ContractBase = ContractType<
           readonly name: { readonly column: 'name' };
         };
       };
-      readonly fields: {
-        readonly id: Char<36>;
-        readonly name: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-      };
-      readonly relations: {};
     };
     readonly User: {
-      readonly storage: {
-        readonly table: 'users';
-        readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly name: { readonly column: 'name' };
-          readonly email: { readonly column: 'email' };
-          readonly invitedById: { readonly column: 'invited_by_id' };
-          readonly address: { readonly column: 'address' };
-        };
-      };
       readonly fields: {
         readonly id: {
           readonly nullable: false;
@@ -455,6 +501,16 @@ type ContractBase = ContractType<
           };
         };
       };
+      readonly storage: {
+        readonly table: 'users';
+        readonly fields: {
+          readonly id: { readonly column: 'id' };
+          readonly name: { readonly column: 'name' };
+          readonly email: { readonly column: 'email' };
+          readonly invitedById: { readonly column: 'invited_by_id' };
+          readonly address: { readonly column: 'address' };
+        };
+      };
     };
   }
 > & {
@@ -474,11 +530,59 @@ type ContractBase = ContractType<
       readonly lateral: true;
       readonly limit: true;
       readonly orderBy: true;
+      readonly 'pgvector/cosine': true;
       readonly returning: true;
     };
     readonly sql: { readonly enums: true; readonly returning: true };
   };
-  readonly extensionPacks: {};
+  readonly extensionPacks: {
+    readonly pgvector: {
+      readonly capabilities: { readonly postgres: { readonly 'pgvector/cosine': true } };
+      readonly familyId: 'sql';
+      readonly id: 'pgvector';
+      readonly kind: 'extension';
+      readonly targetId: 'postgres';
+      readonly types: {
+        readonly codecTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorTypes';
+            readonly named: 'CodecTypes';
+            readonly package: '@prisma-next/extension-pgvector/codec-types';
+          };
+          readonly typeImports: readonly [
+            {
+              readonly alias: 'Vector';
+              readonly named: 'Vector';
+              readonly package: '@prisma-next/extension-pgvector/codec-types';
+            },
+          ];
+        };
+        readonly operationTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorOperationTypes';
+            readonly named: 'OperationTypes';
+            readonly package: '@prisma-next/extension-pgvector/operation-types';
+          };
+        };
+        readonly queryOperationTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorQueryOperationTypes';
+            readonly named: 'QueryOperationTypes';
+            readonly package: '@prisma-next/extension-pgvector/operation-types';
+          };
+        };
+        readonly storage: readonly [
+          {
+            readonly familyId: 'sql';
+            readonly nativeType: 'vector';
+            readonly targetId: 'postgres';
+            readonly typeId: 'pg/vector@1';
+          },
+        ];
+      };
+      readonly version: '0.0.1';
+    };
+  };
   readonly execution: {
     readonly executionHash: ExecutionHash;
     readonly mutations: {

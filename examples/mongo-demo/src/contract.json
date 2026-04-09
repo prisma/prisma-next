@@ -8,7 +8,26 @@
     "users": "User"
   },
   "models": {
+    "Article": {
+      "base": "Post",
+      "fields": {
+        "summary": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "collection": "posts"
+      }
+    },
     "Post": {
+      "discriminator": {
+        "field": "kind"
+      },
       "fields": {
         "_id": {
           "nullable": false,
@@ -38,6 +57,13 @@
             "kind": "scalar"
           }
         },
+        "kind": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        },
         "title": {
           "nullable": false,
           "type": {
@@ -60,6 +86,37 @@
           "to": "User"
         }
       },
+      "storage": {
+        "collection": "posts"
+      },
+      "variants": {
+        "Article": {
+          "value": "article"
+        },
+        "Tutorial": {
+          "value": "tutorial"
+        }
+      }
+    },
+    "Tutorial": {
+      "base": "Post",
+      "fields": {
+        "difficulty": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        },
+        "duration": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/int32@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
       "storage": {
         "collection": "posts"
       }
@@ -157,10 +214,12 @@
   },
   "storage": {
     "collections": {
+      "article": {},
       "posts": {},
+      "tutorial": {},
       "users": {}
     },
-    "storageHash": "sha256:3dc942d093b714429d2c735418815d37860c04e151bb78258ab6fa113e8a0141"
+    "storageHash": "sha256:1d8e1aa7132561cb604442f3039a05dfac31fb0abc68d8d38eb77f5fb369ea51"
   },
   "capabilities": {},
   "extensionPacks": {},

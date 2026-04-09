@@ -51,6 +51,18 @@ describe('codec factory', () => {
     expect(testCodec.meta).toEqual({ db: { sql: { postgres: { nativeType: 'text' } } } });
   });
 
+  it('uses identity fallback for encodeJson/decodeJson when not provided', () => {
+    const testCodec = codec({
+      typeId: 'test/identity@1',
+      targetTypes: ['text'],
+      encode: (value: string) => value,
+      decode: (wire: string) => wire,
+    });
+
+    expect(testCodec.encodeJson('hello')).toBe('hello');
+    expect(testCodec.decodeJson('world')).toBe('world');
+  });
+
   it.each([
     {
       label: 'without meta',
@@ -297,6 +309,21 @@ describe('CodecRegistry', () => {
       containsCodec1: true,
       containsCodec2: true,
     });
+  });
+
+  it('is iterable via Symbol.iterator', () => {
+    const registry = createCodecRegistry();
+    const codec1 = codec({
+      typeId: 'test/iter1@1',
+      targetTypes: ['text'],
+      encode: (value: string) => value,
+      decode: (wire: string) => wire,
+    });
+
+    registry.register(codec1);
+
+    const codecs = [...registry];
+    expect(codecs).toEqual([codec1]);
   });
 
   it('handles codec registration with existing scalar type array', () => {

@@ -98,6 +98,34 @@ export type InferRootRow<
   ModelName extends string & keyof TContract['models'],
 > = VariantRow<TContract, ModelName>;
 
+export type VariantNames<
+  TContract extends MongoContract,
+  ModelName extends string & keyof TContract['models'],
+> = TContract['models'][ModelName] extends {
+  readonly variants: infer V extends Record<string, unknown>;
+}
+  ? keyof V & string
+  : never;
+
+export type VariantModelRow<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+  VariantName extends string,
+> = TContract['models'][ModelName] extends {
+  readonly discriminator: { readonly field: infer DiscField extends string };
+  readonly variants: infer V;
+}
+  ? V extends Record<string, { readonly value: string }>
+    ? VariantName extends keyof V & string & keyof TContract['models']
+      ? Simplify<
+          Omit<InferFullRow<TContract, ModelName>, DiscField> &
+            InferFullRow<TContract, VariantName> &
+            Record<DiscField, V[VariantName]['value']>
+        >
+      : InferFullRow<TContract, ModelName>
+    : InferFullRow<TContract, ModelName>
+  : InferFullRow<TContract, ModelName>;
+
 type IncludeRelationRowType<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
@@ -164,3 +192,32 @@ export type CreateInput<
   Partial<
     Pick<InferModelRow<TContract, ModelName>, '_id' & keyof InferModelRow<TContract, ModelName>>
   >;
+
+type DiscriminatorField<
+  TContract extends MongoContract,
+  ModelName extends string & keyof TContract['models'],
+> = TContract['models'][ModelName] extends {
+  readonly discriminator: { readonly field: infer F extends string };
+}
+  ? F
+  : never;
+
+export type VariantCreateInput<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+  VariantName extends string,
+> = Omit<
+  VariantModelRow<TContract, ModelName, VariantName>,
+  '_id' | DiscriminatorField<TContract, ModelName>
+> &
+  Partial<
+    Pick<InferModelRow<TContract, ModelName>, '_id' & keyof InferModelRow<TContract, ModelName>>
+  >;
+
+export type ResolvedCreateInput<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+  TVariant extends string,
+> = [TVariant] extends [never]
+  ? CreateInput<TContract, ModelName>
+  : VariantCreateInput<TContract, ModelName, TVariant>;

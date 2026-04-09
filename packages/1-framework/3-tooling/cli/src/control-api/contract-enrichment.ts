@@ -73,7 +73,7 @@ function extractExtensionPackMeta(
   }
   if (types) {
     if (types.codecTypes) {
-      const { controlPlaneHooks: _, ...cleanedCodecTypes } = types.codecTypes;
+      const { controlPlaneHooks: _, codecInstances: _ci, ...cleanedCodecTypes } = types.codecTypes;
       base['types'] = { ...types, codecTypes: cleanedCodecTypes };
     } else {
       base['types'] = types;

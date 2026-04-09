@@ -1,4 +1,4 @@
-import type { Contract, ProfileHashBase } from '@prisma-next/contract/types';
+import type { Contract, ContractModelBase, ProfileHashBase } from '@prisma-next/contract/types';
 import type { SqlStorage, TypeMaps, TypeMapsPhantomKey } from '@prisma-next/sql-contract/types';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 
@@ -9,10 +9,16 @@ type Assert<_T extends true> = never;
 type TestCodecTypes = {
   readonly 'pg/vector@1': {
     readonly output: number[];
-    readonly parameterizedOutput: (params: { readonly length: number }) => Float32Array;
   };
   readonly 'pg/int4@1': {
     readonly output: number;
+  };
+};
+
+type TestFieldOutputTypes = {
+  readonly Vectors: {
+    readonly id: number;
+    readonly embedding: Float32Array;
   };
 };
 
@@ -73,28 +79,40 @@ type TestStorageWithTypeRef = SqlStorage & {
   };
 };
 
-type BaseContract = Contract<SqlStorage> & {
-  readonly target: 'postgres';
-  readonly targetFamily: 'sql';
-  readonly roots: Record<string, never>;
-  readonly models: Record<string, never>;
-  readonly capabilities: Record<string, never>;
-  readonly extensionPacks: Record<string, never>;
-  readonly meta: Record<string, never>;
-  readonly profileHash: ProfileHashBase<'test'>;
+type VectorsModel = ContractModelBase & {
+  readonly storage: {
+    readonly table: 'vectors';
+    readonly fields: {
+      readonly id: { readonly column: 'id' };
+      readonly embedding: { readonly column: 'embedding' };
+    };
+  };
 };
 
-type ContractInlineTypeParams = BaseContract & {
-  readonly storage: TestStorage;
-} & { readonly [K in TypeMapsPhantomKey]?: TypeMaps<TestCodecTypes> };
+type TestModels = {
+  readonly Vectors: VectorsModel;
+};
 
-type ContractTypeRef = BaseContract & {
-  readonly storage: TestStorageWithTypeRef;
-} & { readonly [K in TypeMapsPhantomKey]?: TypeMaps<TestCodecTypes> };
+type TestTypeMaps = TypeMaps<
+  TestCodecTypes,
+  Record<string, never>,
+  Record<string, never>,
+  TestFieldOutputTypes
+>;
 
-// ── Scenario 1: inline typeParams → parameterized output ─────────────────
-// Column with typeParams: { length: 1536 } and codec pg/vector@1 with parameterizedOutput
-// should resolve to Float32Array (the return type of parameterizedOutput).
+type ContractInlineTypeParams = Contract<TestStorage, TestModels> & {
+  readonly target: 'postgres';
+  readonly targetFamily: 'sql';
+  readonly profileHash: ProfileHashBase<'test'>;
+} & { readonly [K in TypeMapsPhantomKey]?: TestTypeMaps };
+
+type ContractTypeRef = Contract<TestStorageWithTypeRef, TestModels> & {
+  readonly target: 'postgres';
+  readonly targetFamily: 'sql';
+  readonly profileHash: ProfileHashBase<'test'>;
+} & { readonly [K in TypeMapsPhantomKey]?: TestTypeMaps };
+
+// ── Scenario 1: FieldOutputTypes lookup resolves parameterized output ────
 export type _InlineTypeParams = Assert<
   IsEqual<
     ComputeColumnJsType<
@@ -108,9 +126,7 @@ export type _InlineTypeParams = Assert<
   >
 >;
 
-// ── Scenario 2: typeRef → resolved typeParams → parameterized output ─────
-// Column with typeRef: 'Embedding1536' pointing to storage.types should
-// resolve the same way as inline typeParams.
+// ── Scenario 2: typeRef column resolves via FieldOutputTypes ─────────────
 export type _TypeRefResolved = Assert<
   IsEqual<
     ComputeColumnJsType<
@@ -124,8 +140,7 @@ export type _TypeRefResolved = Assert<
   >
 >;
 
-// ── Scenario 3: no typeParams → base codec output ────────────────────────
-// Column without typeParams or typeRef should fall back to base codec output.
+// ── Scenario 3: no typeParams → base codec output from FieldOutputTypes ──
 export type _BaseCodecFallback = Assert<
   IsEqual<
     ComputeColumnJsType<
@@ -147,8 +162,23 @@ type NullableVectorColumn = {
   readonly typeParams: { readonly length: 1536 };
 };
 
-type ContractNullable = BaseContract & {
-  readonly storage: SqlStorage & {
+type NullableFieldOutputTypes = {
+  readonly Vectors: {
+    readonly embedding: Float32Array | null;
+  };
+};
+
+type NullableVectorsModel = ContractModelBase & {
+  readonly storage: {
+    readonly table: 'vectors';
+    readonly fields: {
+      readonly embedding: { readonly column: 'embedding' };
+    };
+  };
+};
+
+type ContractNullable = Contract<
+  SqlStorage & {
     readonly tables: {
       readonly vectors: {
         readonly columns: {
@@ -160,8 +190,20 @@ type ContractNullable = BaseContract & {
         readonly foreignKeys: readonly [];
       };
     };
-  };
-} & { readonly [K in TypeMapsPhantomKey]?: TypeMaps<TestCodecTypes> };
+  },
+  { readonly Vectors: NullableVectorsModel }
+> & {
+  readonly target: 'postgres';
+  readonly targetFamily: 'sql';
+  readonly profileHash: ProfileHashBase<'test'>;
+} & {
+  readonly [K in TypeMapsPhantomKey]?: TypeMaps<
+    TestCodecTypes,
+    Record<string, never>,
+    Record<string, never>,
+    NullableFieldOutputTypes
+  >;
+};
 
 export type _NullableTypeParams = Assert<
   IsEqual<

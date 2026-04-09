@@ -5,9 +5,72 @@
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
     "post": "Post",
+    "task": "Task",
     "user": "User"
   },
   "models": {
+    "Bug": {
+      "base": "Task",
+      "fields": {
+        "severity": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "stepsToRepro": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "severity": {
+            "column": "severity"
+          },
+          "stepsToRepro": {
+            "column": "stepsToRepro"
+          }
+        },
+        "table": "bug"
+      }
+    },
+    "Feature": {
+      "base": "Task",
+      "fields": {
+        "priority": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "targetRelease": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "priority": {
+            "column": "priority"
+          },
+          "targetRelease": {
+            "column": "targetRelease"
+          }
+        },
+        "table": "feature"
+      }
+    },
     "Post": {
       "fields": {
         "createdAt": {
@@ -84,6 +147,113 @@
         "table": "post"
       }
     },
+    "Task": {
+      "discriminator": {
+        "field": "type"
+      },
+      "fields": {
+        "createdAt": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
+        },
+        "description": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "status": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "title": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "type": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "userId": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {
+        "user": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "userId"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "to": "User"
+        }
+      },
+      "storage": {
+        "fields": {
+          "createdAt": {
+            "column": "createdAt"
+          },
+          "description": {
+            "column": "description"
+          },
+          "id": {
+            "column": "id"
+          },
+          "status": {
+            "column": "status"
+          },
+          "title": {
+            "column": "title"
+          },
+          "type": {
+            "column": "type"
+          },
+          "userId": {
+            "column": "userId"
+          }
+        },
+        "table": "task"
+      },
+      "variants": {
+        "Bug": {
+          "value": "bug"
+        },
+        "Feature": {
+          "value": "feature"
+        }
+      }
+    },
     "User": {
       "fields": {
         "address": {
@@ -137,6 +307,18 @@
             ]
           },
           "to": "Post"
+        },
+        "tasks": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "userId"
+            ]
+          },
+          "to": "Task"
         }
       },
       "storage": {
@@ -196,8 +378,42 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:8092aadb113c201a38d569e3c9226435a7b8bec111a9c13a608fb29e37875bb7",
+    "storageHash": "sha256:76c1bd5f5733774ae1182e83ca882f623cdf12e78a76c2fb06666d60bbdd6452",
     "tables": {
+      "bug": {
+        "columns": {
+          "severity": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "stepsToRepro": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": true
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "uniques": []
+      },
+      "feature": {
+        "columns": {
+          "priority": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "targetRelease": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": true
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "uniques": []
+      },
       "post": {
         "columns": {
           "createdAt": {
@@ -224,6 +440,78 @@
             }
           },
           "title": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "userId": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [
+          {
+            "columns": [
+              "userId"
+            ],
+            "constraint": true,
+            "index": true,
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "user"
+            }
+          }
+        ],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "task": {
+        "columns": {
+          "createdAt": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          },
+          "description": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": true
+          },
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          },
+          "status": {
+            "codecId": "pg/text@1",
+            "default": {
+              "kind": "literal",
+              "value": "open"
+            },
+            "nativeType": "text",
+            "nullable": false
+          },
+          "title": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "type": {
             "codecId": "pg/text@1",
             "nativeType": "text",
             "nullable": false
@@ -324,7 +612,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:8c5eef43d2153fd832b8288ed2d8ffc9f5afb62908f8b4b7e6a4b7018444c41f",
+    "executionHash": "sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e",
     "mutations": {
       "defaults": [
         {
@@ -335,6 +623,16 @@
           "ref": {
             "column": "id",
             "table": "post"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "task"
           }
         },
         {
@@ -381,9 +679,6 @@
             "alias": "PgVectorTypes",
             "named": "CodecTypes",
             "package": "@prisma-next/extension-pgvector/codec-types"
-          },
-          "parameterized": {
-            "pg/vector@1": "Vector<{{length}}>"
           },
           "typeImports": [
             {

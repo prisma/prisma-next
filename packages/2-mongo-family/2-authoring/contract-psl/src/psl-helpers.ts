@@ -1,4 +1,7 @@
 import type { PslAttribute, PslAttributeArgument } from '@prisma-next/psl-parser';
+import { getPositionalArgument, parseQuotedStringLiteral } from '@prisma-next/psl-parser';
+
+export { getPositionalArgument, parseQuotedStringLiteral };
 
 export function lowerFirst(value: string): string {
   if (value.length === 0) return value;

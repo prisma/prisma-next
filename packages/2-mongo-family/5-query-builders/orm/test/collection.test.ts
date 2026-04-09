@@ -143,6 +143,90 @@ describe('MongoCollection chaining', () => {
   });
 });
 
+describe('MongoCollection variant()', () => {
+  it('returns a new instance from variant()', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'Task', executor);
+    const narrowed = col.variant('Bug');
+    expect(narrowed).not.toBe(col);
+  });
+
+  it('injects discriminator eq filter for the variant value', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'Task', executor).variant('Bug');
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('field');
+    if (match.filter.kind === 'field') {
+      expect(match.filter.field).toBe('type');
+      expect(match.filter.op).toBe('$eq');
+    }
+  });
+
+  it('does not mutate original collection', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'Task', executor);
+    col.variant('Bug');
+    col.all();
+    expect(executor.lastStages!).toHaveLength(0);
+  });
+
+  it('composes with where()', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'Task', executor)
+      .variant('Feature')
+      .where(MongoFieldFilter.eq('title', 'Login'));
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('and');
+  });
+
+  it('returns self when model has no discriminator (non-polymorphic)', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor);
+    // @ts-expect-error VariantNames<Contract, 'User'> is never
+    const result = col.variant('NonExistent');
+    expect(result).toBe(col);
+  });
+
+  it('create() injects discriminator value into the document', async () => {
+    const executor = createMockExecutor([{ insertedId: 'new-id' }]);
+    const col = createMongoCollection(contract, 'Task', executor).variant('Bug');
+    await col.create({ title: 'Fix crash', severity: 'high', assigneeId: 'u1' } as never);
+    const command = executor.lastPlan!.command;
+    expect(command.kind).toBe('insertOne');
+    if (command.kind === 'insertOne') {
+      expect(command.document).toHaveProperty('type');
+    }
+  });
+
+  it('create() returns row including discriminator value', async () => {
+    const executor = createMockExecutor([{ insertedId: 'new-id' }]);
+    const col = createMongoCollection(contract, 'Task', executor).variant('Bug');
+    const result = await col.create({
+      title: 'Fix crash',
+      severity: 'high',
+      assigneeId: 'u1',
+    } as never);
+    expect((result as Record<string, unknown>)['type']).toBe('bug');
+  });
+
+  it('createAll() injects discriminator value into each document', async () => {
+    const executor = createMockExecutor([{ insertedIds: ['id-1', 'id-2'], insertedCount: 2 }]);
+    const col = createMongoCollection(contract, 'Task', executor).variant('Bug');
+    const rows: unknown[] = [];
+    for await (const row of col.createAll([
+      { title: 'Bug 1', severity: 'low', assigneeId: 'u1' },
+      { title: 'Bug 2', severity: 'high', assigneeId: 'u2' },
+    ] as never)) {
+      rows.push(row);
+    }
+    expect(rows).toHaveLength(2);
+    expect((rows[0] as Record<string, unknown>)['type']).toBe('bug');
+    expect((rows[1] as Record<string, unknown>)['type']).toBe('bug');
+  });
+});
+
 describe('MongoCollection include()', () => {
   it('adds a relation include', () => {
     const executor = createMockExecutor();

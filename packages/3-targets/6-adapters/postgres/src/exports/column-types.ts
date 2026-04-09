@@ -193,26 +193,12 @@ function createJsonTypeParams(schema: StandardSchemaLike): JsonSchemaTypeParams 
   return { schemaJson: outputSchema };
 }
 
-/**
- * Typed column descriptor for JSON/JSONB columns with Standard Schema.
- *
- * `typeParams.schemaJson` carries the runtime JSON Schema payload (serializable record)
- * used by the emitter to render TypeScript type expressions in contract.d.ts.
- *
- * `typeParams.schema` is a phantom-only key: at runtime it does not exist, but at the
- * type level it preserves the original `TSchema` so that `ResolveStandardSchemaOutput<P>`
- * in codec-types.ts can resolve the output type via `~standard.types.output` or `.infer`.
- */
-type TypedColumnDescriptor<TSchema extends StandardSchemaLike> = ColumnTypeDescriptor & {
-  readonly typeParams: JsonSchemaTypeParams & { readonly schema: TSchema };
-};
-
 function createJsonColumnFactory(
   codecId: string,
   nativeType: string,
   staticDescriptor: ColumnTypeDescriptor,
 ) {
-  return <TSchema extends StandardSchemaLike>(schema?: TSchema): ColumnTypeDescriptor => {
+  return (schema?: StandardSchemaLike): ColumnTypeDescriptor => {
     if (!schema) {
       return staticDescriptor;
     }
@@ -224,13 +210,7 @@ function createJsonColumnFactory(
     return {
       codecId,
       nativeType,
-      // At runtime, typeParams only contains { schemaJson, type? }.
-      // The `schema` key exists only at the type level (phantom) so that
-      // `ResolveStandardSchemaOutput<P>` in codec-types.ts can resolve the
-      // schema's output type via `~standard.types.output` or `.infer`.
-      typeParams: createJsonTypeParams(schema) as JsonSchemaTypeParams & {
-        readonly schema: TSchema;
-      },
+      typeParams: createJsonTypeParams(schema),
     };
   };
 }
@@ -238,19 +218,11 @@ function createJsonColumnFactory(
 const _json = createJsonColumnFactory(PG_JSON_CODEC_ID, 'json', jsonColumn);
 const _jsonb = createJsonColumnFactory(PG_JSONB_CODEC_ID, 'jsonb', jsonbColumn);
 
-export function json(): ColumnTypeDescriptor;
-export function json<TSchema extends StandardSchemaLike>(
-  schema: TSchema,
-): TypedColumnDescriptor<TSchema>;
-export function json<TSchema extends StandardSchemaLike>(schema?: TSchema): ColumnTypeDescriptor {
+export function json(schema?: StandardSchemaLike): ColumnTypeDescriptor {
   return _json(schema);
 }
 
-export function jsonb(): ColumnTypeDescriptor;
-export function jsonb<TSchema extends StandardSchemaLike>(
-  schema: TSchema,
-): TypedColumnDescriptor<TSchema>;
-export function jsonb<TSchema extends StandardSchemaLike>(schema?: TSchema): ColumnTypeDescriptor {
+export function jsonb(schema?: StandardSchemaLike): ColumnTypeDescriptor {
   return _jsonb(schema);
 }
 
