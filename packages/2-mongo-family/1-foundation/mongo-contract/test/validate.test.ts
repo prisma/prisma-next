@@ -303,6 +303,61 @@ describe('validateMongoContract()', () => {
       expect(() => validateMongoContract(json)).toThrow();
     });
 
+    it('rejects cyclic record-shaped index and collection option maps without overflowing the stack', () => {
+      const cyclicPartialFilterExpression: Record<string, unknown> = {
+        archived: false,
+      };
+      cyclicPartialFilterExpression['self'] = cyclicPartialFilterExpression;
+
+      const cyclicStorageEngineEntries: unknown[] = [];
+      cyclicStorageEngineEntries.push(cyclicStorageEngineEntries);
+
+      const json = {
+        ...makeValidContractJson(),
+        storage: {
+          collections: {
+            items: {
+              indexes: [
+                {
+                  fields: { name: 'text' },
+                  options: {
+                    partialFilterExpression: cyclicPartialFilterExpression,
+                  },
+                },
+              ],
+              options: {
+                storageEngine: {
+                  wiredTiger: {
+                    nested: cyclicStorageEngineEntries,
+                  },
+                },
+              },
+            },
+          },
+        },
+        models: {
+          Item: {
+            fields: {
+              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+            },
+            storage: { collection: 'items' },
+          },
+        },
+      };
+
+      let error: unknown;
+
+      try {
+        validateMongoContract(json);
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(error).toBeDefined();
+      expect(error).not.toBeInstanceOf(RangeError);
+    });
+
     it('rejects empty clustered index keys', () => {
       const json = {
         ...makeValidContractJson(),

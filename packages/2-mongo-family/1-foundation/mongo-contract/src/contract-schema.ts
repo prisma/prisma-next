@@ -67,18 +67,36 @@ function isMongoJsonRecord(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function isMongoJsonObject(value: unknown): value is MongoJsonObject {
-  return isMongoJsonRecord(value) && Object.values(value).every((entry) => isMongoJsonValue(entry));
+function withUnseenReference(value: object, seen: WeakSet<object>, visit: () => boolean): boolean {
+  if (seen.has(value)) {
+    return false;
+  }
+
+  seen.add(value);
+  const result = visit();
+  seen.delete(value);
+  return result;
 }
 
-function isMongoJsonValue(value: unknown): value is MongoJsonValue {
+function isMongoJsonObject(value: unknown, seen: WeakSet<object>): value is MongoJsonObject {
+  return (
+    isMongoJsonRecord(value) &&
+    withUnseenReference(value, seen, () =>
+      Object.values(value).every((entry) => isMongoJsonValue(entry, seen)),
+    )
+  );
+}
+
+function isMongoJsonValue(value: unknown, seen = new WeakSet<object>()): value is MongoJsonValue {
   if (MongoJsonPrimitiveSchema.allows(value)) {
     return true;
   }
   if (Array.isArray(value)) {
-    return value.every((entry) => isMongoJsonValue(entry));
+    return withUnseenReference(value, seen, () =>
+      value.every((entry) => isMongoJsonValue(entry, seen)),
+    );
   }
-  return isMongoJsonObject(value);
+  return isMongoJsonObject(value, seen);
 }
 
 const MongoJsonValueSchema = type('unknown').narrow((value, ctx) =>
