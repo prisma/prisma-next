@@ -1,3 +1,4 @@
+export { canonicalize } from '../canonicalize';
 export { deepEqual, indexesEquivalent } from '../index-equivalence';
 export type { MongoSchemaCollectionCtorOptions } from '../schema-collection';
 export { MongoSchemaCollection } from '../schema-collection';
