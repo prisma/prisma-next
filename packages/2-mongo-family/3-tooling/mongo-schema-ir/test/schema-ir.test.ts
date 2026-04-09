@@ -31,6 +31,28 @@ describe('MongoSchemaIndex', () => {
     expect(index.partialFilterExpression).toEqual({ active: { $eq: true } });
   });
 
+  it('constructs with M2 index options', () => {
+    const index = new MongoSchemaIndex({
+      keys: [{ field: 'bio', direction: 'text' }],
+      weights: { bio: 10 },
+      default_language: 'english',
+      language_override: 'lang',
+      collation: { locale: 'en', strength: 2 },
+    });
+    expect(index.weights).toEqual({ bio: 10 });
+    expect(index.default_language).toBe('english');
+    expect(index.language_override).toBe('lang');
+    expect(index.collation).toEqual({ locale: 'en', strength: 2 });
+  });
+
+  it('constructs with wildcardProjection', () => {
+    const index = new MongoSchemaIndex({
+      keys: [{ field: '$**', direction: 1 }],
+      wildcardProjection: { name: 1, email: 1 },
+    });
+    expect(index.wildcardProjection).toEqual({ name: 1, email: 1 });
+  });
+
   it('is frozen after construction', () => {
     const index = new MongoSchemaIndex({
       keys: [{ field: 'email', direction: 1 }],
@@ -219,5 +241,89 @@ describe('indexesEquivalent', () => {
       partialFilterExpression: { ...filter },
     });
     expect(indexesEquivalent(a, b)).toBe(true);
+  });
+
+  it('returns false for different wildcardProjection', () => {
+    const a = new MongoSchemaIndex({
+      keys: [{ field: '$**', direction: 1 }],
+      wildcardProjection: { name: 1 },
+    });
+    const b = new MongoSchemaIndex({
+      keys: [{ field: '$**', direction: 1 }],
+      wildcardProjection: { email: 1 },
+    });
+    expect(indexesEquivalent(a, b)).toBe(false);
+  });
+
+  it('returns true for same wildcardProjection', () => {
+    const a = new MongoSchemaIndex({
+      keys: [{ field: '$**', direction: 1 }],
+      wildcardProjection: { name: 1, email: 1 },
+    });
+    const b = new MongoSchemaIndex({
+      keys: [{ field: '$**', direction: 1 }],
+      wildcardProjection: { name: 1, email: 1 },
+    });
+    expect(indexesEquivalent(a, b)).toBe(true);
+  });
+
+  it('returns false for different collation', () => {
+    const a = new MongoSchemaIndex({
+      keys: [{ field: 'name', direction: 1 }],
+      collation: { locale: 'en', strength: 2 },
+    });
+    const b = new MongoSchemaIndex({
+      keys: [{ field: 'name', direction: 1 }],
+      collation: { locale: 'fr', strength: 2 },
+    });
+    expect(indexesEquivalent(a, b)).toBe(false);
+  });
+
+  it('returns true for same collation', () => {
+    const a = new MongoSchemaIndex({
+      keys: [{ field: 'name', direction: 1 }],
+      collation: { locale: 'en', strength: 2 },
+    });
+    const b = new MongoSchemaIndex({
+      keys: [{ field: 'name', direction: 1 }],
+      collation: { locale: 'en', strength: 2 },
+    });
+    expect(indexesEquivalent(a, b)).toBe(true);
+  });
+
+  it('returns false for different weights', () => {
+    const a = new MongoSchemaIndex({
+      keys: [{ field: 'bio', direction: 'text' }],
+      weights: { bio: 10 },
+    });
+    const b = new MongoSchemaIndex({
+      keys: [{ field: 'bio', direction: 'text' }],
+      weights: { bio: 5 },
+    });
+    expect(indexesEquivalent(a, b)).toBe(false);
+  });
+
+  it('returns false for different default_language', () => {
+    const a = new MongoSchemaIndex({
+      keys: [{ field: 'bio', direction: 'text' }],
+      default_language: 'english',
+    });
+    const b = new MongoSchemaIndex({
+      keys: [{ field: 'bio', direction: 'text' }],
+      default_language: 'french',
+    });
+    expect(indexesEquivalent(a, b)).toBe(false);
+  });
+
+  it('returns false for different language_override', () => {
+    const a = new MongoSchemaIndex({
+      keys: [{ field: 'bio', direction: 'text' }],
+      language_override: 'lang',
+    });
+    const b = new MongoSchemaIndex({
+      keys: [{ field: 'bio', direction: 'text' }],
+      language_override: 'language',
+    });
+    expect(indexesEquivalent(a, b)).toBe(false);
   });
 });
