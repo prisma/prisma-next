@@ -120,7 +120,7 @@ export interface MongoStorageIndex {
 }
 
 export interface MongoStorageCollection {
-  readonly indexes?: readonly MongoIndex[];
+  readonly indexes?: ReadonlyArray<MongoStorageIndex>;
   readonly options?: MongoCollectionOptions;
 }
 

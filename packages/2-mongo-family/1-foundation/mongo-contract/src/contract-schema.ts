@@ -240,9 +240,24 @@ const IndexSchema = type({
   'options?': IndexOptionsSchema,
 });
 
+const MongoIndexKeySchema = type({
+  '+': 'reject',
+  field: 'string',
+  direction: '1 | -1 | "text" | "2dsphere" | "2d" | "hashed"',
+});
+
+const MongoStorageIndexSchema = type({
+  '+': 'reject',
+  keys: MongoIndexKeySchema.array().atLeastLength(1),
+  'unique?': 'boolean',
+  'sparse?': 'boolean',
+  'expireAfterSeconds?': 'number',
+  'partialFilterExpression?': 'Record<string, unknown>',
+});
+
 const StorageCollectionSchema = type({
   '+': 'reject',
-  'indexes?': IndexSchema.array(),
+  'indexes?': MongoStorageIndexSchema.array(),
   'options?': CollectionOptionsSchema,
 });
 
@@ -269,3 +284,15 @@ export const MongoContractSchema = type({
     '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
   }),
 });
+
+export {
+  CollationSchema,
+  CollectionOptionsSchema,
+  IndexFieldsSchema,
+  IndexOptionsSchema,
+  IndexSchema,
+  MongoIndexKeySchema,
+  MongoStorageIndexSchema,
+  NumberRecordSchema,
+  WildcardProjectionSchema,
+};

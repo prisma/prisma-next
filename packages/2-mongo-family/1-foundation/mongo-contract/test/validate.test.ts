@@ -77,15 +77,10 @@ describe('validateMongoContract()', () => {
             items: {
               indexes: [
                 {
-                  fields: { _id: 1 },
-                  options: {
-                    unique: true,
-                    hidden: true,
-                    name: 'item_id_idx',
-                    collation: { locale: 'en', strength: 2 },
-                  },
+                  keys: [{ field: '_id', direction: 1 }],
+                  unique: true,
                 },
-                { fields: { name: 'text' } },
+                { keys: [{ field: 'name', direction: 'text' }] },
               ],
             },
           },
@@ -106,26 +101,21 @@ describe('validateMongoContract()', () => {
       expect(result.contract.storage.collections['items']).toEqual({
         indexes: [
           {
-            fields: { _id: 1 },
-            options: {
-              unique: true,
-              hidden: true,
-              name: 'item_id_idx',
-              collation: { locale: 'en', strength: 2 },
-            },
+            keys: [{ field: '_id', direction: 1 }],
+            unique: true,
           },
-          { fields: { name: 'text' } },
+          { keys: [{ field: 'name', direction: 'text' }] },
         ],
       });
     });
 
-    it('rejects empty index field maps', () => {
+    it('rejects empty index keys array', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
           collections: {
             items: {
-              indexes: [{ fields: {} }],
+              indexes: [{ keys: [] }],
             },
           },
         },
@@ -191,13 +181,10 @@ describe('validateMongoContract()', () => {
             items: {
               indexes: [
                 {
-                  fields: { name: 'text' },
-                  options: {
-                    partialFilterExpression: {
-                      archived: false,
-                      $or: [{ status: 'active' }, { tags: ['priority', 'searchable'] }],
-                    },
-                    weights: { name: 10 },
+                  keys: [{ field: 'name', direction: 'text' }],
+                  partialFilterExpression: {
+                    archived: false,
+                    $or: [{ status: 'active' }, { tags: ['priority', 'searchable'] }],
                   },
                 },
               ],
@@ -236,13 +223,10 @@ describe('validateMongoContract()', () => {
       expect(result.contract.storage.collections['items']).toEqual({
         indexes: [
           {
-            fields: { name: 'text' },
-            options: {
-              partialFilterExpression: {
-                archived: false,
-                $or: [{ status: 'active' }, { tags: ['priority', 'searchable'] }],
-              },
-              weights: { name: 10 },
+            keys: [{ field: 'name', direction: 'text' }],
+            partialFilterExpression: {
+              archived: false,
+              $or: [{ status: 'active' }, { tags: ['priority', 'searchable'] }],
             },
           },
         ],
@@ -273,11 +257,9 @@ describe('validateMongoContract()', () => {
             items: {
               indexes: [
                 {
-                  fields: { name: 'text' },
-                  options: {
-                    partialFilterExpression: {
-                      $or: [{ status: 'active' }, { updatedAt: 1n }],
-                    },
+                  keys: [{ field: 'name', direction: 'text' }],
+                  partialFilterExpression: {
+                    $or: [{ status: 'active' }, { updatedAt: 1n }],
                   },
                 },
               ],
@@ -319,10 +301,8 @@ describe('validateMongoContract()', () => {
             items: {
               indexes: [
                 {
-                  fields: { name: 'text' },
-                  options: {
-                    partialFilterExpression: cyclicPartialFilterExpression,
-                  },
+                  keys: [{ field: 'name', direction: 'text' }],
+                  partialFilterExpression: cyclicPartialFilterExpression,
                 },
               ],
               options: {
@@ -384,7 +364,7 @@ describe('validateMongoContract()', () => {
         storage: {
           collections: {
             items: {
-              indexes: [{ fields: { _id: 1 }, options: { unsupported: true } }],
+              indexes: [{ keys: [{ field: '_id', direction: 1 }], unsupported: true }],
             },
           },
         },
@@ -483,17 +463,23 @@ describe('validateMongoContract()', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
         indexes: [
-          { fields: { name: 1 } },
-          { fields: { email: 1 }, options: { unique: true } },
+          { keys: [{ field: 'name', direction: 1 }] },
+          { keys: [{ field: 'email', direction: 1 }], unique: true },
           {
-            fields: { createdAt: -1 },
-            options: { sparse: true, expireAfterSeconds: 3600 },
+            keys: [{ field: 'createdAt', direction: -1 }],
+            sparse: true,
+            expireAfterSeconds: 3600,
           },
-          { fields: { a: 1, b: -1 } },
-          { fields: { description: 'text' } },
-          { fields: { location: '2dsphere' } },
-          { fields: { coords: '2d' } },
-          { fields: { hash: 'hashed' } },
+          {
+            keys: [
+              { field: 'a', direction: 1 },
+              { field: 'b', direction: -1 },
+            ],
+          },
+          { keys: [{ field: 'description', direction: 'text' }] },
+          { keys: [{ field: 'location', direction: '2dsphere' }] },
+          { keys: [{ field: 'coords', direction: '2d' }] },
+          { keys: [{ field: 'hash', direction: 'hashed' }] },
         ],
       } as typeof json.storage.collections.items;
       const result = validateMongoContract(json);
@@ -505,8 +491,8 @@ describe('validateMongoContract()', () => {
       json.storage.collections.items = {
         indexes: [
           {
-            fields: { status: 1 },
-            options: { partialFilterExpression: { status: { $eq: 'active' } } },
+            keys: [{ field: 'status', direction: 1 }],
+            partialFilterExpression: { status: { $eq: 'active' } },
           },
         ],
       } as typeof json.storage.collections.items;
@@ -514,26 +500,26 @@ describe('validateMongoContract()', () => {
       expect(result.contract).toBeDefined();
     });
 
-    it('rejects index with empty fields', () => {
+    it('rejects index with empty keys array', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ fields: {} }],
+        indexes: [{ keys: [] }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
-    it('rejects index field with invalid direction', () => {
+    it('rejects index key with invalid direction', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ fields: { name: 'invalid' } }],
+        indexes: [{ keys: [{ field: 'name', direction: 'invalid' }] }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
-    it('rejects index missing fields', () => {
+    it('rejects index key missing field', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{}],
+        indexes: [{ keys: [{ direction: 1 }] }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
@@ -541,7 +527,7 @@ describe('validateMongoContract()', () => {
     it('rejects index with extra properties', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ fields: { name: 1 }, extra: true }],
+        indexes: [{ keys: [{ field: 'name', direction: 1 }], extra: true }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
@@ -549,7 +535,7 @@ describe('validateMongoContract()', () => {
     it('rejects collection with extra properties', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ fields: { name: 1 } }],
+        indexes: [{ keys: [{ field: 'name', direction: 1 }] }],
         extra: true,
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
