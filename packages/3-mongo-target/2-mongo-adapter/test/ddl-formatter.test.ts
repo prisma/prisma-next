@@ -1,5 +1,8 @@
 import {
+  CollModCommand,
+  CreateCollectionCommand,
   CreateIndexCommand,
+  DropCollectionCommand,
   DropIndexCommand,
   type MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
@@ -155,5 +158,114 @@ describe('formatMongoOperations', () => {
     expect(result).toEqual([
       'db.sessions.createIndex({ "expiresAt": 1 }, { sparse: true, expireAfterSeconds: 3600 })',
     ]);
+  });
+
+  it('formats createIndex with M2 options (collation, weights, wildcardProjection)', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'additive',
+      precheck: [],
+      execute: [
+        {
+          description: 'create text index',
+          command: new CreateIndexCommand('users', [{ field: 'bio', direction: 'text' }], {
+            weights: { bio: 10 },
+            default_language: 'english',
+            language_override: 'lang',
+            collation: { locale: 'en', strength: 2 },
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const result = formatMongoOperations([op]);
+    expect(result[0]).toContain('createIndex');
+    expect(result[0]).toContain('default_language: "english"');
+    expect(result[0]).toContain('language_override: "lang"');
+  });
+
+  it('formats createCollection with options', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'additive',
+      precheck: [],
+      execute: [
+        {
+          description: 'create collection',
+          command: new CreateCollectionCommand('events', {
+            capped: true,
+            size: 1048576,
+            validator: { $jsonSchema: { bsonType: 'object' } },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const result = formatMongoOperations([op]);
+    expect(result[0]).toContain('db.createCollection("events"');
+    expect(result[0]).toContain('capped: true');
+  });
+
+  it('formats createCollection with no options', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'additive',
+      precheck: [],
+      execute: [
+        {
+          description: 'create collection',
+          command: new CreateCollectionCommand('events'),
+        },
+      ],
+      postcheck: [],
+    };
+    const result = formatMongoOperations([op]);
+    expect(result).toEqual(['db.createCollection("events")']);
+  });
+
+  it('formats dropCollection', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'destructive',
+      precheck: [],
+      execute: [
+        {
+          description: 'drop collection',
+          command: new DropCollectionCommand('events'),
+        },
+      ],
+      postcheck: [],
+    };
+    const result = formatMongoOperations([op]);
+    expect(result).toEqual(['db.events.drop()']);
+  });
+
+  it('formats collMod with validator', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'destructive',
+      precheck: [],
+      execute: [
+        {
+          description: 'update validator',
+          command: new CollModCommand('users', {
+            validator: { $jsonSchema: { bsonType: 'object' } },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const result = formatMongoOperations([op]);
+    expect(result[0]).toContain('db.runCommand({ collMod: "users"');
+    expect(result[0]).toContain('validationLevel: "strict"');
   });
 });
