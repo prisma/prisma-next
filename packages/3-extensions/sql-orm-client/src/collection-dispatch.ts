@@ -45,7 +45,7 @@ export function dispatchCollectionRows<Row>(options: {
       ? (rawRow: Record<string, unknown>) =>
           mapPolymorphicRow(contract, modelName, polyInfo, rawRow, state.variantName) as Row
       : (rawRow: Record<string, unknown>) =>
-          mapStorageRowToModelFields(contract, tableName, rawRow, modelName) as Row;
+          mapStorageRowToModelFields(contract, modelName, rawRow) as Row;
     return mapResultRows(source, mapper);
   }
 
@@ -122,7 +122,7 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
       const parentRows = parentRowsRaw.map((row) => {
         const mapped = polyInfo
           ? mapPolymorphicRow(contract, modelName, polyInfo, row, state.variantName)
-          : mapStorageRowToModelFields(contract, tableName, row, modelName);
+          : mapStorageRowToModelFields(contract, modelName, row);
         return { raw: row, mapped } as RowEnvelope;
       });
 
@@ -135,12 +135,7 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
           }
           const rawChildren = parseIncludedRows(parent.raw[include.relationName]);
           const mappedChildren = rawChildren.map((childRow) =>
-            mapStorageRowToModelFields(
-              contract,
-              include.relatedTableName,
-              childRow,
-              include.relatedModelName,
-            ),
+            mapStorageRowToModelFields(contract, include.relatedModelName, childRow),
           );
           parent.mapped[include.relationName] = coerceSingleQueryIncludeResult(
             mappedChildren,
@@ -149,13 +144,7 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
         }
 
         if (hiddenParentColumns.length > 0) {
-          stripHiddenMappedFields(
-            contract,
-            tableName,
-            parent.mapped,
-            hiddenParentColumns,
-            modelName,
-          );
+          stripHiddenMappedFields(contract, modelName, parent.mapped, hiddenParentColumns);
         }
       }
 
@@ -208,14 +197,14 @@ function dispatchWithMultiQueryIncludes<Row>(options: {
       const parentRows = parentRowsRaw.map((row) => {
         const mapped = polyInfo
           ? mapPolymorphicRow(contract, modelName, polyInfo, row, state.variantName)
-          : mapStorageRowToModelFields(contract, tableName, row, modelName);
+          : mapStorageRowToModelFields(contract, modelName, row);
         return { raw: row, mapped } as RowEnvelope;
       });
       await stitchIncludes(scope, contract, parentRows, state.includes);
 
       if (hiddenParentColumns.length > 0) {
         for (const row of parentRows) {
-          stripHiddenMappedFields(contract, tableName, row.mapped, hiddenParentColumns, modelName);
+          stripHiddenMappedFields(contract, modelName, row.mapped, hiddenParentColumns);
         }
       }
 
@@ -385,7 +374,7 @@ async function resolveRowsByParent(
     childCompiled,
   ).toArray();
   const childRows = childRowsRaw.map((row) =>
-    createRowEnvelope(contract, include.relatedTableName, row, include.relatedModelName),
+    createRowEnvelope(contract, include.relatedModelName, row),
   );
 
   if (state.includes.length > 0) {
@@ -397,13 +386,7 @@ async function resolveRowsByParent(
     const joinValue = child.raw[include.targetColumn];
 
     if (hiddenChildColumns.length > 0) {
-      stripHiddenMappedFields(
-        contract,
-        include.relatedTableName,
-        child.mapped,
-        hiddenChildColumns,
-        include.relatedModelName,
-      );
+      stripHiddenMappedFields(contract, include.relatedModelName, child.mapped, hiddenChildColumns);
     }
 
     let bucket = childByParentJoin.get(joinValue);

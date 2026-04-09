@@ -27,16 +27,15 @@ interface DispatchMutationRowsOptions<Row> {
 export function dispatchMutationRows<Row>(
   options: DispatchMutationRowsOptions<Row>,
 ): AsyncIterableResult<Row> {
-  const { contract, runtime, compiled, tableName, modelName, includes, hiddenColumns, mapRow } =
-    options;
+  const { contract, runtime, compiled, modelName, includes, hiddenColumns, mapRow } = options;
 
   if (includes.length === 0) {
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
 
     return mapResultRows(source, (rawRow) => {
-      const mapped = mapStorageRowToModelFields(contract, tableName, rawRow, modelName);
+      const mapped = mapStorageRowToModelFields(contract, modelName, rawRow);
       if (hiddenColumns.length > 0) {
-        stripHiddenMappedFields(contract, tableName, mapped, hiddenColumns, modelName);
+        stripHiddenMappedFields(contract, modelName, mapped, hiddenColumns);
       }
       return mapRow(mapped);
     });
@@ -50,14 +49,12 @@ export function dispatchMutationRows<Row>(
         return;
       }
 
-      const wrappedRows = rawRows.map((row) =>
-        createRowEnvelope(contract, tableName, row, modelName),
-      );
+      const wrappedRows = rawRows.map((row) => createRowEnvelope(contract, modelName, row));
       await stitchIncludes(scope, contract, wrappedRows, includes);
 
       for (const row of wrappedRows) {
         if (hiddenColumns.length > 0) {
-          stripHiddenMappedFields(contract, tableName, row.mapped, hiddenColumns, modelName);
+          stripHiddenMappedFields(contract, modelName, row.mapped, hiddenColumns);
         }
         yield mapRow(row.mapped);
       }
@@ -145,7 +142,6 @@ export async function executeMutationReturningSingleRow<Row>(
     contract,
     runtime,
     compiled,
-    tableName,
     modelName,
     includes,
     hiddenColumns,
@@ -160,9 +156,9 @@ export async function executeMutationReturningSingleRow<Row>(
       return null;
     }
 
-    const mapped = mapStorageRowToModelFields(contract, tableName, first, modelName);
+    const mapped = mapStorageRowToModelFields(contract, modelName, first);
     if (hiddenColumns.length > 0) {
-      stripHiddenMappedFields(contract, tableName, mapped, hiddenColumns, modelName);
+      stripHiddenMappedFields(contract, modelName, mapped, hiddenColumns);
     }
     return mapRow(mapped);
   }
@@ -175,7 +171,7 @@ export async function executeMutationReturningSingleRow<Row>(
       return null;
     }
 
-    const wrappedRows = [createRowEnvelope(contract, tableName, first, modelName)];
+    const wrappedRows = [createRowEnvelope(contract, modelName, first)];
     await stitchIncludes(scope, contract, wrappedRows, includes);
 
     const result = wrappedRows[0];
@@ -184,7 +180,7 @@ export async function executeMutationReturningSingleRow<Row>(
     }
 
     if (hiddenColumns.length > 0) {
-      stripHiddenMappedFields(contract, tableName, result.mapped, hiddenColumns, modelName);
+      stripHiddenMappedFields(contract, modelName, result.mapped, hiddenColumns);
     }
 
     return mapRow(result.mapped);
