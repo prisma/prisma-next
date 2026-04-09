@@ -839,6 +839,7 @@ export class Collection<
 
         const pkValue = baseCreated[pkColumn];
         variantRow[pkColumn] = pkValue;
+        applyCreateDefaults(collectionCtx, variant.table, [variantRow]);
         const variantCompiled = compileInsertReturning(
           contract,
           variant.table,
