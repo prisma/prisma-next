@@ -134,6 +134,8 @@ The three envelope fields (`id`, `label`, `operationClass`) satisfy the framewor
 
 DDL commands are the mutation primitives — they go in the `execute` array. Each extends `MongoAstNode` (the same base class from `@prisma-next/mongo-query-ast`), making them frozen, immutable, JSON-serializable data structures with a `kind` discriminant.
 
+Unlike DML commands (which don't have visitors), DDL commands implement `accept<R>(visitor: MongoDdlCommandVisitor<R>): R` for compile-time exhaustive dispatch. This serves both the command executor (runner maps commands to driver calls) and the command formatter (CLI renders commands as display strings). See [DDL command dispatch design](ddl-command-dispatch.spec.md).
+
 ### M1: Index commands
 
 ```typescript
@@ -168,6 +170,10 @@ class CreateIndexCommand extends MongoAstNode {
     this.name = options?.name;
     this.freeze();
   }
+
+  accept<R>(visitor: MongoDdlCommandVisitor<R>): R {
+    return visitor.createIndex(this);
+  }
 }
 
 class DropIndexCommand extends MongoAstNode {
@@ -181,8 +187,23 @@ class DropIndexCommand extends MongoAstNode {
     this.name = name;
     this.freeze();
   }
+
+  accept<R>(visitor: MongoDdlCommandVisitor<R>): R {
+    return visitor.dropIndex(this);
+  }
 }
 ```
+
+### DDL command visitor
+
+```typescript
+interface MongoDdlCommandVisitor<R> {
+  createIndex(command: CreateIndexCommand): R;
+  dropIndex(command: DropIndexCommand): R;
+}
+```
+
+Adding a new DDL command kind (M2: `CreateCollectionCommand`, `CollModCommand`, etc.) forces implementation in every visitor — compile-time safety for the executor, formatter, and any future consumer. Follow-up [TML-2234](https://linear.app/prisma-company/issue/TML-2234) tracks adding the same pattern to DML commands.
 
 ### M2: Collection, validator, and option commands (sketched)
 
@@ -225,7 +246,7 @@ type AnyMongoDdlCommand =
 
 ## Inspection commands
 
-Inspection commands are read-only AST nodes that appear as the `source` in check assertions. They represent MongoDB introspection operations — the runner executes them to produce a result set that checks filter against.
+Inspection commands are read-only AST nodes that appear as the `source` in check assertions. They represent MongoDB introspection operations — the runner executes them to produce a result set that checks filter against. Like DDL commands, they implement `accept<R>(visitor: MongoInspectionCommandVisitor<R>): R` for visitor-based dispatch.
 
 ```typescript
 class ListIndexesCommand extends MongoAstNode {
@@ -237,6 +258,10 @@ class ListIndexesCommand extends MongoAstNode {
     this.collection = collection;
     this.freeze();
   }
+
+  accept<R>(visitor: MongoInspectionCommandVisitor<R>): R {
+    return visitor.listIndexes(this);
+  }
 }
 
 class ListCollectionsCommand extends MongoAstNode {
@@ -246,11 +271,20 @@ class ListCollectionsCommand extends MongoAstNode {
     super();
     this.freeze();
   }
+
+  accept<R>(visitor: MongoInspectionCommandVisitor<R>): R {
+    return visitor.listCollections(this);
+  }
 }
 
 type AnyMongoInspectionCommand =
   | ListIndexesCommand
   | ListCollectionsCommand;
+
+interface MongoInspectionCommandVisitor<R> {
+  listIndexes(command: ListIndexesCommand): R;
+  listCollections(command: ListCollectionsCommand): R;
+}
 ```
 
 Each inspection command has a known result document shape, enabling typed filter expressions at authoring time. See the [Check Evaluator design](check-evaluator.spec.md) for details.

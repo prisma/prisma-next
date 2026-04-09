@@ -5,11 +5,9 @@
 Extend the migration system to manage MongoDB's server-side configuration (indexes, JSON Schema validators, collection options) through the same graph-based migration model used for SQL DDL. The project proves the migration architecture generalizes beyond SQL by implementing a Mongo planner, runner, schema IR, and target wiring — all against the existing family-agnostic migration SPI.
 
 **Spec:** `projects/mongo-schema-migrations/spec.md`
-**Linear:** [TML-2220](https://linear.app/prisma-company/issue/TML-2220/schema-migrations-for-mongodb) (parent)
-
 | Milestone | Linear |
 |---|---|
-| M1: Family migration SPI + vertical slice | [TML-2230](https://linear.app/prisma-company/issue/TML-2230) |
+| M1: Family migration SPI + vertical slice | [TML-2220](https://linear.app/prisma-company/issue/TML-2220) |
 | M2: Full index vocabulary + validators + collection options | [TML-2231](https://linear.app/prisma-company/issue/TML-2231) |
 | M3: Polymorphic index generation | [TML-2232](https://linear.app/prisma-company/issue/TML-2232) |
 | M4: Online CLI commands + live introspection | [TML-2233](https://linear.app/prisma-company/issue/TML-2233) |
@@ -22,6 +20,10 @@ Extend the migration system to manage MongoDB's server-side configuration (index
 | Reviewer | Saevar | Migration system owner (WS1); CLI generalization coordination |
 | Collaborator | ORM consolidation (Will) | Polymorphic contract shape (M3 dependency) |
 
+## Testing principle
+
+**Every milestone and every major component must demonstrate its functionality against a real MongoDB instance** (via `mongodb-memory-server`). Unit tests validate internal logic (AST construction, planner diffing, filter evaluation); integration tests prove the output actually works against a database. Each milestone ends with an end-to-end proof task that exercises the full pipeline: contract → plan → apply → verify on a live MongoDB instance.
+
 ## Milestones
 
 ### Milestone 1: Family migration SPI + vertical slice (single index, end-to-end)
@@ -32,8 +34,8 @@ Proves the full migration architecture works for MongoDB by cutting a thin verti
 
 **SPI + CLI generalization:**
 
-- [ ] **1.1 Refactor migration SPI to family-hook pattern.** Examine the existing `TargetMigrationsCapability` / `MigrationPlanner` / `MigrationRunner` interfaces. Refactor the surface to follow the family-hook pattern (like `TargetFamilyHook` for emitters). SQL continues to implement through the refactored surface — internals untouched. Write tests verifying the SQL migration stack still works through the new surface.
-- [ ] **1.2 Generalize CLI operation display.** Replace or complement `extractSqlDdl` in the CLI with a family-agnostic operation display mechanism. The planner or target provides a formatter; the CLI delegates to it. `migration plan` must preview non-SQL operations. Test with a mock non-SQL operation.
+- [ ] **1.1 Validate migration SPI for Mongo.** Confirm the existing `TargetMigrationsCapability` / `MigrationPlanner` / `MigrationRunner` interfaces work for the Mongo target without structural changes. This is an architectural validation exercise: if the existing SPI works, document the finding and move on. If something blocks, make the minimal change needed and document it. Do not refactor proactively.
+- [ ] **1.2 Generalize CLI operation display.** Introduce a family-aware `extractOperationStatements(familyId, operations)` dispatch function in the CLI. SQL continues to use `extractSqlDdl`. Mongo uses a `MongoDdlCommandFormatter` (a `MongoDdlCommandVisitor<string>`) to produce human-readable display strings from DDL command AST nodes. See [CLI display design](specs/cli-display.spec.md) and [DDL command dispatch design](specs/ddl-command-dispatch.spec.md).
 
 **Contract types:**
 
@@ -53,7 +55,7 @@ Proves the full migration architecture works for MongoDB by cutting a thin verti
 
 **Planner:**
 
-- [ ] **1.8 Implement `MongoMigrationPlanner`.** Diff destination contract against origin `MongoSchemaIR`. For M1: detect added indexes → `planCreateIndex` (additive), removed indexes → `planDropIndex` (destructive). Index identity by (collection + ordered fields + key types + semantic options), not by name. Planner convenience functions compose DDL commands, inspection commands, and filter-expression checks into `MongoMigrationPlanOperation` structures. Returns `MigrationPlannerResult`. Write unit tests covering: add index, drop index, no-op (same indexes), index identity (same keys different name = equivalent), correct precheck/execute/postcheck arrays.
+- [ ] **1.8 Implement `MongoMigrationPlanner`.** Diff destination contract against origin `MongoSchemaIR`. For M1: detect added indexes → `planCreateIndex` (additive), removed indexes → `planDropIndex` (destructive). Index identity by (collection + ordered fields + key types + semantic options), not by name. Planner convenience functions compose DDL commands, inspection commands, and filter-expression checks into `MongoMigrationPlanOperation` structures. Returns `MigrationPlannerResult`. Unit tests covering: add index, drop index, no-op (same indexes), index identity (same keys different name = equivalent), correct precheck/execute/postcheck arrays. Integration test: feed planner output to the runner against `mongodb-memory-server` and verify the resulting database state.
 
 **Runner + wiring:**
 
@@ -79,13 +81,13 @@ Extends every layer to cover the full breadth of MongoDB server-side configurati
 **Validators:**
 
 - [ ] **2.3 Extend `MongoStorageCollection` with validator.** Add `validator?: { jsonSchema: Record<string, unknown>; validationLevel: 'strict' | 'moderate'; validationAction: 'error' | 'warn' }` to the contract type. Update Arktype schema. Type and validation tests.
-- [ ] **2.4 Extend schema IR and planner for validators.** Add validator representation to `MongoSchemaIR`. Add `CollModCommand` DDL command class. Planner generates `collMod` operations with appropriate `MongoFilterExpr`-based postchecks against `listCollections` results. Classify: relaxing validation = `widening`, tightening = `destructive`. Tests for add/remove/change validator.
+- [ ] **2.4 Extend schema IR and planner for validators.** Add validator representation to `MongoSchemaIR`. Add `CollModCommand` DDL command class. Planner generates `collMod` operations with appropriate `MongoFilterExpr`-based postchecks against `listCollections` results. Classify: relaxing validation = `widening`, tightening = `destructive`. Unit tests for add/remove/change validator. Integration test: planner output → runner → verify validator applied on `mongodb-memory-server`.
 - [ ] **2.5 Runner executes validator operations.** Command executor handles `CollModCommand` with `$jsonSchema`, `validationLevel`, `validationAction`. Integration tests.
 
 **Collection options:**
 
 - [ ] **2.6 Extend `MongoStorageCollection` with collection options.** Capped settings, time series configuration, collation, change stream pre/post images. Update Arktype schema. Tests.
-- [ ] **2.7 Extend schema IR and planner for collection options.** Add `CreateCollectionCommand` and `DropCollectionCommand` DDL command classes. Planner generates operations with `listCollections`-based checks for new collections and option changes. Tests.
+- [ ] **2.7 Extend schema IR and planner for collection options.** Add `CreateCollectionCommand` and `DropCollectionCommand` DDL command classes. Planner generates operations with `listCollections`-based checks for new collections and option changes. Unit tests. Integration test: planner output → runner → verify collection options on `mongodb-memory-server`.
 - [ ] **2.8 Runner executes collection option operations.** Command executor handles `CreateCollectionCommand` (with options), `DropCollectionCommand`, and `CollModCommand` for option changes. Integration tests.
 
 **Authoring + emitter:**
@@ -93,13 +95,17 @@ Extends every layer to cover the full breadth of MongoDB server-side configurati
 - [ ] **2.9 Add PSL authoring support for Mongo indexes.** Support `@@index` and `@@unique` annotations in the Mongo PSL interpreter. Update `@prisma-next/mongo-contract-psl` to populate `storage.collections[].indexes` from annotations. Tests with PSL fixtures.
 - [ ] **2.10 Update Mongo emitter to populate enriched `storage.collections`.** Emit index definitions, validator (auto-derived `$jsonSchema` from model field definitions), and collection options into the contract. Tests verifying emitted contracts match expected shapes.
 
+**End-to-end proof:**
+
+- [ ] **2.11 End-to-end test: full vocabulary against real MongoDB.** Hand-crafted contracts exercising compound indexes, TTL indexes, partial indexes, validators (`$jsonSchema` + `validationLevel`), and collection options (capped, collation). Verify: `migration plan` produces correct operations → `migration apply` applies them on `mongodb-memory-server` → introspect database to confirm all configuration matches. Second contract modifying validators and removing indexes → plan produces correct `collMod`/`dropIndex` → apply succeeds.
+
 ### Milestone 3: Polymorphic index generation
 
 Auto-derives partial indexes for polymorphic (STI) collections. Depends on the contract carrying discriminator/variants metadata.
 
 **Tasks:**
 
-- [ ] **3.1 Implement polymorphic partial index derivation.** When a collection holds multiple variants, variant-specific field indexes must use `partialFilterExpression` scoped to the discriminator value. The planner derives this automatically from the contract's `discriminator` + `variants` metadata. No user intervention. Unit tests with hand-crafted polymorphic contracts.
+- [ ] **3.1 Implement polymorphic partial index derivation.** When a collection holds multiple variants, variant-specific field indexes must use `partialFilterExpression` scoped to the discriminator value. The planner derives this automatically from the contract's `discriminator` + `variants` metadata. No user intervention. Unit tests with hand-crafted polymorphic contracts. Integration test: planner output → runner → verify partial indexes on `mongodb-memory-server`.
 - [ ] **3.2 End-to-end polymorphic proof.** Contract with a polymorphic collection (base + variants + discriminator) → planner generates partial indexes with correct `partialFilterExpression` → runner applies → partial indexes exist on MongoDB. Integration test with `mongodb-memory-server`.
 
 ### Milestone 4: Online CLI commands + live introspection
@@ -151,7 +157,7 @@ Adds Mongo support to all CLI commands that interact with a live database. The o
 | `MongoMigrationPlanOperation` symmetric structure | Unit | 1.7b | Construction, JSON serialization round-trip |
 | `FilterEvaluator` operator semantics | Unit | 1.7c | `$eq`, `$ne`, `$gt`, `$in`, deep equality, dotted paths |
 | `FilterEvaluator` logical combinators | Unit | 1.7c | `$and`, `$or`, `$not`, `$exists` |
-| Planner diffs and produces index operations | Unit | 1.8 | Add/drop/no-op/identity, correct check arrays |
+| Planner diffs and produces index operations | Unit + Integration | 1.8 | Add/drop/no-op/identity; planner output applied on `mongodb-memory-server` |
 | Runner applies `createIndex`/`dropIndex` | Integration | 1.9 | `mongodb-memory-server` |
 | Runner generic three-phase loop | Integration | 1.9 | precheck → execute → postcheck flow |
 | Runner supports idempotency via postchecks | Integration | 1.9 | Re-apply, postcheck satisfied → skip |
@@ -163,13 +169,14 @@ Adds Mongo support to all CLI commands that interact with a live database. The o
 | All index key types | Unit + Integration | 2.1 | Each key type tested |
 | All index options | Unit + Integration | 2.2 | Each option tested, identity tests |
 | Validator in contract | Unit | 2.3 | Type + Arktype validation |
-| Planner generates `collMod` for validators | Unit | 2.4 | Widening/destructive classification |
+| Planner generates `collMod` for validators | Unit + Integration | 2.4 | Widening/destructive classification; applied on `mongodb-memory-server` |
 | Runner executes validator operations | Integration | 2.5 | `mongodb-memory-server` |
 | Collection options in contract | Unit | 2.6 | Type + Arktype validation |
-| Planner generates collection option ops | Unit | 2.7 | New collection + option changes |
+| Planner generates collection option ops | Unit + Integration | 2.7 | New collection + option changes; applied on `mongodb-memory-server` |
 | Runner executes collection option ops | Integration | 2.8 | `mongodb-memory-server` |
 | Emitter populates enriched collections | Unit | 2.10 | PSL → contract verification |
-| Polymorphic partial indexes auto-generated | Unit | 3.1 | Discriminator → partialFilterExpression |
+| End-to-end full vocabulary | Integration | 2.11 | Compound/TTL/partial indexes + validators + collection options on `mongodb-memory-server` |
+| Polymorphic partial indexes auto-generated | Unit + Integration | 3.1 | Discriminator → partialFilterExpression; planner output applied on `mongodb-memory-server` |
 | End-to-end polymorphic proof | Integration | 3.2 | `mongodb-memory-server` |
 | Live introspection produces `MongoSchemaIR` | Integration | 4.1 | `mongodb-memory-server` |
 | `db init` works with Mongo target | Integration | 4.2 | Additive-only bootstrap |
@@ -182,8 +189,14 @@ Adds Mongo support to all CLI commands that interact with a live database. The o
 
 ## Open Items
 
-- **SPI refactoring scope (1.1):** The spec says "refactor the existing migration SPI to follow the emission pipeline pattern." The investigation shows the existing SPI is already quite generic (`unknown` types, family-agnostic envelope). The refactoring may be smaller than anticipated — possibly just adding an operation formatter hook for CLI display. Determine actual scope early in M1.
-- **Package placement for schema IR (1.5):** Exact package name and layer for the Mongo schema IR AST. Options: new package under `packages/2-mongo-family/3-tooling/` (migration plane), or fold into an existing package. Decide at implementation time based on dependency graph.
 - **ORM consolidation dependency (M3):** Polymorphic index generation depends on the contract carrying discriminator/variants metadata. If that shape changes during ORM consolidation, M3 logic may need updating. Low risk: M3 is last and uses hand-crafted contracts for testing.
 - **M4 sequencing:** M4 can start after M1 (the offline path must work first). Live introspection (4.1) is the prerequisite for most M4 tasks. M4 tasks for commands that only need the marker (`db verify --marker-only`, `migration status` offline) could theoretically start alongside M1 completion.
 - **`contract infer` for Mongo:** The `contract infer` command (infer PSL from live DB) is not in scope. It requires a Mongo-to-PSL reverse mapping which is a separate project.
+
+## Resolved Items
+
+- **SPI refactoring scope (1.1):** Resolved — the existing SPI is already generic enough (`unknown` types, family-agnostic envelope). Task 1.1 is now "validate + wire" not "refactor." If the SPI blocks Mongo, make the minimal change needed.
+- **Package placement for schema IR (1.5):** Resolved — `@prisma-next/mongo-schema-ir` at `packages/2-mongo-family/3-tooling/mongo-schema-ir/`, tooling layer, migration plane. Uses its own `MongoSchemaNode` base class (not `MongoAstNode` from the query AST — they are separate language trees).
+- **DDL command dispatch:** DDL and inspection commands use visitor dispatch (`accept<R>(visitor): R`), not switch statements. The command executor and CLI formatter are independent visitors on the same AST. See [DDL command dispatch design](specs/ddl-command-dispatch.spec.md). Follow-up [TML-2234](https://linear.app/prisma-company/issue/TML-2234) tracks adding the same pattern to DML commands.
+- **CLI display generalization:** Family-aware `extractOperationStatements(familyId, operations)` dispatch. SQL keeps `extractSqlDdl`. Mongo uses `MongoDdlCommandFormatter` visitor. See [CLI display design](specs/cli-display.spec.md).
+- **Operation envelope:** Symmetric `precheck[]` / `execute[]` / `postcheck[]` data envelope, designed for later extraction to a framework generic `Operation<Statement>`. See [operation envelope design](specs/operation-envelope.spec.md).
