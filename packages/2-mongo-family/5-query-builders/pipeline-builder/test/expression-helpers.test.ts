@@ -1,4 +1,8 @@
-import { isRecordArgs, MongoAggLiteral, MongoAggOperator } from '@prisma-next/mongo-query-ast';
+import {
+  isRecordArgs,
+  MongoAggLiteral,
+  MongoAggOperator,
+} from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { fn } from '../src/expression-helpers';
 import type {

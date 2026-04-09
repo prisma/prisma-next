@@ -1,4 +1,8 @@
-import { isRecordArgs, MongoAggAccumulator, MongoAggLiteral } from '@prisma-next/mongo-query-ast';
+import {
+  isRecordArgs,
+  MongoAggAccumulator,
+  MongoAggLiteral,
+} from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
 import type { DocField, NumericField, TypedAggExpr } from '../src/types';
