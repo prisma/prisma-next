@@ -355,6 +355,12 @@
       "plane": "migration"
     },
     {
+      "glob": "packages/2-mongo-family/3-tooling/mongo-schema-ir/**",
+      "domain": "mongo",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
       "glob": "packages/2-mongo-family/4-query/**",
       "domain": "mongo",
       "layer": "query",
