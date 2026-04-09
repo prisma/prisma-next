@@ -1,5 +1,6 @@
 import type { FamilyPackRef } from '@prisma-next/framework-components/components';
 import { sqlFamilyAuthoringFieldPresets } from '../core/authoring-field-presets';
+import { sqlFamilyAuthoringTypes } from '../core/authoring-type-constructors';
 
 const sqlFamilyPack = {
   kind: 'family',
@@ -8,6 +9,7 @@ const sqlFamilyPack = {
   version: '0.0.1',
   authoring: {
     field: sqlFamilyAuthoringFieldPresets,
+    type: sqlFamilyAuthoringTypes,
   },
 } as const;
 

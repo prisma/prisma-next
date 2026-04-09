@@ -30,7 +30,10 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 ## Usage
 
 ```typescript
-import sql, { assemblePslInterpretationContributions } from '@prisma-next/family-sql/control';
+import sql, {
+  assembleAuthoringContributions,
+  assemblePslInterpretationContributions,
+} from '@prisma-next/family-sql/control';
 
 // sql is a ControlFamilyDescriptor with:
 // - kind: 'family'
@@ -73,13 +76,21 @@ const executeResult = await runner.execute({
 });
 
 // Assemble PSL interpretation inputs for sql-contract-psl/provider
+const authoringContributions = assembleAuthoringContributions([
+  sql,
+  postgresTargetDescriptor,
+  postgresAdapterDescriptor,
+  pgVectorExtensionDescriptor,
+]);
 const pslInputs = assemblePslInterpretationContributions([
+  sql,
   postgresTargetDescriptor,
   postgresAdapterDescriptor,
   pgVectorExtensionDescriptor,
 ]);
 const providerOptions = {
   target: postgresTargetDescriptor,
+  authoringContributions,
   scalarTypeDescriptors: pslInputs.scalarTypeDescriptors,
   controlMutationDefaults: {
     defaultFunctionRegistry: pslInputs.defaultFunctionRegistry,

@@ -19,10 +19,12 @@ export type AuthoringTemplateValue =
 export type AuthoringArgumentDescriptor =
   | {
       readonly kind: 'string';
+      readonly name?: string;
       readonly optional?: boolean;
     }
   | {
       readonly kind: 'number';
+      readonly name?: string;
       readonly optional?: boolean;
       readonly integer?: boolean;
       readonly minimum?: number;
@@ -30,10 +32,12 @@ export type AuthoringArgumentDescriptor =
     }
   | {
       readonly kind: 'stringArray';
+      readonly name?: string;
       readonly optional?: boolean;
     }
   | {
       readonly kind: 'object';
+      readonly name?: string;
       readonly optional?: boolean;
       readonly properties: Record<string, AuthoringArgumentDescriptor>;
     };

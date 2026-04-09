@@ -21,7 +21,7 @@ Introduce Target Extension Packs as versioned, installable modules that declare 
 - Pure ESM, side-effect free at import, no network I/O, deterministic behavior
 - Exposes structured entry points for:
   - Contract schema and validators for its namespace
-  - PSL attribute bindings for PSL-first authoring
+  - PSL authoring bindings for PSL-first authoring
   - TS helpers for TS-first authoring
   - Optional adapter hints and lowerer fragments where relevant
   - Codecs for result decoding if the pack introduces new logical types
@@ -63,8 +63,8 @@ export interface ContractSPI {
 
 ### PSL SPI (optional)
 
-- Maps PSL attributes like `@pgvector.column(length: 1536, distance: "cosine")` to contract decorations
-- Validates attribute usage and emits deterministic errors
+- Maps supported PSL extension syntax like `pgvector.Vector(length: 1536)` to contract decorations
+- Validates supported syntax usage and emits deterministic errors
 
 ```typescript
 export interface PslSPI {

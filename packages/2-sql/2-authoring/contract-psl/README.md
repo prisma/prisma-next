@@ -15,14 +15,14 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 
 - Interpret `ParsePslDocumentResult` into SQL `Contract`
 - Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`)
+- Lower shared constructor expressions in both `types {}` blocks and inline field positions (for example `ShortName = sql.String(length: 35)` and `embedding pgvector.Vector(length: 1536)?`)
 - Lower supported default functions through composed registry inputs
 - Support selected Postgres native-type attributes on named types for brownfield round-trips (`@db.Char`, `@db.VarChar`, `@db.Numeric`, `@db.Uuid`, `@db.SmallInt`, `@db.Real`, `@db.Timestamp`, `@db.Timestamptz`, `@db.Date`, `@db.Time`, `@db.Timetz`, `@db.Json`)
-- Support pgvector parity mapping from PSL attributes to existing TS-representable descriptor shape (`codecId`, `nativeType`, `typeParams`)
 - Map PSL relation action tokens to SQL contract referential actions and emit diagnostics for unsupported values
 - Emit deterministic relation metadata in `models.<Model>.relations`
-- Enforce extension composition for supported namespaced attributes (for example `@pgvector.column(...)`)
+- Enforce extension composition for namespaced constructor expressions and emit strict diagnostics for unsupported namespaced attributes
 - Validate generator applicability by declared `codecId` support on composed generator descriptors
-- Consume target-bound scalar descriptors and mutation-default registries assembled by composition layers
+- Consume target-bound scalar descriptors, shared authoring contributions, and mutation-default registries assembled by composition layers
 - Compose provider flow for SQL PSL-first config (`read -> parse -> interpret`) without local registry assembly
 - Preserve parser diagnostics and add interpreter diagnostics with stable codes
 - Return `notOk` with structured diagnostics for unsupported constructs
@@ -66,9 +66,9 @@ Supported `@default(...)` surface in v1 when composed contributors provide handl
 ## Public API
 
 - `@prisma-next/sql-contract-psl`
-  - `interpretPslDocumentToSqlContract({ document, target, scalarTypeDescriptors, controlMutationDefaults?, composedExtensionPacks? })`
+  - `interpretPslDocumentToSqlContract({ document, target, scalarTypeDescriptors, authoringContributions?, controlMutationDefaults?, composedExtensionPacks? })`
 - `@prisma-next/sql-contract-psl/provider`
-  - `prismaContract(schemaPath, { output?, target, scalarTypeDescriptors, controlMutationDefaults?, composedExtensionPacks? })`
+  - `prismaContract(schemaPath, { output?, target, scalarTypeDescriptors, authoringContributions?, controlMutationDefaults?, composedExtensionPacks? })`
   - Provider input is fully preassembled by composition layers (for example `@prisma-next/family-sql/control` helpers).
 
 ## Dependencies

@@ -73,15 +73,15 @@ model Post {
     });
   });
 
-  it('parses field namespaced parameterized attributes', () => {
+  it('parses namespaced parameterized attributes generically', () => {
     const schema = `
 types {
-  Embedding1536 = Bytes @pgvector.column(length: 1536)
+  PackedValue = Bytes @vendor.column(length: 1536)
 }
 
 model Document {
   id Int @id
-  embedding Embedding1536 @pgvector.column(length: 1536)
+  payload PackedValue @vendor.column(length: 1536)
 }
 `;
 
@@ -92,25 +92,103 @@ model Document {
 
     expect(result.ok).toBe(true);
     const documentModel = result.ast.models.find((model) => model.name === 'Document');
-    const embeddingField = documentModel?.fields.find((field) => field.name === 'embedding');
-    const embeddingAttribute = embeddingField?.attributes.find(
-      (attribute) => attribute.name === 'pgvector.column',
+    const payloadField = documentModel?.fields.find((field) => field.name === 'payload');
+    const payloadAttribute = payloadField?.attributes.find(
+      (attribute) => attribute.name === 'vendor.column',
     );
-    expect(embeddingAttribute).toMatchObject({
+    expect(payloadAttribute).toMatchObject({
       kind: 'attribute',
       target: 'field',
-      name: 'pgvector.column',
+      name: 'vendor.column',
       args: [{ kind: 'named', name: 'length', value: '1536' }],
     });
 
-    const namedType = result.ast.types?.declarations.find(
-      (entry) => entry.name === 'Embedding1536',
-    );
+    const namedType = result.ast.types?.declarations.find((entry) => entry.name === 'PackedValue');
     expect(namedType?.attributes[0]).toMatchObject({
       kind: 'attribute',
       target: 'namedType',
-      name: 'pgvector.column',
+      name: 'vendor.column',
       args: [{ kind: 'named', name: 'length', value: '1536' }],
+    });
+  });
+
+  it('parses named type constructor expressions in types blocks', () => {
+    const schema = `
+types {
+  ShortName = sql.String(length: 35)
+  Embedding1536 = pgvector.Vector(1536)
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+
+    const shortName = result.ast.types?.declarations.find((entry) => entry.name === 'ShortName');
+    expect(shortName).toMatchObject({
+      kind: 'namedType',
+      name: 'ShortName',
+      typeConstructor: {
+        path: ['sql', 'String'],
+        args: [{ kind: 'named', name: 'length', value: '35' }],
+      },
+    });
+
+    const embedding = result.ast.types?.declarations.find(
+      (entry) => entry.name === 'Embedding1536',
+    );
+    expect(embedding).toMatchObject({
+      kind: 'namedType',
+      name: 'Embedding1536',
+      typeConstructor: {
+        path: ['pgvector', 'Vector'],
+        args: [{ kind: 'positional', value: '1536' }],
+      },
+    });
+  });
+
+  it('parses inline field constructor expressions', () => {
+    const schema = `
+model Document {
+  id Int @id
+  shortName sql.String(length: 35)
+  embedding pgvector.Vector(length: 1536)?
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+
+    const documentModel = result.ast.models.find((model) => model.name === 'Document');
+    const shortNameField = documentModel?.fields.find((field) => field.name === 'shortName');
+    expect(shortNameField).toMatchObject({
+      kind: 'field',
+      name: 'shortName',
+      optional: false,
+      list: false,
+      typeConstructor: {
+        path: ['sql', 'String'],
+        args: [{ kind: 'named', name: 'length', value: '35' }],
+      },
+    });
+
+    const embeddingField = documentModel?.fields.find((field) => field.name === 'embedding');
+    expect(embeddingField).toMatchObject({
+      kind: 'field',
+      name: 'embedding',
+      optional: true,
+      list: false,
+      typeConstructor: {
+        path: ['pgvector', 'Vector'],
+        args: [{ kind: 'named', name: 'length', value: '1536' }],
+      },
     });
   });
 
@@ -199,7 +277,7 @@ enum UserRole {
     const schema = `
 model User {
   id Int @id
-  email String @pgvector.column(length: )
+  email String @vendor.column(length: )
 }
 `;
 

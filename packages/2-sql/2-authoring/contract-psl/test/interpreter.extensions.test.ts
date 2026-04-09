@@ -1,7 +1,12 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
-import { pgvectorExtensionPack, postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
+import {
+  pgvectorAuthoringContributions,
+  pgvectorExtensionPack,
+  postgresScalarTypeDescriptors,
+  postgresTarget,
+} from './fixtures';
 
 const baseInput = {
   target: postgresTarget,
@@ -9,7 +14,7 @@ const baseInput = {
 } as const;
 
 describe('interpretPslDocumentToSqlContract extensions', () => {
-  it('maps pgvector attributes on named types and fields to vector descriptor shape', () => {
+  it('rejects legacy pgvector.column attributes even when the extension is composed', () => {
     const namedTypeDocument = parsePslDocument({
       schema: `types {
   Embedding1536 = Bytes @pgvector.column(length: 1536)
@@ -27,18 +32,18 @@ model Document {
       ...baseInput,
       document: namedTypeDocument,
       composedExtensionPacks: ['pgvector'],
+      authoringContributions: pgvectorAuthoringContributions,
     });
-    expect(namedTypeResult.ok).toBe(true);
-    if (!namedTypeResult.ok) return;
-    expect(namedTypeResult.value.storage).toMatchObject({
-      types: {
-        Embedding1536: {
-          codecId: 'pg/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
-        },
-      },
-    });
+    expect(namedTypeResult.ok).toBe(false);
+    if (namedTypeResult.ok) return;
+    expect(namedTypeResult.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
+          message: expect.stringContaining('pgvector.column'),
+        }),
+      ]),
+    );
 
     const fieldDocument = parsePslDocument({
       schema: `model Document {
@@ -52,28 +57,24 @@ model Document {
       ...baseInput,
       document: fieldDocument,
       composedExtensionPacks: ['pgvector'],
+      authoringContributions: pgvectorAuthoringContributions,
     });
-    expect(fieldResult.ok).toBe(true);
-    if (!fieldResult.ok) return;
-    expect(fieldResult.value.storage).toMatchObject({
-      tables: {
-        document: {
-          columns: {
-            embedding: {
-              codecId: 'pg/vector@1',
-              nativeType: 'vector',
-              typeParams: { length: 1536 },
-            },
-          },
-        },
-      },
-    });
+    expect(fieldResult.ok).toBe(false);
+    if (fieldResult.ok) return;
+    expect(fieldResult.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
+          message: expect.stringContaining('pgvector.column'),
+        }),
+      ]),
+    );
   });
 
   it('preserves composed extension pack versions when refs are provided', () => {
     const document = parsePslDocument({
       schema: `types {
-  Embedding1536 = Bytes @pgvector.column(length: 1536)
+  Embedding1536 = pgvector.Vector(1536)
 }
 
 model Document {
@@ -89,6 +90,7 @@ model Document {
       document,
       composedExtensionPacks: ['pgvector'],
       composedExtensionPackRefs: [pgvectorExtensionPack],
+      authoringContributions: pgvectorAuthoringContributions,
     });
 
     expect(result.ok).toBe(true);
@@ -108,7 +110,7 @@ model Document {
 }
 
 types {
-  Embedding1536 = Bytes @pgvector.column(length: 1536)
+  Embedding1536 = pgvector.Vector(1536)
 }
 
 model Document {
@@ -138,9 +140,9 @@ model Document {
             },
           },
           pgvector: {
-            vector: {
+            Vector: {
               kind: 'typeConstructor',
-              args: [{ kind: 'number', integer: true, minimum: 1, maximum: 2000 }],
+              args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, maximum: 2000 }],
               output: {
                 codecId: 'custom/vector@1',
                 nativeType: 'vector',
@@ -181,6 +183,162 @@ model Document {
               codecId: 'custom/vector@1',
               nativeType: 'vector',
               typeRef: 'Embedding1536',
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('instantiates family-owned and extension-owned constructor expressions from shared authoring contributions', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  ShortName = sql.String(length: 35)
+  Embedding1536 = pgvector.Vector(1536)
+}
+
+model Document {
+  id Int @id
+  shortName ShortName
+  embedding Embedding1536
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: ['pgvector'],
+      authoringContributions: {
+        type: {
+          sql: {
+            String: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'number', name: 'length', integer: true, minimum: 1 }],
+              output: {
+                codecId: 'custom/varchar@1',
+                nativeType: 'character varying',
+                typeParams: {
+                  length: { kind: 'arg', index: 0 },
+                },
+              },
+            },
+          },
+          pgvector: {
+            Vector: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, maximum: 2000 }],
+              output: {
+                codecId: 'custom/vector@1',
+                nativeType: 'vector',
+                typeParams: {
+                  length: { kind: 'arg', index: 0 },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.storage).toMatchObject({
+      types: {
+        ShortName: {
+          codecId: 'custom/varchar@1',
+          nativeType: 'character varying',
+          typeParams: { length: 35 },
+        },
+        Embedding1536: {
+          codecId: 'custom/vector@1',
+          nativeType: 'vector',
+          typeParams: { length: 1536 },
+        },
+      },
+      tables: {
+        document: {
+          columns: {
+            shortName: {
+              codecId: 'custom/varchar@1',
+              nativeType: 'character varying',
+              typeRef: 'ShortName',
+            },
+            embedding: {
+              codecId: 'custom/vector@1',
+              nativeType: 'vector',
+              typeRef: 'Embedding1536',
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('instantiates inline field constructor expressions from shared authoring contributions', () => {
+    const document = parsePslDocument({
+      schema: `model Document {
+  id Int @id
+  shortName sql.String(length: 35)
+  embedding pgvector.Vector(length: 1536)?
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: ['pgvector'],
+      authoringContributions: {
+        type: {
+          sql: {
+            String: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'number', name: 'length', integer: true, minimum: 1 }],
+              output: {
+                codecId: 'custom/varchar@1',
+                nativeType: 'character varying',
+                typeParams: {
+                  length: { kind: 'arg', index: 0 },
+                },
+              },
+            },
+          },
+          pgvector: {
+            Vector: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, maximum: 2000 }],
+              output: {
+                codecId: 'custom/vector@1',
+                nativeType: 'vector',
+                typeParams: {
+                  length: { kind: 'arg', index: 0 },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.storage.types).toEqual({});
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        document: {
+          columns: {
+            shortName: {
+              codecId: 'custom/varchar@1',
+              nativeType: 'character varying',
+              nullable: false,
+            },
+            embedding: {
+              codecId: 'custom/vector@1',
+              nativeType: 'vector',
+              nullable: true,
             },
           },
         },

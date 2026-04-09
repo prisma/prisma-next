@@ -71,9 +71,9 @@ const bareTargetPack = {
 
 const nestedTypeNamespace = {
   pgvector: {
-    vector: {
+    Vector: {
       kind: 'typeConstructor',
-      args: [{ kind: 'number', integer: true, minimum: 1, maximum: 2000 }],
+      args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, maximum: 2000 }],
       output: {
         codecId: 'pg/vector@1',
         nativeType: 'vector',
@@ -129,7 +129,7 @@ describe('authoring helper runtime', () => {
   it('creates nested type helpers and instantiates storage types', () => {
     const helpers = createTypeHelpersFromNamespace(nestedTypeNamespace) as {
       readonly pgvector: {
-        readonly vector: (length: number) => {
+        readonly Vector: (length: number) => {
           readonly codecId: string;
           readonly nativeType: string;
           readonly typeParams: { readonly length: number };
@@ -137,7 +137,7 @@ describe('authoring helper runtime', () => {
       };
     };
 
-    expect(helpers.pgvector.vector(1536)).toEqual({
+    expect(helpers.pgvector.Vector(1536)).toEqual({
       codecId: 'pg/vector@1',
       nativeType: 'vector',
       typeParams: { length: 1536 },
@@ -147,7 +147,7 @@ describe('authoring helper runtime', () => {
   it('rejects blocked path segments when building type helpers', () => {
     const unsafeNamespace = {
       nested: withBlockedKey({
-        vector: nestedTypeNamespace.pgvector.vector,
+        Vector: nestedTypeNamespace.pgvector.Vector,
       }),
     } as unknown as AuthoringTypeNamespace;
 
@@ -292,7 +292,7 @@ describe('createComposedAuthoringHelpers', () => {
         },
       }),
     ).toThrow(
-      'Duplicate authoring type helper "pgvector.vector". Helper names must be unique across composed packs.',
+      'Duplicate authoring type helper "pgvector.Vector". Helper names must be unique across composed packs.',
     );
   });
 

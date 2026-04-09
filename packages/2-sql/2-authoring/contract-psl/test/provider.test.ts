@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
 import {
   createBuiltinLikeControlMutationDefaults,
+  pgvectorAuthoringContributions,
   pgvectorExtensionPack,
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -195,7 +196,7 @@ model Post {
     });
   });
 
-  describe('given namespaced extension attributes in schema', () => {
+  describe('given namespaced extension constructors in schema', () => {
     it('returns diagnostics when extension namespace is unrecognized', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
@@ -204,7 +205,7 @@ model Post {
         schemaPath,
         `model Document {
   id Int @id
-  embedding Bytes @pgvector.column(length: 1536)
+  embedding pgvector.Vector(length: 1536)
 }
 `,
         'utf-8',
@@ -231,7 +232,68 @@ model Post {
       );
     });
 
-    it('interprets namespaced extension attributes when extension is composed', async () => {
+    it('interprets namespaced extension constructors when extension is composed', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model Document {
+  id Int @id
+  embedding pgvector.Vector(length: 1536)
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', {
+        ...baseOptions,
+        composedExtensionPacks: ['pgvector'],
+        composedExtensionPackRefs: [pgvectorExtensionPack],
+        authoringContributions: pgvectorAuthoringContributions,
+      });
+      const result = await contract.source({ composedExtensionPacks: [] });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = result.value.storage as unknown as {
+        readonly tables: Record<
+          string,
+          {
+            readonly columns: Record<
+              string,
+              {
+                readonly codecId: string;
+                readonly nativeType: string;
+                readonly typeParams?: Record<string, unknown>;
+              }
+            >;
+          }
+        >;
+      };
+
+      expect(storage.tables).toMatchObject({
+        document: {
+          columns: {
+            embedding: {
+              codecId: 'pg/vector@1',
+              nativeType: 'vector',
+              typeParams: { length: 1536 },
+            },
+          },
+        },
+      });
+      expect(result.value.extensionPacks).toMatchObject({
+        pgvector: {
+          version: pgvectorExtensionPack.version,
+        },
+      });
+    });
+  });
+
+  describe('given unsupported legacy extension attributes in schema', () => {
+    it('returns unsupported attribute diagnostics even when the extension is composed', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
       const schemaPath = join(tempDir, 'schema.prisma');
@@ -254,39 +316,23 @@ model Document {
         ...baseOptions,
         composedExtensionPacks: ['pgvector'],
         composedExtensionPackRefs: [pgvectorExtensionPack],
+        authoringContributions: pgvectorAuthoringContributions,
       });
       const result = await contract.source({ composedExtensionPacks: [] });
 
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      const storage = result.value.storage as unknown as {
-        readonly tables: Record<string, { readonly columns: Record<string, unknown> }>;
-        readonly types?: Record<string, unknown>;
-      };
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
 
-      expect(storage.types).toMatchObject({
-        Embedding1536: {
-          codecId: 'pg/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
-        },
-      });
-      expect(storage.tables).toMatchObject({
-        document: {
-          columns: {
-            embedding: {
-              codecId: 'pg/vector@1',
-              nativeType: 'vector',
-              typeRef: 'Embedding1536',
-            },
-          },
-        },
-      });
-      expect(result.value.extensionPacks).toMatchObject({
-        pgvector: {
-          version: pgvectorExtensionPack.version,
-        },
-      });
+      expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
+            sourceId: './schema.prisma',
+            message: expect.stringContaining('pgvector.column'),
+          }),
+        ]),
+      );
     });
   });
 

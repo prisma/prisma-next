@@ -37,7 +37,6 @@ export {
   runnerSuccess,
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
-// SQL-specific types
 export type {
   CodecControlHooks,
   ComponentDatabaseDependencies,
