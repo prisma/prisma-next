@@ -2,7 +2,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
-  findModelNameForTable,
   getColumnToFieldMap,
   getFieldToColumnMap,
   type PolymorphismInfo,
@@ -44,16 +43,14 @@ export function augmentSelectionForJoinColumns(
 
 export function stripHiddenMappedFields(
   contract: Contract<SqlStorage>,
-  tableName: string,
+  modelName: string,
   mapped: Record<string, unknown>,
   hiddenColumns: readonly string[],
-  resolvedModelName?: string,
 ): void {
   if (hiddenColumns.length === 0) {
     return;
   }
 
-  const modelName = resolvedModelName ?? findModelNameForTable(contract, tableName) ?? tableName;
   const columnToField = getColumnToFieldMap(contract, modelName);
   for (const hiddenColumn of hiddenColumns) {
     const fieldName = columnToField[hiddenColumn] ?? hiddenColumn;
@@ -63,27 +60,20 @@ export function stripHiddenMappedFields(
 
 export function createRowEnvelope(
   contract: Contract<SqlStorage>,
-  tableName: string,
+  modelName: string,
   raw: Record<string, unknown>,
-  modelName?: string,
 ): RowEnvelope {
   return {
     raw,
-    mapped: mapStorageRowToModelFields(contract, tableName, raw, modelName),
+    mapped: mapStorageRowToModelFields(contract, modelName, raw),
   };
 }
 
 export function mapStorageRowToModelFields(
   contract: Contract<SqlStorage>,
-  tableName: string,
+  modelName: string,
   row: Record<string, unknown>,
-  resolvedModelName?: string,
 ): Record<string, unknown> {
-  const modelName = resolvedModelName ?? findModelNameForTable(contract, tableName);
-  if (!modelName) {
-    return { ...row };
-  }
-
   const columnToField = getColumnToFieldMap(contract, modelName);
   if (Object.keys(columnToField).length === 0) {
     return { ...row };

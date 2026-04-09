@@ -38,13 +38,13 @@ describe('collection-runtime', () => {
 
   it('mapStorageRowToModelFields() maps known columns and falls back otherwise', () => {
     expect(
-      mapStorageRowToModelFields(contract, 'posts', { id: 1, user_id: 2, custom: true }),
+      mapStorageRowToModelFields(contract, 'Post', { id: 1, user_id: 2, custom: true }),
     ).toEqual({
       id: 1,
       userId: 2,
       custom: true,
     });
-    expect(mapStorageRowToModelFields(contract, 'unknown_table', { id: 1 })).toEqual({ id: 1 });
+    expect(mapStorageRowToModelFields(contract, 'UnknownModel', { id: 1 })).toEqual({ id: 1 });
   });
 
   it('mapModelDataToStorageRow() maps fields and skips undefined values', () => {
@@ -75,25 +75,25 @@ describe('collection-runtime', () => {
 
   it('stripHiddenMappedFields() removes mapped fields for hidden columns', () => {
     const mapped = { id: 1, userId: 2, title: 'A' };
-    stripHiddenMappedFields(contract, 'posts', mapped, ['user_id']);
+    stripHiddenMappedFields(contract, 'Post', mapped, ['user_id']);
 
     expect(mapped).toEqual({ id: 1, title: 'A' });
-    stripHiddenMappedFields(contract, 'posts', mapped, []);
+    stripHiddenMappedFields(contract, 'Post', mapped, []);
     expect(mapped).toEqual({ id: 1, title: 'A' });
   });
 
   it('stripHiddenMappedFields() falls back to raw column names when mappings are missing', () => {
     const unknownTableMapped = { custom_col: 1 };
-    stripHiddenMappedFields(contract, 'unknown_table', unknownTableMapped, ['custom_col']);
+    stripHiddenMappedFields(contract, 'UnknownModel', unknownTableMapped, ['custom_col']);
     expect(unknownTableMapped).toEqual({});
 
     const unknownColumnMapped = { id: 1, custom_col: 2 };
-    stripHiddenMappedFields(contract, 'users', unknownColumnMapped, ['custom_col']);
+    stripHiddenMappedFields(contract, 'User', unknownColumnMapped, ['custom_col']);
     expect(unknownColumnMapped).toEqual({ id: 1 });
   });
 
   it('createRowEnvelope() retains raw and mapped values', () => {
-    expect(createRowEnvelope(contract, 'posts', { id: 1, user_id: 2 })).toEqual({
+    expect(createRowEnvelope(contract, 'Post', { id: 1, user_id: 2 })).toEqual({
       raw: { id: 1, user_id: 2 },
       mapped: { id: 1, userId: 2 },
     });

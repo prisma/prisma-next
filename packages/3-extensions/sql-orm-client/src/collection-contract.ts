@@ -39,7 +39,6 @@ export function modelOf(contract: Contract<SqlStorage>, name: string): ModelEntr
 
 const fieldToColumnCache = new WeakMap<object, Map<string, Record<string, string>>>();
 const columnToFieldCache = new WeakMap<object, Map<string, Record<string, string>>>();
-const tableToModelCache = new WeakMap<object, Map<string, string>>();
 const polymorphismCache = new WeakMap<object, Map<string, PolymorphismInfo | undefined>>();
 
 export function resolvePolymorphismInfo(
@@ -153,24 +152,6 @@ export function getColumnToFieldMap(
   }
   perContract.set(modelName, cached);
   return cached;
-}
-
-// Assumes 1:1 table→model mapping. When multiple models can share a storage
-// table (e.g. owned models), callers should thread modelName directly instead.
-export function findModelNameForTable(
-  contract: Contract<SqlStorage>,
-  tableName: string,
-): string | undefined {
-  let reverseMap = tableToModelCache.get(contract);
-  if (!reverseMap) {
-    reverseMap = new Map();
-    for (const [modelName, model] of Object.entries(modelsOf(contract))) {
-      const table = model?.storage?.table;
-      if (table) reverseMap.set(table, modelName);
-    }
-    tableToModelCache.set(contract, reverseMap);
-  }
-  return reverseMap.get(tableName);
 }
 
 interface ResolvedRelation {
