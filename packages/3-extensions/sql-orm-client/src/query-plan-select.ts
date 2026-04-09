@@ -466,6 +466,7 @@ export function compileSelectWithIncludeStrategy(
   tableName: string,
   state: CollectionState,
   strategy: 'lateral' | 'correlated',
+  modelName?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
   if (
     state.includes.some((include) => include.scalar !== undefined || include.combine !== undefined)
@@ -478,6 +479,13 @@ export function compileSelectWithIncludeStrategy(
   const includeJoins: JoinAst[] = [];
   const includeProjection: ProjectionItem[] = [];
   const topLevelWhere = buildStateWhere(contract, tableName, state);
+
+  const polyInfo = modelName ? resolvePolymorphismInfo(contract, modelName) : undefined;
+  if (polyInfo && polyInfo.mtiVariants.length > 0) {
+    const mtiArtifacts = buildMtiJoins(contract, polyInfo, state.variantName);
+    includeJoins.push(...mtiArtifacts.joins);
+    includeProjection.push(...mtiArtifacts.projection);
+  }
 
   for (const include of state.includes) {
     if (strategy === 'lateral') {
