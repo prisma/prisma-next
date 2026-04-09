@@ -11,6 +11,7 @@ import {
   parseQuotedStringLiteral,
   unquoteStringLiteral,
 } from './psl-attribute-parsing';
+import { checkUncomposedNamespace } from './psl-column-resolution';
 
 export const REFERENTIAL_ACTION_MAP = {
   NoAction: 'noAction',
@@ -340,10 +341,12 @@ export function validateNavigationListFieldAttributes(input: {
     if (attribute.name === 'relation') {
       continue;
     }
-    if (attribute.name.startsWith('pgvector.') && !input.composedExtensions.has('pgvector')) {
+
+    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions);
+    if (uncomposedNamespace) {
       input.diagnostics.push({
         code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-        message: `Attribute "@${attribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
+        message: `Attribute "@${attribute.name}" uses unrecognized namespace "${uncomposedNamespace}". Add extension pack "${uncomposedNamespace}" to extensionPacks in prisma-next.config.ts.`,
         sourceId: input.sourceId,
         span: attribute.span,
       });

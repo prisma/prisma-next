@@ -1,7 +1,6 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import { instantiateAuthoringTypeConstructor } from '@prisma-next/framework-components/authoring';
 import type { PslField, PslModel } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
@@ -16,10 +15,9 @@ import {
 } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
 import {
-  getAuthoringTypeConstructor,
+  checkUncomposedNamespace,
   lowerDefaultForField,
-  parsePgvectorLength,
-  resolveColumnDescriptor,
+  resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
 
 export type ResolvedField = {
@@ -48,11 +46,12 @@ export function collectResolvedFields(
   mapping: ModelNameMapping,
   enumTypeDescriptors: Map<string, ColumnDescriptor>,
   namedTypeDescriptors: Map<string, ColumnDescriptor>,
-  namedTypeBaseTypes: Map<string, string>,
   modelNames: Set<string>,
   compositeTypeNames: ReadonlySet<string>,
   composedExtensions: Set<string>,
   authoringContributions: AuthoringContributions | undefined,
+  familyId: string,
+  targetId: string,
   defaultFunctionRegistry: ControlMutationDefaultRegistry,
   generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>,
   diagnostics: ContractSourceDiagnostic[],
@@ -60,10 +59,6 @@ export function collectResolvedFields(
   scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
 ): ResolvedField[] {
   const resolvedFields: ResolvedField[] = [];
-  const pgvectorVectorConstructor = getAuthoringTypeConstructor(authoringContributions, [
-    'pgvector',
-    'vector',
-  ]);
 
   for (const field of model.fields) {
     if (field.list && modelNames.has(field.typeName)) {
@@ -76,20 +71,22 @@ export function collectResolvedFields(
         attribute.name === 'unique' ||
         attribute.name === 'default' ||
         attribute.name === 'relation' ||
-        attribute.name === 'map' ||
-        attribute.name === 'pgvector.column'
+        attribute.name === 'map'
       ) {
         continue;
       }
-      if (attribute.name.startsWith('pgvector.') && !composedExtensions.has('pgvector')) {
+
+      const uncomposedNamespace = checkUncomposedNamespace(attribute.name, composedExtensions);
+      if (uncomposedNamespace) {
         diagnostics.push({
           code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-          message: `Attribute "@${attribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
+          message: `Attribute "@${attribute.name}" uses unrecognized namespace "${uncomposedNamespace}". Add extension pack "${uncomposedNamespace}" to extensionPacks in prisma-next.config.ts.`,
           sourceId,
           span: attribute.span,
         });
         continue;
       }
+
       diagnostics.push({
         code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
         message: `Field "${model.name}.${field.name}" uses unsupported attribute "@${attribute.name}"`,
@@ -106,96 +103,63 @@ export function collectResolvedFields(
     const isValueObjectField = compositeTypeNames.has(field.typeName);
     const isListField = field.list;
 
-    const pgvectorOnJsonField = getAttribute(field.attributes, 'pgvector.column');
-    if (pgvectorOnJsonField && (isValueObjectField || isListField)) {
-      diagnostics.push({
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        message: `Field "${model.name}.${field.name}" uses @pgvector.column on a JSON-backed field (${isValueObjectField ? 'value object' : 'list'}). @pgvector.column is only supported on scalar Bytes fields.`,
-        sourceId,
-        span: pgvectorOnJsonField.span,
-      });
-      continue;
-    }
-
     let descriptor: ColumnDescriptor | undefined;
     let scalarCodecId: string | undefined;
 
     if (isValueObjectField) {
       descriptor = scalarTypeDescriptors.get('Json');
     } else if (isListField) {
-      const originalDescriptor = resolveColumnDescriptor(
+      const originalDescriptor = resolveFieldTypeDescriptor({
         field,
         enumTypeDescriptors,
         namedTypeDescriptors,
         scalarTypeDescriptors,
-      );
+        authoringContributions,
+        composedExtensions,
+        familyId,
+        targetId,
+        diagnostics,
+        sourceId,
+        entityLabel: `Field "${model.name}.${field.name}"`,
+      });
       if (!originalDescriptor) {
+        if (!field.typeConstructor) {
+          diagnostics.push({
+            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+            message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
+            sourceId,
+            span: field.span,
+          });
+        }
+        continue;
+      }
+      scalarCodecId = originalDescriptor.codecId;
+      descriptor = scalarTypeDescriptors.get('Json');
+    } else {
+      descriptor = resolveFieldTypeDescriptor({
+        field,
+        enumTypeDescriptors,
+        namedTypeDescriptors,
+        scalarTypeDescriptors,
+        authoringContributions,
+        composedExtensions,
+        familyId,
+        targetId,
+        diagnostics,
+        sourceId,
+        entityLabel: `Field "${model.name}.${field.name}"`,
+      });
+    }
+
+    if (!descriptor) {
+      if (!field.typeConstructor) {
         diagnostics.push({
           code: 'PSL_UNSUPPORTED_FIELD_TYPE',
           message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
           sourceId,
           span: field.span,
         });
-        continue;
       }
-      scalarCodecId = originalDescriptor.codecId;
-      descriptor = scalarTypeDescriptors.get('Json');
-    } else {
-      descriptor = resolveColumnDescriptor(
-        field,
-        enumTypeDescriptors,
-        namedTypeDescriptors,
-        scalarTypeDescriptors,
-      );
-
-      const pgvectorColumnAttribute = getAttribute(field.attributes, 'pgvector.column');
-      if (pgvectorColumnAttribute) {
-        if (!composedExtensions.has('pgvector')) {
-          diagnostics.push({
-            code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-            message:
-              'Attribute "@pgvector.column" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.',
-            sourceId,
-            span: pgvectorColumnAttribute.span,
-          });
-        } else {
-          const isBytesBase =
-            field.typeName === 'Bytes' ||
-            namedTypeBaseTypes.get(field.typeRef ?? field.typeName) === 'Bytes';
-          if (!isBytesBase) {
-            diagnostics.push({
-              code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-              message: `Field "${model.name}.${field.name}" uses @pgvector.column on unsupported base type "${field.typeName}"`,
-              sourceId,
-              span: pgvectorColumnAttribute.span,
-            });
-          } else {
-            const length = parsePgvectorLength({
-              attribute: pgvectorColumnAttribute,
-              diagnostics,
-              sourceId,
-            });
-            if (length !== undefined) {
-              descriptor = pgvectorVectorConstructor
-                ? instantiateAuthoringTypeConstructor(pgvectorVectorConstructor, [length])
-                : {
-                    codecId: 'pg/vector@1',
-                    nativeType: 'vector',
-                    typeParams: { length },
-                  };
-            }
-          }
-        }
-      }
-    }
-
-    if (!descriptor) {
-      diagnostics.push({
-        code: 'PSL_UNSUPPORTED_FIELD_TYPE',
-        message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
-        sourceId,
-        span: field.span,
-      });
       continue;
     }
 

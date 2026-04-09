@@ -85,6 +85,17 @@ export function parsePslAttributeName(attributeName: string): PslAttributeNamePa
   };
 }
 
+export function checkUncomposedNamespace(
+  attributeName: string,
+  composedExtensions: ReadonlySet<string>,
+): string | undefined {
+  const parts = parsePslAttributeName(attributeName);
+  if (!parts || parts.namespace === 'db') {
+    return undefined;
+  }
+  return composedExtensions.has(parts.namespace) ? undefined : parts.namespace;
+}
+
 const INVALID_AUTHORING_ARGUMENT = Symbol('invalidAuthoringArgument');
 
 function parseStringArrayLiteral(
