@@ -1,12 +1,12 @@
 import {
-  MongoAggLiteral,
   MongoAndExpr,
   MongoExistsExpr,
   MongoExprFilter,
   MongoFieldFilter,
   MongoNotExpr,
   MongoOrExpr,
-} from '@prisma-next/mongo-query-ast/execution';
+} from '@prisma-next/mongo-query-ast/control';
+import { MongoAggLiteral } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { FilterEvaluator } from '../src/core/filter-evaluator';
 
@@ -244,11 +244,11 @@ describe('FilterEvaluator', () => {
       expect(evaluate(MongoFieldFilter.eq('a.b.c', 42), { a: { b: { c: 42 } } })).toBe(true);
     });
 
-    it('returns undefined for broken path (missing intermediate)', () => {
+    it('returns false for broken path (missing intermediate)', () => {
       expect(evaluate(MongoFieldFilter.eq('a.b.c', 42), { a: { x: 1 } })).toBe(false);
     });
 
-    it('returns undefined for broken path (null intermediate)', () => {
+    it('returns false for broken path (null intermediate)', () => {
       expect(evaluate(MongoFieldFilter.eq('a.b.c', 42), { a: null })).toBe(false);
     });
 

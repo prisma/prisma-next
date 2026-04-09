@@ -1,6 +1,6 @@
 import type { MongoSchemaIndex } from './schema-index';
 
-function deepEqual(a: unknown, b: unknown): boolean {
+export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
   if (a === undefined || b === undefined) return false;
@@ -21,8 +21,11 @@ function deepEqual(a: unknown, b: unknown): boolean {
     const aKeys = Object.keys(aObj);
     const bKeys = Object.keys(bObj);
     if (aKeys.length !== bKeys.length) return false;
-    for (const key of aKeys) {
-      if (!deepEqual(aObj[key], bObj[key])) return false;
+    for (let i = 0; i < aKeys.length; i++) {
+      const aKey = aKeys[i];
+      const bKey = bKeys[i];
+      if (aKey !== bKey) return false;
+      if (aKey !== undefined && !deepEqual(aObj[aKey], bObj[aKey])) return false;
     }
     return true;
   }

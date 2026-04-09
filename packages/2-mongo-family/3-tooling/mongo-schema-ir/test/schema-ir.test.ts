@@ -47,6 +47,8 @@ describe('MongoSchemaIndex', () => {
     const visitor: MongoSchemaVisitor<string> = {
       collection: () => 'collection',
       index: (node) => `index:${node.keys[0]!.field}`,
+      validator: () => 'validator',
+      collectionOptions: () => 'collectionOptions',
     };
     expect(index.accept(visitor)).toBe('index:email');
   });
@@ -85,6 +87,8 @@ describe('MongoSchemaCollection', () => {
     const visitor: MongoSchemaVisitor<string> = {
       collection: (node) => `collection:${node.name}`,
       index: () => 'index',
+      validator: () => 'validator',
+      collectionOptions: () => 'collectionOptions',
     };
     expect(coll.accept(visitor)).toBe('collection:users');
   });
