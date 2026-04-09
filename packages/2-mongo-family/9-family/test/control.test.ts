@@ -1,4 +1,4 @@
-import { createControlStack } from '@prisma-next/framework-components/control';
+import { createControlStack, hasMigrations } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
@@ -38,6 +38,32 @@ describe('mongoTargetDescriptor', () => {
     expect(mongoTargetDescriptor.familyId).toBe('mongo');
     expect(mongoTargetDescriptor.targetId).toBe('mongo');
   });
+
+  it('exposes migrations capability', () => {
+    expect(hasMigrations(mongoTargetDescriptor)).toBe(true);
+  });
+
+  it('migrations.createPlanner() returns a functional planner', () => {
+    if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations');
+    const family = createMongoFamilyInstance(createMinimalControlStack());
+    const planner = mongoTargetDescriptor.migrations.createPlanner(family);
+    expect(typeof planner.plan).toBe('function');
+  });
+
+  it('migrations.createRunner() returns a functional runner', () => {
+    if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations');
+    const family = createMongoFamilyInstance(createMinimalControlStack());
+    const runner = mongoTargetDescriptor.migrations.createRunner(family);
+    expect(typeof runner.execute).toBe('function');
+  });
+
+  it('migrations.contractToSchema(null) returns empty IR', () => {
+    if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations');
+    const ir = mongoTargetDescriptor.migrations.contractToSchema(null) as {
+      collections: Record<string, unknown>;
+    };
+    expect(ir.collections).toEqual({});
+  });
 });
 
 describe('mongoFamilyPack', () => {
@@ -57,7 +83,7 @@ describe('createMongoFamilyInstance', () => {
     expect(instance.familyId).toBe('mongo');
   });
 
-  const stubMethods = ['verify', 'schemaVerify', 'sign', 'readMarker', 'introspect'] as const;
+  const stubMethods = ['verify', 'schemaVerify', 'sign', 'introspect'] as const;
 
   for (const method of stubMethods) {
     it(`${method}() throws "not implemented"`, async () => {
