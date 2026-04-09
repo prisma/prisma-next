@@ -847,11 +847,17 @@ export class Collection<
         );
         await executeQueryPlan<Record<string, unknown>>(runtime, variantCompiled).toArray();
 
+        const prefixedVariant: Record<string, unknown> = {};
+        for (const [col, val] of Object.entries(variantRow)) {
+          if (col === pkColumn) continue;
+          prefixedVariant[`${variant.table}__${col}`] = val;
+        }
+
         const merged = mapPolymorphicRow(
           contract,
           modelName,
           polyInfo,
-          { ...baseCreated, ...variantRow },
+          { ...baseCreated, ...prefixedVariant },
           variant.modelName,
         );
         yield merged as Row;

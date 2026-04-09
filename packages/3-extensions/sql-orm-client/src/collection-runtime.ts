@@ -92,6 +92,7 @@ function getMergedColumnToFieldMap(
   contract: Contract<SqlStorage>,
   baseModelName: string,
   variantModelName: string,
+  variantTable: string | undefined,
 ): Record<string, string> {
   const cacheKey = `${baseModelName}:${variantModelName}`;
   let perContract = mergedColumnToFieldCache.get(contract);
@@ -104,7 +105,16 @@ function getMergedColumnToFieldMap(
 
   const baseMap = getColumnToFieldMap(contract, baseModelName);
   const variantMap = getColumnToFieldMap(contract, variantModelName);
-  const merged = { ...baseMap, ...variantMap };
+
+  const merged: Record<string, string> = { ...baseMap };
+  for (const [col, field] of Object.entries(variantMap)) {
+    if (variantTable) {
+      merged[`${variantTable}__${col}`] = field;
+    } else {
+      merged[col] = field;
+    }
+  }
+
   perContract.set(cacheKey, merged);
   return merged;
 }
@@ -131,7 +141,8 @@ export function mapPolymorphicRow(
     return mapped;
   }
 
-  const mergedMap = getMergedColumnToFieldMap(contract, baseModelName, variant.modelName);
+  const mtiTable = variant.strategy === 'mti' ? variant.table : undefined;
+  const mergedMap = getMergedColumnToFieldMap(contract, baseModelName, variant.modelName, mtiTable);
   const mapped: Record<string, unknown> = {};
   for (const [col, val] of Object.entries(row)) {
     if (col in mergedMap) {
