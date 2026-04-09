@@ -1,0 +1,251 @@
+{
+  "from": "sha256:empty",
+  "to": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
+  "migrationId": "sha256:209db525f5dd7d822bcbcc31c90885beb5d5f31f8498cb65a05f0e8faee2a600",
+  "kind": "regular",
+  "fromContract": null,
+  "toContract": {
+    "schemaVersion": "1",
+    "targetFamily": "mongo",
+    "target": "mongo",
+    "profileHash": "sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840",
+    "roots": {
+      "posts": "Post",
+      "users": "User"
+    },
+    "models": {
+      "Article": {
+        "base": "Post",
+        "fields": {
+          "summary": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {},
+        "storage": {
+          "collection": "posts"
+        }
+      },
+      "Post": {
+        "discriminator": {
+          "field": "kind"
+        },
+        "fields": {
+          "_id": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "authorId": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "content": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "createdAt": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/date@1",
+              "kind": "scalar"
+            }
+          },
+          "kind": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "title": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {
+          "author": {
+            "cardinality": "N:1",
+            "on": {
+              "localFields": ["authorId"],
+              "targetFields": ["_id"]
+            },
+            "to": "User"
+          }
+        },
+        "storage": {
+          "collection": "posts"
+        },
+        "variants": {
+          "Article": {
+            "value": "article"
+          },
+          "Tutorial": {
+            "value": "tutorial"
+          }
+        }
+      },
+      "Tutorial": {
+        "base": "Post",
+        "fields": {
+          "difficulty": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "duration": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/int32@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {},
+        "storage": {
+          "collection": "posts"
+        }
+      },
+      "User": {
+        "fields": {
+          "_id": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "address": {
+            "nullable": true,
+            "type": {
+              "kind": "valueObject",
+              "name": "Address"
+            }
+          },
+          "bio": {
+            "nullable": true,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "email": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "name": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {
+          "posts": {
+            "cardinality": "1:N",
+            "on": {
+              "localFields": ["_id"],
+              "targetFields": ["authorId"]
+            },
+            "to": "Post"
+          }
+        },
+        "storage": {
+          "collection": "users"
+        }
+      }
+    },
+    "valueObjects": {
+      "Address": {
+        "fields": {
+          "city": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "country": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "street": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "zip": {
+            "nullable": true,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "collections": {
+        "article": {},
+        "posts": {},
+        "tutorial": {},
+        "users": {
+          "indexes": [
+            {
+              "keys": [
+                {
+                  "field": "email",
+                  "direction": 1
+                }
+              ],
+              "unique": true
+            }
+          ]
+        }
+      },
+      "storageHash": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe"
+    },
+    "capabilities": {},
+    "extensionPacks": {},
+    "meta": {},
+    "_generated": {
+      "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+      "message": "This file is automatically generated by \"prisma-next contract emit\".",
+      "regenerate": "To regenerate, run: prisma-next contract emit"
+    }
+  },
+  "hints": {
+    "used": [],
+    "applied": [],
+    "plannerVersion": "1.0.0",
+    "planningStrategy": "diff"
+  },
+  "labels": [],
+  "createdAt": "2026-04-09T10:30:13.948Z"
+}
