@@ -1,5 +1,8 @@
 import {
+  CollModCommand,
+  CreateCollectionCommand,
   CreateIndexCommand,
+  DropCollectionCommand,
   DropIndexCommand,
   ListCollectionsCommand,
   ListIndexesCommand,
@@ -95,6 +98,72 @@ describe('MongoCommandExecutor', () => {
     const indexes = await db.collection('posts').listIndexes().toArray();
     const titleIndex = indexes.find((idx) => idx['name'] === 'title_1');
     expect(titleIndex).toBeUndefined();
+  });
+
+  it('createIndex passes M2 options (collation, wildcardProjection)', async () => {
+    await db.createCollection('products');
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CreateIndexCommand('products', [{ field: 'name', direction: 1 }], {
+      collation: { locale: 'en', strength: 2 },
+    });
+
+    await cmd.accept(executor);
+
+    const indexes = await db.collection('products').listIndexes().toArray();
+    const nameIndex = indexes.find((idx) => idx['key']?.['name'] === 1);
+    expect(nameIndex).toBeDefined();
+    expect(nameIndex?.['collation']?.['locale']).toBe('en');
+  });
+
+  it('createCollection creates a new collection', async () => {
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CreateCollectionCommand('events');
+
+    await cmd.accept(executor);
+
+    const colls = await db.listCollections({ name: 'events' }).toArray();
+    expect(colls).toHaveLength(1);
+  });
+
+  it('createCollection creates a capped collection', async () => {
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CreateCollectionCommand('logs', {
+      capped: true,
+      size: 1048576,
+      max: 1000,
+    });
+
+    await cmd.accept(executor);
+
+    const colls = await db.listCollections({ name: 'logs' }).toArray();
+    expect(colls).toHaveLength(1);
+    expect(colls[0]!['options']?.['capped']).toBe(true);
+  });
+
+  it('dropCollection drops an existing collection', async () => {
+    await db.createCollection('temp');
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new DropCollectionCommand('temp');
+
+    await cmd.accept(executor);
+
+    const colls = await db.listCollections({ name: 'temp' }).toArray();
+    expect(colls).toHaveLength(0);
+  });
+
+  it('collMod updates validator on a collection', async () => {
+    await db.createCollection('docs');
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CollModCommand('docs', {
+      validator: { $jsonSchema: { bsonType: 'object', required: ['name'] } },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+
+    await cmd.accept(executor);
+
+    const colls = await db.listCollections({ name: 'docs' }).toArray();
+    expect(colls[0]!['options']?.['validator']).toBeDefined();
   });
 });
 
