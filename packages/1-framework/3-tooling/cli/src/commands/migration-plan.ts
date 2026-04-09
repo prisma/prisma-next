@@ -55,7 +55,7 @@ export interface MigrationPlanResult {
     readonly label: string;
     readonly operationClass: string;
   }[];
-  readonly sql?: readonly string[];
+  readonly sql?: readonly string[] | undefined;
   readonly summary: string;
   readonly timings: {
     readonly total: number;
