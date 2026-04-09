@@ -17,7 +17,11 @@ import {
   MongoFieldFilter,
   type MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
-import type { MongoSchemaIndex, MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import {
+  canonicalize,
+  type MongoSchemaIndex,
+  type MongoSchemaIR,
+} from '@prisma-next/mongo-schema-ir';
 import { contractToMongoSchemaIR } from './contract-to-schema';
 
 function buildIndexLookupKey(index: MongoSchemaIndex): string {
@@ -26,7 +30,12 @@ function buildIndexLookupKey(index: MongoSchemaIndex): string {
     index.unique ? 'unique' : '',
     index.sparse ? 'sparse' : '',
     index.expireAfterSeconds != null ? `ttl:${index.expireAfterSeconds}` : '',
-    index.partialFilterExpression ? `pfe:${JSON.stringify(index.partialFilterExpression)}` : '',
+    index.partialFilterExpression ? `pfe:${canonicalize(index.partialFilterExpression)}` : '',
+    index.wildcardProjection ? `wp:${canonicalize(index.wildcardProjection)}` : '',
+    index.collation ? `col:${canonicalize(index.collation)}` : '',
+    index.weights ? `wt:${canonicalize(index.weights)}` : '',
+    index.default_language ? `dl:${index.default_language}` : '',
+    index.language_override ? `lo:${index.language_override}` : '',
   ]
     .filter(Boolean)
     .join(';');
@@ -65,6 +74,11 @@ function planCreateIndex(collection: string, index: MongoSchemaIndex): MongoMigr
           sparse: index.sparse,
           expireAfterSeconds: index.expireAfterSeconds,
           partialFilterExpression: index.partialFilterExpression,
+          wildcardProjection: index.wildcardProjection,
+          collation: index.collation,
+          weights: index.weights,
+          default_language: index.default_language,
+          language_override: index.language_override,
           name,
         }),
       },
