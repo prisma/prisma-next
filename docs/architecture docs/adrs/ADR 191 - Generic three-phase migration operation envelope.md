@@ -84,13 +84,13 @@ interface TargetMigrationsCapability<...> {
 
 The CLI calls `targetDescriptor.migrations.formatOperationStatements(ops)` when available. Each family provides a formatter that knows how to render its step types as display strings — SQL renders SQL statements, Mongo renders `db.collection.createIndex(...)` shell commands.
 
-## What changes
+## What changes (when implemented)
 
-- `MigrationPlanOperation` in `@prisma-next/framework-components` becomes generic over `TStep` and `TCheck`.
-- A `MigrationOperationSerializer` SPI is added to `@prisma-next/framework-components`.
-- `TargetMigrationsCapability` gains an optional `formatOperationStatements` method.
-- SQL and Mongo families conform to the generic, removing their independent envelope definitions.
-- The CLI `switch(familyId)` dispatch is replaced by the capability method.
+- `MigrationPlanOperation` in `@prisma-next/framework-components` would become generic over `TStep` and `TCheck`.
+- A `MigrationOperationSerializer` SPI would be added to `@prisma-next/framework-components`.
+- `TargetMigrationsCapability` would gain an optional `formatOperationStatements` method.
+- SQL and Mongo families would conform to the generic, removing their independent envelope definitions.
+- The CLI `switch(familyId)` dispatch would be replaced by the capability method.
 
 ## What doesn't change
 

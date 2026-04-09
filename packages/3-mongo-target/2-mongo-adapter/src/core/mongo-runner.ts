@@ -207,7 +207,16 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
     plan: MigrationPlan,
   ): MigrationRunnerResult | undefined {
     const origin = plan.origin ?? null;
-    if (!origin) return undefined;
+    if (!origin) {
+      if (marker) {
+        return runnerFailure(
+          'MARKER_ORIGIN_MISMATCH',
+          'Database already has a contract marker but the plan has no origin. This would silently overwrite the existing marker.',
+          { meta: { markerStorageHash: marker.storageHash } },
+        );
+      }
+      return undefined;
+    }
 
     if (!marker) {
       return runnerFailure(

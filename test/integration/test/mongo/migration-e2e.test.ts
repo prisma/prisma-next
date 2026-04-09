@@ -302,12 +302,15 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         const marker = await readMarker(db);
         expect(marker!.storageHash).toBe(emptyContract.storage.storageHash);
 
-        // Verify second ledger entry
+        // Verify second ledger entry with correct target hash
         const ledgerEntries = await db
           .collection(MIGRATIONS_COLLECTION)
           .find({ type: 'ledger' })
           .toArray();
         expect(ledgerEntries).toHaveLength(2);
+        const dropLedger = ledgerEntries.find((e) => e['to'] === emptyContract.storage.storageHash);
+        expect(dropLedger).toBeDefined();
+        expect(dropLedger!['from']).toBe(indexedContract.storage.storageHash);
       } finally {
         await controlDriver.close();
       }
@@ -332,23 +335,27 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         if (result.kind !== 'success') throw new Error('Plan failed');
 
         const serialized = JSON.parse(serializeMongoOps(result.plan.operations));
-        const plan = {
+        const bootstrapPlan = {
           targetId: 'mongo' as const,
           destination: { storageHash: indexedContract.storage.storageHash },
           operations: serialized,
         };
 
         await runner.execute({
-          plan,
+          plan: bootstrapPlan,
           driver: controlDriver,
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
         });
 
-        // Second apply (same plan) — idempotent
+        // Second apply (same plan with origin) — idempotent
+        const reapplyPlan = {
+          ...bootstrapPlan,
+          origin: { storageHash: indexedContract.storage.storageHash },
+        };
         const reapplyResult = await runner.execute({
-          plan,
+          plan: reapplyPlan,
           driver: controlDriver,
           destinationContract: indexedContract,
           policy: ALL_POLICY,
