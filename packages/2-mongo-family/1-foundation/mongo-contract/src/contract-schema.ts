@@ -260,10 +260,45 @@ const MongoStorageIndexSchema = type({
   'language_override?': 'string',
 });
 
+const MongoStorageValidatorSchema = type({
+  '+': 'reject',
+  jsonSchema: 'Record<string, unknown>',
+  validationLevel: "'strict' | 'moderate'",
+  validationAction: "'error' | 'warn'",
+});
+
+const CappedOptionsSchema = type({
+  '+': 'reject',
+  size: 'number',
+  'max?': 'number',
+});
+
+const TimeseriesOptionsSchema = type({
+  '+': 'reject',
+  timeField: 'string',
+  'metaField?': 'string',
+  'granularity?': "'seconds' | 'minutes' | 'hours'",
+});
+
+const ClusteredIndexSchema = type({
+  '+': 'reject',
+  'name?': 'string',
+});
+
+const MongoCollectionOptionsSchema = type({
+  '+': 'reject',
+  'capped?': CappedOptionsSchema,
+  'timeseries?': TimeseriesOptionsSchema,
+  'collation?': 'Record<string, unknown>',
+  'changeStreamPreAndPostImages?': ChangeStreamPreAndPostImagesSchema,
+  'clusteredIndex?': ClusteredIndexSchema,
+});
+
 const StorageCollectionSchema = type({
   '+': 'reject',
   'indexes?': MongoStorageIndexSchema.array(),
-  'options?': CollectionOptionsSchema,
+  'validator?': MongoStorageValidatorSchema,
+  'options?': MongoCollectionOptionsSchema,
 });
 
 export const MongoContractSchema = type({

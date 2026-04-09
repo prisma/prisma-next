@@ -124,9 +124,28 @@ export interface MongoStorageIndex {
   readonly language_override?: string;
 }
 
+export interface MongoStorageValidator {
+  readonly jsonSchema: Record<string, unknown>;
+  readonly validationLevel: 'strict' | 'moderate';
+  readonly validationAction: 'error' | 'warn';
+}
+
+export interface MongoStorageCollectionOptions {
+  readonly capped?: { size: number; max?: number };
+  readonly timeseries?: {
+    timeField: string;
+    metaField?: string;
+    granularity?: 'seconds' | 'minutes' | 'hours';
+  };
+  readonly collation?: Record<string, unknown>;
+  readonly changeStreamPreAndPostImages?: { enabled: boolean };
+  readonly clusteredIndex?: { name?: string };
+}
+
 export interface MongoStorageCollection {
   readonly indexes?: ReadonlyArray<MongoStorageIndex>;
-  readonly options?: MongoCollectionOptions;
+  readonly validator?: MongoStorageValidator;
+  readonly options?: MongoStorageCollectionOptions;
 }
 
 export type MongoStorage<THash extends string = string> = StorageBase<THash> & {
