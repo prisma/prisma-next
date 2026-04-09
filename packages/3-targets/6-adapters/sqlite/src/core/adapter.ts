@@ -440,7 +440,7 @@ function renderInsert(ast: InsertAst): string {
       .map((row) => {
         const renderedRow = columnOrder.map((column) => {
           const value = row[column];
-          if (!value) {
+          if (value === undefined) {
             throw new Error(`Missing value for column "${column}" in INSERT row`);
           }
           return renderInsertValue(value);

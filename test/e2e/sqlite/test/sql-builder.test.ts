@@ -58,11 +58,14 @@ describe('e2e: sql-builder on SQLite', () => {
     it('callback record select', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
         const rows = await runtime.execute(
-          db.users.select((f) => ({ myId: f.id, myName: f.name })).build(),
+          db.users
+            .select((f) => ({ myId: f.id, myName: f.name }))
+            .orderBy('id')
+            .build(),
         );
         expect(rows).toHaveLength(4);
-        expect(rows[0]).toHaveProperty('myId');
-        expect(rows[0]).toHaveProperty('myName');
+        expect(rows[0]!.myId).toBe(1);
+        expect(rows[0]!.myName).toBe('Alice');
 
         expectTypeOf(rows[0]!).toEqualTypeOf<{ myId: number; myName: string }>();
       });

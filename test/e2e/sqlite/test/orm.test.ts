@@ -220,6 +220,10 @@ describe('e2e: ORM on SQLite', () => {
         });
         expect(created.metadata).toBeNull();
 
+        const found = await ormClient.TypedRow.where((r) => r.id.eq(12)).first();
+        expect(found).not.toBeNull();
+        expect(found!.metadata).toBeNull();
+
         await ormClient.TypedRow.where((r) => r.id.eq(12)).deleteCount();
       });
     });
