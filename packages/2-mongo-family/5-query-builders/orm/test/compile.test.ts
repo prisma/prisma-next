@@ -1,4 +1,4 @@
-import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import {
   type MongoAndExpr,
   MongoFieldFilter,
@@ -10,7 +10,7 @@ import {
   MongoSkipStage,
   MongoSortStage,
   MongoUnwindStage,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import type { MongoCollectionState } from '../src/collection-state';
 import { emptyCollectionState } from '../src/collection-state';

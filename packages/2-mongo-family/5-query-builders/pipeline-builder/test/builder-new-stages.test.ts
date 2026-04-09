@@ -22,7 +22,7 @@ import {
   MongoSortStage,
   MongoUnionWithStage,
   MongoVectorSearchStage,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { mongoPipeline } from '../src/pipeline';
 import type { TContract } from './fixtures/test-contract';

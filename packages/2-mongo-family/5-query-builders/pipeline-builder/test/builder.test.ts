@@ -16,7 +16,7 @@ import {
   MongoSortByCountStage,
   MongoSortStage,
   MongoUnwindStage,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
 import { fn } from '../src/expression-helpers';

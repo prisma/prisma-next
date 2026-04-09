@@ -3,7 +3,7 @@ import type {
   MongoAggAccumulator,
   MongoAggExpr,
   MongoFilterExpr,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 
 export interface DocField {

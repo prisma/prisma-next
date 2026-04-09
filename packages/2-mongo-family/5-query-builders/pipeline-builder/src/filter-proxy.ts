@@ -1,5 +1,5 @@
-import type { MongoFilterExpr } from '@prisma-next/mongo-query-ast';
-import { MongoExistsExpr, MongoFieldFilter } from '@prisma-next/mongo-query-ast';
+import type { MongoFilterExpr } from '@prisma-next/mongo-query-ast/execution';
+import { MongoExistsExpr, MongoFieldFilter } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import type { DocShape, FilterHandle, FilterProxy } from './types';
 

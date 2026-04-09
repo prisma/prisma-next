@@ -1,7 +1,11 @@
 import { createServer, type ServerResponse } from 'node:http';
 import type { SimplifyDeep } from '@prisma-next/mongo-orm';
 import { acc, fn } from '@prisma-next/mongo-pipeline-builder';
-import { MongoCountStage, MongoLimitStage, MongoSortStage } from '@prisma-next/mongo-query-ast';
+import {
+  MongoCountStage,
+  MongoLimitStage,
+  MongoSortStage,
+} from '@prisma-next/mongo-query-ast/execution';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import type { Db } from './db';
 import { createClient } from './db';

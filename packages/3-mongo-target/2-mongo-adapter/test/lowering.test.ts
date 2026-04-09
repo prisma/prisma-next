@@ -44,7 +44,7 @@ import {
   MongoUnionWithStage,
   MongoUnwindStage,
   MongoVectorSearchStage,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { lowerAggExpr, lowerFilter, lowerPipeline, lowerStage } from '../src/lowering';

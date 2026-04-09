@@ -16,7 +16,7 @@ import type {
   MongoQueryPlan,
   MongoUpdatePipelineStage,
   MongoWindowField,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import {
   AggregateCommand,
   MongoAddFieldsStage,
@@ -47,7 +47,7 @@ import {
   MongoUnionWithStage,
   MongoUnwindStage,
   MongoVectorSearchStage,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import { createFieldProxy } from './field-proxy';
 import { createFilterProxy } from './filter-proxy';
 import type {
