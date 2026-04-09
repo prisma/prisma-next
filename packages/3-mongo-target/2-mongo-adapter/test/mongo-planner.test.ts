@@ -1,14 +1,19 @@
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
-import type { MongoContract } from '@prisma-next/mongo-contract';
+import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
 import type {
+  CollModCommand,
+  CreateCollectionCommand,
   CreateIndexCommand,
+  DropCollectionCommand,
   DropIndexCommand,
   MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
 import {
   MongoSchemaCollection,
+  MongoSchemaCollectionOptionsNode,
   MongoSchemaIndex,
   type MongoSchemaIR,
+  MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
 import { MongoMigrationPlanner } from '../src/core/mongo-planner';
@@ -21,9 +26,7 @@ const ADDITIVE_ONLY_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive'],
 };
 
-function makeContract(
-  collections: Record<string, { indexes?: ReadonlyArray<Record<string, unknown>> }>,
-): MongoContract {
+function makeContract(collections: Record<string, MongoStorageCollection>): MongoContract {
   return {
     target: 'mongo',
     targetFamily: 'mongo',
@@ -479,6 +482,213 @@ describe('MongoMigrationPlanner', () => {
       expect(cmd.language_override).toBe('lang');
       expect(cmd.collation).toEqual({ locale: 'en' });
       expect(cmd.wildcardProjection).toEqual({ bio: 1 });
+    });
+  });
+
+  describe('validator diffing', () => {
+    it('emits collMod when validator is added', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { bsonType: 'object' },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin = irWithCollection('users', []);
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      const cmd = collModOps[0]!.execute[0]!.command as CollModCommand;
+      expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+      expect(cmd.validationLevel).toBe('strict');
+    });
+
+    it('emits collMod when validator is removed', () => {
+      const contract = makeContract({ users: {} });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object' },
+              validationLevel: 'strict',
+              validationAction: 'error',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('destructive');
+    });
+
+    it('emits collMod when validator changes', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { bsonType: 'object', properties: { name: { bsonType: 'string' } } },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object' },
+              validationLevel: 'strict',
+              validationAction: 'error',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('destructive');
+    });
+
+    it('no-ops when validators are identical', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { bsonType: 'object' },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object' },
+              validationLevel: 'strict',
+              validationAction: 'error',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(0);
+    });
+  });
+
+  describe('collection lifecycle', () => {
+    it('emits createCollection for new collections with options', () => {
+      const contract = makeContract({
+        events: {
+          options: { capped: { size: 1048576, max: 1000 } },
+        },
+      });
+      const plan = planSuccess(planner, contract, emptyIR());
+      const createOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'createCollection',
+      );
+      expect(createOps).toHaveLength(1);
+      const cmd = createOps[0]!.execute[0]!.command as CreateCollectionCommand;
+      expect(cmd.collection).toBe('events');
+      expect(cmd.capped).toBe(true);
+      expect(cmd.size).toBe(1048576);
+    });
+
+    it('emits dropCollection for removed collections', () => {
+      const contract = makeContract({});
+      const origin: MongoSchemaIR = {
+        collections: {
+          events: new MongoSchemaCollection({
+            name: 'events',
+            options: new MongoSchemaCollectionOptionsNode({
+              capped: { size: 1048576 },
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const dropOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'dropCollection',
+      );
+      expect(dropOps).toHaveLength(1);
+      const cmd = dropOps[0]!.execute[0]!.command as DropCollectionCommand;
+      expect(cmd.collection).toBe('events');
+    });
+
+    it('reports conflict for immutable option change (capped)', () => {
+      const contract = makeContract({
+        events: {
+          options: { capped: { size: 2097152 } },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          events: new MongoSchemaCollection({
+            name: 'events',
+            options: new MongoSchemaCollectionOptionsNode({
+              capped: { size: 1048576 },
+            }),
+          }),
+        },
+      };
+      const result = planner.plan({
+        contract,
+        schema: origin,
+        policy: ALL_CLASSES_POLICY,
+        frameworkComponents: [],
+      });
+      expect(result.kind).toBe('failure');
+      if (result.kind !== 'failure') throw new Error('Expected failure');
+      expect(result.conflicts.some((c) => c.summary.includes('immutable'))).toBe(true);
+    });
+
+    it('emits collMod for mutable option change (changeStreamPreAndPostImages)', () => {
+      const contract = makeContract({
+        events: {
+          options: { changeStreamPreAndPostImages: { enabled: true } },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          events: new MongoSchemaCollection({
+            name: 'events',
+            options: new MongoSchemaCollectionOptionsNode({
+              changeStreamPreAndPostImages: { enabled: false },
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+    });
+
+    it('orders creates before indexes, drops after', () => {
+      const contract = makeContract({
+        events: {
+          indexes: [{ keys: [{ field: 'ts', direction: 1 as const }] }],
+          options: { capped: { size: 1048576 } },
+        },
+      });
+      const plan = planSuccess(planner, contract, emptyIR());
+      const kinds = (plan.operations as MongoMigrationPlanOperation[]).map(
+        (op) => op.execute[0]!.command.kind,
+      );
+      const createCollIdx = kinds.indexOf('createCollection');
+      const createIdxIdx = kinds.indexOf('createIndex');
+      expect(createCollIdx).toBeLessThan(createIdxIdx);
     });
   });
 
