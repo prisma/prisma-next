@@ -2567,9 +2567,15 @@ importers:
       '@prisma-next/mongo-contract-psl':
         specifier: workspace:*
         version: link:../../../../../../packages/2-mongo-family/2-authoring/contract-psl
+      '@prisma-next/mongo-contract-ts':
+        specifier: workspace:*
+        version: link:../../../../../../packages/2-mongo-family/2-authoring/contract-ts
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../../../../packages/2-sql/2-authoring/contract-ts
+      '@prisma-next/target-mongo':
+        specifier: workspace:*
+        version: link:../../../../../../packages/3-mongo-target/1-mongo-target
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../../../../../packages/3-targets/3-targets/postgres
