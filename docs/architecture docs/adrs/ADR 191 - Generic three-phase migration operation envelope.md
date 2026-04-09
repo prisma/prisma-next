@@ -78,7 +78,7 @@ The `switch(familyId)` in the CLI's `extractOperationStatements` is replaced by 
 
 ```ts
 interface TargetMigrationsCapability<...> {
-  formatOperationStatements?(operations: readonly MigrationPlanOperation[]): string[];
+  formatOperationStatements?(operations: readonly MigrationPlanOperation<unknown, unknown>[]): string[];
 }
 ```
 

@@ -15,7 +15,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`Connecting to ${url}...`);
+  console.log('Connecting to MongoDB...');
   const { orm, runtime } = await createClient(url, DB_NAME);
 
   try {

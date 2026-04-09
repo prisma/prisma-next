@@ -7,7 +7,7 @@ import type {
   MongoInspectionCommandVisitor,
 } from '@prisma-next/mongo-query-ast/control';
 import { keysToKeySpec } from '@prisma-next/mongo-query-ast/control';
-import type { Db, Document } from 'mongodb';
+import { type Db, type Document, MongoServerError } from 'mongodb';
 
 export class MongoCommandExecutor implements MongoDdlCommandVisitor<Promise<void>> {
   constructor(private readonly db: Db) {}
@@ -37,7 +37,7 @@ export class MongoInspectionExecutor implements MongoInspectionCommandVisitor<Pr
     try {
       return await this.db.collection(cmd.collection).listIndexes().toArray();
     } catch (error: unknown) {
-      if (error instanceof Error && error.message.includes('ns does not exist')) {
+      if (error instanceof MongoServerError && error.code === 26) {
         return [];
       }
       throw error;

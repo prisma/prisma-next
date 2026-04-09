@@ -56,7 +56,7 @@ Every piece — `CreateIndexCommand`, `ListIndexesCommand`, `MongoFieldFilter`, 
 
 Each migration operation is a **data envelope** with three phases — `precheck[]`, `execute[]`, `postcheck[]` — rather than a behavioral class with per-operation visitor dispatch. The phases are composed from existing AST primitives (DDL commands, inspection commands, filter expressions) that serialize naturally to JSON. The envelope carries no behavior of its own; the semantic richness lives in the commands and expressions inside it.
 
-```
+```text
 Planner                                              Runner
    │                                                    │
    ▼                                                    ▼
