@@ -23,8 +23,7 @@ import {
 import { emptyState } from '../src/types';
 import { bindWhereExpr } from '../src/where-binding';
 import { baseContract, createCollection, createCollectionFor } from './collection-fixtures';
-import type { TestContract } from './helpers';
-import { getTestContract, isSelectAst } from './helpers';
+import { buildMixedPolyContract, isSelectAst } from './helpers';
 
 function dslDescriptor(table: string, column: string) {
   const columnMeta = (
@@ -345,62 +344,9 @@ describe('compileSelectWithIncludeStrategy', () => {
   });
 });
 
-function buildMtiPolyContract(): TestContract {
-  const raw = JSON.parse(JSON.stringify(getTestContract()));
-  raw.models.Task = {
-    fields: {
-      id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
-      title: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
-      type: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
-    },
-    relations: {},
-    storage: {
-      table: 'tasks',
-      fields: { id: { column: 'id' }, title: { column: 'title' }, type: { column: 'type' } },
-    },
-    discriminator: { field: 'type' },
-    variants: { Bug: { value: 'bug' }, Feature: { value: 'feature' } },
-  };
-  raw.models.Bug = {
-    fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
-    relations: {},
-    storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
-    base: 'Task',
-  };
-  raw.models.Feature = {
-    fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
-    relations: {},
-    storage: { table: 'features', fields: { priority: { column: 'priority' } } },
-    base: 'Task',
-  };
-  raw.storage.tables.tasks = {
-    columns: {
-      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-      type: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-      severity: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-    },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-  raw.storage.tables.features = {
-    columns: {
-      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-    },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-  return raw as TestContract;
-}
-
 describe('compileSelect MTI JOINs', () => {
   it('base query LEFT JOINs MTI variant tables', () => {
-    const contract = buildMtiPolyContract();
+    const contract = buildMixedPolyContract();
     const state = emptyState();
 
     const plan = compileSelect(contract, 'tasks', state, 'Task');
@@ -419,7 +365,7 @@ describe('compileSelect MTI JOINs', () => {
   });
 
   it('variant query INNER JOINs the specific MTI variant table', () => {
-    const contract = buildMtiPolyContract();
+    const contract = buildMixedPolyContract();
     const state = { ...emptyState(), variantName: 'Feature' };
 
     const plan = compileSelect(contract, 'tasks', state, 'Task');
@@ -432,7 +378,7 @@ describe('compileSelect MTI JOINs', () => {
   });
 
   it('STI-only variant query produces no JOINs', () => {
-    const contract = buildMtiPolyContract();
+    const contract = buildMixedPolyContract();
     const state = { ...emptyState(), variantName: 'Bug' };
 
     const plan = compileSelect(contract, 'tasks', state, 'Task');
@@ -448,7 +394,7 @@ describe('compileSelect MTI JOINs', () => {
   });
 
   it('MTI projection excludes the shared PK column', () => {
-    const contract = buildMtiPolyContract();
+    const contract = buildMixedPolyContract();
     const plan = compileSelect(contract, 'tasks', emptyState(), 'Task');
     expectSelectAst(plan.ast);
 

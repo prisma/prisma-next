@@ -7,60 +7,15 @@ import {
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
 import { withReturningCapability } from './collection-fixtures';
-import type { TestContract } from './helpers';
-import { createMockRuntime, getTestContext, getTestContract } from './helpers';
-
-function getStiPolyContract(): TestContract {
-  const base = getTestContract();
-  const raw = JSON.parse(JSON.stringify(base));
-  raw.models.User.fields.kind = {
-    nullable: false,
-    type: { kind: 'scalar', codecId: 'pg/text@1' },
-  };
-  raw.models.User.storage.fields.kind = { column: 'kind' };
-  raw.models.User.discriminator = { field: 'kind' };
-  raw.models.User.variants = {
-    Admin: { value: 'admin' },
-    Regular: { value: 'regular' },
-  };
-  raw.models.Admin = {
-    fields: { role: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
-    relations: {},
-    storage: { table: 'users', fields: { role: { column: 'role' } } },
-    base: 'User',
-  };
-  raw.models.Regular = {
-    fields: {
-      plan: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
-    },
-    relations: {},
-    storage: { table: 'users', fields: { plan: { column: 'plan' } } },
-    base: 'User',
-  };
-  raw.storage.tables.users.columns.kind = {
-    codecId: 'pg/text@1',
-    nativeType: 'text',
-    nullable: false,
-  };
-  raw.storage.tables.users.columns.role = {
-    codecId: 'pg/text@1',
-    nativeType: 'text',
-    nullable: true,
-  };
-  raw.storage.tables.users.columns.plan = {
-    codecId: 'pg/text@1',
-    nativeType: 'text',
-    nullable: true,
-  };
-  return raw as TestContract;
-}
-
-function getPolyContract(): TestContract {
-  return getStiPolyContract();
-}
+import {
+  buildMixedPolyContract,
+  buildStiPolyContract,
+  createMockRuntime,
+  getTestContext,
+} from './helpers';
 
 function createPolyCollection() {
-  const contract = getPolyContract();
+  const contract = buildStiPolyContract();
   const baseContext = getTestContext();
   const context = { ...baseContext, contract };
   const runtime = createMockRuntime();
@@ -188,66 +143,6 @@ describe('STI polymorphic query pipeline', () => {
     expect(rows[0]).not.toHaveProperty('plan');
   });
 });
-
-function buildMixedPolyContract(): TestContract {
-  const base = getTestContract();
-  const raw = JSON.parse(JSON.stringify(base));
-
-  raw.models.Task = {
-    fields: {
-      id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
-      title: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
-      type: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
-    },
-    relations: {},
-    storage: {
-      table: 'tasks',
-      fields: { id: { column: 'id' }, title: { column: 'title' }, type: { column: 'type' } },
-    },
-    discriminator: { field: 'type' },
-    variants: { Bug: { value: 'bug' }, Feature: { value: 'feature' } },
-  };
-
-  raw.models.Bug = {
-    fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
-    relations: {},
-    storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
-    base: 'Task',
-  };
-
-  raw.models.Feature = {
-    fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
-    relations: {},
-    storage: { table: 'features', fields: { priority: { column: 'priority' } } },
-    base: 'Task',
-  };
-
-  raw.storage.tables.tasks = {
-    columns: {
-      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-      type: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-      severity: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-    },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  raw.storage.tables.features = {
-    columns: {
-      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-    },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  return raw as TestContract;
-}
 
 function createMixedPolyCollection() {
   const contract = buildMixedPolyContract();
