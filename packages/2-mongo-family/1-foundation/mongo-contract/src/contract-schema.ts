@@ -253,6 +253,11 @@ const MongoStorageIndexSchema = type({
   'sparse?': 'boolean',
   'expireAfterSeconds?': 'number',
   'partialFilterExpression?': 'Record<string, unknown>',
+  'wildcardProjection?': 'Record<string, 0 | 1>',
+  'collation?': 'Record<string, unknown>',
+  'weights?': 'Record<string, number>',
+  'default_language?': 'string',
+  'language_override?': 'string',
 });
 
 const StorageCollectionSchema = type({

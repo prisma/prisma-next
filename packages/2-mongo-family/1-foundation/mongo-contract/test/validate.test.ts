@@ -540,6 +540,50 @@ describe('validateMongoContract()', () => {
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
+
+    it('accepts index with wildcardProjection', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [
+          {
+            keys: [{ field: '$**', direction: 1 }],
+            wildcardProjection: { name: 1, email: 1 },
+          },
+        ],
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts index with collation', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [
+          {
+            keys: [{ field: 'name', direction: 1 }],
+            collation: { locale: 'en', strength: 2 },
+          },
+        ],
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts index with text options (weights, default_language, language_override)', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [
+          {
+            keys: [{ field: 'bio', direction: 'text' }],
+            weights: { bio: 10 },
+            default_language: 'english',
+            language_override: 'lang',
+          },
+        ],
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
   });
 
   describe('happy path', () => {

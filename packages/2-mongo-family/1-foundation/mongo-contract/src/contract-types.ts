@@ -117,6 +117,11 @@ export interface MongoStorageIndex {
   readonly sparse?: boolean;
   readonly expireAfterSeconds?: number;
   readonly partialFilterExpression?: Record<string, unknown>;
+  readonly wildcardProjection?: Record<string, 0 | 1>;
+  readonly collation?: Record<string, unknown>;
+  readonly weights?: Record<string, number>;
+  readonly default_language?: string;
+  readonly language_override?: string;
 }
 
 export interface MongoStorageCollection {
