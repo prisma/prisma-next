@@ -134,7 +134,9 @@ async function main() {
       replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
     uri = replSet.getUri();
-    stopMemoryServer = () => replSet.stop();
+    stopMemoryServer = async () => {
+      await replSet.stop();
+    };
     console.log(`In-memory MongoDB ready at ${uri}`);
   }
 
