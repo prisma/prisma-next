@@ -6,7 +6,6 @@ import {
   MongoExistsExpr,
   MongoFieldFilter,
   type MongoMigrationPlanOperation,
-  MongoNotExpr,
   MongoOrExpr,
 } from '@prisma-next/mongo-query-ast/control';
 import { describe, expect, it } from 'vitest';

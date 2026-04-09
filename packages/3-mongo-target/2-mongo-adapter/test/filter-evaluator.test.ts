@@ -3,7 +3,6 @@ import {
   MongoExistsExpr,
   MongoExprFilter,
   MongoFieldFilter,
-  MongoNotExpr,
   MongoOrExpr,
 } from '@prisma-next/mongo-query-ast/control';
 import { MongoAggLiteral } from '@prisma-next/mongo-query-ast/execution';
