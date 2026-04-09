@@ -7,6 +7,8 @@
   },
   "scripts": {
     "emit": "prisma-next contract emit",
+    "migration:plan": "prisma-next migration plan",
+    "migration:apply": "prisma-next migration apply",
     "dev:api": "tsx src/server.ts",
     "dev": "vite",
     "test": "vitest run",
