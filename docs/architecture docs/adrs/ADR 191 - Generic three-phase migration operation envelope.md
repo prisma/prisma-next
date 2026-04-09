@@ -2,7 +2,7 @@
 
 **Status:** Accepted, not yet implemented.
 
-## Grounding example
+## At a glance
 
 When we built Mongo migrations, we defined this operation interface:
 

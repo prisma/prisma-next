@@ -1,6 +1,6 @@
 # ADR 190 — CAS-based concurrency and migration state storage for MongoDB
 
-## Grounding example
+## At a glance
 
 A developer runs `migration apply`. The runner executes the DDL commands (create indexes, drop indexes), and the database is now in a new state. Two questions arise:
 
