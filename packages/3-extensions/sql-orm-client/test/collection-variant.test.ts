@@ -4,7 +4,7 @@ import {
   type InsertAst,
   LiteralExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Collection } from '../src/collection';
 import { withReturningCapability } from './collection-fixtures';
 import {
@@ -298,5 +298,36 @@ describe('MTI variant create (two-INSERT orchestration)', () => {
     expect(variantRow['priority']).toBeDefined();
     expect(variantRow['id']).toBeDefined();
     expect((variantRow['id'] as { value: unknown }).value).toBe(10);
+  });
+
+  it('wraps both INSERTs in a transaction when available', async () => {
+    const contract = withReturningCapability(buildMixedPolyContract());
+    const baseContext = getTestContext();
+    const context = { ...baseContext, contract };
+    const baseRuntime = createMockRuntime();
+    baseRuntime.setNextResults([
+      [{ id: 10, title: 'Dark mode', type: 'feature' }],
+      [{ id: 10, priority: 1 }],
+    ]);
+
+    const commit = vi.fn().mockResolvedValue(undefined);
+    const rollback = vi.fn().mockResolvedValue(undefined);
+    const txRuntime = {
+      ...baseRuntime,
+      transaction: vi.fn().mockResolvedValue({
+        execute: baseRuntime.execute.bind(baseRuntime),
+        commit,
+        rollback,
+      }),
+    };
+
+    const collection = new Collection({ runtime: txRuntime, context }, 'Task');
+    const narrowed = collection.variant('Feature' as never) as typeof collection;
+    await narrowed.createAll([{ title: 'Dark mode', priority: 1 } as never]).toArray();
+
+    expect(txRuntime.transaction).toHaveBeenCalledOnce();
+    expect(commit).toHaveBeenCalledOnce();
+    expect(rollback).not.toHaveBeenCalled();
+    expect(baseRuntime.executions).toHaveLength(2);
   });
 });

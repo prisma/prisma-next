@@ -126,7 +126,7 @@ export function buildPrimaryKeyFilterFromRow(
   };
 }
 
-async function withMutationScope<T>(
+export async function withMutationScope<T>(
   runtime: RuntimeQueryable,
   run: (scope: RuntimeScope) => Promise<T>,
 ): Promise<T> {
