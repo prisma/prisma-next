@@ -94,7 +94,7 @@ interface MongoSchemaIR {
 
 An empty IR (for a new project with no prior contract) is `{ collections: {} }`.
 
-A collection groups its indexes (and, in future, its validator and options):
+A collection groups its indexes (and, in the future, its validator and options):
 
 ```ts
 class MongoSchemaCollection extends MongoSchemaNode {

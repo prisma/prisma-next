@@ -48,10 +48,10 @@ Two indexes that produce the same lookup key are the same index. For example:
 
 | Index                           | Lookup key               |
 | ------------------------------- | ------------------------ |
-| `{ email: 1 }`, unique          | `email:1|unique`         |
+| `{ email: 1 }`, unique          | `email:1\|unique`        |
 | `{ email: 1 }`, not unique      | `email:1`                |
 | `{ lastName: 1, firstName: 1 }` | `lastName:1,firstName:1` |
-| `{ createdAt: 1 }`, TTL 86400s  | `createdAt:1|ttl:86400`  |
+| `{ createdAt: 1 }`, TTL 86400s  | `createdAt:1\|ttl:86400` |
 
 
 The planner builds a `Map<string, MongoSchemaIndex>` for both origin and destination, then diffs the key sets:
