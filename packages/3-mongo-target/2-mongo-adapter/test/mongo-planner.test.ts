@@ -370,6 +370,118 @@ describe('MongoMigrationPlanner', () => {
     });
   });
 
+  describe('M2 index vocabulary', () => {
+    it('detects different wildcardProjection as distinct indexes', () => {
+      const contract = makeContract({
+        users: {
+          indexes: [
+            {
+              keys: [{ field: '$**', direction: 1 }],
+              wildcardProjection: { name: 1, email: 1 },
+            },
+          ],
+        },
+      });
+      const origin = irWithCollection('users', [
+        new MongoSchemaIndex({
+          keys: [{ field: '$**', direction: 1 }],
+          wildcardProjection: { name: 1 },
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(2);
+    });
+
+    it('detects different collation as distinct indexes', () => {
+      const contract = makeContract({
+        users: {
+          indexes: [
+            {
+              keys: [{ field: 'name', direction: 1 }],
+              collation: { locale: 'en', strength: 2 },
+            },
+          ],
+        },
+      });
+      const origin = irWithCollection('users', [
+        new MongoSchemaIndex({
+          keys: [{ field: 'name', direction: 1 }],
+          collation: { locale: 'fr', strength: 2 },
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(2);
+    });
+
+    it('treats same collation with different key order as identical', () => {
+      const contract = makeContract({
+        users: {
+          indexes: [
+            {
+              keys: [{ field: 'name', direction: 1 }],
+              collation: { strength: 2, locale: 'en' },
+            },
+          ],
+        },
+      });
+      const origin = irWithCollection('users', [
+        new MongoSchemaIndex({
+          keys: [{ field: 'name', direction: 1 }],
+          collation: { locale: 'en', strength: 2 },
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(0);
+    });
+
+    it('detects different weights as distinct indexes', () => {
+      const contract = makeContract({
+        users: {
+          indexes: [
+            {
+              keys: [{ field: 'bio', direction: 'text' }],
+              weights: { bio: 10 },
+            },
+          ],
+        },
+      });
+      const origin = irWithCollection('users', [
+        new MongoSchemaIndex({
+          keys: [{ field: 'bio', direction: 'text' }],
+          weights: { bio: 5 },
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(2);
+    });
+
+    it('passes M2 options through to CreateIndexCommand', () => {
+      const contract = makeContract({
+        users: {
+          indexes: [
+            {
+              keys: [{ field: 'bio', direction: 'text' }],
+              weights: { bio: 10 },
+              default_language: 'english',
+              language_override: 'lang',
+              collation: { locale: 'en' },
+              wildcardProjection: { bio: 1 },
+            },
+          ],
+        },
+      });
+      const plan = planSuccess(planner, contract, emptyIR());
+      expect(plan.operations).toHaveLength(1);
+      const cmd = (plan.operations[0] as MongoMigrationPlanOperation).execute[0]!
+        .command as CreateIndexCommand;
+      expect(cmd.weights).toEqual({ bio: 10 });
+      expect(cmd.default_language).toBe('english');
+      expect(cmd.language_override).toBe('lang');
+      expect(cmd.collation).toEqual({ locale: 'en' });
+      expect(cmd.wildcardProjection).toEqual({ bio: 1 });
+    });
+  });
+
   describe('plan metadata', () => {
     it('sets targetId to mongo', () => {
       const contract = makeContract({ users: {} });
