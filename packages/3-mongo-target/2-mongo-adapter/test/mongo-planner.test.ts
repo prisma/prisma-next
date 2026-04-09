@@ -139,6 +139,43 @@ describe('MongoMigrationPlanner', () => {
       expect(create.operationClass).toBe('additive');
     });
 
+    it('treats indexes with same keys but different TTL as different', () => {
+      const contract = makeContract({
+        sessions: {
+          indexes: [{ keys: [{ field: 'createdAt', direction: 1 }], expireAfterSeconds: 3600 }],
+        },
+      });
+      const origin = irWithCollection('sessions', [
+        new MongoSchemaIndex({
+          keys: [{ field: 'createdAt', direction: 1 }],
+          expireAfterSeconds: 7200,
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(2);
+    });
+
+    it('treats indexes with same keys but different partialFilterExpression as different', () => {
+      const contract = makeContract({
+        items: {
+          indexes: [
+            {
+              keys: [{ field: 'status', direction: 1 }],
+              partialFilterExpression: { active: true },
+            },
+          ],
+        },
+      });
+      const origin = irWithCollection('items', [
+        new MongoSchemaIndex({
+          keys: [{ field: 'status', direction: 1 }],
+          partialFilterExpression: { active: false },
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(2);
+    });
+
     it('handles multiple indexes on same collection', () => {
       const contract = makeContract({
         users: {

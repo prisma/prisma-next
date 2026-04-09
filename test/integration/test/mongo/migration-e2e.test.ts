@@ -5,8 +5,10 @@ import {
   readMarker,
   serializeMongoOps,
 } from '@prisma-next/adapter-mongo/control';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
+import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -15,12 +17,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 const MIGRATIONS_COLLECTION = '_prisma_migrations';
 
 const emptyContract: MongoContract = {
+  target: 'mongo',
+  targetFamily: 'mongo',
   roots: { users: 'User' },
   models: {
     User: {
       fields: {
-        _id: { nullable: false, codecId: 'mongo/objectId@1' },
-        email: { nullable: false, codecId: 'mongo/string@1' },
+        _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+        email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
       },
       relations: {},
       storage: { collection: 'users' },
@@ -30,17 +34,23 @@ const emptyContract: MongoContract = {
     collections: {
       users: {},
     },
-    storageHash: 'sha256:empty-contract',
+    storageHash: coreHash('sha256:empty-contract'),
   },
+  capabilities: {},
+  extensionPacks: {},
+  profileHash: profileHash('sha256:test'),
+  meta: {},
 };
 
 const indexedContract: MongoContract = {
+  target: 'mongo',
+  targetFamily: 'mongo',
   roots: { users: 'User' },
   models: {
     User: {
       fields: {
-        _id: { nullable: false, codecId: 'mongo/objectId@1' },
-        email: { nullable: false, codecId: 'mongo/string@1' },
+        _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+        email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
       },
       relations: {},
       storage: { collection: 'users' },
@@ -52,8 +62,12 @@ const indexedContract: MongoContract = {
         indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
       },
     },
-    storageHash: 'sha256:indexed-contract',
+    storageHash: coreHash('sha256:indexed-contract'),
   },
+  capabilities: {},
+  extensionPacks: {},
+  profileHash: profileHash('sha256:test'),
+  meta: {},
 };
 
 const ALL_POLICY = {
@@ -121,7 +135,8 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
       });
       if (result.kind !== 'success') throw new Error('Plan failed unexpectedly');
 
-      const serialized = JSON.parse(serializeMongoOps(result.plan.operations));
+      const ops = result.plan.operations as readonly MongoMigrationPlanOperation[];
+      const serialized = JSON.parse(serializeMongoOps(ops));
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
@@ -163,7 +178,8 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
       });
       if (result.kind !== 'success') throw new Error('Plan failed');
 
-      const serialized = JSON.parse(serializeMongoOps(result.plan.operations));
+      const ops = result.plan.operations as readonly MongoMigrationPlanOperation[];
+      const serialized = JSON.parse(serializeMongoOps(ops));
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
@@ -199,7 +215,8 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
       });
       if (result.kind !== 'success') throw new Error('Plan failed');
 
-      const serialized = JSON.parse(serializeMongoOps(result.plan.operations));
+      const ops = result.plan.operations as readonly MongoMigrationPlanOperation[];
+      const serialized = JSON.parse(serializeMongoOps(ops));
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
@@ -245,7 +262,8 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         });
         if (createResult.kind !== 'success') throw new Error('Create plan failed');
 
-        const createSerialized = JSON.parse(serializeMongoOps(createResult.plan.operations));
+        const createOps = createResult.plan.operations as readonly MongoMigrationPlanOperation[];
+        const createSerialized = JSON.parse(serializeMongoOps(createOps));
         await runner.execute({
           plan: {
             targetId: 'mongo',
@@ -277,7 +295,8 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         expect(dropResult.plan.operations[0]!.label).toContain('Drop index');
 
         // Step 3: Apply drop
-        const dropSerialized = JSON.parse(serializeMongoOps(dropResult.plan.operations));
+        const dropOps = dropResult.plan.operations as readonly MongoMigrationPlanOperation[];
+        const dropSerialized = JSON.parse(serializeMongoOps(dropOps));
         const dropRunResult = await runner.execute({
           plan: {
             targetId: 'mongo',
@@ -334,7 +353,8 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         });
         if (result.kind !== 'success') throw new Error('Plan failed');
 
-        const serialized = JSON.parse(serializeMongoOps(result.plan.operations));
+        const ops = result.plan.operations as readonly MongoMigrationPlanOperation[];
+        const serialized = JSON.parse(serializeMongoOps(ops));
         const bootstrapPlan = {
           targetId: 'mongo' as const,
           destination: { storageHash: indexedContract.storage.storageHash },
@@ -392,7 +412,8 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         });
         if (result.kind !== 'success') throw new Error('Plan failed');
 
-        const serialized = JSON.parse(serializeMongoOps(result.plan.operations));
+        const ops = result.plan.operations as readonly MongoMigrationPlanOperation[];
+        const serialized = JSON.parse(serializeMongoOps(ops));
         const runResult = await runner.execute({
           plan: {
             targetId: 'mongo',
