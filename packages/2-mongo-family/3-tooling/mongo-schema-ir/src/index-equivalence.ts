@@ -21,11 +21,9 @@ export function deepEqual(a: unknown, b: unknown): boolean {
     const aKeys = Object.keys(aObj);
     const bKeys = Object.keys(bObj);
     if (aKeys.length !== bKeys.length) return false;
-    for (let i = 0; i < aKeys.length; i++) {
-      const aKey = aKeys[i];
-      const bKey = bKeys[i];
-      if (aKey !== bKey) return false;
-      if (!deepEqual(aObj[aKey], bObj[aKey])) return false;
+    for (const key of aKeys) {
+      if (!(key in bObj)) return false;
+      if (!deepEqual(aObj[key], bObj[key])) return false;
     }
     return true;
   }
@@ -36,8 +34,11 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 export function indexesEquivalent(a: MongoSchemaIndex, b: MongoSchemaIndex): boolean {
   if (a.keys.length !== b.keys.length) return false;
   for (let i = 0; i < a.keys.length; i++) {
-    if (a.keys[i]!.field !== b.keys[i]!.field) return false;
-    if (a.keys[i]!.direction !== b.keys[i]!.direction) return false;
+    const aKey = a.keys[i];
+    const bKey = b.keys[i];
+    if (!aKey || !bKey) return false;
+    if (aKey.field !== bKey.field) return false;
+    if (aKey.direction !== bKey.direction) return false;
   }
   if (a.unique !== b.unique) return false;
   if (a.sparse !== b.sparse) return false;
