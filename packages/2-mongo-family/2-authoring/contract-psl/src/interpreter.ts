@@ -9,13 +9,16 @@ import type {
   ContractReferenceRelation,
   ContractValueObject,
 } from '@prisma-next/contract/types';
+import type { MongoIndexKeyDirection, MongoStorageIndex } from '@prisma-next/mongo-contract';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import {
   getAttribute,
   getMapName,
+  getNamedArgument,
   getPositionalArgument,
   lowerFirst,
+  parseFieldList,
   parseQuotedStringLiteral,
   parseRelationAttribute,
 } from './psl-helpers';
@@ -271,6 +274,103 @@ function resolvePolymorphism(input: {
   return { models: patched, roots, diagnostics };
 }
 
+function parseIndexDirection(raw: string | undefined): MongoIndexKeyDirection {
+  if (!raw) return 1;
+  const stripped = raw.replace(/^["']/, '').replace(/["']$/, '');
+  const num = Number(stripped);
+  if (num === 1 || num === -1) return num;
+  if (['text', '2dsphere', '2d', 'hashed'].includes(stripped))
+    return stripped as MongoIndexKeyDirection;
+  return 1;
+}
+
+function parseNumericArg(raw: string | undefined): number | undefined {
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseBooleanArg(raw: string | undefined): boolean | undefined {
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return undefined;
+}
+
+function parseJsonArg(raw: string | undefined): Record<string, unknown> | undefined {
+  if (!raw) return undefined;
+  const stripped = raw.replace(/^["']/, '').replace(/["']$/, '');
+  try {
+    const parsed = JSON.parse(stripped);
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // not valid JSON
+  }
+  return undefined;
+}
+
+function collectIndexes(
+  pslModel: PslModel,
+  fieldMappings: FieldMappings,
+  modelNames: ReadonlySet<string>,
+): MongoStorageIndex[] {
+  const indexes: MongoStorageIndex[] = [];
+
+  for (const field of pslModel.fields) {
+    if (modelNames.has(field.typeName)) continue;
+    const uniqueAttr = getAttribute(field.attributes, 'unique');
+    if (!uniqueAttr) continue;
+    const mappedName = fieldMappings.pslNameToMapped.get(field.name) ?? field.name;
+    indexes.push({
+      keys: [{ field: mappedName, direction: 1 }],
+      unique: true,
+    });
+  }
+
+  for (const attr of pslModel.attributes) {
+    if (attr.name !== 'index' && attr.name !== 'unique') continue;
+
+    const fieldsArg = getPositionalArgument(attr, 0);
+    if (!fieldsArg) continue;
+    const fieldNames = parseFieldList(fieldsArg);
+    if (fieldNames.length === 0) continue;
+
+    const typeArg = getNamedArgument(attr, 'type');
+    const direction = parseIndexDirection(typeArg);
+
+    const keys = fieldNames.map((name) => ({
+      field: fieldMappings.pslNameToMapped.get(name) ?? name,
+      direction,
+    }));
+
+    const index: Record<string, unknown> = { keys };
+    if (attr.name === 'unique') index['unique'] = true;
+
+    const sparse = parseBooleanArg(getNamedArgument(attr, 'sparse'));
+    if (sparse !== undefined) index['sparse'] = sparse;
+
+    const ttl = parseNumericArg(getNamedArgument(attr, 'expireAfterSeconds'));
+    if (ttl !== undefined) index['expireAfterSeconds'] = ttl;
+
+    const weightsStr = getNamedArgument(attr, 'weights');
+    const weights = parseJsonArg(weightsStr);
+    if (weights) index['weights'] = weights;
+
+    const defaultLang = getNamedArgument(attr, 'default_language');
+    if (defaultLang)
+      index['default_language'] = defaultLang.replace(/^["']/, '').replace(/["']$/, '');
+
+    const langOverride = getNamedArgument(attr, 'language_override');
+    if (langOverride)
+      index['language_override'] = langOverride.replace(/^["']/, '').replace(/["']$/, '');
+
+    indexes.push(index as MongoStorageIndex);
+  }
+
+  return indexes;
+}
+
 function isRelationField(field: PslField, modelNames: ReadonlySet<string>): boolean {
   return modelNames.has(field.typeName);
 }
@@ -420,7 +520,8 @@ export function interpretPslDocumentToMongoContract(
     }
 
     models[pslModel.name] = { fields, relations, storage: { collection: collectionName } };
-    collections[collectionName] = {};
+    const modelIndexes = collectIndexes(pslModel, fieldMappings, modelNames);
+    collections[collectionName] = modelIndexes.length > 0 ? { indexes: modelIndexes } : {};
     roots[collectionName] = pslModel.name;
   }
 

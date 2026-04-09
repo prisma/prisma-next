@@ -3,6 +3,17 @@ import { getPositionalArgument, parseQuotedStringLiteral } from '@prisma-next/ps
 
 export { getPositionalArgument, parseQuotedStringLiteral };
 
+export function getNamedArgument(attr: PslAttribute, name: string): string | undefined {
+  const arg = attr.args.find((a) => a.kind === 'named' && a.name === name);
+  return arg?.value;
+}
+
+export function parseFieldList(value: string): readonly string[] {
+  const inner = value.replace(/^\[/, '').replace(/\]$/, '').trim();
+  if (inner.length === 0) return [];
+  return inner.split(',').map((s) => s.trim());
+}
+
 export function lowerFirst(value: string): string {
   if (value.length === 0) return value;
   return value[0]?.toLowerCase() + value.slice(1);
@@ -59,12 +70,6 @@ export function parseRelationAttribute(
     ...(fields !== undefined ? { fields } : {}),
     ...(references !== undefined ? { references } : {}),
   };
-}
-
-function parseFieldList(value: string): readonly string[] {
-  const inner = value.replace(/^\[/, '').replace(/\]$/, '').trim();
-  if (inner.length === 0) return [];
-  return inner.split(',').map((s) => s.trim());
 }
 
 function stripQuotes(value: string): string {
