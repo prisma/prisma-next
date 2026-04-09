@@ -56,7 +56,7 @@ Proves the full migration architecture works for MongoDB by cutting a thin verti
 
 **Planner:**
 
-- [ ] **1.8 Implement `MongoMigrationPlanner`.** Diff destination contract against origin `MongoSchemaIR`. For M1: detect added indexes → `planCreateIndex` (additive), removed indexes → `planDropIndex` (destructive). Index identity by (collection + ordered fields + key types + semantic options), not by name. Planner convenience functions compose DDL commands, inspection commands, and filter-expression checks into `MongoMigrationPlanOperation` structures. Returns `MigrationPlannerResult`. Unit tests covering: add index, drop index, no-op (same indexes), index identity (same keys different name = equivalent), correct precheck/execute/postcheck arrays. Integration test: feed planner output to the runner against `mongodb-memory-server` and verify the resulting database state.
+- [x] **1.8 Implement `MongoMigrationPlanner`.** Diff destination contract against origin `MongoSchemaIR`. For M1: detect added indexes → `planCreateIndex` (additive), removed indexes → `planDropIndex` (destructive). Index identity by (collection + ordered fields + key types + semantic options), not by name. Planner convenience functions compose DDL commands, inspection commands, and filter-expression checks into `MongoMigrationPlanOperation` structures. Returns `MigrationPlannerResult`. Unit tests covering: add index, drop index, no-op (same indexes), index identity (same keys different name = equivalent), correct precheck/execute/postcheck arrays. Integration test: feed planner output to the runner against `mongodb-memory-server` and verify the resulting database state.
 
 **Runner + wiring:**
 
