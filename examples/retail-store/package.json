@@ -1,0 +1,46 @@
+{
+  "name": "retail-store",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "emit": "prisma-next contract emit",
+    "migration:plan": "prisma-next migration plan",
+    "migration:apply": "prisma-next migration apply",
+    "db:seed": "tsx scripts/seed.ts",
+    "dev": "next dev",
+    "build": "next build",
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-mongo": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/driver-mongo": "workspace:*",
+    "@prisma-next/mongo-contract": "workspace:*",
+    "@prisma-next/mongo-orm": "workspace:*",
+    "@prisma-next/mongo-pipeline-builder": "workspace:*",
+    "@prisma-next/mongo-query-ast": "workspace:*",
+    "@prisma-next/mongo-runtime": "workspace:*",
+    "mongodb": "catalog:",
+    "next": "^15.3.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/family-mongo": "workspace:*",
+    "@prisma-next/mongo-contract-psl": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "mongodb-memory-server": "^10.4.0",
+    "tsx": "^4.19.2",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
