@@ -109,6 +109,26 @@ test('value object rows flow through InferModelRow', () => {
   >();
 });
 
+test('double helper infers numeric row values', () => {
+  const Measurement = model('Measurement', {
+    collection: 'measurements',
+    fields: {
+      _id: field.objectId(),
+      reading: field.double(),
+    },
+  });
+
+  const measurementContract = defineContract({
+    family: mongoFamilyPack,
+    target: mongoTargetPack,
+    models: { Measurement },
+  });
+
+  type MeasurementRow = InferModelRow<typeof measurementContract, 'Measurement'>;
+
+  expectTypeOf<MeasurementRow['reading']>().toEqualTypeOf<number>();
+});
+
 test('index helper preserves literal Mongo index authoring', () => {
   const uniqueEmailIndex = index({ email: 1 }, { unique: true });
 

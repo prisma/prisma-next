@@ -55,6 +55,8 @@ export type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer Code
     : Record<string, never>
   : Record<string, never>;
 
+// This mirrors @prisma-next/target-mongo/codec-types because authoring must stay decoupled from
+// the target layer while still exposing the built-in Mongo codec registry to type inference.
 type MongoCodecTypes = {
   readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
   readonly 'mongo/string@1': { readonly input: string; readonly output: string };
@@ -622,6 +624,9 @@ export const field = {
   string() {
     return createScalarFieldBuilder('mongo/string@1');
   },
+  double() {
+    return createScalarFieldBuilder('mongo/double@1');
+  },
   int32() {
     return createScalarFieldBuilder('mongo/int32@1');
   },
@@ -1172,10 +1177,26 @@ function normalizeRoots(roots: Record<string, ModelNameInput> | undefined): Reco
   return normalizedRoots;
 }
 
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
+      .join(',')}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
 function buildCollections(
   models: Record<string, AnyModelBuilder> | undefined,
 ): Record<string, MongoStorageCollection> {
   const collections: Record<string, MongoStorageCollection> = {};
+  const declaredIndexOwners = new Map<string, string>();
 
   for (const modelBuilder of Object.values(models ?? {})) {
     if (!modelBuilder.__collection) {
@@ -1201,6 +1222,18 @@ function buildCollections(
       throw new Error(
         `Collection "${modelBuilder.__collection}" has collectionOptions declared by multiple models. Author collectionOptions on a single model per collection.`,
       );
+    }
+
+    for (const collectionIndex of modelBuilder.__indexes ?? []) {
+      const indexSignature = stableStringify(collectionIndex);
+      const collectionIndexKey = `${modelBuilder.__collection}:${indexSignature}`;
+      const firstOwner = declaredIndexOwners.get(collectionIndexKey);
+      if (firstOwner) {
+        throw new Error(
+          `Collection "${modelBuilder.__collection}" defines duplicate index ${indexSignature}. First declared on model "${firstOwner}" and duplicated on model "${modelBuilder.__name}".`,
+        );
+      }
+      declaredIndexOwners.set(collectionIndexKey, modelBuilder.__name);
     }
 
     collections[modelBuilder.__collection] =

@@ -48,8 +48,10 @@ describe('mongo contract builder', () => {
       models: { User, Post },
     });
 
-    expect(contract.targetFamily).toBe('mongo');
-    expect(contract.target).toBe('mongo');
+    expect(contract).toMatchObject({
+      targetFamily: 'mongo',
+      target: 'mongo',
+    });
     expect(contract.roots).toEqual({
       users: 'User',
       posts: 'Post',
@@ -196,6 +198,27 @@ describe('mongo contract builder', () => {
     });
   });
 
+  it('supports the double scalar helper', () => {
+    const Metric = model('Metric', {
+      collection: 'metrics',
+      fields: {
+        _id: field.objectId(),
+        value: field.double(),
+      },
+    });
+
+    const contract = defineContract({
+      family: mongoFamilyPack,
+      target: mongoTargetPack,
+      models: { Metric },
+    });
+
+    expect(contract.models.Metric.fields.value).toEqual({
+      type: { kind: 'scalar', codecId: 'mongo/double@1' },
+      nullable: false,
+    });
+  });
+
   it('merges indexes from multiple models sharing the same collection', () => {
     const TaskBase = model('TaskBase', {
       collection: 'tasks',
@@ -236,6 +259,44 @@ describe('mongo contract builder', () => {
         ],
       },
     });
+  });
+
+  it('rejects duplicate indexes across models sharing the same collection', () => {
+    const TaskBase = model('TaskBase', {
+      collection: 'tasks',
+      fields: {
+        _id: field.objectId(),
+        type: field.string(),
+        title: field.string(),
+      },
+      indexes: [index({ title: 1 }, { unique: true })],
+      discriminator: {
+        field: 'type',
+        variants: {
+          TaskDerived: { value: 'derived' },
+        },
+      },
+    });
+
+    const TaskDerived = model('TaskDerived', {
+      collection: 'tasks',
+      base: TaskBase,
+      fields: {
+        _id: field.objectId(),
+        expiresAt: field.date(),
+      },
+      indexes: [index({ title: 1 }, { unique: true })],
+    });
+
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { TaskBase, TaskDerived },
+      }),
+    ).toThrow(
+      'Collection "tasks" defines duplicate index {"fields":{"title":1},"options":{"unique":true}}. First declared on model "TaskBase" and duplicated on model "TaskDerived".',
+    );
   });
 
   it('rejects indexes on models without collections', () => {
@@ -338,8 +399,43 @@ describe('mongo contract builder', () => {
     );
   });
 
-  it('supports the callback authoring form', () => {
-    const contract = defineContract(
+  it('keeps the callback authoring form equivalent to the object literal form', () => {
+    const Address = valueObject('Address', {
+      fields: {
+        street: field.string(),
+      },
+    });
+
+    const User = model('User', {
+      collection: 'users',
+      fields: {
+        _id: field.objectId(),
+        address: field.valueObject(Address).optional(),
+      },
+    });
+
+    const Post = model('Post', {
+      collection: 'posts',
+      fields: {
+        _id: field.objectId(),
+        authorId: field.objectId(),
+      },
+      relations: {
+        author: rel.belongsTo(User, {
+          from: 'authorId',
+          to: User.ref('_id'),
+        }),
+      },
+    });
+
+    const literalContract = defineContract({
+      family: mongoFamilyPack,
+      target: mongoTargetPack,
+      valueObjects: { Address },
+      models: { User, Post },
+    });
+
+    const callbackContract = defineContract(
       {
         family: mongoFamilyPack,
         target: mongoTargetPack,
@@ -380,17 +476,6 @@ describe('mongo contract builder', () => {
       },
     );
 
-    expect(contract.models.User.fields.address).toEqual({
-      type: { kind: 'valueObject', name: 'Address' },
-      nullable: true,
-    });
-    expect(contract.models.Post.relations.author).toEqual({
-      to: 'User',
-      cardinality: 'N:1',
-      on: {
-        localFields: ['authorId'],
-        targetFields: ['_id'],
-      },
-    });
+    expect(callbackContract).toEqual(literalContract);
   });
 });

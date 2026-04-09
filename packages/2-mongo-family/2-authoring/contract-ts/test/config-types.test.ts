@@ -4,7 +4,7 @@ import { typescriptContract } from '../src/config-types';
 
 describe('typescriptContract', () => {
   it('returns provider result with contract', async () => {
-    const contract = { targetFamily: 'mongo', target: 'mongo' } as Contract;
+    const contract = { targetFamily: 'mongo', target: 'mongo' } as unknown as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
     const result = await config.source({ composedExtensionPacks: [] });
 
@@ -18,7 +18,7 @@ describe('typescriptContract', () => {
   });
 
   it('omits output when not provided', () => {
-    const contract = { targetFamily: 'mongo', target: 'mongo' } as Contract;
+    const contract = { targetFamily: 'mongo', target: 'mongo' } as unknown as Contract;
     const config = typescriptContract(contract);
 
     expect(config.output).toBeUndefined();
