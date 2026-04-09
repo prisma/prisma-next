@@ -1235,6 +1235,9 @@ importers:
 
   packages/2-mongo-family/9-family:
     dependencies:
+      '@prisma-next/adapter-mongo':
+        specifier: workspace:*
+        version: link:../../3-mongo-target/2-mongo-adapter
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
