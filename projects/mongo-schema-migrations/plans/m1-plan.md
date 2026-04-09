@@ -389,6 +389,26 @@ Tasks are grouped into **phases** by dependency. Tasks within a phase are indepe
 
 ---
 
+#### 1.13 Add migrations to `examples/mongo-demo`
+
+**Goal:** Update the demo app to showcase the migration workflow so it serves as a living example.
+
+**What to do:**
+- Add index definitions to the demo app's contract (e.g., a unique ascending index on `email` in the `users` collection)
+- Regenerate `contract.json` and `contract.d.ts` to include the index definitions
+- Update `README.md` with migration workflow instructions: `migration plan` to preview, `migration apply` to execute
+- Verify the demo works end-to-end: contract with indexes → plan → apply → index exists on the database
+
+**Tests:**
+- Manual verification: run `migration plan` and `migration apply` against a local MongoDB instance
+- Optionally add a test that runs the migration workflow as part of the demo's test suite
+
+**Package:** `examples/mongo-demo/`
+
+**Depends on:** 1.11, 1.12 (target wiring and e2e proof must be complete first)
+
+---
+
 ## Package summary
 
 | New package | Location | Layer | Plane |
