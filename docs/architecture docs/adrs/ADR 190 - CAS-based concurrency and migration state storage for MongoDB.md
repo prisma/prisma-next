@@ -1,155 +1,86 @@
 # ADR 190 — CAS-based concurrency and migration state storage for MongoDB
 
-## At a glance
+## Grounding example
 
-The migration runner uses compare-and-swap on a marker document for concurrency safety, and stores both the marker and migration ledger in a single `_prisma_migrations` collection. If two runners race, one wins and the other gets a clean hash-mismatch error.
+A developer runs `migration apply`. The runner executes the DDL commands (create indexes, drop indexes), and the database is now in a new state. Two questions arise:
 
-```
-_prisma_migrations
-├── { _id: "marker", storageHash: "sha256:v2", profileHash: "sha256:p2", updatedAt: ..., meta: {} }
-├── { type: "ledger", edgeId: "→sha256:v1", from: "", to: "sha256:v1", appliedAt: ... }
-├── { type: "ledger", edgeId: "sha256:v1→sha256:v2", from: "sha256:v1", to: "sha256:v2", appliedAt: ... }
-└── ...
-```
+1. **Where do we record the new state?** The next migration needs to know the database is now at contract version X, not the version before. Without a record, every subsequent `migration apply` would re-run from scratch.
 
-## Context
-
-When the runner applies a migration, it needs to:
-
-1. **Verify** the database is at the expected state before mutating (the plan's origin hash matches the marker).
-2. **Record** the new state after mutating (update the marker to the destination hash).
-3. **Handle races** where two runners attempt `migration apply` simultaneously.
-
-Postgres solves (3) with advisory locks (`pg_advisory_lock`) — the runner acquires a lock before applying and holds it until the marker is updated. MongoDB has no native advisory lock primitive.
+2. **What if two developers run `migration apply` at the same time?** On Postgres, the runner acquires an advisory lock (`pg_advisory_lock`) to serialize access. MongoDB has no native advisory lock. If both runners read "database is at version A," both apply the same migration, and both try to record "database is now at version B" — or worse, they apply *different* migrations and the database ends up in an undefined state.
 
 ## Decision
 
+We store migration state in a `_prisma_migrations` collection using two document types: a **marker** (which contract the database currently satisfies) and **ledger entries** (an audit trail of applied migrations). Concurrency is handled via compare-and-swap (CAS) on the marker document, using MongoDB's document-level atomicity.
+
+```
+_prisma_migrations
+├── { _id: "marker", storageHash: "sha256:v2", profileHash: "sha256:p2", updatedAt: ... }
+├── { type: "ledger", edgeId: "->sha256:v1", from: "", to: "sha256:v1", appliedAt: ... }
+├── { type: "ledger", edgeId: "sha256:v1->sha256:v2", from: "sha256:v1", to: "sha256:v2", appliedAt: ... }
+└── ...
+```
+
 ### The marker
 
-A singleton document that records which contract the database currently satisfies:
+A singleton document (`_id: "marker"`) that records the storage hash and profile hash of the contract the database currently satisfies. This is the Mongo implementation of the marker described in [ADR 021 (Contract Marker Storage)](ADR%20021%20-%20Contract%20Marker%20Storage.md), mapping directly to the framework's `ContractMarkerRecord` interface.
+
+The runner performs three operations on the marker:
+
+- **Read**: `findOne({ _id: 'marker' })` — check whether a marker exists and what hash the database is at.
+- **Initialize**: `insertOne({ _id: 'marker', storageHash, profileHash, ... })` — first migration on a fresh database.
+- **Update (CAS)**: the concurrency primitive, explained below.
+
+### Compare-and-swap
+
+The CAS update is the key design element. It uses `findOneAndUpdate` with a filter that includes the expected current hash:
 
 ```ts
-// _id: "marker" — singleton, one per database
-{
-  _id: "marker",
-  storageHash: "sha256:abc",   // current contract's storage hash
-  profileHash: "sha256:def",   // current contract's profile hash
-  contractJson: null,          // optional full contract (future)
-  canonicalVersion: null,      // canonicalization version (future)
-  updatedAt: ISODate("..."),
-  appTag: null,                // optional deployment context
-  meta: {}                     // reserved for forward-compatible fields
-}
-```
-
-This is the Mongo implementation of the marker described in [ADR 021 (Contract Marker Storage)](ADR%20021%20-%20Contract%20Marker%20Storage.md). The document shape maps directly to the framework's `ContractMarkerRecord` interface.
-
-Three operations on the marker:
-
-**Read** — check if a marker exists and what hash the database is at:
-
-```ts
-async function readMarker(db: Db): Promise<ContractMarkerRecord | null> {
-  const doc = await db
-    .collection('_prisma_migrations')
-    .findOne({ _id: 'marker' });
-  if (!doc) return null;
-  return {
-    storageHash: doc.storageHash,
-    profileHash: doc.profileHash,
-    updatedAt: doc.updatedAt,
-    // ... remaining fields
-  };
-}
-```
-
-**Initialize** — first migration on a fresh database:
-
-```ts
-async function initMarker(
-  db: Db,
-  destination: { storageHash: string; profileHash: string },
-): Promise<void> {
-  await db.collection('_prisma_migrations').insertOne({
-    _id: 'marker',
-    storageHash: destination.storageHash,
-    profileHash: destination.profileHash,
-    updatedAt: new Date(),
-    meta: {},
-  });
-}
-```
-
-**Update (compare-and-swap)** — the concurrency primitive:
-
-```ts
-async function updateMarker(
-  db: Db,
-  expectedFrom: string,
-  destination: { storageHash: string; profileHash: string },
-): Promise<boolean> {
-  const result = await db.collection('_prisma_migrations').findOneAndUpdate(
-    { _id: 'marker', storageHash: expectedFrom },
-    {
-      $set: {
-        storageHash: destination.storageHash,
-        profileHash: destination.profileHash,
-        updatedAt: new Date(),
-      },
+const result = await db.collection('_prisma_migrations').findOneAndUpdate(
+  { _id: 'marker', storageHash: expectedFrom },
+  {
+    $set: {
+      storageHash: destination.storageHash,
+      profileHash: destination.profileHash,
+      updatedAt: new Date(),
     },
-    { upsert: false },
-  );
-  return result !== null;
-}
+  },
+  { upsert: false },
+);
+return result !== null;
 ```
 
-The `findOneAndUpdate` filter includes both `_id: 'marker'` and `storageHash: expectedFrom`. If another process updated the marker between our read and our write, the filter doesn't match, `findOneAndUpdate` returns `null`, and we know the CAS failed. The runner reports `MARKER_ORIGIN_MISMATCH` — a clean, deterministic error.
+This works because MongoDB's `findOneAndUpdate` is atomic at the document level — the filter check and the update happen as a single operation. No other process can modify the document between the filter match and the write.
+
+Here's the race scenario:
+
+1. Runner A reads the marker: `storageHash = "v1"`
+2. Runner B reads the marker: `storageHash = "v1"`
+3. Runner A applies its migration, then calls `findOneAndUpdate({ storageHash: "v1" }, { $set: { storageHash: "v2" } })` — **succeeds** (hash was still "v1")
+4. Runner B applies its migration, then calls `findOneAndUpdate({ storageHash: "v1" }, { $set: { storageHash: "v3" } })` — **fails** (hash is now "v2", filter doesn't match, returns `null`)
+
+Runner B gets a clean `MARKER_ORIGIN_MISMATCH` error. No data corruption, no undefined state, no retry ambiguity.
 
 ### The ledger
 
-Append-only documents recording each applied migration edge:
+Append-only documents recording each applied migration as an edge (from → to):
 
 ```ts
-async function writeLedgerEntry(
-  db: Db,
-  entry: { edgeId: string; from: string; to: string },
-): Promise<void> {
-  await db.collection('_prisma_migrations').insertOne({
-    type: 'ledger',
-    edgeId: entry.edgeId,
-    from: entry.from,
-    to: entry.to,
-    appliedAt: new Date(),
-  });
-}
+await db.collection('_prisma_migrations').insertOne({
+  type: 'ledger',
+  edgeId: `${fromHash}->${toHash}`,
+  from: fromHash,
+  to: toHash,
+  appliedAt: new Date(),
+});
 ```
 
-The ledger is for audit and history — which migrations were applied, in what order, and when. It is not used for correctness decisions. The marker is authoritative for "where is the database now?"
+The ledger is for audit and history — which migrations were applied, in what order, and when. It is not used for correctness decisions. The marker alone is authoritative for "where is the database now?"
 
 ### Single collection
 
-Both the marker and ledger live in `_prisma_migrations`. The marker is identified by `_id: 'marker'`; ledger entries are identified by auto-generated `_id` plus `type: 'ledger'`.
+Both the marker and ledger live in `_prisma_migrations`. The marker is identified by `_id: 'marker'`; ledger entries have auto-generated `_id` values plus `type: 'ledger'`.
 
-One collection to create, one to query (`db._prisma_migrations.find()`), one to reason about during setup and introspection. This mirrors the single-table pattern Postgres uses for its migration metadata.
-
-## Runner execution flow
-
-The runner's execution sequence integrates the marker with the three-phase operation loop from [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md):
-
-```
-1. Deserialize operations from plan JSON (rehydrate AST nodes)
-2. Enforce policy (reject operations with disallowed classes)
-3. Read marker from _prisma_migrations
-4. Validate marker matches plan origin hash
-   └─ mismatch → MARKER_ORIGIN_MISMATCH
-5. For each operation: precheck → execute → postcheck
-   (idempotency probe: if postchecks already pass, skip)
-6. Update marker via CAS
-   └─ CAS failure → another runner applied concurrently
-7. Write ledger entry
-```
-
-Steps 1–5 are the same for every target. Steps 6–7 are the Mongo-specific state persistence.
+One collection to create, one to query, one to reason about during setup and introspection. This mirrors the single-table pattern Postgres uses for its migration metadata.
 
 ## Alternatives considered
 
@@ -158,13 +89,11 @@ Steps 1–5 are the same for every target. Steps 6–7 are the Mongo-specific st
 We could simulate Postgres-style advisory locks with a lock document and a TTL:
 
 ```ts
-// acquire: insert a lock doc with an expiry
 await db.collection('_prisma_locks').insertOne({
   _id: 'migration',
   acquiredAt: new Date(),
   expiresAt: new Date(Date.now() + 60_000),
 });
-// release: delete the lock doc
 ```
 
 This adds significant complexity: lock expiry, stale lock cleanup, retry loops with backoff, and a second collection to manage. All of this for a scenario — concurrent `migration apply` — that is rare in practice and easily detected. CAS on the marker is simpler: one atomic operation, no TTL, no cleanup, no retry loop. The losing runner gets a clean error.
