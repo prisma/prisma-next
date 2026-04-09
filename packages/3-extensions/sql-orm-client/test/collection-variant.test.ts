@@ -349,6 +349,27 @@ describe('STI variant create (discriminator auto-injection)', () => {
   });
 });
 
+describe('MTI variant mutation guards', () => {
+  it('createCount() throws for MTI variants', async () => {
+    const { collection } = createReturningMixedPolyCollection();
+    const narrowed = collection.variant('Feature' as never) as typeof collection;
+    await expect(narrowed.createCount([{ title: 'X', priority: 1 } as never])).rejects.toThrow(
+      /createCount\(\) is not supported for MTI variant/,
+    );
+  });
+
+  it('upsert() throws for MTI variants', async () => {
+    const { collection } = createReturningMixedPolyCollection();
+    const narrowed = collection.variant('Feature' as never) as typeof collection;
+    await expect(
+      narrowed.upsert({
+        create: { title: 'X', priority: 1 } as never,
+        update: {},
+      }),
+    ).rejects.toThrow(/upsert\(\) is not supported for MTI variant/);
+  });
+});
+
 describe('MTI variant create (two-INSERT orchestration)', () => {
   it('executes two INSERTs: base table then variant table', async () => {
     const { collection, runtime } = createReturningMixedPolyCollection();

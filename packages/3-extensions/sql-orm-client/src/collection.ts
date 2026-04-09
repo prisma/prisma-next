@@ -758,6 +758,15 @@ export class Collection<
     });
   }
 
+  #assertNotMtiVariant(method: string): void {
+    const mtiCtx = this.#resolveMtiCreateContext();
+    if (mtiCtx) {
+      throw new Error(
+        `${method} is not supported for MTI variant "${this.state.variantName}" on model "${this.modelName}". Use createAll() instead.`,
+      );
+    }
+  }
+
   #resolveMtiCreateContext(): MtiCreateContext | null {
     const variantName = this.state.variantName;
     if (!variantName) return null;
@@ -891,6 +900,8 @@ export class Collection<
       return 0;
     }
 
+    this.#assertNotMtiVariant('createCount()');
+
     const rows = data as readonly Record<string, unknown>[];
     const mappedRows = this.#mapCreateRows(rows);
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
@@ -919,6 +930,7 @@ export class Collection<
     conflictOn?: UniqueConstraintCriterion<TContract, ModelName>;
   }): Promise<Row> {
     assertReturningCapability(this.contract, 'upsert()');
+    this.#assertNotMtiVariant('upsert()');
 
     const createValues = mapModelDataToStorageRow(this.contract, this.modelName, input.create);
     applyCreateDefaults(this.ctx, this.tableName, [createValues]);
