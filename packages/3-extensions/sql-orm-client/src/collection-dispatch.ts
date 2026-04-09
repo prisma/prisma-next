@@ -107,6 +107,7 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
           selectedFields: parentSelectedForQuery,
         },
         strategy,
+        modelName,
       );
 
       const parentRowsRaw = await executeQueryPlan<Record<string, unknown>>(
