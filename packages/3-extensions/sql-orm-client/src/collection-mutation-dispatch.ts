@@ -17,7 +17,6 @@ interface DispatchMutationRowsOptions<Row> {
   readonly contract: Contract<SqlStorage>;
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
-  readonly tableName: string;
   readonly modelName: string;
   readonly includes: readonly IncludeExpr[];
   readonly hiddenColumns: readonly string[];
@@ -127,7 +126,6 @@ interface ExecuteSingleMutationOptions<Row> {
   readonly contract: Contract<SqlStorage>;
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
-  readonly tableName: string;
   readonly modelName: string;
   readonly includes: readonly IncludeExpr[];
   readonly hiddenColumns: readonly string[];
