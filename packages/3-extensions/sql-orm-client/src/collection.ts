@@ -68,6 +68,7 @@ import {
   executeNestedCreateMutation,
   executeNestedUpdateMutation,
   hasNestedMutationCallbacks,
+  withMutationScope,
 } from './mutation-executor';
 import {
   compileAggregate,
@@ -825,41 +826,44 @@ export class Collection<
           }
         }
 
-        applyCreateDefaults(collectionCtx, tableName, [baseRow]);
-        const baseCompiled = compileInsertReturning(contract, tableName, [baseRow], undefined);
-        const baseResult = await executeQueryPlan<Record<string, unknown>>(
-          runtime,
-          baseCompiled,
-        ).toArray();
-        const baseCreated = baseResult[0];
-        if (!baseCreated) {
-          throw new Error(`MTI base INSERT for model "${modelName}" did not return a row`);
-        }
+        const merged = await withMutationScope(runtime, async (scope) => {
+          applyCreateDefaults(collectionCtx, tableName, [baseRow]);
+          const baseCompiled = compileInsertReturning(contract, tableName, [baseRow], undefined);
+          const baseResult = await executeQueryPlan<Record<string, unknown>>(
+            scope,
+            baseCompiled,
+          ).toArray();
+          const baseCreated = baseResult[0];
+          if (!baseCreated) {
+            throw new Error(`MTI base INSERT for model "${modelName}" did not return a row`);
+          }
 
-        const pkValue = baseCreated[pkColumn];
-        variantRow[pkColumn] = pkValue;
-        applyCreateDefaults(collectionCtx, variant.table, [variantRow]);
-        const variantCompiled = compileInsertReturning(
-          contract,
-          variant.table,
-          [variantRow],
-          undefined,
-        );
-        await executeQueryPlan<Record<string, unknown>>(runtime, variantCompiled).toArray();
+          const pkValue = baseCreated[pkColumn];
+          variantRow[pkColumn] = pkValue;
+          applyCreateDefaults(collectionCtx, variant.table, [variantRow]);
+          const variantCompiled = compileInsertReturning(
+            contract,
+            variant.table,
+            [variantRow],
+            undefined,
+          );
+          await executeQueryPlan<Record<string, unknown>>(scope, variantCompiled).toArray();
 
-        const prefixedVariant: Record<string, unknown> = {};
-        for (const [col, val] of Object.entries(variantRow)) {
-          if (col === pkColumn) continue;
-          prefixedVariant[`${variant.table}__${col}`] = val;
-        }
+          const prefixedVariant: Record<string, unknown> = {};
+          for (const [col, val] of Object.entries(variantRow)) {
+            if (col === pkColumn) continue;
+            prefixedVariant[`${variant.table}__${col}`] = val;
+          }
 
-        const merged = mapPolymorphicRow(
-          contract,
-          modelName,
-          polyInfo,
-          { ...baseCreated, ...prefixedVariant },
-          variant.modelName,
-        );
+          return mapPolymorphicRow(
+            contract,
+            modelName,
+            polyInfo,
+            { ...baseCreated, ...prefixedVariant },
+            variant.modelName,
+          );
+        });
+
         yield merged as Row;
       }
     };
