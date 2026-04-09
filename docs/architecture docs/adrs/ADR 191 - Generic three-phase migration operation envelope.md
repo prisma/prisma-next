@@ -2,13 +2,31 @@
 
 **Status:** Accepted, not yet implemented.
 
-## At a glance
+## Grounding example
 
-Both SQL and Mongo migration families independently implement the same three-phase operation structure: prechecks, execute steps, and postchecks. The framework should own the envelope shape; families should only provide the content types and a serializer. This eliminates the duplication and gives future families a clear contract for migration operations.
+When we built Mongo migrations, we defined this operation interface:
 
-## Context
+```ts
+interface MongoMigrationPlanOperation extends MigrationPlanOperation {
+  readonly precheck: readonly MongoMigrationCheck[];
+  readonly execute: readonly MongoMigrationStep[];
+  readonly postcheck: readonly MongoMigrationCheck[];
+}
+```
 
-The framework's `MigrationPlanOperation` today carries only display fields:
+The SQL family already had an identical structure:
+
+```ts
+interface SqlMigrationPlanOperation<TTargetDetails> extends MigrationPlanOperation {
+  readonly precheck: readonly SqlMigrationPlanOperationStep[];
+  readonly execute: readonly SqlMigrationPlanOperationStep[];
+  readonly postcheck: readonly SqlMigrationPlanOperationStep[];
+}
+```
+
+Same array names, same three-phase semantics, same relationship to the framework base type. The only difference is the content of each step and check — SQL steps carry `sql: string`, Mongo steps carry `command: AnyMongoDdlCommand`.
+
+The framework's `MigrationPlanOperation` base type knows nothing about this structure:
 
 ```ts
 interface MigrationPlanOperation {
@@ -18,36 +36,11 @@ interface MigrationPlanOperation {
 }
 ```
 
-Both families extend this with the same three-phase structure, independently:
-
-**SQL** (in `@prisma-next/sql-family`):
-
-```ts
-interface SqlMigrationPlanOperation<TTargetDetails> extends MigrationPlanOperation {
-  readonly precheck: readonly SqlMigrationPlanOperationStep[];
-  readonly execute: readonly SqlMigrationPlanOperationStep[];
-  readonly postcheck: readonly SqlMigrationPlanOperationStep[];
-}
-// where SqlMigrationPlanOperationStep = { description: string; sql: string; meta?: ... }
-```
-
-**Mongo** (in `@prisma-next/mongo-query-ast/control`):
-
-```ts
-interface MongoMigrationPlanOperation extends MigrationPlanOperation {
-  readonly precheck: readonly MongoMigrationCheck[];
-  readonly execute: readonly MongoMigrationStep[];
-  readonly postcheck: readonly MongoMigrationCheck[];
-}
-// where MongoMigrationStep = { description: string; command: AnyMongoDdlCommand }
-// and MongoMigrationCheck = { description: string; source: ...; filter: ...; expect: ... }
-```
-
-The parallel is exact: same array names, same three-phase semantics, same relationship to the framework base type. Each family also has a parallel serializer (`serializeMongoOps` / the SQL plan serializer) and the CLI has a `switch(familyId)` for operation display formatting.
+This means every family independently defines the envelope, independently serializes it, and the CLI has a `switch(familyId)` to format operations for display. A third family would have to copy the same pattern again.
 
 ## Decision
 
-Extract the three-phase structure into the framework as a generic:
+Extract the three-phase structure into the framework as a generic. Families provide only the content types (step and check) and a serializer — the framework owns the envelope shape.
 
 ```ts
 interface MigrationPlanOperation<TStep, TCheck> {
@@ -60,11 +53,11 @@ interface MigrationPlanOperation<TStep, TCheck> {
 }
 ```
 
-SQL instantiates this as `MigrationPlanOperation<SqlStep, SqlCheck>`. Mongo instantiates it as `MigrationPlanOperation<MongoMigrationStep, MongoMigrationCheck>`.
+SQL instantiates this as `MigrationPlanOperation<SqlStep, SqlCheck>`. Mongo instantiates it as `MigrationPlanOperation<MongoMigrationStep, MongoMigrationCheck>`. A future family implements its own step and check types and plugs into the same envelope.
 
 ### Serialization SPI
 
-Each family provides a serializer for its step and check types:
+The framework needs to serialize and deserialize operations to/from `ops.json`, but it doesn't know the concrete step and check types. Each family provides a serializer:
 
 ```ts
 interface MigrationOperationSerializer<TStep, TCheck> {
@@ -75,7 +68,9 @@ interface MigrationOperationSerializer<TStep, TCheck> {
 }
 ```
 
-The framework handles the envelope (`id`, `label`, `operationClass`, array structure), delegating the content of each step/check to the family-provided serializer. This replaces the current pattern where each family serializes the entire operation independently.
+The framework handles the envelope (`id`, `label`, `operationClass`, array structure) and delegates each step/check to the family-provided serializer. This replaces the current pattern where each family serializes the entire operation independently.
+
+The serialization SPI is needed because the content types vary in complexity. SQL steps are plain strings (`{ sql: "CREATE INDEX ..." }`), but Mongo steps contain frozen class instances that must be rehydrated from `kind` discriminants (see [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)). The framework can't handle both without family-specific logic.
 
 ### CLI display
 
@@ -83,12 +78,11 @@ The `switch(familyId)` in the CLI's `extractOperationStatements` is replaced by 
 
 ```ts
 interface TargetMigrationsCapability<...> {
-  // ... existing methods ...
   formatOperationStatements?(operations: readonly MigrationPlanOperation[]): string[];
 }
 ```
 
-The CLI calls `targetDescriptor.migrations.formatOperationStatements(ops)` when available. Each family provides a formatter that knows how to render its step types as display strings.
+The CLI calls `targetDescriptor.migrations.formatOperationStatements(ops)` when available. Each family provides a formatter that knows how to render its step types as display strings — SQL renders SQL statements, Mongo renders `db.collection.createIndex(...)` shell commands.
 
 ## What changes
 
@@ -107,6 +101,19 @@ The CLI calls `targetDescriptor.migrations.formatOperationStatements(ops)` when 
 
 This is a type-level refactor that eliminates duplication, not a behavioral change.
 
-## Current state
+## Alternatives considered
 
-The Mongo M1 implementation is designed for this extraction — `MongoMigrationPlanOperation` already mirrors the target generic shape. The SQL family's `SqlMigrationPlanOperation` has the same structure with a `TTargetDetails` parameter for target-specific metadata. The extraction requires aligning both to the framework generic and wiring the serialization SPI.
+### Keep the duplication
+
+There are only two families today. The parallel structure is easy to maintain by convention, and adding a generic introduces type-parameter complexity to every consumer of `MigrationPlanOperation`. We chose to extract anyway because:
+
+- The duplication extends beyond the type: each family also duplicates the serializer and the CLI has a `switch` for formatting. The generic eliminates all three.
+- A third family (DynamoDB, Cosmos, etc.) would need to discover and replicate the pattern. The generic makes the contract explicit.
+- The cost is low — the generic is a straightforward type parameter addition with no runtime impact.
+
+### Framework owns execution semantics, not just the envelope
+
+Instead of a generic envelope with family-provided content, the framework could define a generic runner loop that dispatches steps and checks via family-provided executors. This goes further than the envelope refactor — it would centralize the precheck → execute → postcheck loop itself. We chose not to because:
+
+- The execution semantics differ in important ways. SQL steps are executed as SQL statements via a driver. Mongo steps are dispatched via visitor to a command executor. Abstracting over both would require a generic executor interface that adds complexity without meaningful code sharing.
+- The current design gives families full control over execution, which is important for target-specific error handling and transaction boundaries.

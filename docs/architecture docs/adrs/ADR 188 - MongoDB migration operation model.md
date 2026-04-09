@@ -1,35 +1,18 @@
 # ADR 188 — MongoDB migration operation model: data-driven commands and checks
 
-## At a glance
+## Grounding example
 
-Migration operations are composed from serializable AST primitives — DDL commands, inspection commands, and filter expressions. The planner assembles them into three-phase envelopes (precheck, execute, postcheck) that serialize to `ops.json` via `JSON.stringify`. When the runner loads a plan, it **rehydrates** the JSON back into live AST objects that dispatch directly to visitors — the command executor, the CLI formatter, or any future consumer. The framework never interprets the operation content; it just persists and restores it.
+The migration planner has compared two contracts and determined that a unique ascending index on `users.email` needs to be created. It needs to produce an operation that the runner can execute.
 
-```
-Planner                                              Runner
-   │                                                    │
-   ▼                                                    ▼
-Operation (live AST objects)                      Load ops.json
-   │                                                    │
-   ▼                                                    ▼
-JSON.stringify ──────▶ ops.json ──────▶ deserialize (rehydrate)
-                                                        │
-                                                        ▼
-                                              Operation (live AST objects)
-                                                        │
-                                              ┌─────────┼──────────┐
-                                              ▼         ▼          ▼
-                                          precheck   execute   postcheck
-```
+But the operation isn't just "create this index." Three things must happen:
 
-## Context
+1. **Before** mutating: verify the index doesn't already exist (to avoid errors on re-run)
+2. **Execute**: create the index
+3. **After** mutating: verify the unique index now exists (to confirm success)
 
-A migration step for MongoDB needs to express three things: what to check before mutating, what mutation to perform, and what to verify afterward. These must persist to a JSON plan file (`ops.json`) that a generic runner can load and execute without operation-specific dispatch logic. The runner should run the same three-phase loop for every operation — it should not know whether the operation creates an index, modifies a validator, or drops a collection.
+These three concerns — precheck, execute, postcheck — must be captured as data that can be persisted to a JSON file (`ops.json`), loaded later by a generic runner, and executed without the runner knowing anything about indexes specifically.
 
-## Decision
-
-Each migration operation is a **data envelope** with three phases — `precheck[]`, `execute[]`, `postcheck[]` — rather than a behavioral class. The phases contain AST primitives that serialize naturally to JSON and rehydrate into live objects on deserialization.
-
-Here is the complete operation for "add a unique ascending index on `users.email`":
+Here is what the operation looks like:
 
 ```ts
 const op: MongoMigrationPlanOperation = {
@@ -67,55 +50,32 @@ const op: MongoMigrationPlanOperation = {
 };
 ```
 
-Every piece — `CreateIndexCommand`, `ListIndexesCommand`, `MongoFieldFilter`, `MongoAndExpr` — is a frozen `MongoAstNode` with plain-property fields. `JSON.stringify(op, null, 2)` produces the persisted format:
+Every piece — `CreateIndexCommand`, `ListIndexesCommand`, `MongoFieldFilter`, `MongoAndExpr` — is a frozen AST node with plain-property fields. The runner doesn't need to know this is an index operation. It runs the same three-phase loop for every operation: evaluate prechecks, dispatch execute commands, evaluate postchecks.
 
-```json
-{
-  "id": "index.users.create(email:1)",
-  "label": "Create index on users (email ascending)",
-  "operationClass": "additive",
-  "precheck": [
-    {
-      "description": "index does not already exist",
-      "source": { "kind": "listIndexes", "collection": "users" },
-      "filter": { "kind": "field", "field": "key", "op": "$eq", "value": { "email": 1 } },
-      "expect": "notExists"
-    }
-  ],
-  "execute": [
-    {
-      "description": "create index",
-      "command": {
-        "kind": "createIndex",
-        "collection": "users",
-        "keys": [{ "field": "email", "direction": 1 }],
-        "unique": true,
-        "name": "email_1"
-      }
-    }
-  ],
-  "postcheck": [
-    {
-      "description": "unique index exists",
-      "source": { "kind": "listIndexes", "collection": "users" },
-      "filter": {
-        "kind": "and",
-        "exprs": [
-          { "kind": "field", "field": "key", "op": "$eq", "value": { "email": 1 } },
-          { "kind": "field", "field": "unique", "op": "$eq", "value": true }
-        ]
-      },
-      "expect": "exists"
-    }
-  ]
-}
+## Decision
+
+Each migration operation is a **data envelope** with three phases — `precheck[]`, `execute[]`, `postcheck[]` — rather than a behavioral class with per-operation visitor dispatch. The phases are composed from existing AST primitives (DDL commands, inspection commands, filter expressions) that serialize naturally to JSON. The envelope carries no behavior of its own; the semantic richness lives in the commands and expressions inside it.
+
+```
+Planner                                              Runner
+   │                                                    │
+   ▼                                                    ▼
+Operation (live AST objects)                      Load ops.json
+   │                                                    │
+   ▼                                                    ▼
+JSON.stringify ──────▶ ops.json ──────▶ deserialize (rehydrate)
+                                                        │
+                                                        ▼
+                                              Operation (live AST objects)
+                                                        │
+                                              ┌─────────┼──────────┐
+                                              ▼         ▼          ▼
+                                          precheck   execute   postcheck
 ```
 
-The JSON and the TypeScript carry the same structure. The runner doesn't need to know what kind of operation this is — it evaluates checks, dispatches commands, and moves on.
+## The envelope
 
-## The operation envelope
-
-The envelope is a plain interface — no `kind` discriminant, no visitor, no class hierarchy. The semantic richness lives in the commands and expressions inside, not in the wrapper:
+The envelope is a plain interface — no `kind` discriminant, no visitor, no class hierarchy:
 
 ```ts
 interface MongoMigrationPlanOperation extends MigrationPlanOperation {
@@ -138,7 +98,7 @@ interface MongoMigrationStep {
 }
 ```
 
-The M1 command vocabulary is `CreateIndexCommand` and `DropIndexCommand`. M2 adds `CreateCollectionCommand`, `DropCollectionCommand`, and `CollModCommand`. All follow the same `MongoAstNode` pattern: frozen, `kind`-discriminated, `accept(visitor)` for dispatch.
+The current command vocabulary is `CreateIndexCommand` and `DropIndexCommand`. Future additions (e.g. `CreateCollectionCommand`, `DropCollectionCommand`, `CollModCommand`) follow the same `MongoAstNode` pattern: frozen, `kind`-discriminated, `accept(visitor)` for dispatch. Adding a new command means one new class and one new case in the command executor — not a new operation type.
 
 ### Checks
 
@@ -154,55 +114,34 @@ interface MongoMigrationCheck {
 ```
 
 - **`source`** — an inspection command (`ListIndexesCommand`, `ListCollectionsCommand`) that queries the database and returns result documents.
-- **`filter`** — a `MongoFilterExpr` applied client-side to the results. This reuses the existing filter expression AST from `@prisma-next/mongo-query-ast` — the same `$eq`, `$and`, `$or`, `$not`, `$exists`, `$gt`, `$in` vocabulary used in query `$match` stages.
+- **`filter`** — a `MongoFilterExpr` applied client-side to the results. This reuses the existing filter expression AST from `@prisma-next/mongo-query-ast` — the same `$eq`, `$and`, `$or`, `$not`, `$exists`, `$gt`, `$in` vocabulary used in query `$match` stages. We reuse it because it's already built, tested, serializable, and familiar to anyone who knows MongoDB query syntax.
 - **`expect`** — `'exists'` means at least one result matches; `'notExists'` means none match.
 
-## Rehydration
+This gives checks the same expressive power as MongoDB query filters, without inventing a separate vocabulary.
 
-The operation round-trips through JSON. Serialization is trivial — `JSON.stringify` — because all AST nodes are frozen plain-property objects. Deserialization is the interesting part: the deserializer walks the JSON, matches `kind` discriminants, validates structure with Arktype schemas, and reconstructs live class instances.
+## Serialization
 
-For example, the DDL command deserializer:
+Because all AST nodes are frozen plain-property objects, `JSON.stringify` produces the persisted format directly. For example, the precheck from the grounding example serializes as:
 
-```ts
-function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
-  const record = json as Record<string, unknown>;
-  const kind = record['kind'] as string;
-  switch (kind) {
-    case 'createIndex': {
-      const data = validate(CreateIndexJson, json, 'createIndex command');
-      return new CreateIndexCommand(data.collection, data.keys, {
-        unique: data.unique,
-        sparse: data.sparse,
-        expireAfterSeconds: data.expireAfterSeconds,
-        partialFilterExpression: data.partialFilterExpression,
-        name: data.name,
-      });
-    }
-    case 'dropIndex': {
-      const data = validate(DropIndexJson, json, 'dropIndex command');
-      return new DropIndexCommand(data.collection, data.name);
-    }
-    default:
-      throw new Error(`Unknown DDL command kind: ${kind}`);
-  }
+```json
+{
+  "description": "index does not already exist",
+  "source": { "kind": "listIndexes", "collection": "users" },
+  "filter": { "kind": "field", "field": "key", "op": "$eq", "value": { "email": 1 } },
+  "expect": "notExists"
 }
 ```
 
-`CreateIndexJson` and `DropIndexJson` are Arktype schemas that validate the JSON structure before construction. A malformed or hand-edited `ops.json` fails with a clear error at deserialization, not at runtime.
+The execute and postcheck phases follow the same pattern — each AST node serializes to a `kind`-discriminated JSON object.
 
-The rehydrated objects are indistinguishable from the originals. A `CreateIndexCommand` deserialized from JSON has the same `accept(visitor)` method, the same frozen properties, and can be dispatched directly to the command executor or CLI formatter. The runner doesn't need to know the command was ever serialized.
-
-The same rehydration applies to inspection commands and filter expressions — every `kind`-discriminated node in the JSON tree is reconstructed into its corresponding AST class.
+On the deserialization side, the runner walks the JSON, matches `kind` discriminants, validates structure with Arktype schemas, and reconstructs live class instances. The rehydrated objects are indistinguishable from the originals — a `CreateIndexCommand` deserialized from JSON has the same `accept(visitor)` method and frozen properties as one constructed in code. This means the command executor, CLI formatter, or any future consumer can work with rehydrated operations identically to planner-produced ones.
 
 ## Composability
 
-Because operations are composed from a small set of serializable primitives (DDL commands, inspection commands, filter expressions), anything that can assemble these primitives can produce a valid operation. The planner does this automatically by diffing contracts. But the same primitives are available to:
+Because operations are composed from a small set of serializable primitives, anything that can assemble those primitives can produce a valid operation. The planner does this automatically by diffing contracts. But the same primitives are available to other producers:
 
-- **Hand-authored migrations** — a user runs `migration new` and assembles an operation from the same building blocks the planner uses. The framework serializes it to `ops.json` and the runner executes it, without any special handling.
-- **Data migrations** — future data migration steps could place DML commands (e.g., `UpdateManyCommand`) in the execute array alongside DDL commands, with filter-expression checks verifying the outcome.
-- **Extension packs** — an Atlas extension pack could contribute new command kinds (e.g., `CreateSearchIndexCommand`). As long as the command executor and deserializer handle the new `kind`, existing operations continue to work.
-
-The framework, target, and family don't need to know anything about what's inside an operation — they just persist and restore the primitives.
+- **Hand-authored migrations** — a user could assemble an operation from the same building blocks the planner uses. The framework serializes it to `ops.json` and the runner executes it, without any special handling.
+- **Extension packs** — a target-specific extension could contribute new command kinds (e.g. `CreateSearchIndexCommand`). As long as the command executor and deserializer handle the new `kind`, existing operations continue to work.
 
 ## Alternatives considered
 
@@ -223,7 +162,7 @@ We could have invented check-specific types: `{ kind: 'indexExists', collection:
 - **Familiar.** The same expressions appear in MongoDB queries (`$match`, `find()`).
 - **Expressive.** `$eq`, `$gt`, `$in`, `$and`, `$or`, `$not`, `$exists` — far richer than any purpose-built vocabulary we would realistically build.
 
-The trade-off is a client-side filter evaluator, which is straightforward and also useful for testing and dry-run simulation. See the [Check Evaluator](../subsystems/7%20-%20Migration%20System.md) section of the Migration System subsystem doc.
+The trade-off is a client-side filter evaluator, which is straightforward and also useful for testing and dry-run simulation.
 
 ### Embedding display strings in the plan
 

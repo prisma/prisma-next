@@ -1,20 +1,32 @@
 # ADR 189 — Structural index matching for MongoDB migrations
 
-## At a glance
+## Grounding example
 
-The migration planner matches indexes by structure — keys, directions, and options — not by name. Two indexes with different names but identical structure are the same index. This prevents unnecessary drop-and-create cycles when names differ but behavior is identical.
+The migration planner is comparing two contracts and finds the same index described with different names:
 
-## Context
+```ts
+const origin = new MongoSchemaIndex({
+  keys: [{ field: 'email', direction: 1 }],
+  unique: true,
+});
+// MongoDB would call this "email_1"
 
-The migration planner diffs two `MongoSchemaIR` snapshots (see [ADR 187](ADR%20187%20-%20MongoDB%20schema%20representation%20for%20migration%20diffing.md)) to determine which indexes to create and which to drop. It needs a rule for when two indexes are "the same."
+const destination = new MongoSchemaIndex({
+  keys: [{ field: 'email', direction: 1 }],
+  unique: true,
+});
+// The contract calls this "idx_users_email"
+```
 
-MongoDB auto-generates index names from key fields (e.g., `email_1` for `{ email: 1 }`), but users can override them. This creates a question: if the origin has an index named `email_1` on `{ email: 1, unique: true }` and the destination has an index named `idx_users_email` on `{ email: 1, unique: true }`, is that a rename (no-op) or a drop-and-create?
+Are these the same index? If yes, the planner emits no operations — the database already has what's needed. If no, the planner drops one and creates the other, which on a large collection can take minutes and block writes during foreground index builds.
 
-On a large collection, dropping and recreating an index can take minutes and blocks writes during foreground builds. Getting this wrong has real operational consequences.
+Getting this wrong in either direction is costly: unnecessary rebuilds waste time and risk downtime; missing a real structural change leaves the database out of sync with the contract.
 
 ## Decision
 
-The planner matches indexes structurally. Two indexes are equivalent if and only if they produce the same **lookup key** — a string built from their structurally significant properties:
+The planner matches indexes by structure, not by name. Two indexes are equivalent if and only if they have the same keys (fields, order, directions) and the same behavioral options (unique, sparse, TTL, partial filter expression). Name is not part of identity.
+
+The mechanism is a **lookup key** — a canonical string computed from an index's structural properties:
 
 ```ts
 function buildIndexLookupKey(index: MongoSchemaIndex): string {
@@ -31,7 +43,7 @@ function buildIndexLookupKey(index: MongoSchemaIndex): string {
 }
 ```
 
-For example:
+Two indexes that produce the same lookup key are the same index. For example:
 
 | Index | Lookup key |
 |---|---|
@@ -40,7 +52,7 @@ For example:
 | `{ lastName: 1, firstName: 1 }` | `lastName:1,firstName:1` |
 | `{ createdAt: 1 }`, TTL 86400s | `createdAt:1\|ttl:86400` |
 
-Two indexes with the lookup key `email:1|unique` are equivalent regardless of their names. The planner builds a `Map<string, MongoSchemaIndex>` for both origin and destination, then diffs the key sets:
+The planner builds a `Map<string, MongoSchemaIndex>` for both origin and destination, then diffs the key sets:
 
 - Key in destination but not in origin → `createIndex`
 - Key in origin but not in destination → `dropIndex`
@@ -48,33 +60,22 @@ Two indexes with the lookup key `email:1|unique` are equivalent regardless of th
 
 This gives O(1) per-index comparison and deterministic results.
 
-## What structural identity includes
+### What the lookup key includes
 
-Each component matters because it changes the index's behavior:
+Each component is included because it changes the index's behavior at the database level:
 
 - **Key fields and order.** `{ a: 1, b: 1 }` and `{ b: 1, a: 1 }` are different compound indexes with different query optimization characteristics. MongoDB treats them as distinct.
 - **Direction.** `{ a: 1 }` (ascending) and `{ a: -1 }` (descending) are different indexes. Direction matters for sort-order optimization in compound indexes.
-- **`unique`.** A unique index enforces a constraint; a non-unique index does not. Changing uniqueness changes behavior.
-- **`sparse`.** A sparse index omits documents missing the indexed field. Changing sparseness changes which documents are indexed.
+- **`unique`.** A unique index enforces a constraint; a non-unique index does not.
+- **`sparse`.** A sparse index omits documents missing the indexed field.
 - **`expireAfterSeconds`.** A TTL index with a 24-hour expiry is different from one with a 7-day expiry.
 - **`partialFilterExpression`.** A partial index scoped to `{ status: "active" }` is different from one scoped to `{ status: "archived" }`.
 
-## What structural identity excludes
+### What the lookup key excludes
 
 **Name.** Index names are metadata, not behavior. An index named `email_1` and an index named `idx_users_email` with identical keys and options serve the same purpose — keeping both would be redundant. This follows [ADR 009 (Deterministic Naming Scheme)](ADR%20009%20-%20Deterministic%20Naming%20Scheme.md), which establishes that names are derived metadata, not identity.
 
-## Operation ordering
-
-When the planner produces operations, it emits them in a deterministic order:
-
-1. **Drops** before **creates** — drop obsolete indexes before creating replacements, avoiding transient duplicate indexes.
-2. **Lexicographic** within each category — sorted by collection name, then by lookup key.
-
-This ensures identical contracts always produce identical plans.
-
-## Trade-off
-
-Intentional name-only changes cannot be expressed through the planner. If a team wants to rename `email_1` to `idx_users_email` without changing the index's structure, the planner sees a no-op. Achieving the rename requires a hand-authored migration that drops the old name and creates the new one. This is rare — index names are almost never meaningful to application code — and the cost of getting structural matching wrong (unnecessary rebuilds on large collections) is far higher.
+One consequence: intentional name-only renames cannot be expressed through the planner. If a team wants to rename `email_1` to `idx_users_email` without changing structure, the planner sees a no-op. This requires a hand-authored migration. In practice this is rare — index names are almost never meaningful to application code — and the cost of getting structural matching wrong (unnecessary rebuilds on large collections) is far higher.
 
 ## Alternatives considered
 
