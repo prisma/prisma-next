@@ -103,7 +103,7 @@ describe('validateMongoContract()', () => {
 
       const result = validateMongoContract(json);
 
-      expect(result.contract.storage.collections.items).toEqual({
+      expect(result.contract.storage.collections['items']).toEqual({
         indexes: [
           {
             fields: { _id: 1 },
@@ -148,7 +148,7 @@ describe('validateMongoContract()', () => {
 
       const result = validateMongoContract(json);
 
-      expect(result.contract.storage.collections.items).toEqual({
+      expect(result.contract.storage.collections['items']).toEqual({
         options: {
           capped: true,
           size: 4096,
