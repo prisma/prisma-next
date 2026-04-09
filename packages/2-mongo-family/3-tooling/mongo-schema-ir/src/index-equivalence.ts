@@ -25,7 +25,7 @@ export function deepEqual(a: unknown, b: unknown): boolean {
       const aKey = aKeys[i];
       const bKey = bKeys[i];
       if (aKey !== bKey) return false;
-      if (aKey !== undefined && !deepEqual(aObj[aKey], bObj[aKey])) return false;
+      if (!deepEqual(aObj[aKey], bObj[aKey])) return false;
     }
     return true;
   }
