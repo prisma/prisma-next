@@ -134,8 +134,9 @@ export function mapPolymorphicRow(
     const baseMap = getColumnToFieldMap(contract, baseModelName);
     const mapped: Record<string, unknown> = {};
     for (const [col, val] of Object.entries(row)) {
-      if (col in baseMap) {
-        mapped[baseMap[col]!] = val;
+      const field = baseMap[col];
+      if (field !== undefined) {
+        mapped[field] = val;
       }
     }
     return mapped;
@@ -145,8 +146,9 @@ export function mapPolymorphicRow(
   const mergedMap = getMergedColumnToFieldMap(contract, baseModelName, variant.modelName, mtiTable);
   const mapped: Record<string, unknown> = {};
   for (const [col, val] of Object.entries(row)) {
-    if (col in mergedMap) {
-      mapped[mergedMap[col]!] = val;
+    const field = mergedMap[col];
+    if (field !== undefined) {
+      mapped[field] = val;
     }
   }
   return mapped;
