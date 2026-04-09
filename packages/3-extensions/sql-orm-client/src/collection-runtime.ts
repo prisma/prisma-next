@@ -126,9 +126,8 @@ export function mapPolymorphicRow(
   row: Record<string, unknown>,
   variantName?: string,
 ): Record<string, unknown> {
-  const resolvedVariantName = variantName;
-  const variant = resolvedVariantName
-    ? polyInfo.variants.get(resolvedVariantName)
+  const variant = variantName
+    ? polyInfo.variants.get(variantName)
     : polyInfo.variantsByValue.get(row[polyInfo.discriminatorColumn] as string);
 
   if (!variant) {
