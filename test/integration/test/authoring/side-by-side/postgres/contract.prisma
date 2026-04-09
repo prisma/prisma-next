@@ -1,0 +1,19 @@
+model User {
+  id    Int    @id @default(autoincrement())
+  name  String
+  email String
+  bio   String?
+  posts Post[]
+
+  @@map("users")
+}
+
+model Post {
+  id          Int      @id @default(autoincrement())
+  authorId    Int
+  title       String
+  publishedAt DateTime?
+  author      User     @relation(fields: [authorId], references: [id])
+
+  @@map("posts")
+}

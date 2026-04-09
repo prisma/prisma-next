@@ -119,6 +119,21 @@ describe('validateMongoContract()', () => {
       });
     });
 
+    it('rejects empty index field maps', () => {
+      const json = {
+        ...makeValidContractJson(),
+        storage: {
+          collections: {
+            items: {
+              indexes: [{ fields: {} }],
+            },
+          },
+        },
+      };
+
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
     it('accepts collection options', () => {
       const json = {
         ...makeValidContractJson(),
@@ -166,6 +181,90 @@ describe('validateMongoContract()', () => {
           },
         },
       });
+    });
+
+    it('accepts record-shaped index and collection option maps', () => {
+      const json = {
+        ...makeValidContractJson(),
+        storage: {
+          collections: {
+            items: {
+              indexes: [
+                {
+                  fields: { name: 'text' },
+                  options: {
+                    partialFilterExpression: { archived: false },
+                    weights: { name: 10 },
+                  },
+                },
+              ],
+              options: {
+                storageEngine: {
+                  wiredTiger: { configString: 'block_compressor=zstd' },
+                },
+                indexOptionDefaults: {
+                  storageEngine: {
+                    wiredTiger: { configString: 'prefix_compression=true' },
+                  },
+                },
+              },
+            },
+          },
+        },
+        models: {
+          Item: {
+            fields: {
+              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+            },
+            storage: { collection: 'items' },
+          },
+        },
+      };
+
+      const result = validateMongoContract(json);
+
+      expect(result.contract.storage.collections['items']).toEqual({
+        indexes: [
+          {
+            fields: { name: 'text' },
+            options: {
+              partialFilterExpression: { archived: false },
+              weights: { name: 10 },
+            },
+          },
+        ],
+        options: {
+          storageEngine: {
+            wiredTiger: { configString: 'block_compressor=zstd' },
+          },
+          indexOptionDefaults: {
+            storageEngine: {
+              wiredTiger: { configString: 'prefix_compression=true' },
+            },
+          },
+        },
+      });
+    });
+
+    it('rejects empty clustered index keys', () => {
+      const json = {
+        ...makeValidContractJson(),
+        storage: {
+          collections: {
+            items: {
+              options: {
+                clusteredIndex: {
+                  key: {},
+                  unique: true,
+                },
+              },
+            },
+          },
+        },
+      };
+
+      expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects unknown index option keys', () => {

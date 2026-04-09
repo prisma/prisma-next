@@ -1165,6 +1165,9 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../1-foundation/mongo-contract
+      '@prisma-next/mongo-contract-ts':
+        specifier: workspace:*
+        version: link:../2-authoring/contract-ts
       '@prisma-next/mongo-pipeline-builder':
         specifier: workspace:*
         version: link:../5-query-builders/pipeline-builder

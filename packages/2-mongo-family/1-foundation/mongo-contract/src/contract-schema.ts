@@ -54,10 +54,15 @@ const StorageRelationEntrySchema = type({
   field: 'string',
 });
 
+const UnknownValueRecordSchema = type({ '[string]': 'unknown' });
+const NumberRecordSchema = type({ '[string]': 'number' });
+
 const IndexFieldsSchema = type({
   '+': 'reject',
   '[string]': '1 | -1 | "text" | "2dsphere" | "2d" | "hashed"',
-});
+}).narrow((fields, ctx) =>
+  Object.keys(fields).length > 0 ? true : ctx.mustBe('an index field map with at least one entry'),
+);
 
 const CollationSchema = type({
   '+': 'reject',
@@ -81,10 +86,10 @@ const IndexOptionsSchema = type({
   '+': 'reject',
   'unique?': 'boolean',
   'name?': 'string',
-  'partialFilterExpression?': 'Record<string, unknown>',
+  'partialFilterExpression?': UnknownValueRecordSchema,
   'sparse?': 'boolean',
   'expireAfterSeconds?': 'number',
-  'weights?': 'Record<string, number>',
+  'weights?': NumberRecordSchema,
   'default_language?': 'string',
   'language_override?': 'string',
   'textIndexVersion?': 'number',
@@ -106,7 +111,7 @@ const IndexSchema = type({
 
 const IndexOptionDefaultsSchema = type({
   '+': 'reject',
-  'storageEngine?': 'Record<string, unknown>',
+  'storageEngine?': UnknownValueRecordSchema,
 });
 
 const TimeSeriesCollectionOptionsSchema = type({
@@ -121,7 +126,11 @@ const TimeSeriesCollectionOptionsSchema = type({
 const ClusteredCollectionKeySchema = type({
   '+': 'reject',
   '[string]': '1',
-});
+}).narrow((key, ctx) =>
+  Object.keys(key).length > 0
+    ? true
+    : ctx.mustBe('a clustered index key map with at least one entry'),
+);
 
 const ClusteredCollectionOptionsSchema = type({
   '+': 'reject',
@@ -140,7 +149,7 @@ const CollectionOptionsSchema = type({
   'capped?': 'boolean',
   'size?': 'number',
   'max?': 'number',
-  'storageEngine?': 'Record<string, unknown>',
+  'storageEngine?': UnknownValueRecordSchema,
   'indexOptionDefaults?': IndexOptionDefaultsSchema,
   'collation?': CollationSchema,
   'timeseries?': TimeSeriesCollectionOptionsSchema,

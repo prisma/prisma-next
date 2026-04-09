@@ -16,7 +16,7 @@ This separation keeps the architecture flexible (per the original Clean Architec
 
 The repository uses numbered prefixes in directory names to make the hierarchy explicit:
 
-```
+```text
 packages/
   1-framework/           # Domain 1: Framework (target-agnostic)
     0-foundation/        # Layer 0: Foundation
@@ -33,7 +33,7 @@ packages/
     3-tooling/           # Layer 3: Tooling
     4-lanes/             # Layer 4: Lanes
     5-runtime/           # Layer 5: Runtime
-  3-mongo-target/        # Domain 3: Mongo target packages
+  3-mongo-target/        # Domain 3: Mongo target
   3-extensions/          # Domain 3: Extensions
   3-targets/             # Domain 3: Targets
     3-targets/           # Layer 3: Target descriptors
@@ -77,7 +77,7 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 
 The SQL domain (`packages/2-sql/`) contains SQL-specific packages organized by layer:
 
-```
+```text
 * 2-sql
 |-- 1-core (shared plane)
 |   |-- contract/      → @prisma-next/sql-contract
@@ -87,7 +87,6 @@ The SQL domain (`packages/2-sql/`) contains SQL-specific packages organized by l
 |   |-- contract-ts/   → @prisma-next/sql-contract-ts
 |-- 3-tooling (migration plane)
 |   |-- emitter/       → @prisma-next/sql-contract-emitter
-|   |-- family/        → @prisma-next/family-sql
 |-- 4-lanes (runtime plane)
 |   |-- relational-core/ → @prisma-next/sql-relational-core
 |   |-- sql-lane/      → @prisma-next/sql-lane
@@ -95,13 +94,15 @@ The SQL domain (`packages/2-sql/`) contains SQL-specific packages organized by l
 |   |-- query-builder/ → @prisma-next/sql-lane-query-builder
 |-- 5-runtime (runtime plane)
     |-- → @prisma-next/sql-runtime
+|-- 9-family (migration plane)
+    |-- → @prisma-next/family-sql
 ```
 
 ### Mongo Family Domain
 
 The Mongo family domain (`packages/2-mongo-family/`) contains Mongo-specific packages organized by layer:
 
-```
+```text
 * 2-mongo-family
 |-- 1-foundation (shared plane)
 |   |-- mongo-contract/   → @prisma-next/mongo-contract
@@ -142,7 +143,7 @@ The targets domain (`packages/3-targets/`) contains concrete target extension pa
 
 Mongo-specific target packages live under `packages/3-mongo-target/`:
 
-```
+```text
 * 3-mongo-target
 |-- 1-mongo-target (migration plane)
 |   |-- → @prisma-next/target-mongo (target descriptor / pack)
@@ -257,14 +258,14 @@ Contract authoring surfaces for creating contracts programmatically.
 - `packages/2-mongo-family/2-authoring/contract-psl/` → `@prisma-next/mongo-contract-psl` - PSL interpretation into Mongo contract input
 - `packages/2-mongo-family/2-authoring/contract-ts/` → `@prisma-next/mongo-contract-ts` - Mongo TS authoring surface for `defineContract(...)`
 
-**Dependency Rules:** Can import from `core/*` only. SQL authoring may also import from SQL tooling layer.
+**Dependency Rules:** Can import from `core/*` only. SQL authoring may also import from SQL tooling layer; Mongo authoring may also import from Mongo tooling layer.
 
 ### Tooling Layer (Family Domains, Migration Plane)
 
 Target-family specific emitter hooks and family-provided helpers for CLI assembly.
 
 - `packages/2-sql/3-tooling/emitter/` → `@prisma-next/sql-contract-emitter` - SQL emitter hook
-- `packages/2-sql/3-tooling/family/` → `@prisma-next/family-sql` - SQL family descriptor (exports `ControlFamilyDescriptor` with hooks and `convertOperationManifest`)
+- `packages/2-sql/9-family/` → `@prisma-next/family-sql` - SQL family descriptor and authoring-time family pack
 - `packages/2-mongo-family/3-tooling/emitter/` → `@prisma-next/mongo-emitter` - Mongo emitter hook
 - `packages/2-mongo-family/9-family/` → `@prisma-next/family-mongo` - Mongo family descriptor and authoring-time family pack
 - `packages/1-framework/3-tooling/cli/src/pack-assembly.ts` - Generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for conversion

@@ -196,6 +196,48 @@ describe('mongo contract builder', () => {
     });
   });
 
+  it('merges indexes from multiple models sharing the same collection', () => {
+    const TaskBase = model('TaskBase', {
+      collection: 'tasks',
+      fields: {
+        _id: field.objectId(),
+        type: field.string(),
+        title: field.string(),
+      },
+      indexes: [index({ title: 1 }, { unique: true })],
+      discriminator: {
+        field: 'type',
+        variants: {
+          TaskDerived: { value: 'derived' },
+        },
+      },
+    });
+
+    const TaskDerived = model('TaskDerived', {
+      collection: 'tasks',
+      base: TaskBase,
+      fields: {
+        expiresAt: field.date(),
+      },
+      indexes: [index({ expiresAt: 1 }, { expireAfterSeconds: 3600 })],
+    });
+
+    const contract = defineContract({
+      family: mongoFamilyPack,
+      target: mongoTargetPack,
+      models: { TaskBase, TaskDerived },
+    });
+
+    expect(contract.storage.collections).toEqual({
+      tasks: {
+        indexes: [
+          { fields: { title: 1 }, options: { unique: true } },
+          { fields: { expiresAt: 1 }, options: { expireAfterSeconds: 3600 } },
+        ],
+      },
+    });
+  });
+
   it('rejects indexes on models without collections', () => {
     const Comment = model('Comment', {
       fields: {

@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@prisma-next/adapter-mongo": "workspace:*",
+    "@prisma-next/mongo-contract-ts": "workspace:*",
     "@prisma-next/mongo-pipeline-builder": "workspace:*",
     "@prisma-next/mongo-value": "workspace:*",
     "@prisma-next/driver-mongo": "workspace:*",
