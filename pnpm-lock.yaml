@@ -22,7 +22,7 @@ catalogs:
       specifier: ^4.0.3
       version: 4.0.3
     mongodb:
-      specifier: ^6.21.0
+      specifier: ^6.16.0
       version: 6.21.0
     pg:
       specifier: 8.16.3
