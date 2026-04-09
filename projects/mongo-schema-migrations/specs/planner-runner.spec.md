@@ -284,17 +284,26 @@ This is structurally identical to the SQL runner's `applyPlan` loop. The only di
 
 ### Command executor
 
-The command executor maps each DDL command AST node to a MongoDB driver call. DDL command kinds are defined in [Operation Design](operation-ast.spec.md).
+The command executor is a `MongoDdlCommandVisitor<Promise<void>>` that maps each DDL command AST node to a MongoDB driver call via visitor dispatch. The runner calls `command.accept(executor)` — no switch statement needed. DDL command kinds and visitor interface are defined in [Operation Design](operation-ast.spec.md) and [DDL command dispatch](ddl-command-dispatch.spec.md).
 
-| Command kind       | MongoDB driver call                                  |
+| Visitor method     | MongoDB driver call                                  |
 |--------------------|------------------------------------------------------|
 | `createIndex`      | `collection.createIndex(keySpec, options)`            |
 | `dropIndex`        | `collection.dropIndex(name)`                         |
-| `createCollection` | `db.createCollection(name, options)`                  |
-| `dropCollection`   | `collection.drop()`                                  |
-| `collMod`          | `db.command({ collMod: name, validator: ..., ... })`  |
+| `createCollection` | `db.createCollection(name, options)` (M2)            |
+| `dropCollection`   | `collection.drop()` (M2)                             |
+| `collMod`          | `db.command({ collMod: name, validator: ..., ... })` (M2) |
 
-The executor switches on `command.kind` and translates each command's typed fields into the corresponding driver arguments. Unknown command kinds (e.g. from a future extension pack) throw loudly rather than silently no-oping.
+Adding a new DDL command kind forces a new visitor method — compile-time safety ensures the executor handles every command. The same visitor pattern is used for the CLI command formatter (see [CLI display design](cli-display.spec.md)).
+
+### Inspection command executor
+
+The inspection command executor is a `MongoInspectionCommandVisitor<Promise<Document[]>>` that runs inspection commands against the database and returns result documents. The runner calls `check.source.accept(inspectionExecutor)` to retrieve the result set for filter evaluation.
+
+| Visitor method     | MongoDB driver call                                  |
+|--------------------|------------------------------------------------------|
+| `listIndexes`      | `collection.listIndexes().toArray()`                 |
+| `listCollections`  | `db.listCollections().toArray()`                     |
 
 ### Check evaluation
 
