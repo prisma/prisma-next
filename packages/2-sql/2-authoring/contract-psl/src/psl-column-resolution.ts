@@ -1,11 +1,22 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
+  AuthoringArgumentDescriptor,
   AuthoringContributions,
   AuthoringTypeConstructorDescriptor,
 } from '@prisma-next/framework-components/authoring';
-import { isAuthoringTypeConstructorDescriptor } from '@prisma-next/framework-components/authoring';
-import type { PslAttribute, PslField } from '@prisma-next/psl-parser';
+import {
+  instantiateAuthoringTypeConstructor,
+  isAuthoringTypeConstructorDescriptor,
+  validateAuthoringHelperArguments,
+} from '@prisma-next/framework-components/authoring';
+import type {
+  PslAttribute,
+  PslAttributeArgument,
+  PslField,
+  PslSpan,
+  PslTypeConstructorCall,
+} from '@prisma-next/psl-parser';
 import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
@@ -15,8 +26,6 @@ import {
   parseDefaultFunctionCall,
 } from './default-function-registry';
 import {
-  getNamedArgument,
-  getPositionalArgument,
   getPositionalArgumentEntry,
   getPositionalArguments,
   parseOptionalNumericArguments,
@@ -30,6 +39,11 @@ export type ColumnDescriptor = {
   readonly nativeType: string;
   readonly typeRef?: string;
   readonly typeParams?: Record<string, unknown>;
+};
+
+export type PslAttributeNameParts = {
+  readonly namespace: string;
+  readonly name: string;
 };
 
 export function toNamedTypeFieldDescriptor(
@@ -57,6 +71,337 @@ export function getAuthoringTypeConstructor(
   }
 
   return isAuthoringTypeConstructorDescriptor(current) ? current : undefined;
+}
+
+export function parsePslAttributeName(attributeName: string): PslAttributeNameParts | undefined {
+  const dotIndex = attributeName.indexOf('.');
+  if (dotIndex <= 0 || dotIndex === attributeName.length - 1) {
+    return undefined;
+  }
+
+  return {
+    namespace: attributeName.slice(0, dotIndex),
+    name: attributeName.slice(dotIndex + 1),
+  };
+}
+
+const INVALID_AUTHORING_ARGUMENT = Symbol('invalidAuthoringArgument');
+
+function parseStringArrayLiteral(
+  value: string,
+): readonly string[] | typeof INVALID_AUTHORING_ARGUMENT {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
+    return INVALID_AUTHORING_ARGUMENT;
+  }
+
+  const body = trimmed.slice(1, -1).trim();
+  if (body.length === 0) {
+    return [];
+  }
+
+  return body
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+    .map((entry) => unquoteStringLiteral(entry));
+}
+
+function parsePslAuthoringArgumentValue(
+  descriptor: AuthoringArgumentDescriptor,
+  rawValue: string,
+): unknown | typeof INVALID_AUTHORING_ARGUMENT {
+  if (descriptor.kind === 'string') {
+    return unquoteStringLiteral(rawValue);
+  }
+
+  if (descriptor.kind === 'number') {
+    const parsed = Number(unquoteStringLiteral(rawValue));
+    return Number.isNaN(parsed) ? INVALID_AUTHORING_ARGUMENT : parsed;
+  }
+
+  if (descriptor.kind === 'stringArray') {
+    return parseStringArrayLiteral(rawValue);
+  }
+
+  return INVALID_AUTHORING_ARGUMENT;
+}
+
+function pushInvalidPslHelperArgument(input: {
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly entityLabel: string;
+  readonly helperLabel: string;
+  readonly message: string;
+}): undefined {
+  input.diagnostics.push({
+    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+    message: `${input.entityLabel} ${input.helperLabel} ${input.message}`,
+    sourceId: input.sourceId,
+    span: input.span,
+  });
+  return undefined;
+}
+
+function mapPslHelperArgs(input: {
+  readonly args: readonly PslAttributeArgument[];
+  readonly descriptors: readonly AuthoringArgumentDescriptor[];
+  readonly helperLabel: string;
+  readonly span: PslSpan;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly entityLabel: string;
+}): readonly unknown[] | undefined {
+  const mappedArgs: unknown[] = input.descriptors.map(() => undefined);
+
+  const positionalArgs = input.args.filter(
+    (arg): arg is Extract<PslAttributeArgument, { kind: 'positional' }> =>
+      arg.kind === 'positional',
+  );
+  const namedArgs = input.args.filter(
+    (arg): arg is Extract<PslAttributeArgument, { kind: 'named' }> => arg.kind === 'named',
+  );
+
+  if (positionalArgs.length > input.descriptors.length) {
+    return pushInvalidPslHelperArgument({
+      diagnostics: input.diagnostics,
+      sourceId: input.sourceId,
+      span: input.span,
+      entityLabel: input.entityLabel,
+      helperLabel: input.helperLabel,
+      message: `accepts at most ${input.descriptors.length} argument(s), received ${positionalArgs.length}.`,
+    });
+  }
+
+  for (const [index, argument] of positionalArgs.entries()) {
+    const descriptor = input.descriptors[index];
+    if (!descriptor) {
+      return pushInvalidPslHelperArgument({
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        span: argument.span,
+        entityLabel: input.entityLabel,
+        helperLabel: input.helperLabel,
+        message: `does not define positional argument #${index + 1}.`,
+      });
+    }
+
+    const value = parsePslAuthoringArgumentValue(descriptor, argument.value);
+    if (value === INVALID_AUTHORING_ARGUMENT) {
+      return pushInvalidPslHelperArgument({
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        span: argument.span,
+        entityLabel: input.entityLabel,
+        helperLabel: input.helperLabel,
+        message: `cannot parse argument #${index + 1} for descriptor kind "${descriptor.kind}".`,
+      });
+    }
+
+    mappedArgs[index] = value;
+  }
+
+  for (const argument of namedArgs) {
+    const descriptorIndex = input.descriptors.findIndex(
+      (descriptor) => descriptor.name === argument.name,
+    );
+    if (descriptorIndex < 0) {
+      return pushInvalidPslHelperArgument({
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        span: argument.span,
+        entityLabel: input.entityLabel,
+        helperLabel: input.helperLabel,
+        message: `received unknown named argument "${argument.name}".`,
+      });
+    }
+
+    if (mappedArgs[descriptorIndex] !== undefined) {
+      return pushInvalidPslHelperArgument({
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        span: argument.span,
+        entityLabel: input.entityLabel,
+        helperLabel: input.helperLabel,
+        message: `received duplicate value for argument "${argument.name}".`,
+      });
+    }
+
+    const descriptor = input.descriptors[descriptorIndex];
+    if (!descriptor) {
+      return pushInvalidPslHelperArgument({
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        span: argument.span,
+        entityLabel: input.entityLabel,
+        helperLabel: input.helperLabel,
+        message: `does not define named argument "${argument.name}".`,
+      });
+    }
+
+    const value = parsePslAuthoringArgumentValue(descriptor, argument.value);
+    if (value === INVALID_AUTHORING_ARGUMENT) {
+      return pushInvalidPslHelperArgument({
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        span: argument.span,
+        entityLabel: input.entityLabel,
+        helperLabel: input.helperLabel,
+        message: `cannot parse named argument "${argument.name}" for descriptor kind "${descriptor.kind}".`,
+      });
+    }
+
+    mappedArgs[descriptorIndex] = value;
+  }
+
+  return mappedArgs;
+}
+
+export function instantiatePslTypeConstructor(input: {
+  readonly call: PslTypeConstructorCall;
+  readonly descriptor: AuthoringTypeConstructorDescriptor;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly entityLabel: string;
+}):
+  | {
+      readonly codecId: string;
+      readonly nativeType: string;
+      readonly typeParams?: Record<string, unknown>;
+    }
+  | undefined {
+  const helperPath = input.call.path.join('.');
+  const args = mapPslHelperArgs({
+    args: input.call.args,
+    descriptors: input.descriptor.args ?? [],
+    helperLabel: `constructor "${helperPath}"`,
+    span: input.call.span,
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+    entityLabel: input.entityLabel,
+  });
+  if (!args) {
+    return undefined;
+  }
+
+  try {
+    validateAuthoringHelperArguments(helperPath, input.descriptor.args, args);
+    return instantiateAuthoringTypeConstructor(input.descriptor, args);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `${input.entityLabel} constructor "${helperPath}" ${message}`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return undefined;
+  }
+}
+
+function pushUnsupportedTypeConstructorDiagnostic(input: {
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly code: 'PSL_UNSUPPORTED_FIELD_TYPE' | 'PSL_UNSUPPORTED_NAMED_TYPE_CONSTRUCTOR';
+  readonly message: string;
+}): undefined {
+  input.diagnostics.push({
+    code: input.code,
+    message: input.message,
+    sourceId: input.sourceId,
+    span: input.span,
+  });
+  return undefined;
+}
+
+export function resolvePslTypeConstructorDescriptor(input: {
+  readonly call: PslTypeConstructorCall;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly familyId: string;
+  readonly targetId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly unsupportedCode: 'PSL_UNSUPPORTED_FIELD_TYPE' | 'PSL_UNSUPPORTED_NAMED_TYPE_CONSTRUCTOR';
+  readonly unsupportedMessage: string;
+}): AuthoringTypeConstructorDescriptor | undefined {
+  const descriptor = getAuthoringTypeConstructor(input.authoringContributions, input.call.path);
+  if (descriptor) {
+    return descriptor;
+  }
+
+  const namespace = input.call.path.length > 1 ? input.call.path[0] : undefined;
+  if (
+    namespace &&
+    namespace !== input.familyId &&
+    namespace !== input.targetId &&
+    !input.composedExtensions.has(namespace)
+  ) {
+    input.diagnostics.push({
+      code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+      message: `Type constructor "${input.call.path.join('.')}" uses unrecognized namespace "${namespace}". Add extension pack "${namespace}" to extensionPacks in prisma-next.config.ts.`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return undefined;
+  }
+
+  return pushUnsupportedTypeConstructorDiagnostic({
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+    span: input.call.span,
+    code: input.unsupportedCode,
+    message: input.unsupportedMessage,
+  });
+}
+
+export function resolveFieldTypeDescriptor(input: {
+  readonly field: PslField;
+  readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
+  readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly familyId: string;
+  readonly targetId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly entityLabel: string;
+}): ColumnDescriptor | undefined {
+  if (input.field.typeConstructor) {
+    const helperPath = input.field.typeConstructor.path.join('.');
+    const descriptor = resolvePslTypeConstructorDescriptor({
+      call: input.field.typeConstructor,
+      authoringContributions: input.authoringContributions,
+      composedExtensions: input.composedExtensions,
+      familyId: input.familyId,
+      targetId: input.targetId,
+      diagnostics: input.diagnostics,
+      sourceId: input.sourceId,
+      unsupportedCode: 'PSL_UNSUPPORTED_FIELD_TYPE',
+      unsupportedMessage: `${input.entityLabel} type constructor "${helperPath}" is not supported in SQL PSL provider v1`,
+    });
+    if (!descriptor) {
+      return undefined;
+    }
+
+    return instantiatePslTypeConstructor({
+      call: input.field.typeConstructor,
+      descriptor,
+      diagnostics: input.diagnostics,
+      sourceId: input.sourceId,
+      entityLabel: input.entityLabel,
+    });
+  }
+
+  return resolveColumnDescriptor(
+    input.field,
+    input.enumTypeDescriptors,
+    input.namedTypeDescriptors,
+    input.scalarTypeDescriptors,
+  );
 }
 
 /**
@@ -240,37 +585,6 @@ export function resolveDbNativeTypeAttribute(input: {
       };
     }
   }
-}
-
-export function parsePgvectorLength(input: {
-  readonly attribute: PslAttribute;
-  readonly diagnostics: ContractSourceDiagnostic[];
-  readonly sourceId: string;
-}): number | undefined {
-  const namedLength = getNamedArgument(input.attribute, 'length');
-  const namedDim = getNamedArgument(input.attribute, 'dim');
-  const positional = getPositionalArgument(input.attribute);
-  const raw = namedLength ?? namedDim ?? positional;
-  if (!raw) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      message: '@pgvector.column requires length/dim argument',
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-  const parsed = Number(unquoteStringLiteral(raw));
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      message: '@pgvector.column length/dim must be a positive integer',
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-  return parsed;
 }
 
 export function parseDefaultLiteralValue(expression: string): ColumnDefault | undefined {
