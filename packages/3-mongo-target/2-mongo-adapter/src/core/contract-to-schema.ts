@@ -1,27 +1,47 @@
 import type {
-  MongoContract,
-  MongoIndex,
   MongoStorageCollection,
+  MongoStorageCollectionOptions,
+  MongoStorageIndex,
+  MongoStorageValidator,
 } from '@prisma-next/mongo-contract';
 import {
   MongoSchemaCollection,
+  MongoSchemaCollectionOptionsNode,
   MongoSchemaIndex,
   type MongoSchemaIR,
+  MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 
-function convertIndex(index: MongoIndex): MongoSchemaIndex {
-  const keys = Object.entries(index.fields).map(([field, direction]) => ({
-    field,
-    direction,
-  }));
+function convertIndex(index: MongoStorageIndex): MongoSchemaIndex {
   return new MongoSchemaIndex({
-    keys,
-    unique: index.options?.unique,
-    sparse: index.options?.sparse,
-    expireAfterSeconds: index.options?.expireAfterSeconds,
-    partialFilterExpression: index.options?.partialFilterExpression as
-      | Record<string, unknown>
-      | undefined,
+    keys: index.keys,
+    unique: index.unique,
+    sparse: index.sparse,
+    expireAfterSeconds: index.expireAfterSeconds,
+    partialFilterExpression: index.partialFilterExpression,
+    wildcardProjection: index.wildcardProjection,
+    collation: index.collation,
+    weights: index.weights,
+    default_language: index.default_language,
+    language_override: index.language_override,
+  });
+}
+
+function convertValidator(v: MongoStorageValidator): MongoSchemaValidator {
+  return new MongoSchemaValidator({
+    jsonSchema: v.jsonSchema,
+    validationLevel: v.validationLevel,
+    validationAction: v.validationAction,
+  });
+}
+
+function convertOptions(o: MongoStorageCollectionOptions): MongoSchemaCollectionOptionsNode {
+  return new MongoSchemaCollectionOptionsNode({
+    capped: o.capped,
+    timeseries: o.timeseries,
+    collation: o.collation,
+    changeStreamPreAndPostImages: o.changeStreamPreAndPostImages,
+    clusteredIndex: o.clusteredIndex,
   });
 }
 
@@ -29,6 +49,8 @@ function convertCollection(name: string, def: MongoStorageCollection): MongoSche
   return new MongoSchemaCollection({
     name,
     indexes: (def.indexes ?? []).map(convertIndex),
+    validator: def.validator ? convertValidator(def.validator) : undefined,
+    options: def.options ? convertOptions(def.options) : undefined,
   });
 }
 
