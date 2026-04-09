@@ -2,7 +2,10 @@ import type { MigrationOperationClass } from '@prisma-next/framework-components/
 import {
   type AnyMongoDdlCommand,
   type AnyMongoInspectionCommand,
+  CollModCommand,
+  CreateCollectionCommand,
   CreateIndexCommand,
+  DropCollectionCommand,
   DropIndexCommand,
   ListCollectionsCommand,
   ListIndexesCommand,
@@ -30,12 +33,46 @@ const CreateIndexJson = type({
   'expireAfterSeconds?': 'number',
   'partialFilterExpression?': 'Record<string, unknown>',
   'name?': 'string',
+  'wildcardProjection?': 'Record<string, unknown>',
+  'collation?': 'Record<string, unknown>',
+  'weights?': 'Record<string, unknown>',
+  'default_language?': 'string',
+  'language_override?': 'string',
 });
 
 const DropIndexJson = type({
   kind: '"dropIndex"',
   collection: 'string',
   name: 'string',
+});
+
+const CreateCollectionJson = type({
+  kind: '"createCollection"',
+  collection: 'string',
+  'validator?': 'Record<string, unknown>',
+  'validationLevel?': '"strict" | "moderate"',
+  'validationAction?': '"error" | "warn"',
+  'capped?': 'boolean',
+  'size?': 'number',
+  'max?': 'number',
+  'timeseries?': 'Record<string, unknown>',
+  'collation?': 'Record<string, unknown>',
+  'changeStreamPreAndPostImages?': 'Record<string, unknown>',
+  'clusteredIndex?': 'Record<string, unknown>',
+});
+
+const DropCollectionJson = type({
+  kind: '"dropCollection"',
+  collection: 'string',
+});
+
+const CollModJson = type({
+  kind: '"collMod"',
+  collection: 'string',
+  'validator?': 'Record<string, unknown>',
+  'validationLevel?': '"strict" | "moderate"',
+  'validationAction?': '"error" | "warn"',
+  'changeStreamPreAndPostImages?': 'Record<string, unknown>',
 });
 
 const ListIndexesJson = type({
@@ -134,11 +171,48 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
         expireAfterSeconds: data.expireAfterSeconds,
         partialFilterExpression: data.partialFilterExpression,
         name: data.name,
+        wildcardProjection: data.wildcardProjection as Record<string, 0 | 1> | undefined,
+        collation: data.collation,
+        weights: data.weights as Record<string, number> | undefined,
+        default_language: data.default_language,
+        language_override: data.language_override,
       });
     }
     case 'dropIndex': {
       const data = validate(DropIndexJson, json, 'dropIndex command');
       return new DropIndexCommand(data.collection, data.name);
+    }
+    case 'createCollection': {
+      const data = validate(CreateCollectionJson, json, 'createCollection command');
+      return new CreateCollectionCommand(data.collection, {
+        validator: data.validator,
+        validationLevel: data.validationLevel,
+        validationAction: data.validationAction,
+        capped: data.capped,
+        size: data.size,
+        max: data.max,
+        timeseries: data.timeseries as CreateCollectionCommand['timeseries'],
+        collation: data.collation,
+        changeStreamPreAndPostImages: data.changeStreamPreAndPostImages as
+          | { enabled: boolean }
+          | undefined,
+        clusteredIndex: data.clusteredIndex as CreateCollectionCommand['clusteredIndex'],
+      });
+    }
+    case 'dropCollection': {
+      const data = validate(DropCollectionJson, json, 'dropCollection command');
+      return new DropCollectionCommand(data.collection);
+    }
+    case 'collMod': {
+      const data = validate(CollModJson, json, 'collMod command');
+      return new CollModCommand(data.collection, {
+        validator: data.validator,
+        validationLevel: data.validationLevel,
+        validationAction: data.validationAction,
+        changeStreamPreAndPostImages: data.changeStreamPreAndPostImages as
+          | { enabled: boolean }
+          | undefined,
+      });
     }
     default:
       throw new Error(`Unknown DDL command kind: ${kind}`);
