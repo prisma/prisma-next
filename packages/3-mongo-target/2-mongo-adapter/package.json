@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@prisma-next/config": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
-    "arktype": "catalog:",
     "@prisma-next/mongo-codec": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-lowering": "workspace:*",
@@ -26,13 +26,14 @@
     "@prisma-next/mongo-value": "workspace:*",
     "@prisma-next/mongo-wire": "workspace:*",
     "@prisma-next/operations": "workspace:*",
+    "arktype": "catalog:",
     "mongodb": "catalog:"
   },
   "devDependencies": {
-    "@prisma-next/contract": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
+    "mongodb-memory-server": "^10.4.3",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
