@@ -1,6 +1,7 @@
 import type { ControlAdapterDescriptor } from '@prisma-next/framework-components/control';
 
 export { contractToMongoSchemaIR } from '../core/contract-to-schema';
+export { formatMongoOperations } from '../core/ddl-formatter';
 export { deserializeMongoOps, serializeMongoOps } from '../core/mongo-ops-serializer';
 
 import {
