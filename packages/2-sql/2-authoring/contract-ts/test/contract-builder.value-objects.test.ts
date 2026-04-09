@@ -1,4 +1,5 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
@@ -12,6 +13,104 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 };
 
 describe('value objects in contract definition builder', () => {
+  it('encodes value-object literal defaults through codecLookup during storage lowering', () => {
+    const isMoneyValue = (value: unknown): value is { amount: number; currency: string } =>
+      typeof value === 'object' &&
+      value !== null &&
+      'amount' in value &&
+      typeof value.amount === 'number' &&
+      'currency' in value &&
+      typeof value.currency === 'string';
+
+    const codecLookup: CodecLookup = {
+      get: (id) => {
+        if (id !== 'pg/jsonb@1') {
+          return undefined;
+        }
+
+        return {
+          id,
+          targetTypes: ['jsonb'],
+          traits: ['equality'] as const,
+          decode: (wire: unknown) => wire,
+          encodeJson: (value: unknown) => {
+            if (!isMoneyValue(value)) {
+              throw new Error('Expected a Money value');
+            }
+
+            return {
+              amount: value.amount.toString(),
+              currency: value.currency,
+            };
+          },
+          decodeJson: (json: unknown) => json,
+        };
+      },
+    };
+
+    const contract = buildSqlContractFromDefinition(
+      {
+        target: postgresTargetPack,
+        models: [
+          {
+            modelName: 'Invoice',
+            tableName: 'invoice',
+            fields: [
+              {
+                fieldName: 'id',
+                columnName: 'id',
+                descriptor: { codecId: 'pg/int4@1', nativeType: 'int4' },
+                nullable: false,
+              },
+              {
+                fieldName: 'total',
+                columnName: 'total',
+                valueObjectName: 'Money',
+                nullable: false,
+                default: {
+                  kind: 'literal',
+                  value: {
+                    amount: 12,
+                    currency: 'EUR',
+                  },
+                },
+              },
+            ],
+            id: { columns: ['id'] },
+          },
+        ],
+        valueObjects: [
+          {
+            name: 'Money',
+            fields: [
+              {
+                fieldName: 'amount',
+                columnName: 'amount',
+                descriptor: { codecId: 'pg/int8@1', nativeType: 'int8' },
+                nullable: false,
+              },
+              {
+                fieldName: 'currency',
+                columnName: 'currency',
+                descriptor: { codecId: 'pg/text@1', nativeType: 'text' },
+                nullable: false,
+              },
+            ],
+          },
+        ],
+      },
+      codecLookup,
+    );
+
+    expect(contract.storage.tables['invoice']?.columns['total']?.default).toEqual({
+      kind: 'literal',
+      value: {
+        amount: '12',
+        currency: 'EUR',
+      },
+    });
+  });
+
   it('emits valueObjects section with scalar fields', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,

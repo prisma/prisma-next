@@ -113,11 +113,16 @@ function buildStorageColumn(
   codecLookup?: CodecLookup,
 ): StorageColumn {
   if (isValueObjectField(field)) {
+    const encodedDefault =
+      field.default !== undefined
+        ? encodeColumnDefault(field.default, JSONB_CODEC_ID, codecLookup)
+        : undefined;
+
     return {
       nativeType: JSONB_NATIVE_TYPE,
       codecId: JSONB_CODEC_ID,
       nullable: field.nullable,
-      ...ifDefined('default', field.default),
+      ...ifDefined('default', encodedDefault),
     };
   }
 
