@@ -339,6 +339,8 @@ packages/
     pgvector/            # pgvector extension pack
 ```
 
+`packages/3-targets/**` remains the canonical generic target domain for dialect-scoped target, adapter, and driver packages such as Postgres. `packages/3-mongo-target/**` is the Mongo-specific counterpart under the same broader target concept, and contributors should keep following the repo's `{domain}/{subdomain}` naming pattern when adding new package groups.
+
 Dependency direction is strictly one-way: `core → authoring → tooling → lanes → runtime-executor → family runtime → adapters`. Numbered prefixes reinforce the hierarchy: lower numbers can be imported by higher numbers, never the reverse. Enforce with Dependency Cruiser using data-driven configuration from `architecture.config.json`.
 
 ### Diagram — Thin core, fat targets
