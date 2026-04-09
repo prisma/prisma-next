@@ -1,4 +1,5 @@
 import { type } from 'arktype';
+import type { MongoJsonObject, MongoJsonPrimitive, MongoJsonValue } from './contract-types';
 
 const ScalarFieldTypeSchema = type({
   '+': 'reject',
@@ -54,7 +55,43 @@ const StorageRelationEntrySchema = type({
   field: 'string',
 });
 
-const UnknownValueRecordSchema = type({ '[string]': 'unknown' });
+const MongoJsonPrimitiveSchema = type
+  .declare<MongoJsonPrimitive>()
+  .type('string | number | boolean | null');
+
+function isMongoJsonRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function isMongoJsonObject(value: unknown): value is MongoJsonObject {
+  return isMongoJsonRecord(value) && Object.values(value).every((entry) => isMongoJsonValue(entry));
+}
+
+function isMongoJsonValue(value: unknown): value is MongoJsonValue {
+  if (MongoJsonPrimitiveSchema.allows(value)) {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.every((entry) => isMongoJsonValue(entry));
+  }
+  return isMongoJsonObject(value);
+}
+
+const MongoJsonValueSchema = type('unknown').narrow((value, ctx) =>
+  isMongoJsonValue(value) ? true : ctx.mustBe('a JSON-serializable MongoJsonValue'),
+);
+
+const MongoJsonObjectSchema = type({ '[string]': 'unknown' }).narrow((value, ctx) =>
+  isMongoJsonRecord(value) &&
+  Object.values(value).every((entry) => MongoJsonValueSchema.allows(entry))
+    ? true
+    : ctx.mustBe('a JSON object with MongoJsonValue entries'),
+);
+
 const NumberRecordSchema = type({ '[string]': 'number' });
 
 const IndexFieldsSchema = type({
@@ -86,7 +123,7 @@ const IndexOptionsSchema = type({
   '+': 'reject',
   'unique?': 'boolean',
   'name?': 'string',
-  'partialFilterExpression?': UnknownValueRecordSchema,
+  'partialFilterExpression?': MongoJsonObjectSchema,
   'sparse?': 'boolean',
   'expireAfterSeconds?': 'number',
   'weights?': NumberRecordSchema,
@@ -111,7 +148,7 @@ const IndexSchema = type({
 
 const IndexOptionDefaultsSchema = type({
   '+': 'reject',
-  'storageEngine?': UnknownValueRecordSchema,
+  'storageEngine?': MongoJsonObjectSchema,
 });
 
 const TimeSeriesCollectionOptionsSchema = type({
@@ -149,7 +186,7 @@ const CollectionOptionsSchema = type({
   'capped?': 'boolean',
   'size?': 'number',
   'max?': 'number',
-  'storageEngine?': UnknownValueRecordSchema,
+  'storageEngine?': MongoJsonObjectSchema,
   'indexOptionDefaults?': IndexOptionDefaultsSchema,
   'collation?': CollationSchema,
   'timeseries?': TimeSeriesCollectionOptionsSchema,

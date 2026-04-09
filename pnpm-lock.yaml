@@ -1162,6 +1162,9 @@ importers:
       '@prisma-next/driver-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/3-mongo-driver
+      '@prisma-next/family-mongo':
+        specifier: workspace:*
+        version: link:../9-family
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../1-foundation/mongo-contract
@@ -1174,6 +1177,9 @@ importers:
       '@prisma-next/mongo-value':
         specifier: workspace:*
         version: link:../1-foundation/mongo-value
+      '@prisma-next/target-mongo':
+        specifier: workspace:*
+        version: link:../../3-mongo-target/1-mongo-target
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils

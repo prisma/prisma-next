@@ -1,3 +1,4 @@
+import mongoFamilyPack from '@prisma-next/family-mongo/pack';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -6,6 +7,7 @@ import type {
 import { defineContract, field, model, rel } from '@prisma-next/mongo-contract-ts/contract-builder';
 import { acc, fn, mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
+import mongoTargetPack from '@prisma-next/target-mongo/pack';
 import { ObjectId } from 'mongodb';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { withMongod } from './setup';
@@ -71,21 +73,6 @@ const contractJson = {
   profileHash: 'test-profile',
   meta: {},
 };
-
-const mongoFamilyPack = {
-  kind: 'family',
-  id: 'mongo',
-  familyId: 'mongo',
-  version: '0.0.1',
-} as const;
-
-const mongoTargetPack = {
-  kind: 'target',
-  id: 'mongo',
-  familyId: 'mongo',
-  targetId: 'mongo',
-  version: '0.0.1',
-} as const;
 
 const User = model('User', {
   collection: 'users',
@@ -303,7 +290,7 @@ describe('pipeline builder integration', () => {
         count: number;
       }>();
 
-      const results = await ctx.runtime.execute(plan).toArray();
+      const results = await ctx.runtime.execute(plan);
 
       expect(results).toEqual([
         {

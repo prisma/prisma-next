@@ -193,18 +193,27 @@ describe('validateMongoContract()', () => {
                 {
                   fields: { name: 'text' },
                   options: {
-                    partialFilterExpression: { archived: false },
+                    partialFilterExpression: {
+                      archived: false,
+                      $or: [{ status: 'active' }, { tags: ['priority', 'searchable'] }],
+                    },
                     weights: { name: 10 },
                   },
                 },
               ],
               options: {
                 storageEngine: {
-                  wiredTiger: { configString: 'block_compressor=zstd' },
+                  wiredTiger: {
+                    configString: 'block_compressor=zstd',
+                    nested: [{ compression: 'zstd' }, 1, true, null],
+                  },
                 },
                 indexOptionDefaults: {
                   storageEngine: {
-                    wiredTiger: { configString: 'prefix_compression=true' },
+                    wiredTiger: {
+                      configString: 'prefix_compression=true',
+                      nested: [{ prefixCompression: true }],
+                    },
                   },
                 },
               },
@@ -229,22 +238,69 @@ describe('validateMongoContract()', () => {
           {
             fields: { name: 'text' },
             options: {
-              partialFilterExpression: { archived: false },
+              partialFilterExpression: {
+                archived: false,
+                $or: [{ status: 'active' }, { tags: ['priority', 'searchable'] }],
+              },
               weights: { name: 10 },
             },
           },
         ],
         options: {
           storageEngine: {
-            wiredTiger: { configString: 'block_compressor=zstd' },
+            wiredTiger: {
+              configString: 'block_compressor=zstd',
+              nested: [{ compression: 'zstd' }, 1, true, null],
+            },
           },
           indexOptionDefaults: {
             storageEngine: {
-              wiredTiger: { configString: 'prefix_compression=true' },
+              wiredTiger: {
+                configString: 'prefix_compression=true',
+                nested: [{ prefixCompression: true }],
+              },
             },
           },
         },
       });
+    });
+
+    it('rejects non-JSON values in record-shaped index and collection option maps', () => {
+      const json = {
+        ...makeValidContractJson(),
+        storage: {
+          collections: {
+            items: {
+              indexes: [
+                {
+                  fields: { name: 'text' },
+                  options: {
+                    partialFilterExpression: {
+                      $or: [{ status: 'active' }, { updatedAt: 1n }],
+                    },
+                  },
+                },
+              ],
+              options: {
+                storageEngine: {
+                  wiredTiger: { configString: 'block_compressor=zstd' },
+                },
+              },
+            },
+          },
+        },
+        models: {
+          Item: {
+            fields: {
+              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+            },
+            storage: { collection: 'items' },
+          },
+        },
+      };
+
+      expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects empty clustered index keys', () => {
