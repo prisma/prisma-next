@@ -178,15 +178,21 @@ withTempDir(({ createTempDir }) => {
 // ---------------------------------------------------------------------------
 
 const scenarioFixtureSubdir = 'db-update-scenarios';
+const projectSlugVariantFixture = 'contract-add-project-slug.ts';
 
 /**
- * Switches the contract from v1 to v2 by copying contract-v2.ts over contract.ts,
- * then re-emitting the contract.
+ * Switches the baseline scenario contract to the additive project slug variant,
+ * then re-emits the contract.
  */
-async function switchToContractV2(testDir: string, configPath: string): Promise<void> {
-  const v2Source = join(fixtureAppDir, 'fixtures', scenarioFixtureSubdir, 'contract-v2.ts');
+async function switchToProjectSlugVariant(testDir: string, configPath: string): Promise<void> {
+  const variantSource = join(
+    fixtureAppDir,
+    'fixtures',
+    scenarioFixtureSubdir,
+    projectSlugVariantFixture,
+  );
   const contractDest = join(testDir, 'contract.ts');
-  copyFileSync(v2Source, contractDest);
+  copyFileSync(variantSource, contractDest);
 
   const emitCommand = createContractEmitCommand();
   const originalCwd = process.cwd();
@@ -248,7 +254,7 @@ withTempDir(({ createTempDir }) => {
           );
 
           await runDbInit(testSetup, ['--config', configPath, '--no-color']);
-          await switchToContractV2(testSetup.testDir, configPath);
+          await switchToProjectSlugVariant(testSetup.testDir, configPath);
 
           consoleOutput.length = 0;
           await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
@@ -286,7 +292,7 @@ withTempDir(({ createTempDir }) => {
           );
 
           await runDbInit(testSetup, ['--config', configPath, '--no-color']);
-          await switchToContractV2(testSetup.testDir, configPath);
+          await switchToProjectSlugVariant(testSetup.testDir, configPath);
 
           consoleOutput.length = 0;
           await runDbUpdate(testSetup, ['--config', configPath, '--no-color']);
@@ -497,7 +503,7 @@ withTempDir(({ createTempDir }) => {
           );
 
           await runDbInit(testSetup, ['--config', configPath, '--no-color']);
-          await switchToContractV2(testSetup.testDir, configPath);
+          await switchToProjectSlugVariant(testSetup.testDir, configPath);
 
           const outputStart = consoleOutput.length;
           await runDbUpdate(testSetup, [
