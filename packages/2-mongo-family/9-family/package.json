@@ -16,8 +16,9 @@
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
-    "@prisma-next/target-mongo": "workspace:*",
-    "@prisma-next/mongo-emitter": "workspace:*"
+    "@prisma-next/mongo-contract-ts": "workspace:*",
+    "@prisma-next/mongo-emitter": "workspace:*",
+    "@prisma-next/target-mongo": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
@@ -40,6 +41,7 @@
   "types": "./dist/control.d.mts",
   "exports": {
     "./control": "./dist/control.mjs",
+    "./pack": "./dist/pack.mjs",
     "./package.json": "./package.json"
   }
 }

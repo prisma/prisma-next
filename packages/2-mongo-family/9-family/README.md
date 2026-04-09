@@ -1,28 +1,35 @@
 # @prisma-next/family-mongo
 
-Mongo family descriptor for Prisma Next.
+Mongo family descriptor and family pack for Prisma Next.
 
 ## Purpose
 
-Provides the Mongo family descriptor (`ControlFamilyDescriptor`) that includes:
-- The Mongo target family hook (`mongoEmission`)
-- Factory method (`create()`) to create family instances
-- The Mongo target descriptor with codec type imports
+This package is the Mongo family integration point for both control-plane assembly and authoring-time pack composition. It provides:
+
+- the Mongo `ControlFamilyDescriptor` and `mongoTargetDescriptor` used by configs and CLI flows
+- the pure-data Mongo family pack ref used by `contract.ts` authoring
+- a cohesive dependency surface for the Mongo family, including `@prisma-next/mongo-contract-ts`
 
 ## Responsibilities
 
-- **Family Descriptor Export**: Exports the Mongo `ControlFamilyDescriptor` for use in CLI configuration files and the Mongo demo
-- **Family Instance Creation**: Creates `MongoControlFamilyInstance` objects that implement control-plane domain actions (`validateContract`, `emitContract`)
-- **Family Hook Integration**: Integrates the Mongo target family hook (`mongoEmission`) from `@prisma-next/mongo-emitter`
-- **Target Descriptor Export**: Exports a pre-built `mongoTargetDescriptor` with codec type imports pointing to `@prisma-next/mongo-core/codec-types`
-- **Contract Validation**: Validates Mongo contract JSON via `validateMongoContract()` from `@prisma-next/mongo-core`
-- **Contract Emission**: Emits `contract.json` and `contract.d.ts` for the Mongo family using the shared `emit()` pipeline
+- **Control-plane assembly**: Exposes `mongoFamilyDescriptor` and `createMongoFamilyInstance()` for validation and emission flows.
+- **Family hook integration**: Wires `mongoEmission` from `@prisma-next/mongo-emitter` into the family descriptor.
+- **Target bridge**: Exposes a `mongoTargetDescriptor` built from `@prisma-next/target-mongo/pack` metadata for control-plane stacks.
+- **Authoring-time family pack**: Exposes `@prisma-next/family-mongo/pack` so `defineContract(...)` can bind a Mongo contract to the Mongo family without importing control-plane code.
+- **Validation and emission**: Delegates Mongo contract validation to `@prisma-next/mongo-contract` and contract emission to the shared emitter pipeline.
+
+## Entrypoints
+
+- `./control`: control-plane entrypoint exporting `mongoFamilyDescriptor`, `mongoTargetDescriptor`, `createMongoFamilyInstance`, and `MongoControlFamilyInstance`
+- `./pack`: pure pack ref for TypeScript authoring flows such as `@prisma-next/mongo-contract-ts/contract-builder`
 
 ## Usage
 
+### Control plane
+
 ```typescript
-import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
 
 const stack = createControlStack({
   family: mongoFamilyDescriptor,
@@ -35,25 +42,71 @@ const contract = familyInstance.validateContract(contractJson);
 const result = await familyInstance.emitContract({ contract });
 ```
 
+### TypeScript authoring
+
+```typescript
+import mongoFamily from '@prisma-next/family-mongo/pack';
+import { defineContract, field, model, rel, valueObject } from '@prisma-next/mongo-contract-ts/contract-builder';
+import mongoTarget from '@prisma-next/target-mongo/pack';
+
+const Address = valueObject('Address', {
+  fields: {
+    street: field.string(),
+    zip: field.string().optional(),
+  },
+});
+
+const Task = model('Task', {
+  collection: 'tasks',
+  storageRelations: {
+    comments: { field: 'comments' },
+  },
+  fields: {
+    _id: field.objectId(),
+    type: field.string(),
+    metadata: field.valueObject(Address).optional(),
+  },
+  relations: {
+    comments: rel.hasMany('Comment'),
+  },
+  discriminator: {
+    field: 'type',
+    variants: {
+      Bug: { value: 'bug' },
+    },
+  },
+});
+
+const Comment = model('Comment', {
+  owner: Task,
+  fields: {
+    _id: field.objectId(),
+    text: field.string(),
+  },
+});
+
+export const contract = defineContract({
+  family: mongoFamily,
+  target: mongoTarget,
+  valueObjects: { Address },
+  models: { Task, Comment },
+});
+```
+
+The current `contract.ts` slice supports roots and collections, typed reference relations, owned models with `storage.relations`, value objects, and discriminator-based polymorphism.
+
 ## Package Structure
 
-- **`src/core/control-descriptor.ts`**: `MongoFamilyDescriptor` class implementing `ControlFamilyDescriptor` (pure data + factory)
-- **`src/core/control-instance.ts`**: `createMongoFamilyInstance()` factory and `MongoControlFamilyInstance` interface with domain action methods (`validateContract`, `emitContract`)
-- **`src/core/mongo-target-descriptor.ts`**: Pre-built `mongoTargetDescriptor` with codec type import metadata
-- **`src/exports/control.ts`**: Control plane entry point
-
-## Entrypoints
-
-- **`./control`**: Control plane entry point — exports `mongoFamilyDescriptor`, `mongoTargetDescriptor`, `createMongoFamilyInstance`, and `MongoControlFamilyInstance`
+- `src/core/control-descriptor.ts`: `MongoFamilyDescriptor` implementation
+- `src/core/control-instance.ts`: `createMongoFamilyInstance()` and `MongoControlFamilyInstance`
+- `src/core/mongo-target-descriptor.ts`: pre-built control target descriptor derived from `@prisma-next/target-mongo/pack`
+- `src/exports/control.ts`: control-plane entrypoint
+- `src/exports/pack.ts`: authoring-time family pack ref
 
 ## Dependencies
 
-- **`@prisma-next/framework-components`**: `ControlStack`, `ControlFamilyDescriptor`, component types
-- **`@prisma-next/emitter`**: `emit()` function for contract emission
-- **`@prisma-next/contract`**: `Contract`, `ContractMarkerRecord`
-- **`@prisma-next/mongo-core`**: `MongoContract`, `validateMongoContract()`
-- **`@prisma-next/mongo-emitter`**: `mongoEmission`
-- **`@prisma-next/target-mongo`**: Target descriptor metadata
-
-**Dependents:**
-- `examples/mongo-demo/` imports this package to wire the Mongo control plane
+- `@prisma-next/framework-components`: control-plane types and stack assembly
+- `@prisma-next/mongo-contract`: Mongo contract validation and types
+- `@prisma-next/mongo-contract-ts`: Mongo `contract.ts` authoring surface
+- `@prisma-next/mongo-emitter`: Mongo family emission hook
+- `@prisma-next/target-mongo`: Mongo target pack metadata

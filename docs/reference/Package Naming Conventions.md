@@ -16,12 +16,14 @@ packages/
     4-runtime/           # Layer 4: Runtime
       runtime-executor/
   2-document/            # Domain 2: Document (placeholder)
+  2-mongo-family/        # Domain 2: Mongo family
   2-sql/                 # Domain 2: SQL family
     1-core/              # Layer 1: Core
     2-authoring/         # Layer 2: Authoring
     3-tooling/           # Layer 3: Tooling
     4-lanes/             # Layer 4: Lanes
     5-runtime/           # Layer 5: Runtime
+  3-mongo-target/        # Domain 3: Mongo target packages
   3-extensions/          # Domain 3: Extensions
   3-targets/             # Domain 3: Targets
     3-targets/           # Layer 3: Target descriptors
@@ -38,7 +40,7 @@ Planes are a conceptual grouping recorded in `architecture.config.json` but do n
 ## Naming Rules
 
 - Use the published package name as the only import specifier. The directory layout is for humans and guardrails.
-- Encode target family with a `sql-` (or future `doc-`) prefix in package names for discoverability.
+- Encode target family with a family-specific prefix such as `sql-` or `mongo-` for discoverability.
 - Collapse nested dirs to hyphenated names; no slashes after the scope.
 - Keep conventional names for adapters/drivers (e.g., `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`) even when nested under `packages/3-targets/**`.
 - Layers (core/authoring/tooling/lanes/runtime/adapters) constrain dependency direction; they generally do not appear in package names, except when meaningful (e.g., `runtime-executor`).
@@ -73,6 +75,30 @@ Planes are a conceptual grouping recorded in `architecture.config.json` but do n
 | `packages/2-sql/4-lanes/relational-core/` | `@prisma-next/sql-relational-core` |
 | `packages/2-sql/4-lanes/sql-lane/` | `@prisma-next/sql-lane` |
 | `packages/2-sql/5-runtime/` | `@prisma-next/sql-runtime` |
+
+**Mongo Family Domain:**
+
+| Directory | Package Name |
+|-----------|--------------|
+| `packages/2-mongo-family/1-foundation/mongo-contract/` | `@prisma-next/mongo-contract` |
+| `packages/2-mongo-family/2-authoring/contract-psl/` | `@prisma-next/mongo-contract-psl` |
+| `packages/2-mongo-family/2-authoring/contract-ts/` | `@prisma-next/mongo-contract-ts` |
+| `packages/2-mongo-family/3-tooling/emitter/` | `@prisma-next/mongo-emitter` |
+| `packages/2-mongo-family/4-query/query-ast/` | `@prisma-next/mongo-query-ast` |
+| `packages/2-mongo-family/5-query-builders/orm/` | `@prisma-next/mongo-orm` |
+| `packages/2-mongo-family/5-query-builders/pipeline-builder/` | `@prisma-next/mongo-pipeline-builder` |
+| `packages/2-mongo-family/6-transport/mongo-lowering/` | `@prisma-next/mongo-lowering` |
+| `packages/2-mongo-family/6-transport/mongo-wire/` | `@prisma-next/mongo-wire` |
+| `packages/2-mongo-family/7-runtime/` | `@prisma-next/mongo-runtime` |
+| `packages/2-mongo-family/9-family/` | `@prisma-next/family-mongo` |
+
+**Mongo Target Domain:**
+
+| Directory | Package Name |
+|-----------|--------------|
+| `packages/3-mongo-target/1-mongo-target/` | `@prisma-next/target-mongo` |
+| `packages/3-mongo-target/2-mongo-adapter/` | `@prisma-next/adapter-mongo` |
+| `packages/3-mongo-target/3-mongo-driver/` | `@prisma-next/driver-mongo` |
 
 **Targets Domain:**
 

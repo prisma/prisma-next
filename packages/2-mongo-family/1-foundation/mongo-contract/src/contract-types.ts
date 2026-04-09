@@ -67,6 +67,15 @@ type ExtractValueObjects<TContract> = TContract extends {
   ? VO
   : Record<never, never>;
 
+type NormalizeContractFields<TFields> = {
+  [K in keyof TFields]: TFields[K] extends ContractField ? TFields[K] : never;
+};
+
+type ExtractValueObjectFields<
+  TValueObjects extends Record<string, ContractValueObject>,
+  VOName extends keyof TValueObjects,
+> = NormalizeContractFields<TValueObjects[VOName]['fields']>;
+
 type InferFieldBaseType<
   TFieldType,
   TValueObjects extends Record<string, ContractValueObject>,
@@ -76,8 +85,8 @@ type InferFieldBaseType<
   : TFieldType extends { kind: 'valueObject'; name: infer VOName extends string }
     ? VOName extends keyof TValueObjects
       ? {
-          -readonly [K in keyof TValueObjects[VOName]['fields']]: InferFieldType<
-            TValueObjects[VOName]['fields'][K],
+          -readonly [K in keyof ExtractValueObjectFields<TValueObjects, VOName>]: InferFieldType<
+            ExtractValueObjectFields<TValueObjects, VOName>[K],
             TValueObjects,
             TCodecTypes
           >;
@@ -93,16 +102,18 @@ type InferFieldBaseType<
       : unknown;
 
 type InferFieldType<
-  TField extends ContractField,
+  TField,
   TValueObjects extends Record<string, ContractValueObject>,
   TCodecTypes extends Record<string, { output: unknown }>,
-> = TField extends { many: true }
-  ? TField['nullable'] extends true
-    ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[] | null
-    : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[]
-  : TField['nullable'] extends true
-    ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes> | null
-    : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>;
+> = TField extends ContractField
+  ? TField extends { many: true }
+    ? TField['nullable'] extends true
+      ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[] | null
+      : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[]
+    : TField['nullable'] extends true
+      ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes> | null
+      : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>
+  : never;
 
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
