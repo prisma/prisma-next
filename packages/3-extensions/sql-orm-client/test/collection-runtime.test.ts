@@ -224,4 +224,47 @@ describe('mapPolymorphicRow()', () => {
 
     expect(result).toEqual({ id: 3, title: 'Unknown', type: 'epic' });
   });
+
+  it('preserves identity-mapped fields (no explicit column mapping)', () => {
+    const contract = buildMixedPolyContract();
+    // Remove explicit column mappings to create identity-mapped fields
+    const models = contract.models as Record<string, Record<string, unknown>>;
+    models['Task']!['storage'] = {
+      table: 'tasks',
+      fields: { id: {}, title: {}, type: {} },
+    };
+    models['Bug']!['storage'] = {
+      table: 'tasks',
+      fields: { severity: {} },
+    };
+    models['Feature']!['storage'] = {
+      table: 'features',
+      fields: { priority: {} },
+    };
+
+    const polyInfo = resolvePolymorphismInfo(contract, 'Task')!;
+
+    const stiRow = { id: 1, title: 'Crash', type: 'bug', severity: 'high' };
+    expect(mapPolymorphicRow(contract, 'Task', polyInfo, stiRow)).toEqual({
+      id: 1,
+      title: 'Crash',
+      type: 'bug',
+      severity: 'high',
+    });
+
+    const mtiRow = { id: 2, title: 'Feature', type: 'feature', features__priority: 5 };
+    expect(mapPolymorphicRow(contract, 'Task', polyInfo, mtiRow)).toEqual({
+      id: 2,
+      title: 'Feature',
+      type: 'feature',
+      priority: 5,
+    });
+
+    const unknownRow = { id: 3, title: 'Unknown', type: 'epic' };
+    expect(mapPolymorphicRow(contract, 'Task', polyInfo, unknownRow)).toEqual({
+      id: 3,
+      title: 'Unknown',
+      type: 'epic',
+    });
+  });
 });

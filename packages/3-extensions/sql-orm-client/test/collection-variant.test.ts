@@ -267,6 +267,30 @@ describe('MTI variant mutation guards', () => {
   });
 });
 
+describe('STI variant upsert (discriminator auto-injection)', () => {
+  it('injects discriminator into upsert create values for STI variant', async () => {
+    const { collection, runtime } = createReturningMixedPolyCollection();
+    runtime.setNextResults([[{ id: 1, title: 'Crash', type: 'bug', severity: 'critical' }]]);
+
+    const narrowed = collection.variant('Bug' as never) as typeof collection;
+    await narrowed.upsert({
+      create: { title: 'Crash', severity: 'critical' } as never,
+      update: { title: 'Updated' } as never,
+    });
+
+    const execution = runtime.executions[0]!;
+    const ast = execution.plan.ast as InsertAst;
+    expect(ast.kind).toBe('insert');
+
+    const insertRow = ast.rows![0]!;
+    const typeParam = insertRow['type'];
+    expect(typeParam).toBeDefined();
+    expect((typeParam as { value: unknown }).value).toBe('bug');
+
+    expect(insertRow['severity']).toBeDefined();
+  });
+});
+
 describe('MTI variant create (two-INSERT orchestration)', () => {
   it('executes two INSERTs: base table then variant table', async () => {
     const { collection, runtime } = createReturningMixedPolyCollection();
@@ -298,6 +322,20 @@ describe('MTI variant create (two-INSERT orchestration)', () => {
     expect(variantRow['priority']).toBeDefined();
     expect(variantRow['id']).toBeDefined();
     expect((variantRow['id'] as { value: unknown }).value).toBe(10);
+  });
+
+  it('uses variant RETURNING result for the yielded row', async () => {
+    const { collection, runtime } = createReturningMixedPolyCollection();
+    runtime.setNextResults([
+      [{ id: 10, title: 'Dark mode', type: 'feature' }],
+      [{ id: 10, priority: 99 }],
+    ]);
+
+    const narrowed = collection.variant('Feature' as never) as typeof collection;
+    const rows = await narrowed.createAll([{ title: 'Dark mode', priority: 1 } as never]).toArray();
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveProperty('priority', 99);
   });
 
   it('wraps both INSERTs in a transaction when available', async () => {
