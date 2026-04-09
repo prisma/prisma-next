@@ -1,4 +1,7 @@
 import type { ControlAdapterDescriptor } from '@prisma-next/framework-components/control';
+
+export { contractToMongoSchemaIR } from '../core/contract-to-schema';
+
 import {
   mongoBooleanCodec,
   mongoDateCodec,
