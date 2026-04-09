@@ -2171,12 +2171,21 @@ importers:
 
   packages/3-mongo-target/3-mongo-driver:
     dependencies:
+      '@prisma-next/errors':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/errors
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/framework-components
       '@prisma-next/mongo-lowering':
         specifier: workspace:*
         version: link:../../2-mongo-family/6-transport/mongo-lowering
       '@prisma-next/mongo-wire':
         specifier: workspace:*
         version: link:../../2-mongo-family/6-transport/mongo-wire
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/utils
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
