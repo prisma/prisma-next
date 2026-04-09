@@ -26,6 +26,7 @@
     "@prisma-next/mongo-value": "workspace:*",
     "@prisma-next/mongo-wire": "workspace:*",
     "@prisma-next/operations": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "arktype": "catalog:",
     "mongodb": "catalog:"
   },

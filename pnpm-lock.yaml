@@ -2134,6 +2134,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/utils
       arktype:
         specifier: 'catalog:'
         version: 2.1.29
