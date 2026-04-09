@@ -40,7 +40,7 @@ That means:
 - Emitter parses PSL and produces `contract.json` and `contract.d.ts`
 
 #### TS-first
-- Source of truth is `contract/contract.ts` using `defineContract()`
+- Source of truth is `contract/contract.ts` using `defineContract({ family, target, models, ... })`
 - Emitter executes the builder in a constrained environment and produces `contract.json` and `contract.d.ts`
 
 ### Canonical artifact

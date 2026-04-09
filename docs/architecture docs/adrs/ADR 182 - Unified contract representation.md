@@ -49,12 +49,10 @@ Here is the contract pipeline **today** — authoring paths converge on a unifie
 ```mermaid
 graph TD
   PSL(schema.psl) --> AST(PslDocumentAst)
-  TS_STAGED(contract.ts - staged) --> SCI(StagedInput)
-  TS_CHAIN(contract.ts - chain) --> CBS(BuilderState)
-  SCI --> SCD(SqlContractDef)
-  SCD -->|lower| IR
+  TS(contract.ts) --> CI(ContractInput)
+  CI --> CD(ContractDefinition)
+  CD -->|lower| IR
   AST -->|interpret| IR
-  CBS -->|.build| IR
   IR(Contract)
   IR -->|serialize| JSON(contract.json + contract.d.ts)
   JSON -->|parse + validate| SC(Contract)
@@ -66,9 +64,9 @@ graph TD
 ```mermaid
 graph TD
   PSL(schema.psl) --> AST(PslDocumentAst)
-  TS(contract.ts - staged) --> SCI(StagedInput)
+  TS(contract.ts) --> CI(ContractInput)
   AST -->|lower| Contract
-  SCI -->|lower| Contract
+  CI -->|lower| Contract
   Contract("Contract<Storage, ModelStorage>")
   Contract -->|serialize| JSON(contract.json + contract.d.ts)
   JSON -->|parse + validate| C2(Contract)
@@ -87,13 +85,13 @@ At runtime, consumers needed model-first structure. The ORM client needed to tra
 
 The result is a round-trip: **model-first → storage-first → model-first**. An intermediate representation exists solely to bridge the authoring-side conversion:
 
-- **ContractDefinition** — the staged TS authoring DSL produced model-first data, but could not emit it directly as the canonical form. So it built this SQL-specific intermediate, then converted *down* to `ContractIR`. This type mirrors the ORM client's type definitions — both organize data around models, fields, and relations, because both describe the contract from the user's semantic perspective.
+- **ContractDefinition** — the TypeScript authoring surface produces model-first data, but cannot emit it directly as the canonical form. So it builds this SQL-specific intermediate, then converts *down* to `ContractIR`. This type mirrors the ORM client's type definitions — both organize data around models, fields, and relations, because both describe the contract from the user's semantic perspective.
 
 Some of the most egregious symptoms had already been addressed on main before this ADR: the top-level `relations` section and the materialized `mappings` section (`modelToTable`, `fieldToColumn`, etc.) were removed. Relations now live on each model, and mappings are derived at runtime. But the core problem remained: `ContractIR` was storage-first, `ContractDefinition` existed as a stepping stone down to it, and `ContractBase` reconstructed domain structure on the way back up.
 
 Meanwhile, `MongoContract` — designed from scratch with [ADR 172](ADR%20172%20-%20Contract%20domain-storage%20separation.md)'s domain/storage separation — is already model-first. It doesn't use `ContractIR` at all. And `ContractIR` is nominally family-agnostic, but in practice it's just the SQL contract with `Record<string, unknown>` escape hatches — Mongo never adopted it.
 
-Three independent efforts — the staged DSL, the ORM client, and the Mongo family — all converged on the same model-first shape. The canonical representation needed to be that shape, not the storage-first IR that everything converted to and from.
+Three independent efforts — the TypeScript authoring pipeline, the ORM client, and the Mongo family — all converged on the same model-first shape. The canonical representation needed to be that shape, not the storage-first IR that everything converted to and from.
 
 ## Design principles
 
@@ -170,7 +168,7 @@ These properties are preserved in the emitted artifact. `storageHash` lives on `
 ### What this does not replace
 
 - **PslDocumentAst** — a syntax tree with source spans, fundamentally different from a resolved contract. Needed for diagnostics and error reporting.
-- **StagedContractInput** — live builder objects with closures, lazy tokens, and type-level state. Non-serializable by design.
+- **ContractInput** — live builder objects with closures, lazy tokens, and type-level state. Non-serializable by design.
 - **ContractBuilderState** — the old chain-builder's internal state. Being deprecated.
 
 These are authoring-time representations. They exist because authoring ergonomics require live objects that a serializable contract type cannot provide. The boundary is clear: authoring representations are non-serializable and transient; the contract is serializable and canonical.
@@ -200,7 +198,7 @@ These are authoring-time representations. They exist because authoring ergonomic
 
 - **SQL consumers must adapt.** Code that read `ContractIR`-shaped data (storage as the primary key, models as a secondary section) had to change to read model-first `Contract` data. That affected the emitter, both builders, and the three query lane surfaces (schema, sql, orm). The top-level `relations` and `mappings` sections had already been removed; the remaining work was restructuring the `models` ↔ `storage` relationship.
 - **Emitter changes.** The SQL emitter previously produced `contract.json` in the storage-first `ContractIR` shape; it now emits the unified model-first `Contract` shape. The emitted `contract.d.ts` reflects model-first types.
-- **Builder changes.** The staged lowering pipeline produces `Contract<SqlStorage, SqlModelStorage>` (via `ContractDefinition` where applicable) instead of ending at `ContractIR`.
+- **Builder changes.** The TypeScript authoring lowering pipeline produces `Contract<SqlStorage, SqlModelStorage>` (via `ContractDefinition` where applicable) instead of ending at `ContractIR`.
 
 ### Migration
 

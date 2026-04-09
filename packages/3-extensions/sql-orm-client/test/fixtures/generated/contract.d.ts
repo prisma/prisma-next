@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:319804686c1aba50fc4508c05ecc509bfdc2f250324fb929ea313eceafc650c0'>;
+  StorageHashBase<'sha256:d71e27db7ae6204cbdaaf5a439a93d18602af3248b161eed6429f2a5c044ee55'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:e216decd356eea44980cf151c6044d85fb936e1fad093fbfb93ca34b96cf5847'>;
 export type ProfileHash =
@@ -71,10 +71,7 @@ export type FieldOutputTypes = {
     readonly userId: CodecTypes['pg/int4@1']['output'];
     readonly bio: CodecTypes['pg/text@1']['output'];
   };
-  readonly Tag: {
-    readonly id: CodecTypes['pg/text@1']['output'];
-    readonly name: CodecTypes['pg/text@1']['output'];
-  };
+  readonly Tag: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
   readonly User: {
     readonly id: CodecTypes['pg/int4@1']['output'];
     readonly name: CodecTypes['pg/text@1']['output'];
@@ -205,7 +202,7 @@ type ContractBase = ContractType<
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
+        uniques: readonly [{ readonly columns: readonly ['user_id'] }];
         indexes: readonly [];
         foreignKeys: readonly [
           {
@@ -219,9 +216,10 @@ type ContractBase = ContractType<
       readonly tags: {
         columns: {
           readonly id: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
+            readonly nativeType: 'character';
+            readonly codecId: 'sql/char@1';
             readonly nullable: false;
+            readonly typeParams: { readonly length: 36 };
           };
           readonly name: {
             readonly nativeType: 'text';
@@ -408,7 +406,7 @@ type ContractBase = ContractType<
       readonly relations: {
         readonly user: {
           readonly to: 'User';
-          readonly cardinality: '1:1';
+          readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
             readonly targetFields: readonly ['id'];
@@ -428,7 +426,11 @@ type ContractBase = ContractType<
       readonly fields: {
         readonly id: {
           readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'sql/char@1';
+            readonly typeParams: { readonly length: 36 };
+          };
         };
         readonly name: {
           readonly nullable: false;

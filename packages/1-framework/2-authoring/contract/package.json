@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "Target-agnostic contract authoring builder core for Prisma Next",
+  "description": "Target-agnostic authored storage descriptor types for Prisma Next",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
@@ -14,12 +14,7 @@
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
-  "dependencies": {
-    "@prisma-next/contract": "workspace:*",
-    "@prisma-next/framework-components": "workspace:*",
-    "@prisma-next/utils": "workspace:*",
-    "ts-toolbelt": "^9.6.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",

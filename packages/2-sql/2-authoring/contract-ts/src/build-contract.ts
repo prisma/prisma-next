@@ -17,13 +17,6 @@ import {
   type JsonValue,
   type StorageHashBase,
 } from '@prisma-next/contract/types';
-import type {
-  ColumnBuilderState,
-  ContractBuilderState,
-  ModelBuilderState,
-  RelationDefinition,
-  TableBuilderState,
-} from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   applyFkDefaults,
@@ -41,35 +34,9 @@ import type {
   ValueObjectFieldNode,
 } from './contract-definition';
 
-type RuntimeTableState = TableBuilderState<
-  string,
-  Record<string, ColumnBuilderState<string, boolean, string>>,
-  readonly string[] | undefined
->;
-
 type DomainFieldRef =
   | { readonly kind: 'scalar'; readonly many?: boolean }
   | { readonly kind: 'valueObject'; readonly name: string; readonly many?: boolean };
-
-type RuntimeModelState = ModelBuilderState<
-  string,
-  string,
-  Record<string, string>,
-  Record<string, RelationDefinition>
-> & {
-  readonly domainFieldRefs?: Record<string, DomainFieldRef>;
-};
-
-export type RuntimeBuilderState = ContractBuilderState<
-  string | undefined,
-  Record<string, RuntimeTableState>,
-  Record<string, RuntimeModelState>,
-  string | undefined,
-  Record<string, unknown> | undefined,
-  Record<string, Record<string, boolean>> | undefined
-> & {
-  readonly valueObjects?: Record<string, ContractValueObject>;
-};
 
 function encodeDefaultLiteralValue(
   value: ColumnDefaultLiteralInputValue,
@@ -102,238 +69,6 @@ function assertStorageSemantics(storage: SqlStorage): void {
   if (semanticErrors.length > 0) {
     throw new Error(`Contract semantic validation failed: ${semanticErrors.join('; ')}`);
   }
-}
-
-export function buildContract(
-  state: RuntimeBuilderState,
-  codecLookup?: CodecLookup,
-): Contract<SqlStorage> {
-  if (!state.target) {
-    throw new Error('target is required. Call .target() before .build()');
-  }
-
-  const target = state.target;
-  const targetFamily = 'sql';
-
-  const storageTables: Record<string, StorageTable> = {};
-  const executionDefaults: ExecutionMutationDefault[] = [];
-
-  for (const tableName of Object.keys(state.tables)) {
-    const tableState = state.tables[tableName];
-    if (!tableState) continue;
-
-    const columns: Record<string, StorageColumn> = {};
-
-    for (const columnName in tableState.columns) {
-      const columnState = tableState.columns[columnName];
-      if (!columnState) continue;
-
-      const encodedDefault =
-        columnState.default !== undefined
-          ? encodeColumnDefault(columnState.default as ColumnDefault, columnState.type, codecLookup)
-          : undefined;
-
-      columns[columnName] = {
-        nativeType: columnState.nativeType,
-        codecId: columnState.type,
-        nullable: columnState.nullable ?? false,
-        ...ifDefined('typeParams', columnState.typeParams),
-        ...ifDefined('default', encodedDefault),
-        ...ifDefined('typeRef', columnState.typeRef),
-      };
-
-      if ('executionDefault' in columnState && columnState.executionDefault) {
-        executionDefaults.push({
-          ref: { table: tableName, column: columnName },
-          onCreate: columnState.executionDefault as ExecutionMutationDefaultValue,
-        });
-      }
-    }
-
-    const uniques = (tableState.uniques ?? []).map((u) => ({
-      columns: u.columns,
-      ...(u.name ? { name: u.name } : {}),
-    }));
-
-    const indexes = (tableState.indexes ?? []).map((i) => ({
-      columns: i.columns,
-      ...(i.name ? { name: i.name } : {}),
-      ...(i.using ? { using: i.using } : {}),
-      ...(i.config ? { config: i.config } : {}),
-    }));
-
-    const foreignKeys = (tableState.foreignKeys ?? []).map((fk) => ({
-      columns: fk.columns,
-      references: fk.references,
-      ...applyFkDefaults(fk, state.foreignKeyDefaults),
-      ...(fk.name ? { name: fk.name } : {}),
-      ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
-      ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
-    }));
-
-    storageTables[tableName] = {
-      columns,
-      uniques,
-      indexes,
-      foreignKeys,
-      ...(tableState.primaryKey
-        ? {
-            primaryKey: {
-              columns: tableState.primaryKey,
-              ...(tableState.primaryKeyName ? { name: tableState.primaryKeyName } : {}),
-            },
-          }
-        : {}),
-    };
-  }
-
-  const storageTypes = (state.storageTypes ?? {}) as Record<string, StorageTypeInstance>;
-  const storageWithoutHash = {
-    tables: storageTables,
-    types: storageTypes,
-  };
-  const storageHash: StorageHashBase<string> = state.storageHash
-    ? coreHash(state.storageHash)
-    : computeStorageHash({
-        target,
-        targetFamily,
-        storage: storageWithoutHash,
-      });
-  const storage: SqlStorage = { ...storageWithoutHash, storageHash };
-
-  const executionSection =
-    executionDefaults.length > 0
-      ? {
-          mutations: {
-            defaults: executionDefaults.sort((a, b) => {
-              const tableCompare = a.ref.table.localeCompare(b.ref.table);
-              if (tableCompare !== 0) {
-                return tableCompare;
-              }
-              return a.ref.column.localeCompare(b.ref.column);
-            }),
-          },
-        }
-      : undefined;
-
-  const models: Record<string, ContractModel> = {};
-  const roots: Record<string, string> = {};
-
-  for (const modelName in state.models) {
-    const modelState = state.models[modelName];
-    if (!modelState) continue;
-
-    const tableName = modelState.table;
-    roots[tableName] = modelName;
-
-    const tableState = state.tables[tableName];
-
-    const storageFields: Record<string, { readonly column: string }> = {};
-    const domainFields: Record<string, ContractField> = {};
-
-    for (const fieldName in modelState.fields) {
-      const columnName = modelState.fields[fieldName];
-      if (!columnName) continue;
-
-      storageFields[fieldName] = { column: columnName };
-
-      const domainRef = modelState.domainFieldRefs?.[fieldName];
-      if (domainRef?.kind === 'valueObject') {
-        const columnState = tableState?.columns[columnName];
-        domainFields[fieldName] = {
-          type: { kind: 'valueObject', name: domainRef.name },
-          nullable: columnState?.nullable ?? false,
-          ...(domainRef.many ? { many: true } : {}),
-        };
-      } else {
-        const columnState = tableState?.columns[columnName];
-        if (columnState) {
-          domainFields[fieldName] = {
-            type: {
-              kind: 'scalar',
-              codecId: columnState.type,
-              ...ifDefined('typeParams', columnState.typeParams),
-            },
-            nullable: columnState.nullable ?? false,
-            ...(domainRef?.many ? { many: true } : {}),
-          };
-        }
-      }
-    }
-
-    // RelationDefinition.cardinality includes 'N:M' which isn't in
-    // ContractReferenceRelation yet — cast is needed until the contract
-    // type is extended to cover many-to-many.
-    const columnToField = new Map(
-      Object.entries(modelState.fields).map(([field, col]) => [col, field]),
-    );
-    const modelRelations: Record<string, ContractRelation> = {};
-    if (modelState.relations) {
-      for (const relName in modelState.relations) {
-        const rel = modelState.relations[relName];
-        if (!rel) continue;
-
-        const targetModelState = state.models[rel.to];
-        const targetColumnToField = targetModelState
-          ? new Map(Object.entries(targetModelState.fields).map(([field, col]) => [col, field]))
-          : undefined;
-
-        modelRelations[relName] = {
-          to: rel.to,
-          cardinality: rel.cardinality as ContractRelation['cardinality'],
-          on: {
-            localFields: rel.on.parentCols.map((col) => columnToField.get(col) ?? col),
-            targetFields: rel.on.childCols.map((col) => targetColumnToField?.get(col) ?? col),
-          },
-        };
-      }
-    }
-
-    models[modelName] = {
-      storage: {
-        table: tableName,
-        fields: storageFields,
-      },
-      fields: domainFields,
-      relations: modelRelations,
-    };
-  }
-
-  const extensionNamespaces = state.extensionNamespaces ?? [];
-  const extensionPacks: Record<string, unknown> = { ...(state.extensionPacks || {}) };
-  for (const namespace of extensionNamespaces) {
-    if (!Object.hasOwn(extensionPacks, namespace)) {
-      extensionPacks[namespace] = {};
-    }
-  }
-
-  const capabilities: Record<string, Record<string, boolean>> = state.capabilities || {};
-  const profileHash = computeProfileHash({ target, targetFamily, capabilities });
-
-  const executionWithHash = executionSection
-    ? {
-        ...executionSection,
-        executionHash: computeExecutionHash({ target, targetFamily, execution: executionSection }),
-      }
-    : undefined;
-
-  const contract: Contract<SqlStorage> = {
-    target,
-    targetFamily,
-    models,
-    roots,
-    storage,
-    ...(executionWithHash ? { execution: executionWithHash } : {}),
-    ...ifDefined('valueObjects', state.valueObjects),
-    extensionPacks,
-    capabilities,
-    profileHash,
-    meta: {},
-  };
-
-  assertStorageSemantics(contract.storage);
-
-  return contract;
 }
 
 function assertKnownTargetModel(
@@ -373,122 +108,115 @@ function isValueObjectField(
 const JSONB_CODEC_ID = 'pg/jsonb@1';
 const JSONB_NATIVE_TYPE = 'jsonb';
 
+function buildStorageColumn(
+  field: FieldNode | ValueObjectFieldNode,
+  codecLookup?: CodecLookup,
+): StorageColumn {
+  if (isValueObjectField(field)) {
+    const encodedDefault =
+      field.default !== undefined
+        ? encodeColumnDefault(field.default, JSONB_CODEC_ID, codecLookup)
+        : undefined;
+
+    return {
+      nativeType: JSONB_NATIVE_TYPE,
+      codecId: JSONB_CODEC_ID,
+      nullable: field.nullable,
+      ...ifDefined('default', encodedDefault),
+    };
+  }
+
+  if (field.many) {
+    return {
+      nativeType: JSONB_NATIVE_TYPE,
+      codecId: JSONB_CODEC_ID,
+      nullable: field.nullable,
+    };
+  }
+
+  const codecId = field.descriptor.codecId;
+  const encodedDefault =
+    field.default !== undefined
+      ? encodeColumnDefault(field.default, codecId, codecLookup)
+      : undefined;
+
+  return {
+    nativeType: field.descriptor.nativeType,
+    codecId,
+    nullable: field.nullable,
+    ...ifDefined('typeParams', field.descriptor.typeParams),
+    ...ifDefined('default', encodedDefault),
+    ...ifDefined('typeRef', field.descriptor.typeRef),
+  };
+}
+
+function buildDomainField(
+  field: FieldNode | ValueObjectFieldNode,
+  column: StorageColumn,
+): ContractField {
+  if (isValueObjectField(field)) {
+    return {
+      type: { kind: 'valueObject', name: field.valueObjectName },
+      nullable: field.nullable,
+      ...(field.many ? { many: true } : {}),
+    };
+  }
+
+  return {
+    type: {
+      kind: 'scalar',
+      codecId: column.codecId,
+      ...ifDefined('typeParams', column.typeParams),
+    },
+    nullable: column.nullable,
+    ...(field.many ? { many: true } : {}),
+  };
+}
+
 export function buildSqlContractFromDefinition(
   definition: ContractDefinition,
   codecLookup?: CodecLookup,
-): Contract {
+): Contract<SqlStorage> {
+  const target = definition.target.targetId;
+  const targetFamily = 'sql';
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
 
-  const tables: Record<string, RuntimeTableState> = {};
-  for (const model of definition.models) {
-    const columns: Record<string, ColumnBuilderState<string, boolean, string>> = {};
+  const storageTables: Record<string, StorageTable> = {};
+  const executionDefaults: ExecutionMutationDefault[] = [];
+  const models: Record<string, ContractModel> = {};
+  const roots: Record<string, string> = {};
 
-    for (const field of model.fields) {
-      if (isValueObjectField(field)) {
-        columns[field.columnName] = {
-          name: field.columnName,
-          type: JSONB_CODEC_ID,
-          nativeType: JSONB_NATIVE_TYPE,
-          nullable: field.nullable,
-          ...ifDefined('default', field.default),
-          ...ifDefined('executionDefault', field.executionDefault),
-        } as ColumnBuilderState<string, boolean, string>;
-        continue;
-      }
+  for (const semanticModel of definition.models) {
+    const tableName = semanticModel.tableName;
+    roots[tableName] = semanticModel.modelName;
 
-      if (field.many) {
-        columns[field.columnName] = {
-          name: field.columnName,
-          type: JSONB_CODEC_ID,
-          nativeType: JSONB_NATIVE_TYPE,
-          nullable: field.nullable,
-        } as ColumnBuilderState<string, boolean, string>;
-        continue;
-      }
+    // --- Build storage table ---
 
+    const columns: Record<string, StorageColumn> = {};
+    const fieldToColumn: Record<string, string> = {};
+    const domainFields: Record<string, ContractField> = {};
+    const domainFieldRefs: Record<string, DomainFieldRef> = {};
+
+    for (const field of semanticModel.fields) {
       if (field.executionDefault) {
         if (field.default !== undefined) {
           throw new Error(
-            `Field "${model.modelName}.${field.fieldName}" cannot define both default and executionDefault.`,
+            `Field "${semanticModel.modelName}.${field.fieldName}" cannot define both default and executionDefault.`,
           );
         }
         if (field.nullable) {
           throw new Error(
-            `Field "${model.modelName}.${field.fieldName}" cannot be nullable when executionDefault is present.`,
-          );
-        }
-        columns[field.columnName] = {
-          name: field.columnName,
-          type: field.descriptor.codecId,
-          nativeType: field.descriptor.nativeType,
-          nullable: false,
-          ...ifDefined('typeParams', field.descriptor.typeParams),
-          ...ifDefined('typeRef', field.descriptor.typeRef),
-          executionDefault: field.executionDefault,
-        } as ColumnBuilderState<string, false, string>;
-        continue;
-      }
-
-      columns[field.columnName] = {
-        name: field.columnName,
-        type: field.descriptor.codecId,
-        nativeType: field.descriptor.nativeType,
-        nullable: field.nullable,
-        ...ifDefined('typeParams', field.descriptor.typeParams),
-        ...ifDefined('typeRef', field.descriptor.typeRef),
-        ...ifDefined('default', field.default),
-      } as ColumnBuilderState<string, boolean, string>;
-    }
-
-    if (model.id) {
-      const fieldsByColumnName = new Map(model.fields.map((field) => [field.columnName, field]));
-      for (const columnName of model.id.columns) {
-        const field = fieldsByColumnName.get(columnName);
-        if (field?.nullable) {
-          throw new Error(
-            `Model "${model.modelName}" uses nullable field "${field.fieldName}" in its identity.`,
+            `Field "${semanticModel.modelName}.${field.fieldName}" cannot be nullable when executionDefault is present.`,
           );
         }
       }
-    }
 
-    const foreignKeys = (model.foreignKeys ?? []).map((fk) => {
-      const targetModel = assertKnownTargetModel(
-        modelsByName,
-        model.modelName,
-        fk.references.model,
-        'Foreign key',
-      );
-      assertTargetTableMatches(model.modelName, targetModel, fk.references.table, 'Foreign key');
-      return {
-        columns: fk.columns,
-        references: { table: fk.references.table, columns: fk.references.columns },
-        ...ifDefined('name', fk.name),
-        ...ifDefined('onDelete', fk.onDelete),
-        ...ifDefined('onUpdate', fk.onUpdate),
-        ...ifDefined('constraint', fk.constraint),
-        ...ifDefined('index', fk.index),
-      };
-    });
+      const column = buildStorageColumn(field, codecLookup);
+      columns[field.columnName] = column;
+      fieldToColumn[field.fieldName] = field.columnName;
 
-    tables[model.tableName] = {
-      name: model.tableName,
-      columns,
-      ...(model.id ? { primaryKey: model.id.columns } : {}),
-      ...(model.id?.name ? { primaryKeyName: model.id.name } : {}),
-      uniques: model.uniques ?? [],
-      indexes: model.indexes ?? [],
-      foreignKeys,
-    } as RuntimeTableState;
-  }
+      domainFields[field.fieldName] = buildDomainField(field, column);
 
-  const modelStates: Record<string, RuntimeModelState> = {};
-  for (const model of definition.models) {
-    const fields: Record<string, string> = {};
-    const domainFieldRefs: Record<string, DomainFieldRef> = {};
-
-    for (const field of model.fields) {
-      fields[field.fieldName] = field.columnName;
       if (isValueObjectField(field)) {
         domainFieldRefs[field.fieldName] = {
           kind: 'valueObject',
@@ -496,35 +224,122 @@ export function buildSqlContractFromDefinition(
           ...(field.many ? { many: true } : {}),
         };
       } else if (field.many) {
-        domainFieldRefs[field.fieldName] = {
-          kind: 'scalar',
-          many: true,
-        };
+        domainFieldRefs[field.fieldName] = { kind: 'scalar', many: true };
+      }
+
+      if ('executionDefault' in field && field.executionDefault) {
+        executionDefaults.push({
+          ref: { table: tableName, column: field.columnName },
+          onCreate: field.executionDefault as ExecutionMutationDefaultValue,
+        });
       }
     }
 
-    const relations: Record<string, RelationDefinition> = {};
-    for (const relation of model.relations ?? []) {
+    if (semanticModel.id) {
+      const fieldsByColumnName = new Map(
+        semanticModel.fields.map((field) => [field.columnName, field]),
+      );
+      for (const columnName of semanticModel.id.columns) {
+        const field = fieldsByColumnName.get(columnName);
+        if (field?.nullable) {
+          throw new Error(
+            `Model "${semanticModel.modelName}" uses nullable field "${field.fieldName}" in its identity.`,
+          );
+        }
+      }
+    }
+
+    const foreignKeys = (semanticModel.foreignKeys ?? []).map((fk) => {
       const targetModel = assertKnownTargetModel(
         modelsByName,
-        model.modelName,
+        semanticModel.modelName,
+        fk.references.model,
+        'Foreign key',
+      );
+      assertTargetTableMatches(
+        semanticModel.modelName,
+        targetModel,
+        fk.references.table,
+        'Foreign key',
+      );
+      return {
+        columns: fk.columns,
+        references: { table: fk.references.table, columns: fk.references.columns },
+        ...applyFkDefaults(
+          {
+            ...ifDefined('constraint', fk.constraint),
+            ...ifDefined('index', fk.index),
+          },
+          definition.foreignKeyDefaults,
+        ),
+        ...ifDefined('name', fk.name),
+        ...ifDefined('onDelete', fk.onDelete),
+        ...ifDefined('onUpdate', fk.onUpdate),
+      };
+    });
+
+    storageTables[tableName] = {
+      columns,
+      uniques: (semanticModel.uniques ?? []).map((u) => ({
+        columns: u.columns,
+        ...ifDefined('name', u.name),
+      })),
+      indexes: (semanticModel.indexes ?? []).map((i) => ({
+        columns: i.columns,
+        ...ifDefined('name', i.name),
+        ...ifDefined('using', i.using),
+        ...ifDefined('config', i.config),
+      })),
+      foreignKeys,
+      ...(semanticModel.id
+        ? {
+            primaryKey: {
+              columns: semanticModel.id.columns,
+              ...ifDefined('name', semanticModel.id.name),
+            },
+          }
+        : {}),
+    };
+
+    // --- Build contract model ---
+
+    const storageFields: Record<string, { readonly column: string }> = {};
+    for (const [fieldName, columnName] of Object.entries(fieldToColumn)) {
+      storageFields[fieldName] = { column: columnName };
+    }
+
+    const columnToField = new Map(
+      Object.entries(fieldToColumn).map(([field, col]) => [col, field]),
+    );
+    const modelRelations: Record<string, ContractRelation> = {};
+    for (const relation of semanticModel.relations ?? []) {
+      const targetModel = assertKnownTargetModel(
+        modelsByName,
+        semanticModel.modelName,
         relation.toModel,
         'Relation',
       );
-      assertTargetTableMatches(model.modelName, targetModel, relation.toTable, 'Relation');
+      assertTargetTableMatches(semanticModel.modelName, targetModel, relation.toTable, 'Relation');
 
       if (relation.cardinality === 'N:M' && !relation.through) {
         throw new Error(
-          `Relation "${model.modelName}.${relation.fieldName}" with cardinality "N:M" requires through metadata`,
+          `Relation "${semanticModel.modelName}.${relation.fieldName}" with cardinality "N:M" requires through metadata`,
         );
       }
 
-      relations[relation.fieldName] = {
+      const targetColumnToField = new Map(
+        targetModel.fields.map((f) => [f.columnName, f.fieldName]),
+      );
+
+      modelRelations[relation.fieldName] = {
         to: relation.toModel,
-        cardinality: relation.cardinality,
+        // RelationDefinition.cardinality includes 'N:M' which isn't in
+        // ContractReferenceRelation yet — cast is needed until the contract
+        // type is extended to cover many-to-many.
+        cardinality: relation.cardinality as ContractRelation['cardinality'],
         on: {
-          parentCols: relation.on.parentColumns,
-          childCols: relation.on.childColumns,
+          localFields: relation.on.parentColumns.map((col) => columnToField.get(col) ?? col),
+          targetFields: relation.on.childColumns.map((col) => targetColumnToField.get(col) ?? col),
         },
         ...(relation.through
           ? {
@@ -538,14 +353,65 @@ export function buildSqlContractFromDefinition(
       };
     }
 
-    modelStates[model.modelName] = {
-      name: model.modelName,
-      table: model.tableName,
-      fields,
-      relations,
-      ...(Object.keys(domainFieldRefs).length > 0 ? { domainFieldRefs } : {}),
+    models[semanticModel.modelName] = {
+      storage: {
+        table: tableName,
+        fields: storageFields,
+      },
+      fields: domainFields,
+      relations: modelRelations,
     };
   }
+
+  // --- Assemble contract ---
+
+  const storageTypes = (definition.storageTypes ?? {}) as Record<string, StorageTypeInstance>;
+  const storageWithoutHash = {
+    tables: storageTables,
+    types: storageTypes,
+  };
+  const storageHash: StorageHashBase<string> = definition.storageHash
+    ? coreHash(definition.storageHash)
+    : computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
+  const storage: SqlStorage = { ...storageWithoutHash, storageHash };
+
+  const executionSection =
+    executionDefaults.length > 0
+      ? {
+          mutations: {
+            defaults: executionDefaults.sort((a, b) => {
+              const tableCompare = a.ref.table.localeCompare(b.ref.table);
+              if (tableCompare !== 0) {
+                return tableCompare;
+              }
+              return a.ref.column.localeCompare(b.ref.column);
+            }),
+          },
+        }
+      : undefined;
+
+  const extensionNamespaces = definition.extensionPacks
+    ? Object.values(definition.extensionPacks).map((pack) => pack.id)
+    : undefined;
+
+  const extensionPacks: Record<string, unknown> = { ...(definition.extensionPacks || {}) };
+  if (extensionNamespaces) {
+    for (const namespace of extensionNamespaces) {
+      if (!Object.hasOwn(extensionPacks, namespace)) {
+        extensionPacks[namespace] = {};
+      }
+    }
+  }
+
+  const capabilities: Record<string, Record<string, boolean>> = definition.capabilities || {};
+  const profileHash = computeProfileHash({ target, targetFamily, capabilities });
+
+  const executionWithHash = executionSection
+    ? {
+        ...executionSection,
+        executionHash: computeExecutionHash({ target, targetFamily, execution: executionSection }),
+      }
+    : undefined;
 
   const valueObjects: Record<string, ContractValueObject> | undefined =
     definition.valueObjects && definition.valueObjects.length > 0
@@ -577,22 +443,21 @@ export function buildSqlContractFromDefinition(
         )
       : undefined;
 
-  const extensionNamespaces = definition.extensionPacks
-    ? Object.values(definition.extensionPacks).map((pack) => pack.id)
-    : undefined;
-
-  const state: RuntimeBuilderState = {
-    target: definition.target.targetId,
-    tables,
-    models: modelStates,
-    ...ifDefined('storageTypes', definition.storageTypes),
-    ...ifDefined('storageHash', definition.storageHash),
-    ...ifDefined('extensionPacks', definition.extensionPacks),
-    ...ifDefined('capabilities', definition.capabilities),
-    ...ifDefined('foreignKeyDefaults', definition.foreignKeyDefaults),
-    ...ifDefined('extensionNamespaces', extensionNamespaces),
+  const contract: Contract<SqlStorage> = {
+    target,
+    targetFamily,
+    models,
+    roots,
+    storage,
+    ...(executionWithHash ? { execution: executionWithHash } : {}),
     ...ifDefined('valueObjects', valueObjects),
+    extensionPacks,
+    capabilities,
+    profileHash,
+    meta: {},
   };
 
-  return buildContract(state, codecLookup);
+  assertStorageSemantics(contract.storage);
+
+  return contract;
 }

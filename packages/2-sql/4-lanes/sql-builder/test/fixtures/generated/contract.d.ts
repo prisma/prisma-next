@@ -56,6 +56,7 @@ export type FieldOutputTypes = {
     readonly title: CodecTypes['pg/text@1']['output'];
     readonly userId: CodecTypes['pg/int4@1']['output'];
     readonly views: CodecTypes['pg/int4@1']['output'];
+    readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
   };
   readonly Profile: {
     readonly id: CodecTypes['pg/int4@1']['output'];
@@ -277,6 +278,10 @@ type ContractBase = ContractType<
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
         };
+        readonly embedding: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1' };
+        };
       };
       readonly relations: {
         readonly comments: {
@@ -303,6 +308,7 @@ type ContractBase = ContractType<
           readonly title: { readonly column: 'title' };
           readonly userId: { readonly column: 'user_id' };
           readonly views: { readonly column: 'views' };
+          readonly embedding: { readonly column: 'embedding' };
         };
       };
     };

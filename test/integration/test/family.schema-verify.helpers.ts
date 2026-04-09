@@ -22,7 +22,7 @@ export { postgresAdapter, postgresDriver, sql, postgres };
 export { validateContract };
 export type { Contract, SqlStorage };
 export { default as sqlFamily } from '@prisma-next/family-sql/pack';
-export { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
+export { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 export { default as postgresPack } from '@prisma-next/target-postgres/pack';
 export { timeouts, withClient };
 export { pgvector } from './family.schema-verify.extensions';

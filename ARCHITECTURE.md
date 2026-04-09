@@ -87,7 +87,7 @@ See [`architecture.config.json`](./architecture.config.json) for the complete do
 
 - **`@prisma-next/contract`** — Core contract types (`ContractBase`, `Source`)
 - **`@prisma-next/operations`** — Target-neutral operation registry and capability helpers
-- **`@prisma-next/contract-authoring`** — TS builders, canonicalization, schema DSL
+- **`@prisma-next/contract-authoring`** — Shared authored storage descriptor types
 - **`@prisma-next/cli`** — CLI tooling for contract emission
 - **`@prisma-next/emitter`** — Contract emission engine
 - **`@prisma-next/runtime-executor`** — Target-agnostic execution engine (verification, plugin lifecycle, telemetry)

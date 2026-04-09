@@ -9,7 +9,6 @@ TML-2211 shipped the pipeline builder with a starter set of typed expression hel
 Many of the missing operators use **named arguments** (e.g. `{ $dateToString: { format: "...", date: <expr> } }`) rather than the positional form the AST currently supports. Rather than working around this limitation, we extend `MongoAggOperator` and `MongoAggAccumulator` to support named arguments natively, keeping the AST fully traversable by visitors and rewriters.
 
 **Linear:** [TML-2217](https://linear.app/prisma-company/issue/TML-2217)
-**Parent spec:** [projects/mongo-pipeline-builder/spec.md](../spec.md)
 
 # Requirements
 
@@ -177,7 +176,6 @@ No change from existing data access patterns.
 
 - [MongoDB aggregation expression operators](https://www.mongodb.com/docs/manual/reference/operator/aggregation/)
 - [Pipeline builder task plan](../plans/pipeline-builder-plan.md)
-- [Parent project spec](../spec.md)
 - [TML-2217](https://linear.app/prisma-company/issue/TML-2217)
 
 # Resolved Questions

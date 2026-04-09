@@ -464,19 +464,6 @@ importers:
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(tsx@4.20.6)(yaml@2.8.1)
 
   packages/1-framework/2-authoring/contract:
-    dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../0-foundation/contract
-      '@prisma-next/framework-components':
-        specifier: workspace:*
-        version: link:../../1-core/framework-components
-      '@prisma-next/utils':
-        specifier: workspace:*
-        version: link:../../0-foundation/utils
-      ts-toolbelt:
-        specifier: ^9.6.0
-        version: 9.6.0
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
@@ -1924,6 +1911,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/ids':
+        specifier: workspace:*
+        version: link:../../1-framework/2-authoring/ids
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../2-sql/2-authoring/contract-ts

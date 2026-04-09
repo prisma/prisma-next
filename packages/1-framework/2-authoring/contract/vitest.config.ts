@@ -14,7 +14,7 @@ export default defineConfig({
         '**/*.test.ts',
         '**/*.test-d.ts',
         '**/*.config.ts',
-        '**/builder-state.ts', // Types-only file
+        '**/descriptors.ts', // Types-only file
         '**/types.ts', // Types-only file
         '**/index.ts', // Re-export file
       ],

@@ -1,4 +1,4 @@
-import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
@@ -10,6 +10,7 @@ import {
   setupCommandMocks,
   withTempDir,
 } from './utils/cli-test-helpers';
+import { replaceInFileOrThrow } from './utils/contract-fixture-editing';
 import { runDbInit } from './utils/db-init-test-helpers';
 import {
   runDbUpdate,
@@ -20,13 +21,11 @@ import {
 const fixtureSubdir = 'db-init';
 
 function addNicknameColumnToContract(testDir: string): void {
-  const contractPath = join(testDir, 'contract.ts');
-  const contractSource = readFileSync(contractPath, 'utf-8');
-  const updatedSource = contractSource.replace(
-    ".column('email', { type: textColumn, nullable: false })",
-    ".column('email', { type: textColumn, nullable: false })\n      .column('nickname', { type: textColumn, nullable: true })",
+  replaceInFileOrThrow(
+    join(testDir, 'contract.ts'),
+    '        email: field.column(textColumn),\n',
+    '        email: field.column(textColumn),\n        nickname: field.column(textColumn).optional(),\n',
   );
-  writeFileSync(contractPath, updatedSource, 'utf-8');
 }
 
 withTempDir(({ createTempDir }) => {
@@ -179,15 +178,21 @@ withTempDir(({ createTempDir }) => {
 // ---------------------------------------------------------------------------
 
 const scenarioFixtureSubdir = 'db-update-scenarios';
+const projectSlugVariantFixture = 'contract-add-project-slug.ts';
 
 /**
- * Switches the contract from v1 to v2 by copying contract-v2.ts over contract.ts,
- * then re-emitting the contract.
+ * Switches the baseline scenario contract to the additive project slug variant,
+ * then re-emits the contract.
  */
-async function switchToContractV2(testDir: string, configPath: string): Promise<void> {
-  const v2Source = join(fixtureAppDir, 'fixtures', scenarioFixtureSubdir, 'contract-v2.ts');
+async function switchToProjectSlugVariant(testDir: string, configPath: string): Promise<void> {
+  const variantSource = join(
+    fixtureAppDir,
+    'fixtures',
+    scenarioFixtureSubdir,
+    projectSlugVariantFixture,
+  );
   const contractDest = join(testDir, 'contract.ts');
-  copyFileSync(v2Source, contractDest);
+  copyFileSync(variantSource, contractDest);
 
   const emitCommand = createContractEmitCommand();
   const originalCwd = process.cwd();
@@ -249,7 +254,7 @@ withTempDir(({ createTempDir }) => {
           );
 
           await runDbInit(testSetup, ['--config', configPath, '--no-color']);
-          await switchToContractV2(testSetup.testDir, configPath);
+          await switchToProjectSlugVariant(testSetup.testDir, configPath);
 
           consoleOutput.length = 0;
           await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
@@ -287,7 +292,7 @@ withTempDir(({ createTempDir }) => {
           );
 
           await runDbInit(testSetup, ['--config', configPath, '--no-color']);
-          await switchToContractV2(testSetup.testDir, configPath);
+          await switchToProjectSlugVariant(testSetup.testDir, configPath);
 
           consoleOutput.length = 0;
           await runDbUpdate(testSetup, ['--config', configPath, '--no-color']);
@@ -498,7 +503,7 @@ withTempDir(({ createTempDir }) => {
           );
 
           await runDbInit(testSetup, ['--config', configPath, '--no-color']);
-          await switchToContractV2(testSetup.testDir, configPath);
+          await switchToProjectSlugVariant(testSetup.testDir, configPath);
 
           const outputStart = consoleOutput.length;
           await runDbUpdate(testSetup, [

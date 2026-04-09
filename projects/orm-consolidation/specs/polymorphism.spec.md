@@ -366,7 +366,7 @@ Discriminator values in `contract.json` are encoded/decoded through the discrimi
 - [ADR 182 — Unified contract representation](../../../docs/architecture%20docs/adrs/ADR%20182%20-%20Unified%20contract%20representation.md) — `ContractModel` carries `discriminator?`, `variants?`, `base?`
 - [ADR 184 — Codec-owned value serialization](../../../docs/architecture%20docs/adrs/ADR%20184%20-%20Codec-owned%20value%20serialization.md) — discriminator value encoding
 - **Linear:** [TML-2205](https://linear.app/prisma-company/issue/TML-2205)
-- **Project plan:** [projects/orm-consolidation/plan.md](../plan.md) § Phase 1.75b
+- **Execution plan:** [phase-1.75b-polymorphism-plan.md](../plans/phase-1.75b-polymorphism-plan.md)
 
 # Open Questions
 

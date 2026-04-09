@@ -43,25 +43,39 @@ type ForeignKey = {
 
 These fields are **required** in the canonical contract JSON — every FK is self-contained and interpretable without consulting any other part of the contract. There is no global mode flag.
 
-### 2. Builder-level defaults (authoring sugar)
+### 2. Contract-level defaults (authoring sugar)
 
-The contract builder provides a `.foreignKeyDefaults()` method as authoring sugar. At `.build()` time, defaults are **materialized** into each FK node:
+The TypeScript contract DSL provides a root `foreignKeyDefaults` option. During lowering, defaults are **materialized** into each FK node:
 
 ```ts
-const contract = defineContract<CodecTypes>()
-  .target(postgresPack)
-  .foreignKeyDefaults({ constraint: false, index: true }) // PlanetScale-style
-  .table('post', (t) =>
-    t.foreignKey(['userId'], { table: 'user', columns: ['id'] })
-    // ^^^ materialized as { constraint: false, index: true }
-  )
-  .build();
+const User = model('User', {
+  fields: {
+    id: field.column(int4Column).id(),
+  },
+}).sql({ table: 'user' });
+
+const Post = model('Post', {
+  fields: {
+    id: field.column(int4Column).id(),
+    userId: field.column(int4Column),
+  },
+}).sql(({ cols, constraints }) => ({
+  table: 'post',
+  foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
+}));
+
+const contract = defineContract({
+  family: sqlFamily,
+  target: postgresPack,
+  foreignKeyDefaults: { constraint: false, index: true }, // PlanetScale-style
+  models: { User, Post },
+});
 ```
 
 Per-FK overrides take precedence over defaults:
 
 ```ts
-.foreignKey(['userId'], { table: 'user', columns: ['id'] }, { constraint: true })
+constraints.foreignKey(cols.userId, User.refs.id, { constraint: true })
 // ^^^ constraint: true overrides the default false
 ```
 

@@ -1,41 +1,42 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column } from '@prisma-next/adapter-postgres/column-types';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-export const contract = defineContract<CodecTypes>()
-  .target(postgresPack)
-  .table('org_team', (t) =>
-    t.column('team_id', { type: int4Column, nullable: false }).primaryKey(['team_id']),
-  )
-  .table('team_member', (t) =>
-    t
-      .column('member_id', { type: int4Column, nullable: false })
-      .column('team_ref', { type: int4Column, nullable: false })
-      .primaryKey(['member_id'])
-      .index(['team_ref'])
-      .unique(['team_ref', 'member_id'])
-      .foreignKey(
-        ['team_ref'],
-        { table: 'org_team', columns: ['team_id'] },
-        { name: 'team_member_team_ref_fkey', onDelete: 'cascade', onUpdate: 'cascade' },
-      ),
-  )
-  .model('Team', 'org_team', (m) => m.field('id', 'team_id'))
-  .model('Member', 'team_member', (m) =>
-    m
-      .field('id', 'member_id')
-      .field('teamId', 'team_ref')
-      .relation('team', {
-        toModel: 'Team',
-        toTable: 'org_team',
-        cardinality: 'N:1',
-        on: {
-          parentTable: 'team_member',
-          parentColumns: ['team_ref'],
-          childTable: 'org_team',
-          childColumns: ['team_id'],
-        },
-      }),
-  )
-  .build();
+const Team = model('Team', {
+  fields: {
+    id: field.column(int4Column).column('team_id').id(),
+  },
+}).sql({ table: 'org_team' });
+
+const Member = model('Member', {
+  fields: {
+    id: field.column(int4Column).column('member_id').id(),
+    teamId: field.column(int4Column).column('team_ref'),
+  },
+  relations: {
+    team: rel.belongsTo(Team, { from: 'teamId', to: 'id' }).sql({
+      fk: {
+        name: 'team_member_team_ref_fkey',
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      },
+    }),
+  },
+})
+  .attributes(({ fields, constraints }) => ({
+    uniques: [constraints.unique([fields.teamId, fields.id])],
+  }))
+  .sql(({ cols, constraints }) => ({
+    table: 'team_member',
+    indexes: [constraints.index(cols.teamId)],
+  }));
+
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgresPack,
+  models: {
+    Team,
+    Member,
+  },
+});

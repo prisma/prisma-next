@@ -21,7 +21,7 @@ This package contains integration tests that verify the complete flow from contr
 - `test/*.helpers.ts` - Shared test helpers for related test files
 - `test/fixtures/` - Test fixtures (contract JSON, type definitions, CLI fixture apps)
 
-**Note**: Integration tests that depend on multiple packages (e.g., both `sql-contract-ts` and `sql-query`) are placed here to avoid cyclic dependencies.
+**Note**: Integration tests that depend on multiple packages (for example SQL authoring, emission, and runtime packages together) are placed here to avoid cyclic dependencies.
 
 ### Test File Organization
 
@@ -57,7 +57,8 @@ This package depends on all packages under test via workspace protocol:
 - `@prisma-next/emitter` - Contract emission
 - `@prisma-next/runtime` - Execution runtime
 - `@prisma-next/sql-contract-ts` - SQL contract authoring (for integration tests)
-- `@prisma-next/sql-query` - Query builders (legacy; prefer `@prisma-next/sql-lane` and `@prisma-next/sql-relational-core`)
+- `@prisma-next/sql-builder` - SQL builder lane
+- `@prisma-next/sql-relational-core` - Shared relational lane helpers
 - `@prisma-next/sql-contract` - SQL contract types (canonical source: `@prisma-next/sql-contract/types`)
 
 ## Location
@@ -82,7 +83,8 @@ Tests automatically depend on builds of target packages via Turborepo.
 
 ## Related Packages
 
-- `@prisma-next/sql-query`: SQL query builder and plan types
+- `@prisma-next/sql-builder`: SQL builder lane
+- `@prisma-next/sql-relational-core`: Shared relational lane helpers
 - `@prisma-next/runtime`: Runtime execution engine that consumes contracts
 - `test/e2e/framework/`: End-to-end tests using the CLI to emit contracts and execute queries
 

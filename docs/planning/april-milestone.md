@@ -81,22 +81,22 @@ Stop condition: Numbers in hand. If acceptable, move on. If not, file an issue w
 
 ---
 
-### 2. Contract authoring (PSL + TypeScript DSL)
+### 2. Contract authoring (PSL + TypeScript)
 
 **People:** Alberto
 
-Users describe their domain model — which becomes the contract — in one of two ways: PSL (Prisma Schema Language) or a TypeScript DSL. Both need significant work.
+Users describe their domain model — which becomes the contract — in one of two ways: PSL (Prisma Schema Language) or a TypeScript authoring surface. Both need significant work.
 
 **Key risks**:
 
-- The TS authoring DSL needs to be genuinely pleasant to use — if it feels like writing JSON with extra steps, users will avoid it and we lose the "author in TypeScript" selling point.
+- The TypeScript authoring surface needs to be genuinely pleasant to use — if it feels like writing JSON with extra steps, users will avoid it and we lose the "author in TypeScript" selling point.
 - The language server is a DX-critical path. If PSL has new features but the VS Code extension doesn't understand them, users get red squiggles on valid code. This erodes trust fast — but the architecture for fixing this is well understood.
 
 #### Priority queue
 
 **VP1: Symmetric authoring surfaces from shared composition**
 
-Both PSL and TS must present DSLs that are derived from the same framework composition data sources — families, targets, and extension packs contribute type constructors and field presets via the [ADR 170](../../architecture%20docs/adrs/ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md) registry (ADR 170 defines how extensions contribute authoring helpers like `pgvector.Vector(1536)` to both surfaces through a shared definition), and both surfaces lower through these shared definitions. The two surfaces should be symmetrical in capability — what's expressible in one is broadly expressible in the other — but idiomatically different in each language.
+Both PSL and TypeScript must present authoring surfaces that are derived from the same framework composition data sources — families, targets, and extension packs contribute type constructors and field presets via the [ADR 170](../../architecture%20docs/adrs/ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md) registry (ADR 170 defines how extensions contribute authoring helpers like `pgvector.Vector(1536)` to both surfaces through a shared definition), and both surfaces lower through these shared definitions. The two surfaces should be symmetrical in capability — what's expressible in one is broadly expressible in the other — but idiomatically different in each language.
 
 User story: I author the same contract in PSL and in TS. Both use a family-provided type constructor (e.g. `sql.String(length: 35)`) and an extension-provided namespaced type constructor (e.g. `pgvector.Vector(1536)`). Both emit identical contracts.
 
@@ -104,23 +104,23 @@ Tasks:
 
 1. **ADR 170 type constructors and field presets** — implement the shared registry that families, targets, and extension packs use to contribute authoring helpers. Both PSL and TS lower through these definitions.
 2. **PSL surface** — parameterized types and field presets. The PSL-side changes needed to consume ADR 170 definitions.
-3. **TS DSL surface** — the new DSL that replaces the existing proof-of-concept. Must consume the same ADR 170 definitions as PSL.
+3. **TypeScript authoring surface** — the new authoring surface that replaces the existing proof-of-concept. Must consume the same ADR 170 definitions as PSL.
 4. **Parity test** — author a representative contract in both PSL and TS using at least one family-provided and one extension-provided type constructor. Verify identical contract output.
 
 Stop condition: A contract authored in both PSL and TS, using at least one family-provided type constructor (e.g. `sql.String(length: 35)`) and at least one extension-provided namespaced type constructor (e.g. `pgvector.Vector(1536)`), emitting identical contracts. Then stop — full vocabulary of helpers, preset coverage, and parameterized type polish are May.
 
-**VP2: TS DSL achieves comparable terseness to PSL**
+**VP2: TypeScript authoring achieves comparable terseness to PSL**
 
-The current TS authoring surface mirrors the contract JSON structure — extremely verbose, repetitive, and roughly 3–5x longer than the equivalent PSL. The new DSL must close this gap substantially. This is a concrete, measurable proof that the DSL design works, not a UX polish question.
+The current TypeScript authoring surface mirrors the contract JSON structure — extremely verbose, repetitive, and roughly 3–5x longer than the equivalent PSL. The new authoring surface must close this gap substantially. This is a concrete, measurable proof that the surface design works, not a UX polish question.
 
-User story: I author a representative contract (multiple models, relations, at least one extension type) in both PSL and the new TS DSL. The TS version is in the same ballpark of length as the PSL version.
+User story: I author a representative contract (multiple models, relations, at least one extension type) in both PSL and the new TypeScript authoring surface. The TypeScript version is in the same ballpark of length as the PSL version.
 
 Tasks:
 
-1. **Implement the new TS DSL** — (overlaps with VP1 task 3).
+1. **Implement the new TypeScript authoring surface** — (overlaps with VP1 task 3).
 2. **Terseness comparison** — take a representative contract, author it in both PSL and TS, compare line counts. Pass/fail.
 
-Stop condition: The TS version of a representative contract is in the same ballpark of length as the PSL version. Then stop — DSL ergonomics, API naming, and syntactic sugar are May.
+Stop condition: The TypeScript version of a representative contract is in the same ballpark of length as the PSL version. Then stop — authoring ergonomics, API naming, and syntactic sugar are May.
 
 **VP3: Invisible contract emission in at least one major framework**
 
@@ -369,5 +369,4 @@ Tasks:
 4. **Handoff to developer relations** — package the docs, examples, and guide for the dev relations team to use in community outreach (reaching out to authors of Prisma generators, Arktype, Zod, NestJS, and other packages with close integrations — see [community-generator-migration-analysis.md](../reference/community-generator-migration-analysis.md)).
 
 Stop condition: A team member who hasn't worked on extensions can scaffold and build a trivial middleware extension using only the docs and examples, without asking questions. Then stop — comprehensive docs, video tutorials, and community management are the dev relations team's job.
-
 

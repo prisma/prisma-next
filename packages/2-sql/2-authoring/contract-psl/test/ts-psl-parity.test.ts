@@ -259,7 +259,7 @@ describe('TS and PSL authoring parity', () => {
     expect(interpreted.value).toEqual(tsContract);
   });
 
-  it('keeps the staged contract DSL within the terseness threshold for the same contract', () => {
+  it('keeps the contract DSL within the terseness threshold for the same contract', () => {
     const pslLines = countSemanticLines(representativePslSchema);
     const tsLines = countSemanticLines(representativeTsAuthoring);
 

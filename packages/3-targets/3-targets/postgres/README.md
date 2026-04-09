@@ -101,12 +101,14 @@ if (planResult.kind === 'success') {
 ```typescript
 import postgresPack from '@prisma-next/target-postgres/pack';
 import pgvector from '@prisma-next/extension-pgvector/pack';
+import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 
-export const contract = defineContract()
-  .target(postgresPack)
-  .extensionPacks({ pgvector })
-  .build();
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgresPack,
+  extensionPacks: { pgvector },
+});
 ```
 
 Pack refs are pure JSON-friendly objects that make TypeScript contract authoring work in both emit and no-emit workflows without requiring separate manifest files.
@@ -145,7 +147,7 @@ See `@prisma-next/family-sql/control` README for full error code documentation.
 
 - `./control`: Control plane entry point for `SqlControlTargetDescriptor`
 - `./runtime`: Runtime entry point for target-specific runtime code (future)
-- `./pack`: Pure pack ref for `defineContract().target(postgresPack)`
+- `./pack`: Pure pack ref for `defineContract({ family, target: postgresPack, ... })`
 
 ## Tests
 

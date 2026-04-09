@@ -1,17 +1,20 @@
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 import { postgresPack } from '../helpers/postgres-pack';
+import { sqlFamilyPack } from '../helpers/sql-family-pack';
 
-const contractObj = defineContract<Record<string, never>>()
-  .target(postgresPack)
-  .table('user', (t) =>
-    t
-      .column('id', { type: int4Column, nullable: false })
-      .column('email', { type: textColumn, nullable: false })
-      .primaryKey(['id']),
-  )
-  .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
-  .build();
+const contractObj = defineContract({
+  family: sqlFamilyPack,
+  target: postgresPack,
+  models: {
+    User: model('User', {
+      fields: {
+        id: field.column(int4Column).id(),
+        email: field.column(textColumn),
+      },
+    }).sql({ table: 'user' }),
+  },
+});
 
 export const contract = {
   ...contractObj,

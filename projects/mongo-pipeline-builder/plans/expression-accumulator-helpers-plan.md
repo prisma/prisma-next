@@ -94,8 +94,6 @@ Wire all new exports, verify all tests pass, and update documentation.
 ### Close-out
 
 - [ ] Verify all acceptance criteria in the [spec](../specs/expression-accumulator-helpers.spec.md) are met
-- [ ] Update the parent [project spec](../spec.md) to mark TML-2217 as complete
-- [ ] Update the parent [project plan](../plan.md) to mark the follow-up as complete
 
 ## Test Coverage
 

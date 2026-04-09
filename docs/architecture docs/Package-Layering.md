@@ -126,7 +126,7 @@ The extensions domain (`packages/3-extensions/`) contains ecosystem extensions a
 Clean Architecture layers for Prisma Next:
 
 - **Core** – target-agnostic contracts, plan metadata, shared operations, runtime kernel.
-- **Authoring** – PSL/TS builders that produce contracts.
+- **Authoring** – PSL/TS authoring surfaces plus shared descriptor types that produce contracts.
 - **Targets** – family-specific contract types and emitter hooks.
 - **Lanes** – query DSLs/ORMs that produce AST plans.
 - **Runtime** – target-neutral runtime core plus per-family runtime implementations.
@@ -204,11 +204,11 @@ The innermost layer containing target-family agnostic types and utilities.
 Contract authoring surfaces for creating contracts programmatically.
 
 **Framework Domain (Migration Plane):**
-- `packages/1-framework/2-authoring/contract/` → `@prisma-next/contract-authoring` - TS builders, canonicalization, schema DSL
+- `packages/1-framework/2-authoring/contract/` → `@prisma-next/contract-authoring` - shared target-neutral authoring descriptors (`ColumnTypeDescriptor`, `IndexDef`, FK metadata)
 - `packages/1-framework/2-authoring/psl-parser/` → `@prisma-next/psl-parser` - PSL parser + IR (future)
 
 **SQL Domain (Migration Plane):**
-- `packages/2-sql/2-authoring/contract-ts/` → `@prisma-next/sql-contract-ts` - SQL TS authoring surface wraps `@prisma-next/contract-authoring`
+- `packages/2-sql/2-authoring/contract-ts/` → `@prisma-next/sql-contract-ts` - SQL TS authoring surface, composed helper DSL, and lowering pipeline
 
 **Dependency Rules:** Can import from `core/*` only. SQL authoring may also import from SQL tooling layer.
 

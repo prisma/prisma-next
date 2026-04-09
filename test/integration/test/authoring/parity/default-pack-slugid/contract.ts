@@ -1,16 +1,20 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-export const contract = defineContract<CodecTypes>()
-  .target(postgresPack)
-  .table('user', (t) =>
-    t
-      .generated('id', {
-        type: { codecId: 'pg/text@1', nativeType: 'text' },
-        generated: { kind: 'generator', id: 'slugid' },
-      })
-      .primaryKey(['id']),
-  )
-  .model('User', 'user', (m) => m.field('id', 'id'))
-  .build();
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgresPack,
+  models: {
+    User: model('User', {
+      fields: {
+        id: field
+          .generated({
+            type: { codecId: 'pg/text@1', nativeType: 'text' },
+            generated: { kind: 'generator', id: 'slugid' },
+          })
+          .id(),
+      },
+    }).sql({ table: 'user' }),
+  },
+});

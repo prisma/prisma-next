@@ -1,3 +1,4 @@
+import type { Char } from '@prisma-next/adapter-postgres/codec-types';
 import { DefaultValueExpr, InsertAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
@@ -216,12 +217,13 @@ describe('integration/create', () => {
       async () => {
         await withCollectionRuntime(async (runtime) => {
           const tags = createReturningTagsCollection(runtime);
+          const customId = '123e4567-e89b-12d3-a456-426614174000' as Char<36>;
 
-          const created = await tags.create({ id: 'custom-id', name: 'rust' });
-          expect(created).toEqual({ id: 'custom-id', name: 'rust' });
+          const created = await tags.create({ id: customId, name: 'rust' });
+          expect(created).toEqual({ id: customId, name: 'rust' });
 
           const found = await tags.where({ name: 'rust' }).first();
-          expect(found).toEqual({ id: 'custom-id', name: 'rust' });
+          expect(found).toEqual({ id: customId, name: 'rust' });
         });
       },
       timeouts.spinUpPpgDev,

@@ -33,24 +33,29 @@ pnpm add @prisma-next/extension-paradedb
 Define BM25 indexes on your tables using `bm25` field builders plus `bm25Index()`:
 
 ```typescript
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { int4Column, textColumn, jsonbColumn } from '@prisma-next/adapter-postgres/column-types';
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import { bm25, bm25Index } from '@prisma-next/extension-paradedb/index-types';
 import paradedb from '@prisma-next/extension-paradedb/pack';
 import postgres from '@prisma-next/target-postgres/pack';
 
-export const contract = defineContract()
-  .target(postgres)
-  .extensionPacks({ paradedb })
-  .table('items', (t) =>
-    t
-      .column('id', { type: int4Column, nullable: false })
-      .column('description', { type: textColumn, nullable: false })
-      .column('category', { type: textColumn, nullable: false })
-      .column('rating', { type: int4Column, nullable: false })
-      .column('metadata', { type: jsonbColumn, nullable: false })
-      .primaryKey(['id'])
-      .index(
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgres,
+  extensionPacks: { paradedb },
+  models: {
+    Item: model('Item', {
+      fields: {
+        id: field.column(int4Column).id(),
+        description: field.column(textColumn),
+        category: field.column(textColumn),
+        rating: field.column(int4Column),
+        metadata: field.column(jsonbColumn),
+      },
+    }).sql({
+      table: 'items',
+      indexes: [
         bm25Index({
           keyField: 'id',
           fields: [
@@ -61,9 +66,10 @@ export const contract = defineContract()
           ],
           name: 'search_idx',
         }),
-      ),
-  )
-  .build();
+      ],
+    }),
+  },
+});
 ```
 
 ### Field Builders

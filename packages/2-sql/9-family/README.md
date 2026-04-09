@@ -101,7 +101,7 @@ if (executeResult.ok) {
 This package is the control plane entry point for the SQL family. It composes:
 - `@prisma-next/sql-contract-emitter` - Provides the SQL family hook
 - `@prisma-next/sql-operations` - SQL operation signature types
-- `@prisma-next/sql-contract-ts` - Contract validation
+- `@prisma-next/sql-contract` - SQL contract types and validation
 
 The framework CLI uses this descriptor to:
 1. Create family instances for control-plane operations (via `create()`)
@@ -151,8 +151,7 @@ The runner returns structured errors with the following codes:
 
 - **`@prisma-next/framework-components`**: Control plane types via `./control` (`ControlFamilyDescriptor`, `ControlTargetDescriptor`, `ControlAdapterDescriptor`, `ControlDriverDescriptor`, `ControlExtensionDescriptor`, `ControlDriverInstance`, etc.)
 - **`@prisma-next/sql-contract-emitter`**: SQL target family hook (`sqlEmission`)
-- **`@prisma-next/sql-contract-ts`**: Contract validation (`validateContract`)
-- **`@prisma-next/sql-contract`**: SQL contract types (`SqlContract`, `SqlStorage`)
+- **`@prisma-next/sql-contract`**: SQL contract types plus validation (`validateContract`)
 - **`@prisma-next/sql-operations`**: SQL operation registry types (`SqlOperationEntry`, `SqlOperationRegistry`)
 
 **Dependents:**
@@ -169,4 +168,3 @@ The runner returns structured errors with the following codes:
 - **Tests**:
   - CLI integration: `test/integration/test/cli.db-init.e2e.test.ts`
   - Target unit/integration: `packages/3-targets/3-targets/postgres/test/migrations/*`
-
