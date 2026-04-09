@@ -3,11 +3,11 @@ import { MongoAstNode } from './ast-node';
 import type { MongoDdlCommandVisitor } from './ddl-visitors';
 
 export interface CreateIndexOptions {
-  readonly unique?: boolean;
-  readonly sparse?: boolean;
-  readonly expireAfterSeconds?: number;
-  readonly partialFilterExpression?: Record<string, unknown>;
-  readonly name?: string;
+  readonly unique?: boolean | undefined;
+  readonly sparse?: boolean | undefined;
+  readonly expireAfterSeconds?: number | undefined;
+  readonly partialFilterExpression?: Record<string, unknown> | undefined;
+  readonly name?: string | undefined;
 }
 
 export class CreateIndexCommand extends MongoAstNode {

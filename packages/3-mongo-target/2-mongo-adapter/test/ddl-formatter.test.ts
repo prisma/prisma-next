@@ -1,8 +1,6 @@
 import {
   CreateIndexCommand,
   DropIndexCommand,
-  ListIndexesCommand,
-  MongoFieldFilter,
   type MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
 import { describe, expect, it } from 'vitest';

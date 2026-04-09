@@ -17,7 +17,7 @@ export class MongoControlDriver implements ControlDriverInstance<'mongo', 'mongo
     this.#client = client;
   }
 
-  query(): Promise<never> {
+  query(_sql: string, _params?: readonly unknown[]): Promise<never> {
     throw new Error('MongoDB control driver does not support SQL queries');
   }
 
@@ -54,7 +54,7 @@ const mongoControlDriverDescriptor: ControlDriverDescriptor<'mongo', 'mongo', Mo
         throw errorRuntime('Database connection failed', {
           why: message,
           fix: 'Verify the MongoDB URL, ensure the database is reachable, and confirm credentials/permissions',
-          meta: redacted,
+          meta: { ...redacted },
         });
       }
     },

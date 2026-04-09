@@ -13,7 +13,7 @@ export class MongoCommandExecutor implements MongoDdlCommandVisitor<Promise<void
   constructor(private readonly db: Db) {}
 
   async createIndex(cmd: CreateIndexCommand): Promise<void> {
-    const keySpec = keysToKeySpec(cmd.keys);
+    const keySpec: Document = keysToKeySpec(cmd.keys);
     const options: Record<string, unknown> = {};
     if (cmd.unique !== undefined) options['unique'] = cmd.unique;
     if (cmd.sparse !== undefined) options['sparse'] = cmd.sparse;
