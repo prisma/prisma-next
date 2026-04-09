@@ -44,7 +44,7 @@ The desired state adds the compound index. The planner diffs the two IRs and emi
 
 The IR has two producers and one consumer:
 
-```
+```text
 Contract (prior version)         Live MongoDB instance (future)
     │                                     │
     ▼                                     ▼
