@@ -7,7 +7,7 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
-import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
+import { extractOperationStatements } from '../control-api/operations/extract-operation-statements';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -183,7 +183,7 @@ async function executeMigrationShowCommand(
   }
 
   const ops = pkg.ops as readonly MigrationPlanOperation[];
-  const sql = extractSqlDdl(ops);
+  const sql = extractOperationStatements(config.family.familyId, ops) ?? [];
 
   const result: MigrationShowResult = {
     ok: true,
