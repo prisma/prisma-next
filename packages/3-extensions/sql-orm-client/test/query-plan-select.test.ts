@@ -4,13 +4,15 @@ import {
   ColumnRef,
   DerivedTableSource,
   EqColJoinOn,
+  JoinAst,
   ListExpression,
   LiteralExpr,
   OperationExpr,
   OrderByItem,
   OrExpr,
   ParamRef,
-  type SelectAst,
+  ProjectionItem,
+  SelectAst,
   SubqueryExpr,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
@@ -345,23 +347,28 @@ describe('compileSelectWithIncludeStrategy', () => {
 });
 
 describe('compileSelect MTI JOINs', () => {
-  it('base query LEFT JOINs MTI variant tables', () => {
+  const tasksBaseProjection = ['id', 'title', 'type', 'severity'].map((col) =>
+    ProjectionItem.of(col, ColumnRef.of('tasks', col)),
+  );
+  const featuresMtiProjection = [
+    ProjectionItem.of('features__priority', ColumnRef.of('features', 'priority')),
+  ];
+  const featuresJoinOn = EqColJoinOn.of(
+    ColumnRef.of('tasks', 'id'),
+    ColumnRef.of('features', 'id'),
+  );
+
+  it('base query LEFT JOINs MTI variant tables with table-qualified aliases', () => {
     const contract = buildMixedPolyContract();
-    const state = emptyState();
 
-    const plan = compileSelect(contract, 'tasks', state, 'Task');
-    expectSelectAst(plan.ast);
+    const plan = compileSelect(contract, 'tasks', emptyState(), 'Task');
 
-    expect(plan.ast.joins).toHaveLength(1);
-    const join = plan.ast.joins![0]!;
-    expect(join.joinType).toBe('left');
-    expect(join.source).toEqual(TableSource.named('features'));
-    expect(join.on).toEqual(
-      EqColJoinOn.of(ColumnRef.of('tasks', 'id'), ColumnRef.of('features', 'id')),
+    expect(plan.ast).toEqual(
+      SelectAst.from(TableSource.named('tasks'))
+        .withProjection([...tasksBaseProjection, ...featuresMtiProjection])
+        .withSelectAllIntent({ table: 'tasks' })
+        .withJoins([JoinAst.left(TableSource.named('features'), featuresJoinOn)]),
     );
-
-    const projectedAliases = plan.ast.projection.map((p) => p.alias);
-    expect(projectedAliases).toContain('features__priority');
   });
 
   it('variant query INNER JOINs the specific MTI variant table', () => {
@@ -369,12 +376,13 @@ describe('compileSelect MTI JOINs', () => {
     const state = { ...emptyState(), variantName: 'Feature' };
 
     const plan = compileSelect(contract, 'tasks', state, 'Task');
-    expectSelectAst(plan.ast);
 
-    expect(plan.ast.joins).toHaveLength(1);
-    const join = plan.ast.joins![0]!;
-    expect(join.joinType).toBe('inner');
-    expect(join.source).toEqual(TableSource.named('features'));
+    expect(plan.ast).toEqual(
+      SelectAst.from(TableSource.named('tasks'))
+        .withProjection([...tasksBaseProjection, ...featuresMtiProjection])
+        .withSelectAllIntent({ table: 'tasks' })
+        .withJoins([JoinAst.inner(TableSource.named('features'), featuresJoinOn)]),
+    );
   });
 
   it('STI-only variant query produces no JOINs', () => {
@@ -382,26 +390,25 @@ describe('compileSelect MTI JOINs', () => {
     const state = { ...emptyState(), variantName: 'Bug' };
 
     const plan = compileSelect(contract, 'tasks', state, 'Task');
-    expectSelectAst(plan.ast);
 
-    expect(plan.ast.joins).toBeUndefined();
+    expect(plan.ast).toEqual(
+      SelectAst.from(TableSource.named('tasks'))
+        .withProjection(tasksBaseProjection)
+        .withSelectAllIntent({ table: 'tasks' }),
+    );
   });
 
   it('non-polymorphic model produces no JOINs', () => {
     const plan = compileSelect(baseContract, 'users', emptyState(), 'User');
-    expectSelectAst(plan.ast);
-    expect(plan.ast.joins).toBeUndefined();
-  });
 
-  it('MTI projection excludes the shared PK column', () => {
-    const contract = buildMixedPolyContract();
-    const plan = compileSelect(contract, 'tasks', emptyState(), 'Task');
-    expectSelectAst(plan.ast);
-
-    const featureProjections = plan.ast.projection.filter(
-      (p) => p.expr.kind === 'column-ref' && p.expr.table === 'features',
+    expect(plan.ast).toEqual(
+      SelectAst.from(TableSource.named('users'))
+        .withProjection(
+          ['address', 'email', 'id', 'invited_by_id', 'name'].map((col) =>
+            ProjectionItem.of(col, ColumnRef.of('users', col)),
+          ),
+        )
+        .withSelectAllIntent({ table: 'users' }),
     );
-    expect(featureProjections).toHaveLength(1);
-    expect(featureProjections[0]!.alias).toBe('features__priority');
   });
 });
