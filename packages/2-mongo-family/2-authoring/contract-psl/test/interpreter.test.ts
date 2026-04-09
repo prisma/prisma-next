@@ -749,4 +749,117 @@ describe('interpretPslDocumentToMongoContract', () => {
       });
     });
   });
+
+  describe('index authoring', () => {
+    it('creates ascending index from @@index', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@index([email])
+        }
+      `);
+      const coll = ir.storage as Record<string, Record<string, unknown>>;
+      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['user']?.[
+        'indexes'
+      ] as ReadonlyArray<Record<string, unknown>>;
+      expect(indexes).toHaveLength(1);
+      expect(indexes[0]!['keys']).toEqual([{ field: 'email', direction: 1 }]);
+    });
+
+    it('creates unique index from @@unique', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@unique([email])
+        }
+      `);
+      const coll = ir.storage as Record<string, Record<string, unknown>>;
+      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['user']?.[
+        'indexes'
+      ] as ReadonlyArray<Record<string, unknown>>;
+      expect(indexes).toHaveLength(1);
+      expect(indexes[0]!['unique']).toBe(true);
+    });
+
+    it('creates compound index', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          name  String
+          @@index([email, name])
+        }
+      `);
+      const coll = ir.storage as Record<string, Record<string, unknown>>;
+      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['user']?.[
+        'indexes'
+      ] as ReadonlyArray<Record<string, unknown>>;
+      expect(indexes).toHaveLength(1);
+      expect(indexes[0]!['keys']).toEqual([
+        { field: 'email', direction: 1 },
+        { field: 'name', direction: 1 },
+      ]);
+    });
+
+    it('creates field-level @unique index', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String   @unique
+        }
+      `);
+      const coll = ir.storage as Record<string, Record<string, unknown>>;
+      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['user']?.[
+        'indexes'
+      ] as ReadonlyArray<Record<string, unknown>>;
+      expect(indexes).toHaveLength(1);
+      expect(indexes[0]!['unique']).toBe(true);
+      expect(indexes[0]!['keys']).toEqual([{ field: 'email', direction: 1 }]);
+    });
+
+    it('creates index with sparse and TTL options', () => {
+      const ir = interpretOk(`
+        model Session {
+          id        ObjectId @id @map("_id")
+          expiresAt DateTime
+          @@index([expiresAt], sparse: true, expireAfterSeconds: 3600)
+        }
+      `);
+      const coll = ir.storage as Record<string, Record<string, unknown>>;
+      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['session']?.[
+        'indexes'
+      ] as ReadonlyArray<Record<string, unknown>>;
+      expect(indexes).toHaveLength(1);
+      expect(indexes[0]!['sparse']).toBe(true);
+      expect(indexes[0]!['expireAfterSeconds']).toBe(3600);
+    });
+
+    it('respects @map on indexed fields', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String   @map("email_address")
+          @@index([email])
+        }
+      `);
+      const coll = ir.storage as Record<string, Record<string, unknown>>;
+      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['user']?.[
+        'indexes'
+      ] as ReadonlyArray<Record<string, unknown>>;
+      expect(indexes[0]!['keys']).toEqual([{ field: 'email_address', direction: 1 }]);
+    });
+
+    it('creates no indexes when none declared', () => {
+      const ir = interpretOk(`
+        model User {
+          id ObjectId @id @map("_id")
+        }
+      `);
+      const coll = ir.storage as Record<string, Record<string, unknown>>;
+      const userColl = (coll['collections'] as Record<string, Record<string, unknown>>)['user'];
+      expect(userColl?.['indexes']).toBeUndefined();
+    });
+  });
 });
