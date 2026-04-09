@@ -1,6 +1,6 @@
 # ADR 189 — Structural index matching for MongoDB migrations
 
-## Grounding example
+## At a glance
 
 The migration planner is comparing two contracts and finds the same index described with different names:
 
@@ -45,12 +45,14 @@ function buildIndexLookupKey(index: MongoSchemaIndex): string {
 
 Two indexes that produce the same lookup key are the same index. For example:
 
-| Index | Lookup key |
-|---|---|
-| `{ email: 1 }`, unique | `email:1\|unique` |
-| `{ email: 1 }`, not unique | `email:1` |
+
+| Index                           | Lookup key               |
+| ------------------------------- | ------------------------ |
+| `{ email: 1 }`, unique          | `email:1|unique`         |
+| `{ email: 1 }`, not unique      | `email:1`                |
 | `{ lastName: 1, firstName: 1 }` | `lastName:1,firstName:1` |
-| `{ createdAt: 1 }`, TTL 86400s | `createdAt:1\|ttl:86400` |
+| `{ createdAt: 1 }`, TTL 86400s  | `createdAt:1|ttl:86400`  |
+
 
 The planner builds a `Map<string, MongoSchemaIndex>` for both origin and destination, then diffs the key sets:
 
@@ -66,10 +68,10 @@ Each component is included because it changes the index's behavior at the databa
 
 - **Key fields and order.** `{ a: 1, b: 1 }` and `{ b: 1, a: 1 }` are different compound indexes with different query optimization characteristics. MongoDB treats them as distinct.
 - **Direction.** `{ a: 1 }` (ascending) and `{ a: -1 }` (descending) are different indexes. Direction matters for sort-order optimization in compound indexes.
-- **`unique`.** A unique index enforces a constraint; a non-unique index does not.
-- **`sparse`.** A sparse index omits documents missing the indexed field.
-- **`expireAfterSeconds`.** A TTL index with a 24-hour expiry is different from one with a 7-day expiry.
-- **`partialFilterExpression`.** A partial index scoped to `{ status: "active" }` is different from one scoped to `{ status: "archived" }`.
+- `**unique`.** A unique index enforces a constraint; a non-unique index does not.
+- `**sparse`.** A sparse index omits documents missing the indexed field.
+- `**expireAfterSeconds`.** A TTL index with a 24-hour expiry is different from one with a 7-day expiry.
+- `**partialFilterExpression`.** A partial index scoped to `{ status: "active" }` is different from one scoped to `{ status: "archived" }`.
 
 ### What the lookup key excludes
 
