@@ -1,6 +1,10 @@
 import {
+  CollModCommand,
+  CreateCollectionCommand,
   CreateIndexCommand,
+  DropCollectionCommand,
   DropIndexCommand,
+  ListCollectionsCommand,
   ListIndexesCommand,
   MongoAndExpr,
   MongoExistsExpr,
@@ -468,5 +472,123 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     expect(cmd.expireAfterSeconds).toBe(3600);
     expect(cmd.partialFilterExpression).toEqual(pfe);
     expect(cmd.name).toBe('status_1');
+  });
+
+  it('round-trips createIndex with M2 options', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'additive',
+      precheck: [],
+      execute: [
+        {
+          description: 'create text index',
+          command: new CreateIndexCommand('users', [{ field: 'bio', direction: 'text' }], {
+            weights: { bio: 10 },
+            default_language: 'english',
+            language_override: 'lang',
+            collation: { locale: 'en', strength: 2 },
+            wildcardProjection: { name: 1, email: 1 },
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
+    const cmd = deserialized[0]!.execute[0]!.command as CreateIndexCommand;
+    expect(cmd.weights).toEqual({ bio: 10 });
+    expect(cmd.default_language).toBe('english');
+    expect(cmd.language_override).toBe('lang');
+    expect(cmd.collation).toEqual({ locale: 'en', strength: 2 });
+    expect(cmd.wildcardProjection).toEqual({ name: 1, email: 1 });
+  });
+
+  it('round-trips createCollection command', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'coll.events.create',
+      label: 'Create collection events',
+      operationClass: 'additive',
+      precheck: [
+        {
+          description: 'collection does not exist',
+          source: new ListCollectionsCommand(),
+          filter: MongoFieldFilter.eq('name', 'events'),
+          expect: 'notExists',
+        },
+      ],
+      execute: [
+        {
+          description: 'create events collection',
+          command: new CreateCollectionCommand('events', {
+            capped: true,
+            size: 1048576,
+            max: 1000,
+            validator: { $jsonSchema: { bsonType: 'object' } },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
+    const cmd = deserialized[0]!.execute[0]!.command as CreateCollectionCommand;
+    expect(cmd.kind).toBe('createCollection');
+    expect(cmd.collection).toBe('events');
+    expect(cmd.capped).toBe(true);
+    expect(cmd.size).toBe(1048576);
+    expect(cmd.max).toBe(1000);
+    expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
+  });
+
+  it('round-trips dropCollection command', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'coll.events.drop',
+      label: 'Drop collection events',
+      operationClass: 'destructive',
+      precheck: [],
+      execute: [
+        {
+          description: 'drop events collection',
+          command: new DropCollectionCommand('events'),
+        },
+      ],
+      postcheck: [],
+    };
+    const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
+    const cmd = deserialized[0]!.execute[0]!.command as DropCollectionCommand;
+    expect(cmd.kind).toBe('dropCollection');
+    expect(cmd.collection).toBe('events');
+  });
+
+  it('round-trips collMod command', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'validator.users.update',
+      label: 'Update validator on users',
+      operationClass: 'destructive',
+      precheck: [],
+      execute: [
+        {
+          description: 'update validator on users',
+          command: new CollModCommand('users', {
+            validator: { $jsonSchema: { bsonType: 'object' } },
+            validationLevel: 'strict',
+            validationAction: 'error',
+            changeStreamPreAndPostImages: { enabled: true },
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
+    const cmd = deserialized[0]!.execute[0]!.command as CollModCommand;
+    expect(cmd.kind).toBe('collMod');
+    expect(cmd.collection).toBe('users');
+    expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
+    expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
   });
 });
