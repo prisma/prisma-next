@@ -22,9 +22,11 @@ export class MongoSchemaIndex extends MongoSchemaNode {
     super();
     this.keys = options.keys;
     this.unique = options.unique ?? false;
-    this.sparse = options.sparse;
-    this.expireAfterSeconds = options.expireAfterSeconds;
-    this.partialFilterExpression = options.partialFilterExpression;
+    if (options.sparse !== undefined) this.sparse = options.sparse;
+    if (options.expireAfterSeconds !== undefined)
+      this.expireAfterSeconds = options.expireAfterSeconds;
+    if (options.partialFilterExpression !== undefined)
+      this.partialFilterExpression = options.partialFilterExpression;
     this.freeze();
   }
 

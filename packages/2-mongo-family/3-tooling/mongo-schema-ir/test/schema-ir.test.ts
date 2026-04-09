@@ -35,9 +35,7 @@ describe('MongoSchemaIndex', () => {
     const index = new MongoSchemaIndex({
       keys: [{ field: 'email', direction: 1 }],
     });
-    expect(() => {
-      (index as Record<string, unknown>)['unique'] = true;
-    }).toThrow();
+    expect(Object.isFrozen(index)).toBe(true);
   });
 
   it('dispatches via visitor', () => {
@@ -77,9 +75,7 @@ describe('MongoSchemaCollection', () => {
 
   it('is frozen after construction', () => {
     const coll = new MongoSchemaCollection({ name: 'users' });
-    expect(() => {
-      (coll as Record<string, unknown>)['name'] = 'other';
-    }).toThrow();
+    expect(Object.isFrozen(coll)).toBe(true);
   });
 
   it('dispatches via visitor', () => {
@@ -202,13 +198,12 @@ describe('indexesEquivalent', () => {
     expect(indexesEquivalent(a, b)).toBe(false);
   });
 
-  it('treats undefined and absent partialFilterExpression as equivalent', () => {
+  it('treats two indexes without partialFilterExpression as equivalent', () => {
     const a = new MongoSchemaIndex({
       keys: [{ field: 'email', direction: 1 }],
     });
     const b = new MongoSchemaIndex({
       keys: [{ field: 'email', direction: 1 }],
-      partialFilterExpression: undefined,
     });
     expect(indexesEquivalent(a, b)).toBe(true);
   });
