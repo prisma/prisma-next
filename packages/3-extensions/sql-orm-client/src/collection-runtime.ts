@@ -95,7 +95,7 @@ function getMergedColumnToFieldMap(
   variantModelName: string,
   variantTable: string | undefined,
 ): Record<string, string> {
-  const cacheKey = `${baseModelName}:${variantModelName}`;
+  const cacheKey = `${baseModelName}:${variantModelName}:${variantTable ?? ''}`;
   let perContract = mergedColumnToFieldCache.get(contract);
   if (!perContract) {
     perContract = new Map();
