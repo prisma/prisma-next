@@ -1,5 +1,4 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import mongoAdapter from '@prisma-next/adapter-mongo/control';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
@@ -18,6 +17,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as validateSqlContract } from '@prisma-next/sql-contract/validate';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
+import { dirname, join } from 'pathe';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

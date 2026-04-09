@@ -1219,9 +1219,6 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../1-foundation/mongo-contract
-      '@prisma-next/mongo-contract-ts':
-        specifier: workspace:*
-        version: link:../2-authoring/contract-ts
       '@prisma-next/mongo-emitter':
         specifier: workspace:*
         version: link:../3-tooling/emitter
@@ -1229,6 +1226,9 @@ importers:
         specifier: workspace:*
         version: link:../../3-mongo-target/1-mongo-target
     devDependencies:
+      '@prisma-next/mongo-contract-ts':
+        specifier: workspace:*
+        version: link:../2-authoring/contract-ts
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../0-config/tsconfig

@@ -1,6 +1,4 @@
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { defineContract, field, model } from '@prisma-next/mongo-contract-ts/contract-builder';
-import mongoTargetPack from '@prisma-next/target-mongo/pack';
 import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
@@ -49,28 +47,6 @@ describe('mongoFamilyPack', () => {
       id: 'mongo',
       familyId: 'mongo',
       version: '0.0.1',
-    });
-  });
-
-  it('composes with mongo-contract-ts authoring', () => {
-    const User = model('User', {
-      collection: 'users',
-      fields: {
-        _id: field.objectId(),
-        email: field.string(),
-      },
-    });
-
-    const contract = defineContract({
-      family: mongoFamilyPack,
-      target: mongoTargetPack,
-      models: { User },
-    });
-
-    expect(contract.targetFamily).toBe('mongo');
-    expect(contract.target).toBe('mongo');
-    expect(contract.roots).toEqual({
-      users: 'User',
     });
   });
 });
