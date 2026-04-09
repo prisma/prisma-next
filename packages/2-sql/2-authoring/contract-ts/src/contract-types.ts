@@ -152,6 +152,22 @@ type ModelFieldNames<Definition, ModelName extends ModelNames<Definition>> = key
 > &
   string;
 
+type StagedModelRelations<
+  Definition,
+  ModelName extends ModelNames<Definition>,
+> = DefinitionModels<Definition>[ModelName] extends {
+  readonly stageOne: { readonly relations: infer R };
+}
+  ? R extends Record<string, unknown>
+    ? R
+    : Record<never, never>
+  : Record<never, never>;
+
+type StagedModelRelationNames<
+  Definition,
+  ModelName extends ModelNames<Definition>,
+> = keyof StagedModelRelations<Definition, ModelName> & string;
+
 type ModelFieldState<
   Definition,
   ModelName extends ModelNames<Definition>,
@@ -407,7 +423,9 @@ type BuiltModels<Definition> = {
         };
       };
     };
-    readonly relations: Record<string, ContractRelation>;
+    readonly relations: {
+      readonly [RelName in StagedModelRelationNames<Definition, ModelName>]: ContractRelation;
+    };
   };
 };
 

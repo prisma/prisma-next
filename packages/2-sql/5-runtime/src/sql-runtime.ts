@@ -123,7 +123,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.codecRegistryValidated = false;
 
-    const familyAdapter = new SqlFamilyAdapter(context.contract);
+    const familyAdapter = new SqlFamilyAdapter(context.contract, adapter.profile);
 
     const coreOptions: RuntimeCoreOptions<
       TContract,

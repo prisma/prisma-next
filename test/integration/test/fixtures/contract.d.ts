@@ -122,7 +122,11 @@ type ContractBase = ContractType<
       readonly orderBy: true;
       readonly returning: true;
     };
-    readonly sql: { readonly enums: true; readonly returning: true };
+    readonly sql: {
+      readonly defaultInInsert: true;
+      readonly enums: true;
+      readonly returning: true;
+    };
   };
   readonly extensionPacks: {};
   readonly meta: {};

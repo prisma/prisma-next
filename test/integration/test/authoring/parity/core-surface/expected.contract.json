@@ -11,32 +11,32 @@
     "Post": {
       "fields": {
         "id": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
-          },
-          "nullable": false
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "rating": {
+          "nullable": true,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/float8@1"
-          },
-          "nullable": true
+            "codecId": "pg/float8@1",
+            "kind": "scalar"
+          }
         },
         "title": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
-          },
-          "nullable": false
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "userId": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
-          },
-          "nullable": false
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -70,46 +70,46 @@
     "User": {
       "fields": {
         "createdAt": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/timestamptz@1"
-          },
-          "nullable": false
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
         },
         "email": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
-          },
-          "nullable": false
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
         },
         "id": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
-          },
-          "nullable": false
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "isActive": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/bool@1"
-          },
-          "nullable": false
+            "codecId": "pg/bool@1",
+            "kind": "scalar"
+          }
         },
         "profile": {
+          "nullable": true,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/jsonb@1"
-          },
-          "nullable": true
+            "codecId": "pg/jsonb@1",
+            "kind": "scalar"
+          }
         },
         "role": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/enum@1"
-          },
-          "nullable": false
+            "codecId": "pg/enum@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {},
@@ -277,6 +277,7 @@
       "returning": true
     },
     "sql": {
+      "defaultInInsert": true,
       "enums": true,
       "returning": true
     }

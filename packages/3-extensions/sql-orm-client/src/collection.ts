@@ -40,6 +40,7 @@ import type {
 } from './collection-internal-types';
 import {
   dispatchMutationRows,
+  dispatchSplitMutationRows,
   executeMutationReturningSingleRow,
 } from './collection-mutation-dispatch';
 import { augmentSelectionForJoinColumns, mapModelDataToStorageRow } from './collection-runtime';
@@ -65,7 +66,9 @@ import {
   compileDeleteCount,
   compileDeleteReturning,
   compileInsertCount,
+  compileInsertCountSplit,
   compileInsertReturning,
+  compileInsertReturningSplit,
   compileSelect,
   compileUpdateCount,
   compileUpdateReturning,
@@ -694,6 +697,24 @@ export class Collection<
       this.state.selectedFields,
       parentJoinColumns,
     );
+    if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
+      const plans = compileInsertReturningSplit(
+        this.contract,
+        this.tableName,
+        mappedRows,
+        selectedForInsert,
+      );
+      return dispatchSplitMutationRows<Row>({
+        contract: this.contract,
+        runtime: this.ctx.runtime,
+        plans,
+        tableName: this.tableName,
+        includes: this.state.includes,
+        hiddenColumns,
+        mapRow: (mapped) => mapped as Row,
+      });
+    }
+
     const compiled = compileInsertReturning(
       this.contract,
       this.tableName,
@@ -720,6 +741,15 @@ export class Collection<
       mapModelDataToStorageRow(this.contract, this.modelName, row),
     );
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
+
+    if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
+      const plans = compileInsertCountSplit(this.contract, this.tableName, mappedRows);
+      for (const plan of plans) {
+        await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, plan).toArray();
+      }
+      return data.length;
+    }
+
     const compiled = compileInsertCount(this.contract, this.tableName, mappedRows);
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
     return data.length;
