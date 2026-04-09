@@ -1,120 +1,93 @@
-import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
-import type { Contract } from '@prisma-next/contract/types';
+import mongoFamily from '@prisma-next/family-mongo/pack';
+import { defineContract, field, model, rel } from '@prisma-next/mongo-contract-ts/contract-builder';
+import mongoTarget from '@prisma-next/target-mongo/pack';
 
-// Hand-constructed because the Mongo authoring surface (PSL) doesn't yet
-// support polymorphism, discriminators, or embedded documents — features
-// this integration test exercises.
-
-const target = 'mongo';
-const targetFamily = 'mongo';
-const capabilities = {};
-
-const storageBody = {
-  collections: {
-    tasks: {},
-    users: {},
+const User = model('User', {
+  collection: 'users',
+  storageRelations: {
+    addresses: { field: 'addresses' },
   },
-} as const;
-
-const storage = {
-  ...storageBody,
-  storageHash: computeStorageHash({ target, targetFamily, storage: storageBody }),
-} as const;
-
-export const contract = {
-  target,
-  targetFamily,
-  capabilities,
-  extensionPacks: {},
-  meta: {},
-  profileHash: computeProfileHash({ target, targetFamily, capabilities }),
-  roots: {
-    tasks: 'Task',
-    users: 'User',
+  fields: {
+    _id: field.objectId(),
+    name: field.string(),
+    email: field.string(),
   },
-  storage,
+  relations: {
+    addresses: rel.hasMany('Address'),
+  },
+});
+
+const Task = model('Task', {
+  collection: 'tasks',
+  storageRelations: {
+    comments: { field: 'comments' },
+  },
+  fields: {
+    _id: field.objectId(),
+    title: field.string(),
+    type: field.string(),
+    assigneeId: field.objectId(),
+  },
+  relations: {
+    assignee: rel.belongsTo(User, {
+      from: 'assigneeId',
+      to: User.ref('_id'),
+    }),
+    comments: rel.hasMany('Comment'),
+  },
+  discriminator: {
+    field: 'type',
+    variants: {
+      Bug: { value: 'bug' },
+      Feature: { value: 'feature' },
+    },
+  },
+});
+
+const Bug = model('Bug', {
+  collection: 'tasks',
+  base: Task,
+  fields: {
+    severity: field.string(),
+  },
+});
+
+const Feature = model('Feature', {
+  collection: 'tasks',
+  base: Task,
+  fields: {
+    priority: field.string(),
+    targetRelease: field.string(),
+  },
+});
+
+const Address = model('Address', {
+  owner: User,
+  fields: {
+    street: field.string(),
+    city: field.string(),
+    zip: field.string(),
+  },
+});
+
+const Comment = model('Comment', {
+  owner: Task,
+  fields: {
+    _id: field.objectId(),
+    text: field.string(),
+    createdAt: field.date(),
+  },
+});
+
+export const contract = defineContract({
+  family: mongoFamily,
+  target: mongoTarget,
   models: {
-    Task: {
-      storage: {
-        collection: 'tasks',
-        relations: { comments: { field: 'comments' } },
-      },
-      fields: {
-        _id: { type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' }, nullable: false },
-        title: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-        type: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-        assigneeId: {
-          type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
-          nullable: false,
-        },
-      },
-      relations: {
-        assignee: {
-          to: 'User',
-          cardinality: 'N:1' as const,
-          on: { localFields: ['assigneeId'], targetFields: ['_id'] },
-        },
-        comments: { to: 'Comment', cardinality: '1:N' as const },
-      },
-      discriminator: { field: 'type' },
-      variants: {
-        Bug: { value: 'bug' },
-        Feature: { value: 'feature' },
-      },
-    },
-    Bug: {
-      storage: { collection: 'tasks' },
-      fields: {
-        severity: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-      },
-      relations: {},
-      base: 'Task',
-    },
-    Feature: {
-      storage: { collection: 'tasks' },
-      fields: {
-        priority: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-        targetRelease: {
-          type: { kind: 'scalar' as const, codecId: 'mongo/string@1' },
-          nullable: false,
-        },
-      },
-      relations: {},
-      base: 'Task',
-    },
-    User: {
-      storage: {
-        collection: 'users',
-        relations: { addresses: { field: 'addresses' } },
-      },
-      fields: {
-        _id: { type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' }, nullable: false },
-        name: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-        email: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-      },
-      relations: {
-        addresses: { to: 'Address', cardinality: '1:N' as const },
-      },
-    },
-    Address: {
-      storage: {},
-      fields: {
-        street: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-        city: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-        zip: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-      },
-      relations: {},
-      owner: 'User',
-    },
-    Comment: {
-      storage: {},
-      fields: {
-        _id: { type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' }, nullable: false },
-        text: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-        createdAt: { type: { kind: 'scalar' as const, codecId: 'mongo/date@1' }, nullable: false },
-      },
-      relations: {},
-      owner: 'Task',
-    },
+    Task,
+    Bug,
+    Feature,
+    User,
+    Address,
+    Comment,
   },
-} satisfies Contract;
+});
