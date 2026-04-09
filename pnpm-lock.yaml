@@ -2128,6 +2128,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
