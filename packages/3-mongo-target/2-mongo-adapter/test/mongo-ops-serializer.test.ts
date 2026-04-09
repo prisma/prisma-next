@@ -251,6 +251,196 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     expect(() => deserializeMongoOps(json)).toThrow(/Unknown filter expression kind/);
   });
 
+  it('rejects createIndex with missing collection', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [],
+        execute: [
+          {
+            description: 'test',
+            command: { kind: 'createIndex', keys: [{ field: 'x', direction: 1 }] },
+          },
+        ],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid createIndex command/);
+  });
+
+  it('rejects createIndex with invalid direction', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [],
+        execute: [
+          {
+            description: 'test',
+            command: {
+              kind: 'createIndex',
+              collection: 'users',
+              keys: [{ field: 'x', direction: 'invalid' }],
+            },
+          },
+        ],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid createIndex command/);
+  });
+
+  it('rejects createIndex with empty keys array', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [],
+        execute: [
+          {
+            description: 'test',
+            command: { kind: 'createIndex', collection: 'users', keys: [] },
+          },
+        ],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid createIndex command/);
+  });
+
+  it('rejects dropIndex with missing name', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [],
+        execute: [
+          {
+            description: 'test',
+            command: { kind: 'dropIndex', collection: 'users' },
+          },
+        ],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid dropIndex command/);
+  });
+
+  it('rejects operation with missing id', () => {
+    const json = [
+      {
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [],
+        execute: [],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid migration operation/);
+  });
+
+  it('rejects operation with invalid operationClass', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'invalid',
+        precheck: [],
+        execute: [],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid migration operation/);
+  });
+
+  it('rejects check with missing description', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [
+          {
+            source: { kind: 'listIndexes', collection: 'users' },
+            filter: { kind: 'field', field: 'x', op: '$eq', value: 1 },
+            expect: 'exists',
+          },
+        ],
+        execute: [],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid migration check/);
+  });
+
+  it('rejects field filter with missing field', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [
+          {
+            description: 'test',
+            source: { kind: 'listIndexes', collection: 'users' },
+            filter: { kind: 'field', op: '$eq', value: 1 },
+            expect: 'exists',
+          },
+        ],
+        execute: [],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid field filter/);
+  });
+
+  it('rejects exists filter with missing exists flag', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [
+          {
+            description: 'test',
+            source: { kind: 'listIndexes', collection: 'users' },
+            filter: { kind: 'exists', field: 'x' },
+            expect: 'exists',
+          },
+        ],
+        execute: [],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid exists filter/);
+  });
+
+  it('rejects listIndexes with missing collection', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [
+          {
+            description: 'test',
+            source: { kind: 'listIndexes' },
+            filter: { kind: 'field', field: 'x', op: '$eq', value: 1 },
+            expect: 'exists',
+          },
+        ],
+        execute: [],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid listIndexes command/);
+  });
+
   it('preserves createIndex options through round-trip', () => {
     const pfe = { active: { $eq: true } };
     const op: MongoMigrationPlanOperation = {
