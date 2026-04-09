@@ -240,9 +240,24 @@ const ModelDefinitionSchema = type({
   'owner?': 'string',
 });
 
+const MongoIndexKeySchema = type({
+  '+': 'reject',
+  field: 'string',
+  direction: '1 | -1 | "text" | "2dsphere" | "2d" | "hashed"',
+});
+
+const MongoStorageIndexSchema = type({
+  '+': 'reject',
+  keys: MongoIndexKeySchema.array().atLeastLength(1),
+  'unique?': 'boolean',
+  'sparse?': 'boolean',
+  'expireAfterSeconds?': 'number',
+  'partialFilterExpression?': 'Record<string, unknown>',
+});
+
 const StorageCollectionSchema = type({
   '+': 'reject',
-  'indexes?': IndexSchema.array(),
+  'indexes?': MongoStorageIndexSchema.array(),
   'options?': CollectionOptionsSchema,
 });
 
