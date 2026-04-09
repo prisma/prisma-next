@@ -31,9 +31,13 @@
     "src"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/exports/index.d.mts",
-      "import": "./dist/exports/index.mjs"
+    "./execution": {
+      "types": "./dist/exports/execution.d.mts",
+      "import": "./dist/exports/execution.mjs"
+    },
+    "./control": {
+      "types": "./dist/exports/control.d.mts",
+      "import": "./dist/exports/control.mjs"
     },
     "./package.json": "./package.json"
   },

@@ -83,7 +83,7 @@ describeWithMongoDB('value objects e2e: Mongo → real DB → typed ORM', (ctx) 
       notes: { street: '2 Second Ave', city: 'Newtown', zip: '22222' },
     });
 
-    const { MongoFieldFilter } = await import('@prisma-next/mongo-query-ast');
+    const { MongoFieldFilter } = await import('@prisma-next/mongo-query-ast/execution');
     const updated = await ormClient.shop
       .where(MongoFieldFilter.eq('name', 'Updated Store'))
       .update({
