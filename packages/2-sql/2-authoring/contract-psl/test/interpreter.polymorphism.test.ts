@@ -22,6 +22,36 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
       ...input,
     });
 
+  it('ignores polymorphism collection when the schema has no models', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Email = String
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = result.value.storage as {
+      readonly types?: Record<string, { readonly codecId: string; readonly nativeType: string }>;
+    };
+
+    expect(result.value.roots).toEqual({});
+    expect(result.value.models).toEqual({});
+    expect(storage.types).toMatchObject({
+      Email: {
+        codecId: 'pg/text@1',
+        nativeType: 'text',
+      },
+    });
+  });
+
   describe('@@discriminator and @@base — happy paths', () => {
     it('emits discriminator on base model', () => {
       const document = parsePslDocument({

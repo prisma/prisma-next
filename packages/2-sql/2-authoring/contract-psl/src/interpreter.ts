@@ -1085,7 +1085,7 @@ export function interpretPslDocumentToSqlContract(
   });
 
   const { discriminatorDeclarations, baseDeclarations } = collectPolymorphismDeclarations(
-    input.document.ast.models,
+    models,
     sourceId,
     diagnostics,
   );

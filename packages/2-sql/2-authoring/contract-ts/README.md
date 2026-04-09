@@ -210,7 +210,7 @@ const contract = defineContract({
 });
 ```
 
-Per-FK overrides still live next to the FK authoring site, either via `constraints.foreignKey(...)` inside model `.sql(...)` or via `rel.belongsTo(...).sql({ fk: ... })`. See [ADR 161](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md).
+Per-FK overrides still live next to the FK authoring site, either via `constraints.foreignKey(...)` inside model `.sql(...)` or via `rel.belongsTo(...).sql({ fk: ... })`. See [ADR 161](../../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md).
 
 ### Validating Contracts
 
