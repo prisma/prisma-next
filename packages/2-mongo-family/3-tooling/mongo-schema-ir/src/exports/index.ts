@@ -1,9 +1,13 @@
 export { deepEqual, indexesEquivalent } from '../index-equivalence';
-export type { MongoSchemaCollectionOptions } from '../schema-collection';
+export type { MongoSchemaCollectionCtorOptions } from '../schema-collection';
 export { MongoSchemaCollection } from '../schema-collection';
+export type { MongoSchemaCollectionOptionsInput } from '../schema-collection-options';
+export { MongoSchemaCollectionOptionsNode } from '../schema-collection-options';
 export type { MongoSchemaIndexOptions } from '../schema-index';
 export { MongoSchemaIndex } from '../schema-index';
 export type { MongoSchemaIR } from '../schema-ir';
 export { MongoSchemaNode } from '../schema-node';
+export type { MongoSchemaValidatorOptions } from '../schema-validator';
+export { MongoSchemaValidator } from '../schema-validator';
 export type { AnyMongoSchemaNode } from '../types';
 export type { MongoSchemaVisitor } from '../visitor';
