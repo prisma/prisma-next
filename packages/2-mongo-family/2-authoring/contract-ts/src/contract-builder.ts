@@ -14,9 +14,14 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import {
+  type MongoCollectionOptions,
   type MongoContract,
   type MongoContractWithTypeMaps,
+  type MongoIndex,
+  type MongoIndexFields,
+  type MongoIndexOptions,
   type MongoStorage,
+  type MongoStorageCollection,
   type MongoTypeMaps,
   validateMongoContract,
 } from '@prisma-next/mongo-contract';
@@ -32,7 +37,11 @@ type StorageRelationSpec = {
 type ContractCapabilities = Record<string, Record<string, boolean>>;
 type StringListInput = string | readonly string[];
 type Present<T> = Exclude<T, undefined>;
-type Simplify<T> = { [K in keyof T]: T[K] } & {};
+type EmptyObject = Record<never, never>;
+type Simplify<T> = { [K in keyof T]: T[K] } & EmptyObject;
+type StrictShape<Actual, Shape> = Actual &
+  Shape &
+  Record<Exclude<keyof Actual, keyof Shape>, never>;
 
 type UnionToIntersection<Union> = (Union extends unknown ? (value: Union) => void : never) extends (
   value: infer Intersection,
@@ -142,6 +151,8 @@ export interface ModelBuilder<
   readonly __name: Name;
   readonly __fields: Fields;
   readonly __relations: Relations;
+  readonly __indexes: readonly MongoIndex[] | undefined;
+  readonly __collectionOptions: MongoCollectionOptions | undefined;
   readonly __collection: Collection;
   readonly __owner: Owner;
   readonly __base: Base;
@@ -242,13 +253,13 @@ type ExtractModelStorageRelations<T> =
 type ModelStorageSection<T> =
   ExtractModelCollection<T> extends string
     ? { readonly collection: ExtractModelCollection<T> }
-    : {};
+    : EmptyObject;
 type ModelStorageRelationsSection<T> =
   ExtractModelStorageRelations<T> extends Record<string, StorageRelationSpec>
     ? keyof ExtractModelStorageRelations<T> extends never
-      ? {}
+      ? EmptyObject
       : { readonly relations: ExtractModelStorageRelations<T> }
-    : {};
+    : EmptyObject;
 type RootModelCollection<T> =
   ExtractModelCollection<T> extends string
     ? ExtractModelOwner<T> extends undefined
@@ -300,7 +311,7 @@ type ContractFieldFromBuilder<TBuilder> =
         {
           readonly type: Type;
           readonly nullable: Nullable;
-        } & (Many extends true ? { readonly many: true } : {})
+        } & (Many extends true ? { readonly many: true } : EmptyObject)
       >
     : never;
 
@@ -350,13 +361,15 @@ type ContractRelationsFromRecord<Relations extends Record<string, AnyRelationBui
 type ContractModelStorageFromBuilder<TBuilder> = ModelStorageSection<TBuilder> &
   ModelStorageRelationsSection<TBuilder>;
 
-type MaybeOwner<Owner> = [Owner] extends [undefined] ? {} : { readonly owner: Owner & string };
-type MaybeBase<Base> = [Base] extends [undefined] ? {} : { readonly base: Base & string };
+type MaybeOwner<Owner> = [Owner] extends [undefined]
+  ? EmptyObject
+  : { readonly owner: Owner & string };
+type MaybeBase<Base> = [Base] extends [undefined] ? EmptyObject : { readonly base: Base & string };
 type MaybeDiscriminator<Discriminator> = [Discriminator] extends [undefined]
-  ? {}
+  ? EmptyObject
   : { readonly discriminator: Discriminator & { readonly field: string } };
 type MaybeVariants<Variants> = [Variants] extends [undefined]
-  ? {}
+  ? EmptyObject
   : { readonly variants: Variants & Record<string, VariantSpec> };
 
 type ContractModelFromBuilder<TBuilder> =
@@ -392,7 +405,7 @@ type DerivedRootModels<Models extends Record<string, AnyModelBuilder>> = Simplif
 }>;
 
 type StorageCollectionsFromModels<Models extends Record<string, AnyModelBuilder>> = Simplify<{
-  readonly [K in keyof Models as CollectionName<Models[K]>]: Record<string, never>;
+  readonly [K in keyof Models as CollectionName<Models[K]>]: MongoStorageCollection;
 }>;
 
 type NormalizeRoots<Roots extends Record<string, ModelNameInput>> = Simplify<{
@@ -453,7 +466,7 @@ type DefinitionStorage<Definition> = Simplify<
 
 type MaybeValueObjectsSection<ValueObjects extends Record<string, AnyValueObjectBuilder>> =
   keyof ValueObjects extends never
-    ? {}
+    ? EmptyObject
     : {
         readonly valueObjects: ContractValueObjectsFromRecord<ValueObjects>;
       };
@@ -482,6 +495,7 @@ export type MongoContractResult<Definition> = MongoContractWithTypeMaps<
 
 type ContractAuthoringHelpers = {
   readonly field: typeof field;
+  readonly index: typeof index;
   readonly model: typeof model;
   readonly rel: typeof rel;
   readonly valueObject: typeof valueObject;
@@ -581,7 +595,7 @@ function createScalarFieldBuilder<
   {
     readonly kind: 'scalar';
     readonly codecId: CodecId;
-  } & ([TypeParams] extends [undefined] ? {} : { readonly typeParams: TypeParams }),
+  } & ([TypeParams] extends [undefined] ? EmptyObject : { readonly typeParams: TypeParams }),
   false,
   false
 > {
@@ -593,7 +607,7 @@ function createScalarFieldBuilder<
     } as {
       readonly kind: 'scalar';
       readonly codecId: CodecId;
-    } & ([TypeParams] extends [undefined] ? {} : { readonly typeParams: TypeParams }),
+    } & ([TypeParams] extends [undefined] ? EmptyObject : { readonly typeParams: TypeParams }),
     nullable: false,
     many: false,
   });
@@ -635,6 +649,31 @@ export const field = {
     });
   },
 } as const;
+
+export function index<const Fields extends MongoIndexFields>(
+  fields: Fields,
+): {
+  readonly fields: Fields;
+};
+export function index<const Fields extends MongoIndexFields, const Options>(
+  fields: Fields,
+  options: StrictShape<Options, MongoIndexOptions>,
+): {
+  readonly fields: Fields;
+  readonly options: Options & MongoIndexOptions;
+};
+export function index(
+  fields: MongoIndexFields,
+  options?: MongoIndexOptions,
+): {
+  readonly fields: MongoIndexFields;
+  readonly options?: MongoIndexOptions;
+} {
+  return {
+    fields,
+    ...(options ? { options } : {}),
+  };
+}
 
 function createFieldReference<const ModelName extends string, const FieldName extends string>(
   modelName: ModelName,
@@ -855,12 +894,16 @@ type ModelInput<
   Fields extends Record<string, AnyFieldBuilder>,
   Relations extends Record<string, AnyRelationBuilder> | undefined,
   Collection extends string | undefined,
+  Indexes extends readonly MongoIndex[] | undefined,
+  CollectionOptions,
   Owner extends ModelNameInput | undefined,
   Base extends ModelNameInput | undefined,
   StorageRelations extends Record<string, StorageRelationSpec> | undefined,
   Discriminator extends ModelDiscriminatorInput<Record<string, VariantSpec>> | undefined,
 > = {
   readonly collection?: Collection;
+  readonly indexes?: Indexes;
+  readonly collectionOptions?: StrictShape<CollectionOptions, MongoCollectionOptions>;
   readonly storageRelations?: StorageRelations;
   readonly fields: Fields;
   readonly relations?: Relations;
@@ -874,6 +917,8 @@ export function model<
   const Fields extends Record<string, AnyFieldBuilder>,
   const Relations extends Record<string, AnyRelationBuilder> | undefined = undefined,
   const Collection extends string | undefined = undefined,
+  const Indexes extends readonly MongoIndex[] | undefined = undefined,
+  const CollectionOptions = undefined,
   const Owner extends ModelNameInput | undefined = undefined,
   const Base extends ModelNameInput | undefined = undefined,
   const StorageRelations extends Record<string, StorageRelationSpec> | undefined = undefined,
@@ -882,7 +927,17 @@ export function model<
     | undefined = undefined,
 >(
   name: Name,
-  input: ModelInput<Fields, Relations, Collection, Owner, Base, StorageRelations, Discriminator>,
+  input: ModelInput<
+    Fields,
+    Relations,
+    Collection,
+    Indexes,
+    CollectionOptions,
+    Owner,
+    Base,
+    StorageRelations,
+    Discriminator
+  >,
 ): ModelBuilder<
   Name,
   Fields,
@@ -905,6 +960,8 @@ export function model<
     __relations: (input.relations ?? {}) as Relations extends Record<string, AnyRelationBuilder>
       ? Relations
       : Record<never, never>,
+    __indexes: input.indexes,
+    __collectionOptions: input.collectionOptions,
     __collection: input.collection as Collection,
     __owner: (input.owner
       ? resolveModelName(input.owner)
@@ -1116,15 +1173,50 @@ function normalizeRoots(roots: Record<string, ModelNameInput> | undefined): Reco
 
 function buildCollections(
   models: Record<string, AnyModelBuilder> | undefined,
-): Record<string, Record<string, never>> {
-  const collections: Record<string, Record<string, never>> = {};
+): Record<string, MongoStorageCollection> {
+  const collections: Record<string, MongoStorageCollection> = {};
 
   for (const modelBuilder of Object.values(models ?? {})) {
     if (!modelBuilder.__collection) {
+      if (modelBuilder.__indexes && modelBuilder.__indexes.length > 0) {
+        throw new Error(
+          `Model "${modelBuilder.__name}" defines indexes but has no collection to attach them to.`,
+        );
+      }
+
+      if (modelBuilder.__collectionOptions) {
+        throw new Error(
+          `Model "${modelBuilder.__name}" defines collectionOptions but has no collection to attach them to.`,
+        );
+      }
+
       continue;
     }
 
-    collections[modelBuilder.__collection] = {};
+    const existingCollection = collections[modelBuilder.__collection] ?? {};
+    const existingIndexes = existingCollection.indexes ?? [];
+
+    if (existingCollection.options && modelBuilder.__collectionOptions) {
+      throw new Error(
+        `Collection "${modelBuilder.__collection}" has collectionOptions declared by multiple models. Author collectionOptions on a single model per collection.`,
+      );
+    }
+
+    collections[modelBuilder.__collection] =
+      modelBuilder.__indexes && modelBuilder.__indexes.length > 0
+        ? {
+            ...existingCollection,
+            indexes: [...existingIndexes, ...modelBuilder.__indexes],
+            ...(modelBuilder.__collectionOptions
+              ? { options: modelBuilder.__collectionOptions }
+              : {}),
+          }
+        : modelBuilder.__collectionOptions
+          ? {
+              ...existingCollection,
+              options: modelBuilder.__collectionOptions,
+            }
+          : existingCollection;
   }
 
   return collections;
@@ -1238,6 +1330,6 @@ export function defineContract(
 
   return buildContractFromDefinition({
     ...definition,
-    ...factory({ field, model, rel, valueObject }),
+    ...factory({ field, index, model, rel, valueObject }),
   });
 }

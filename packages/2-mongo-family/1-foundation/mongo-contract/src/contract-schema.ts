@@ -54,6 +54,101 @@ const StorageRelationEntrySchema = type({
   field: 'string',
 });
 
+const IndexFieldsSchema = type({
+  '+': 'reject',
+  '[string]': '1 | -1 | "text" | "2dsphere" | "2d" | "hashed"',
+});
+
+const CollationSchema = type({
+  '+': 'reject',
+  locale: 'string',
+  'caseLevel?': 'boolean',
+  'caseFirst?': '"off" | "upper" | "lower"',
+  'strength?': '1 | 2 | 3 | 4 | 5',
+  'numericOrdering?': 'boolean',
+  'alternate?': '"non-ignorable" | "shifted"',
+  'maxVariable?': '"punct" | "space"',
+  'backwards?': 'boolean',
+  'normalization?': 'boolean',
+});
+
+const WildcardProjectionSchema = type({
+  '+': 'reject',
+  '[string]': '0 | 1',
+});
+
+const IndexOptionsSchema = type({
+  '+': 'reject',
+  'unique?': 'boolean',
+  'name?': 'string',
+  'partialFilterExpression?': 'Record<string, unknown>',
+  'sparse?': 'boolean',
+  'expireAfterSeconds?': 'number',
+  'weights?': 'Record<string, number>',
+  'default_language?': 'string',
+  'language_override?': 'string',
+  'textIndexVersion?': 'number',
+  '2dsphereIndexVersion?': 'number',
+  'bits?': 'number',
+  'min?': 'number',
+  'max?': 'number',
+  'bucketSize?': 'number',
+  'hidden?': 'boolean',
+  'collation?': CollationSchema,
+  'wildcardProjection?': WildcardProjectionSchema,
+});
+
+const IndexSchema = type({
+  '+': 'reject',
+  fields: IndexFieldsSchema,
+  'options?': IndexOptionsSchema,
+});
+
+const IndexOptionDefaultsSchema = type({
+  '+': 'reject',
+  'storageEngine?': 'Record<string, unknown>',
+});
+
+const TimeSeriesCollectionOptionsSchema = type({
+  '+': 'reject',
+  timeField: 'string',
+  'metaField?': 'string',
+  'granularity?': '"seconds" | "minutes" | "hours"',
+  'bucketMaxSpanSeconds?': 'number',
+  'bucketRoundingSeconds?': 'number',
+});
+
+const ClusteredCollectionKeySchema = type({
+  '+': 'reject',
+  '[string]': '1',
+});
+
+const ClusteredCollectionOptionsSchema = type({
+  '+': 'reject',
+  'name?': 'string',
+  key: ClusteredCollectionKeySchema,
+  unique: 'boolean',
+});
+
+const ChangeStreamPreAndPostImagesSchema = type({
+  '+': 'reject',
+  enabled: 'boolean',
+});
+
+const CollectionOptionsSchema = type({
+  '+': 'reject',
+  'capped?': 'boolean',
+  'size?': 'number',
+  'max?': 'number',
+  'storageEngine?': 'Record<string, unknown>',
+  'indexOptionDefaults?': IndexOptionDefaultsSchema,
+  'collation?': CollationSchema,
+  'timeseries?': TimeSeriesCollectionOptionsSchema,
+  'clusteredIndex?': ClusteredCollectionOptionsSchema,
+  'expireAfterSeconds?': 'number',
+  'changeStreamPreAndPostImages?': ChangeStreamPreAndPostImagesSchema,
+});
+
 const ModelStorageSchema = type({
   '+': 'reject',
   'collection?': 'string',
@@ -81,7 +176,11 @@ const ModelDefinitionSchema = type({
   'owner?': 'string',
 });
 
-const StorageCollectionSchema = type({ '+': 'reject' });
+const StorageCollectionSchema = type({
+  '+': 'reject',
+  'indexes?': IndexSchema.array(),
+  'options?': CollectionOptionsSchema,
+});
 
 export const MongoContractSchema = type({
   '+': 'reject',

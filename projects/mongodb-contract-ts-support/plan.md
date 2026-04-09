@@ -80,6 +80,7 @@ Verify that Mongo `contract.ts` works through the real repo workflows instead of
 
 - The largest architectural choice is whether to extract a new family-neutral DSL core before Mongo lands. The plan assumes “extract only what Mongo immediately reuses.”
 - The callback helper namespace still needs a concrete decision. The plan assumes Mongo gets a SQL-adjacent callback shape without inheriting SQL-only helper concepts.
+- MongoDB collection validator authoring is intentionally deferred. Validators are a standard MongoDB feature and would be useful future contract metadata for DB-level guardrails, emit/setup flows, drift verification, and introspection, but they are not part of the current index and collection-options slice.
 - Union-field and `dict` authoring are intentionally deferred unless implementation reveals they are required for first-slice consumer compatibility.
 - Example/demo adoption should wait for explicit approval because the repo instructions call out example and CI changes as ask-first work.
 

@@ -1,5 +1,11 @@
 import mongoFamily from '@prisma-next/family-mongo/pack';
-import { defineContract, field, model, rel } from '@prisma-next/mongo-contract-ts/contract-builder';
+import {
+  defineContract,
+  field,
+  index,
+  model,
+  rel,
+} from '@prisma-next/mongo-contract-ts/contract-builder';
 import mongoTarget from '@prisma-next/target-mongo/pack';
 
 const User = model('User', {
@@ -11,6 +17,10 @@ const User = model('User', {
     _id: field.objectId(),
     name: field.string(),
     email: field.string(),
+  },
+  indexes: [index({ email: 1 }, { unique: true })],
+  collectionOptions: {
+    collation: { locale: 'en', strength: 2 },
   },
   relations: {
     addresses: rel.hasMany('Address'),

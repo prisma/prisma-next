@@ -1,6 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
-import { defineContract, field, model, rel, valueObject } from '../src/contract-builder';
+import { defineContract, field, index, model, rel, valueObject } from '../src/contract-builder';
 
 const mongoFamilyPack = {
   kind: 'family',
@@ -161,6 +161,139 @@ describe('mongo contract builder', () => {
     });
     expect(contract.models.Bug.base).toBe('Task');
     expect(contract.models.Comment.owner).toBe('Task');
+  });
+
+  it('lowers Mongo indexes into storage.collections', () => {
+    const User = model('User', {
+      collection: 'users',
+      fields: {
+        _id: field.objectId(),
+        email: field.string(),
+        createdAt: field.date(),
+        location: field.string(),
+      },
+      indexes: [
+        index({ email: 1 }, { unique: true }),
+        index({ createdAt: 1 }, { expireAfterSeconds: 3600 }),
+        index({ location: '2dsphere' }),
+      ],
+    });
+
+    const contract = defineContract({
+      family: mongoFamilyPack,
+      target: mongoTargetPack,
+      models: { User },
+    });
+
+    expect(contract.storage.collections).toEqual({
+      users: {
+        indexes: [
+          { fields: { email: 1 }, options: { unique: true } },
+          { fields: { createdAt: 1 }, options: { expireAfterSeconds: 3600 } },
+          { fields: { location: '2dsphere' } },
+        ],
+      },
+    });
+  });
+
+  it('rejects indexes on models without collections', () => {
+    const Comment = model('Comment', {
+      fields: {
+        _id: field.objectId(),
+        text: field.string(),
+      },
+      indexes: [index({ text: 'text' })],
+    });
+
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { Comment },
+      }),
+    ).toThrow('Model "Comment" defines indexes but has no collection to attach them to.');
+  });
+
+  it('lowers collection options into storage.collections', () => {
+    const User = model('User', {
+      collection: 'users',
+      fields: {
+        _id: field.objectId(),
+        email: field.string(),
+      },
+      collectionOptions: {
+        collation: { locale: 'en', strength: 2 },
+        changeStreamPreAndPostImages: { enabled: true },
+      },
+    });
+
+    const contract = defineContract({
+      family: mongoFamilyPack,
+      target: mongoTargetPack,
+      models: { User },
+    });
+
+    expect(contract.storage.collections).toEqual({
+      users: {
+        options: {
+          collation: { locale: 'en', strength: 2 },
+          changeStreamPreAndPostImages: { enabled: true },
+        },
+      },
+    });
+  });
+
+  it('rejects collection options on models without collections', () => {
+    const Comment = model('Comment', {
+      fields: {
+        _id: field.objectId(),
+        text: field.string(),
+      },
+      collectionOptions: {
+        collation: { locale: 'en' },
+      },
+    });
+
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { Comment },
+      }),
+    ).toThrow('Model "Comment" defines collectionOptions but has no collection to attach them to.');
+  });
+
+  it('rejects collection options declared by multiple models for the same collection', () => {
+    const Task = model('Task', {
+      collection: 'tasks',
+      fields: {
+        _id: field.objectId(),
+        title: field.string(),
+      },
+      collectionOptions: {
+        collation: { locale: 'en' },
+      },
+    });
+    const Bug = model('Bug', {
+      collection: 'tasks',
+      fields: {
+        _id: field.objectId(),
+        severity: field.string(),
+      },
+      collectionOptions: {
+        changeStreamPreAndPostImages: { enabled: true },
+      },
+    });
+
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { Task, Bug },
+      }),
+    ).toThrow(
+      'Collection "tasks" has collectionOptions declared by multiple models. Author collectionOptions on a single model per collection.',
+    );
   });
 
   it('supports the callback authoring form', () => {

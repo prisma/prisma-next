@@ -312,6 +312,28 @@ describe('mongoEmission.generateContractTypes', () => {
       expect(types).toContain('readonly posts: Record<string, never>');
     });
 
+    it('generates collection metadata for indexes and options', () => {
+      const contract = createMongoContract({
+        storage: {
+          collections: {
+            users: {
+              indexes: [{ fields: { email: 1 }, options: { unique: true } }],
+              options: {
+                collation: { locale: 'en', strength: 2 },
+              },
+            },
+          },
+        },
+      });
+      const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
+      expect(types).toContain('readonly users: { readonly indexes:');
+      expect(types).toContain('readonly fields: { readonly email: 1 }');
+      expect(types).toContain('readonly options: { readonly unique: true }');
+      expect(types).toContain(
+        "readonly collation: { readonly locale: 'en'; readonly strength: 2 }",
+      );
+    });
+
     it('generates empty collections', () => {
       const contract = createMongoContract({ storage: { collections: {} } });
       const types = generateContractDts(contract, mongoEmission, [], [], testHashes);

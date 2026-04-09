@@ -68,6 +68,140 @@ describe('validateMongoContract()', () => {
       const json = { ...makeValidContractJson(), extra: true };
       expect(() => validateMongoContract(json)).toThrow();
     });
+
+    it('accepts collection indexes', () => {
+      const json = {
+        ...makeValidContractJson(),
+        storage: {
+          collections: {
+            items: {
+              indexes: [
+                {
+                  fields: { _id: 1 },
+                  options: {
+                    unique: true,
+                    hidden: true,
+                    name: 'item_id_idx',
+                    collation: { locale: 'en', strength: 2 },
+                  },
+                },
+                { fields: { name: 'text' } },
+              ],
+            },
+          },
+        },
+        models: {
+          Item: {
+            fields: {
+              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+            },
+            storage: { collection: 'items' },
+          },
+        },
+      };
+
+      const result = validateMongoContract(json);
+
+      expect(result.contract.storage.collections.items).toEqual({
+        indexes: [
+          {
+            fields: { _id: 1 },
+            options: {
+              unique: true,
+              hidden: true,
+              name: 'item_id_idx',
+              collation: { locale: 'en', strength: 2 },
+            },
+          },
+          { fields: { name: 'text' } },
+        ],
+      });
+    });
+
+    it('accepts collection options', () => {
+      const json = {
+        ...makeValidContractJson(),
+        storage: {
+          collections: {
+            items: {
+              options: {
+                capped: true,
+                size: 4096,
+                expireAfterSeconds: 3600,
+                collation: { locale: 'en', strength: 2 },
+                changeStreamPreAndPostImages: { enabled: true },
+                timeseries: {
+                  timeField: 'createdAt',
+                  granularity: 'hours',
+                },
+                clusteredIndex: {
+                  name: '_id_',
+                  key: { _id: 1 },
+                  unique: true,
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const result = validateMongoContract(json);
+
+      expect(result.contract.storage.collections.items).toEqual({
+        options: {
+          capped: true,
+          size: 4096,
+          expireAfterSeconds: 3600,
+          collation: { locale: 'en', strength: 2 },
+          changeStreamPreAndPostImages: { enabled: true },
+          timeseries: {
+            timeField: 'createdAt',
+            granularity: 'hours',
+          },
+          clusteredIndex: {
+            name: '_id_',
+            key: { _id: 1 },
+            unique: true,
+          },
+        },
+      });
+    });
+
+    it('rejects unknown index option keys', () => {
+      const json = {
+        ...makeValidContractJson(),
+        storage: {
+          collections: {
+            items: {
+              indexes: [{ fields: { _id: 1 }, options: { unsupported: true } }],
+            },
+          },
+        },
+      };
+
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects invalid collection option values', () => {
+      const json = {
+        ...makeValidContractJson(),
+        storage: {
+          collections: {
+            items: {
+              options: {
+                timeseries: {
+                  timeField: 'createdAt',
+                  granularity: 'days',
+                },
+              },
+            },
+          },
+        },
+      };
+
+      expect(() => validateMongoContract(json)).toThrow();
+    });
   });
 
   describe('domain validation passthrough', () => {

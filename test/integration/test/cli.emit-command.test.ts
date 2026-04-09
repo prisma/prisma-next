@@ -791,6 +791,16 @@ model Post {
         expect(contractJson).toMatchObject({
           targetFamily: 'mongo',
           target: 'mongo',
+          storage: {
+            collections: {
+              users: {
+                indexes: [{ fields: { email: 1 }, options: { unique: true } }],
+                options: {
+                  collation: { locale: 'en', strength: 2 },
+                },
+              },
+            },
+          },
           models: {
             Task: expect.objectContaining({
               storage: expect.objectContaining({
@@ -817,6 +827,14 @@ model Post {
         expect(contractDts).toContain("readonly owner: 'Task'");
         expect(contractDts).toContain("readonly base: 'Task'");
         expect(contractDts).toContain("readonly discriminator: { readonly field: 'type' }");
+        expect(contractDts).toContain('readonly users: {');
+        expect(contractDts).toContain('readonly indexes:');
+        expect(contractDts).toContain('readonly email: 1');
+        expect(contractDts).toContain('readonly unique: true');
+        expect(contractDts).toContain('readonly options:');
+        expect(contractDts).toContain(
+          "readonly collation: { readonly locale: 'en'; readonly strength: 2 }",
+        );
 
         const jsonOutput = consoleOutput.join('\n');
         const parsed = JSON.parse(jsonOutput);

@@ -9,6 +9,15 @@ import { describeWithMongoDB } from './setup';
 const { contract } = validateMongoContract<Contract>(ormContractJson);
 
 describeWithMongoDB('mongoOrm integration', (ctx) => {
+  it('loads generated collection indexes and options', () => {
+    expect(contract.storage.collections.users).toEqual({
+      indexes: [{ fields: { email: 1 }, options: { unique: true } }],
+      options: {
+        collation: { locale: 'en', strength: 2 },
+      },
+    });
+  });
+
   it('all() on a non-polymorphic root returns typed results', async () => {
     const db = ctx.client.db(ctx.dbName);
     await db.collection('users').insertMany([

@@ -12,6 +12,7 @@ export type {
 export {
   defineContract,
   field,
+  index,
   model,
   rel,
   valueObject,
