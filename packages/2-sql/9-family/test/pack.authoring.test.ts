@@ -7,7 +7,7 @@ describe('sql family pack authoring contributions', () => {
       sql: {
         String: {
           kind: 'typeConstructor',
-          args: [{ kind: 'number', name: 'length', integer: true, minimum: 1 }],
+          args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, maximum: 10485760 }],
           output: {
             codecId: 'sql/varchar@1',
             nativeType: 'character varying',
@@ -20,6 +20,16 @@ describe('sql family pack authoring contributions', () => {
           },
         },
       },
+    });
+  });
+
+  it('bounds sql.String length to the Postgres varchar maximum', () => {
+    const descriptor = sqlFamilyPack.authoring?.type.sql.String.args[0];
+    expect(descriptor).toMatchObject({
+      kind: 'number',
+      integer: true,
+      minimum: 1,
+      maximum: 10485760,
     });
   });
 });
