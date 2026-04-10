@@ -505,6 +505,39 @@ describe('validateMongoContract()', () => {
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
+
+    it('rejects validator missing jsonSchema', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        validator: {
+          validationLevel: 'strict',
+          validationAction: 'error',
+        },
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects validator missing validationLevel', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        validator: {
+          jsonSchema: { bsonType: 'object' },
+          validationAction: 'error',
+        },
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects validator missing validationAction', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        validator: {
+          jsonSchema: { bsonType: 'object' },
+          validationLevel: 'strict',
+        },
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
   });
 
   describe('storage collection options validation', () => {
@@ -562,6 +595,27 @@ describe('validateMongoContract()', () => {
       } as typeof json.storage.collections.items;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
+    });
+
+    it('rejects capped option without required size', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        options: { capped: { max: 100 } },
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects invalid wildcardProjection values', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [
+          {
+            keys: [{ field: '$**', direction: 1 }],
+            wildcardProjection: { name: 2 },
+          },
+        ],
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('accepts collection with no validator or options (backward compat)', () => {
