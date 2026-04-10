@@ -1,7 +1,6 @@
-import { ObjectId } from 'mongodb';
 import type { Db } from '../db';
 import { executeRaw } from './execute-raw';
-import { objectIdEq } from './object-id-filter';
+import { objectIdEq, rawObjectIdFilter } from './object-id-filter';
 
 export function getCartByUserId(db: Db, userId: string) {
   return db.orm.carts.where(objectIdEq('userId', userId)).first();
@@ -48,8 +47,8 @@ export async function addToCart(
   const plan = db.raw
     .collection('carts')
     .findOneAndUpdate(
-      { userId: new ObjectId(userId) },
-      { $push: { items: item }, $setOnInsert: { userId: new ObjectId(userId) } },
+      rawObjectIdFilter('userId', userId),
+      { $push: { items: item }, $setOnInsert: rawObjectIdFilter('userId', userId) },
       { upsert: true },
     )
     .build();
@@ -59,7 +58,7 @@ export async function addToCart(
 export async function removeFromCart(db: Db, userId: string, productId: string) {
   const plan = db.raw
     .collection('carts')
-    .updateOne({ userId: new ObjectId(userId) }, { $pull: { items: { productId } } })
+    .updateOne(rawObjectIdFilter('userId', userId), { $pull: { items: { productId } } })
     .build();
   await executeRaw(db, plan);
 }
