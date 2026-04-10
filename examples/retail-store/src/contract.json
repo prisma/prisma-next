@@ -13,6 +13,29 @@
     "users": "User"
   },
   "models": {
+    "AddToCartEvent": {
+      "base": "Event",
+      "fields": {
+        "brand": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        },
+        "productId": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "collection": "events"
+      }
+    },
     "Cart": {
       "fields": {
         "_id": {
@@ -57,19 +80,15 @@
       }
     },
     "Event": {
+      "discriminator": {
+        "field": "type"
+      },
       "fields": {
         "_id": {
           "nullable": false,
           "type": {
             "codecId": "mongo/objectId@1",
             "kind": "scalar"
-          }
-        },
-        "metadata": {
-          "nullable": false,
-          "type": {
-            "kind": "valueObject",
-            "name": "EventMetadata"
           }
         },
         "sessionId": {
@@ -104,6 +123,17 @@
       "relations": {},
       "storage": {
         "collection": "events"
+      },
+      "variants": {
+        "AddToCartEvent": {
+          "value": "add-to-cart"
+        },
+        "SearchEvent": {
+          "value": "search"
+        },
+        "ViewProductEvent": {
+          "value": "view-product"
+        }
       }
     },
     "Invoice": {
@@ -390,6 +420,22 @@
         "collection": "products"
       }
     },
+    "SearchEvent": {
+      "base": "Event",
+      "fields": {
+        "query": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "collection": "events"
+      }
+    },
     "User": {
       "fields": {
         "_id": {
@@ -449,6 +495,43 @@
       },
       "storage": {
         "collection": "users"
+      }
+    },
+    "ViewProductEvent": {
+      "base": "Event",
+      "fields": {
+        "brand": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        },
+        "exitMethod": {
+          "nullable": true,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        },
+        "productId": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        },
+        "subCategory": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "collection": "events"
       }
     }
   },
@@ -524,45 +607,6 @@
         },
         "productId": {
           "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        }
-      }
-    },
-    "EventMetadata": {
-      "fields": {
-        "brand": {
-          "nullable": true,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "exitMethod": {
-          "nullable": true,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "productId": {
-          "nullable": true,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "query": {
-          "nullable": true,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "subCategory": {
-          "nullable": true,
           "type": {
             "codecId": "mongo/string@1",
             "kind": "scalar"
@@ -698,15 +742,18 @@
   },
   "storage": {
     "collections": {
+      "addToCartEvent": {},
       "carts": {},
       "events": {},
       "invoices": {},
       "locations": {},
       "orders": {},
       "products": {},
-      "users": {}
+      "searchEvent": {},
+      "users": {},
+      "viewProductEvent": {}
     },
-    "storageHash": "sha256:b2f017227576ceb083f5af0684ab88a70f7f5970ab4e636eb6c746aad588695f"
+    "storageHash": "sha256:71e1f44f6bba16b9ed93e3105524e31153ce2edae6780a600348566599591bc0"
   },
   "capabilities": {},
   "extensionPacks": {},
