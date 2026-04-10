@@ -366,15 +366,6 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
     const declarationValueColumn = trimmedStartColumn + Math.max(valueOffset, 0);
 
     const typeAndAttributeSplit = splitTypeAndAttributes(declarationValue);
-    if (!typeAndAttributeSplit) {
-      pushDiagnostic(context, {
-        code: 'PSL_INVALID_TYPES_MEMBER',
-        message: `Invalid types declaration "${line}"`,
-        span: createTrimmedLineSpan(context, lineIndex),
-      });
-      continue;
-    }
-
     const typeSource = typeAndAttributeSplit.typeSource.trim();
     const attributeSource = typeAndAttributeSplit.attributeSource.trimStart();
     const leadingAttributeWhitespace =
@@ -613,15 +604,6 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
   const separator = fieldMatch[2] ?? '';
   const remainder = fieldMatch[3] ?? '';
   const typeAndAttributeSplit = splitTypeAndAttributes(remainder);
-  if (!typeAndAttributeSplit) {
-    pushDiagnostic(context, {
-      code: 'PSL_INVALID_MODEL_MEMBER',
-      message: `Invalid model member declaration "${line}"`,
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
-    return undefined;
-  }
-
   const rawTypeSource = typeAndAttributeSplit.typeSource.trim();
   const attributePart = typeAndAttributeSplit.attributeSource;
   const optional = rawTypeSource.endsWith('?');
@@ -716,13 +698,11 @@ function isQuoteEscaped(value: string, quoteIndex: number): boolean {
   return backslashCount % 2 === 1;
 }
 
-function splitTypeAndAttributes(value: string):
-  | {
-      readonly typeSource: string;
-      readonly attributeSource: string;
-      readonly attributeOffset: number;
-    }
-  | undefined {
+function splitTypeAndAttributes(value: string): {
+  readonly typeSource: string;
+  readonly attributeSource: string;
+  readonly attributeOffset: number;
+} {
   let depthParen = 0;
   let depthBracket = 0;
   let depthBrace = 0;
