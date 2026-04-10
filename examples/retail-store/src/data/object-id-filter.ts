@@ -6,3 +6,8 @@ export function objectIdEq(field: string, id: string | ObjectId): MongoFieldFilt
   const oid = id instanceof ObjectId ? id : new ObjectId(id);
   return MongoFieldFilter.eq(field, new MongoParamRef(oid));
 }
+
+export function rawObjectIdFilter(field: string, id: string | ObjectId): Record<string, ObjectId> {
+  const oid = id instanceof ObjectId ? id : new ObjectId(id);
+  return { [field]: oid };
+}
