@@ -5,6 +5,9 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { type Db, MongoClient } from 'mongodb';
+import { version } from '../../package.json' with { type: 'json' };
+
+const DRIVER_INFO = { name: 'Prisma', version };
 
 export class MongoControlDriver implements ControlDriverInstance<'mongo', 'mongo'> {
   readonly familyId = 'mongo' as const;
@@ -38,6 +41,7 @@ const mongoControlDriverDescriptor: ControlDriverDescriptor<'mongo', 'mongo', Mo
       const client = new MongoClient(url, {
         serverSelectionTimeoutMS: 5000,
         connectTimeoutMS: 5000,
+        driverInfo: DRIVER_INFO,
       });
       try {
         await client.connect();
