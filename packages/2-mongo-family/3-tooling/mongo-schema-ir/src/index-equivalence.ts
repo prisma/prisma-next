@@ -1,3 +1,4 @@
+import { canonicalize } from './canonicalize';
 import type { MongoSchemaIndex } from './schema-index';
 
 /**
@@ -48,10 +49,11 @@ export function indexesEquivalent(a: MongoSchemaIndex, b: MongoSchemaIndex): boo
   if (a.unique !== b.unique) return false;
   if (a.sparse !== b.sparse) return false;
   if (a.expireAfterSeconds !== b.expireAfterSeconds) return false;
-  if (!deepEqual(a.partialFilterExpression, b.partialFilterExpression)) return false;
-  if (!deepEqual(a.wildcardProjection, b.wildcardProjection)) return false;
-  if (!deepEqual(a.collation, b.collation)) return false;
-  if (!deepEqual(a.weights, b.weights)) return false;
+  if (canonicalize(a.partialFilterExpression) !== canonicalize(b.partialFilterExpression))
+    return false;
+  if (canonicalize(a.wildcardProjection) !== canonicalize(b.wildcardProjection)) return false;
+  if (canonicalize(a.collation) !== canonicalize(b.collation)) return false;
+  if (canonicalize(a.weights) !== canonicalize(b.weights)) return false;
   if (a.default_language !== b.default_language) return false;
   if (a.language_override !== b.language_override) return false;
   return true;

@@ -662,6 +662,35 @@ describe('MongoMigrationPlanner', () => {
       expect(collModOps[0]!.operationClass).toBe('destructive');
     });
 
+    it('treats reordered jsonSchema keys as equivalent (no operation emitted)', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { properties: { name: { bsonType: 'string' } }, bsonType: 'object' },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object', properties: { name: { bsonType: 'string' } } },
+              validationLevel: 'strict',
+              validationAction: 'error',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(0);
+    });
+
     it('classifies validationAction error->warn as widening', () => {
       const contract = makeContract({
         users: {
@@ -884,6 +913,51 @@ describe('MongoMigrationPlanner', () => {
           options: { capped: { size: 2097152 } },
         },
       });
+      const origin: MongoSchemaIR = {
+        collections: {
+          events: new MongoSchemaCollection({
+            name: 'events',
+            options: new MongoSchemaCollectionOptions({
+              capped: { size: 1048576 },
+            }),
+          }),
+        },
+      };
+      const result = planner.plan({
+        contract,
+        schema: origin,
+        policy: ALL_CLASSES_POLICY,
+        frameworkComponents: [],
+      });
+      expect(result.kind).toBe('failure');
+      if (result.kind !== 'failure') throw new Error('Expected failure');
+      expect(result.conflicts.some((c) => c.summary.includes('immutable'))).toBe(true);
+    });
+
+    it('reports conflict when adding collation to existing collection without options', () => {
+      const contract = makeContract({
+        users: {
+          options: { collation: { locale: 'en', strength: 2 } },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({ name: 'users' }),
+        },
+      };
+      const result = planner.plan({
+        contract,
+        schema: origin,
+        policy: ALL_CLASSES_POLICY,
+        frameworkComponents: [],
+      });
+      expect(result.kind).toBe('failure');
+      if (result.kind !== 'failure') throw new Error('Expected failure');
+      expect(result.conflicts.some((c) => c.summary.includes('immutable'))).toBe(true);
+    });
+
+    it('reports conflict when removing capped from existing collection', () => {
+      const contract = makeContract({ events: {} });
       const origin: MongoSchemaIR = {
         collections: {
           events: new MongoSchemaCollection({
