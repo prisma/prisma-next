@@ -1,3 +1,5 @@
+import { MongoFieldFilter, MongoOrExpr } from '@prisma-next/mongo-query-ast/execution';
+import { MongoParamRef } from '@prisma-next/mongo-value';
 import type { FieldOutputTypes } from '../contract';
 import type { Db } from '../db';
 import { collectResults } from './execute-raw';
@@ -9,8 +11,27 @@ export function findProducts(db: Db) {
   return db.orm.products.all();
 }
 
+export function findProductsPaginated(db: Db, skip: number, take: number) {
+  return db.orm.products.skip(skip).take(take).all();
+}
+
 export function findProductById(db: Db, id: string) {
   return db.orm.products.where(objectIdEq('_id', id)).first();
+}
+
+function escapeRegex(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export async function searchProducts(db: Db, query: string): Promise<Product[]> {
+  const regex = new MongoParamRef(new RegExp(escapeRegex(query), 'i'));
+  const filter = MongoOrExpr.of([
+    MongoFieldFilter.of('name', '$regex', regex),
+    MongoFieldFilter.of('brand', '$regex', regex),
+    MongoFieldFilter.of('articleType', '$regex', regex),
+  ]);
+  const plan = db.pipeline.from('products').match(filter).build();
+  return collectResults<Product>(db, plan);
 }
 
 export async function getRandomProducts(db: Db, count: number): Promise<Product[]> {

@@ -1,52 +1,104 @@
-import { findProducts } from '../src/data/products';
+import Link from 'next/link';
+import { Badge } from '../src/components/ui/badge';
+import { Button } from '../src/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../src/components/ui/card';
+import { findProductsPaginated, searchProducts } from '../src/data/products';
 import { getDb } from '../src/db-singleton';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProductCatalog() {
+const PAGE_SIZE = 8;
+
+export default async function ProductCatalog({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const page = Math.max(1, Number(params['page']) || 1);
+  const query = typeof params['q'] === 'string' ? params['q'] : '';
+
   const db = await getDb();
-  const products = await findProducts(db);
+
+  const products = query
+    ? await searchProducts(db, query)
+    : await findProductsPaginated(db, (page - 1) * PAGE_SIZE, PAGE_SIZE);
 
   return (
     <div>
-      <h1 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Product Catalog</h1>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '1.5rem',
-        }}
-      >
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Product Catalog</h1>
+      </div>
+
+      <form className="mb-6 flex gap-2" action="/" method="GET">
+        <input
+          name="q"
+          type="text"
+          defaultValue={query}
+          placeholder="Search products..."
+          className="flex h-10 w-full max-w-sm rounded-md border border-input bg-card px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <Button type="submit" size="default">
+          Search
+        </Button>
+        {query && (
+          <Button variant="ghost" asChild>
+            <Link href="/">Clear</Link>
+          </Button>
+        )}
+      </form>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {products.map((product) => (
-          <a
+          <Link
             key={String(product._id)}
             href={`/products/${String(product._id)}`}
-            style={{
-              background: 'var(--card-bg)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: '1.25rem',
-              display: 'block',
-              textDecoration: 'none',
-              color: 'inherit',
-              transition: 'box-shadow 0.2s',
-            }}
+            className="no-underline text-inherit"
           >
-            <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>
-              {product.brand}
-            </div>
-            <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{product.name}</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '0.75rem' }}>
-              {product.articleType} · {product.subCategory}
-            </div>
-            <div style={{ fontWeight: 700, color: 'var(--accent)' }}>
-              ${Number(product.price.amount).toFixed(2)} {product.price.currency}
-            </div>
-          </a>
+            <Card className="h-full hover:shadow-md transition-shadow">
+              <CardHeader>
+                <p className="text-xs text-muted">{product.brand}</p>
+                <CardTitle className="text-base">{product.name}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-1.5 flex-wrap mb-3">
+                  <Badge variant="muted">{product.articleType}</Badge>
+                  <Badge variant="outline">{product.subCategory}</Badge>
+                </div>
+                <p className="text-sm text-muted line-clamp-2">{product.description}</p>
+              </CardContent>
+              <CardFooter>
+                <span className="font-bold text-accent">
+                  ${Number(product.price.amount).toFixed(2)}
+                </span>
+              </CardFooter>
+            </Card>
+          </Link>
         ))}
       </div>
+
       {products.length === 0 && (
-        <p style={{ color: 'var(--muted)' }}>No products found. Run the seed script first.</p>
+        <p className="text-muted text-center py-12">
+          {query
+            ? `No products matching "${query}".`
+            : 'No products found. Run the seed script first.'}
+        </p>
+      )}
+
+      {!query && (
+        <div className="flex justify-center gap-2 mt-8">
+          {page > 1 && (
+            <Button variant="outline" asChild>
+              <Link href={`/?page=${page - 1}`}>Previous</Link>
+            </Button>
+          )}
+          <span className="flex items-center px-4 text-sm text-muted">Page {page}</span>
+          {products.length === PAGE_SIZE && (
+            <Button variant="outline" asChild>
+              <Link href={`/?page=${page + 1}`}>Next</Link>
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );
