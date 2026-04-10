@@ -9,6 +9,7 @@ import {
   type MongoSkipStage,
   type MongoSortStage,
 } from '@prisma-next/mongo-query-ast/execution';
+import { MongoParamRef } from '@prisma-next/mongo-value';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
@@ -309,6 +310,35 @@ describe('MongoCollection write methods', () => {
       expect(executor.lastCommand!.kind).toBe('insertOne');
       expect(executor.lastCommand!.collection).toBe('users');
     });
+
+    it('attaches codecId from contract fields to MongoParamRef in document', async () => {
+      const executor = createMockExecutor([{ insertedId: 'id' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.create({ name: 'Alice', email: 'a@b.c' });
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('insertOne');
+      if (command.kind === 'insertOne') {
+        const nameRef = command.document['name'] as MongoParamRef;
+        expect(nameRef).toBeInstanceOf(MongoParamRef);
+        expect(nameRef.codecId).toBe('mongo/string@1');
+        const emailRef = command.document['email'] as MongoParamRef;
+        expect(emailRef).toBeInstanceOf(MongoParamRef);
+        expect(emailRef.codecId).toBe('mongo/string@1');
+      }
+    });
+
+    it('attaches objectId codecId for ObjectId-typed fields', async () => {
+      const executor = createMockExecutor([{ insertedId: 'id' }]);
+      const col = createMongoCollection(contract, 'Task', executor);
+      await col.create({ title: 'Fix bug', assigneeId: 'abc123', type: 'bug' });
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('insertOne');
+      if (command.kind === 'insertOne') {
+        const assigneeRef = command.document['assigneeId'] as MongoParamRef;
+        expect(assigneeRef).toBeInstanceOf(MongoParamRef);
+        expect(assigneeRef.codecId).toBe('mongo/objectId@1');
+      }
+    });
   });
 
   describe('createAll()', () => {
@@ -375,6 +405,20 @@ describe('MongoCollection write methods', () => {
       const col = createMongoCollection(contract, 'User', executor);
       const result = await col.where(MongoFieldFilter.eq('_id', 'missing')).update({ name: 'X' });
       expect(result).toBeNull();
+    });
+
+    it('attaches codecId to $set fields from contract', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1', name: 'Updated', email: 'a@b.c' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update({ name: 'Updated' });
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('findOneAndUpdate');
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        const nameRef = update['$set']!['name']!;
+        expect(nameRef).toBeInstanceOf(MongoParamRef);
+        expect(nameRef.codecId).toBe('mongo/string@1');
+      }
     });
   });
 
