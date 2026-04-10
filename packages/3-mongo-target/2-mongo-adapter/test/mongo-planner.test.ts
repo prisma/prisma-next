@@ -304,6 +304,51 @@ describe('MongoMigrationPlanner', () => {
       if (result.kind !== 'failure') throw new Error('Expected failure');
       expect(result.conflicts).toHaveLength(3);
     });
+
+    it('rejects destructive validator add with additive-only policy', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { bsonType: 'object' },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin = irWithCollection('users', []);
+      const result = planner.plan({
+        contract,
+        schema: origin,
+        policy: ADDITIVE_ONLY_POLICY,
+        frameworkComponents: [],
+      });
+      expect(result.kind).toBe('failure');
+      if (result.kind !== 'failure') throw new Error('Expected failure');
+      expect(result.conflicts).toHaveLength(1);
+      expect(result.conflicts[0]!.summary).toContain('destructive');
+    });
+
+    it('allows widening validator removal with widening policy', () => {
+      const wideningPolicy: MigrationOperationPolicy = {
+        allowedOperationClasses: ['additive', 'widening'],
+      };
+      const contract = makeContract({ users: {} });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object' },
+              validationLevel: 'strict',
+              validationAction: 'error',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin, wideningPolicy);
+      expect(plan.operations).toHaveLength(1);
+      expect(plan.operations[0]!.operationClass).toBe('widening');
+    });
   });
 
   describe('operation structure', () => {

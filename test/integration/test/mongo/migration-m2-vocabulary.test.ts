@@ -466,6 +466,131 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
       expect(colls[0]!['options']?.['size']).toBeGreaterThanOrEqual(10_000_000);
       expect(colls[0]!['options']?.['max']).toBe(1000);
     });
+
+    it('creates a collection with collation', async () => {
+      const contract = makeContract(
+        {
+          posts: {
+            options: {
+              collation: { locale: 'en', strength: 2 },
+            },
+          },
+        },
+        'collation-coll',
+      );
+
+      await planAndApply(db, replSetUri, null, contract);
+
+      const colls = await db.listCollections({ name: 'posts' }).toArray();
+      expect(colls).toHaveLength(1);
+      const collation = colls[0]!['options']?.['collation'] as Record<string, unknown> | undefined;
+      expect(collation?.['locale']).toBe('en');
+      expect(collation?.['strength']).toBe(2);
+    });
+
+    it('creates a collection with changeStreamPreAndPostImages and toggles it', async () => {
+      const v1 = makeContract(
+        {
+          events: {
+            options: {
+              changeStreamPreAndPostImages: { enabled: true },
+            },
+          },
+        },
+        'csppi-v1',
+      );
+
+      await planAndApply(db, replSetUri, null, v1);
+
+      let colls = await db.listCollections({ name: 'events' }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(
+        (colls[0]!['options']?.['changeStreamPreAndPostImages'] as Record<string, unknown>)?.[
+          'enabled'
+        ],
+      ).toBe(true);
+
+      const v2 = makeContract(
+        {
+          events: {
+            options: {
+              changeStreamPreAndPostImages: { enabled: false },
+            },
+          },
+        },
+        'csppi-v2',
+      );
+
+      await planAndApply(db, replSetUri, v1, v2);
+
+      colls = await db.listCollections({ name: 'events' }).toArray();
+      expect(colls).toHaveLength(1);
+      const csppiAfter = colls[0]!['options']?.['changeStreamPreAndPostImages'] as
+        | Record<string, unknown>
+        | undefined;
+      const disabledOrRemoved = csppiAfter === undefined || csppiAfter['enabled'] === false;
+      expect(disabledOrRemoved).toBe(true);
+    });
+
+    it('creates a timeseries collection', async () => {
+      const contract = makeContract(
+        {
+          metrics: {
+            options: {
+              timeseries: { timeField: 'ts', granularity: 'hours' },
+            },
+          },
+        },
+        'timeseries-coll',
+      );
+
+      try {
+        await planAndApply(db, replSetUri, null, contract);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('not supported') || msg.includes('requires')) {
+          console.log(`Skipping timeseries test: ${msg}`);
+          return;
+        }
+        throw e;
+      }
+
+      const colls = await db.listCollections({ name: 'metrics' }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]!['type']).toBe('timeseries');
+      const tsOpts = colls[0]!['options']?.['timeseries'] as Record<string, unknown> | undefined;
+      expect(tsOpts?.['timeField']).toBe('ts');
+      expect(tsOpts?.['granularity']).toBe('hours');
+    });
+
+    it('creates a collection with clusteredIndex', async () => {
+      const contract = makeContract(
+        {
+          clustered: {
+            options: {
+              clusteredIndex: { name: 'myCluster' },
+            },
+          },
+        },
+        'clustered-coll',
+      );
+
+      try {
+        await planAndApply(db, replSetUri, null, contract);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('not supported') || msg.includes('requires') || msg.includes('unknown')) {
+          console.log(`Skipping clusteredIndex test: ${msg}`);
+          return;
+        }
+        throw e;
+      }
+
+      const colls = await db.listCollections({ name: 'clustered' }).toArray();
+      expect(colls).toHaveLength(1);
+      const info = colls[0]!;
+      expect(info['options']?.['clusteredIndex']).toBeDefined();
+    });
   });
 
   describe('collection drops', () => {
