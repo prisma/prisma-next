@@ -10,7 +10,7 @@ import type {
 } from '@prisma-next/mongo-query-ast/control';
 import {
   MongoSchemaCollection,
-  MongoSchemaCollectionOptionsNode,
+  MongoSchemaCollectionOptions,
   MongoSchemaIndex,
   type MongoSchemaIR,
   MongoSchemaValidator,
@@ -820,7 +820,7 @@ describe('MongoMigrationPlanner', () => {
         collections: {
           events: new MongoSchemaCollection({
             name: 'events',
-            options: new MongoSchemaCollectionOptionsNode({
+            options: new MongoSchemaCollectionOptions({
               capped: { size: 1048576 },
             }),
           }),
@@ -845,7 +845,7 @@ describe('MongoMigrationPlanner', () => {
         collections: {
           events: new MongoSchemaCollection({
             name: 'events',
-            options: new MongoSchemaCollectionOptionsNode({
+            options: new MongoSchemaCollectionOptions({
               capped: { size: 1048576 },
             }),
           }),
@@ -872,7 +872,7 @@ describe('MongoMigrationPlanner', () => {
         collections: {
           events: new MongoSchemaCollection({
             name: 'events',
-            options: new MongoSchemaCollectionOptionsNode({
+            options: new MongoSchemaCollectionOptions({
               changeStreamPreAndPostImages: { enabled: false },
             }),
           }),
@@ -896,7 +896,7 @@ describe('MongoMigrationPlanner', () => {
         collections: {
           events: new MongoSchemaCollection({
             name: 'events',
-            options: new MongoSchemaCollectionOptionsNode({
+            options: new MongoSchemaCollectionOptions({
               changeStreamPreAndPostImages: { enabled: true },
             }),
           }),

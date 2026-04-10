@@ -506,7 +506,7 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
   });
 
   describe('full lifecycle: create → modify → remove', () => {
-    it('exercices a multi-step lifecycle for diverse index types', async () => {
+    it('exercises a multi-step lifecycle for diverse index types', async () => {
       const v1 = makeContract(
         {
           articles: {

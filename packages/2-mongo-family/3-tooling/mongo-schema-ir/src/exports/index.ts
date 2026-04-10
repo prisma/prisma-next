@@ -3,7 +3,7 @@ export { deepEqual, indexesEquivalent } from '../index-equivalence';
 export type { MongoSchemaCollectionCtorOptions } from '../schema-collection';
 export { MongoSchemaCollection } from '../schema-collection';
 export type { MongoSchemaCollectionOptionsInput } from '../schema-collection-options';
-export { MongoSchemaCollectionOptionsNode } from '../schema-collection-options';
+export { MongoSchemaCollectionOptions } from '../schema-collection-options';
 export type { MongoSchemaIndexOptions } from '../schema-index';
 export { MongoSchemaIndex } from '../schema-index';
 export type { MongoSchemaIR } from '../schema-ir';

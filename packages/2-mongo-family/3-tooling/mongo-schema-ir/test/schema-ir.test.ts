@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { canonicalize } from '../src/canonicalize';
 import { indexesEquivalent } from '../src/index-equivalence';
 import { MongoSchemaCollection } from '../src/schema-collection';
-import { MongoSchemaCollectionOptionsNode } from '../src/schema-collection-options';
+import { MongoSchemaCollectionOptions } from '../src/schema-collection-options';
 import { MongoSchemaIndex } from '../src/schema-index';
 import { MongoSchemaValidator } from '../src/schema-validator';
 import type { MongoSchemaVisitor } from '../src/visitor';
@@ -156,9 +156,9 @@ describe('MongoSchemaValidator', () => {
   });
 });
 
-describe('MongoSchemaCollectionOptionsNode', () => {
+describe('MongoSchemaCollectionOptions', () => {
   it('constructs with no options', () => {
-    const opts = new MongoSchemaCollectionOptionsNode({});
+    const opts = new MongoSchemaCollectionOptions({});
     expect(opts.kind).toBe('collectionOptions');
     expect(opts.capped).toBeUndefined();
     expect(opts.timeseries).toBeUndefined();
@@ -168,7 +168,7 @@ describe('MongoSchemaCollectionOptionsNode', () => {
   });
 
   it('constructs with all options', () => {
-    const opts = new MongoSchemaCollectionOptionsNode({
+    const opts = new MongoSchemaCollectionOptions({
       capped: { size: 1048576, max: 1000 },
       timeseries: { timeField: 'ts', metaField: 'meta', granularity: 'hours' },
       collation: { locale: 'en' },
@@ -183,12 +183,12 @@ describe('MongoSchemaCollectionOptionsNode', () => {
   });
 
   it('is frozen after construction', () => {
-    const opts = new MongoSchemaCollectionOptionsNode({});
+    const opts = new MongoSchemaCollectionOptions({});
     expect(Object.isFrozen(opts)).toBe(true);
   });
 
   it('dispatches via visitor', () => {
-    const opts = new MongoSchemaCollectionOptionsNode({ capped: { size: 100 } });
+    const opts = new MongoSchemaCollectionOptions({ capped: { size: 100 } });
     const visitor: MongoSchemaVisitor<string> = {
       collection: () => 'collection',
       index: () => 'index',
@@ -206,7 +206,7 @@ describe('MongoSchemaCollection with validator and options', () => {
       validationLevel: 'strict',
       validationAction: 'error',
     });
-    const options = new MongoSchemaCollectionOptionsNode({
+    const options = new MongoSchemaCollectionOptions({
       capped: { size: 1048576 },
     });
     const coll = new MongoSchemaCollection({

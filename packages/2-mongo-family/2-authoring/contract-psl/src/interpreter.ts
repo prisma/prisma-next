@@ -345,28 +345,40 @@ function collectIndexes(
       direction,
     }));
 
-    const index: Record<string, unknown> = { keys };
-    if (attr.name === 'unique') index['unique'] = true;
-
+    const unique = attr.name === 'unique' ? true : undefined;
     const sparse = parseBooleanArg(getNamedArgument(attr, 'sparse'));
-    if (sparse !== undefined) index['sparse'] = sparse;
+    const expireAfterSeconds = parseNumericArg(getNamedArgument(attr, 'expireAfterSeconds'));
 
-    const ttl = parseNumericArg(getNamedArgument(attr, 'expireAfterSeconds'));
-    if (ttl !== undefined) index['expireAfterSeconds'] = ttl;
+    const rawWeights = parseJsonArg(getNamedArgument(attr, 'weights'));
+    let weights: Record<string, number> | undefined;
+    if (rawWeights) {
+      weights = {};
+      for (const [k, v] of Object.entries(rawWeights)) {
+        if (typeof v === 'number') weights[k] = v;
+      }
+    }
 
-    const weightsStr = getNamedArgument(attr, 'weights');
-    const weights = parseJsonArg(weightsStr);
-    if (weights) index['weights'] = weights;
+    const rawDefaultLang = getNamedArgument(attr, 'default_language');
+    const default_language = rawDefaultLang
+      ? rawDefaultLang.replace(/^["']/, '').replace(/["']$/, '')
+      : undefined;
 
-    const defaultLang = getNamedArgument(attr, 'default_language');
-    if (defaultLang)
-      index['default_language'] = defaultLang.replace(/^["']/, '').replace(/["']$/, '');
+    const rawLangOverride = getNamedArgument(attr, 'language_override');
+    const language_override = rawLangOverride
+      ? rawLangOverride.replace(/^["']/, '').replace(/["']$/, '')
+      : undefined;
 
-    const langOverride = getNamedArgument(attr, 'language_override');
-    if (langOverride)
-      index['language_override'] = langOverride.replace(/^["']/, '').replace(/["']$/, '');
+    const index: MongoStorageIndex = {
+      keys,
+      ...(unique != null && { unique }),
+      ...(sparse != null && { sparse }),
+      ...(expireAfterSeconds != null && { expireAfterSeconds }),
+      ...(weights != null && { weights }),
+      ...(default_language != null && { default_language }),
+      ...(language_override != null && { language_override }),
+    };
 
-    indexes.push(index as unknown as MongoStorageIndex);
+    indexes.push(index);
   }
 
   return indexes;
