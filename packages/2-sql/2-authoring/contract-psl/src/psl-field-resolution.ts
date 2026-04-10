@@ -1,8 +1,7 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import { instantiateAuthoringTypeConstructor } from '@prisma-next/framework-components/authoring';
-import type { PslField, PslModel } from '@prisma-next/psl-parser';
+import type { PslAttribute, PslField, PslModel } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ControlMutationDefaultRegistry,
@@ -16,10 +15,10 @@ import {
 } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
 import {
-  getAuthoringTypeConstructor,
+  checkUncomposedNamespace,
   lowerDefaultForField,
-  parsePgvectorLength,
-  resolveColumnDescriptor,
+  reportUncomposedNamespace,
+  resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
 
 export type ResolvedField = {
@@ -43,60 +42,136 @@ export type ModelNameMapping = {
   readonly fieldColumns: Map<string, string>;
 };
 
-export function collectResolvedFields(
-  model: PslModel,
-  mapping: ModelNameMapping,
-  enumTypeDescriptors: Map<string, ColumnDescriptor>,
-  namedTypeDescriptors: Map<string, ColumnDescriptor>,
-  namedTypeBaseTypes: Map<string, string>,
-  modelNames: Set<string>,
-  compositeTypeNames: ReadonlySet<string>,
-  composedExtensions: Set<string>,
-  authoringContributions: AuthoringContributions | undefined,
-  defaultFunctionRegistry: ControlMutationDefaultRegistry,
-  generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>,
-  diagnostics: ContractSourceDiagnostic[],
-  sourceId: string,
-  scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
-): ResolvedField[] {
+export interface CollectResolvedFieldsInput {
+  readonly model: PslModel;
+  readonly mapping: ModelNameMapping;
+  readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
+  readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
+  readonly modelNames: Set<string>;
+  readonly compositeTypeNames: ReadonlySet<string>;
+  readonly composedExtensions: Set<string>;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly familyId: string;
+  readonly targetId: string;
+  readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
+  readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+}
+
+const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
+  'id',
+  'unique',
+  'default',
+  'relation',
+  'map',
+]);
+
+function validateFieldAttributes(input: {
+  readonly model: PslModel;
+  readonly field: PslField;
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly familyId: string;
+  readonly targetId: string;
+}): void {
+  for (const attribute of input.field.attributes) {
+    if (BUILTIN_FIELD_ATTRIBUTE_NAMES.has(attribute.name)) {
+      continue;
+    }
+
+    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
+      familyId: input.familyId,
+      targetId: input.targetId,
+    });
+    if (uncomposedNamespace) {
+      reportUncomposedNamespace({
+        subjectLabel: `Attribute "@${attribute.name}"`,
+        namespace: uncomposedNamespace,
+        sourceId: input.sourceId,
+        span: attribute.span,
+        diagnostics: input.diagnostics,
+      });
+      continue;
+    }
+
+    input.diagnostics.push({
+      code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
+      message: `Field "${input.model.name}.${input.field.name}" uses unsupported attribute "@${attribute.name}"`,
+      sourceId: input.sourceId,
+      span: attribute.span,
+    });
+  }
+}
+
+function extractFieldConstraintNames(input: {
+  readonly model: PslModel;
+  readonly field: PslField;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): {
+  readonly idAttribute: PslAttribute | undefined;
+  readonly uniqueAttribute: PslAttribute | undefined;
+  readonly idName: string | undefined;
+  readonly uniqueName: string | undefined;
+} {
+  const idAttribute = getAttribute(input.field.attributes, 'id');
+  const uniqueAttribute = getAttribute(input.field.attributes, 'unique');
+  const idName = parseConstraintMapArgument({
+    attribute: idAttribute,
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+    entityLabel: `Field "${input.model.name}.${input.field.name}" @id`,
+    span: input.field.span,
+    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+  });
+  const uniqueName = parseConstraintMapArgument({
+    attribute: uniqueAttribute,
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+    entityLabel: `Field "${input.model.name}.${input.field.name}" @unique`,
+    span: input.field.span,
+    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+  });
+  return { idAttribute, uniqueAttribute, idName, uniqueName };
+}
+
+export function collectResolvedFields(input: CollectResolvedFieldsInput): ResolvedField[] {
+  const {
+    model,
+    mapping,
+    enumTypeDescriptors,
+    namedTypeDescriptors,
+    modelNames,
+    compositeTypeNames,
+    composedExtensions,
+    authoringContributions,
+    familyId,
+    targetId,
+    defaultFunctionRegistry,
+    generatorDescriptorById,
+    diagnostics,
+    sourceId,
+    scalarTypeDescriptors,
+  } = input;
   const resolvedFields: ResolvedField[] = [];
-  const pgvectorVectorConstructor = getAuthoringTypeConstructor(authoringContributions, [
-    'pgvector',
-    'vector',
-  ]);
 
   for (const field of model.fields) {
     if (field.list && modelNames.has(field.typeName)) {
       continue;
     }
 
-    for (const attribute of field.attributes) {
-      if (
-        attribute.name === 'id' ||
-        attribute.name === 'unique' ||
-        attribute.name === 'default' ||
-        attribute.name === 'relation' ||
-        attribute.name === 'map' ||
-        attribute.name === 'pgvector.column'
-      ) {
-        continue;
-      }
-      if (attribute.name.startsWith('pgvector.') && !composedExtensions.has('pgvector')) {
-        diagnostics.push({
-          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-          message: `Attribute "@${attribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
-          sourceId,
-          span: attribute.span,
-        });
-        continue;
-      }
-      diagnostics.push({
-        code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
-        message: `Field "${model.name}.${field.name}" uses unsupported attribute "@${attribute.name}"`,
-        sourceId,
-        span: attribute.span,
-      });
-    }
+    validateFieldAttributes({
+      model,
+      field,
+      composedExtensions,
+      diagnostics,
+      sourceId,
+      familyId,
+      targetId,
+    });
 
     const relationAttribute = getAttribute(field.attributes, 'relation');
     if (relationAttribute && modelNames.has(field.typeName)) {
@@ -106,96 +181,56 @@ export function collectResolvedFields(
     const isValueObjectField = compositeTypeNames.has(field.typeName);
     const isListField = field.list;
 
-    const pgvectorOnJsonField = getAttribute(field.attributes, 'pgvector.column');
-    if (pgvectorOnJsonField && (isValueObjectField || isListField)) {
-      diagnostics.push({
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        message: `Field "${model.name}.${field.name}" uses @pgvector.column on a JSON-backed field (${isValueObjectField ? 'value object' : 'list'}). @pgvector.column is only supported on scalar Bytes fields.`,
-        sourceId,
-        span: pgvectorOnJsonField.span,
-      });
-      continue;
-    }
-
     let descriptor: ColumnDescriptor | undefined;
     let scalarCodecId: string | undefined;
+    const resolveInput = {
+      field,
+      enumTypeDescriptors,
+      namedTypeDescriptors,
+      scalarTypeDescriptors,
+      authoringContributions,
+      composedExtensions,
+      familyId,
+      targetId,
+      diagnostics,
+      sourceId,
+      entityLabel: `Field "${model.name}.${field.name}"`,
+    };
 
     if (isValueObjectField) {
       descriptor = scalarTypeDescriptors.get('Json');
     } else if (isListField) {
-      const originalDescriptor = resolveColumnDescriptor(
-        field,
-        enumTypeDescriptors,
-        namedTypeDescriptors,
-        scalarTypeDescriptors,
-      );
-      if (!originalDescriptor) {
-        diagnostics.push({
-          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
-          message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
-          sourceId,
-          span: field.span,
-        });
+      const resolved = resolveFieldTypeDescriptor(resolveInput);
+      if (!resolved.ok) {
+        if (!resolved.alreadyReported) {
+          diagnostics.push({
+            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+            message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
+            sourceId,
+            span: field.span,
+          });
+        }
         continue;
       }
-      scalarCodecId = originalDescriptor.codecId;
+      scalarCodecId = resolved.descriptor.codecId;
       descriptor = scalarTypeDescriptors.get('Json');
     } else {
-      descriptor = resolveColumnDescriptor(
-        field,
-        enumTypeDescriptors,
-        namedTypeDescriptors,
-        scalarTypeDescriptors,
-      );
-
-      const pgvectorColumnAttribute = getAttribute(field.attributes, 'pgvector.column');
-      if (pgvectorColumnAttribute) {
-        if (!composedExtensions.has('pgvector')) {
+      const resolved = resolveFieldTypeDescriptor(resolveInput);
+      if (!resolved.ok) {
+        if (!resolved.alreadyReported) {
           diagnostics.push({
-            code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-            message:
-              'Attribute "@pgvector.column" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.',
+            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+            message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
             sourceId,
-            span: pgvectorColumnAttribute.span,
+            span: field.span,
           });
-        } else {
-          const isBytesBase =
-            field.typeName === 'Bytes' ||
-            namedTypeBaseTypes.get(field.typeRef ?? field.typeName) === 'Bytes';
-          if (!isBytesBase) {
-            diagnostics.push({
-              code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-              message: `Field "${model.name}.${field.name}" uses @pgvector.column on unsupported base type "${field.typeName}"`,
-              sourceId,
-              span: pgvectorColumnAttribute.span,
-            });
-          } else {
-            const length = parsePgvectorLength({
-              attribute: pgvectorColumnAttribute,
-              diagnostics,
-              sourceId,
-            });
-            if (length !== undefined) {
-              descriptor = pgvectorVectorConstructor
-                ? instantiateAuthoringTypeConstructor(pgvectorVectorConstructor, [length])
-                : {
-                    codecId: 'pg/vector@1',
-                    nativeType: 'vector',
-                    typeParams: { length },
-                  };
-            }
-          }
         }
+        continue;
       }
+      descriptor = resolved.descriptor;
     }
 
     if (!descriptor) {
-      diagnostics.push({
-        code: 'PSL_UNSUPPORTED_FIELD_TYPE',
-        message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
-        sourceId,
-        span: field.span,
-      });
       continue;
     }
 
@@ -235,23 +270,11 @@ export function collectResolvedFields(
       }
     }
     const mappedColumnName = mapping.fieldColumns.get(field.name) ?? field.name;
-    const idAttribute = getAttribute(field.attributes, 'id');
-    const uniqueAttribute = getAttribute(field.attributes, 'unique');
-    const idName = parseConstraintMapArgument({
-      attribute: idAttribute,
+    const { idAttribute, uniqueAttribute, idName, uniqueName } = extractFieldConstraintNames({
+      model,
+      field,
       sourceId,
       diagnostics,
-      entityLabel: `Field "${model.name}.${field.name}" @id`,
-      span: field.span,
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-    });
-    const uniqueName = parseConstraintMapArgument({
-      attribute: uniqueAttribute,
-      sourceId,
-      diagnostics,
-      entityLabel: `Field "${model.name}.${field.name}" @unique`,
-      span: field.span,
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
     });
 
     resolvedFields.push({

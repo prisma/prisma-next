@@ -4,8 +4,17 @@ import type {
   AuthoringContributions,
   AuthoringTypeConstructorDescriptor,
 } from '@prisma-next/framework-components/authoring';
-import { isAuthoringTypeConstructorDescriptor } from '@prisma-next/framework-components/authoring';
-import type { PslAttribute, PslField } from '@prisma-next/psl-parser';
+import {
+  instantiateAuthoringTypeConstructor,
+  isAuthoringTypeConstructorDescriptor,
+  validateAuthoringHelperArguments,
+} from '@prisma-next/framework-components/authoring';
+import type {
+  PslAttribute,
+  PslField,
+  PslSpan,
+  PslTypeConstructorCall,
+} from '@prisma-next/psl-parser';
 import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
@@ -15,8 +24,6 @@ import {
   parseDefaultFunctionCall,
 } from './default-function-registry';
 import {
-  getNamedArgument,
-  getPositionalArgument,
   getPositionalArgumentEntry,
   getPositionalArguments,
   parseOptionalNumericArguments,
@@ -24,6 +31,7 @@ import {
   pushInvalidAttributeArgument,
   unquoteStringLiteral,
 } from './psl-attribute-parsing';
+import { mapPslHelperArgs } from './psl-authoring-arguments';
 
 export type ColumnDescriptor = {
   readonly codecId: string;
@@ -57,6 +65,225 @@ export function getAuthoringTypeConstructor(
   }
 
   return isAuthoringTypeConstructorDescriptor(current) ? current : undefined;
+}
+
+/**
+ * Returns the namespace prefix of `attributeName` if it references an
+ * unrecognized extension namespace, otherwise `undefined`. A namespace is
+ * considered recognized when it is:
+ *
+ * - `db` (native-type spec, always allowed),
+ * - the active family id (e.g. `sql`),
+ * - the active target id (e.g. `postgres`),
+ * - present in `composedExtensions`.
+ *
+ * Family/target namespaces are exempted so that e.g. `@sql.foo` surfaces as
+ * PSL_UNSUPPORTED_*_ATTRIBUTE (the attribute isn't defined) rather than
+ * PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (the namespace is already composed).
+ */
+export function checkUncomposedNamespace(
+  attributeName: string,
+  composedExtensions: ReadonlySet<string>,
+  context?: { readonly familyId?: string; readonly targetId?: string },
+): string | undefined {
+  const dotIndex = attributeName.indexOf('.');
+  if (dotIndex <= 0 || dotIndex === attributeName.length - 1) {
+    return undefined;
+  }
+  const namespace = attributeName.slice(0, dotIndex);
+  if (
+    namespace === 'db' ||
+    namespace === context?.familyId ||
+    namespace === context?.targetId ||
+    composedExtensions.has(namespace)
+  ) {
+    return undefined;
+  }
+  return namespace;
+}
+
+/**
+ * Pushes the canonical `PSL_EXTENSION_NAMESPACE_NOT_COMPOSED` diagnostic for a
+ * subject (attribute, model attribute, or type constructor) that references an
+ * extension namespace which is not composed in the current contract.
+ *
+ * The `data` payload carries the missing namespace so machine consumers
+ * (agents, IDE extensions, CLI auto-fix) don't have to parse the prose.
+ */
+export function reportUncomposedNamespace(input: {
+  readonly subjectLabel: string;
+  readonly namespace: string;
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): void {
+  input.diagnostics.push({
+    code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+    message: `${input.subjectLabel} uses unrecognized namespace "${input.namespace}". Add extension pack "${input.namespace}" to extensionPacks in prisma-next.config.ts.`,
+    sourceId: input.sourceId,
+    span: input.span,
+    data: { namespace: input.namespace, suggestedPack: input.namespace },
+  });
+}
+
+export function instantiatePslTypeConstructor(input: {
+  readonly call: PslTypeConstructorCall;
+  readonly descriptor: AuthoringTypeConstructorDescriptor;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly entityLabel: string;
+}):
+  | {
+      readonly codecId: string;
+      readonly nativeType: string;
+      readonly typeParams?: Record<string, unknown>;
+    }
+  | undefined {
+  const helperPath = input.call.path.join('.');
+  const args = mapPslHelperArgs({
+    args: input.call.args,
+    descriptors: input.descriptor.args ?? [],
+    helperLabel: `constructor "${helperPath}"`,
+    span: input.call.span,
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+    entityLabel: input.entityLabel,
+  });
+  if (!args) {
+    return undefined;
+  }
+
+  try {
+    validateAuthoringHelperArguments(helperPath, input.descriptor.args, args);
+    return instantiateAuthoringTypeConstructor(input.descriptor, args);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `${input.entityLabel} constructor "${helperPath}" ${message}`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return undefined;
+  }
+}
+
+function pushUnsupportedTypeConstructorDiagnostic(input: {
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly code: 'PSL_UNSUPPORTED_FIELD_TYPE' | 'PSL_UNSUPPORTED_NAMED_TYPE_CONSTRUCTOR';
+  readonly message: string;
+}): undefined {
+  input.diagnostics.push({
+    code: input.code,
+    message: input.message,
+    sourceId: input.sourceId,
+    span: input.span,
+  });
+  return undefined;
+}
+
+export function resolvePslTypeConstructorDescriptor(input: {
+  readonly call: PslTypeConstructorCall;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly familyId: string;
+  readonly targetId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly unsupportedCode: 'PSL_UNSUPPORTED_FIELD_TYPE' | 'PSL_UNSUPPORTED_NAMED_TYPE_CONSTRUCTOR';
+  readonly unsupportedMessage: string;
+}): AuthoringTypeConstructorDescriptor | undefined {
+  const descriptor = getAuthoringTypeConstructor(input.authoringContributions, input.call.path);
+  if (descriptor) {
+    return descriptor;
+  }
+
+  const namespace = input.call.path.length > 1 ? input.call.path[0] : undefined;
+  if (
+    namespace &&
+    namespace !== 'db' &&
+    namespace !== input.familyId &&
+    namespace !== input.targetId &&
+    !input.composedExtensions.has(namespace)
+  ) {
+    reportUncomposedNamespace({
+      subjectLabel: `Type constructor "${input.call.path.join('.')}"`,
+      namespace,
+      sourceId: input.sourceId,
+      span: input.call.span,
+      diagnostics: input.diagnostics,
+    });
+    return undefined;
+  }
+
+  return pushUnsupportedTypeConstructorDiagnostic({
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+    span: input.call.span,
+    code: input.unsupportedCode,
+    message: input.unsupportedMessage,
+  });
+}
+
+export type ResolveFieldTypeResult =
+  | { readonly ok: true; readonly descriptor: ColumnDescriptor }
+  | { readonly ok: false; readonly alreadyReported: boolean };
+
+export function resolveFieldTypeDescriptor(input: {
+  readonly field: PslField;
+  readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly familyId: string;
+  readonly targetId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly entityLabel: string;
+}): ResolveFieldTypeResult {
+  if (input.field.typeConstructor) {
+    const helperPath = input.field.typeConstructor.path.join('.');
+    const descriptor = resolvePslTypeConstructorDescriptor({
+      call: input.field.typeConstructor,
+      authoringContributions: input.authoringContributions,
+      composedExtensions: input.composedExtensions,
+      familyId: input.familyId,
+      targetId: input.targetId,
+      diagnostics: input.diagnostics,
+      sourceId: input.sourceId,
+      unsupportedCode: 'PSL_UNSUPPORTED_FIELD_TYPE',
+      unsupportedMessage: `${input.entityLabel} type constructor "${helperPath}" is not supported in SQL PSL provider v1`,
+    });
+    if (!descriptor) {
+      return { ok: false, alreadyReported: true };
+    }
+
+    const instantiated = instantiatePslTypeConstructor({
+      call: input.field.typeConstructor,
+      descriptor,
+      diagnostics: input.diagnostics,
+      sourceId: input.sourceId,
+      entityLabel: input.entityLabel,
+    });
+    if (!instantiated) {
+      return { ok: false, alreadyReported: true };
+    }
+    return { ok: true, descriptor: instantiated };
+  }
+
+  const descriptor = resolveColumnDescriptor(
+    input.field,
+    input.enumTypeDescriptors,
+    input.namedTypeDescriptors,
+    input.scalarTypeDescriptors,
+  );
+  if (!descriptor) {
+    return { ok: false, alreadyReported: false };
+  }
+  return { ok: true, descriptor };
 }
 
 /**
@@ -242,37 +469,6 @@ export function resolveDbNativeTypeAttribute(input: {
   }
 }
 
-export function parsePgvectorLength(input: {
-  readonly attribute: PslAttribute;
-  readonly diagnostics: ContractSourceDiagnostic[];
-  readonly sourceId: string;
-}): number | undefined {
-  const namedLength = getNamedArgument(input.attribute, 'length');
-  const namedDim = getNamedArgument(input.attribute, 'dim');
-  const positional = getPositionalArgument(input.attribute);
-  const raw = namedLength ?? namedDim ?? positional;
-  if (!raw) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      message: '@pgvector.column requires length/dim argument',
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-  const parsed = Number(unquoteStringLiteral(raw));
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      message: '@pgvector.column length/dim must be a positive integer',
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-  return parsed;
-}
-
 export function parseDefaultLiteralValue(expression: string): ColumnDefault | undefined {
   const trimmed = expression.trim();
   if (trimmed === 'true' || trimmed === 'false') {
@@ -387,8 +583,8 @@ export function lowerDefaultForField(input: {
 
 export function resolveColumnDescriptor(
   field: PslField,
-  enumTypeDescriptors: Map<string, ColumnDescriptor>,
-  namedTypeDescriptors: Map<string, ColumnDescriptor>,
+  enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
+  namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
   scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
 ): ColumnDescriptor | undefined {
   if (field.typeRef && namedTypeDescriptors.has(field.typeRef)) {

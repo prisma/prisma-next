@@ -249,9 +249,9 @@ describe('assembleControlMutationDefaultContributions', () => {
       authoring: {
         type: {
           pgvector: {
-            vector: {
+            Vector: {
               kind: 'typeConstructor',
-              args: [{ kind: 'number', integer: true, minimum: 1, maximum: 2000 }],
+              args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, maximum: 2000 }],
               output: {
                 codecId: 'pg/vector@1',
                 nativeType: 'vector',
@@ -272,7 +272,7 @@ describe('assembleControlMutationDefaultContributions', () => {
         kind: 'typeConstructor',
       },
       pgvector: {
-        vector: {
+        Vector: {
           kind: 'typeConstructor',
         },
       },

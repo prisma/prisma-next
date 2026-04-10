@@ -9,7 +9,7 @@ Scope: **PSL → SQL Contract IR** via `@prisma-next/psl-parser` and `@prisma-ne
 - **Models, enums, and named types** (`types { ... }`) with deterministic parsing and span-aware diagnostics.
 - **SQL storage mapping** for a Postgres-first subset: tables, columns, primary keys, uniques, indexes, and foreign keys.
 - **Defaults** for a curated set of TS-aligned functions and literals, lowered into either storage defaults or execution defaults.
-- **Extension-pack parity (minimal)**: `@pgvector.column(...)` when the corresponding pack is composed in config.
+- **Extension-pack parity (minimal)**: namespaced constructor expressions such as `pgvector.Vector(...)` when the corresponding pack is composed in config.
 
 For package-level responsibilities and supported defaults, see:
 
@@ -38,7 +38,10 @@ This is a deliberate “strict subset” choice: PSL v1 is bounded by the curren
 
 - **Selected Postgres native type attributes (`@db.`*) are supported on named types** for brownfield round-trips.
   - Current support covers the printer/provider subset needed to preserve native storage shape for inferred PSL: `@db.Char`, `@db.VarChar`, `@db.Numeric`, `@db.Uuid`, `@db.SmallInt`, `@db.Real`, `@db.Timestamp`, `@db.Timestamptz`, `@db.Date`, `@db.Time`, `@db.Timetz`, and `@db.Json`.
-  - The extension-pack parity surface still includes `@pgvector.column(...)` when the corresponding pack is composed.
+- **Shared constructor expressions are supported** in both `types {}` aliases and inline field positions.
+  - Examples: `ShortName = sql.String(length: 35)` and `embedding pgvector.Vector(length: 1536)?`.
+- **Namespaced extension attributes are not part of the supported PSL v1 surface.**
+  - Legacy forms like `@pgvector.column(...)` are strict errors even when the extension is composed.
 - **Typed JSON schema parameterization is unsupported** (PSL has no way to encode TS `typeParams` schema payloads in v1).
 
 ### Relations
@@ -71,8 +74,8 @@ This is a deliberate “strict subset” choice: PSL v1 is bounded by the curren
 ### Extension packs and namespacing
 
 - PSL does **not** activate or pin extension packs.
-- Namespaced attributes are only accepted when the corresponding pack is composed in `prisma-next.config.ts`.
-- Beyond the initial pgvector subset, other namespaced attributes are currently strict errors.
+- Namespaced constructor expressions are only accepted when the corresponding pack is composed in `prisma-next.config.ts`.
+- Beyond the initial constructor-based pgvector subset, other namespaced extension syntax is currently strict error territory.
 
 ### Capabilities and contract metadata
 

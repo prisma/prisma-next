@@ -3,6 +3,8 @@ import type {
   ControlStack,
 } from '@prisma-next/framework-components/control';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
+import { sqlFamilyAuthoringFieldPresets } from './authoring-field-presets';
+import { sqlFamilyAuthoringTypes } from './authoring-type-constructors';
 import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './control-instance';
 
 export class SqlFamilyDescriptor
@@ -13,6 +15,10 @@ export class SqlFamilyDescriptor
   readonly familyId = 'sql' as const;
   readonly version = '0.0.1';
   readonly emission = sqlEmission;
+  readonly authoring = {
+    field: sqlFamilyAuthoringFieldPresets,
+    type: sqlFamilyAuthoringTypes,
+  } as const;
 
   create<TTargetId extends string>(
     stack: ControlStack<'sql', TTargetId>,

@@ -17,6 +17,12 @@ export interface ContractSourceDiagnostic {
   readonly message: string;
   readonly sourceId?: string;
   readonly span?: ContractSourceDiagnosticSpan;
+  /**
+   * Optional structured payload for machine-readable consumers (agents,
+   * IDE extensions, CLI auto-fix). Human-readable prose lives in `message`;
+   * `data` carries the extracted facts (e.g. `{ namespace: 'pgvector' }`).
+   */
+  readonly data?: Readonly<Record<string, unknown>>;
 }
 
 export interface ContractSourceDiagnostics {

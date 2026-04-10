@@ -18,6 +18,7 @@ import type {
   PslNamedTypeDeclaration,
   PslPosition,
   PslSpan,
+  PslTypeConstructorCall,
   PslTypesBlock,
 } from './types';
 
@@ -348,7 +349,7 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
       continue;
     }
 
-    const declarationMatch = line.match(/^([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*)(.*)$/);
+    const declarationMatch = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
     if (!declarationMatch) {
       pushDiagnostic(context, {
         code: 'PSL_INVALID_TYPES_MEMBER',
@@ -359,17 +360,33 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
     }
 
     const declarationName = declarationMatch[1] ?? '';
-    const baseType = declarationMatch[2] ?? '';
-    const attributePart = declarationMatch[3] ?? '';
     const trimmedStartColumn = firstNonWhitespaceColumn(raw);
-    const attributeOffset = line.length - attributePart.length;
-    const attributeSource = attributePart.trimStart();
-    const leadingAttributeWhitespace = attributePart.length - attributeSource.length;
+    const declarationValue = (declarationMatch[2] ?? '').trim();
+    const valueOffset = line.indexOf(declarationValue);
+    const declarationValueColumn = trimmedStartColumn + Math.max(valueOffset, 0);
+
+    const typeAndAttributeSplit = splitTypeAndAttributes(declarationValue);
+    const typeSource = typeAndAttributeSplit.typeSource.trim();
+    const attributeSource = typeAndAttributeSplit.attributeSource.trimStart();
+    const leadingAttributeWhitespace =
+      typeAndAttributeSplit.attributeSource.length - attributeSource.length;
+
+    const typeConstructor = parseTypeConstructorCall(context, {
+      declarationValue: typeSource,
+      lineIndex,
+      startColumn: declarationValueColumn,
+      invalidCode: 'PSL_INVALID_TYPES_MEMBER',
+      invalidMessage: (value) => `Invalid types declaration "${value}"`,
+    });
+    if (typeConstructor === 'malformed') {
+      continue;
+    }
+
     const attributeParse = extractAttributeTokensWithSpans(
       context,
       lineIndex,
       attributeSource,
-      trimmedStartColumn + attributeOffset + leadingAttributeWhitespace,
+      declarationValueColumn + typeAndAttributeSplit.attributeOffset + leadingAttributeWhitespace,
     );
     if (!attributeParse.ok) {
       continue;
@@ -385,6 +402,29 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
       )
       .filter((attribute): attribute is PslAttribute => Boolean(attribute));
 
+    if (typeConstructor) {
+      declarations.push({
+        kind: 'namedType',
+        name: declarationName,
+        typeConstructor,
+        attributes,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+
+    const baseTypeMatch = typeSource.match(/^([A-Za-z_]\w*)$/);
+    if (!baseTypeMatch) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_TYPES_MEMBER',
+        message: `Invalid types declaration "${line}"`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+
+    const baseType = baseTypeMatch[1] ?? '';
+
     declarations.push({
       kind: 'namedType',
       name: declarationName,
@@ -398,6 +438,78 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
     kind: 'types',
     declarations,
     span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
+  };
+}
+
+function parseTypeConstructorCall(
+  context: ParserContext,
+  input: {
+    readonly declarationValue: string;
+    readonly lineIndex: number;
+    readonly startColumn: number;
+    readonly invalidCode: PslDiagnosticCode;
+    readonly invalidMessage: (value: string) => string;
+  },
+): PslTypeConstructorCall | 'malformed' | undefined {
+  const value = input.declarationValue.trim();
+  const constructorMatch = value.match(
+    /^([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*)\s*\(/,
+  );
+  if (!constructorMatch) {
+    return undefined;
+  }
+
+  // constructorMatch already required `(`; openParen is guaranteed ≥ 0.
+  const openParen = value.indexOf('(');
+  const closeParen = value.lastIndexOf(')');
+
+  if (closeParen !== value.length - 1) {
+    pushDiagnostic(context, {
+      code: input.invalidCode,
+      message: input.invalidMessage(value),
+      span: createInlineSpan(
+        context,
+        input.lineIndex,
+        input.startColumn,
+        input.startColumn + value.length,
+      ),
+    });
+    return 'malformed';
+  }
+
+  const constructorPath = constructorMatch[1] ?? '';
+
+  const argsRaw = value.slice(openParen + 1, closeParen);
+  const args = parseArgumentList(context, {
+    argsRaw,
+    argsOffset: input.startColumn + openParen + 1,
+    lineIndex: input.lineIndex,
+    token: value,
+    span: createInlineSpan(
+      context,
+      input.lineIndex,
+      input.startColumn,
+      input.startColumn + value.length,
+    ),
+    invalidCode: input.invalidCode,
+    invalidEmptyArgumentMessage: `Invalid empty argument in type constructor "${value}"`,
+    invalidNamedArgumentMessage: (part) =>
+      `Invalid named argument syntax "${part}" in type constructor "${value}"`,
+  });
+  if (!args) {
+    return 'malformed';
+  }
+
+  return {
+    kind: 'typeConstructor',
+    path: constructorPath.split('.'),
+    args,
+    span: createInlineSpan(
+      context,
+      input.lineIndex,
+      input.startColumn,
+      input.startColumn + value.length,
+    ),
   };
 }
 
@@ -478,7 +590,7 @@ function parseEnumAttribute(
 }
 
 function parseField(context: ParserContext, line: string, lineIndex: number): PslField | undefined {
-  const fieldMatch = line.match(/^([A-Za-z_]\w*)\s+([A-Za-z_]\w*(?:\[\])?)(\?)?(.*)$/);
+  const fieldMatch = line.match(/^([A-Za-z_]\w*)(\s+)(.+)$/);
   if (!fieldMatch) {
     pushDiagnostic(context, {
       code: 'PSL_INVALID_MODEL_MEMBER',
@@ -489,30 +601,62 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
   }
 
   const fieldName = fieldMatch[1] ?? '';
-  const rawTypeToken = fieldMatch[2] ?? '';
-  const optionalMarker = fieldMatch[3] ?? '';
-  const attributePart = fieldMatch[4] ?? '';
-  const list = rawTypeToken.endsWith('[]');
-  const typeName = list ? rawTypeToken.slice(0, -2) : rawTypeToken;
-  const optional = optionalMarker === '?';
-
-  const attributes: PslFieldAttribute[] = [];
+  const separator = fieldMatch[2] ?? '';
+  const remainder = fieldMatch[3] ?? '';
+  const typeAndAttributeSplit = splitTypeAndAttributes(remainder);
+  const rawTypeSource = typeAndAttributeSplit.typeSource.trim();
+  const attributePart = typeAndAttributeSplit.attributeSource;
+  const optional = rawTypeSource.endsWith('?');
+  const typeSourceWithoutOptional = optional ? rawTypeSource.slice(0, -1).trimEnd() : rawTypeSource;
+  const list = typeSourceWithoutOptional.endsWith('[]');
+  const baseTypeSource = list
+    ? typeSourceWithoutOptional.slice(0, -2).trimEnd()
+    : typeSourceWithoutOptional;
   const rawLine = context.lines[lineIndex] ?? '';
   const trimmedStartColumn = firstNonWhitespaceColumn(rawLine);
-  const attributeOffset = line.length - attributePart.length;
+  const typeStartColumn = trimmedStartColumn + fieldName.length + separator.length;
+
+  const typeConstructor = parseTypeConstructorCall(context, {
+    declarationValue: baseTypeSource,
+    lineIndex,
+    startColumn: typeStartColumn,
+    invalidCode: 'PSL_INVALID_MODEL_MEMBER',
+    invalidMessage: (value) => `Invalid field type constructor "${value}"`,
+  });
+  if (typeConstructor === 'malformed') {
+    return undefined;
+  }
+
+  const simpleTypeMatch = baseTypeSource.match(/^([A-Za-z_]\w*)$/);
+  const typeName = typeConstructor?.path.join('.') ?? simpleTypeMatch?.[1];
+  if (!typeName) {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_MODEL_MEMBER',
+      message: `Invalid model member declaration "${line}"`,
+      span: createTrimmedLineSpan(context, lineIndex),
+    });
+    return undefined;
+  }
+
+  const attributes: PslFieldAttribute[] = [];
   const attributeSource = attributePart.trimStart();
   const leadingAttributeWhitespace = attributePart.length - attributeSource.length;
   const tokenParse = extractAttributeTokensWithSpans(
     context,
     lineIndex,
     attributeSource,
-    trimmedStartColumn + attributeOffset + leadingAttributeWhitespace,
+    trimmedStartColumn +
+      fieldName.length +
+      separator.length +
+      typeAndAttributeSplit.attributeOffset +
+      leadingAttributeWhitespace,
   );
   if (!tokenParse.ok) {
     return {
       kind: 'field',
       name: fieldName,
       typeName,
+      ...ifDefined('typeConstructor', typeConstructor),
       optional,
       list,
       attributes,
@@ -536,10 +680,85 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
     kind: 'field',
     name: fieldName,
     typeName,
+    ...ifDefined('typeConstructor', typeConstructor),
     optional,
     list,
     attributes,
     span: createTrimmedLineSpan(context, lineIndex),
+  };
+}
+
+function isQuoteEscaped(value: string, quoteIndex: number): boolean {
+  let backslashCount = 0;
+
+  for (let index = quoteIndex - 1; index >= 0 && value[index] === '\\'; index -= 1) {
+    backslashCount += 1;
+  }
+
+  return backslashCount % 2 === 1;
+}
+
+function splitTypeAndAttributes(value: string): {
+  readonly typeSource: string;
+  readonly attributeSource: string;
+  readonly attributeOffset: number;
+} {
+  let depthParen = 0;
+  let depthBracket = 0;
+  let depthBrace = 0;
+  let quote: '"' | "'" | null = null;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index] ?? '';
+    if (quote) {
+      if (character === quote && !isQuoteEscaped(value, index)) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '(') {
+      depthParen += 1;
+      continue;
+    }
+    if (character === ')') {
+      depthParen = Math.max(0, depthParen - 1);
+      continue;
+    }
+    if (character === '[') {
+      depthBracket += 1;
+      continue;
+    }
+    if (character === ']') {
+      depthBracket = Math.max(0, depthBracket - 1);
+      continue;
+    }
+    if (character === '{') {
+      depthBrace += 1;
+      continue;
+    }
+    if (character === '}') {
+      depthBrace = Math.max(0, depthBrace - 1);
+      continue;
+    }
+
+    if (character === '@' && depthParen === 0 && depthBracket === 0 && depthBrace === 0) {
+      return {
+        typeSource: value.slice(0, index).trimEnd(),
+        attributeSource: value.slice(index),
+        attributeOffset: index,
+      };
+    }
+  }
+
+  return {
+    typeSource: value.trimEnd(),
+    attributeSource: '',
+    attributeOffset: value.length,
   };
 }
 
@@ -613,12 +832,15 @@ function parseAttributeToken(
       return undefined;
     }
     const argsRaw = rawBody.slice(openParen + 1, closeParen);
-    const parsedArgs = parseAttributeArguments(context, {
+    const parsedArgs = parseArgumentList(context, {
       argsRaw,
       argsOffset: input.span.start.column - 1 + (expectsBlockPrefix ? 2 : 1) + openParen + 1,
       lineIndex: input.lineIndex,
       token: input.token,
       span: input.span,
+      invalidCode: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+      invalidEmptyArgumentMessage: `Invalid empty argument in attribute "${input.token}"`,
+      invalidNamedArgumentMessage: (part) => `Invalid named argument syntax "${part}"`,
     });
     if (!parsedArgs) {
       return undefined;
@@ -635,7 +857,7 @@ function parseAttributeToken(
   };
 }
 
-function parseAttributeArguments(
+function parseArgumentList(
   context: ParserContext,
   input: {
     readonly argsRaw: string;
@@ -643,6 +865,9 @@ function parseAttributeArguments(
     readonly lineIndex: number;
     readonly token: string;
     readonly span: PslSpan;
+    readonly invalidCode: PslDiagnosticCode;
+    readonly invalidEmptyArgumentMessage: string;
+    readonly invalidNamedArgumentMessage: (part: string) => string;
   },
 ): readonly PslAttributeArgument[] | undefined {
   const trimmed = input.argsRaw.trim();
@@ -658,8 +883,8 @@ function parseAttributeArguments(
     const trimmedPart = original.trim();
     if (trimmedPart.length === 0) {
       pushDiagnostic(context, {
-        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
-        message: `Invalid empty argument in attribute "${input.token}"`,
+        code: input.invalidCode,
+        message: input.invalidEmptyArgumentMessage,
         span: input.span,
       });
       return undefined;
@@ -675,8 +900,8 @@ function parseAttributeArguments(
       const first = namedSplit[0];
       if (!first) {
         pushDiagnostic(context, {
-          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
-          message: `Invalid named argument syntax "${trimmedPart}"`,
+          code: input.invalidCode,
+          message: input.invalidNamedArgumentMessage(trimmedPart),
           span: partSpan,
         });
         return undefined;
@@ -685,8 +910,8 @@ function parseAttributeArguments(
       const rawValue = trimmedPart.slice(first.end + 1).trim();
       if (!name || rawValue.length === 0) {
         pushDiagnostic(context, {
-          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
-          message: `Invalid named argument syntax "${trimmedPart}"`,
+          code: input.invalidCode,
+          message: input.invalidNamedArgumentMessage(trimmedPart),
           span: partSpan,
         });
         return undefined;
@@ -720,19 +945,17 @@ function findBlockBounds(context: ParserContext, startLine: number): BlockBounds
   for (let lineIndex = startLine; lineIndex < context.lines.length; lineIndex += 1) {
     const line = stripInlineComment(context.lines[lineIndex] ?? '');
     let quote: '"' | "'" | null = null;
-    let previousCharacter = '';
-    for (const character of line) {
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index] ?? '';
       if (quote) {
-        if (character === quote && previousCharacter !== '\\') {
+        if (character === quote && !isQuoteEscaped(line, index)) {
           quote = null;
         }
-        previousCharacter = character;
         continue;
       }
 
       if (character === '"' || character === "'") {
         quote = character;
-        previousCharacter = character;
         continue;
       }
 
@@ -745,7 +968,6 @@ function findBlockBounds(context: ParserContext, startLine: number): BlockBounds
           return { startLine, endLine: lineIndex, closed: true };
         }
       }
-      previousCharacter = character;
     }
   }
 
@@ -771,13 +993,14 @@ function splitTopLevelSegments(value: string, separator: ',' | ':'): TopLevelSeg
   const parts: TopLevelSegment[] = [];
   let depthParen = 0;
   let depthBracket = 0;
+  let depthBrace = 0;
   let quote: '"' | "'" | null = null;
   let start = 0;
 
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index] ?? '';
     if (quote) {
-      if (character === quote && value[index - 1] !== '\\') {
+      if (character === quote && !isQuoteEscaped(value, index)) {
         quote = null;
       }
       continue;
@@ -804,8 +1027,16 @@ function splitTopLevelSegments(value: string, separator: ',' | ':'): TopLevelSeg
       depthBracket = Math.max(0, depthBracket - 1);
       continue;
     }
+    if (character === '{') {
+      depthBrace += 1;
+      continue;
+    }
+    if (character === '}') {
+      depthBrace = Math.max(0, depthBrace - 1);
+      continue;
+    }
 
-    if (character === separator && depthParen === 0 && depthBracket === 0) {
+    if (character === separator && depthParen === 0 && depthBracket === 0 && depthBrace === 0) {
       parts.push({
         value: value.slice(start, index),
         start,
@@ -874,7 +1105,7 @@ function extractAttributeTokensWithSpans(
       while (index < value.length) {
         const char = value[index] ?? '';
         if (quote) {
-          if (char === quote && value[index - 1] !== '\\') {
+          if (char === quote && !isQuoteEscaped(value, index)) {
             quote = null;
           }
           index += 1;
@@ -947,7 +1178,7 @@ function stripInlineComment(line: string): string {
     const next = line[index + 1] ?? '';
 
     if (quote) {
-      if (current === quote && line[index - 1] !== '\\') {
+      if (current === quote && !isQuoteEscaped(line, index)) {
         quote = null;
       }
       continue;

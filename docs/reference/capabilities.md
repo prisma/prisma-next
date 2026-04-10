@@ -229,7 +229,7 @@ Canonical capability keys with descriptions, typical implementers, and ADR refer
 | postgres.partialIndex | Partial/filtered index support | postgres adapter | ADR 065 |
 | mysql.generatedColumns | Generated column support | mysql adapter | ADR 065 |
 | sqlite.fts5 | FTS5 support | sqlite adapter | ADR 065 |
-| pgvector.vector | Vector type support | pgvector pack | ADR 112–115 |
+| pgvector.cosine | Cosine distance and similarity operations | pgvector pack | ADR 112–115 |
 | postgis.geometry | Geometry type support | postgis pack | ADR 112–115 |
 
 Notes

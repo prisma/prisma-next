@@ -99,7 +99,7 @@ describe(
       'dbInit succeeds for a PSL-emitted pgvector named type schema',
       async () => {
         const emittedContract = await emitPgvectorContract(`types {
-  Embedding1536 = Bytes @pgvector.column(length: 1536)
+  Embedding1536 = pgvector.Vector(1536)
 }
 
 model Document {
@@ -136,7 +136,7 @@ model Document {
       'dbUpdate recovers a dropped pgvector NOT NULL column on a non-empty table',
       async () => {
         const emittedContract = await emitPgvectorContract(`types {
-  Embedding3 = Bytes @pgvector.column(length: 3)
+  Embedding3 = pgvector.Vector(3)
 }
 
 model Document {

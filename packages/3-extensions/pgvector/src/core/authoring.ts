@@ -3,9 +3,11 @@ import { VECTOR_MAX_DIM } from './constants';
 
 export const pgvectorAuthoringTypes = {
   pgvector: {
-    vector: {
+    Vector: {
       kind: 'typeConstructor',
-      args: [{ kind: 'number', integer: true, minimum: 1, maximum: VECTOR_MAX_DIM }],
+      args: [
+        { kind: 'number', name: 'length', integer: true, minimum: 1, maximum: VECTOR_MAX_DIM },
+      ],
       output: {
         codecId: 'pg/vector@1',
         nativeType: 'vector',

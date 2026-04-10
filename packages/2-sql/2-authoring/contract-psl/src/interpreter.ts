@@ -23,7 +23,6 @@ import type {
   PslField,
   PslModel,
   PslNamedTypeDeclaration,
-  PslSpan,
 } from '@prisma-next/psl-parser';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
@@ -51,10 +50,13 @@ import {
 } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
 import {
+  checkUncomposedNamespace,
   getAuthoringTypeConstructor,
-  parsePgvectorLength,
-  resolveColumnDescriptor,
+  instantiatePslTypeConstructor,
+  reportUncomposedNamespace,
   resolveDbNativeTypeAttribute,
+  resolveFieldTypeDescriptor,
+  resolvePslTypeConstructorDescriptor,
   toNamedTypeFieldDescriptor,
 } from './psl-column-resolution';
 import {
@@ -109,13 +111,25 @@ function buildComposedExtensionPackRefs(
   );
 }
 
-function hasSameSpan(a: PslSpan, b: ContractSourceDiagnosticSpan): boolean {
-  return (
-    a.start.offset === b.start.offset &&
-    a.end.offset === b.end.offset &&
-    a.start.line === b.start.line &&
-    a.end.line === b.end.line
-  );
+function diagnosticDedupKey(diagnostic: ContractSourceDiagnostic): string {
+  const span = diagnostic.span;
+  const spanKey = span
+    ? `${span.start.offset}:${span.end.offset}:${span.start.line}:${span.end.line}`
+    : '';
+  return `${diagnostic.code}\u0000${diagnostic.sourceId}\u0000${spanKey}\u0000${diagnostic.message}`;
+}
+
+function dedupeDiagnostics(
+  diagnostics: readonly ContractSourceDiagnostic[],
+): ContractSourceDiagnostic[] {
+  const seen = new Map<string, ContractSourceDiagnostic>();
+  for (const diagnostic of diagnostics) {
+    const key = diagnosticDedupKey(diagnostic);
+    if (!seen.has(key)) {
+      seen.set(key, diagnostic);
+    }
+  }
+  return [...seen.values()];
 }
 
 function compareStrings(left: string, right: string): -1 | 0 | 1 {
@@ -194,112 +208,178 @@ interface ResolveNamedTypeDeclarationsInput {
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensions: ReadonlySet<string>;
-  readonly pgvectorVectorConstructor: AuthoringTypeConstructorDescriptor | undefined;
+  readonly familyId: string;
+  readonly targetId: string;
+  readonly authoringContributions: AuthoringContributions | undefined;
   readonly diagnostics: ContractSourceDiagnostic[];
+}
+
+function validateNamedTypeAttributes(input: {
+  readonly declaration: PslNamedTypeDeclaration;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly allowDbNativeType: boolean;
+  readonly familyId: string;
+  readonly targetId: string;
+}): {
+  readonly dbNativeTypeAttribute: PslAttribute | undefined;
+  readonly hasUnsupportedNamedTypeAttribute: boolean;
+} {
+  const dbNativeTypeAttributes = input.allowDbNativeType
+    ? input.declaration.attributes.filter((attribute) => attribute.name.startsWith('db.'))
+    : [];
+  const [dbNativeTypeAttribute, ...extraDbNativeTypeAttributes] = dbNativeTypeAttributes;
+  let hasUnsupportedNamedTypeAttribute = false;
+
+  for (const extra of extraDbNativeTypeAttributes) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `Named type "${input.declaration.name}" can declare at most one @db.* attribute`,
+      sourceId: input.sourceId,
+      span: extra.span,
+    });
+    hasUnsupportedNamedTypeAttribute = true;
+  }
+
+  for (const attribute of input.declaration.attributes) {
+    if (input.allowDbNativeType && attribute.name.startsWith('db.')) {
+      continue;
+    }
+
+    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
+      familyId: input.familyId,
+      targetId: input.targetId,
+    });
+    if (uncomposedNamespace) {
+      reportUncomposedNamespace({
+        subjectLabel: `Attribute "@${attribute.name}"`,
+        namespace: uncomposedNamespace,
+        sourceId: input.sourceId,
+        span: attribute.span,
+        diagnostics: input.diagnostics,
+      });
+      hasUnsupportedNamedTypeAttribute = true;
+      continue;
+    }
+
+    input.diagnostics.push({
+      code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
+      message: `Named type "${input.declaration.name}" uses unsupported attribute "${attribute.name}"`,
+      sourceId: input.sourceId,
+      span: attribute.span,
+    });
+    hasUnsupportedNamedTypeAttribute = true;
+  }
+
+  return { dbNativeTypeAttribute, hasUnsupportedNamedTypeAttribute };
 }
 
 function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput): {
   readonly storageTypes: Record<string, StorageTypeInstance>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
-  readonly namedTypeBaseTypes: Map<string, string>;
 } {
   const storageTypes: Record<string, StorageTypeInstance> = {};
   const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
-  const namedTypeBaseTypes = new Map<string, string>();
 
   for (const declaration of input.declarations) {
-    const baseDescriptor =
-      input.enumTypeDescriptors.get(declaration.baseType) ??
-      input.scalarTypeDescriptors.get(declaration.baseType);
-    if (!baseDescriptor) {
+    if (declaration.typeConstructor) {
+      const { hasUnsupportedNamedTypeAttribute } = validateNamedTypeAttributes({
+        declaration,
+        sourceId: input.sourceId,
+        diagnostics: input.diagnostics,
+        composedExtensions: input.composedExtensions,
+        allowDbNativeType: false,
+        familyId: input.familyId,
+        targetId: input.targetId,
+      });
+      if (hasUnsupportedNamedTypeAttribute) {
+        continue;
+      }
+
+      const helperPath = declaration.typeConstructor.path.join('.');
+      const typeConstructor = resolvePslTypeConstructorDescriptor({
+        call: declaration.typeConstructor,
+        authoringContributions: input.authoringContributions,
+        composedExtensions: input.composedExtensions,
+        familyId: input.familyId,
+        targetId: input.targetId,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        unsupportedCode: 'PSL_UNSUPPORTED_NAMED_TYPE_CONSTRUCTOR',
+        unsupportedMessage: `Named type "${declaration.name}" references unsupported constructor "${helperPath}"`,
+      });
+      if (!typeConstructor) {
+        continue;
+      }
+
+      const storageType = instantiatePslTypeConstructor({
+        call: declaration.typeConstructor,
+        descriptor: typeConstructor,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        entityLabel: `Named type "${declaration.name}"`,
+      });
+      if (!storageType) {
+        continue;
+      }
+
+      namedTypeDescriptors.set(
+        declaration.name,
+        toNamedTypeFieldDescriptor(declaration.name, storageType),
+      );
+      storageTypes[declaration.name] = {
+        codecId: storageType.codecId,
+        nativeType: storageType.nativeType,
+        typeParams: storageType.typeParams ?? {},
+      };
+      continue;
+    }
+
+    // Parser invariant: when typeConstructor is absent, baseType is defined.
+    // The check below narrows `baseType` for TypeScript and guards against a
+    // parser regression; it is unreachable under a correct parser.
+    if (declaration.baseType === undefined) {
       input.diagnostics.push({
         code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        message: `Named type "${declaration.name}" references unsupported base type "${declaration.baseType}"`,
+        message: `Named type "${declaration.name}" must declare a base type or constructor`,
         sourceId: input.sourceId,
         span: declaration.span,
       });
       continue;
     }
-    namedTypeBaseTypes.set(declaration.name, declaration.baseType);
-
-    const pgvectorAttribute = getAttribute(declaration.attributes, 'pgvector.column');
-    const dbNativeTypeAttribute = declaration.attributes.find((attribute) =>
-      attribute.name.startsWith('db.'),
-    );
-    const unsupportedNamedTypeAttribute = declaration.attributes.find(
-      (attribute) => attribute.name !== 'pgvector.column' && !attribute.name.startsWith('db.'),
-    );
-    if (unsupportedNamedTypeAttribute) {
+    const { baseType } = declaration;
+    const baseDescriptor =
+      input.enumTypeDescriptors.get(baseType) ?? input.scalarTypeDescriptors.get(baseType);
+    if (!baseDescriptor) {
       input.diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
-        message: `Named type "${declaration.name}" uses unsupported attribute "${unsupportedNamedTypeAttribute.name}"`,
+        code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
+        message: `Named type "${declaration.name}" references unsupported base type "${baseType}"`,
         sourceId: input.sourceId,
-        span: unsupportedNamedTypeAttribute.span,
+        span: declaration.span,
       });
       continue;
     }
 
-    if (pgvectorAttribute && dbNativeTypeAttribute) {
-      input.diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
-        message: `Named type "${declaration.name}" cannot combine @pgvector.column with @${dbNativeTypeAttribute.name}.`,
+    const { dbNativeTypeAttribute, hasUnsupportedNamedTypeAttribute } = validateNamedTypeAttributes(
+      {
+        declaration,
         sourceId: input.sourceId,
-        span: dbNativeTypeAttribute.span,
-      });
-      continue;
-    }
-
-    if (pgvectorAttribute) {
-      if (!input.composedExtensions.has('pgvector')) {
-        input.diagnostics.push({
-          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-          message:
-            'Attribute "@pgvector.column" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.',
-          sourceId: input.sourceId,
-          span: pgvectorAttribute.span,
-        });
-        continue;
-      }
-      if (declaration.baseType !== 'Bytes') {
-        input.diagnostics.push({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: `Named type "${declaration.name}" uses @pgvector.column on unsupported base type "${declaration.baseType}"`,
-          sourceId: input.sourceId,
-          span: pgvectorAttribute.span,
-        });
-        continue;
-      }
-      const length = parsePgvectorLength({
-        attribute: pgvectorAttribute,
         diagnostics: input.diagnostics,
-        sourceId: input.sourceId,
-      });
-      if (length === undefined) {
-        continue;
-      }
-      const pgvectorStorageType = input.pgvectorVectorConstructor
-        ? instantiateAuthoringTypeConstructor(input.pgvectorVectorConstructor, [length])
-        : {
-            codecId: 'pg/vector@1',
-            nativeType: 'vector',
-            typeParams: { length },
-          };
-      namedTypeDescriptors.set(
-        declaration.name,
-        toNamedTypeFieldDescriptor(declaration.name, pgvectorStorageType),
-      );
-      storageTypes[declaration.name] = {
-        codecId: pgvectorStorageType.codecId,
-        nativeType: pgvectorStorageType.nativeType,
-        typeParams: pgvectorStorageType.typeParams ?? { length },
-      };
+        composedExtensions: input.composedExtensions,
+        allowDbNativeType: true,
+        familyId: input.familyId,
+        targetId: input.targetId,
+      },
+    );
+    if (hasUnsupportedNamedTypeAttribute) {
       continue;
     }
 
     if (dbNativeTypeAttribute) {
       const descriptor = resolveDbNativeTypeAttribute({
         attribute: dbNativeTypeAttribute,
-        baseType: declaration.baseType,
+        baseType,
         baseDescriptor,
         diagnostics: input.diagnostics,
         sourceId: input.sourceId,
@@ -329,7 +409,7 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
     };
   }
 
-  return { storageTypes, namedTypeDescriptors, namedTypeBaseTypes };
+  return { storageTypes, namedTypeDescriptors };
 }
 
 interface BuildModelNodeInput {
@@ -340,8 +420,9 @@ interface BuildModelNodeInput {
   readonly compositeTypeNames: ReadonlySet<string>;
   readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
-  readonly namedTypeBaseTypes: Map<string, string>;
   readonly composedExtensions: Set<string>;
+  readonly familyId: string;
+  readonly targetId: string;
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
@@ -361,22 +442,23 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   const { model, mapping, sourceId, diagnostics } = input;
   const tableName = mapping.tableName;
 
-  const resolvedFields = collectResolvedFields(
+  const resolvedFields = collectResolvedFields({
     model,
     mapping,
-    input.enumTypeDescriptors,
-    input.namedTypeDescriptors,
-    input.namedTypeBaseTypes,
-    input.modelNames,
-    input.compositeTypeNames,
-    input.composedExtensions,
-    input.authoringContributions,
-    input.defaultFunctionRegistry,
-    input.generatorDescriptorById,
+    enumTypeDescriptors: input.enumTypeDescriptors,
+    namedTypeDescriptors: input.namedTypeDescriptors,
+    modelNames: input.modelNames,
+    compositeTypeNames: input.compositeTypeNames,
+    composedExtensions: input.composedExtensions,
+    authoringContributions: input.authoringContributions,
+    familyId: input.familyId,
+    targetId: input.targetId,
+    defaultFunctionRegistry: input.defaultFunctionRegistry,
+    generatorDescriptorById: input.generatorDescriptorById,
     diagnostics,
     sourceId,
-    input.scalarTypeDescriptors,
-  );
+    scalarTypeDescriptors: input.scalarTypeDescriptors,
+  });
 
   const primaryKeyFields = resolvedFields.filter((field) => field.isId);
   const primaryKeyColumns = primaryKeyFields.map((field) => field.columnName);
@@ -402,6 +484,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       sourceId,
       composedExtensions: input.composedExtensions,
       diagnostics,
+      familyId: input.familyId,
+      targetId: input.targetId,
     });
     const relationAttribute = getAttribute(field.attributes, 'relation');
     let relationName: string | undefined;
@@ -517,12 +601,18 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       }
       continue;
     }
-    if (modelAttribute.name.startsWith('pgvector.') && !input.composedExtensions.has('pgvector')) {
-      diagnostics.push({
-        code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-        message: `Attribute "@@${modelAttribute.name}" uses unrecognized namespace "pgvector". Add extension pack "pgvector" to extensionPacks in prisma-next.config.ts.`,
+    const uncomposedNamespace = checkUncomposedNamespace(
+      modelAttribute.name,
+      input.composedExtensions,
+      { familyId: input.familyId, targetId: input.targetId },
+    );
+    if (uncomposedNamespace) {
+      reportUncomposedNamespace({
+        subjectLabel: `Attribute "@@${modelAttribute.name}"`,
+        namespace: uncomposedNamespace,
         sourceId,
         span: modelAttribute.span,
+        diagnostics,
       });
       continue;
     }
@@ -692,14 +782,32 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   };
 }
 
-function buildValueObjects(
-  compositeTypes: readonly PslCompositeType[],
-  enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
-  namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
-  scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
-  diagnostics: ContractSourceDiagnostic[],
-  sourceId: string,
-): Record<string, ContractValueObject> {
+interface BuildValueObjectsInput {
+  readonly compositeTypes: readonly PslCompositeType[];
+  readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly familyId: string;
+  readonly targetId: string;
+  readonly authoringContributions: AuthoringContributions | undefined;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+}
+
+function buildValueObjects(input: BuildValueObjectsInput): Record<string, ContractValueObject> {
+  const {
+    compositeTypes,
+    enumTypeDescriptors,
+    namedTypeDescriptors,
+    scalarTypeDescriptors,
+    composedExtensions,
+    familyId,
+    targetId,
+    authoringContributions,
+    diagnostics,
+    sourceId,
+  } = input;
   const valueObjects: Record<string, ContractValueObject> = {};
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
 
@@ -714,25 +822,35 @@ function buildValueObjects(
         fields[field.name] = field.list ? { ...result, many: true } : result;
         continue;
       }
-      const descriptor = resolveColumnDescriptor(
+      const resolved = resolveFieldTypeDescriptor({
         field,
-        enumTypeDescriptors as Map<string, ColumnDescriptor>,
-        namedTypeDescriptors as Map<string, ColumnDescriptor>,
+        enumTypeDescriptors,
+        namedTypeDescriptors,
         scalarTypeDescriptors,
-      );
-      if (!descriptor) {
-        diagnostics.push({
-          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
-          message: `Field "${compositeType.name}.${field.name}" type "${field.typeName}" is not supported`,
-          sourceId,
-          span: field.span,
-        });
+        authoringContributions,
+        composedExtensions,
+        familyId,
+        targetId,
+        diagnostics,
+        sourceId,
+        entityLabel: `Field "${compositeType.name}.${field.name}"`,
+      });
+      if (!resolved.ok) {
+        if (!resolved.alreadyReported) {
+          diagnostics.push({
+            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+            message: `Field "${compositeType.name}.${field.name}" type "${field.typeName}" is not supported`,
+            sourceId,
+            span: field.span,
+          });
+        }
         continue;
       }
-      fields[field.name] = {
+      const scalarField: ContractField = {
         nullable: field.optional,
-        type: { kind: 'scalar', codecId: descriptor.codecId },
+        type: { kind: 'scalar', codecId: resolved.descriptor.codecId },
       };
+      fields[field.name] = field.list ? { ...scalarField, many: true } : scalarField;
     }
     valueObjects[compositeType.name] = { fields };
   }
@@ -1011,8 +1129,8 @@ export function interpretPslDocumentToSqlContract(
   const modelNames = new Set(models.map((model) => model.name));
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
-  const defaultFunctionRegistry =
-    input.controlMutationDefaults?.defaultFunctionRegistry ?? new Map<string, never>();
+  const defaultFunctionRegistry: ControlMutationDefaultRegistry =
+    input.controlMutationDefaults?.defaultFunctionRegistry ?? new Map();
   const generatorDescriptors = input.controlMutationDefaults?.generatorDescriptors ?? [];
   const generatorDescriptorById = new Map<string, MutationDefaultGeneratorDescriptor>();
   for (const descriptor of generatorDescriptors) {
@@ -1032,10 +1150,9 @@ export function interpretPslDocumentToSqlContract(
     enumTypeDescriptors: enumResult.enumTypeDescriptors,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
     composedExtensions,
-    pgvectorVectorConstructor: getAuthoringTypeConstructor(input.authoringContributions, [
-      'pgvector',
-      'vector',
-    ]),
+    familyId: input.target.familyId,
+    targetId: input.target.targetId,
+    authoringContributions: input.authoringContributions,
     diagnostics,
   });
 
@@ -1060,8 +1177,9 @@ export function interpretPslDocumentToSqlContract(
       compositeTypeNames,
       enumTypeDescriptors: enumResult.enumTypeDescriptors,
       namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
-      namedTypeBaseTypes: namedTypeResult.namedTypeBaseTypes,
       composedExtensions,
+      familyId: input.target.familyId,
+      targetId: input.target.targetId,
       authoringContributions: input.authoringContributions,
       defaultFunctionRegistry,
       generatorDescriptorById,
@@ -1090,22 +1208,23 @@ export function interpretPslDocumentToSqlContract(
     diagnostics,
   );
 
-  if (diagnostics.length > 0) {
-    const dedupedDiagnostics = diagnostics.filter(
-      (diagnostic, index, allDiagnostics) =>
-        allDiagnostics.findIndex(
-          (candidate) =>
-            candidate.code === diagnostic.code &&
-            candidate.message === diagnostic.message &&
-            candidate.sourceId === diagnostic.sourceId &&
-            ((candidate.span && diagnostic.span && hasSameSpan(candidate.span, diagnostic.span)) ||
-              (!candidate.span && !diagnostic.span)),
-        ) === index,
-    );
+  const valueObjects = buildValueObjects({
+    compositeTypes,
+    enumTypeDescriptors: enumResult.enumTypeDescriptors,
+    namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
+    scalarTypeDescriptors: input.scalarTypeDescriptors,
+    composedExtensions,
+    familyId: input.target.familyId,
+    targetId: input.target.targetId,
+    authoringContributions: input.authoringContributions,
+    diagnostics,
+    sourceId,
+  });
 
+  if (diagnostics.length > 0) {
     return notOk({
       summary: 'PSL to SQL contract interpretation failed',
-      diagnostics: dedupedDiagnostics,
+      diagnostics: dedupeDiagnostics(diagnostics),
     });
   }
 
@@ -1131,15 +1250,6 @@ export function interpretPslDocumentToSqlContract(
         : {}),
     })),
   });
-
-  const valueObjects = buildValueObjects(
-    compositeTypes,
-    enumResult.enumTypeDescriptors,
-    namedTypeResult.namedTypeDescriptors,
-    input.scalarTypeDescriptors,
-    diagnostics,
-    sourceId,
-  );
 
   let patchedModels = patchModelDomainFields(
     contract.models as Record<string, ContractModel>,

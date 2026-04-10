@@ -813,7 +813,7 @@ type ContractBase = ContractType<
       readonly lateral: true;
       readonly limit: true;
       readonly orderBy: true;
-      readonly 'pgvector/cosine': true;
+      readonly 'pgvector.cosine': true;
       readonly returning: true;
     };
     readonly sql: {
@@ -824,7 +824,7 @@ type ContractBase = ContractType<
   };
   readonly extensionPacks: {
     readonly pgvector: {
-      readonly capabilities: { readonly postgres: { readonly 'pgvector/cosine': true } };
+      readonly capabilities: { readonly postgres: { readonly 'pgvector.cosine': true } };
       readonly familyId: 'sql';
       readonly id: 'pgvector';
       readonly kind: 'extension';

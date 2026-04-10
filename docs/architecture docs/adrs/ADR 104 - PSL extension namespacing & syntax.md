@@ -1,5 +1,7 @@
 # ADR 104 — PSL extension namespacing & syntax
 
+Historical note: the current SQL PSL provider exposes extension-owned storage types via constructor expressions such as `pgvector.Vector(...)`. The attribute-based examples below describe the generic namespaced extension syntax direction captured in this ADR.
+
 ## Context
 
 We need a stable way for database and domain feature packs to extend PSL while keeping the emitted data contract deterministic and code-free. Examples include vector types and operators (pgvector), geospatial types and functions (PostGIS), and custom index strategies.
@@ -38,7 +40,7 @@ The emitter validates extension usage against pack-provided (or core-convention)
 model Document {
   id      Int     @id @default(autoincrement())
   content String
-  embedding Bytes  @pgvector.column(length: 1536, distance: cosine)
+  embedding Bytes  @vector.column(length: 1536, distance: cosine)
 }
 ```
 
@@ -48,7 +50,7 @@ This pattern keeps the parser simple (no type-parameter syntax) while preserving
 
 ```prisma
 types {
-  Embedding1536 = Bytes @pgvector.column(length: 1536)
+  Embedding1536 = Bytes @vector.column(length: 1536)
 }
 
 model Document {
@@ -90,7 +92,7 @@ model Place {
           "nullable": false,
           "meta": {
             "ext": {
-              "pgvector": { "length": 1536, "distance": "cosine" }
+              "vector": { "length": 1536, "distance": "cosine" }
             }
           }
         }
@@ -98,7 +100,7 @@ model Place {
     }
   },
   "extensionPacks": {
-    "pgvector": {
+    "vector": {
       "version": "1.2.0",
       "columns": {
         "document.embedding": { "length": 1536, "distance": "cosine" }
@@ -113,7 +115,7 @@ model Place {
   },
   "capabilities": {
     "postgres": { "lateral": true, "jsonAgg": true },
-    "pgvector": { "ivfflat": true, "hnsw": false },
+    "vector": { "ivfflat": true, "hnsw": false },
     "postgis": { "gist": true }
   }
 }
@@ -147,7 +149,7 @@ model Place {
 
 Extension attributes attach **extra meaning** to a field (for example, “this `Bytes` column is a pgvector `vector(1536)`”). If an attribute is applied to an incompatible base type, the schema can look valid at a glance but produce confusing runtime behavior or incorrect storage assumptions. To keep authoring predictable, extension attributes are interpreted with **strict, enforceable invariants**. Example (pgvector):
 
-- `@pgvector.column(...)` is only valid on compatible base types (e.g. `Bytes`) or on named type instances defined in `types { ... }` whose base is compatible.
+- `@vector.column(...)` is only valid on compatible base types (e.g. `Bytes`) or on named type instances defined in `types { ... }` whose base is compatible.
 - If applied to an incompatible base type, emission fails with a targeted diagnostic.
 - If the pack is not composed in `prisma-next.config.ts`, the namespace is unknown and emission fails.
 
