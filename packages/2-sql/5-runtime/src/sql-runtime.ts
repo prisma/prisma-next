@@ -13,7 +13,11 @@ import type {
   RuntimeVerifyOptions,
   TelemetryOutcome,
 } from '@prisma-next/runtime-executor';
-import { AsyncIterableResult, createRuntimeCore } from '@prisma-next/runtime-executor';
+import {
+  AsyncIterableResult,
+  createRuntimeCore,
+  runtimeError,
+} from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
@@ -85,6 +89,10 @@ export interface RuntimeQueryable {
   execute<Row = Record<string, unknown>>(
     plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
   ): AsyncIterableResult<Row>;
+}
+
+export interface TransactionContext extends RuntimeQueryable {
+  readonly invalidated: boolean;
 }
 
 interface CoreQueryable {
@@ -221,6 +229,69 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
   close(): Promise<void> {
     return this.core.close();
+  }
+}
+
+function transactionClosedError(): Error {
+  return runtimeError(
+    'RUNTIME.TRANSACTION_CLOSED',
+    'Cannot read from a query result after the transaction has ended. Await the result or call .toArray() inside the transaction callback.',
+    {},
+  );
+}
+
+export async function withTransaction<R>(
+  runtime: Runtime,
+  fn: (tx: TransactionContext) => PromiseLike<R>,
+): Promise<R> {
+  const connection = await runtime.connection();
+  const transaction = await connection.transaction();
+
+  let invalidated = false;
+  const txContext: TransactionContext = {
+    get invalidated() {
+      return invalidated;
+    },
+    execute<Row = Record<string, unknown>>(
+      plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+    ): AsyncIterableResult<Row> {
+      if (invalidated) {
+        throw transactionClosedError();
+      }
+      const inner = transaction.execute(plan);
+      const guarded = async function* (): AsyncGenerator<Row, void, unknown> {
+        for await (const row of inner) {
+          if (invalidated) {
+            throw transactionClosedError();
+          }
+          yield row;
+        }
+      };
+      return new AsyncIterableResult(guarded());
+    },
+  };
+
+  try {
+    const result = await fn(txContext);
+    invalidated = true;
+    await transaction.commit();
+    return result;
+  } catch (error) {
+    invalidated = true;
+    try {
+      await transaction.rollback();
+    } catch (rollbackError) {
+      const wrapped = runtimeError(
+        'RUNTIME.TRANSACTION_ROLLBACK_FAILED',
+        'Transaction rollback failed after callback error',
+        { rollbackError },
+      );
+      wrapped.cause = error;
+      throw wrapped;
+    }
+    throw error;
+  } finally {
+    await connection.release();
   }
 }
 
