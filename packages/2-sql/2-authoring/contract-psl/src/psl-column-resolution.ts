@@ -683,6 +683,10 @@ export function resolvePslTypeConstructorDescriptor(input: {
   });
 }
 
+export type ResolveFieldTypeResult =
+  | { readonly ok: true; readonly descriptor: ColumnDescriptor }
+  | { readonly ok: false; readonly alreadyReported: boolean };
+
 export function resolveFieldTypeDescriptor(input: {
   readonly field: PslField;
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -695,7 +699,7 @@ export function resolveFieldTypeDescriptor(input: {
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly entityLabel: string;
-}): ColumnDescriptor | undefined {
+}): ResolveFieldTypeResult {
   if (input.field.typeConstructor) {
     const helperPath = input.field.typeConstructor.path.join('.');
     const descriptor = resolvePslTypeConstructorDescriptor({
@@ -710,24 +714,32 @@ export function resolveFieldTypeDescriptor(input: {
       unsupportedMessage: `${input.entityLabel} type constructor "${helperPath}" is not supported in SQL PSL provider v1`,
     });
     if (!descriptor) {
-      return undefined;
+      return { ok: false, alreadyReported: true };
     }
 
-    return instantiatePslTypeConstructor({
+    const instantiated = instantiatePslTypeConstructor({
       call: input.field.typeConstructor,
       descriptor,
       diagnostics: input.diagnostics,
       sourceId: input.sourceId,
       entityLabel: input.entityLabel,
     });
+    if (!instantiated) {
+      return { ok: false, alreadyReported: true };
+    }
+    return { ok: true, descriptor: instantiated };
   }
 
-  return resolveColumnDescriptor(
+  const descriptor = resolveColumnDescriptor(
     input.field,
     input.enumTypeDescriptors,
     input.namedTypeDescriptors,
     input.scalarTypeDescriptors,
   );
+  if (!descriptor) {
+    return { ok: false, alreadyReported: false };
+  }
+  return { ok: true, descriptor };
 }
 
 /**

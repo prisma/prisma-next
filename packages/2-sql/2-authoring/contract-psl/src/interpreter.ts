@@ -799,7 +799,7 @@ function buildValueObjects(input: BuildValueObjectsInput): Record<string, Contra
         fields[field.name] = field.list ? { ...result, many: true } : result;
         continue;
       }
-      const descriptor = resolveFieldTypeDescriptor({
+      const resolved = resolveFieldTypeDescriptor({
         field,
         enumTypeDescriptors,
         namedTypeDescriptors,
@@ -812,8 +812,8 @@ function buildValueObjects(input: BuildValueObjectsInput): Record<string, Contra
         sourceId,
         entityLabel: `Field "${compositeType.name}.${field.name}"`,
       });
-      if (!descriptor) {
-        if (!field.typeConstructor) {
+      if (!resolved.ok) {
+        if (!resolved.alreadyReported) {
           diagnostics.push({
             code: 'PSL_UNSUPPORTED_FIELD_TYPE',
             message: `Field "${compositeType.name}.${field.name}" type "${field.typeName}" is not supported`,
@@ -825,7 +825,7 @@ function buildValueObjects(input: BuildValueObjectsInput): Record<string, Contra
       }
       fields[field.name] = {
         nullable: field.optional,
-        type: { kind: 'scalar', codecId: descriptor.codecId },
+        type: { kind: 'scalar', codecId: resolved.descriptor.codecId },
       };
     }
     valueObjects[compositeType.name] = { fields };

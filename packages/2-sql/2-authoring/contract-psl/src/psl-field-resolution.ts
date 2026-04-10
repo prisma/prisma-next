@@ -143,9 +143,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     if (isValueObjectField) {
       descriptor = scalarTypeDescriptors.get('Json');
     } else if (isListField) {
-      const originalDescriptor = resolveFieldTypeDescriptor(resolveInput);
-      if (!originalDescriptor) {
-        if (!field.typeConstructor) {
+      const resolved = resolveFieldTypeDescriptor(resolveInput);
+      if (!resolved.ok) {
+        if (!resolved.alreadyReported) {
           diagnostics.push({
             code: 'PSL_UNSUPPORTED_FIELD_TYPE',
             message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
@@ -155,21 +155,25 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         }
         continue;
       }
-      scalarCodecId = originalDescriptor.codecId;
+      scalarCodecId = resolved.descriptor.codecId;
       descriptor = scalarTypeDescriptors.get('Json');
     } else {
-      descriptor = resolveFieldTypeDescriptor(resolveInput);
+      const resolved = resolveFieldTypeDescriptor(resolveInput);
+      if (!resolved.ok) {
+        if (!resolved.alreadyReported) {
+          diagnostics.push({
+            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+            message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
+            sourceId,
+            span: field.span,
+          });
+        }
+        continue;
+      }
+      descriptor = resolved.descriptor;
     }
 
     if (!descriptor) {
-      if (!field.typeConstructor) {
-        diagnostics.push({
-          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
-          message: `Field "${model.name}.${field.name}" type "${field.typeName}" is not supported in SQL PSL provider v1`,
-          sourceId,
-          span: field.span,
-        });
-      }
       continue;
     }
 
