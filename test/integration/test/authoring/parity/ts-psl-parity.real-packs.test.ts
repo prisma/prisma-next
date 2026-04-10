@@ -1,17 +1,17 @@
-import { parsePslDocument } from '@prisma-next/psl-parser';
-import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import { describe, expect, it } from 'vitest';
-import pgvectorControl from '../../../3-extensions/pgvector/src/exports/control';
-import pgvectorPack from '../../../3-extensions/pgvector/src/exports/pack';
-import postgresControl from '../../../3-targets/3-targets/postgres/src/exports/control';
-import postgresPack from '../../../3-targets/3-targets/postgres/src/exports/pack';
-import postgresAdapter from '../../../3-targets/6-adapters/postgres/src/exports/control';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import pgvectorControl from '@prisma-next/extension-pgvector/control';
+import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyControl, {
   assembleAuthoringContributions,
   assemblePslInterpretationContributions,
-} from '../src/exports/control';
-import sqlFamilyPack from '../src/exports/pack';
+} from '@prisma-next/family-sql/control';
+import sqlFamilyPack from '@prisma-next/family-sql/pack';
+import { parsePslDocument } from '@prisma-next/psl-parser';
+import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresControl from '@prisma-next/target-postgres/control';
+import postgresPack from '@prisma-next/target-postgres/pack';
+import { describe, expect, it } from 'vitest';
 
 const int4Column = {
   codecId: 'pg/int4@1',
