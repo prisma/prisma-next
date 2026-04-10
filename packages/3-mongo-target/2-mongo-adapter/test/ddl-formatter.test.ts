@@ -268,4 +268,71 @@ describe('formatMongoOperations', () => {
     expect(result[0]).toContain('db.runCommand({ collMod: "users"');
     expect(result[0]).toContain('validationLevel: "strict"');
   });
+
+  it('formats createIndex with wildcardProjection and partialFilterExpression', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'additive',
+      precheck: [],
+      execute: [
+        {
+          description: 'create wildcard index',
+          command: new CreateIndexCommand('users', [{ field: '$**', direction: 1 }], {
+            wildcardProjection: { bio: 1, name: 0 },
+            partialFilterExpression: { active: true },
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const result = formatMongoOperations([op]);
+    expect(result[0]).toContain('wildcardProjection:');
+    expect(result[0]).toContain('"bio":1');
+    expect(result[0]).toContain('partialFilterExpression:');
+    expect(result[0]).toContain('"active":true');
+  });
+
+  it('formats createCollection with changeStreamPreAndPostImages', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'additive',
+      precheck: [],
+      execute: [
+        {
+          description: 'create collection',
+          command: new CreateCollectionCommand('events', {
+            changeStreamPreAndPostImages: { enabled: true },
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const result = formatMongoOperations([op]);
+    expect(result[0]).toContain('changeStreamPreAndPostImages:');
+    expect(result[0]).toContain('"enabled":true');
+  });
+
+  it('formats collMod with changeStreamPreAndPostImages', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'destructive',
+      precheck: [],
+      execute: [
+        {
+          description: 'enable change stream images',
+          command: new CollModCommand('users', {
+            changeStreamPreAndPostImages: { enabled: true },
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const result = formatMongoOperations([op]);
+    expect(result[0]).toContain('db.runCommand({ collMod: "users"');
+    expect(result[0]).toContain('changeStreamPreAndPostImages:');
+    expect(result[0]).toContain('"enabled":true');
+  });
 });

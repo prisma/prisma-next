@@ -5,7 +5,8 @@ import type {
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as markerLedger from '../src/core/marker-ledger';
 import { initMarker, readMarker } from '../src/core/marker-ledger';
 import { createMongoControlDriver } from '../src/core/mongo-control-driver';
 import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
@@ -267,6 +268,87 @@ describe('MongoMigrationRunner', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+    }
+  });
+
+  it('returns MARKER_ORIGIN_MISMATCH when marker exists but plan has no origin', async () => {
+    await initMarker(db, { storageHash: 'sha256:existing', profileHash: 'sha256:p1' });
+
+    const contract = makeContract({
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
+    });
+    const plan = planForContract(contract);
+    const serialized = serializePlan(plan);
+
+    const runner = new MongoMigrationRunner();
+    const result = await runner.execute({
+      plan: serialized,
+      driver: makeDriver(),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+    }
+  });
+
+  it('returns MARKER_ORIGIN_MISMATCH when no marker but plan has origin', async () => {
+    const contract = makeContract({
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
+    });
+    const plan = planForContract(contract);
+    const serialized = serializePlan({
+      ...plan,
+      origin: { storageHash: 'sha256:something' },
+    });
+
+    const runner = new MongoMigrationRunner();
+    const result = await runner.execute({
+      plan: serialized,
+      driver: makeDriver(),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+    }
+  });
+
+  it('returns MARKER_CAS_FAILURE when marker update loses compare-and-swap', async () => {
+    await initMarker(db, { storageHash: 'sha256:origin', profileHash: 'sha256:profile' });
+
+    const contract = makeContract({
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
+    });
+    const plan = planForContract(contract);
+    const serialized = serializePlan({
+      ...plan,
+      origin: { storageHash: 'sha256:origin' },
+    });
+
+    const updateSpy = vi.spyOn(markerLedger, 'updateMarker').mockResolvedValue(false);
+    try {
+      const runner = new MongoMigrationRunner();
+      const result = await runner.execute({
+        plan: serialized,
+        driver: makeDriver(),
+        destinationContract: contract,
+        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('MARKER_CAS_FAILURE');
+      }
+    } finally {
+      updateSpy.mockRestore();
     }
   });
 

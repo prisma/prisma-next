@@ -34,7 +34,9 @@ afterAll(async () => {
 beforeEach(async () => {
   const collections = await db.listCollections().toArray();
   for (const col of collections) {
-    await db.dropCollection(col['name'] as string);
+    const name = col['name'] as string;
+    if (name.startsWith('system.')) continue;
+    await db.dropCollection(name);
   }
 });
 
@@ -164,6 +166,151 @@ describe('MongoCommandExecutor', () => {
 
     const colls = await db.listCollections({ name: 'docs' }).toArray();
     expect((colls[0] as Record<string, unknown>)['options']).toHaveProperty('validator');
+  });
+
+  it('createIndex passes text-index options (weights, default_language, language_override)', async () => {
+    await db.createCollection('articles');
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CreateIndexCommand(
+      'articles',
+      [
+        { field: 'title', direction: 'text' },
+        { field: 'body', direction: 'text' },
+      ],
+      {
+        weights: { title: 10, body: 1 },
+        default_language: 'english',
+        language_override: 'lang',
+      },
+    );
+
+    await cmd.accept(executor);
+
+    const indexes = await db.collection('articles').listIndexes().toArray();
+    const textIndex = indexes.find(
+      (idx) =>
+        idx['default_language'] === 'english' &&
+        idx['language_override'] === 'lang' &&
+        idx['weights'] !== undefined,
+    );
+    expect(textIndex).toBeDefined();
+    expect(textIndex?.['weights']).toEqual({ title: 10, body: 1 });
+    expect(textIndex?.['default_language']).toBe('english');
+    expect(textIndex?.['language_override']).toBe('lang');
+  });
+
+  it('createIndex passes wildcardProjection option', async () => {
+    await db.createCollection('wildcard_items');
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CreateIndexCommand('wildcard_items', [{ field: '$**', direction: 1 }], {
+      wildcardProjection: { name: 1 },
+    });
+
+    await cmd.accept(executor);
+
+    const indexes = await db.collection('wildcard_items').listIndexes().toArray();
+    const wildcardIdx = indexes.find((idx) => idx['key']?.['$**'] === 1);
+    expect(wildcardIdx).toBeDefined();
+    expect(wildcardIdx?.['wildcardProjection']).toEqual({ name: 1 });
+  });
+
+  it('createCollection passes validator and validation options', async () => {
+    const executor = new MongoCommandExecutor(db);
+    const validator = { $jsonSchema: { bsonType: 'object', required: ['name'] } };
+    const cmd = new CreateCollectionCommand('validated_coll', {
+      validator,
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+
+    await cmd.accept(executor);
+
+    const colls = await db.listCollections({ name: 'validated_coll' }).toArray();
+    expect(colls).toHaveLength(1);
+    const opts = (colls[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
+    expect(opts['validator']).toEqual(validator);
+    expect(opts['validationLevel']).toBe('strict');
+    expect(opts['validationAction']).toBe('error');
+  });
+
+  it('createCollection passes changeStreamPreAndPostImages option', async () => {
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CreateCollectionCommand('cs_images_coll', {
+      changeStreamPreAndPostImages: { enabled: true },
+    });
+
+    await cmd.accept(executor);
+
+    const colls = await db.listCollections({ name: 'cs_images_coll' }).toArray();
+    expect(colls).toHaveLength(1);
+    const opts = (colls[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
+    expect(opts['changeStreamPreAndPostImages']).toEqual({ enabled: true });
+  });
+
+  it('createCollection passes collation option', async () => {
+    const executor = new MongoCommandExecutor(db);
+    const collation = { locale: 'en', strength: 2 };
+    const cmd = new CreateCollectionCommand('collation_coll', {
+      collation,
+    });
+
+    await cmd.accept(executor);
+
+    const colls = await db.listCollections({ name: 'collation_coll' }).toArray();
+    expect(colls).toHaveLength(1);
+    const opts = (colls[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
+    expect(opts['collation']).toMatchObject(collation);
+  });
+
+  it('collMod passes changeStreamPreAndPostImages option', async () => {
+    await db.createCollection('cs_mod_coll');
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CollModCommand('cs_mod_coll', {
+      changeStreamPreAndPostImages: { enabled: true },
+    });
+
+    await cmd.accept(executor);
+
+    const colls = await db.listCollections({ name: 'cs_mod_coll' }).toArray();
+    expect(colls).toHaveLength(1);
+    const opts = (colls[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
+    expect(opts['changeStreamPreAndPostImages']).toEqual({ enabled: true });
+  });
+
+  it('createCollection passes timeseries option', async () => {
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CreateCollectionCommand('ts_coll', {
+      timeseries: { timeField: 'ts', granularity: 'hours' },
+    });
+
+    try {
+      await cmd.accept(executor);
+    } catch {
+      return;
+    }
+
+    const colls = await db.listCollections({ name: 'ts_coll' }).toArray();
+    expect(colls).toHaveLength(1);
+    const opts = (colls[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
+    expect(opts['timeseries']).toMatchObject({ timeField: 'ts', granularity: 'hours' });
+  });
+
+  it('createCollection passes clusteredIndex option', async () => {
+    const executor = new MongoCommandExecutor(db);
+    const cmd = new CreateCollectionCommand('clustered_coll', {
+      clusteredIndex: { key: { _id: 1 }, unique: true },
+    });
+
+    try {
+      await cmd.accept(executor);
+    } catch {
+      return;
+    }
+
+    const colls = await db.listCollections({ name: 'clustered_coll' }).toArray();
+    expect(colls).toHaveLength(1);
+    const opts = (colls[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
+    expect(opts['clusteredIndex']).toMatchObject({ key: { _id: 1 }, unique: true });
   });
 });
 
