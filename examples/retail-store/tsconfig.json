@@ -3,8 +3,25 @@
   "compilerOptions": {
     "outDir": "dist",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx"
+    "jsx": "preserve",
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "isolatedModules": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "app/**/*.ts", "app/**/*.tsx"],
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "test/**/*.ts",
+    "middleware.ts",
+    ".next/types/**/*.ts"
+  ],
   "exclude": ["dist", "test/fixtures/**/*"]
 }
