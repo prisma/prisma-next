@@ -1,65 +1,71 @@
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { Button } from '../../src/components/ui/button';
+import { Card, CardContent } from '../../src/components/ui/card';
+import { Separator } from '../../src/components/ui/separator';
 import { getCartByUserId } from '../../src/data/carts';
 import { getDb } from '../../src/db-singleton';
+import { getAuthUserId } from '../../src/lib/auth';
+import { CartActions } from './cart-actions';
 
 export const dynamic = 'force-dynamic';
 
-const DEMO_USER_ID = process.env['DEMO_USER_ID'] ?? '';
-
 export default async function CartPage() {
+  const userId = await getAuthUserId();
+  if (!userId) redirect('/login');
+
   const db = await getDb();
-  const cart = DEMO_USER_ID ? await getCartByUserId(db, DEMO_USER_ID) : null;
+  const cart = await getCartByUserId(db, userId);
   const items = cart?.items ?? [];
 
   const total = items.reduce((sum, item) => sum + Number(item.price.amount) * item.amount, 0);
 
   return (
-    <div style={{ maxWidth: '600px' }}>
-      <h1 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Shopping Cart</h1>
+    <div className="max-w-2xl">
+      <h1 className="text-2xl font-bold mb-6">Shopping Cart</h1>
 
       {items.length === 0 ? (
-        <p style={{ color: 'var(--muted)' }}>Your cart is empty.</p>
+        <div className="text-center py-12">
+          <p className="text-muted mb-4">Your cart is empty.</p>
+          <Button asChild>
+            <Link href="/">Browse Products</Link>
+          </Button>
+        </div>
       ) : (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div className="flex flex-col gap-3">
             {items.map((item, i) => (
-              <div
-                key={`${item.productId}-${i}`}
-                style={{
-                  background: 'var(--card-bg)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  padding: '1rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600 }}>{item.name}</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
-                    {item.brand} · Qty: {item.amount}
+              <Card key={`${item.productId}-${i}`}>
+                <CardContent className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="font-semibold">{item.name}</p>
+                    <p className="text-sm text-muted">
+                      {item.brand} · Qty: {item.amount}
+                    </p>
                   </div>
-                </div>
-                <div style={{ fontWeight: 600 }}>
-                  ${(Number(item.price.amount) * item.amount).toFixed(2)}
-                </div>
-              </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold">
+                      ${(Number(item.price.amount) * item.amount).toFixed(2)}
+                    </span>
+                    <CartActions productId={item.productId as string} mode="remove" />
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
 
-          <div
-            style={{
-              marginTop: '1.5rem',
-              paddingTop: '1rem',
-              borderTop: '2px solid var(--border)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: '1.1rem',
-              fontWeight: 700,
-            }}
-          >
+          <Separator className="my-6" />
+
+          <div className="flex items-center justify-between text-lg font-bold">
             <span>Total</span>
             <span>${total.toFixed(2)}</span>
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <CartActions mode="clear" />
+            <Button asChild>
+              <Link href="/checkout">Proceed to Checkout</Link>
+            </Button>
           </div>
         </>
       )}
