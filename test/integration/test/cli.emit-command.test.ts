@@ -794,7 +794,7 @@ model Post {
           storage: {
             collections: {
               users: {
-                indexes: [{ fields: { email: 1 }, options: { unique: true } }],
+                indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
                 options: {
                   collation: { locale: 'en', strength: 2 },
                 },
