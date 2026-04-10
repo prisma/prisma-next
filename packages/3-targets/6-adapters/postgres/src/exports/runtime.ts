@@ -12,7 +12,7 @@ import { type as arktype } from 'arktype';
 import { createPostgresAdapter } from '../core/adapter';
 import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
 import { codecDefinitions } from '../core/codecs';
-import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
+import { postgresAdapterDescriptorMeta, postgresQueryOperations } from '../core/descriptor-meta';
 import {
   compileJsonSchemaValidator,
   type JsonSchemaValidateFn,
@@ -79,6 +79,7 @@ const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', 
     ...postgresAdapterDescriptorMeta,
     codecs: createPostgresCodecRegistry,
     parameterizedCodecs: () => parameterizedCodecDescriptors,
+    queryOperations: () => postgresQueryOperations,
     mutationDefaultGenerators: createPostgresMutationDefaultGenerators,
     create(): SqlRuntimeAdapter {
       return createPostgresAdapter();

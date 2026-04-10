@@ -1,11 +1,17 @@
 export interface ParamSpec {
+  readonly codecId?: string;
+  readonly traits?: readonly string[];
+  readonly nullable: boolean;
+}
+
+export interface ReturnSpec {
   readonly codecId: string;
   readonly nullable: boolean;
 }
 
 export interface OperationEntry {
   readonly args: readonly ParamSpec[];
-  readonly returns: ParamSpec;
+  readonly returns: ReturnSpec;
 }
 
 export type OperationDescriptor<T extends OperationEntry = OperationEntry> = T & {

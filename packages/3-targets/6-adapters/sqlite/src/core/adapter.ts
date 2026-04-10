@@ -319,12 +319,6 @@ function renderBinary(expr: BinaryExpr, contract?: SqliteContract): string {
       break;
   }
 
-  // ilike is not supported by SQLite — waiting for prisma/prisma-next#277
-  // to move ilike into an extension so it can be properly capability-gated.
-  if (expr.op === 'ilike') {
-    throw new Error('SQLite does not support ILIKE. Use LIKE for case-sensitive matching.');
-  }
-
   const operatorMap: Record<BinaryExpr['op'], string> = {
     eq: '=',
     neq: '!=',
@@ -333,7 +327,6 @@ function renderBinary(expr: BinaryExpr, contract?: SqliteContract): string {
     gte: '>=',
     lte: '<=',
     like: 'LIKE',
-    ilike: 'LIKE', // unreachable — guarded above; kept to satisfy Record<op, string>
     in: 'IN',
     notIn: 'NOT IN',
   };

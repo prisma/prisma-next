@@ -62,7 +62,22 @@ describe('createModelAccessor', () => {
     expectBinaryParam(post['id']!.lte(10), 'posts', 'id', 'lte', 10);
     expectBinaryParam(post['userId']!.eq(42), 'posts', 'user_id', 'eq', 42);
     expectBinaryParam(user['name']!.like('%Ali%'), 'users', 'name', 'like', '%Ali%');
-    expectBinaryParam(user['name']!.ilike('%ali%'), 'users', 'name', 'ilike', '%ali%');
+  });
+
+  it('creates ilike as trait-matched extension operation returning predicate', () => {
+    const user = createModelAccessor(context, 'User');
+    const ilike = user['name']!.ilike;
+    const result = ilike('%ali%');
+    expect(result).toBeInstanceOf(OperationExpr);
+    const op = result as OperationExpr;
+    expect(op.method).toBe('ilike');
+    expect(op.self).toEqual(ColumnRef.of('users', 'name'));
+  });
+
+  it('does not expose ilike on non-textual fields', () => {
+    const post = createModelAccessor(context, 'Post');
+    const field = post['views'] as unknown as Record<string, unknown>;
+    expect(field['ilike']).toBeUndefined();
   });
 
   it('creates list literal, null check, and order directive helpers', () => {
@@ -403,7 +418,6 @@ describe('createModelAccessor', () => {
       expect(field['gte']).toBeUndefined();
       expect(field['lte']).toBeUndefined();
       expect(field['like']).toBeUndefined();
-      expect(field['ilike']).toBeUndefined();
       expect(field['asc']).toBeUndefined();
       expect(field['desc']).toBeUndefined();
     });
@@ -423,7 +437,6 @@ describe('createModelAccessor', () => {
         'gte',
         'lte',
         'like',
-        'ilike',
         'in',
         'notIn',
         'isNull',

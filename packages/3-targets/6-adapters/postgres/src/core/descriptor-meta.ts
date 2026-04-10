@@ -1,4 +1,5 @@
 import type { CodecControlHooks, ExpandNativeTypeInput } from '@prisma-next/family-sql/control';
+import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
@@ -126,6 +127,18 @@ const identityHooks: CodecControlHooks = { expandNativeType: ({ nativeType }) =>
 // ============================================================================
 // Descriptor metadata
 // ============================================================================
+
+export const postgresQueryOperations: readonly SqlOperationDescriptor[] = [
+  {
+    method: 'ilike',
+    args: [
+      { traits: ['textual'], nullable: false },
+      { codecId: PG_TEXT_CODEC_ID, nullable: false },
+    ],
+    returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+    lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} ILIKE {{arg0}}' },
+  },
+];
 
 export const postgresAdapterDescriptorMeta = {
   kind: 'adapter',
@@ -255,5 +268,12 @@ export const postgresAdapterDescriptorMeta = {
       { typeId: PG_JSON_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'json' },
       { typeId: PG_JSONB_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'jsonb' },
     ],
+    queryOperationTypes: {
+      import: {
+        package: '@prisma-next/adapter-postgres/operation-types',
+        named: 'QueryOperationTypes',
+        alias: 'PgAdapterQueryOps',
+      },
+    },
   },
 } as const;

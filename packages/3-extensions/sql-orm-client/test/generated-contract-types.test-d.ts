@@ -354,7 +354,7 @@ userCollection.where((u) => u.metadata.gt(1));
 userCollection.where((u) => u.metadata.gte(1));
 // @ts-expect-error jsonb has no textual trait → like not available
 userCollection.where((u) => u.metadata.like('%'));
-// @ts-expect-error jsonb has no textual trait → ilike not available
+// @ts-expect-error jsonb has no textual trait → ilike extension op not available
 userCollection.where((u) => u.metadata.ilike('%'));
 // @ts-expect-error jsonb has no order trait → asc not available
 userCollection.orderBy((u) => u.metadata.asc());

@@ -2,6 +2,7 @@ import type { QueryOperationTypesBase } from '@prisma-next/sql-contract/types';
 import type {
   Expand,
   ExpressionType,
+  FieldSpec,
   QueryContext,
   Scope,
   ScopeField,
@@ -9,7 +10,7 @@ import type {
   Subquery,
 } from './scope';
 
-export type Expression<T extends ScopeField> = {
+export type Expression<T extends FieldSpec> = {
   [ExpressionType]: T;
   buildAst(): import('@prisma-next/sql-relational-core/ast').AnyExpression;
 };
@@ -66,10 +67,33 @@ export type OrderByScope<
   namespaces: AvailableScope['namespaces'];
 };
 
-type ExtensionFunctionArgs<
-  Args extends readonly ScopeField[],
+type CodecIdsWithTrait<
   CT extends Record<string, { readonly input: unknown }>,
-> = { [I in keyof Args]: ExpressionOrValue<Args[I], CT> };
+  Trait extends string,
+> = {
+  [K in keyof CT & string]: CT[K] extends { readonly traits: infer T }
+    ? Trait extends T
+      ? K
+      : never
+    : never;
+}[keyof CT & string];
+
+type ResolveExtArg<Arg, CT extends Record<string, { readonly input: unknown }>> = Arg extends {
+  readonly codecId: infer CId extends string;
+  readonly nullable: infer N extends boolean;
+}
+  ? ExpressionOrValue<{ codecId: CId; nullable: N }, CT>
+  : Arg extends {
+        readonly traits: infer T extends string;
+        readonly nullable: infer N extends boolean;
+      }
+    ? ExpressionOrValue<{ codecId: CodecIdsWithTrait<CT, T>; nullable: N }, CT>
+    : never;
+
+type ExtensionFunctionArgs<
+  Args extends readonly unknown[],
+  CT extends Record<string, { readonly input: unknown }>,
+> = { [I in keyof Args]: ResolveExtArg<Args[I], CT> };
 
 type DeriveExtFunctions<
   OT extends QueryOperationTypesBase,

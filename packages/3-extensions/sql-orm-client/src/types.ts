@@ -155,7 +155,6 @@ export type ComparisonMethodFns<T> = {
   gte(value: T): AnyExpression;
   lte(value: T): AnyExpression;
   like(pattern: string): AnyExpression;
-  ilike(pattern: string): AnyExpression;
   in(values: readonly T[]): AnyExpression;
   notIn(values: readonly T[]): AnyExpression;
   isNull(): AnyExpression;
@@ -224,17 +223,47 @@ type MapArgsToJsTypes<
   ? [CodecArgJsType<Head, TCodecTypes>, ...MapArgsToJsTypes<Tail, TCodecTypes>]
   : [];
 
+type IsBooleanReturn<Returns, TCodecTypes extends Record<string, unknown>> = Returns extends {
+  readonly codecId: infer Id extends string;
+}
+  ? Id extends keyof TCodecTypes
+    ? TCodecTypes[Id] extends { readonly traits: infer T }
+      ? 'boolean' extends T
+        ? true
+        : false
+      : false
+    : false
+  : false;
+
 type QueryOperationMethod<Op, TCodecTypes extends Record<string, unknown>> = Op extends {
   readonly args: readonly [unknown, ...infer UserArgs];
   readonly returns: infer Returns;
 }
-  ? (
-      ...args: MapArgsToJsTypes<UserArgs, TCodecTypes>
-    ) => ComparisonMethods<
-      QueryOperationReturnJsType<Returns, TCodecTypes>,
-      QueryOperationReturnTraits<Returns, TCodecTypes>
-    >
+  ? IsBooleanReturn<Returns, TCodecTypes> extends true
+    ? (...args: MapArgsToJsTypes<UserArgs, TCodecTypes>) => AnyExpression
+    : (
+        ...args: MapArgsToJsTypes<UserArgs, TCodecTypes>
+      ) => ComparisonMethods<
+        QueryOperationReturnJsType<Returns, TCodecTypes>,
+        QueryOperationReturnTraits<Returns, TCodecTypes>
+      >
   : never;
+
+type OpMatchesField<Op, CodecId extends string, CT extends Record<string, unknown>> = Op extends {
+  readonly args: readonly [infer Self, ...(readonly unknown[])];
+}
+  ? Self extends { readonly codecId: CodecId }
+    ? true
+    : Self extends { readonly traits: infer RequiredTraits extends string }
+      ? CodecId extends keyof CT
+        ? CT[CodecId] extends { readonly traits: infer FieldTraits }
+          ? RequiredTraits extends FieldTraits
+            ? true
+            : false
+          : false
+        : false
+      : false
+  : false;
 
 type FieldOperations<
   TContract extends Contract<SqlStorage>,
@@ -243,9 +272,11 @@ type FieldOperations<
 > = FieldCodecId<TContract, ModelName, FieldName> extends infer CodecId extends string
   ? ExtractQueryOperationTypes<TContract> extends infer AllOps
     ? {
-        [OpName in keyof AllOps & string as AllOps[OpName] extends {
-          readonly args: readonly [{ readonly codecId: CodecId }, ...(readonly unknown[])];
-        }
+        [OpName in keyof AllOps & string as OpMatchesField<
+          AllOps[OpName],
+          CodecId,
+          ExtractCodecTypes<TContract>
+        > extends true
           ? OpName
           : never]: QueryOperationMethod<AllOps[OpName], ExtractCodecTypes<TContract>>;
       }
@@ -329,10 +360,6 @@ export const COMPARISON_METHODS_META = {
   like: {
     traits: ['textual'],
     create: scalarComparisonMethod('like'),
-  },
-  ilike: {
-    traits: ['textual'],
-    create: scalarComparisonMethod('ilike'),
   },
   asc: {
     traits: ['order'],
