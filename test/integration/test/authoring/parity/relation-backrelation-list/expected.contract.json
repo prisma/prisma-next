@@ -11,18 +11,18 @@
     "Post": {
       "fields": {
         "id": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
-          },
-          "nullable": false
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         },
         "userId": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
-          },
-          "nullable": false
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -50,11 +50,11 @@
     "User": {
       "fields": {
         "id": {
+          "nullable": false,
           "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
-          },
-          "nullable": false
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
         }
       },
       "relations": {
@@ -138,6 +138,7 @@
       "returning": true
     },
     "sql": {
+      "defaultInInsert": true,
       "enums": true,
       "returning": true
     }

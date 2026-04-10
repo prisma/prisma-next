@@ -17,7 +17,7 @@ interface DispatchMutationRowsOptions<Row> {
   readonly contract: Contract<SqlStorage>;
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
-  readonly tableName: string;
+  readonly modelName: string;
   readonly includes: readonly IncludeExpr[];
   readonly hiddenColumns: readonly string[];
   readonly mapRow: (mapped: Record<string, unknown>) => Row;
@@ -26,15 +26,15 @@ interface DispatchMutationRowsOptions<Row> {
 export function dispatchMutationRows<Row>(
   options: DispatchMutationRowsOptions<Row>,
 ): AsyncIterableResult<Row> {
-  const { contract, runtime, compiled, tableName, includes, hiddenColumns, mapRow } = options;
+  const { contract, runtime, compiled, modelName, includes, hiddenColumns, mapRow } = options;
 
   if (includes.length === 0) {
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
 
     return mapResultRows(source, (rawRow) => {
-      const mapped = mapStorageRowToModelFields(contract, tableName, rawRow);
+      const mapped = mapStorageRowToModelFields(contract, modelName, rawRow);
       if (hiddenColumns.length > 0) {
-        stripHiddenMappedFields(contract, tableName, mapped, hiddenColumns);
+        stripHiddenMappedFields(contract, modelName, mapped, hiddenColumns);
       }
       return mapRow(mapped);
     });
@@ -48,12 +48,12 @@ export function dispatchMutationRows<Row>(
         return;
       }
 
-      const wrappedRows = rawRows.map((row) => createRowEnvelope(contract, tableName, row));
+      const wrappedRows = rawRows.map((row) => createRowEnvelope(contract, modelName, row));
       await stitchIncludes(scope, contract, wrappedRows, includes);
 
       for (const row of wrappedRows) {
         if (hiddenColumns.length > 0) {
-          stripHiddenMappedFields(contract, tableName, row.mapped, hiddenColumns);
+          stripHiddenMappedFields(contract, modelName, row.mapped, hiddenColumns);
         }
         yield mapRow(row.mapped);
       }
@@ -67,11 +67,66 @@ export function dispatchMutationRows<Row>(
   return new AsyncIterableResult(generator());
 }
 
+interface DispatchSplitMutationRowsOptions<Row> {
+  readonly contract: Contract<SqlStorage>;
+  readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
+  readonly plans: ReadonlyArray<SqlQueryPlan<Record<string, unknown>>>;
+  readonly tableName: string;
+  readonly includes: readonly IncludeExpr[];
+  readonly hiddenColumns: readonly string[];
+  readonly mapRow: (mapped: Record<string, unknown>) => Row;
+}
+
+export function dispatchSplitMutationRows<Row>(
+  options: DispatchSplitMutationRowsOptions<Row>,
+): AsyncIterableResult<Row> {
+  const { contract, runtime, plans, tableName, includes, hiddenColumns, mapRow } = options;
+
+  const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+    if (includes.length > 0) {
+      const { scope, release } = await acquireRuntimeScope(runtime);
+      try {
+        const allRawRows: Record<string, unknown>[] = [];
+        for (const plan of plans) {
+          const rows = await executeQueryPlan<Record<string, unknown>>(scope, plan).toArray();
+          allRawRows.push(...rows);
+        }
+        if (allRawRows.length === 0) return;
+
+        const wrappedRows = allRawRows.map((row) => createRowEnvelope(contract, tableName, row));
+        await stitchIncludes(scope, contract, wrappedRows, includes);
+
+        for (const row of wrappedRows) {
+          if (hiddenColumns.length > 0) {
+            stripHiddenMappedFields(contract, tableName, row.mapped, hiddenColumns);
+          }
+          yield mapRow(row.mapped);
+        }
+      } finally {
+        if (release) await release();
+      }
+    } else {
+      for (const plan of plans) {
+        const rows = await executeQueryPlan<Record<string, unknown>>(runtime, plan).toArray();
+        for (const rawRow of rows) {
+          const mapped = mapStorageRowToModelFields(contract, tableName, rawRow);
+          if (hiddenColumns.length > 0) {
+            stripHiddenMappedFields(contract, tableName, mapped, hiddenColumns);
+          }
+          yield mapRow(mapped);
+        }
+      }
+    }
+  };
+
+  return new AsyncIterableResult(generator());
+}
+
 interface ExecuteSingleMutationOptions<Row> {
   readonly contract: Contract<SqlStorage>;
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
-  readonly tableName: string;
+  readonly modelName: string;
   readonly includes: readonly IncludeExpr[];
   readonly hiddenColumns: readonly string[];
   readonly mapRow: (mapped: Record<string, unknown>) => Row;
@@ -85,7 +140,7 @@ export async function executeMutationReturningSingleRow<Row>(
     contract,
     runtime,
     compiled,
-    tableName,
+    modelName,
     includes,
     hiddenColumns,
     mapRow,
@@ -99,9 +154,9 @@ export async function executeMutationReturningSingleRow<Row>(
       return null;
     }
 
-    const mapped = mapStorageRowToModelFields(contract, tableName, first);
+    const mapped = mapStorageRowToModelFields(contract, modelName, first);
     if (hiddenColumns.length > 0) {
-      stripHiddenMappedFields(contract, tableName, mapped, hiddenColumns);
+      stripHiddenMappedFields(contract, modelName, mapped, hiddenColumns);
     }
     return mapRow(mapped);
   }
@@ -114,7 +169,7 @@ export async function executeMutationReturningSingleRow<Row>(
       return null;
     }
 
-    const wrappedRows = [createRowEnvelope(contract, tableName, first)];
+    const wrappedRows = [createRowEnvelope(contract, modelName, first)];
     await stitchIncludes(scope, contract, wrappedRows, includes);
 
     const result = wrappedRows[0];
@@ -123,7 +178,7 @@ export async function executeMutationReturningSingleRow<Row>(
     }
 
     if (hiddenColumns.length > 0) {
-      stripHiddenMappedFields(contract, tableName, result.mapped, hiddenColumns);
+      stripHiddenMappedFields(contract, modelName, result.mapped, hiddenColumns);
     }
 
     return mapRow(result.mapped);

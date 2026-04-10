@@ -1,11 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { isToOneCardinality } from './collection-contract';
+import { isToOneCardinality, resolvePolymorphismInfo } from './collection-contract';
 import {
   acquireRuntimeScope,
   augmentSelectionForJoinColumns,
   createRowEnvelope,
+  mapPolymorphicRow,
   mapResultRows,
   mapStorageRowToModelFields,
   type RowEnvelope,
@@ -32,16 +33,20 @@ export function dispatchCollectionRows<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
+  modelName: string;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName } = options;
+  const { contract, runtime, state, tableName, modelName } = options;
+  const polyInfo = resolvePolymorphismInfo(contract, modelName);
 
   if (state.includes.length === 0) {
-    const compiled = compileSelect(contract, tableName, state);
+    const compiled = compileSelect(contract, tableName, state, modelName);
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
-    return mapResultRows(
-      source,
-      (rawRow) => mapStorageRowToModelFields(contract, tableName, rawRow) as Row,
-    );
+    const mapper = polyInfo
+      ? (rawRow: Record<string, unknown>) =>
+          mapPolymorphicRow(contract, modelName, polyInfo, rawRow, state.variantName) as Row
+      : (rawRow: Record<string, unknown>) =>
+          mapStorageRowToModelFields(contract, modelName, rawRow) as Row;
+    return mapResultRows(source, mapper);
   }
 
   return dispatchWithIncludeStrategy<Row>(options);
@@ -52,6 +57,7 @@ function dispatchWithIncludeStrategy<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
+  modelName: string;
 }): AsyncIterableResult<Row> {
   const strategy = selectIncludeStrategy(options.contract);
 
@@ -84,8 +90,9 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
+  modelName: string;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName, strategy } = options;
+  const { contract, runtime, state, tableName, modelName, strategy } = options;
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
@@ -100,6 +107,7 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
           selectedFields: parentSelectedForQuery,
         },
         strategy,
+        modelName,
       );
 
       const parentRowsRaw = await executeQueryPlan<Record<string, unknown>>(
@@ -110,7 +118,13 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
         return;
       }
 
-      const parentRows = parentRowsRaw.map((row) => createRowEnvelope(contract, tableName, row));
+      const polyInfo = resolvePolymorphismInfo(contract, modelName);
+      const parentRows = parentRowsRaw.map((row) => {
+        const mapped = polyInfo
+          ? mapPolymorphicRow(contract, modelName, polyInfo, row, state.variantName)
+          : mapStorageRowToModelFields(contract, modelName, row);
+        return { raw: row, mapped } as RowEnvelope;
+      });
 
       for (const parent of parentRows) {
         for (const include of state.includes) {
@@ -121,7 +135,7 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
           }
           const rawChildren = parseIncludedRows(parent.raw[include.relationName]);
           const mappedChildren = rawChildren.map((childRow) =>
-            mapStorageRowToModelFields(contract, include.relatedTableName, childRow),
+            mapStorageRowToModelFields(contract, include.relatedModelName, childRow),
           );
           parent.mapped[include.relationName] = coerceSingleQueryIncludeResult(
             mappedChildren,
@@ -130,7 +144,7 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
         }
 
         if (hiddenParentColumns.length > 0) {
-          stripHiddenMappedFields(contract, tableName, parent.mapped, hiddenParentColumns);
+          stripHiddenMappedFields(contract, modelName, parent.mapped, hiddenParentColumns);
         }
       }
 
@@ -152,19 +166,25 @@ function dispatchWithMultiQueryIncludes<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
+  modelName: string;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName } = options;
+  const { contract, runtime, state, tableName, modelName } = options;
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
       const parentJoinColumns = state.includes.map((include) => include.localColumn);
       const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
         augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
-      const parentCompiled = compileSelect(contract, tableName, {
-        ...state,
-        includes: [],
-        selectedFields: parentSelectedForQuery,
-      });
+      const parentCompiled = compileSelect(
+        contract,
+        tableName,
+        {
+          ...state,
+          includes: [],
+          selectedFields: parentSelectedForQuery,
+        },
+        modelName,
+      );
       const parentRowsRaw = await executeQueryPlan<Record<string, unknown>>(
         scope,
         parentCompiled,
@@ -173,12 +193,18 @@ function dispatchWithMultiQueryIncludes<Row>(options: {
         return;
       }
 
-      const parentRows = parentRowsRaw.map((row) => createRowEnvelope(contract, tableName, row));
+      const polyInfo = resolvePolymorphismInfo(contract, modelName);
+      const parentRows = parentRowsRaw.map((row) => {
+        const mapped = polyInfo
+          ? mapPolymorphicRow(contract, modelName, polyInfo, row, state.variantName)
+          : mapStorageRowToModelFields(contract, modelName, row);
+        return { raw: row, mapped } as RowEnvelope;
+      });
       await stitchIncludes(scope, contract, parentRows, state.includes);
 
       if (hiddenParentColumns.length > 0) {
         for (const row of parentRows) {
-          stripHiddenMappedFields(contract, tableName, row.mapped, hiddenParentColumns);
+          stripHiddenMappedFields(contract, modelName, row.mapped, hiddenParentColumns);
         }
       }
 
@@ -348,7 +374,7 @@ async function resolveRowsByParent(
     childCompiled,
   ).toArray();
   const childRows = childRowsRaw.map((row) =>
-    createRowEnvelope(contract, include.relatedTableName, row),
+    createRowEnvelope(contract, include.relatedModelName, row),
   );
 
   if (state.includes.length > 0) {
@@ -360,7 +386,7 @@ async function resolveRowsByParent(
     const joinValue = child.raw[include.targetColumn];
 
     if (hiddenChildColumns.length > 0) {
-      stripHiddenMappedFields(contract, include.relatedTableName, child.mapped, hiddenChildColumns);
+      stripHiddenMappedFields(contract, include.relatedModelName, child.mapped, hiddenChildColumns);
     }
 
     let bucket = childByParentJoin.get(joinValue);

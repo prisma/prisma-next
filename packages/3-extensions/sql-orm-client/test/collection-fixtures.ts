@@ -45,6 +45,26 @@ export function withReturningCapability(contract: TestContract = baseContract): 
   } as TestContract;
 }
 
+export function withoutDefaultInInsert(contract: TestContract = baseContract): TestContract {
+  const clone = structuredClone(contract);
+  if (clone.capabilities?.['sql']) {
+    delete (clone.capabilities['sql'] as Record<string, unknown>)['defaultInInsert'];
+  }
+  return clone;
+}
+
+export function createReturningCollectionWithoutDefaultInInsert<ModelName extends TestModelName>(
+  modelName: ModelName,
+): {
+  collection: Collection<TestContract, ModelName>;
+  runtime: MockRuntime;
+} {
+  const runtime = createMockRuntime();
+  const context = contextForContract(withReturningCapability(withoutDefaultInInsert()));
+  const collection = new Collection({ runtime, context }, modelName);
+  return { collection, runtime };
+}
+
 export function createReturningCollectionFor<ModelName extends TestModelName>(
   modelName: ModelName,
 ): {

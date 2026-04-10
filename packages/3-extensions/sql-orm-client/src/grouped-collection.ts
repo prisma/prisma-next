@@ -112,7 +112,7 @@ export class GroupedCollection<
     ).toArray();
 
     return rows.map((row) => {
-      const mapped = mapStorageRowToModelFields(this.contract, this.tableName, row);
+      const mapped = mapStorageRowToModelFields(this.contract, this.modelName, row);
       for (const [alias, selector] of aggregateEntries) {
         mapped[alias] = coerceAggregateValue(selector.fn, row[alias]);
       }

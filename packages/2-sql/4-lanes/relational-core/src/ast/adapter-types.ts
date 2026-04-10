@@ -2,6 +2,11 @@ import type { CodecRegistry } from './codec-types';
 
 export type AdapterTarget = string;
 
+export interface MarkerStatement {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+}
+
 export interface AdapterProfile<TTarget extends AdapterTarget = AdapterTarget> {
   readonly id: string;
   readonly target: TTarget;
@@ -12,6 +17,12 @@ export interface AdapterProfile<TTarget extends AdapterTarget = AdapterTarget> {
    * between wire types and JavaScript types.
    */
   codecs(): CodecRegistry;
+  /**
+   * Returns the SQL statement to read the contract marker from the database.
+   * Each adapter provides target-specific SQL (e.g. schema-qualified table names,
+   * parameter placeholder style).
+   */
+  readMarkerStatement(): MarkerStatement;
 }
 
 export interface LoweredPayload<TBody = unknown> {

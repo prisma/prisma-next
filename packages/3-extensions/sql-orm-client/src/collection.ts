@@ -16,10 +16,13 @@ import { mapCursorValuesToColumns, mapFieldsToColumns } from './collection-colum
 import {
   assertReturningCapability,
   getColumnToFieldMap,
+  getFieldToColumnMap,
   isToOneCardinality,
+  type PolymorphismInfo,
   resolveFieldToColumn,
   resolveIncludeRelation,
   resolveModelTableName,
+  resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
   resolveUpsertConflictColumns,
 } from './collection-contract';
@@ -36,13 +39,19 @@ import type {
   // biome-ignore lint/correctness/noUnusedImports: used in `declare` property
   RowType,
   WithOrderByState,
+  WithVariantState,
   WithWhereState,
 } from './collection-internal-types';
 import {
   dispatchMutationRows,
+  dispatchSplitMutationRows,
   executeMutationReturningSingleRow,
 } from './collection-mutation-dispatch';
-import { augmentSelectionForJoinColumns, mapModelDataToStorageRow } from './collection-runtime';
+import {
+  augmentSelectionForJoinColumns,
+  mapModelDataToStorageRow,
+  mapPolymorphicRow,
+} from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { shorthandToWhereExpr } from './filters';
 import { GroupedCollection } from './grouped-collection';
@@ -59,13 +68,16 @@ import {
   executeNestedCreateMutation,
   executeNestedUpdateMutation,
   hasNestedMutationCallbacks,
+  withMutationScope,
 } from './mutation-executor';
 import {
   compileAggregate,
   compileDeleteCount,
   compileDeleteReturning,
   compileInsertCount,
+  compileInsertCountSplit,
   compileInsertReturning,
+  compileInsertReturningSplit,
   compileSelect,
   compileUpdateCount,
   compileUpdateReturning,
@@ -78,7 +90,6 @@ import {
   type CollectionContext,
   type CollectionState,
   type CollectionTypeState,
-  type CreateInput,
   type DefaultCollectionTypeState,
   type DefaultModelRow,
   emptyState,
@@ -94,6 +105,7 @@ import {
   type NumericFieldNames,
   type RelatedModelName,
   type RelationNames,
+  type ResolvedCreateInput,
   type ShorthandWhereFilter,
   type UniqueConstraintCriterion,
   type VariantModelRow,
@@ -134,6 +146,14 @@ function isWhereDirectInput(value: unknown): value is WhereDirectInput {
     (isWhereExpr(value) && typeof (value as { accept?: unknown }).accept === 'function') ||
     isToWhereExprInput(value)
   );
+}
+
+interface MtiCreateContext {
+  polyInfo: PolymorphismInfo;
+  variant: { modelName: string; value: string; table: string; strategy: 'mti' };
+  baseFieldToColumn: Record<string, string>;
+  variantFieldToColumn: Record<string, string>;
+  pkColumn: string;
 }
 
 export class Collection<
@@ -213,8 +233,9 @@ export class Collection<
     TContract,
     ModelName,
     VariantModelRow<TContract, ModelName, V>,
-    WithWhereState<State>
+    WithVariantState<WithWhereState<State>, V>
   > {
+    type ReturnState = WithVariantState<WithWhereState<State>, V>;
     const model = this.contract.models[this.modelName] as Record<string, unknown> | undefined;
     const discriminator = model?.['discriminator'] as { field: string } | undefined;
     const variants = model?.['variants'] as Record<string, { value: string }> | undefined;
@@ -224,7 +245,7 @@ export class Collection<
         TContract,
         ModelName,
         VariantModelRow<TContract, ModelName, V>,
-        WithWhereState<State>
+        ReturnState
       >;
     }
 
@@ -234,7 +255,7 @@ export class Collection<
         TContract,
         ModelName,
         VariantModelRow<TContract, ModelName, V>,
-        WithWhereState<State>
+        ReturnState
       >;
     }
 
@@ -256,7 +277,7 @@ export class Collection<
         )
       : this.state.filters;
 
-    return this.#cloneWithRow<VariantModelRow<TContract, ModelName, V>, WithWhereState<State>>({
+    return this.#cloneWithRow<VariantModelRow<TContract, ModelName, V>, ReturnState>({
       filters: [...filtersWithoutPreviousVariant, filter],
       variantName: variantName as string,
     });
@@ -641,11 +662,11 @@ export class Collection<
     return normalizeAggregateResult(aggregateSpec, rows[0] ?? {});
   }
 
-  async create(data: CreateInput<TContract, ModelName>): Promise<Row>;
+  async create(data: ResolvedCreateInput<TContract, ModelName, State['variantName']>): Promise<Row>;
   async create(data: MutationCreateInputWithRelations<TContract, ModelName>): Promise<Row>;
   async create(
     data:
-      | CreateInput<TContract, ModelName>
+      | ResolvedCreateInput<TContract, ModelName, State['variantName']>
       | MutationCreateInputWithRelations<TContract, ModelName>,
   ): Promise<Row> {
     assertReturningCapability(this.contract, 'create()');
@@ -668,7 +689,9 @@ export class Collection<
       return reloaded;
     }
 
-    const rows = await this.createAll([data as CreateInput<TContract, ModelName>]);
+    const rows = await this.createAll([
+      data as ResolvedCreateInput<TContract, ModelName, State['variantName']>,
+    ]);
     const created = rows[0];
     if (created) {
       return created;
@@ -677,7 +700,9 @@ export class Collection<
     throw new Error(`create() for model "${this.modelName}" did not return a row`);
   }
 
-  createAll(data: readonly CreateInput<TContract, ModelName>[]): AsyncIterableResult<Row> {
+  createAll(
+    data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
+  ): AsyncIterableResult<Row> {
     if (data.length === 0) {
       const generator = async function* (): AsyncGenerator<Row, void, unknown> {};
       return new AsyncIterableResult(generator());
@@ -685,15 +710,37 @@ export class Collection<
 
     assertReturningCapability(this.contract, 'createAll()');
 
-    const mappedRows = data.map((row) =>
-      mapModelDataToStorageRow(this.contract, this.modelName, row),
-    );
+    const rows = data as readonly Record<string, unknown>[];
+    const mtiContext = this.#resolveMtiCreateContext();
+    if (mtiContext) {
+      return this.#executeMtiCreate(rows, mtiContext);
+    }
+
+    const mappedRows = this.#mapCreateRows(rows);
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
     const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
     const { selectedForQuery: selectedForInsert, hiddenColumns } = augmentSelectionForJoinColumns(
       this.state.selectedFields,
       parentJoinColumns,
     );
+    if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
+      const plans = compileInsertReturningSplit(
+        this.contract,
+        this.tableName,
+        mappedRows,
+        selectedForInsert,
+      );
+      return dispatchSplitMutationRows<Row>({
+        contract: this.contract,
+        runtime: this.ctx.runtime,
+        plans,
+        tableName: this.tableName,
+        includes: this.state.includes,
+        hiddenColumns,
+        mapRow: (mapped) => mapped as Row,
+      });
+    }
+
     const compiled = compileInsertReturning(
       this.contract,
       this.tableName,
@@ -704,22 +751,188 @@ export class Collection<
       contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
-      tableName: this.tableName,
+      modelName: this.modelName,
       includes: this.state.includes,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
     });
   }
 
-  async createCount(data: readonly CreateInput<TContract, ModelName>[]): Promise<number> {
+  #assertNotMtiVariant(method: string): void {
+    const mtiCtx = this.#resolveMtiCreateContext();
+    if (mtiCtx) {
+      throw new Error(
+        `${method} is not supported for MTI variant "${this.state.variantName}" on model "${this.modelName}". Use createAll() instead.`,
+      );
+    }
+  }
+
+  #resolveMtiCreateContext(): MtiCreateContext | null {
+    const variantName = this.state.variantName;
+    if (!variantName) return null;
+
+    const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName);
+    if (!polyInfo) return null;
+
+    const variant = polyInfo.variants.get(variantName);
+    if (!variant || variant.strategy !== 'mti') return null;
+
+    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName);
+    const variantFieldToColumn = getFieldToColumnMap(this.contract, variant.modelName);
+    const pkColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
+
+    return {
+      polyInfo,
+      variant: variant as typeof variant & { strategy: 'mti' },
+      baseFieldToColumn,
+      variantFieldToColumn,
+      pkColumn,
+    };
+  }
+
+  #executeMtiCreate(
+    data: readonly Record<string, unknown>[],
+    mtiCtx: MtiCreateContext,
+  ): AsyncIterableResult<Row> {
+    const { polyInfo, variant, baseFieldToColumn, variantFieldToColumn, pkColumn } = mtiCtx;
+    const contract = this.contract;
+    const collectionCtx = this.ctx;
+    const runtime = collectionCtx.runtime;
+    const tableName = this.tableName;
+    const modelName = this.modelName;
+
+    const baseFieldColumns = new Set(Object.values(baseFieldToColumn));
+    const variantFieldColumns = new Set(Object.values(variantFieldToColumn));
+    const mergedFieldToColumn = { ...baseFieldToColumn, ...variantFieldToColumn };
+
+    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+      for (const row of data) {
+        const allMapped: Record<string, unknown> = {};
+        for (const [fieldName, value] of Object.entries(row as Record<string, unknown>)) {
+          if (value === undefined) continue;
+          const columnName = mergedFieldToColumn[fieldName] ?? fieldName;
+          allMapped[columnName] = value;
+        }
+        allMapped[polyInfo.discriminatorColumn] = variant.value;
+
+        const baseRow: Record<string, unknown> = {};
+        const variantRow: Record<string, unknown> = {};
+        for (const [col, val] of Object.entries(allMapped)) {
+          if (baseFieldColumns.has(col) || col === polyInfo.discriminatorColumn) {
+            baseRow[col] = val;
+          }
+          if (variantFieldColumns.has(col)) {
+            variantRow[col] = val;
+          }
+        }
+
+        const merged = await withMutationScope(runtime, async (scope) => {
+          applyCreateDefaults(collectionCtx, tableName, [baseRow]);
+          const baseCompiled = compileInsertReturning(contract, tableName, [baseRow], undefined);
+          const baseResult = await executeQueryPlan<Record<string, unknown>>(
+            scope,
+            baseCompiled,
+          ).toArray();
+          const baseCreated = baseResult[0];
+          if (!baseCreated) {
+            throw new Error(`MTI base INSERT for model "${modelName}" did not return a row`);
+          }
+
+          const pkValue = baseCreated[pkColumn];
+          variantRow[pkColumn] = pkValue;
+          applyCreateDefaults(collectionCtx, variant.table, [variantRow]);
+          const variantCompiled = compileInsertReturning(
+            contract,
+            variant.table,
+            [variantRow],
+            undefined,
+          );
+          const variantResult = await executeQueryPlan<Record<string, unknown>>(
+            scope,
+            variantCompiled,
+          ).toArray();
+          const variantCreated = variantResult[0];
+          if (!variantCreated) {
+            throw new Error(
+              `MTI variant INSERT for model "${modelName}" into "${variant.table}" did not return a row`,
+            );
+          }
+
+          const prefixedVariant: Record<string, unknown> = {};
+          for (const [col, val] of Object.entries(variantCreated)) {
+            if (col === pkColumn) continue;
+            prefixedVariant[`${variant.table}__${col}`] = val;
+          }
+
+          return mapPolymorphicRow(
+            contract,
+            modelName,
+            polyInfo,
+            { ...baseCreated, ...prefixedVariant },
+            variant.modelName,
+          );
+        });
+
+        yield merged as Row;
+      }
+    };
+
+    return new AsyncIterableResult(generator());
+  }
+
+  #mapCreateRows(data: readonly Record<string, unknown>[]): Record<string, unknown>[] {
+    const variantName = this.state.variantName;
+    if (!variantName) {
+      return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
+    }
+
+    const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName);
+    if (!polyInfo) {
+      return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
+    }
+
+    const variant = polyInfo.variants.get(variantName);
+    if (!variant) {
+      return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
+    }
+
+    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName);
+    const variantFieldToColumn = getFieldToColumnMap(this.contract, variant.modelName);
+    const mergedFieldToColumn = { ...baseFieldToColumn, ...variantFieldToColumn };
+
+    return data.map((row) => {
+      const mapped: Record<string, unknown> = {};
+      for (const [fieldName, value] of Object.entries(row as Record<string, unknown>)) {
+        if (value === undefined) continue;
+        const columnName = mergedFieldToColumn[fieldName] ?? fieldName;
+        mapped[columnName] = value;
+      }
+      mapped[polyInfo.discriminatorColumn] = variant.value;
+      return mapped;
+    });
+  }
+
+  async createCount(
+    data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
+  ): Promise<number> {
     if (data.length === 0) {
       return 0;
     }
 
-    const mappedRows = data.map((row) =>
-      mapModelDataToStorageRow(this.contract, this.modelName, row),
-    );
+    this.#assertNotMtiVariant('createCount()');
+
+    const rows = data as readonly Record<string, unknown>[];
+    const mappedRows = this.#mapCreateRows(rows);
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
+
+    if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
+      const plans = compileInsertCountSplit(this.contract, this.tableName, mappedRows);
+      for (const plan of plans) {
+        await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, plan).toArray();
+      }
+      return data.length;
+    }
+
     const compiled = compileInsertCount(this.contract, this.tableName, mappedRows);
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
     return data.length;
@@ -731,13 +944,15 @@ export class Collection<
    * so this method may issue a follow-up reload query to return the existing row.
    */
   async upsert(input: {
-    create: CreateInput<TContract, ModelName>;
+    create: ResolvedCreateInput<TContract, ModelName, State['variantName']>;
     update: Partial<DefaultModelRow<TContract, ModelName>>;
     conflictOn?: UniqueConstraintCriterion<TContract, ModelName>;
   }): Promise<Row> {
     assertReturningCapability(this.contract, 'upsert()');
+    this.#assertNotMtiVariant('upsert()');
 
-    const createValues = mapModelDataToStorageRow(this.contract, this.modelName, input.create);
+    const mappedCreateRows = this.#mapCreateRows([input.create as Record<string, unknown>]);
+    const createValues = mappedCreateRows[0] ?? {};
     applyCreateDefaults(this.ctx, this.tableName, [createValues]);
     const updateValues = mapModelDataToStorageRow(this.contract, this.modelName, input.update);
     const hasUpdateValues = Object.keys(updateValues).length > 0;
@@ -767,7 +982,7 @@ export class Collection<
       contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
-      tableName: this.tableName,
+      modelName: this.modelName,
       includes: this.state.includes,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
@@ -849,7 +1064,7 @@ export class Collection<
       contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
-      tableName: this.tableName,
+      modelName: this.modelName,
       includes: this.state.includes,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
@@ -915,7 +1130,7 @@ export class Collection<
       contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
-      tableName: this.tableName,
+      modelName: this.modelName,
       includes: this.state.includes,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
@@ -996,6 +1211,7 @@ export class Collection<
       runtime: this.ctx.runtime,
       state: resultState,
       tableName: this.tableName,
+      modelName: this.modelName,
     });
     return rows[0] ?? null;
   }
@@ -1065,6 +1281,7 @@ export class Collection<
       runtime: this.ctx.runtime,
       state: this.state,
       tableName: this.tableName,
+      modelName: this.modelName,
     });
   }
 }

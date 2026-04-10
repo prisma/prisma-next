@@ -3,14 +3,18 @@ import {
   BinaryExpr,
   ColumnRef,
   DerivedTableSource,
+  EqColJoinOn,
+  JoinAst,
   ListExpression,
   LiteralExpr,
   OperationExpr,
   OrderByItem,
   OrExpr,
   ParamRef,
-  type SelectAst,
+  ProjectionItem,
+  SelectAst,
   SubqueryExpr,
+  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
@@ -18,9 +22,10 @@ import {
   compileSelect,
   compileSelectWithIncludeStrategy,
 } from '../src/query-plan-select';
+import { emptyState } from '../src/types';
 import { bindWhereExpr } from '../src/where-binding';
 import { baseContract, createCollection, createCollectionFor } from './collection-fixtures';
-import { isSelectAst } from './helpers';
+import { buildMixedPolyContract, isSelectAst } from './helpers';
 
 function dslDescriptor(table: string, column: string) {
   const columnMeta = (
@@ -337,6 +342,73 @@ describe('compileSelectWithIncludeStrategy', () => {
 
     expect(() => compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral')).toThrow(
       'single-query include strategy does not support scalar include selectors or combine()',
+    );
+  });
+});
+
+describe('compileSelect MTI JOINs', () => {
+  const tasksBaseProjection = ['id', 'title', 'type', 'severity'].map((col) =>
+    ProjectionItem.of(col, ColumnRef.of('tasks', col)),
+  );
+  const featuresMtiProjection = [
+    ProjectionItem.of('features__priority', ColumnRef.of('features', 'priority')),
+  ];
+  const featuresJoinOn = EqColJoinOn.of(
+    ColumnRef.of('tasks', 'id'),
+    ColumnRef.of('features', 'id'),
+  );
+
+  it('base query LEFT JOINs MTI variant tables with table-qualified aliases', () => {
+    const contract = buildMixedPolyContract();
+
+    const plan = compileSelect(contract, 'tasks', emptyState(), 'Task');
+
+    expect(plan.ast).toEqual(
+      SelectAst.from(TableSource.named('tasks'))
+        .withProjection([...tasksBaseProjection, ...featuresMtiProjection])
+        .withSelectAllIntent({ table: 'tasks' })
+        .withJoins([JoinAst.left(TableSource.named('features'), featuresJoinOn)]),
+    );
+  });
+
+  it('variant query INNER JOINs the specific MTI variant table', () => {
+    const contract = buildMixedPolyContract();
+    const state = { ...emptyState(), variantName: 'Feature' };
+
+    const plan = compileSelect(contract, 'tasks', state, 'Task');
+
+    expect(plan.ast).toEqual(
+      SelectAst.from(TableSource.named('tasks'))
+        .withProjection([...tasksBaseProjection, ...featuresMtiProjection])
+        .withSelectAllIntent({ table: 'tasks' })
+        .withJoins([JoinAst.inner(TableSource.named('features'), featuresJoinOn)]),
+    );
+  });
+
+  it('STI-only variant query produces no JOINs', () => {
+    const contract = buildMixedPolyContract();
+    const state = { ...emptyState(), variantName: 'Bug' };
+
+    const plan = compileSelect(contract, 'tasks', state, 'Task');
+
+    expect(plan.ast).toEqual(
+      SelectAst.from(TableSource.named('tasks'))
+        .withProjection(tasksBaseProjection)
+        .withSelectAllIntent({ table: 'tasks' }),
+    );
+  });
+
+  it('non-polymorphic model produces no JOINs', () => {
+    const plan = compileSelect(baseContract, 'users', emptyState(), 'User');
+
+    expect(plan.ast).toEqual(
+      SelectAst.from(TableSource.named('users'))
+        .withProjection(
+          ['address', 'email', 'id', 'invited_by_id', 'name'].map((col) =>
+            ProjectionItem.of(col, ColumnRef.of('users', col)),
+          ),
+        )
+        .withSelectAllIntent({ table: 'users' }),
     );
   });
 });

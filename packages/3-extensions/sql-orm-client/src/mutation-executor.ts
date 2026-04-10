@@ -126,7 +126,7 @@ export function buildPrimaryKeyFilterFromRow(
   };
 }
 
-async function withMutationScope<T>(
+export async function withMutationScope<T>(
   runtime: RuntimeQueryable,
   run: (scope: RuntimeScope) => Promise<T>,
 ): Promise<T> {
@@ -261,7 +261,7 @@ async function updateFirstGraph(
 
     const updatedRaw = updatedRowsRaw[0];
     if (updatedRaw) {
-      parentRow = mapStorageRowToModelFields(contract, tableName, updatedRaw);
+      parentRow = mapStorageRowToModelFields(contract, modelName, updatedRaw);
     }
   }
 
@@ -599,7 +599,7 @@ async function insertSingleRow(
     throw new Error(`Nested create for model "${modelName}" did not return a row`);
   }
 
-  return mapStorageRowToModelFields(contract, tableName, firstRow);
+  return mapStorageRowToModelFields(contract, modelName, firstRow);
 }
 
 async function findRowByCriterion(
@@ -632,7 +632,7 @@ async function findRowByCriterion(
     return null;
   }
 
-  return mapStorageRowToModelFields(contract, tableName, firstRow);
+  return mapStorageRowToModelFields(contract, modelName, firstRow);
 }
 
 async function findFirstByFilters(
@@ -655,7 +655,7 @@ async function findFirstByFilters(
     return null;
   }
 
-  return mapStorageRowToModelFields(contract, tableName, firstRow);
+  return mapStorageRowToModelFields(contract, modelName, firstRow);
 }
 
 async function executeUpdateCount(

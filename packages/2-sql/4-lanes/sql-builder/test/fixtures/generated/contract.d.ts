@@ -428,6 +428,7 @@ type ContractBase = ContractType<
     };
     readonly sql: {
       readonly autoIndexesForeignKeys: false;
+      readonly defaultInInsert: true;
       readonly enums: true;
       readonly foreignKeys: true;
       readonly jsonAgg: true;

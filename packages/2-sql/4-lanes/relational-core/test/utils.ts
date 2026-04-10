@@ -18,6 +18,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
       codecs() {
         return createCodecRegistry();
       },
+      readMarkerStatement: () => ({ sql: '', params: [] }),
     },
     lower(ast: SelectAst, ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);

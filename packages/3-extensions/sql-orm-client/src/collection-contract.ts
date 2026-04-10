@@ -7,8 +7,27 @@ type ModelEntry = {
   storage?: { table?: string; fields?: ModelStorageFields };
   relations?: Record<string, unknown>;
   fields?: Record<string, { type?: ContractFieldType }>;
+  discriminator?: { field: string };
+  variants?: Record<string, { value: string }>;
+  base?: string;
 };
 type ModelsMap = Record<string, ModelEntry>;
+
+export interface PolymorphismVariantInfo {
+  readonly modelName: string;
+  readonly value: string;
+  readonly table: string;
+  readonly strategy: 'sti' | 'mti';
+}
+
+export interface PolymorphismInfo {
+  readonly discriminatorField: string;
+  readonly discriminatorColumn: string;
+  readonly baseTable: string;
+  readonly variants: ReadonlyMap<string, PolymorphismVariantInfo>;
+  readonly variantsByValue: ReadonlyMap<string, PolymorphismVariantInfo>;
+  readonly mtiVariants: readonly PolymorphismVariantInfo[];
+}
 
 function modelsOf(contract: Contract<SqlStorage>): ModelsMap {
   return contract.models as ModelsMap;
@@ -20,7 +39,75 @@ export function modelOf(contract: Contract<SqlStorage>, name: string): ModelEntr
 
 const fieldToColumnCache = new WeakMap<object, Map<string, Record<string, string>>>();
 const columnToFieldCache = new WeakMap<object, Map<string, Record<string, string>>>();
-const tableToModelCache = new WeakMap<object, Map<string, string>>();
+const polymorphismCache = new WeakMap<object, Map<string, PolymorphismInfo | undefined>>();
+
+export function resolvePolymorphismInfo(
+  contract: Contract<SqlStorage>,
+  modelName: string,
+): PolymorphismInfo | undefined {
+  let perContract = polymorphismCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    polymorphismCache.set(contract, perContract);
+  }
+  if (perContract.has(modelName)) return perContract.get(modelName);
+
+  const models = modelsOf(contract);
+  const model = models[modelName];
+  if (!model?.discriminator || !model.variants) {
+    perContract.set(modelName, undefined);
+    return undefined;
+  }
+
+  const baseTable = model.storage?.table;
+  if (!baseTable) {
+    perContract.set(modelName, undefined);
+    return undefined;
+  }
+
+  const discriminatorField = model.discriminator.field;
+  const discriminatorColumn = resolveFieldToColumn(contract, modelName, discriminatorField);
+
+  const variants = new Map<string, PolymorphismVariantInfo>();
+  const variantsByValue = new Map<string, PolymorphismVariantInfo>();
+  const mtiVariants: PolymorphismVariantInfo[] = [];
+
+  for (const [variantModelName, variantEntry] of Object.entries(model.variants)) {
+    const variantModel = models[variantModelName];
+    if (!variantModel) {
+      throw new Error(
+        `Model "${modelName}" declares variant "${variantModelName}", but that model is missing from the contract`,
+      );
+    }
+    const variantTable = variantModel.storage?.table ?? baseTable;
+    const strategy = variantTable === baseTable ? 'sti' : 'mti';
+
+    const info: PolymorphismVariantInfo = {
+      modelName: variantModelName,
+      value: variantEntry.value,
+      table: variantTable,
+      strategy,
+    };
+
+    variants.set(variantModelName, info);
+    variantsByValue.set(variantEntry.value, info);
+    if (strategy === 'mti') {
+      mtiVariants.push(info);
+    }
+  }
+
+  const result: PolymorphismInfo = {
+    discriminatorField,
+    discriminatorColumn,
+    baseTable,
+    variants,
+    variantsByValue,
+    mtiVariants,
+  };
+
+  perContract.set(modelName, result);
+  return result;
+}
 
 export function resolveFieldToColumn(
   contract: Contract<SqlStorage>,
@@ -72,22 +159,31 @@ export function getColumnToFieldMap(
   return cached;
 }
 
-// Assumes 1:1 table→model mapping. When multiple models can share a storage
-// table (e.g. owned models), callers should thread modelName directly instead.
-export function findModelNameForTable(
+const completeColumnToFieldCache = new WeakMap<object, Map<string, Record<string, string>>>();
+
+/**
+ * Like getColumnToFieldMap but includes identity-mapped fields (where field name equals column
+ * name). getColumnToFieldMap only returns explicit remaps; this returns ALL column→field entries.
+ */
+export function getCompleteColumnToFieldMap(
   contract: Contract<SqlStorage>,
-  tableName: string,
-): string | undefined {
-  let reverseMap = tableToModelCache.get(contract);
-  if (!reverseMap) {
-    reverseMap = new Map();
-    for (const [modelName, model] of Object.entries(modelsOf(contract))) {
-      const table = model?.storage?.table;
-      if (table) reverseMap.set(table, modelName);
-    }
-    tableToModelCache.set(contract, reverseMap);
+  modelName: string,
+): Record<string, string> {
+  let perContract = completeColumnToFieldCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    completeColumnToFieldCache.set(contract, perContract);
   }
-  return reverseMap.get(tableName);
+  let cached = perContract.get(modelName);
+  if (cached) return cached;
+
+  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
+  cached = {};
+  for (const [f, s] of Object.entries(storageFields)) {
+    cached[s?.column ?? f] = f;
+  }
+  perContract.set(modelName, cached);
+  return cached;
 }
 
 interface ResolvedRelation {

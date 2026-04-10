@@ -699,6 +699,7 @@
       "returning": true
     },
     "sql": {
+      "defaultInInsert": true,
       "enums": true,
       "returning": true
     }
