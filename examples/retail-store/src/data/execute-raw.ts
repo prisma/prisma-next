@@ -14,3 +14,10 @@ export async function collectResults<T>(db: Db, plan: MongoQueryPlan): Promise<T
   }
   return results;
 }
+
+export async function collectFirstResult<T>(db: Db, plan: MongoQueryPlan): Promise<T | null> {
+  for await (const row of db.runtime.execute(plan)) {
+    return row as T;
+  }
+  return null;
+}

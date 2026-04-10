@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server';
-import {
-  addToCart,
-  clearCart,
-  getCartByUserId,
-  removeFromCart,
-  upsertCart,
-} from '../../../src/data/carts';
+import { addToCart, clearCart, getCartByUserId, removeFromCart } from '../../../src/data/carts';
 import { getDb } from '../../../src/db-singleton';
 import { getAuthUserId } from '../../../src/lib/auth';
 
@@ -23,12 +17,7 @@ export async function POST(req: Request) {
   const body = await req.json();
   const db = await getDb();
 
-  const existing = await getCartByUserId(db, userId);
-  if (existing) {
-    await addToCart(db, userId, body);
-  } else {
-    await upsertCart(db, userId, [body]);
-  }
+  await addToCart(db, userId, body);
 
   const cart = await getCartByUserId(db, userId);
   return NextResponse.json(cart ?? { items: [] });
