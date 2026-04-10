@@ -9,6 +9,11 @@ PSL-to-Mongo contract interpreter for Prisma Next. Transforms Prisma Schema Lang
 - **Contract provider**: `mongoContract()` (exported from `./provider`) integrates with the CLI's `prisma-next contract emit` command, reading a `.prisma` schema file and producing a `ContractConfig`
 - **Diagnostics**: Emits structured diagnostics for unsupported field types (`PSL_UNSUPPORTED_FIELD_TYPE`), missing `@id` fields (`PSL_MISSING_ID_FIELD`), orphaned backrelations (`PSL_ORPHANED_BACKRELATION`), and ambiguous backrelations (`PSL_AMBIGUOUS_BACKRELATION`)
 
+## Known limitations
+
+- **Per-index `collation`**: PSL authoring does not support the `collation` index option. Users requiring per-index collation must use the TypeScript contract builder (`@prisma-next/mongo-contract-ts`).
+- **`partialFilterExpression` / `wildcardProjection`**: These object-valued index options are not supported in PSL and require the TypeScript contract builder.
+
 ## Dependencies
 
 - **Depends on**:

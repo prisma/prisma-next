@@ -9,8 +9,9 @@ This package defines the in-memory representation of MongoDB collection schemas 
 ## Responsibilities
 
 - **Schema AST nodes**: `MongoSchemaCollection`, `MongoSchemaIndex`, `MongoSchemaValidator`, `MongoSchemaCollectionOptions` — frozen, visitable AST nodes representing MongoDB schema elements.
-- **Index equivalence**: `indexesEquivalent()` compares two `MongoSchemaIndex` nodes field-by-field (keys, direction, unique, sparse, TTL, partial filter). Used by the planner to decide create/drop operations.
-- **Deep equality**: `deepEqual()` provides order-sensitive structural comparison for MongoDB values (objects compare key order, matching BSON semantics).
+- **Index equivalence**: `indexesEquivalent()` compares two `MongoSchemaIndex` nodes field-by-field (keys, direction, unique, sparse, TTL, partial filter, wildcardProjection, collation, weights, default_language, language_override). Used by the planner to decide create/drop operations.
+- **Deep equality**: `deepEqual()` provides key-order-sensitive structural comparison for MongoDB values. For key-order-independent comparison, use `canonicalize()`.
+- **Canonical serialization**: `canonicalize()` produces a key-order-independent string representation of values. Used by the planner for index lookup keys.
 - **Visitor pattern**: `MongoSchemaVisitor<R>` enables extensible traversal without modifying AST nodes.
 
 ## Dependencies
@@ -19,8 +20,7 @@ This package defines the in-memory representation of MongoDB collection schemas 
 
 **Dependents:**
 
-- `@prisma-next/adapter-mongo` — uses the schema IR for contract-to-schema conversion, migration planning, and filter evaluation.
-- `@prisma-next/mongo-emitter` — produces schema IR during contract emission.
+- `@prisma-next/adapter-mongo` — uses the schema IR via `contractToMongoSchemaIR()` for contract-to-schema conversion, migration planning, and filter evaluation.
 
 ## Usage
 

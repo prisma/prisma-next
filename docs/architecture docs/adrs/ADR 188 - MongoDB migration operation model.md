@@ -98,7 +98,7 @@ interface MongoMigrationStep {
 }
 ```
 
-The current command vocabulary is `CreateIndexCommand` and `DropIndexCommand`. Future additions (e.g. `CreateCollectionCommand`, `DropCollectionCommand`, `CollModCommand`) follow the same `MongoAstNode` pattern: frozen, `kind`-discriminated, `accept(visitor)` for dispatch. Adding a new command means one new class and one new case in the command executor — not a new operation type.
+The command vocabulary is `CreateIndexCommand`, `DropIndexCommand`, `CreateCollectionCommand`, `DropCollectionCommand`, and `CollModCommand`. All follow the same `MongoAstNode` pattern: frozen, `kind`-discriminated, `accept(visitor)` for dispatch. Adding a new command means one new class and one new case in the command executor — not a new operation type.
 
 ### Checks
 
