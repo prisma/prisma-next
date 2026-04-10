@@ -5,9 +5,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { type Db, MongoClient } from 'mongodb';
-import { version } from '../../package.json' with { type: 'json' };
-
-const DRIVER_INFO = { name: 'Prisma', version };
+import { DRIVER_INFO } from '../core/driver-info';
 
 export class MongoControlDriver implements ControlDriverInstance<'mongo', 'mongo'> {
   readonly familyId = 'mongo' as const;
@@ -35,7 +33,7 @@ const mongoControlDriverDescriptor: ControlDriverDescriptor<'mongo', 'mongo', Mo
     familyId: 'mongo',
     targetId: 'mongo',
     id: 'mongo',
-    version: '0.0.1',
+    version: DRIVER_INFO.version,
     capabilities: {},
     async create(url: string): Promise<MongoControlDriver> {
       const client = new MongoClient(url, {

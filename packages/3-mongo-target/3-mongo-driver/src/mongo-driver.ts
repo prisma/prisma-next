@@ -18,9 +18,7 @@ import type {
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
 import { type Db, MongoClient } from 'mongodb';
-import { version } from '../package.json' with { type: 'json' };
-
-const DRIVER_INFO = { name: 'Prisma', version };
+import { DRIVER_INFO } from './core/driver-info';
 
 class MongoDriverImpl implements MongoDriver {
   readonly #db: Db;
