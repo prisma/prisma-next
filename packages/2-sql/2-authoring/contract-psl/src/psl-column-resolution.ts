@@ -372,6 +372,7 @@ export function resolvePslTypeConstructorDescriptor(input: {
   const namespace = input.call.path.length > 1 ? input.call.path[0] : undefined;
   if (
     namespace &&
+    namespace !== 'db' &&
     namespace !== input.familyId &&
     namespace !== input.targetId &&
     !input.composedExtensions.has(namespace)
