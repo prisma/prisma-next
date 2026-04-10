@@ -87,7 +87,8 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
 
 /** Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather
  *  than importing the real pgvector pack, so interpreter unit tests stay layer-isolated.
- *  Real-pack parity is covered by `packages/2-sql/9-family/test/ts-psl-parity.real-packs.test.ts`. */
+ *  Real-pack parity is covered by
+ *  `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`. */
 export const pgvectorAuthoringContributions = {
   type: {
     pgvector: {
