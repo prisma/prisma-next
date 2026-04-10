@@ -1,6 +1,6 @@
 # Retail Store — Prisma Next MongoDB Example
 
-An e-commerce example application demonstrating Prisma Next's MongoDB capabilities with a Next.js frontend.
+An interactive e-commerce example application demonstrating Prisma Next's MongoDB capabilities with a Next.js frontend.
 
 ## What This Demonstrates
 
@@ -11,8 +11,14 @@ An e-commerce example application demonstrating Prisma Next's MongoDB capabiliti
 | **Reference relations** | `include('user')` compiles to `$lookup` for cart→user, order→user, invoice→order |
 | **Array update operators** | `$push`/`$pull` via `mongoRaw` for cart items and order status history |
 | **Aggregation pipelines** | `$match`→`$group`→`$sort` for event analytics, `$sample` for random products |
+| **Pipeline search** | `$regex` via `MongoOrExpr` + `MongoFieldFilter.of` for multi-field text search |
+| **Pagination** | ORM `.skip(n).take(n)` for paginated product listing |
 | **Vector search** | `findSimilarProducts` via `$vectorSearch` (requires Atlas cluster) |
-| **Next.js integration** | Server-rendered pages and REST API routes backed by the data access layer |
+| **Cookie-based auth** | Next.js middleware + signup/logout API routes with `userId` cookie |
+| **Interactive cart** | Add to Cart, remove, clear — all backed by PN data layer + CartProvider context |
+| **Checkout flow** | Home delivery vs BOPIS (Buy Online, Pick Up In Store) with location picker |
+| **Order lifecycle** | Status progression (placed → shipped → delivered) via `$push` status entries |
+| **Next.js integration** | Server-rendered pages, client components, REST API routes, Tailwind CSS v4 |
 
 ## Quick Start (tests only — no external DB)
 
@@ -44,7 +50,7 @@ MONGODB_DB=retail_store
 pnpm db:seed
 ```
 
-This populates all 7 collections with sample data and automatically writes `DEMO_USER_ID` (the seeded demo user's ObjectId) into `.env`. The cart and orders pages use this to identify the logged-in user.
+This populates all 7 collections with 24 products across 5 brands, 4 store locations, and sample users/orders/events.
 
 **3. Start the dev server:**
 
@@ -52,7 +58,17 @@ This populates all 7 collections with sample data and automatically writes `DEMO
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to browse the product catalog, view the cart, and see order history.
+Open [http://localhost:3000](http://localhost:3000). You'll be redirected to the sign-up page — click "Sign Up" to create a user and start browsing.
+
+### User Flow
+
+1. **Sign Up** → creates a user doc via ORM, sets `userId` cookie
+2. **Browse** → paginated product catalog (8 per page), search bar
+3. **Add to Cart** → click on a product, "Add to Cart" button
+4. **Cart** → view items, remove individual items, clear cart
+5. **Checkout** → choose home delivery or store pickup, place order
+6. **Orders** → view order history, advance status (placed → shipped → delivered)
+7. **Log Out** → clears cookie, redirects to sign-up
 
 ### Vector Search (optional, Atlas only)
 
@@ -79,8 +95,12 @@ src/contract.d.ts         Generated types (compile-time safety)
 src/db.ts                 Database factory (orm, runtime, pipeline, raw)
 src/seed.ts               Seed data for all 7 collections
 src/data/                 Data access layer (typed functions per collection)
+src/lib/auth.ts           Server-side auth helper (cookie-based)
+src/lib/utils.ts          cn() utility for Tailwind class merging
+src/components/           Navbar, CartProvider, AddToCartButton, UI primitives
 test/                     Integration tests against mongodb-memory-server
 app/                      Next.js App Router (pages + API routes)
+middleware.ts             Auth middleware (redirects to /login)
 ```
 
 ## Framework Gaps
