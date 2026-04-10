@@ -26,10 +26,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const body = await req.json();
   const db = await getDb();
-  await updateOrderStatus(db, id, {
+  const updated = await updateOrderStatus(db, id, {
     status: body.status,
     timestamp: new Date(),
   });
+  if (!updated) {
+    return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+  }
   const order = await getOrderWithUser(db, id);
   return NextResponse.json(order);
 }
