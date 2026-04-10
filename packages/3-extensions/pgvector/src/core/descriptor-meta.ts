@@ -41,7 +41,7 @@ export const pgvectorPackMeta = {
   version: '0.0.1',
   capabilities: {
     postgres: {
-      'pgvector/cosine': true,
+      'pgvector.cosine': true,
     },
   },
   authoring: {

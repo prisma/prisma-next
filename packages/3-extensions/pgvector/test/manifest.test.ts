@@ -11,7 +11,7 @@ describe('pgvector descriptor', () => {
     const postgresCapabilities = pgvectorExtensionDescriptor.capabilities?.['postgres'] as
       | Record<string, unknown>
       | undefined;
-    expect(postgresCapabilities?.['pgvector/cosine']).toBe(true);
+    expect(postgresCapabilities?.['pgvector.cosine']).toBe(true);
   });
 
   it('has codec types import', () => {
