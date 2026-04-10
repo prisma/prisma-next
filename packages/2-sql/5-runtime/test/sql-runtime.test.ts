@@ -21,7 +21,7 @@ import type {
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
-import { createRuntime } from '../src/sql-runtime';
+import { createRuntime, withTransaction } from '../src/sql-runtime';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
@@ -35,13 +35,16 @@ const testContract: Contract<SqlStorage> = {
   meta: {},
 };
 
-interface DriverExecuteSpies {
+interface DriverMockSpies {
   rootExecute: ReturnType<typeof vi.fn>;
   connectionExecute: ReturnType<typeof vi.fn>;
   transactionExecute: ReturnType<typeof vi.fn>;
+  connectionRelease: ReturnType<typeof vi.fn>;
+  transactionCommit: ReturnType<typeof vi.fn>;
+  transactionRollback: ReturnType<typeof vi.fn>;
 }
 
-type MockSqlDriver = SqlDriver & { __spies: DriverExecuteSpies };
+type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
 
 function createStubCodecs(): CodecRegistry {
   const registry = createCodecRegistry();
@@ -128,6 +131,9 @@ function createMockDriver(): MockSqlDriver {
       rootExecute,
       connectionExecute,
       transactionExecute,
+      connectionRelease: connection.release,
+      transactionCommit: transaction.commit,
+      transactionRollback: transaction.rollback,
     },
   });
 }
@@ -322,5 +328,186 @@ describe('createRuntime', () => {
     expect(driver.__spies.rootExecute).toHaveBeenCalledTimes(1);
     expect(driver.__spies.connectionExecute).not.toHaveBeenCalled();
     expect(driver.__spies.transactionExecute).not.toHaveBeenCalled();
+  });
+});
+
+describe('withTransaction', () => {
+  function createRuntimeForTransaction() {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+    return { runtime, driver };
+  }
+
+  it('commits on successful callback and returns the result', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+
+    const result = await withTransaction(runtime, async (tx) => {
+      await tx.execute(createRawExecutionPlan()).toArray();
+      return 42;
+    });
+
+    expect(result).toBe(42);
+    expect(driver.__spies.transactionCommit).toHaveBeenCalledOnce();
+    expect(driver.__spies.transactionRollback).not.toHaveBeenCalled();
+    expect(driver.__spies.connectionRelease).toHaveBeenCalledOnce();
+  });
+
+  it('rolls back on callback error and re-throws', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+    const error = new Error('test error');
+
+    await expect(
+      withTransaction(runtime, async () => {
+        throw error;
+      }),
+    ).rejects.toBe(error);
+
+    expect(driver.__spies.transactionRollback).toHaveBeenCalledOnce();
+    expect(driver.__spies.transactionCommit).not.toHaveBeenCalled();
+    expect(driver.__spies.connectionRelease).toHaveBeenCalledOnce();
+  });
+
+  it('releases connection after commit', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+
+    await withTransaction(runtime, async () => 'ok');
+
+    expect(driver.__spies.connectionRelease).toHaveBeenCalledOnce();
+  });
+
+  it('releases connection after rollback', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+
+    await withTransaction(runtime, async () => {
+      throw new Error('fail');
+    }).catch(() => {});
+
+    expect(driver.__spies.connectionRelease).toHaveBeenCalledOnce();
+  });
+
+  it('propagates commit failure', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+    const commitError = new Error('commit failed');
+    driver.__spies.transactionCommit.mockRejectedValueOnce(commitError);
+
+    const result = withTransaction(runtime, async () => 'value');
+
+    await expect(result).rejects.toBe(commitError);
+  });
+
+  it('forwards the callback return value', async () => {
+    const { runtime } = createRuntimeForTransaction();
+
+    const result = await withTransaction(runtime, async () => ({
+      name: 'test',
+      count: 3,
+    }));
+
+    expect(result).toEqual({ name: 'test', count: 3 });
+  });
+
+  it('executes queries against the transaction', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+
+    await withTransaction(runtime, async (tx) => {
+      await tx.execute(createRawExecutionPlan()).toArray();
+    });
+
+    expect(driver.__spies.transactionExecute).toHaveBeenCalledOnce();
+    expect(driver.__spies.rootExecute).not.toHaveBeenCalled();
+    expect(driver.__spies.connectionExecute).not.toHaveBeenCalled();
+  });
+
+  it('throws on execute after commit (invalidation)', async () => {
+    const { runtime } = createRuntimeForTransaction();
+    let savedTx: { execute: (plan: ExecutionPlan) => unknown } | undefined;
+
+    await withTransaction(runtime, async (tx) => {
+      savedTx = tx;
+    });
+
+    expect(() => savedTx!.execute(createRawExecutionPlan())).toThrow(
+      'Cannot read from a query result after the transaction has ended',
+    );
+  });
+
+  it('throws on iteration of escaped AsyncIterableResult after commit', async () => {
+    const { runtime } = createRuntimeForTransaction();
+
+    const escaped = await withTransaction(runtime, async (tx) => {
+      return { result: tx.execute(createRawExecutionPlan()) };
+    });
+
+    await expect(escaped.result.toArray()).rejects.toThrow(
+      'Cannot read from a query result after the transaction has ended',
+    );
+  });
+
+  it('sets invalidated flag after commit', async () => {
+    const { runtime } = createRuntimeForTransaction();
+    let txRef: { invalidated: boolean } | undefined;
+
+    await withTransaction(runtime, async (tx) => {
+      expect(tx.invalidated).toBe(false);
+      txRef = tx;
+    });
+
+    expect(txRef!.invalidated).toBe(true);
+  });
+
+  it('wraps original error when rollback fails', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+    const callbackError = new Error('callback failed');
+    const rollbackError = new Error('rollback failed');
+    driver.__spies.transactionRollback.mockRejectedValueOnce(rollbackError);
+
+    const rejection = withTransaction(runtime, async () => {
+      throw callbackError;
+    });
+
+    await expect(rejection).rejects.toThrow('Transaction rollback failed after callback error');
+    await expect(rejection).rejects.toMatchObject({
+      code: 'RUNTIME.TRANSACTION_ROLLBACK_FAILED',
+      cause: callbackError,
+      details: { rollbackError },
+    });
+    expect(driver.__spies.connectionRelease).toHaveBeenCalledOnce();
+  });
+
+  it('sets invalidated flag after rollback', async () => {
+    const { runtime } = createRuntimeForTransaction();
+    let txRef: { invalidated: boolean } | undefined;
+
+    await withTransaction(runtime, async (tx) => {
+      txRef = tx;
+      throw new Error('fail');
+    }).catch(() => {});
+
+    expect(txRef!.invalidated).toBe(true);
+  });
+
+  it('releases connection independently across sequential transactions', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+
+    await withTransaction(runtime, async (tx) => {
+      await tx.execute(createRawExecutionPlan()).toArray();
+    });
+
+    await withTransaction(runtime, async (tx) => {
+      await tx.execute(createRawExecutionPlan()).toArray();
+    });
+
+    await withTransaction(runtime, async () => {
+      throw new Error('fail');
+    }).catch(() => {});
+
+    expect(driver.__spies.connectionRelease).toHaveBeenCalledTimes(3);
+    expect(driver.__spies.transactionCommit).toHaveBeenCalledTimes(2);
+    expect(driver.__spies.transactionRollback).toHaveBeenCalledTimes(1);
   });
 });
