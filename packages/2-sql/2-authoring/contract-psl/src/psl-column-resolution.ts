@@ -100,6 +100,9 @@ export function checkUncomposedNamespace(
  * Pushes the canonical `PSL_EXTENSION_NAMESPACE_NOT_COMPOSED` diagnostic for a
  * subject (attribute, model attribute, or type constructor) that references an
  * extension namespace which is not composed in the current contract.
+ *
+ * The `data` payload carries the missing namespace so machine consumers
+ * (agents, IDE extensions, CLI auto-fix) don't have to parse the prose.
  */
 export function reportUncomposedNamespace(input: {
   readonly subjectLabel: string;
@@ -113,6 +116,7 @@ export function reportUncomposedNamespace(input: {
     message: `${input.subjectLabel} uses unrecognized namespace "${input.namespace}". Add extension pack "${input.namespace}" to extensionPacks in prisma-next.config.ts.`,
     sourceId: input.sourceId,
     span: input.span,
+    data: { namespace: input.namespace, suggestedPack: input.namespace },
   });
 }
 

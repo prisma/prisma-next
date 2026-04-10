@@ -201,6 +201,7 @@ model User {
           span: expect.objectContaining({
             start: expect.objectContaining({ line: 3 }),
           }),
+          data: { namespace: 'pgvector', suggestedPack: 'pgvector' },
         }),
       ]),
     );
