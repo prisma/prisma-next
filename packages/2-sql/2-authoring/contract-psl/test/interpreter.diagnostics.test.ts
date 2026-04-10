@@ -473,6 +473,39 @@ model User {
     );
   });
 
+  it('rejects named types that declare multiple @db.* attributes', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Email = String @db.VarChar(10) @db.Char(2)
+}
+
+model User {
+  id Int @id
+  email Email
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: [],
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('at most one @db.* attribute'),
+        }),
+      ]),
+    );
+  });
+
   it('does not report family/target namespaces as uncomposed attribute namespaces', () => {
     const document = parsePslDocument({
       schema: `model User {

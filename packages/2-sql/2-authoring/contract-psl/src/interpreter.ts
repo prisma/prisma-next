@@ -226,10 +226,21 @@ function validateNamedTypeAttributes(input: {
   readonly dbNativeTypeAttribute: PslAttribute | undefined;
   readonly hasUnsupportedNamedTypeAttribute: boolean;
 } {
-  const dbNativeTypeAttribute = input.allowDbNativeType
-    ? input.declaration.attributes.find((attribute) => attribute.name.startsWith('db.'))
-    : undefined;
+  const dbNativeTypeAttributes = input.allowDbNativeType
+    ? input.declaration.attributes.filter((attribute) => attribute.name.startsWith('db.'))
+    : [];
+  const [dbNativeTypeAttribute, ...extraDbNativeTypeAttributes] = dbNativeTypeAttributes;
   let hasUnsupportedNamedTypeAttribute = false;
+
+  for (const extra of extraDbNativeTypeAttributes) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `Named type "${input.declaration.name}" can declare at most one @db.* attribute`,
+      sourceId: input.sourceId,
+      span: extra.span,
+    });
+    hasUnsupportedNamedTypeAttribute = true;
+  }
 
   for (const attribute of input.declaration.attributes) {
     if (input.allowDbNativeType && attribute.name.startsWith('db.')) {
