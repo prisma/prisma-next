@@ -6,8 +6,8 @@ import type {
   MongoPipelineStage,
   MongoProjectionValue,
   MongoWindowField,
-} from '@prisma-next/mongo-query-ast';
-import { isExprArray, isRecordArgs } from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
+import { isExprArray, isRecordArgs } from '@prisma-next/mongo-query-ast/execution';
 import type { Document } from '@prisma-next/mongo-value';
 import { resolveValue } from './resolve-value';
 

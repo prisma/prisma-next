@@ -1,4 +1,4 @@
-import { MongoAggFieldRef } from '@prisma-next/mongo-query-ast';
+import { MongoAggFieldRef } from '@prisma-next/mongo-query-ast/execution';
 import type { DocField, DocShape, FieldProxy, TypedAggExpr } from './types';
 
 export function createFieldProxy<S extends DocShape>(): FieldProxy<S> {

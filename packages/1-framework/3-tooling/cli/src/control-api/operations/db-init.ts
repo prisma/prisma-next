@@ -11,7 +11,7 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbInitResult, DbInitSuccess, OnControlProgress } from '../types';
-import { extractSqlDdl } from './extract-sql-ddl';
+import { extractOperationStatements } from './extract-operation-statements';
 import { createOperationCallbacks, stripOperations } from './migration-helpers';
 
 /**
@@ -191,8 +191,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
 
   // Plan mode - don't execute
   if (mode === 'plan') {
-    const planSql =
-      familyInstance.familyId === 'sql' ? extractSqlDdl(migrationPlan.operations) : undefined;
+    const planSql = extractOperationStatements(familyInstance.familyId, migrationPlan.operations);
     const result: DbInitSuccess = {
       mode: 'plan',
       plan: {

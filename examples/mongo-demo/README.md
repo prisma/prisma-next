@@ -33,14 +33,39 @@ pnpm emit
 pnpm test
 ```
 
+## Migrations
+
+The demo includes a unique ascending index on `users.email`, demonstrating the MongoDB migration workflow.
+
+> **Note:** Index definitions in `src/contract.json` are hand-added because PSL `@@index` support for MongoDB is not yet implemented (planned for M2). Do not run `pnpm emit` without re-adding the index definitions afterward.
+
+### Preview migration plan
+
+```bash
+pnpm migration:plan --name add-email-index
+```
+
+### Apply migrations
+
+```bash
+# Set your MongoDB URL (or use the default in prisma-next.config.ts)
+export MONGODB_URL=mongodb://localhost:27017/mongo-demo
+
+pnpm migration:apply
+```
+
+This creates the unique index on `users.email` and records the migration in the `_prisma_migrations` collection.
+
 ## Scripts
 
-| Script         | Description                                                                 |
-| -------------- | --------------------------------------------------------------------------- |
-| `pnpm emit`    | Emit `src/contract.json` + `src/contract.d.ts` via `prisma-next contract emit` |
-| `pnpm test`    | Run integration tests against an in-memory MongoDB replica set              |
-| `pnpm dev`     | Start the Vite dev server (React UI)                                        |
-| `pnpm dev:api` | Start the API server (`src/server.ts`)                                      |
+| Script                | Description                                                                 |
+| --------------------- | --------------------------------------------------------------------------- |
+| `pnpm emit`           | Emit `src/contract.json` + `src/contract.d.ts` via `prisma-next contract emit` |
+| `pnpm migration:plan` | Preview migration operations (offline, no DB needed)                        |
+| `pnpm migration:apply`| Apply pending migrations to the database                                    |
+| `pnpm test`           | Run integration tests against an in-memory MongoDB replica set              |
+| `pnpm dev`            | Start the Vite dev server (React UI)                                        |
+| `pnpm dev:api`        | Start the API server (`src/server.ts`)                                      |
 
 ## How emission works
 
@@ -65,10 +90,11 @@ pnpm test
 | File                            | Purpose                                            |
 | ------------------------------- | -------------------------------------------------- |
 | `prisma/contract.prisma`       | PSL schema (authoring surface)                     |
-| `prisma-next.config.ts`        | CLI config (family + target + adapter + contract provider) |
-| `src/contract.json`            | Emitted contract (generated, do not edit)           |
+| `prisma-next.config.ts`        | CLI config (family + target + adapter + driver + contract provider) |
+| `src/contract.json`            | Emitted contract with hand-added indexes (see note above) |
 | `src/contract.d.ts`            | Emitted type definitions (generated, do not edit)   |
 | `src/db.ts`                    | Runtime composition (adapter → driver → runtime → ORM) |
+| `.env.example`                 | Environment variable template (`MONGODB_URL`)       |
 | `test/blog.test.ts`            | Integration tests using `mongodb-memory-server`    |
 
 ## Comparison with prisma-next-demo

@@ -132,38 +132,6 @@ const CollationSchema = type({
   'normalization?': 'boolean',
 });
 
-const WildcardProjectionSchema = type({
-  '+': 'reject',
-  '[string]': '0 | 1',
-});
-
-const IndexOptionsSchema = type({
-  '+': 'reject',
-  'unique?': 'boolean',
-  'name?': 'string',
-  'partialFilterExpression?': MongoJsonObjectSchema,
-  'sparse?': 'boolean',
-  'expireAfterSeconds?': 'number',
-  'weights?': NumberRecordSchema,
-  'default_language?': 'string',
-  'language_override?': 'string',
-  'textIndexVersion?': 'number',
-  '2dsphereIndexVersion?': 'number',
-  'bits?': 'number',
-  'min?': 'number',
-  'max?': 'number',
-  'bucketSize?': 'number',
-  'hidden?': 'boolean',
-  'collation?': CollationSchema,
-  'wildcardProjection?': WildcardProjectionSchema,
-});
-
-const IndexSchema = type({
-  '+': 'reject',
-  fields: IndexFieldsSchema,
-  'options?': IndexOptionsSchema,
-});
-
 const IndexOptionDefaultsSchema = type({
   '+': 'reject',
   'storageEngine?': MongoJsonObjectSchema,
@@ -238,6 +206,38 @@ const ModelDefinitionSchema = type({
   'variants?': type({ '[string]': VariantEntrySchema }),
   'base?': 'string',
   'owner?': 'string',
+});
+
+const WildcardProjectionSchema = type({
+  '+': 'reject',
+  '[string]': '0 | 1',
+});
+
+const IndexOptionsSchema = type({
+  '+': 'reject',
+  'unique?': 'boolean',
+  'name?': 'string',
+  'partialFilterExpression?': MongoJsonObjectSchema,
+  'sparse?': 'boolean',
+  'expireAfterSeconds?': 'number',
+  'weights?': NumberRecordSchema,
+  'default_language?': 'string',
+  'language_override?': 'string',
+  'textIndexVersion?': 'number',
+  '2dsphereIndexVersion?': 'number',
+  'bits?': 'number',
+  'min?': 'number',
+  'max?': 'number',
+  'bucketSize?': 'number',
+  'hidden?': 'boolean',
+  'collation?': CollationSchema,
+  'wildcardProjection?': WildcardProjectionSchema,
+});
+
+const IndexSchema = type({
+  '+': 'reject',
+  fields: IndexFieldsSchema,
+  'options?': IndexOptionsSchema,
 });
 
 const StorageCollectionSchema = type({

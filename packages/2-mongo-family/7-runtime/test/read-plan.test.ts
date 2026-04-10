@@ -1,4 +1,8 @@
-import { AggregateCommand, MongoFieldFilter, MongoMatchStage } from '@prisma-next/mongo-query-ast';
+import {
+  AggregateCommand,
+  MongoFieldFilter,
+  MongoMatchStage,
+} from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';
 

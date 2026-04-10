@@ -1,75 +1,23 @@
+import { existsSync } from 'node:fs';
 import { createServer, type ServerResponse } from 'node:http';
 import type { SimplifyDeep } from '@prisma-next/mongo-orm';
+
+if (existsSync('.env')) {
+  process.loadEnvFile('.env');
+}
+
 import { acc, fn } from '@prisma-next/mongo-pipeline-builder';
-import { MongoCountStage, MongoLimitStage, MongoSortStage } from '@prisma-next/mongo-query-ast';
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import {
+  MongoCountStage,
+  MongoLimitStage,
+  MongoSortStage,
+} from '@prisma-next/mongo-query-ast/execution';
 import type { Db } from './db';
 import { createClient } from './db';
+import { seed } from './seed';
 
-const PORT = 3456;
+const PORT = Number(process.env['PORT'] ?? 3456);
 const DB_NAME = 'blog';
-
-async function seed(orm: Db['orm']) {
-  const createdUsers = await orm.users.createAll([
-    {
-      name: 'Alice Chen',
-      email: 'alice@example.com',
-      bio: 'Full-stack engineer and tech blogger',
-      address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
-    },
-    {
-      name: 'Bob Kumar',
-      email: 'bob@example.com',
-      bio: 'DevOps enthusiast',
-      address: { street: '456 Oak Ave', city: 'Portland', zip: null, country: 'US' },
-    },
-    { name: 'Carol Santos', email: 'carol@example.com', bio: null, address: null },
-  ]);
-  const alice = createdUsers[0];
-  const bob = createdUsers[1];
-  const carol = createdUsers[2];
-  if (!alice || !bob || !carol) throw new Error('Failed to seed users');
-
-  const articles = orm.posts.variant('Article');
-  const tutorials = orm.posts.variant('Tutorial');
-
-  await articles.createAll([
-    {
-      title: 'Getting Started with Prisma Next',
-      content: 'Learn how to build contract-first data access layers with Prisma Next and MongoDB.',
-      summary: 'A comprehensive introduction to contract-first data layers.',
-      authorId: alice._id as string,
-      createdAt: new Date('2026-01-15'),
-    },
-    {
-      title: 'Contract-First Development',
-      content:
-        'Why contract-first architecture leads to better type safety and developer experience.',
-      summary: 'The benefits of contract-first over code-first approaches.',
-      authorId: alice._id as string,
-      createdAt: new Date('2026-02-01'),
-    },
-  ]);
-
-  await tutorials.createAll([
-    {
-      title: 'Build a REST API with Prisma Next',
-      content: 'Step-by-step tutorial for building a REST API with Prisma Next and MongoDB.',
-      difficulty: 'intermediate',
-      duration: 45,
-      authorId: bob._id as string,
-      createdAt: new Date('2026-02-20'),
-    },
-    {
-      title: 'Advanced Query Patterns',
-      content: 'Deep dive into advanced query patterns for MongoDB.',
-      difficulty: 'advanced',
-      duration: 90,
-      authorId: carol._id as string,
-      createdAt: new Date('2026-03-10'),
-    },
-  ]);
-}
 
 // ---------------------------------------------------------------------------
 // ORM queries
@@ -172,18 +120,33 @@ function jsonResponse(res: ServerResponse, data: unknown, status = 200) {
 }
 
 async function main() {
-  console.log('Starting in-memory MongoDB...');
-  const replSet = await MongoMemoryReplSet.create({
-    replSet: { count: 1, storageEngine: 'wiredTiger' },
-  });
-  const uri = replSet.getUri();
-  console.log(`MongoDB ready at ${uri}`);
+  const externalUrl = process.env['MONGODB_URL'];
+  let uri: string;
+  let stopMemoryServer: (() => Promise<void>) | undefined;
+
+  if (externalUrl) {
+    uri = externalUrl;
+    console.log(`Connecting to external MongoDB at ${uri}`);
+  } else {
+    const { MongoMemoryReplSet } = await import('mongodb-memory-server');
+    console.log('No MONGODB_URL set — starting in-memory MongoDB...');
+    const replSet = await MongoMemoryReplSet.create({
+      replSet: { count: 1, storageEngine: 'wiredTiger' },
+    });
+    uri = replSet.getUri();
+    stopMemoryServer = async () => {
+      await replSet.stop();
+    };
+    console.log(`In-memory MongoDB ready at ${uri}`);
+  }
 
   const { orm, runtime, pipeline } = await createClient(uri, DB_NAME);
 
-  console.log('Seeding data...');
-  await seed(orm);
-  console.log('Seed complete.');
+  if (!externalUrl) {
+    console.log('Seeding data...');
+    await seed(orm);
+    console.log('Seed complete.');
+  }
 
   const server = createServer(async (req, res) => {
     try {
@@ -230,7 +193,7 @@ async function main() {
     console.log('\nShutting down...');
     server.close();
     await runtime.close();
-    await replSet.stop();
+    await stopMemoryServer?.();
     process.exit(0);
   });
 }

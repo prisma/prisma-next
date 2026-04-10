@@ -1,5 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { MongoPipelineStage, MongoQueryPlan } from '@prisma-next/mongo-query-ast';
+import type { MongoPipelineStage, MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import {
   AggregateCommand,
   MongoAndExpr,
@@ -10,7 +10,7 @@ import {
   MongoSkipStage,
   MongoSortStage,
   MongoUnwindStage,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import type { MongoCollectionState, MongoIncludeExpr } from './collection-state';
 
 function compileIncludes(includes: readonly MongoIncludeExpr[]): MongoPipelineStage[] {

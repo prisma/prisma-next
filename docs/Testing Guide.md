@@ -1053,6 +1053,79 @@ pnpm --filter @prisma-next/sql-runtime typecheck
 
 ---
 
+## MongoDB Testing Infrastructure
+
+MongoDB tests use `mongodb-memory-server` to run a real MongoDB instance in-process. This provides fast, isolated integration tests without requiring an external MongoDB installation.
+
+### Dependencies
+
+- `mongodb-memory-server` (`^10.4.0`) — in-process MongoDB server
+- `mongodb` (`^6.16.0`, via pnpm catalog) — MongoDB driver
+- Listed in `pnpm-workspace.yaml` under `allowBuilds`
+
+### Test setup helpers
+
+**Integration tests** (`test/integration/test/mongo/setup.ts`):
+
+```typescript
+import { describeWithMongoDB } from './setup';
+
+describeWithMongoDB('my feature', (ctx) => {
+  it('does something', async () => {
+    const db = ctx.client.db('test');
+    // db is a clean database (dropped before each test)
+  });
+});
+```
+
+`describeWithMongoDB` manages the full lifecycle: starts a `MongoMemoryReplSet` (single-node replica set with WiredTiger), creates a `MongoClient`, drops the database before each test, and cleans up after all tests.
+
+**Package-level tests** (`packages/2-mongo-family/7-runtime/test/setup.ts`):
+
+```typescript
+import { withMongod } from './setup';
+
+it('does something', async () => {
+  await withMongod(async (ctx) => {
+    const db = ctx.client.db('test');
+    // ...
+  });
+});
+```
+
+`withMongod` is a callback-style helper with `try`/`finally` teardown.
+
+### Configuration
+
+Vitest config for MongoDB tests must set:
+- `testTimeout` and `hookTimeout` to `timeouts.spinUpDbServer` (30s base, scalable via `TEST_TIMEOUT_MULTIPLIER`)
+- `fileParallelism: false` — MongoDB tests cannot run in parallel within a single file
+
+Timeouts are available from `@prisma-next/test-utils`:
+
+```typescript
+import { timeouts } from '@prisma-next/test-utils';
+```
+
+### Where tests live
+
+| Test type | Location | Command |
+|---|---|---|
+| Package unit tests | `packages/*/test/*.test.ts` | `pnpm test` in the package |
+| Mongo integration tests | `test/integration/test/mongo/*.test.ts` | `pnpm test:integration` |
+| Mongo example tests | `examples/mongo-demo/test/*.test.ts` | `pnpm test:examples` |
+
+### Replica set mode
+
+Always use `MongoMemoryReplSet` (not `MongoMemoryServer`) — replica set mode is required for transactions and change streams.
+
+```typescript
+const replSet = await MongoMemoryReplSet.create({
+  instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+  replSet: { count: 1, storageEngine: 'wiredTiger' },
+});
+```
+
 ## Related Documentation
 
 - **Test Descriptions:** `.cursor/rules/omit-should-in-tests.mdc`

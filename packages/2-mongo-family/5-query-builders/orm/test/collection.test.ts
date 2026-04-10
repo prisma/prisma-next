@@ -1,4 +1,4 @@
-import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import {
   MongoFieldFilter,
   type MongoLimitStage,
@@ -8,7 +8,7 @@ import {
   type MongoProjectStage,
   type MongoSkipStage,
   type MongoSortStage,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';

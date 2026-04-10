@@ -12,12 +12,14 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
+    "@prisma-next/adapter-mongo": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-emitter": "workspace:*",
-    "@prisma-next/target-mongo": "workspace:*"
+    "@prisma-next/target-mongo": "workspace:*",
+    "mongodb": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/mongo-contract-ts": "workspace:*",
