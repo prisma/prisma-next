@@ -399,6 +399,10 @@ function parseStringArrayLiteral(
   return parsed;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function parsePslObjectLiteral(
   value: string,
 ): Record<string, unknown> | typeof INVALID_AUTHORING_ARGUMENT {
@@ -417,14 +421,11 @@ function parsePslObjectLiteral(
     }
   }
 
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+  if (!isPlainObject(parsed)) {
     return INVALID_AUTHORING_ARGUMENT;
   }
 
-  // Structural narrowing leaves `parsed` as `object`; key-validation in
-  // `validateAuthoringArgument` (framework-authoring) enforces the record
-  // shape downstream.
-  return parsed as Record<string, unknown>;
+  return parsed;
 }
 
 function parsePslAuthoringArgumentValue(
