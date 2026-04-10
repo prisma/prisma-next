@@ -156,7 +156,7 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
   });
 
   describe('text indexes', () => {
-    it('creates a text index with weights and default_language', async () => {
+    it('creates a text index with weights, default_language, and language_override', async () => {
       const contract = makeContract(
         {
           articles: {
@@ -168,6 +168,7 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
                 ],
                 weights: { title: 10, body: 5 },
                 default_language: 'english',
+                language_override: 'idioma',
               },
             ],
           },
@@ -182,6 +183,7 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
       expect(textIdx).toBeDefined();
       expect(textIdx!['weights']).toEqual({ title: 10, body: 5 });
       expect(textIdx!['default_language']).toBe('english');
+      expect(textIdx!['language_override']).toBe('idioma');
     });
   });
 
