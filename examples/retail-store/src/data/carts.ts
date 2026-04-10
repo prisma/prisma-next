@@ -33,9 +33,6 @@ export function clearCart(db: Db, userId: string) {
   return db.orm.carts.where(objectIdEq('userId', userId)).update({ items: [] });
 }
 
-// Raw commands pass filter objects directly to the MongoDB driver, so bare
-// ObjectId values work without MongoParamRef wrapping (unlike ORM filters
-// which go through AST lowering — see objectIdEq).
 export async function addToCart(
   db: Db,
   userId: string,
@@ -50,7 +47,11 @@ export async function addToCart(
 ) {
   const plan = db.raw
     .collection('carts')
-    .updateOne({ userId: new ObjectId(userId) }, { $push: { items: item } })
+    .findOneAndUpdate(
+      { userId: new ObjectId(userId) },
+      { $push: { items: item }, $setOnInsert: { userId: new ObjectId(userId) } },
+      { upsert: true },
+    )
     .build();
   await executeRaw(db, plan);
 }
