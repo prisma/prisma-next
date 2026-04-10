@@ -823,10 +823,11 @@ function buildValueObjects(input: BuildValueObjectsInput): Record<string, Contra
         }
         continue;
       }
-      fields[field.name] = {
+      const scalarField: ContractField = {
         nullable: field.optional,
         type: { kind: 'scalar', codecId: resolved.descriptor.codecId },
       };
+      fields[field.name] = field.list ? { ...scalarField, many: true } : scalarField;
     }
     valueObjects[compositeType.name] = { fields };
   }

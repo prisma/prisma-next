@@ -389,6 +389,38 @@ model User {
     });
   });
 
+  it('preserves the many marker for scalar list fields inside composite types', () => {
+    const document = parsePslDocument({
+      schema: `type Address {
+  street String
+  tags   String[]
+}
+
+model User {
+  id Int @id
+  home Address?
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.valueObjects).toEqual({
+      Address: {
+        fields: {
+          street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+          tags: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' }, many: true },
+        },
+      },
+    });
+  });
+
   it('emits value object field references with valueObject domain type and JSONB storage', () => {
     const document = parsePslDocument({
       schema: `type Address {
