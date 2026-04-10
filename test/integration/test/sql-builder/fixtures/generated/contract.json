@@ -86,6 +86,13 @@
     },
     "Post": {
       "fields": {
+        "embedding": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/vector@1",
+            "kind": "scalar"
+          }
+        },
         "id": {
           "nullable": false,
           "type": {
@@ -143,6 +150,9 @@
       },
       "storage": {
         "fields": {
+          "embedding": {
+            "column": "embedding"
+          },
           "id": {
             "column": "id"
           },
@@ -489,6 +499,7 @@
       "transactionalDDL": true
     },
     "sql": {
+      "defaultInInsert": true,
       "enums": true,
       "foreignKeys": true,
       "jsonAgg": true,
@@ -513,9 +524,6 @@
             "alias": "PgVectorTypes",
             "named": "CodecTypes",
             "package": "@prisma-next/extension-pgvector/codec-types"
-          },
-          "parameterized": {
-            "pg/vector@1": "Vector<{{length}}>"
           },
           "typeImports": [
             {

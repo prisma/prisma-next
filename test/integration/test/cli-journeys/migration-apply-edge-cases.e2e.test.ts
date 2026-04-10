@@ -72,14 +72,14 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'resumes from last successful migration after empty-table precheck failure',
+      'resumes from last successful migration after unique constraint violation',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
           createTempDir,
         });
 
-        // Plan and apply initial migration (creates user table)
+        // Plan and apply initial migration (creates user table with id + email)
         const emit0 = await runContractEmit(ctx);
         expect(emit0.exitCode, 'emit base').toBe(0);
         const plan0 = await runMigrationPlan(ctx, ['--name', 'initial']);
@@ -92,24 +92,22 @@ withTempDir(({ createTempDir }) => {
         );
         expect(firstResult.migrationsApplied, 'applied 1').toBe(1);
 
-        // Insert data so a NOT NULL column addition will fail
+        // Insert rows with duplicate emails
         await sql(
           db.connectionString,
-          `INSERT INTO "user" (id, email) VALUES (1, 'user@example.com')`,
+          `INSERT INTO "user" (id, email) VALUES (1, 'dup@example.com'), (2, 'dup@example.com')`,
         );
 
-        // Plan a migration that adds a non-nullable column (will fail on existing rows)
-        swapContract(ctx, 'contract-additive-required');
+        // Plan migration that adds a unique constraint on email
+        swapContract(ctx, 'contract-unique-email');
         const emit1 = await runContractEmit(ctx);
-        expect(emit1.exitCode, 'emit additive-required').toBe(0);
-        const plan1 = await runMigrationPlan(ctx, ['--name', 'add-required-name']);
-        expect(plan1.exitCode, 'plan add-required-name').toBe(0);
+        expect(emit1.exitCode, 'emit unique-email').toBe(0);
+        const plan1 = await runMigrationPlan(ctx, ['--name', 'add-unique-email']);
+        expect(plan1.exitCode, 'plan add-unique-email').toBe(0);
 
-        // Apply fails because the planner's empty-table precheck rejects adding
-        // a NOT NULL + UNIQUE column to a non-empty table (temporary default
-        // strategy is disabled when the column has a UNIQUE constraint).
+        // Apply fails because duplicate emails violate the unique constraint
         const applyFail = await runMigrationApply(ctx, ['--json']);
-        expect(applyFail.exitCode, 'apply fails on non-empty table precheck').toBe(1);
+        expect(applyFail.exitCode, 'apply fails on duplicate key').toBe(1);
 
         // Marker stays at the first migration's target hash
         const marker = await sql(
@@ -121,9 +119,13 @@ withTempDir(({ createTempDir }) => {
           firstResult.markerHash,
         );
 
-        // Fix: remove conflicting data, then resume
-        await sql(db.connectionString, 'DELETE FROM "user"');
+        // Fix: deduplicate emails
+        await sql(
+          db.connectionString,
+          `UPDATE "user" SET email = 'unique@example.com' WHERE id = 2`,
+        );
 
+        // Resume: apply succeeds now that duplicates are resolved
         const applyResume = await runMigrationApply(ctx, ['--json']);
         expect(applyResume.exitCode, 'resume succeeds').toBe(0);
 
