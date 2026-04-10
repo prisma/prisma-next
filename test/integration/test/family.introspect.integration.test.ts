@@ -387,36 +387,28 @@ describe('family instance introspect', () => {
     it(
       'handles connection errors gracefully',
       async () => {
-        let invalidDriver: Awaited<ReturnType<typeof postgresDriver.create>> | undefined;
-        try {
-          invalidDriver = await postgresDriver.create('postgresql://invalid:5432/invalid');
-        } catch {
-          // Driver creation might fail immediately, which is fine
-          // We'll skip this test if driver creation fails
-          return;
+        if (!connectionString) {
+          throw new Error('Connection string not set');
         }
 
-        try {
-          const familyInstance = sql.create(
-            createControlStack({
-              family: sql,
-              target: postgres,
-              adapter: postgresAdapter,
-              driver: postgresDriver,
-              extensionPacks: [],
-            }),
-          );
+        const invalidDriver = await postgresDriver.create(connectionString);
+        await invalidDriver.close();
 
-          await expect(
-            familyInstance.introspect({
-              driver: invalidDriver,
-            }),
-          ).rejects.toThrow();
-        } finally {
-          await invalidDriver.close().catch(() => {
-            // Ignore cleanup errors
-          });
-        }
+        const familyInstance = sql.create(
+          createControlStack({
+            family: sql,
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensionPacks: [],
+          }),
+        );
+
+        await expect(
+          familyInstance.introspect({
+            driver: invalidDriver,
+          }),
+        ).rejects.toThrow();
       },
       timeouts.databaseOperation,
     );

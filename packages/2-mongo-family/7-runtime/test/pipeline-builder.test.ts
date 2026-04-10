@@ -1,10 +1,15 @@
+import mongoFamilyPack from '@prisma-next/family-mongo/pack';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
+import { defineContract, field, model, rel } from '@prisma-next/mongo-contract-ts/contract-builder';
 import { acc, fn, mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
-import { describe, expect, it } from 'vitest';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
+import mongoTargetPack from '@prisma-next/target-mongo/pack';
+import { ObjectId } from 'mongodb';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { withMongod } from './setup';
 
 type TestContract = MongoContract & {
@@ -34,6 +39,7 @@ type TestContract = MongoContract & {
 };
 
 type TContract = MongoContractWithTypeMaps<TestContract, MongoTypeMaps>;
+type PlanRow<TPlan> = TPlan extends MongoQueryPlan<infer Row> ? Row : never;
 
 const contractJson = {
   target: 'mongo',
@@ -67,6 +73,37 @@ const contractJson = {
   profileHash: 'test-profile',
   meta: {},
 };
+
+const User = model('User', {
+  collection: 'users',
+  fields: {
+    _id: field.objectId(),
+    name: field.string(),
+    email: field.string(),
+  },
+});
+
+const Task = model('Task', {
+  collection: 'tasks',
+  fields: {
+    _id: field.objectId(),
+    title: field.string(),
+    type: field.string(),
+    assigneeId: field.objectId(),
+  },
+  relations: {
+    assignee: rel.belongsTo(User, {
+      from: 'assigneeId',
+      to: User.ref('_id'),
+    }),
+  },
+});
+
+const contract = defineContract({
+  family: mongoFamilyPack,
+  target: mongoTargetPack,
+  models: { User, Task },
+});
 
 describe('pipeline builder integration', () => {
   const p = mongoPipeline<TContract>({ contractJson });
@@ -212,6 +249,55 @@ describe('pipeline builder integration', () => {
       expect(typed[0]).toHaveProperty('department', 'eng');
       expect(typed[0]).toHaveProperty('amount', 100);
       expect(typed[0]).not.toHaveProperty('status');
+    });
+  });
+
+  it('executes with a builder-authored contract directly', async () => {
+    await withMongod(async (ctx) => {
+      const db = ctx.client.db(ctx.dbName);
+      const userId = new ObjectId();
+
+      await db.collection('users').insertOne({
+        _id: userId,
+        name: 'Alice',
+        email: 'alice@example.com',
+      });
+      await db.collection('tasks').insertMany([
+        {
+          _id: new ObjectId(),
+          title: 'Fix crash',
+          type: 'bug',
+          assigneeId: userId,
+        },
+        {
+          _id: new ObjectId(),
+          title: 'Fix typo',
+          type: 'bug',
+          assigneeId: userId,
+        },
+      ]);
+
+      const plan = mongoPipeline<typeof contract>({ contractJson: contract })
+        .from('tasks')
+        .group((f) => ({
+          _id: f.type,
+          count: acc.count(),
+        }))
+        .build();
+
+      expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
+        _id: string;
+        count: number;
+      }>();
+
+      const results = await ctx.runtime.execute(plan);
+
+      expect(results).toEqual([
+        {
+          _id: 'bug',
+          count: 2,
+        },
+      ]);
     });
   });
 });

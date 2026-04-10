@@ -1,10 +1,11 @@
 import { createOperationRegistry } from '@prisma-next/operations';
 import { ObjectId } from 'mongodb';
 import { describe, expect, it } from 'vitest';
-import { MONGO_VECTOR_CODEC_ID } from '../src/core/codec-ids';
+import { MONGO_DOUBLE_CODEC_ID, MONGO_VECTOR_CODEC_ID } from '../src/core/codec-ids';
 import {
   mongoBooleanCodec,
   mongoDateCodec,
+  mongoDoubleCodec,
   mongoInt32Codec,
   mongoObjectIdCodec,
   mongoStringCodec,
@@ -45,6 +46,17 @@ describe('mongoInt32Codec', () => {
   });
 });
 
+describe('mongoDoubleCodec', () => {
+  it('round-trips floating-point number values', () => {
+    expect(mongoDoubleCodec.decode(42.5)).toBe(42.5);
+    expect(mongoDoubleCodec.encode!(42.5)).toBe(42.5);
+  });
+
+  it('has id mongo/double@1', () => {
+    expect(mongoDoubleCodec.id).toBe(MONGO_DOUBLE_CODEC_ID);
+  });
+});
+
 describe('mongoBooleanCodec', () => {
   it('round-trips boolean values', () => {
     expect(mongoBooleanCodec.decode(true)).toBe(true);
@@ -71,6 +83,10 @@ describe('codec traits', () => {
 
   it('int32 has equality, order, numeric traits', () => {
     expect(mongoInt32Codec.traits).toEqual(['equality', 'order', 'numeric']);
+  });
+
+  it('double has equality, order, numeric traits', () => {
+    expect(mongoDoubleCodec.traits).toEqual(['equality', 'order', 'numeric']);
   });
 
   it('boolean has equality, boolean traits', () => {

@@ -215,9 +215,26 @@
   "storage": {
     "collections": {
       "tasks": {},
-      "users": {}
+      "users": {
+        "indexes": [
+          {
+            "fields": {
+              "email": 1
+            },
+            "options": {
+              "unique": true
+            }
+          }
+        ],
+        "options": {
+          "collation": {
+            "locale": "en",
+            "strength": 2
+          }
+        }
+      }
     },
-    "storageHash": "sha256:de882d199d3e43918b7dbd576f638a67f6fee5bb34289a3f05c0f0bee847d6db"
+    "storageHash": "sha256:177d25ad859f5fed519710a605cfbd84efba7f3d3eab32b6d2ac5756350c7fe3"
   },
   "capabilities": {},
   "extensionPacks": {},

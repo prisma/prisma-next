@@ -3,7 +3,9 @@ import { expectTypeOf, test } from 'vitest';
 import type {
   ExtractMongoFieldOutputTypes,
   InferModelRow,
+  MongoCollectionOptions,
   MongoContractWithTypeMaps,
+  MongoIndexOptions,
   MongoTypeMaps,
 } from '../src/contract-types';
 
@@ -136,4 +138,35 @@ test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () 
     TM
   >;
   expectTypeOf<ExtractMongoFieldOutputTypes<C>>().toEqualTypeOf<TestFieldOutputTypes>();
+});
+
+test('Mongo index and collection option types stay specific', () => {
+  const typedIndexOptions: MongoIndexOptions = {
+    unique: true,
+    collation: { locale: 'en', strength: 2 },
+    wildcardProjection: { internal: 0, title: 1 },
+  };
+  const typedCollectionOptions: MongoCollectionOptions = {
+    capped: true,
+    collation: { locale: 'en', strength: 2 },
+    timeseries: { timeField: 'createdAt', granularity: 'hours' },
+    changeStreamPreAndPostImages: { enabled: true },
+  };
+
+  expectTypeOf(typedIndexOptions.collation?.strength).toEqualTypeOf<
+    1 | 2 | 3 | 4 | 5 | undefined
+  >();
+  expectTypeOf(typedCollectionOptions.timeseries?.granularity).toEqualTypeOf<
+    'seconds' | 'minutes' | 'hours' | undefined
+  >();
+});
+
+test('Mongo option types reject unsupported keys', () => {
+  // @ts-expect-error unknown Mongo index option
+  const _invalidIndexOptions: MongoIndexOptions = { unsupported: true };
+  _invalidIndexOptions;
+
+  // @ts-expect-error unknown Mongo collection option
+  const _invalidCollectionOptions: MongoCollectionOptions = { unsupported: true };
+  _invalidCollectionOptions;
 });

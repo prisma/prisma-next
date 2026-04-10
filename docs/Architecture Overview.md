@@ -264,7 +264,7 @@ Contributors extend behavior by publishing packs or adapters. Core recompilation
 
 ## Package Layout & Families
 
-To make the "thin core, fat targets" principle enforceable in code, the repository is organized by rings (clean architecture) and by target family (e.g., SQL). See ADR 140 for details.
+To make the "thin core, fat targets" principle enforceable in code, the repository is organized by rings (clean architecture) and by target family (e.g., SQL and Mongo). See ADR 140 for details.
 
 Key points:
 - Core owns contracts, plan model, and a target-agnostic runtime kernel.
@@ -306,6 +306,28 @@ packages/
       orm-lane/          # ORM builder, includes, relation filters
       query-builder/     # query builder lane
     5-runtime/           # SQL runtime implementing the runtime SPI
+  2-mongo-family/        # Domain 2: Mongo family
+    1-foundation/
+      mongo-contract/    # Mongo contract types + validation
+    2-authoring/
+      contract-psl/      # Mongo PSL interpretation
+      contract-ts/       # Mongo TS authoring surface
+    3-tooling/
+      emitter/           # Mongo emitter hook
+    4-query/
+      query-ast/         # Mongo query plan + filter AST
+    5-query-builders/
+      orm/               # Mongo ORM client
+      pipeline-builder/  # Mongo aggregation pipeline builder
+    6-transport/
+      mongo-lowering/    # lowering interfaces and transport contracts
+      mongo-wire/        # wire commands and result types
+    7-runtime/           # Mongo runtime implementing the runtime SPI
+    9-family/            # Mongo family descriptor and family pack
+  3-mongo-target/        # Domain 3: Mongo target packages
+    1-mongo-target/      # Mongo target pack
+    2-mongo-adapter/     # Mongo adapter
+    3-mongo-driver/      # Mongo driver
   3-targets/             # Domain 3: Targets
     3-targets/
       postgres/          # Postgres target descriptor
@@ -316,6 +338,8 @@ packages/
   3-extensions/          # Domain 3: Extensions
     pgvector/            # pgvector extension pack
 ```
+
+`packages/3-targets/**` remains the canonical generic target domain for dialect-scoped target, adapter, and driver packages such as Postgres. `packages/3-mongo-target/**` is the Mongo-specific counterpart under the same broader target concept, and contributors should keep following the repo's `{domain}/{subdomain}` naming pattern when adding new package groups.
 
 Dependency direction is strictly one-way: `core → authoring → tooling → lanes → runtime-executor → family runtime → adapters`. Numbered prefixes reinforce the hierarchy: lower numbers can be imported by higher numbers, never the reverse. Enforce with Dependency Cruiser using data-driven configuration from `architecture.config.json`.
 

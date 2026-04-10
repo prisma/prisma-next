@@ -11,7 +11,9 @@
     "@prisma-next/family-mongo": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/mongo-contract-psl": "workspace:*",
+    "@prisma-next/mongo-contract-ts": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/target-mongo": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "pg": "catalog:"

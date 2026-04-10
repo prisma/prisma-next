@@ -16,7 +16,7 @@ This separation keeps the architecture flexible (per the original Clean Architec
 
 The repository uses numbered prefixes in directory names to make the hierarchy explicit:
 
-```
+```text
 packages/
   1-framework/           # Domain 1: Framework (target-agnostic)
     0-foundation/        # Layer 0: Foundation
@@ -26,12 +26,14 @@ packages/
     4-runtime/           # Layer 4: Runtime
       runtime-executor/
   2-document/            # Domain 2: Document (placeholder)
+  2-mongo-family/        # Domain 2: Mongo family
   2-sql/                 # Domain 2: SQL family
     1-core/              # Layer 1: Core
     2-authoring/         # Layer 2: Authoring
     3-tooling/           # Layer 3: Tooling
     4-lanes/             # Layer 4: Lanes
     5-runtime/           # Layer 5: Runtime
+  3-mongo-target/        # Domain 3: Mongo target
   3-extensions/          # Domain 3: Extensions
   3-targets/             # Domain 3: Targets
     3-targets/           # Layer 3: Target descriptors
@@ -75,7 +77,7 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 
 The SQL domain (`packages/2-sql/`) contains SQL-specific packages organized by layer:
 
-```
+```text
 * 2-sql
 |-- 1-core (shared plane)
 |   |-- contract/      → @prisma-next/sql-contract
@@ -85,7 +87,6 @@ The SQL domain (`packages/2-sql/`) contains SQL-specific packages organized by l
 |   |-- contract-ts/   → @prisma-next/sql-contract-ts
 |-- 3-tooling (migration plane)
 |   |-- emitter/       → @prisma-next/sql-contract-emitter
-|   |-- family/        → @prisma-next/family-sql
 |-- 4-lanes (runtime plane)
 |   |-- relational-core/ → @prisma-next/sql-relational-core
 |   |-- sql-lane/      → @prisma-next/sql-lane
@@ -93,6 +94,35 @@ The SQL domain (`packages/2-sql/`) contains SQL-specific packages organized by l
 |   |-- query-builder/ → @prisma-next/sql-lane-query-builder
 |-- 5-runtime (runtime plane)
     |-- → @prisma-next/sql-runtime
+|-- 9-family (migration plane)
+    |-- → @prisma-next/family-sql
+```
+
+### Mongo Family Domain
+
+The Mongo family domain (`packages/2-mongo-family/`) contains Mongo-specific packages organized by layer:
+
+```text
+* 2-mongo-family
+|-- 1-foundation (shared plane)
+|   |-- mongo-contract/   → @prisma-next/mongo-contract
+|-- 2-authoring (migration plane)
+|   |-- contract-psl/     → @prisma-next/mongo-contract-psl
+|   |-- contract-ts/      → @prisma-next/mongo-contract-ts
+|-- 3-tooling (migration plane)
+|   |-- emitter/          → @prisma-next/mongo-emitter
+|-- 4-query (runtime plane)
+|   |-- query-ast/        → @prisma-next/mongo-query-ast
+|-- 5-query-builders (runtime plane)
+|   |-- orm/              → @prisma-next/mongo-orm
+|   |-- pipeline-builder/ → @prisma-next/mongo-pipeline-builder
+|-- 6-transport (shared plane)
+|   |-- mongo-lowering/   → @prisma-next/mongo-lowering
+|   |-- mongo-wire/       → @prisma-next/mongo-wire
+|-- 7-runtime (runtime plane)
+|   |-- → @prisma-next/mongo-runtime
+|-- 9-family (migration plane)
+    |-- → @prisma-next/family-mongo
 ```
 
 ### Targets Domain (Extension Packs)
@@ -107,6 +137,20 @@ The targets domain (`packages/3-targets/`) contains concrete target extension pa
 |   |-- → @prisma-next/adapter-postgres (adapter with control/runtime entrypoints)
 |-- 7-drivers/postgres (runtime plane)
     |-- → @prisma-next/driver-postgres (driver implementation)
+```
+
+### Mongo Targets Domain
+
+Mongo-specific target packages live under `packages/3-mongo-target/`:
+
+```text
+* 3-mongo-target
+|-- 1-mongo-target (migration plane)
+|   |-- → @prisma-next/target-mongo (target descriptor / pack)
+|-- 2-mongo-adapter (multi-plane)
+|   |-- → @prisma-next/adapter-mongo
+|-- 3-mongo-driver (runtime plane)
+    |-- → @prisma-next/driver-mongo
 ```
 
 ### Extensions Domain
@@ -210,14 +254,20 @@ Contract authoring surfaces for creating contracts programmatically.
 **SQL Domain (Migration Plane):**
 - `packages/2-sql/2-authoring/contract-ts/` → `@prisma-next/sql-contract-ts` - SQL TS authoring surface, composed helper DSL, and lowering pipeline
 
-**Dependency Rules:** Can import from `core/*` only. SQL authoring may also import from SQL tooling layer.
+**Mongo Domain (Migration Plane):**
+- `packages/2-mongo-family/2-authoring/contract-psl/` → `@prisma-next/mongo-contract-psl` - PSL interpretation into Mongo contract input
+- `packages/2-mongo-family/2-authoring/contract-ts/` → `@prisma-next/mongo-contract-ts` - Mongo TS authoring surface for `defineContract(...)`
 
-### Tooling Layer (SQL Domain, Migration Plane)
+**Dependency Rules:** Can import from `core/*` only. SQL authoring may also import from SQL tooling layer; Mongo authoring may also import from Mongo tooling layer.
 
-Target-family specific emitter hooks and family‑provided helpers for CLI assembly.
+### Tooling Layer (Family Domains, Migration Plane)
+
+Target-family specific emitter hooks and family-provided helpers for CLI assembly.
 
 - `packages/2-sql/3-tooling/emitter/` → `@prisma-next/sql-contract-emitter` - SQL emitter hook
-- `packages/2-sql/3-tooling/family/` → `@prisma-next/family-sql` - SQL family descriptor (exports `ControlFamilyDescriptor` with hooks and `convertOperationManifest`)
+- `packages/2-sql/9-family/` → `@prisma-next/family-sql` - SQL family descriptor and authoring-time family pack
+- `packages/2-mongo-family/3-tooling/emitter/` → `@prisma-next/mongo-emitter` - Mongo emitter hook
+- `packages/2-mongo-family/9-family/` → `@prisma-next/family-mongo` - Mongo family descriptor and authoring-time family pack
 - `packages/1-framework/3-tooling/cli/src/pack-assembly.ts` - Generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for conversion
 - Pack entrypoints: use `/control` for control plane descriptors and helpers (no runtime), `/runtime` for factories (runtime only). The app config imports from `/control` to keep emit pure.
 
@@ -286,6 +336,17 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |
 | `packages/1-framework/3-tooling/emitter/` | `@prisma-next/emitter` |
 | `packages/1-framework/4-runtime/runtime-executor/` | `@prisma-next/runtime-executor` |
+| `packages/2-mongo-family/1-foundation/mongo-contract/` | `@prisma-next/mongo-contract` |
+| `packages/2-mongo-family/2-authoring/contract-psl/` | `@prisma-next/mongo-contract-psl` |
+| `packages/2-mongo-family/2-authoring/contract-ts/` | `@prisma-next/mongo-contract-ts` |
+| `packages/2-mongo-family/3-tooling/emitter/` | `@prisma-next/mongo-emitter` |
+| `packages/2-mongo-family/4-query/query-ast/` | `@prisma-next/mongo-query-ast` |
+| `packages/2-mongo-family/5-query-builders/orm/` | `@prisma-next/mongo-orm` |
+| `packages/2-mongo-family/5-query-builders/pipeline-builder/` | `@prisma-next/mongo-pipeline-builder` |
+| `packages/2-mongo-family/6-transport/mongo-lowering/` | `@prisma-next/mongo-lowering` |
+| `packages/2-mongo-family/6-transport/mongo-wire/` | `@prisma-next/mongo-wire` |
+| `packages/2-mongo-family/7-runtime/` | `@prisma-next/mongo-runtime` |
+| `packages/2-mongo-family/9-family/` | `@prisma-next/family-mongo` |
 | `packages/2-sql/1-core/contract/` | `@prisma-next/sql-contract` |
 | `packages/2-sql/1-core/operations/` | `@prisma-next/sql-operations` |
 | `packages/2-sql/1-core/schema-ir/` | `@prisma-next/sql-schema-ir` |
@@ -297,6 +358,9 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/2-sql/4-lanes/orm-lane/` | `@prisma-next/sql-orm-lane` |
 | `packages/2-sql/4-lanes/query-builder/` | `@prisma-next/sql-lane-query-builder` |
 | `packages/2-sql/5-runtime/` | `@prisma-next/sql-runtime` |
+| `packages/3-mongo-target/1-mongo-target/` | `@prisma-next/target-mongo` |
+| `packages/3-mongo-target/2-mongo-adapter/` | `@prisma-next/adapter-mongo` |
+| `packages/3-mongo-target/3-mongo-driver/` | `@prisma-next/driver-mongo` |
 | `packages/3-targets/3-targets/postgres/` | `@prisma-next/target-postgres` |
 | `packages/3-targets/6-adapters/postgres/` | `@prisma-next/adapter-postgres` |
 | `packages/3-targets/7-drivers/postgres/` | `@prisma-next/driver-postgres` |
@@ -318,17 +382,21 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 - **`core/*`** → cannot import from any other layer
 - **`authoring/*`** → can import from `core/*` only
 - **`2-sql/3-tooling/*`** → can import from `1-core/*` and `2-authoring/*` only
+- **`2-mongo-family/3-tooling/*`** and **`2-mongo-family/9-family`** → can import from `1-core/*` and `2-authoring/*` only
 - **`2-sql/4-lanes/*`** → can import from `1-core/*`, `2-authoring/*`, `2-sql/3-tooling/*` only
 - **`1-framework/4-runtime/runtime-executor`** → can import from `1-core/*`, `2-authoring/*`, `3-tooling/*` only (no direct imports from `3-targets/*`)
 - **`2-sql/5-runtime`** → can import from `4-runtime/runtime-executor` and `2-sql/3-tooling/*` and `3-targets/6-adapters/*` only
+- **`2-mongo-family/4-query/*`, `5-query-builders/*`, `6-transport/*`, `7-runtime`** → follow the same downward-only rule within the Mongo family plus allowed framework imports
 - **`3-targets/6-adapters/*`** → can import from `2-sql/3-tooling/*` and `2-sql/5-runtime` only
+- **`3-mongo-target/2-mongo-adapter`** → can import from Mongo family shared/runtime layers, not SQL family packages
 
 ### Domain Rules
 
 - Framework domain packages are target-agnostic and can be imported by any target family
 - SQL domain packages can import from framework domain and their own SQL family packages
-- SQL domain packages cannot import from other target families (e.g., `sql/*` cannot import `document/*`)
-- SQL family packages use `@prisma-next/sql-...` prefix for discoverability
+- Mongo domain packages can import from framework domain and their own Mongo family packages
+- Family packages cannot import from other target families (e.g., `sql/*` cannot import `mongo/*`, and `mongo/*` cannot import `sql/*`)
+- SQL family packages use the `@prisma-next/sql-...` prefix and Mongo family packages use the `@prisma-next/mongo-...` prefix for discoverability
 
 ## Package Exports Pattern
 
@@ -441,6 +509,7 @@ This structure allows the same package to provide both control plane configurati
 
 The package layering structure uses numbered directory prefixes for visual hierarchy:
 - All domain directories created with numbered prefixes (`1-framework/`, `2-sql/`, `2-document/`, `3-targets/`, `3-extensions/`)
+- Active Mongo domains also live under numbered prefixes (`2-mongo-family/`, `3-mongo-target/`)
 - All layer directories created with numbered prefixes (e.g., `1-core/`, `2-authoring/`, `3-tooling/`, `4-lanes/`, `5-runtime/`)
 - Plane subdirectories removed (`shared/`, `migration/`, `runtime/` intermediate directories flattened)
 - Workspace configuration updated (`pnpm-workspace.yaml`)
@@ -452,8 +521,10 @@ The package layering structure uses numbered directory prefixes for visual hiera
 **Package Layout:**
 
 - `packages/1-framework/` - Framework domain (target-agnostic)
+- `packages/2-mongo-family/` - Mongo family domain
 - `packages/2-sql/` - SQL family domain
 - `packages/2-document/` - Document family domain (placeholder)
+- `packages/3-mongo-target/` - Mongo target domain (target pack, adapter, driver)
 - `packages/3-targets/` - Targets domain (concrete dialects, adapters, drivers)
 - `packages/3-extensions/` - Extensions domain (compat layers, extension packs)
 

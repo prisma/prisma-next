@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
 import { mongoTargetDescriptor } from '../src/core/mongo-target-descriptor';
+import mongoFamilyPack from '../src/exports/pack';
 
 function createMinimalControlStack() {
   return createControlStack({ family: mongoFamilyDescriptor, target: mongoTargetDescriptor });
@@ -36,6 +37,17 @@ describe('mongoTargetDescriptor', () => {
     expect(mongoTargetDescriptor.id).toBe('mongo');
     expect(mongoTargetDescriptor.familyId).toBe('mongo');
     expect(mongoTargetDescriptor.targetId).toBe('mongo');
+  });
+});
+
+describe('mongoFamilyPack', () => {
+  it('has expected shape', () => {
+    expect(mongoFamilyPack).toEqual({
+      kind: 'family',
+      id: 'mongo',
+      familyId: 'mongo',
+      version: '0.0.1',
+    });
   });
 });
 

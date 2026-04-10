@@ -118,9 +118,11 @@ export type GroupSpec = {
 export type GroupedDocShape<Spec extends GroupSpec> = {
   [K in keyof Spec & string]: Spec[K] extends TypedAggExpr<infer F>
     ? F
-    : Spec[K] extends null
-      ? { readonly codecId: 'mongo/null@1'; readonly nullable: true }
-      : DocField;
+    : Spec[K] extends TypedAccumulatorExpr<infer F>
+      ? F
+      : Spec[K] extends null
+        ? { readonly codecId: 'mongo/null@1'; readonly nullable: true }
+        : DocField;
 };
 
 /**

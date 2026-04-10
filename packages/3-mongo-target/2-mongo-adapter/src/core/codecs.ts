@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import {
   MONGO_BOOLEAN_CODEC_ID,
   MONGO_DATE_CODEC_ID,
+  MONGO_DOUBLE_CODEC_ID,
   MONGO_INT32_CODEC_ID,
   MONGO_OBJECTID_CODEC_ID,
   MONGO_STRING_CODEC_ID,
@@ -23,6 +24,14 @@ export const mongoStringCodec = mongoCodec({
   traits: ['equality', 'order', 'textual'],
   decode: (wire: string) => wire,
   encode: (value: string) => value,
+});
+
+export const mongoDoubleCodec = mongoCodec({
+  typeId: MONGO_DOUBLE_CODEC_ID,
+  targetTypes: ['float'],
+  traits: ['equality', 'order', 'numeric'],
+  decode: (wire: number) => wire,
+  encode: (value: number) => value,
 });
 
 export const mongoInt32Codec = mongoCodec({

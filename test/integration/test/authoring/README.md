@@ -2,6 +2,12 @@
 
 This directory contains the fixture-driven TS↔PSL authoring parity harness for integration tests.
 
+It also contains side-by-side SQL and Mongo examples that show the same conceptual contract in:
+
+- TypeScript authoring (`contract.ts`)
+- PSL authoring (`contract.prisma`)
+- emitted canonical JSON (`contract.json`)
+
 ## What this suite verifies
 
 The runner in `cli.emit-parity-fixtures.test.ts` validates parity between:
@@ -29,6 +35,12 @@ It also includes diagnostics coverage from invalid PSL fixture inputs.
 - `expected.contract.json` — expected canonical artifact snapshot
 
 `diagnostics/<case>/` contains invalid PSL inputs used to assert diagnostics behavior.
+
+`side-by-side/<family>/` contains comparable examples across families:
+
+- `contract.ts` — TypeScript-authored contract
+- `contract.prisma` — PSL-authored contract
+- `contract.json` — committed emitted artifact snapshot
 
 ## How tests are executed
 
@@ -59,8 +71,20 @@ pnpm --filter @prisma-next/integration-tests exec vitest run test/authoring/cli.
 pnpm --filter @prisma-next/integration-tests exec vitest run test/cli.emit-command.test.ts
 ```
 
+Run only the side-by-side examples suite:
+
+```bash
+pnpm --filter @prisma-next/integration-tests exec vitest run test/authoring/side-by-side-contracts.test.ts
+```
+
 Update expected snapshots for parity cases:
 
 ```bash
 UPDATE_AUTHORING_PARITY_EXPECTED=1 pnpm --filter @prisma-next/integration-tests exec vitest run test/authoring/cli.emit-parity-fixtures.test.ts
+```
+
+Update the committed side-by-side `contract.json` snapshots:
+
+```bash
+UPDATE_SIDE_BY_SIDE_CONTRACTS=1 pnpm --filter @prisma-next/integration-tests exec vitest run test/authoring/side-by-side-contracts.test.ts
 ```

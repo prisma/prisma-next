@@ -753,4 +753,102 @@ model Post {
       }
     },
   );
+
+  it(
+    'emits contract.json and contract.d.ts with Mongo contract.ts config',
+    { timeout: timeouts.typeScriptCompilation },
+    async () => {
+      const command = createContractEmitCommand();
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(
+        fixtureSubdir,
+        'prisma-next.config.mongo-contract-ts.ts',
+      );
+      const testDirMongo = testSetup.testDir;
+      const outputDirMongo = testSetup.outputDir;
+      const cleanupMongo = testSetup.cleanup;
+
+      try {
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDirMongo);
+          const exitCode = await executeCommand(command, [
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).toBe(0);
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        const contractJsonPath = join(outputDirMongo, 'contract.json');
+        const contractDtsPath = join(outputDirMongo, 'contract.d.ts');
+
+        expect(existsSync(contractJsonPath)).toBe(true);
+        expect(existsSync(contractDtsPath)).toBe(true);
+
+        const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        expect(contractJson).toMatchObject({
+          targetFamily: 'mongo',
+          target: 'mongo',
+          storage: {
+            collections: {
+              users: {
+                indexes: [{ fields: { email: 1 }, options: { unique: true } }],
+                options: {
+                  collation: { locale: 'en', strength: 2 },
+                },
+              },
+            },
+          },
+          models: {
+            Task: expect.objectContaining({
+              storage: expect.objectContaining({
+                collection: 'tasks',
+                relations: {
+                  comments: { field: 'comments' },
+                },
+              }),
+              discriminator: { field: 'type' },
+              variants: {
+                Bug: { value: 'bug' },
+              },
+            }),
+            Bug: expect.objectContaining({
+              base: 'Task',
+            }),
+            Comment: expect.objectContaining({
+              owner: 'Task',
+            }),
+          },
+        });
+
+        const contractDts = readFileSync(contractDtsPath, 'utf-8');
+        expect(contractDts).toContain("readonly owner: 'Task'");
+        expect(contractDts).toContain("readonly base: 'Task'");
+        expect(contractDts).toContain("readonly discriminator: { readonly field: 'type' }");
+        expect(contractDts).toContain('readonly users: {');
+        expect(contractDts).toContain('readonly indexes:');
+        expect(contractDts).toContain('readonly email: 1');
+        expect(contractDts).toContain('readonly unique: true');
+        expect(contractDts).toContain('readonly options:');
+        expect(contractDts).toContain(
+          "readonly collation: { readonly locale: 'en'; readonly strength: 2 }",
+        );
+
+        const jsonOutput = consoleOutput.join('\n');
+        const parsed = JSON.parse(jsonOutput);
+        expect(parsed).toMatchObject({
+          ok: true,
+          storageHash: expect.stringMatching(/^sha256:/),
+          files: {
+            json: expect.stringContaining('contract.json'),
+            dts: expect.stringContaining('contract.d.ts'),
+          },
+        });
+      } finally {
+        cleanupMongo();
+      }
+    },
+  );
 });

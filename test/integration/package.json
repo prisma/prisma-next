@@ -43,10 +43,12 @@
     "@prisma-next/family-mongo": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-contract-psl": "workspace:*",
+    "@prisma-next/mongo-contract-ts": "workspace:*",
     "@prisma-next/mongo-orm": "workspace:*",
     "@prisma-next/mongo-pipeline-builder": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/mongo-runtime": "workspace:*",
+    "@prisma-next/target-mongo": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "@prisma-next/vite-plugin-contract-emit": "workspace:*",
     "arktype": "catalog:"

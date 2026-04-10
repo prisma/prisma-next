@@ -2,6 +2,7 @@ import type { ControlAdapterDescriptor } from '@prisma-next/framework-components
 import {
   mongoBooleanCodec,
   mongoDateCodec,
+  mongoDoubleCodec,
   mongoInt32Codec,
   mongoObjectIdCodec,
   mongoStringCodec,
@@ -19,6 +20,7 @@ const mongoAdapterDescriptor: ControlAdapterDescriptor<'mongo', 'mongo'> = {
       codecInstances: [
         mongoObjectIdCodec,
         mongoStringCodec,
+        mongoDoubleCodec,
         mongoInt32Codec,
         mongoBooleanCodec,
         mongoDateCodec,

@@ -6,7 +6,108 @@ import type {
   StorageBase,
 } from '@prisma-next/contract/types';
 
-export type MongoStorageCollection = Record<string, never>;
+export type MongoIndexFieldValue = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
+
+export type MongoIndexFields = Record<string, MongoIndexFieldValue>;
+
+export type MongoJsonPrimitive = string | number | boolean | null;
+
+export type MongoJsonValue = MongoJsonPrimitive | readonly MongoJsonValue[] | MongoJsonObject;
+
+export type MongoJsonObject = {
+  readonly [key: string]: MongoJsonValue;
+};
+
+export type MongoCollationCaseFirst = 'off' | 'upper' | 'lower';
+
+export type MongoCollationStrength = 1 | 2 | 3 | 4 | 5;
+
+export type MongoCollationAlternate = 'non-ignorable' | 'shifted';
+
+export type MongoCollationMaxVariable = 'punct' | 'space';
+
+export type MongoCollationOptions = {
+  readonly locale: string;
+  readonly caseLevel?: boolean;
+  readonly caseFirst?: MongoCollationCaseFirst;
+  readonly strength?: MongoCollationStrength;
+  readonly numericOrdering?: boolean;
+  readonly alternate?: MongoCollationAlternate;
+  readonly maxVariable?: MongoCollationMaxVariable;
+  readonly backwards?: boolean;
+  readonly normalization?: boolean;
+};
+
+export type MongoWildcardProjection = Readonly<Record<string, 0 | 1>>;
+
+export type MongoIndexOptions = {
+  readonly unique?: boolean;
+  readonly name?: string;
+  readonly partialFilterExpression?: MongoJsonObject;
+  readonly sparse?: boolean;
+  readonly expireAfterSeconds?: number;
+  readonly weights?: Readonly<Record<string, number>>;
+  readonly default_language?: string;
+  readonly language_override?: string;
+  readonly textIndexVersion?: number;
+  readonly '2dsphereIndexVersion'?: number;
+  readonly bits?: number;
+  readonly min?: number;
+  readonly max?: number;
+  readonly bucketSize?: number;
+  readonly hidden?: boolean;
+  readonly collation?: MongoCollationOptions;
+  readonly wildcardProjection?: MongoWildcardProjection;
+};
+
+export type MongoIndex = {
+  readonly fields: MongoIndexFields;
+  readonly options?: MongoIndexOptions;
+};
+
+export type MongoIndexOptionDefaults = {
+  readonly storageEngine?: MongoJsonObject;
+};
+
+export type MongoTimeSeriesGranularity = 'seconds' | 'minutes' | 'hours';
+
+export type MongoTimeSeriesCollectionOptions = {
+  readonly timeField: string;
+  readonly metaField?: string;
+  readonly granularity?: MongoTimeSeriesGranularity;
+  readonly bucketMaxSpanSeconds?: number;
+  readonly bucketRoundingSeconds?: number;
+};
+
+export type MongoClusteredCollectionKey = Readonly<Record<string, 1>>;
+
+export type MongoClusteredCollectionOptions = {
+  readonly name?: string;
+  readonly key: MongoClusteredCollectionKey;
+  readonly unique: boolean;
+};
+
+export type MongoChangeStreamPreAndPostImagesOptions = {
+  readonly enabled: boolean;
+};
+
+export type MongoCollectionOptions = {
+  readonly capped?: boolean;
+  readonly size?: number;
+  readonly max?: number;
+  readonly storageEngine?: MongoJsonObject;
+  readonly indexOptionDefaults?: MongoIndexOptionDefaults;
+  readonly collation?: MongoCollationOptions;
+  readonly timeseries?: MongoTimeSeriesCollectionOptions;
+  readonly clusteredIndex?: MongoClusteredCollectionOptions;
+  readonly expireAfterSeconds?: number;
+  readonly changeStreamPreAndPostImages?: MongoChangeStreamPreAndPostImagesOptions;
+};
+
+export type MongoStorageCollection = {
+  readonly indexes?: readonly MongoIndex[];
+  readonly options?: MongoCollectionOptions;
+};
 
 export type MongoStorage<THash extends string = string> = StorageBase<THash> & {
   readonly collections: Record<string, MongoStorageCollection>;
@@ -67,6 +168,15 @@ type ExtractValueObjects<TContract> = TContract extends {
   ? VO
   : Record<never, never>;
 
+type NormalizeContractFields<TFields> = {
+  [K in keyof TFields]: TFields[K] extends ContractField ? TFields[K] : never;
+};
+
+type ExtractValueObjectFields<
+  TValueObjects extends Record<string, ContractValueObject>,
+  VOName extends keyof TValueObjects,
+> = NormalizeContractFields<TValueObjects[VOName]['fields']>;
+
 type InferFieldBaseType<
   TFieldType,
   TValueObjects extends Record<string, ContractValueObject>,
@@ -76,8 +186,8 @@ type InferFieldBaseType<
   : TFieldType extends { kind: 'valueObject'; name: infer VOName extends string }
     ? VOName extends keyof TValueObjects
       ? {
-          -readonly [K in keyof TValueObjects[VOName]['fields']]: InferFieldType<
-            TValueObjects[VOName]['fields'][K],
+          -readonly [K in keyof ExtractValueObjectFields<TValueObjects, VOName>]: InferFieldType<
+            ExtractValueObjectFields<TValueObjects, VOName>[K],
             TValueObjects,
             TCodecTypes
           >;
@@ -93,16 +203,18 @@ type InferFieldBaseType<
       : unknown;
 
 type InferFieldType<
-  TField extends ContractField,
+  TField,
   TValueObjects extends Record<string, ContractValueObject>,
   TCodecTypes extends Record<string, { output: unknown }>,
-> = TField extends { many: true }
-  ? TField['nullable'] extends true
-    ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[] | null
-    : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[]
-  : TField['nullable'] extends true
-    ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes> | null
-    : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>;
+> = TField extends ContractField
+  ? TField extends { many: true }
+    ? TField['nullable'] extends true
+      ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[] | null
+      : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>[]
+    : TField['nullable'] extends true
+      ? InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes> | null
+      : InferFieldBaseType<TField['type'], TValueObjects, TCodecTypes>
+  : never;
 
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
