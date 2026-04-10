@@ -706,6 +706,16 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
   };
 }
 
+function isQuoteEscaped(value: string, quoteIndex: number): boolean {
+  let backslashCount = 0;
+
+  for (let index = quoteIndex - 1; index >= 0 && value[index] === '\\'; index -= 1) {
+    backslashCount += 1;
+  }
+
+  return backslashCount % 2 === 1;
+}
+
 function splitTypeAndAttributes(value: string):
   | {
       readonly typeSource: string;
@@ -721,7 +731,7 @@ function splitTypeAndAttributes(value: string):
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index] ?? '';
     if (quote) {
-      if (character === quote && value[index - 1] !== '\\') {
+      if (character === quote && !isQuoteEscaped(value, index)) {
         quote = null;
       }
       continue;
@@ -955,19 +965,17 @@ function findBlockBounds(context: ParserContext, startLine: number): BlockBounds
   for (let lineIndex = startLine; lineIndex < context.lines.length; lineIndex += 1) {
     const line = stripInlineComment(context.lines[lineIndex] ?? '');
     let quote: '"' | "'" | null = null;
-    let previousCharacter = '';
-    for (const character of line) {
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index] ?? '';
       if (quote) {
-        if (character === quote && previousCharacter !== '\\') {
+        if (character === quote && !isQuoteEscaped(line, index)) {
           quote = null;
         }
-        previousCharacter = character;
         continue;
       }
 
       if (character === '"' || character === "'") {
         quote = character;
-        previousCharacter = character;
         continue;
       }
 
@@ -980,7 +988,6 @@ function findBlockBounds(context: ParserContext, startLine: number): BlockBounds
           return { startLine, endLine: lineIndex, closed: true };
         }
       }
-      previousCharacter = character;
     }
   }
 
@@ -1013,7 +1020,7 @@ function splitTopLevelSegments(value: string, separator: ',' | ':'): TopLevelSeg
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index] ?? '';
     if (quote) {
-      if (character === quote && value[index - 1] !== '\\') {
+      if (character === quote && !isQuoteEscaped(value, index)) {
         quote = null;
       }
       continue;
@@ -1118,7 +1125,7 @@ function extractAttributeTokensWithSpans(
       while (index < value.length) {
         const char = value[index] ?? '';
         if (quote) {
-          if (char === quote && value[index - 1] !== '\\') {
+          if (char === quote && !isQuoteEscaped(value, index)) {
             quote = null;
           }
           index += 1;
@@ -1191,7 +1198,7 @@ function stripInlineComment(line: string): string {
     const next = line[index + 1] ?? '';
 
     if (quote) {
-      if (current === quote && line[index - 1] !== '\\') {
+      if (current === quote && !isQuoteEscaped(line, index)) {
         quote = null;
       }
       continue;

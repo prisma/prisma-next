@@ -252,6 +252,69 @@ types {
     });
   });
 
+  it('parses constructor arguments and trailing attributes after quoted values ending with escaped backslashes', () => {
+    const schema = String.raw`
+types {
+  WindowsPath = sql.String(label: "C:\\\\", length: 35) @db.VarChar(191)
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+
+    const windowsPath = result.ast.types?.declarations.find(
+      (entry) => entry.name === 'WindowsPath',
+    );
+    expect(windowsPath?.typeConstructor).toMatchObject({
+      path: ['sql', 'String'],
+      args: [
+        { kind: 'named', name: 'label' },
+        { kind: 'named', name: 'length', value: '35' },
+      ],
+    });
+    expect(windowsPath?.attributes).toMatchObject([
+      {
+        kind: 'attribute',
+        target: 'namedType',
+        name: 'db.VarChar',
+        args: [{ kind: 'positional', value: '191' }],
+      },
+    ]);
+  });
+
+  it('strips inline comments after quoted values ending with escaped backslashes', () => {
+    const schema = String.raw`
+model File {
+  id Int @id
+  path String @default("C:\\\\") // keep this as a Windows-style path
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+
+    const fileModel = result.ast.models.find((model) => model.name === 'File');
+    const pathField = fileModel?.fields.find((field) => field.name === 'path');
+    expect(pathField?.attributes).toMatchObject([
+      {
+        kind: 'attribute',
+        target: 'field',
+        name: 'default',
+        args: [{ kind: 'positional', value: '"C:\\\\\\\\"' }],
+      },
+    ]);
+  });
+
   it('parses hyphenated namespace attribute names', () => {
     const schema = `
 model Document {
