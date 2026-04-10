@@ -1,6 +1,10 @@
 import type { Db } from './db';
 
-export async function seed(db: Db) {
+export interface SeedResult {
+  demoUserId: string;
+}
+
+export async function seed(db: Db): Promise<SeedResult> {
   const products = await db.orm.products.createAll([
     {
       name: 'Classic Oxford Shirt',
@@ -180,4 +184,6 @@ export async function seed(db: Db) {
       },
     },
   ]);
+
+  return { demoUserId: String(alice._id) };
 }

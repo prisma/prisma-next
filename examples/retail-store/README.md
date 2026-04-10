@@ -44,25 +44,9 @@ MONGODB_DB=retail_store
 pnpm db:seed
 ```
 
-This populates all 7 collections (products, users, carts, orders, locations, invoices, events) with sample data.
+This populates all 7 collections with sample data and automatically writes `DEMO_USER_ID` (the seeded demo user's ObjectId) into `.env`. The cart and orders pages use this to identify the logged-in user.
 
-**3. Get the demo user's ObjectId:**
-
-The cart and orders pages filter by a logged-in user. After seeding, grab Alice's `_id` hex string:
-
-```bash
-mongosh "$MONGODB_URL/$MONGODB_DB" --eval 'db.users.findOne({email:"alice@example.com"})._id.str'
-```
-
-Add it to `.env`:
-
-```env
-DEMO_USER_ID=<hex string from above>
-```
-
-Without `DEMO_USER_ID`, the cart and orders pages will show empty.
-
-**4. Start the dev server:**
+**3. Start the dev server:**
 
 ```bash
 pnpm dev
