@@ -103,6 +103,12 @@
       "plane": "runtime"
     },
     {
+      "glob": "packages/2-sql/9-family/src/exports/pack.ts",
+      "domain": "sql",
+      "layer": "family",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/2-sql/4-lanes/**",
       "domain": "sql",
       "layer": "lanes",
