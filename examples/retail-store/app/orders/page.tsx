@@ -1,84 +1,65 @@
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { Badge } from '../../src/components/ui/badge';
+import { Card, CardContent } from '../../src/components/ui/card';
 import { getUserOrders } from '../../src/data/orders';
 import { getDb } from '../../src/db-singleton';
+import { getAuthUserId } from '../../src/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-const DEMO_USER_ID = process.env['DEMO_USER_ID'] ?? '';
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    placed: '#2563eb',
-    shipped: '#d97706',
-    delivered: '#16a34a',
-    cancelled: '#dc2626',
-  };
-  const bg = colors[status] ?? '#666';
-  return (
-    <span
-      style={{
-        background: bg,
-        color: '#fff',
-        padding: '0.15rem 0.5rem',
-        borderRadius: '4px',
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        textTransform: 'uppercase',
-      }}
-    >
-      {status}
-    </span>
-  );
-}
+const statusVariant: Record<string, 'default' | 'warning' | 'success' | 'destructive'> = {
+  placed: 'default',
+  shipped: 'warning',
+  delivered: 'success',
+  cancelled: 'destructive',
+};
 
 export default async function OrdersPage() {
+  const userId = await getAuthUserId();
+  if (!userId) redirect('/login');
+
   const db = await getDb();
-  const orders = DEMO_USER_ID ? await getUserOrders(db, DEMO_USER_ID) : [];
+  const orders = await getUserOrders(db, userId);
 
   return (
-    <div style={{ maxWidth: '700px' }}>
-      <h1 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Order History</h1>
+    <div className="max-w-3xl">
+      <h1 className="text-2xl font-bold mb-6">Order History</h1>
 
       {orders.length === 0 ? (
-        <p style={{ color: 'var(--muted)' }}>No orders yet.</p>
+        <p className="text-muted text-center py-12">No orders yet.</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="flex flex-col gap-3">
           {orders.map((order) => {
             const lastStatus = order.statusHistory[order.statusHistory.length - 1];
             const total = order.items.reduce(
               (sum, item) => sum + Number(item.price.amount) * item.amount,
               0,
             );
+            const status = lastStatus?.status as string;
             return (
-              <a
+              <Link
                 key={String(order._id)}
                 href={`/orders/${String(order._id)}`}
-                style={{
-                  background: 'var(--card-bg)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  padding: '1.25rem',
-                  textDecoration: 'none',
-                  color: 'inherit',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
+                className="no-underline text-inherit"
               >
-                <div>
-                  <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                    {order.items.length} item{order.items.length !== 1 ? 's' : ''}
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
-                    {order.shippingAddress}
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ marginBottom: '0.25rem' }}>
-                    {lastStatus && <StatusBadge status={lastStatus.status as string} />}
-                  </div>
-                  <div style={{ fontWeight: 600 }}>${total.toFixed(2)}</div>
-                </div>
-              </a>
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardContent className="flex items-center justify-between p-5">
+                    <div>
+                      <p className="font-semibold">
+                        {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                      </p>
+                      <p className="text-sm text-muted">{order.shippingAddress}</p>
+                    </div>
+                    <div className="text-right flex flex-col items-end gap-1">
+                      {status && (
+                        <Badge variant={statusVariant[status] ?? 'outline'}>{status}</Badge>
+                      )}
+                      <span className="font-semibold">${total.toFixed(2)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             );
           })}
         </div>
