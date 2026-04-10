@@ -1193,6 +1193,13 @@ export function interpretPslDocumentToSqlContract(
     sourceId,
   });
 
+  if (diagnostics.length > 0) {
+    return notOk({
+      summary: 'PSL to SQL contract interpretation failed',
+      diagnostics,
+    });
+  }
+
   let patchedModels = patchModelDomainFields(
     contract.models as Record<string, ContractModel>,
     modelResolvedFields,
