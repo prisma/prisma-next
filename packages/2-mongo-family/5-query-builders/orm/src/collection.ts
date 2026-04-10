@@ -1,4 +1,9 @@
-import type { ContractReferenceRelation, PlanMeta } from '@prisma-next/contract/types';
+import type {
+  ContractField,
+  ContractReferenceRelation,
+  ContractValueObject,
+  PlanMeta,
+} from '@prisma-next/contract/types';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -468,27 +473,71 @@ class MongoCollectionImpl<
     return rows;
   }
 
+  #modelFields(): Record<string, ContractField> {
+    const model = this.#contract.models[this.#modelName] as MongoModelDefinition | undefined;
+    return model?.fields ?? {};
+  }
+
+  #wrapFieldValue(value: unknown, field: ContractField | undefined): MongoValue {
+    if (field === undefined) return new MongoParamRef(value);
+
+    if (field.type.kind === 'scalar') {
+      return new MongoParamRef(value, { codecId: field.type.codecId });
+    }
+
+    if (field.type.kind === 'valueObject') {
+      const voName = field.type.name;
+      const voDef = (this.#contract as { valueObjects?: Record<string, ContractValueObject> })
+        .valueObjects?.[voName];
+      if (!voDef || value === null) return new MongoParamRef(value);
+
+      if (field.many && Array.isArray(value)) {
+        return value.map((item) =>
+          this.#wrapValueObject(item as Record<string, unknown>, voDef),
+        ) as unknown as MongoValue;
+      }
+      return this.#wrapValueObject(value as Record<string, unknown>, voDef);
+    }
+
+    return new MongoParamRef(value);
+  }
+
+  #wrapValueObject(
+    data: Record<string, unknown>,
+    voDef: ContractValueObject,
+  ): Record<string, MongoValue> {
+    const doc: Record<string, MongoValue> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value === undefined) continue;
+      const fieldDef = voDef.fields[key];
+      doc[key] = this.#wrapFieldValue(value, fieldDef);
+    }
+    return doc;
+  }
+
   #toDocument(data: Record<string, unknown>): Record<string, MongoValue> {
+    const fields = this.#modelFields();
     const doc: Record<string, MongoValue> = {};
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined) {
-        doc[key] = new MongoParamRef(value);
+        doc[key] = this.#wrapFieldValue(value, fields[key]);
       }
     }
     return doc;
   }
 
   #toSetFields(data: Record<string, unknown>): Record<string, MongoValue> {
-    const fields: Record<string, MongoValue> = {};
+    const fields = this.#modelFields();
+    const result: Record<string, MongoValue> = {};
     for (const [key, value] of Object.entries(data)) {
       if (key === '_id' && value !== undefined) {
         throw new Error('Mutation payloads cannot modify `_id`');
       }
       if (value !== undefined) {
-        fields[key] = new MongoParamRef(value);
+        result[key] = this.#wrapFieldValue(value, fields[key]);
       }
     }
-    return fields;
+    return result;
   }
 
   #stripUndefined(data: Record<string, unknown>): Record<string, unknown> {
