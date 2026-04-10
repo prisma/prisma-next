@@ -17,6 +17,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as validateSqlContract } from '@prisma-next/sql-contract/validate';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
+import { timeouts } from '@prisma-next/test-utils';
 import { dirname, join } from 'pathe';
 import { describe, expect, it } from 'vitest';
 
@@ -111,143 +112,151 @@ describe('side-by-side contract examples', () => {
     expect(fixtures).toHaveLength(2);
   });
 
-  it('validates and emits the Postgres side-by-side contract from TS and PSL', async () => {
-    const fixtureCase = fixtureCases.find((candidate) => candidate.name === 'postgres');
-    if (!fixtureCase) {
-      throw new Error('Postgres fixture not found');
-    }
+  it(
+    'validates and emits the Postgres side-by-side contract from TS and PSL',
+    async () => {
+      const fixtureCase = fixtureCases.find((candidate) => candidate.name === 'postgres');
+      if (!fixtureCase) {
+        throw new Error('Postgres fixture not found');
+      }
 
-    const fixture = await loadFixture(fixtureCase);
-    const provider = prismaContract(fixtureCase.contractPslPath, {
-      target: postgres,
-      scalarTypeDescriptors: sqlPslInterpretationContributions.scalarTypeDescriptors,
-      controlMutationDefaults: {
-        defaultFunctionRegistry: sqlPslInterpretationContributions.defaultFunctionRegistry,
-        generatorDescriptors: sqlPslInterpretationContributions.generatorDescriptors,
-      },
-    });
+      const fixture = await loadFixture(fixtureCase);
+      const provider = prismaContract(fixtureCase.contractPslPath, {
+        target: postgres,
+        scalarTypeDescriptors: sqlPslInterpretationContributions.scalarTypeDescriptors,
+        controlMutationDefaults: {
+          defaultFunctionRegistry: sqlPslInterpretationContributions.defaultFunctionRegistry,
+          generatorDescriptors: sqlPslInterpretationContributions.generatorDescriptors,
+        },
+      });
 
-    const providerResult = await provider.source(sourceContext);
-    expect(providerResult.ok).toBe(true);
-    if (!providerResult.ok) {
-      throw new Error(providerResult.failure.summary);
-    }
+      const providerResult = await provider.source(sourceContext);
+      expect(providerResult.ok).toBe(true);
+      if (!providerResult.ok) {
+        throw new Error(providerResult.failure.summary);
+      }
 
-    const stack = createControlStack({
-      family: sql,
-      target: postgres,
-      adapter: postgresAdapter,
-    });
-    const familyInstance = sql.create(stack);
-    const frameworkComponents = [postgres, postgresAdapter];
+      const stack = createControlStack({
+        family: sql,
+        target: postgres,
+        adapter: postgresAdapter,
+      });
+      const familyInstance = sql.create(stack);
+      const frameworkComponents = [postgres, postgresAdapter];
 
-    const normalizedTs = familyInstance.validateContract(
-      enrichContract(fixture.tsContract, frameworkComponents),
-    );
-    const normalizedPsl = familyInstance.validateContract(
-      enrichContract(providerResult.value, frameworkComponents),
-    );
+      const normalizedTs = familyInstance.validateContract(
+        enrichContract(fixture.tsContract, frameworkComponents),
+      );
+      const normalizedPsl = familyInstance.validateContract(
+        enrichContract(providerResult.value, frameworkComponents),
+      );
 
-    expect(normalizedTs).toEqual(normalizedPsl);
+      expect(normalizedTs).toEqual(normalizedPsl);
 
-    const emittedTs = await emit(normalizedTs, stack, sql.emission);
-    const emittedPsl = await emit(normalizedPsl, stack, sql.emission);
+      const emittedTs = await emit(normalizedTs, stack, sql.emission);
+      const emittedPsl = await emit(normalizedPsl, stack, sql.emission);
 
-    expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
+      expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
 
-    const emittedContractJson = parseContractJson(emittedTs.contractJson);
-    const validatedContract = validateEmittedSqlContract(emittedContractJson);
+      const emittedContractJson = parseContractJson(emittedTs.contractJson);
+      const validatedContract = validateEmittedSqlContract(emittedContractJson);
 
-    expect(validatedContract.roots).toEqual({
-      posts: 'Post',
-      users: 'User',
-    });
-    expect(validatedContract.models['User']?.relations['posts']).toMatchObject({
-      cardinality: '1:N',
-      to: 'Post',
-    });
-    expect(validatedContract.models['Post']?.relations['author']).toMatchObject({
-      cardinality: 'N:1',
-      to: 'User',
-      on: {
-        localFields: ['authorId'],
-        targetFields: ['id'],
-      },
-    });
+      expect(validatedContract.roots).toEqual({
+        posts: 'Post',
+        users: 'User',
+      });
+      expect(validatedContract.models['User']?.relations['posts']).toMatchObject({
+        cardinality: '1:N',
+        to: 'Post',
+      });
+      expect(validatedContract.models['Post']?.relations['author']).toMatchObject({
+        cardinality: 'N:1',
+        to: 'User',
+        on: {
+          localFields: ['authorId'],
+          targetFields: ['id'],
+        },
+      });
 
-    if (shouldUpdateExpected) {
-      writeExpectedContractJson(fixtureCase, emittedTs.contractJson);
-    }
+      if (shouldUpdateExpected) {
+        writeExpectedContractJson(fixtureCase, emittedTs.contractJson);
+      }
 
-    expect(emittedTs.contractJson).toBe(readExpectedContractJson(fixtureCase));
-  });
+      expect(emittedTs.contractJson).toBe(readExpectedContractJson(fixtureCase));
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('validates and emits the Mongo side-by-side contract from TS and PSL', async () => {
-    const fixtureCase = fixtureCases.find((candidate) => candidate.name === 'mongo');
-    if (!fixtureCase) {
-      throw new Error('Mongo fixture not found');
-    }
+  it(
+    'validates and emits the Mongo side-by-side contract from TS and PSL',
+    async () => {
+      const fixtureCase = fixtureCases.find((candidate) => candidate.name === 'mongo');
+      if (!fixtureCase) {
+        throw new Error('Mongo fixture not found');
+      }
 
-    const fixture = await loadFixture(fixtureCase);
-    const provider = mongoContract(fixtureCase.contractPslPath);
-    const providerResult = await provider.source(sourceContext);
-    expect(providerResult.ok).toBe(true);
-    if (!providerResult.ok) {
-      throw new Error(providerResult.failure.summary);
-    }
+      const fixture = await loadFixture(fixtureCase);
+      const provider = mongoContract(fixtureCase.contractPslPath);
+      const providerResult = await provider.source(sourceContext);
+      expect(providerResult.ok).toBe(true);
+      if (!providerResult.ok) {
+        throw new Error(providerResult.failure.summary);
+      }
 
-    const stack = createControlStack({
-      family: mongoFamilyDescriptor,
-      target: mongoTargetDescriptor,
-      adapter: mongoAdapter,
-    });
-    const familyInstance = mongoFamilyDescriptor.create(stack);
-    const frameworkComponents = [mongoTargetDescriptor, mongoAdapter];
+      const stack = createControlStack({
+        family: mongoFamilyDescriptor,
+        target: mongoTargetDescriptor,
+        adapter: mongoAdapter,
+      });
+      const familyInstance = mongoFamilyDescriptor.create(stack);
+      const frameworkComponents = [mongoTargetDescriptor, mongoAdapter];
 
-    const normalizedTs = familyInstance.validateContract(
-      enrichContract(fixture.tsContract, frameworkComponents),
-    );
-    const normalizedPsl = familyInstance.validateContract(
-      enrichContract(providerResult.value, frameworkComponents),
-    );
+      const normalizedTs = familyInstance.validateContract(
+        enrichContract(fixture.tsContract, frameworkComponents),
+      );
+      const normalizedPsl = familyInstance.validateContract(
+        enrichContract(providerResult.value, frameworkComponents),
+      );
 
-    expect(normalizedTs).toEqual(normalizedPsl);
+      expect(normalizedTs).toEqual(normalizedPsl);
 
-    const emittedTs = await emit(normalizedTs, stack, mongoFamilyDescriptor.emission);
-    const emittedPsl = await emit(normalizedPsl, stack, mongoFamilyDescriptor.emission);
+      const emittedTs = await emit(normalizedTs, stack, mongoFamilyDescriptor.emission);
+      const emittedPsl = await emit(normalizedPsl, stack, mongoFamilyDescriptor.emission);
 
-    expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
+      expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
 
-    const emittedContractJson = parseContractJson(emittedTs.contractJson);
-    const validatedContract = validateEmittedMongoContract(emittedContractJson);
+      const emittedContractJson = parseContractJson(emittedTs.contractJson);
+      const validatedContract = validateEmittedMongoContract(emittedContractJson);
 
-    expect(validatedContract.contract.roots).toEqual({
-      posts: 'Post',
-      users: 'User',
-    });
-    expect(validatedContract.contract.models['User']?.relations['posts']).toMatchObject({
-      cardinality: '1:N',
-      to: 'Post',
-      on: {
-        localFields: ['_id'],
-        targetFields: ['authorId'],
-      },
-    });
-    expect(validatedContract.contract.models['Post']?.relations['author']).toMatchObject({
-      cardinality: 'N:1',
-      to: 'User',
-      on: {
-        localFields: ['authorId'],
-        targetFields: ['_id'],
-      },
-    });
+      expect(validatedContract.contract.roots).toEqual({
+        posts: 'Post',
+        users: 'User',
+      });
+      expect(validatedContract.contract.models['User']?.relations['posts']).toMatchObject({
+        cardinality: '1:N',
+        to: 'Post',
+        on: {
+          localFields: ['_id'],
+          targetFields: ['authorId'],
+        },
+      });
+      expect(validatedContract.contract.models['Post']?.relations['author']).toMatchObject({
+        cardinality: 'N:1',
+        to: 'User',
+        on: {
+          localFields: ['authorId'],
+          targetFields: ['_id'],
+        },
+      });
 
-    if (shouldUpdateExpected) {
-      writeExpectedContractJson(fixtureCase, emittedTs.contractJson);
-    }
+      if (shouldUpdateExpected) {
+        writeExpectedContractJson(fixtureCase, emittedTs.contractJson);
+      }
 
-    expect(emittedTs.contractJson).toBe(readExpectedContractJson(fixtureCase));
-  });
+      expect(emittedTs.contractJson).toBe(readExpectedContractJson(fixtureCase));
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('keeps the Postgres and Mongo examples structurally comparable', async () => {
     const postgresFixture = fixtureCases.find((candidate) => candidate.name === 'postgres');
