@@ -218,12 +218,10 @@
       "users": {
         "indexes": [
           {
-            "fields": {
-              "email": 1
-            },
-            "options": {
-              "unique": true
-            }
+            "keys": [
+              { "field": "email", "direction": 1 }
+            ],
+            "unique": true
           }
         ],
         "options": {
