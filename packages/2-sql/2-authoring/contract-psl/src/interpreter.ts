@@ -1089,8 +1089,8 @@ export function interpretPslDocumentToSqlContract(
   const modelNames = new Set(models.map((model) => model.name));
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
-  const defaultFunctionRegistry =
-    input.controlMutationDefaults?.defaultFunctionRegistry ?? new Map<string, never>();
+  const defaultFunctionRegistry: ControlMutationDefaultRegistry =
+    input.controlMutationDefaults?.defaultFunctionRegistry ?? new Map();
   const generatorDescriptors = input.controlMutationDefaults?.generatorDescriptors ?? [];
   const generatorDescriptorById = new Map<string, MutationDefaultGeneratorDescriptor>();
   for (const descriptor of generatorDescriptors) {
