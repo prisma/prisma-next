@@ -199,7 +199,7 @@ describe('MongoMigrationPlanner', () => {
       expect(plan.operations).toHaveLength(2);
     });
 
-    it('drops all indexes when collection removed from destination', () => {
+    it('drops all indexes and the collection when collection removed from destination', () => {
       const contract = makeContract({});
       const origin: MongoSchemaIR = {
         collections: {
@@ -210,8 +210,9 @@ describe('MongoMigrationPlanner', () => {
         },
       };
       const plan = planSuccess(planner, contract, origin);
-      expect(plan.operations).toHaveLength(2);
+      expect(plan.operations).toHaveLength(3);
       expect(plan.operations.every((op) => op.operationClass === 'destructive')).toBe(true);
+      expect(plan.operations[2]!.id).toBe('collection.users.drop');
     });
 
     it('handles empty origin (all creates)', () => {
@@ -295,7 +296,7 @@ describe('MongoMigrationPlanner', () => {
       });
       expect(result.kind).toBe('failure');
       if (result.kind !== 'failure') throw new Error('Expected failure');
-      expect(result.conflicts).toHaveLength(2);
+      expect(result.conflicts).toHaveLength(3);
     });
   });
 
