@@ -41,11 +41,6 @@ export type ColumnDescriptor = {
   readonly typeParams?: Record<string, unknown>;
 };
 
-export type PslAttributeNameParts = {
-  readonly namespace: string;
-  readonly name: string;
-};
-
 export function toNamedTypeFieldDescriptor(
   typeRef: string,
   descriptor: Pick<ColumnDescriptor, 'codecId' | 'nativeType'>,
@@ -73,27 +68,19 @@ export function getAuthoringTypeConstructor(
   return isAuthoringTypeConstructorDescriptor(current) ? current : undefined;
 }
 
-export function parsePslAttributeName(attributeName: string): PslAttributeNameParts | undefined {
-  const dotIndex = attributeName.indexOf('.');
-  if (dotIndex <= 0 || dotIndex === attributeName.length - 1) {
-    return undefined;
-  }
-
-  return {
-    namespace: attributeName.slice(0, dotIndex),
-    name: attributeName.slice(dotIndex + 1),
-  };
-}
-
 export function checkUncomposedNamespace(
   attributeName: string,
   composedExtensions: ReadonlySet<string>,
 ): string | undefined {
-  const parts = parsePslAttributeName(attributeName);
-  if (!parts || parts.namespace === 'db') {
+  const dotIndex = attributeName.indexOf('.');
+  if (dotIndex <= 0 || dotIndex === attributeName.length - 1) {
     return undefined;
   }
-  return composedExtensions.has(parts.namespace) ? undefined : parts.namespace;
+  const namespace = attributeName.slice(0, dotIndex);
+  if (namespace === 'db' || composedExtensions.has(namespace)) {
+    return undefined;
+  }
+  return namespace;
 }
 
 /**

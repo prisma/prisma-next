@@ -468,10 +468,11 @@ function parseTypeConstructorCall(
     return undefined;
   }
 
+  // constructorMatch already required `(`; openParen is guaranteed ≥ 0.
   const openParen = value.indexOf('(');
   const closeParen = value.lastIndexOf(')');
 
-  if (openParen < 0 || closeParen !== value.length - 1) {
+  if (closeParen !== value.length - 1) {
     pushDiagnostic(context, {
       code: input.invalidCode,
       message: input.invalidMessage(value),
