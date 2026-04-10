@@ -64,7 +64,6 @@ export function CheckoutForm({ defaultAddress, locations, cartItems }: CheckoutF
       });
 
       if (res.ok) {
-        await fetch('/api/cart', { method: 'DELETE' });
         invalidateCart();
         const order = await res.json();
         router.push(`/orders/${order._id}`);

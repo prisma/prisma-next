@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { clearCart } from '../../../src/data/carts';
 import { createOrder, getUserOrders } from '../../../src/data/orders';
 import { getDb } from '../../../src/db-singleton';
 import { getAuthUserId } from '../../../src/lib/auth';
@@ -23,5 +24,6 @@ export async function POST(req: Request) {
     type: body.type ?? 'home',
     statusHistory: [{ status: 'placed', timestamp: new Date() }],
   });
+  await clearCart(db, userId);
   return NextResponse.json(order, { status: 201 });
 }
