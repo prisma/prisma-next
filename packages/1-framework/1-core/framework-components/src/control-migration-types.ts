@@ -23,8 +23,65 @@ import type { TargetBoundComponentDescriptor } from './framework-components';
  * - 'additive': Adds new structures without modifying existing ones (safe)
  * - 'widening': Relaxes constraints or expands types (generally safe)
  * - 'destructive': Removes or alters existing structures (potentially unsafe)
+ * - 'data': Data transformation operation (e.g., backfill, type conversion)
  */
-export type MigrationOperationClass = 'additive' | 'widening' | 'destructive';
+export type MigrationOperationClass = 'additive' | 'widening' | 'destructive' | 'data';
+
+// ============================================================================
+// Data Transform Operation
+// ============================================================================
+
+/**
+ * A lowered query statement as stored in ops.json.
+ * Contains the SQL string and parameter values — ready for execution.
+ * Lowering from query builder AST to SQL happens at verify time.
+ */
+export interface SerializedQueryPlan {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+}
+
+/**
+ * A data transform operation within a migration edge.
+ *
+ * Data transforms are authored in TypeScript using the query builder,
+ * serialized to JSON ASTs at verification time, and rendered to SQL
+ * by the target adapter at apply time.
+ *
+ * The `name` serves as the invariant identity — it's recorded in the
+ * ledger and used for invariant-aware routing via environment refs.
+ *
+ * In draft state (before verification), `check` and `run` are null.
+ * After verification, they contain the serialized query ASTs.
+ */
+export interface DataTransformOperation extends MigrationPlanOperation {
+  readonly operationClass: 'data';
+  /**
+   * The invariant name for this data transform.
+   * Recorded in the ledger on successful edge completion.
+   * Used by environment refs to declare required invariants.
+   */
+  readonly name: string;
+  /**
+   * Path to the TypeScript source file that produced this operation.
+   * Not part of edgeId computation — for traceability only.
+   */
+  readonly source: string;
+  /**
+   * Serialized check query plan, or a boolean literal.
+   * - SerializedQueryPlan: describes violations; empty result = already applied.
+   * - false: always run (no check).
+   * - true: always skip.
+   * - null: not yet serialized (draft state).
+   */
+  readonly check: SerializedQueryPlan | boolean | null;
+  /**
+   * Serialized run query plans.
+   * - Array of serialized query plans to execute sequentially.
+   * - null: not yet serialized (draft state).
+   */
+  readonly run: readonly SerializedQueryPlan[] | null;
+}
 
 /**
  * Policy defining which operation classes are allowed during a migration.
@@ -36,6 +93,16 @@ export interface MigrationOperationPolicy {
 // ============================================================================
 // Plan Types (Display-Oriented)
 // ============================================================================
+
+/**
+ * Minimal shape for operation descriptors at the framework level.
+ * Targets produce richer types; this captures just enough for the
+ * framework to scaffold migration.ts files and pass descriptors through.
+ */
+export interface OperationDescriptor {
+  readonly kind: string;
+  readonly [key: string]: unknown;
+}
 
 /**
  * A single migration operation for display purposes.
@@ -273,4 +340,43 @@ export interface TargetMigrationsCapability<
     contract: Contract | null,
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>,
   ): unknown;
+
+  /**
+   * Plans a migration using the descriptor-based planner.
+   * Returns operation descriptors and whether data migration is needed.
+   * The caller decides whether to resolve immediately or scaffold migration.ts.
+   */
+  planWithDescriptors?(context: {
+    readonly fromContract: Contract | null;
+    readonly toContract: Contract;
+    readonly frameworkComponents?: ReadonlyArray<
+      TargetBoundComponentDescriptor<TFamilyId, TTargetId>
+    >;
+  }):
+    | {
+        readonly ok: true;
+        readonly descriptors: readonly OperationDescriptor[];
+        readonly needsDataMigration: boolean;
+      }
+    | {
+        readonly ok: false;
+        readonly conflicts: readonly MigrationPlannerConflict[];
+      };
+
+  /**
+   * Resolves operation descriptors into target-specific migration plan operations
+   * with SQL/DDL, prechecks, and postchecks. Called by `migration verify` to
+   * serialize migration.ts into ops.json.
+   */
+  resolveDescriptors?(
+    descriptors: readonly OperationDescriptor[],
+    context: {
+      readonly fromContract: Contract | null;
+      readonly toContract: Contract;
+      readonly schemaName?: string;
+      readonly frameworkComponents?: ReadonlyArray<
+        TargetBoundComponentDescriptor<TFamilyId, TTargetId>
+      >;
+    },
+  ): readonly MigrationPlanOperation[];
 }

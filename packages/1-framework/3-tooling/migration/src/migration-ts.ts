@@ -1,0 +1,199 @@
+/**
+ * Utilities for scaffolding and evaluating migration.ts files.
+ *
+ * - scaffoldMigrationTs: writes a migration.ts file with boilerplate
+ * - evaluateMigrationTs: loads migration.ts via native Node import, returns descriptors
+ *
+ * Shared by migration plan (scaffold), migration new (scaffold), and
+ * migration verify (evaluate).
+ */
+
+import { stat, writeFile } from 'node:fs/promises';
+import type { OperationDescriptor } from '@prisma-next/framework-components/control';
+import { join, relative, resolve } from 'pathe';
+
+const MIGRATION_TS_FILE = 'migration.ts';
+
+/**
+ * Options for scaffolding a migration.ts file.
+ */
+export interface ScaffoldOptions {
+  /** Operation descriptors to serialize as builder calls. */
+  readonly descriptors?: readonly OperationDescriptor[];
+  /** Absolute path to contract.json — used to derive contract.d.ts import for typed builders. */
+  readonly contractJsonPath?: string;
+}
+
+function serializeQueryInput(input: unknown): string {
+  if (typeof input === 'boolean') return String(input);
+  if (typeof input === 'symbol') return 'TODO /* fill in using db.sql.from(...) */';
+  if (input === null || input === undefined) return 'null';
+  if (Array.isArray(input)) {
+    if (input.length === 0) return '[]';
+    if (input.every((item) => typeof item === 'symbol'))
+      return '[TODO /* fill in using db.sql.from(...) */]';
+    return `[${input.map(serializeQueryInput).join(', ')}]`;
+  }
+  return JSON.stringify(input);
+}
+
+function descriptorToBuilderCall(desc: OperationDescriptor): string {
+  switch (desc.kind) {
+    case 'createTable':
+      return `createTable(${JSON.stringify(desc['table'])})`;
+    case 'dropTable':
+      return `dropTable(${JSON.stringify(desc['table'])})`;
+    case 'addColumn': {
+      const args = [JSON.stringify(desc['table']), JSON.stringify(desc['column'])];
+      if (desc['overrides']) {
+        args.push(JSON.stringify(desc['overrides']));
+      }
+      return `addColumn(${args.join(', ')})`;
+    }
+    case 'dropColumn':
+      return `dropColumn(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
+    case 'alterColumnType': {
+      const opts: Record<string, unknown> = {};
+      if (desc['using']) opts['using'] = desc['using'];
+      if (desc['toType']) opts['toType'] = desc['toType'];
+      const hasOpts = Object.keys(opts).length > 0;
+      return hasOpts
+        ? `alterColumnType(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])}, ${JSON.stringify(opts)})`
+        : `alterColumnType(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
+    }
+    case 'setNotNull':
+      return `setNotNull(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
+    case 'dropNotNull':
+      return `dropNotNull(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
+    case 'setDefault':
+      return `setDefault(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
+    case 'dropDefault':
+      return `dropDefault(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['column'])})`;
+    case 'addPrimaryKey':
+      return `addPrimaryKey(${JSON.stringify(desc['table'])})`;
+    case 'addUnique':
+      return `addUnique(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['columns'])})`;
+    case 'addForeignKey':
+      return `addForeignKey(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['columns'])})`;
+    case 'dropConstraint':
+      return `dropConstraint(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['constraintName'])})`;
+    case 'createIndex':
+      return `createIndex(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['columns'])})`;
+    case 'dropIndex':
+      return `dropIndex(${JSON.stringify(desc['table'])}, ${JSON.stringify(desc['indexName'])})`;
+    case 'createEnumType':
+      return desc['values']
+        ? `createEnumType(${JSON.stringify(desc['typeName'])}, ${JSON.stringify(desc['values'])})`
+        : `createEnumType(${JSON.stringify(desc['typeName'])})`;
+    case 'addEnumValues':
+      return `addEnumValues(${JSON.stringify(desc['typeName'])}, ${JSON.stringify(desc['values'])})`;
+    case 'dropEnumType':
+      return `dropEnumType(${JSON.stringify(desc['typeName'])})`;
+    case 'renameType':
+      return `renameType(${JSON.stringify(desc['fromName'])}, ${JSON.stringify(desc['toName'])})`;
+    case 'createDependency':
+      return `createDependency(${JSON.stringify(desc['dependencyId'])})`;
+    case 'dataTransform':
+      return `dataTransform(${JSON.stringify(desc['name'])}, {\n    check: ${serializeQueryInput(desc['check'])},\n    run: ${serializeQueryInput(desc['run'])},\n  })`;
+    default:
+      throw new Error(`Unknown descriptor kind: ${desc.kind}`);
+  }
+}
+
+/**
+ * Scaffolds a migration.ts file in the given package directory.
+ * Serializes operation descriptors as builder calls that the user can edit.
+ * On verify, this file is re-evaluated to produce the final ops.
+ */
+export async function scaffoldMigrationTs(
+  packageDir: string,
+  options: ScaffoldOptions = {},
+): Promise<void> {
+  const filePath = join(packageDir, MIGRATION_TS_FILE);
+
+  const descriptors = options.descriptors ?? [];
+  const hasDataTransform = descriptors.some((d) => d.kind === 'dataTransform');
+
+  const lines: string[] = [];
+
+  if (hasDataTransform && options.contractJsonPath) {
+    const relativeContractDts = relative(packageDir, options.contractJsonPath).replace(
+      /\.json$/,
+      '.d',
+    );
+    lines.push(`import type { Contract } from "${relativeContractDts}"`);
+    lines.push(`import { createBuilders } from "@prisma-next/target-postgres/migration-builders"`);
+    lines.push('');
+    const importList = [...new Set(descriptors.map((d) => d.kind))];
+    importList.push('TODO');
+    lines.push(`const { ${importList.join(', ')} } = createBuilders<Contract>()`);
+  } else {
+    const importList = [...new Set(descriptors.map((d) => d.kind))];
+    if (importList.length === 0) {
+      importList.push('createTable');
+    }
+    if (hasDataTransform) {
+      importList.push('TODO');
+    }
+    lines.push(
+      `import { ${importList.join(', ')} } from "@prisma-next/target-postgres/migration-builders"`,
+    );
+  }
+
+  const calls = descriptors.map((d) => `  ${descriptorToBuilderCall(d)},`).join('\n');
+  const body = calls.length > 0 ? `\n${calls}\n` : '';
+
+  lines.push('');
+  lines.push(`export default () => [${body}]`);
+  lines.push('');
+
+  await writeFile(filePath, lines.join('\n'));
+}
+
+/**
+ * Checks whether a migration.ts file exists in the package directory.
+ */
+export async function hasMigrationTs(packageDir: string): Promise<boolean> {
+  try {
+    const s = await stat(join(packageDir, MIGRATION_TS_FILE));
+    return s.isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Evaluates a migration.ts file by loading it via native Node import.
+ * Returns the result of calling the default export (expected to be a
+ * function returning an array of operation descriptors).
+ *
+ * Requires Node ≥24 for native TypeScript support.
+ */
+export async function evaluateMigrationTs(packageDir: string): Promise<readonly unknown[]> {
+  const filePath = resolve(join(packageDir, MIGRATION_TS_FILE));
+
+  try {
+    await stat(filePath);
+  } catch {
+    throw new Error(`migration.ts not found at "${filePath}"`);
+  }
+
+  // Use native Node TS import (Node ≥24, stable type stripping)
+  const mod = (await import(filePath)) as { default?: unknown };
+
+  if (typeof mod.default !== 'function') {
+    throw new Error(
+      `migration.ts must export a default function returning an operation list. Got: ${typeof mod.default}`,
+    );
+  }
+
+  const result: unknown = mod.default();
+
+  if (!Array.isArray(result)) {
+    throw new Error(
+      `migration.ts default export must return an array of operations. Got: ${typeof result}`,
+    );
+  }
+
+  return result;
+}

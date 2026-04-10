@@ -15,6 +15,7 @@ export type {
   ControlTargetInstance,
 } from '../control-instances';
 export type {
+  DataTransformOperation,
   MigrationOperationClass,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -29,10 +30,14 @@ export type {
   MigrationRunnerFailure,
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
+  OperationDescriptor,
+  SerializedQueryPlan,
   TargetMigrationsCapability,
 } from '../control-migration-types';
 export type {
+  BaseSchemaIssue,
   EmitContractResult,
+  EnumValuesChangedIssue,
   IntrospectSchemaResult,
   OperationContext,
   SchemaIssue,

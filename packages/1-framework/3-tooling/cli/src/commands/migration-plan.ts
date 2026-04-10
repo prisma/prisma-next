@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import type { OperationDescriptor } from '@prisma-next/framework-components/control';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration } from '@prisma-next/migration-tools/dag';
@@ -10,7 +10,7 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
-import { extractOperationStatements } from '../control-api/operations/extract-operation-statements';
+import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import {
   type CliErrorConflict,
   type CliStructuredError,
@@ -55,7 +55,7 @@ export interface MigrationPlanResult {
     readonly label: string;
     readonly operationClass: string;
   }[];
-  readonly sql?: readonly string[] | undefined;
+  readonly sql?: readonly string[];
   readonly summary: string;
   readonly timings: {
     readonly total: number;

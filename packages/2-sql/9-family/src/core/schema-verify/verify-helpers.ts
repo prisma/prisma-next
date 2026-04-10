@@ -493,6 +493,7 @@ export function verifyDatabaseDependencies(
     if (!isSatisfied) {
       const depIssue: SchemaIssue = {
         kind: 'dependency_missing',
+        dependencyId: dependency.id,
         message: `Dependency "${dependency.id}" is missing from database`,
       };
       issues.push(depIssue);

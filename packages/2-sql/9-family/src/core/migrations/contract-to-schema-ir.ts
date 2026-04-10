@@ -260,5 +260,10 @@ function deriveAnnotations(
   annotationNamespace: string,
 ): SqlAnnotations | undefined {
   if (!storage.types || Object.keys(storage.types).length === 0) return undefined;
-  return { [annotationNamespace]: { storageTypes: storage.types } };
+  // Re-key by nativeType to match the structure produced by introspection
+  const byNativeType: Record<string, (typeof storage.types)[string]> = {};
+  for (const typeInstance of Object.values(storage.types)) {
+    byNativeType[typeInstance.nativeType] = typeInstance;
+  }
+  return { [annotationNamespace]: { storageTypes: byNativeType } };
 }

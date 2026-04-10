@@ -8,6 +8,7 @@ export default defineConfig({
     'exports/dag': 'src/exports/dag.ts',
     'exports/refs': 'src/exports/refs.ts',
     'exports/constants': 'src/exports/constants.ts',
+    'exports/migration-ts': 'src/exports/migration-ts.ts',
   },
   exports: { enabled: false },
 });
