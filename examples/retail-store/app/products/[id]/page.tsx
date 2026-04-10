@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { AddToCartButton } from '../../../src/components/add-to-cart-button';
 import { Badge } from '../../../src/components/ui/badge';
 import { Card, CardContent, CardHeader } from '../../../src/components/ui/card';
 import { findProductById } from '../../../src/data/products';
@@ -39,6 +40,18 @@ export default async function ProductDetail({ params }: { params: Promise<{ id: 
           <div className="text-2xl font-bold text-accent">
             ${Number(product.price.amount).toFixed(2)} {product.price.currency}
           </div>
+          <AddToCartButton
+            product={{
+              _id: String(product._id),
+              name: product.name as string,
+              brand: product.brand as string,
+              code: product.code as string,
+              price: {
+                amount: Number(product.price.amount),
+                currency: product.price.currency as string,
+              },
+            }}
+          />
           <p className="text-xs text-muted">Code: {product.code}</p>
         </CardContent>
       </Card>
