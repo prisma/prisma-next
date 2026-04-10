@@ -49,10 +49,9 @@ export async function updateOrderStatus(
   orderId: string,
   entry: { status: string; timestamp: Date },
 ) {
-  const oid = orderId instanceof ObjectId ? orderId : new ObjectId(orderId as string);
   const plan = db.raw
     .collection('orders')
-    .updateOne({ _id: oid }, { $push: { statusHistory: entry } })
+    .updateOne({ _id: new ObjectId(orderId) }, { $push: { statusHistory: entry } })
     .build();
   for await (const _ of db.runtime.execute(plan)) {
     /* consume */
