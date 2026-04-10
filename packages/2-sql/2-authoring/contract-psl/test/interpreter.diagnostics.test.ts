@@ -472,4 +472,114 @@ model User {
       ]),
     );
   });
+
+  it('does not report db.* constructors as uncomposed namespace', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Short = String @db.VarChar(35)
+}
+
+model User {
+  id Int @id
+  short Short
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: [],
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.storage.types?.Short).toBeDefined();
+  });
+
+  it('surfaces value-object field errors through the diagnostics gate', () => {
+    const document = parsePslDocument({
+      schema: `type Address {
+  street String
+  bogus  Missing
+}
+
+model User {
+  id      Int     @id
+  address Address
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: [],
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+          sourceId: 'schema.prisma',
+        }),
+      ]),
+    );
+  });
+
+  it('emits distinct diagnostic codes for malformed versus uncomposed constructor calls', () => {
+    const malformed = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  name sql.String(
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const malformedResult = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document: malformed,
+      composedExtensionPacks: [],
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(malformedResult.ok).toBe(false);
+    if (malformedResult.ok) return;
+    const malformedCodes = malformedResult.failure.diagnostics.map((d) => d.code);
+    expect(malformedCodes).not.toContain('PSL_EXTENSION_NAMESPACE_NOT_COMPOSED');
+
+    const uncomposed = parsePslDocument({
+      schema: `model User {
+  id        Int @id
+  embedding pgvector.Vector(1536)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const uncomposedResult = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document: uncomposed,
+      composedExtensionPacks: [],
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(uncomposedResult.ok).toBe(false);
+    if (uncomposedResult.ok) return;
+    expect(uncomposedResult.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+          data: { namespace: 'pgvector', suggestedPack: 'pgvector' },
+        }),
+      ]),
+    );
+  });
 });
