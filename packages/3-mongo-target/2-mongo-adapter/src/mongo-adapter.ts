@@ -1,3 +1,4 @@
+import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
 import type {
   MongoQueryPlan,
@@ -20,49 +21,58 @@ import {
 import { lowerFilter, lowerPipeline, lowerStage } from './lowering';
 import { resolveValue } from './resolve-value';
 
-function resolveDocument(expr: MongoExpr): Document {
-  const result: Record<string, unknown> = {};
-  for (const [key, val] of Object.entries(expr)) {
-    result[key] = resolveValue(val);
-  }
-  return result;
-}
-
 function isUpdatePipeline(
   update: MongoUpdateSpec,
 ): update is ReadonlyArray<MongoUpdatePipelineStage> {
   return Array.isArray(update);
 }
 
-function lowerUpdate(update: MongoUpdateSpec): Document | ReadonlyArray<Document> {
-  if (isUpdatePipeline(update)) {
-    return update.map((stage) => lowerStage(stage));
-  }
-  return resolveDocument(update);
-}
-
 class MongoAdapterImpl implements MongoAdapter {
+  readonly #codecs: MongoCodecRegistry | undefined;
+
+  constructor(codecs?: MongoCodecRegistry) {
+    this.#codecs = codecs;
+  }
+
+  #resolveDocument(expr: MongoExpr): Document {
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(expr)) {
+      result[key] = resolveValue(val, this.#codecs);
+    }
+    return result;
+  }
+
+  #lowerUpdate(update: MongoUpdateSpec): Document | ReadonlyArray<Document> {
+    if (isUpdatePipeline(update)) {
+      return update.map((stage) => lowerStage(stage));
+    }
+    return this.#resolveDocument(update);
+  }
+
   lower(plan: MongoQueryPlan): AnyMongoWireCommand {
     const { command } = plan;
     switch (command.kind) {
       case 'insertOne':
-        return new InsertOneWireCommand(command.collection, resolveDocument(command.document));
+        return new InsertOneWireCommand(
+          command.collection,
+          this.#resolveDocument(command.document),
+        );
       case 'updateOne':
         return new UpdateOneWireCommand(
           command.collection,
           lowerFilter(command.filter),
-          lowerUpdate(command.update),
+          this.#lowerUpdate(command.update),
         );
       case 'insertMany':
         return new InsertManyWireCommand(
           command.collection,
-          command.documents.map((doc) => resolveDocument(doc)),
+          command.documents.map((doc) => this.#resolveDocument(doc)),
         );
       case 'updateMany':
         return new UpdateManyWireCommand(
           command.collection,
           lowerFilter(command.filter),
-          lowerUpdate(command.update),
+          this.#lowerUpdate(command.update),
         );
       case 'deleteOne':
         return new DeleteOneWireCommand(command.collection, lowerFilter(command.filter));
@@ -72,7 +82,7 @@ class MongoAdapterImpl implements MongoAdapter {
         return new FindOneAndUpdateWireCommand(
           command.collection,
           lowerFilter(command.filter),
-          lowerUpdate(command.update),
+          this.#lowerUpdate(command.update),
           command.upsert,
         );
       case 'findOneAndDelete':
@@ -111,6 +121,32 @@ class MongoAdapterImpl implements MongoAdapter {
   }
 }
 
-export function createMongoAdapter(): MongoAdapter {
-  return new MongoAdapterImpl();
+import {
+  mongoBooleanCodec,
+  mongoDateCodec,
+  mongoDoubleCodec,
+  mongoInt32Codec,
+  mongoObjectIdCodec,
+  mongoStringCodec,
+  mongoVectorCodec,
+} from './core/codecs';
+
+function defaultCodecRegistry(): MongoCodecRegistry {
+  const registry = createMongoCodecRegistry();
+  for (const codec of [
+    mongoObjectIdCodec,
+    mongoStringCodec,
+    mongoDoubleCodec,
+    mongoInt32Codec,
+    mongoBooleanCodec,
+    mongoDateCodec,
+    mongoVectorCodec,
+  ]) {
+    registry.register(codec);
+  }
+  return registry;
+}
+
+export function createMongoAdapter(codecs?: MongoCodecRegistry): MongoAdapter {
+  return new MongoAdapterImpl(codecs ?? defaultCodecRegistry());
 }
