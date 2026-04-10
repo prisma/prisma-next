@@ -33,15 +33,20 @@ function runnerFailure(
   });
 }
 
+function isMongoControlDriverInstance(
+  driver: ControlDriverInstance<'mongo', 'mongo'>,
+): driver is MongoControlDriverInstance {
+  return 'db' in driver && driver.db != null;
+}
+
 function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
-  const mongoDriver = driver as MongoControlDriverInstance;
-  if (!mongoDriver.db) {
+  if (!isMongoControlDriverInstance(driver)) {
     throw new Error(
       'Mongo control driver does not expose a db property. ' +
-        'Use createMongoControlDriver() from @prisma-next/adapter-mongo/control.',
+        'Use mongoControlDriver.create() from `@prisma-next/driver-mongo/control`.',
     );
   }
-  return mongoDriver.db;
+  return driver.db;
 }
 
 export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
@@ -132,15 +137,37 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
     }
 
     const destination = options.plan.destination;
+    const destinationProfileHash = destination.profileHash ?? destination.storageHash;
+
+    if (
+      operationsExecuted === 0 &&
+      existingMarker?.storageHash === destination.storageHash &&
+      existingMarker.profileHash === destinationProfileHash
+    ) {
+      return ok({ operationsPlanned: operations.length, operationsExecuted });
+    }
+
     if (existingMarker) {
-      await updateMarker(db, existingMarker.storageHash, {
+      const updated = await updateMarker(db, existingMarker.storageHash, {
         storageHash: destination.storageHash,
-        profileHash: destination.profileHash ?? destination.storageHash,
+        profileHash: destinationProfileHash,
       });
+      if (!updated) {
+        return runnerFailure(
+          'MARKER_CAS_FAILURE',
+          'Marker was modified by another process during migration execution.',
+          {
+            meta: {
+              expectedStorageHash: existingMarker.storageHash,
+              destinationStorageHash: destination.storageHash,
+            },
+          },
+        );
+      }
     } else {
       await initMarker(db, {
         storageHash: destination.storageHash,
-        profileHash: destination.profileHash ?? destination.storageHash,
+        profileHash: destinationProfileHash,
       });
     }
 
