@@ -44,10 +44,9 @@ export async function addToCart(
     image: { url: string };
   },
 ) {
-  const oid = userId instanceof ObjectId ? userId : new ObjectId(userId as string);
   const plan = db.raw
     .collection('carts')
-    .updateOne({ userId: oid }, { $push: { items: item } })
+    .updateOne({ userId: new ObjectId(userId) }, { $push: { items: item } })
     .build();
   for await (const _ of db.runtime.execute(plan)) {
     /* consume */
@@ -55,10 +54,9 @@ export async function addToCart(
 }
 
 export async function removeFromCart(db: Db, userId: string, productId: string) {
-  const oid = userId instanceof ObjectId ? userId : new ObjectId(userId as string);
   const plan = db.raw
     .collection('carts')
-    .updateOne({ userId: oid }, { $pull: { items: { productId } } })
+    .updateOne({ userId: new ObjectId(userId) }, { $pull: { items: { productId } } })
     .build();
   for await (const _ of db.runtime.execute(plan)) {
     /* consume */
