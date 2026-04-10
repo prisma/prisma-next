@@ -9,8 +9,8 @@ interface AddToCartButtonProps {
     _id: string;
     name: string;
     brand: string;
-    code: string;
     price: { amount: number; currency: string };
+    image: { url: string };
   };
 }
 
@@ -30,7 +30,7 @@ export function AddToCartButton({ product }: AddToCartButtonProps) {
           brand: product.brand,
           amount: 1,
           price: product.price,
-          image: { url: `/images/products/${product.code.toLowerCase()}.jpg` },
+          image: product.image,
         }),
       });
       invalidateCart();

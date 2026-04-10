@@ -45,11 +45,11 @@ export default async function ProductDetail({ params }: { params: Promise<{ id: 
               _id: String(product._id),
               name: product.name as string,
               brand: product.brand as string,
-              code: product.code as string,
               price: {
                 amount: Number(product.price.amount),
                 currency: product.price.currency as string,
               },
+              image: { url: product.image.url as string },
             }}
           />
           <p className="text-xs text-muted">Code: {product.code}</p>
