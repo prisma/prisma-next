@@ -53,6 +53,7 @@ import {
   checkUncomposedNamespace,
   getAuthoringTypeConstructor,
   instantiatePslTypeConstructor,
+  reportUncomposedNamespace,
   resolveDbNativeTypeAttribute,
   resolveFieldTypeDescriptor,
   resolvePslTypeConstructorDescriptor,
@@ -235,11 +236,12 @@ function validateNamedTypeAttributes(input: {
 
     const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions);
     if (uncomposedNamespace) {
-      input.diagnostics.push({
-        code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-        message: `Attribute "@${attribute.name}" uses unrecognized namespace "${uncomposedNamespace}". Add extension pack "${uncomposedNamespace}" to extensionPacks in prisma-next.config.ts.`,
+      reportUncomposedNamespace({
+        subjectLabel: `Attribute "@${attribute.name}"`,
+        namespace: uncomposedNamespace,
         sourceId: input.sourceId,
         span: attribute.span,
+        diagnostics: input.diagnostics,
       });
       hasUnsupportedNamedTypeAttribute = true;
       continue;
@@ -582,11 +584,12 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       input.composedExtensions,
     );
     if (uncomposedNamespace) {
-      diagnostics.push({
-        code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-        message: `Attribute "@@${modelAttribute.name}" uses unrecognized namespace "${uncomposedNamespace}". Add extension pack "${uncomposedNamespace}" to extensionPacks in prisma-next.config.ts.`,
+      reportUncomposedNamespace({
+        subjectLabel: `Attribute "@@${modelAttribute.name}"`,
+        namespace: uncomposedNamespace,
         sourceId,
         span: modelAttribute.span,
+        diagnostics,
       });
       continue;
     }

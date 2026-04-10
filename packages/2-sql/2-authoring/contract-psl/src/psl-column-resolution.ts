@@ -96,6 +96,26 @@ export function checkUncomposedNamespace(
   return composedExtensions.has(parts.namespace) ? undefined : parts.namespace;
 }
 
+/**
+ * Pushes the canonical `PSL_EXTENSION_NAMESPACE_NOT_COMPOSED` diagnostic for a
+ * subject (attribute, model attribute, or type constructor) that references an
+ * extension namespace which is not composed in the current contract.
+ */
+export function reportUncomposedNamespace(input: {
+  readonly subjectLabel: string;
+  readonly namespace: string;
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): void {
+  input.diagnostics.push({
+    code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+    message: `${input.subjectLabel} uses unrecognized namespace "${input.namespace}". Add extension pack "${input.namespace}" to extensionPacks in prisma-next.config.ts.`,
+    sourceId: input.sourceId,
+    span: input.span,
+  });
+}
+
 const INVALID_AUTHORING_ARGUMENT = Symbol('invalidAuthoringArgument');
 
 type ParsedPslLiteral =
@@ -637,11 +657,12 @@ export function resolvePslTypeConstructorDescriptor(input: {
     namespace !== input.targetId &&
     !input.composedExtensions.has(namespace)
   ) {
-    input.diagnostics.push({
-      code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-      message: `Type constructor "${input.call.path.join('.')}" uses unrecognized namespace "${namespace}". Add extension pack "${namespace}" to extensionPacks in prisma-next.config.ts.`,
+    reportUncomposedNamespace({
+      subjectLabel: `Type constructor "${input.call.path.join('.')}"`,
+      namespace,
       sourceId: input.sourceId,
       span: input.call.span,
+      diagnostics: input.diagnostics,
     });
     return undefined;
   }

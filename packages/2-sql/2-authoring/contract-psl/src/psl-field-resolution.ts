@@ -17,6 +17,7 @@ import type { ColumnDescriptor } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
   lowerDefaultForField,
+  reportUncomposedNamespace,
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
 
@@ -97,11 +98,12 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
 
       const uncomposedNamespace = checkUncomposedNamespace(attribute.name, composedExtensions);
       if (uncomposedNamespace) {
-        diagnostics.push({
-          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-          message: `Attribute "@${attribute.name}" uses unrecognized namespace "${uncomposedNamespace}". Add extension pack "${uncomposedNamespace}" to extensionPacks in prisma-next.config.ts.`,
+        reportUncomposedNamespace({
+          subjectLabel: `Attribute "@${attribute.name}"`,
+          namespace: uncomposedNamespace,
           sourceId,
           span: attribute.span,
+          diagnostics,
         });
         continue;
       }
