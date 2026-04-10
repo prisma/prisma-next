@@ -483,23 +483,17 @@ describe('validateMongoContract()', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
         indexes: [
-          { keys: [{ field: 'name', direction: 1 }] },
-          { keys: [{ field: 'email', direction: 1 }], unique: true },
+          { fields: { name: 1 } },
+          { fields: { email: 1 }, options: { unique: true } },
           {
-            keys: [{ field: 'createdAt', direction: -1 }],
-            sparse: true,
-            expireAfterSeconds: 3600,
+            fields: { createdAt: -1 },
+            options: { sparse: true, expireAfterSeconds: 3600 },
           },
-          {
-            keys: [
-              { field: 'a', direction: 1 },
-              { field: 'b', direction: -1 },
-            ],
-          },
-          { keys: [{ field: 'description', direction: 'text' }] },
-          { keys: [{ field: 'location', direction: '2dsphere' }] },
-          { keys: [{ field: 'coords', direction: '2d' }] },
-          { keys: [{ field: 'hash', direction: 'hashed' }] },
+          { fields: { a: 1, b: -1 } },
+          { fields: { description: 'text' } },
+          { fields: { location: '2dsphere' } },
+          { fields: { coords: '2d' } },
+          { fields: { hash: 'hashed' } },
         ],
       } as typeof json.storage.collections.items;
       const result = validateMongoContract(json);
@@ -511,8 +505,8 @@ describe('validateMongoContract()', () => {
       json.storage.collections.items = {
         indexes: [
           {
-            keys: [{ field: 'status', direction: 1 }],
-            partialFilterExpression: { status: { $eq: 'active' } },
+            fields: { status: 1 },
+            options: { partialFilterExpression: { status: { $eq: 'active' } } },
           },
         ],
       } as typeof json.storage.collections.items;
@@ -520,26 +514,26 @@ describe('validateMongoContract()', () => {
       expect(result.contract).toBeDefined();
     });
 
-    it('rejects index with empty keys array', () => {
+    it('rejects index with empty fields', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ keys: [] }],
+        indexes: [{ fields: {} }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
-    it('rejects index key with invalid direction', () => {
+    it('rejects index field with invalid direction', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ keys: [{ field: 'name', direction: 'invalid' }] }],
+        indexes: [{ fields: { name: 'invalid' } }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
-    it('rejects index key missing field', () => {
+    it('rejects index missing fields', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ keys: [{ direction: 1 }] }],
+        indexes: [{}],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
@@ -547,7 +541,7 @@ describe('validateMongoContract()', () => {
     it('rejects index with extra properties', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ keys: [{ field: 'name', direction: 1 }], extra: true }],
+        indexes: [{ fields: { name: 1 }, extra: true }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
@@ -555,7 +549,7 @@ describe('validateMongoContract()', () => {
     it('rejects collection with extra properties', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ keys: [{ field: 'name', direction: 1 }] }],
+        indexes: [{ fields: { name: 1 } }],
         extra: true,
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();

@@ -132,38 +132,6 @@ const CollationSchema = type({
   'normalization?': 'boolean',
 });
 
-const WildcardProjectionSchema = type({
-  '+': 'reject',
-  '[string]': '0 | 1',
-});
-
-const IndexOptionsSchema = type({
-  '+': 'reject',
-  'unique?': 'boolean',
-  'name?': 'string',
-  'partialFilterExpression?': MongoJsonObjectSchema,
-  'sparse?': 'boolean',
-  'expireAfterSeconds?': 'number',
-  'weights?': NumberRecordSchema,
-  'default_language?': 'string',
-  'language_override?': 'string',
-  'textIndexVersion?': 'number',
-  '2dsphereIndexVersion?': 'number',
-  'bits?': 'number',
-  'min?': 'number',
-  'max?': 'number',
-  'bucketSize?': 'number',
-  'hidden?': 'boolean',
-  'collation?': CollationSchema,
-  'wildcardProjection?': WildcardProjectionSchema,
-});
-
-const IndexSchema = type({
-  '+': 'reject',
-  fields: IndexFieldsSchema,
-  'options?': IndexOptionsSchema,
-});
-
 const IndexOptionDefaultsSchema = type({
   '+': 'reject',
   'storageEngine?': MongoJsonObjectSchema,
@@ -240,24 +208,41 @@ const ModelDefinitionSchema = type({
   'owner?': 'string',
 });
 
-const MongoIndexKeySchema = type({
+const WildcardProjectionSchema = type({
   '+': 'reject',
-  field: 'string',
-  direction: '1 | -1 | "text" | "2dsphere" | "2d" | "hashed"',
+  '[string]': '0 | 1',
 });
 
-const MongoStorageIndexSchema = type({
+const IndexOptionsSchema = type({
   '+': 'reject',
-  keys: MongoIndexKeySchema.array().atLeastLength(1),
   'unique?': 'boolean',
+  'name?': 'string',
+  'partialFilterExpression?': MongoJsonObjectSchema,
   'sparse?': 'boolean',
   'expireAfterSeconds?': 'number',
-  'partialFilterExpression?': 'Record<string, unknown>',
+  'weights?': NumberRecordSchema,
+  'default_language?': 'string',
+  'language_override?': 'string',
+  'textIndexVersion?': 'number',
+  '2dsphereIndexVersion?': 'number',
+  'bits?': 'number',
+  'min?': 'number',
+  'max?': 'number',
+  'bucketSize?': 'number',
+  'hidden?': 'boolean',
+  'collation?': CollationSchema,
+  'wildcardProjection?': WildcardProjectionSchema,
+});
+
+const IndexSchema = type({
+  '+': 'reject',
+  fields: IndexFieldsSchema,
+  'options?': IndexOptionsSchema,
 });
 
 const StorageCollectionSchema = type({
   '+': 'reject',
-  'indexes?': MongoStorageIndexSchema.array(),
+  'indexes?': IndexSchema.array(),
   'options?': CollectionOptionsSchema,
 });
 

@@ -1,7 +1,7 @@
 import type {
   MongoContract,
+  MongoIndex,
   MongoStorageCollection,
-  MongoStorageIndex,
 } from '@prisma-next/mongo-contract';
 import {
   MongoSchemaCollection,
@@ -9,13 +9,19 @@ import {
   type MongoSchemaIR,
 } from '@prisma-next/mongo-schema-ir';
 
-function convertIndex(index: MongoStorageIndex): MongoSchemaIndex {
+function convertIndex(index: MongoIndex): MongoSchemaIndex {
+  const keys = Object.entries(index.fields).map(([field, direction]) => ({
+    field,
+    direction,
+  }));
   return new MongoSchemaIndex({
-    keys: index.keys,
-    unique: index.unique,
-    sparse: index.sparse,
-    expireAfterSeconds: index.expireAfterSeconds,
-    partialFilterExpression: index.partialFilterExpression,
+    keys,
+    unique: index.options?.unique,
+    sparse: index.options?.sparse,
+    expireAfterSeconds: index.options?.expireAfterSeconds,
+    partialFilterExpression: index.options?.partialFilterExpression as
+      | Record<string, unknown>
+      | undefined,
   });
 }
 
