@@ -22,6 +22,8 @@ import {
   type MongoIndexOptions,
   type MongoStorage,
   type MongoStorageCollection,
+  type MongoStorageCollectionOptions,
+  type MongoStorageIndex,
   type MongoTypeMaps,
   validateMongoContract,
 } from '@prisma-next/mongo-contract';
@@ -1192,6 +1194,35 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function toStorageIndex(index: MongoIndex): MongoStorageIndex {
+  const keys = Object.entries(index.fields).map(([field, direction]) => ({
+    field,
+    direction,
+  }));
+  const result: Record<string, unknown> = { keys };
+  if (index.options) {
+    for (const [key, value] of Object.entries(index.options)) {
+      if (value !== undefined) {
+        result[key] = value;
+      }
+    }
+  }
+  return result as unknown as MongoStorageIndex;
+}
+
+function toStorageCollectionOptions(opts: MongoCollectionOptions): MongoStorageCollectionOptions {
+  const result: Record<string, unknown> = {};
+  if (opts.capped) {
+    result['capped'] = { size: opts.size ?? 0, ...(opts.max != null ? { max: opts.max } : {}) };
+  }
+  if (opts.timeseries) result['timeseries'] = opts.timeseries;
+  if (opts.collation) result['collation'] = opts.collation;
+  if (opts.changeStreamPreAndPostImages)
+    result['changeStreamPreAndPostImages'] = opts.changeStreamPreAndPostImages;
+  if (opts.clusteredIndex) result['clusteredIndex'] = { name: opts.clusteredIndex.name };
+  return result as unknown as MongoStorageCollectionOptions;
+}
+
 function buildCollections(
   models: Record<string, AnyModelBuilder> | undefined,
 ): Record<string, MongoStorageCollection> {
@@ -1236,19 +1267,22 @@ function buildCollections(
       declaredIndexOwners.set(collectionIndexKey, modelBuilder.__name);
     }
 
+    const storageIndexes = (modelBuilder.__indexes ?? []).map(toStorageIndex);
+    const storageOptions = modelBuilder.__collectionOptions
+      ? toStorageCollectionOptions(modelBuilder.__collectionOptions)
+      : undefined;
+
     collections[modelBuilder.__collection] =
-      modelBuilder.__indexes && modelBuilder.__indexes.length > 0
+      storageIndexes.length > 0
         ? {
             ...existingCollection,
-            indexes: [...existingIndexes, ...modelBuilder.__indexes],
-            ...(modelBuilder.__collectionOptions
-              ? { options: modelBuilder.__collectionOptions }
-              : {}),
+            indexes: [...existingIndexes, ...storageIndexes],
+            ...(storageOptions ? { options: storageOptions } : {}),
           }
-        : modelBuilder.__collectionOptions
+        : storageOptions
           ? {
               ...existingCollection,
-              options: modelBuilder.__collectionOptions,
+              options: storageOptions,
             }
           : existingCollection;
   }

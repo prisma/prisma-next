@@ -366,7 +366,7 @@ function collectIndexes(
     if (langOverride)
       index['language_override'] = langOverride.replace(/^["']/, '').replace(/["']$/, '');
 
-    indexes.push(index as MongoStorageIndex);
+    indexes.push(index as unknown as MongoStorageIndex);
   }
 
   return indexes;

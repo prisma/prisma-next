@@ -790,12 +790,15 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email])
         }
       `);
-      const coll = ir.storage as Record<string, Record<string, unknown>>;
-      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['user']?.[
-        'indexes'
-      ] as ReadonlyArray<Record<string, unknown>>;
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['user']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
       expect(indexes).toHaveLength(1);
-      expect(indexes[0]!['keys']).toEqual([{ field: 'email', direction: 1 }]);
+      expect(indexes![0]!['keys']).toEqual([{ field: 'email', direction: 1 }]);
     });
 
     it('creates unique index from @@unique', () => {
@@ -806,12 +809,15 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@unique([email])
         }
       `);
-      const coll = ir.storage as Record<string, Record<string, unknown>>;
-      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['user']?.[
-        'indexes'
-      ] as ReadonlyArray<Record<string, unknown>>;
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['user']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
       expect(indexes).toHaveLength(1);
-      expect(indexes[0]!['unique']).toBe(true);
+      expect(indexes![0]!['unique']).toBe(true);
     });
 
     it('creates compound index', () => {
@@ -823,12 +829,15 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email, name])
         }
       `);
-      const coll = ir.storage as Record<string, Record<string, unknown>>;
-      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['user']?.[
-        'indexes'
-      ] as ReadonlyArray<Record<string, unknown>>;
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['user']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
       expect(indexes).toHaveLength(1);
-      expect(indexes[0]!['keys']).toEqual([
+      expect(indexes![0]!['keys']).toEqual([
         { field: 'email', direction: 1 },
         { field: 'name', direction: 1 },
       ]);
@@ -841,13 +850,16 @@ describe('interpretPslDocumentToMongoContract', () => {
           email String   @unique
         }
       `);
-      const coll = ir.storage as Record<string, Record<string, unknown>>;
-      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['user']?.[
-        'indexes'
-      ] as ReadonlyArray<Record<string, unknown>>;
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['user']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
       expect(indexes).toHaveLength(1);
-      expect(indexes[0]!['unique']).toBe(true);
-      expect(indexes[0]!['keys']).toEqual([{ field: 'email', direction: 1 }]);
+      expect(indexes![0]!['unique']).toBe(true);
+      expect(indexes![0]!['keys']).toEqual([{ field: 'email', direction: 1 }]);
     });
 
     it('creates index with sparse and TTL options', () => {
@@ -858,13 +870,16 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([expiresAt], sparse: true, expireAfterSeconds: 3600)
         }
       `);
-      const coll = ir.storage as Record<string, Record<string, unknown>>;
-      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['session']?.[
-        'indexes'
-      ] as ReadonlyArray<Record<string, unknown>>;
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['session']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
       expect(indexes).toHaveLength(1);
-      expect(indexes[0]!['sparse']).toBe(true);
-      expect(indexes[0]!['expireAfterSeconds']).toBe(3600);
+      expect(indexes![0]!['sparse']).toBe(true);
+      expect(indexes![0]!['expireAfterSeconds']).toBe(3600);
     });
 
     it('respects @map on indexed fields', () => {
@@ -875,11 +890,14 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email])
         }
       `);
-      const coll = ir.storage as Record<string, Record<string, unknown>>;
-      const indexes = (coll['collections'] as Record<string, Record<string, unknown>>)['user']?.[
-        'indexes'
-      ] as ReadonlyArray<Record<string, unknown>>;
-      expect(indexes[0]!['keys']).toEqual([{ field: 'email_address', direction: 1 }]);
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['user']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
+      expect(indexes![0]!['keys']).toEqual([{ field: 'email_address', direction: 1 }]);
     });
 
     it('creates no indexes when none declared', () => {
@@ -888,15 +906,22 @@ describe('interpretPslDocumentToMongoContract', () => {
           id ObjectId @id @map("_id")
         }
       `);
-      const coll = ir.storage as Record<string, Record<string, unknown>>;
-      const userColl = (coll['collections'] as Record<string, Record<string, unknown>>)['user'];
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const userColl = storage['collections']?.['user'];
       expect(userColl?.['indexes']).toBeUndefined();
     });
   });
 
   describe('validator derivation', () => {
-    function getValidator(ir: Record<string, unknown>, collectionName: string) {
-      const storage = ir.storage as Record<string, Record<string, Record<string, unknown>>>;
+    function getValidator(ir: unknown, collectionName: string) {
+      const contract = ir as Record<string, unknown>;
+      const storage = contract['storage'] as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
       return storage['collections']?.[collectionName]?.['validator'] as
         | Record<string, unknown>
         | undefined;
@@ -986,7 +1011,10 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email])
         }
       `);
-      const storage = ir.storage as Record<string, Record<string, Record<string, unknown>>>;
+      const storage = ir['storage'] as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
       const userColl = storage['collections']?.['user'];
       expect(userColl?.['indexes']).toBeDefined();
       expect(userColl?.['validator']).toBeDefined();

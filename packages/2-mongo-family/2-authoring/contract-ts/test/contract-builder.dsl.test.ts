@@ -190,9 +190,9 @@ describe('mongo contract builder', () => {
     expect(contract.storage.collections).toEqual({
       users: {
         indexes: [
-          { fields: { email: 1 }, options: { unique: true } },
-          { fields: { createdAt: 1 }, options: { expireAfterSeconds: 3600 } },
-          { fields: { location: '2dsphere' } },
+          { keys: [{ field: 'email', direction: 1 }], unique: true },
+          { keys: [{ field: 'createdAt', direction: 1 }], expireAfterSeconds: 3600 },
+          { keys: [{ field: 'location', direction: '2dsphere' }] },
         ],
       },
     });
@@ -254,8 +254,8 @@ describe('mongo contract builder', () => {
     expect(contract.storage.collections).toEqual({
       tasks: {
         indexes: [
-          { fields: { title: 1 }, options: { unique: true } },
-          { fields: { expiresAt: 1 }, options: { expireAfterSeconds: 3600 } },
+          { keys: [{ field: 'title', direction: 1 }], unique: true },
+          { keys: [{ field: 'expiresAt', direction: 1 }], expireAfterSeconds: 3600 },
         ],
       },
     });

@@ -41,7 +41,13 @@ beforeEach(async () => {
 function makeContract(
   collections: Record<
     string,
-    { indexes?: Array<{ fields: Record<string, 1 | -1>; options?: { unique?: boolean } }> }
+    {
+      indexes?: Array<{
+        keys: Array<{ field: string; direction: 1 | -1 }>;
+        unique?: boolean;
+        sparse?: boolean;
+      }>;
+    }
   >,
   storageHash = 'sha256:dest',
 ) {
@@ -86,7 +92,7 @@ function makeDriver() {
 describe('MongoMigrationRunner', () => {
   it('creates an index on a real MongoDB instance', async () => {
     const contract = makeContract({
-      users: { indexes: [{ fields: { email: 1 }, options: { unique: true } }] },
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
@@ -155,7 +161,7 @@ describe('MongoMigrationRunner', () => {
     await db.collection('items').createIndex({ sku: 1 }, { unique: true, name: 'sku_1' });
 
     const contract = makeContract({
-      items: { indexes: [{ fields: { sku: 1 }, options: { unique: true } }] },
+      items: { indexes: [{ keys: [{ field: 'sku', direction: 1 }], unique: true }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
@@ -180,7 +186,7 @@ describe('MongoMigrationRunner', () => {
     await db.collection('users').createIndex({ email: 1 }, { name: 'email_1' });
 
     const contract = makeContract({
-      users: { indexes: [{ fields: { email: 1 } }] },
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
@@ -203,8 +209,8 @@ describe('MongoMigrationRunner', () => {
 
   it('executes multiple operations in order', async () => {
     const contract = makeContract({
-      alpha: { indexes: [{ fields: { a: 1 } }] },
-      beta: { indexes: [{ fields: { b: 1 } }] },
+      alpha: { indexes: [{ keys: [{ field: 'a', direction: 1 }] }] },
+      beta: { indexes: [{ keys: [{ field: 'b', direction: 1 }] }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
@@ -241,7 +247,7 @@ describe('MongoMigrationRunner', () => {
     await initMarker(db, { storageHash: 'sha256:different', profileHash: 'sha256:p1' });
 
     const contract = makeContract({
-      users: { indexes: [{ fields: { email: 1 } }] },
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan({
@@ -266,7 +272,7 @@ describe('MongoMigrationRunner', () => {
 
   it('returns POLICY_VIOLATION for disallowed operation class', async () => {
     const contract = makeContract({
-      users: { indexes: [{ fields: { email: 1 } }] },
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
@@ -288,7 +294,7 @@ describe('MongoMigrationRunner', () => {
 
   it('updates marker and writes ledger entry after successful execution', async () => {
     const contract = makeContract({
-      users: { indexes: [{ fields: { email: 1 } }] },
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);

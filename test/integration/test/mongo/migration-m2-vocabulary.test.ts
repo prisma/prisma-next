@@ -52,7 +52,7 @@ function makeContract(
 }
 
 async function planAndApply(
-  db: Db,
+  _db: Db,
   replSetUri: string,
   origin: MongoContract | null,
   destination: MongoContract,

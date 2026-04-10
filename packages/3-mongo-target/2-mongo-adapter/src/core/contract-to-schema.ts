@@ -1,4 +1,5 @@
 import type {
+  MongoContract,
   MongoStorageCollection,
   MongoStorageCollectionOptions,
   MongoStorageIndex,
@@ -36,21 +37,16 @@ function convertValidator(v: MongoStorageValidator): MongoSchemaValidator {
 }
 
 function convertOptions(o: MongoStorageCollectionOptions): MongoSchemaCollectionOptionsNode {
-  return new MongoSchemaCollectionOptionsNode({
-    capped: o.capped,
-    timeseries: o.timeseries,
-    collation: o.collation,
-    changeStreamPreAndPostImages: o.changeStreamPreAndPostImages,
-    clusteredIndex: o.clusteredIndex,
-  });
+  return new MongoSchemaCollectionOptionsNode(o);
 }
 
 function convertCollection(name: string, def: MongoStorageCollection): MongoSchemaCollection {
+  const indexes = (def.indexes ?? []).map(convertIndex);
   return new MongoSchemaCollection({
     name,
-    indexes: (def.indexes ?? []).map(convertIndex),
-    validator: def.validator ? convertValidator(def.validator) : undefined,
-    options: def.options ? convertOptions(def.options) : undefined,
+    indexes,
+    ...(def.validator != null && { validator: convertValidator(def.validator) }),
+    ...(def.options != null && { options: convertOptions(def.options) }),
   });
 }
 
