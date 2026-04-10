@@ -156,7 +156,7 @@ function validatorsEqual(
   return (
     a.validationLevel === b.validationLevel &&
     a.validationAction === b.validationAction &&
-    deepEqual(a.jsonSchema, b.jsonSchema)
+    canonicalize(a.jsonSchema) === canonicalize(b.jsonSchema)
   );
 }
 
@@ -166,7 +166,7 @@ function classifyValidatorUpdate(
 ): 'widening' | 'destructive' {
   let hasDestructive = false;
 
-  if (!deepEqual(origin.jsonSchema, dest.jsonSchema)) {
+  if (canonicalize(origin.jsonSchema) !== canonicalize(dest.jsonSchema)) {
     hasDestructive = true;
   }
 
@@ -221,6 +221,7 @@ function planValidatorDiff(
           filter: MongoAndExpr.of([
             MongoFieldFilter.eq('name', collName),
             MongoFieldFilter.eq('options.validationLevel', destValidator.validationLevel),
+            MongoFieldFilter.eq('options.validationAction', destValidator.validationAction),
           ]),
           expect: 'exists' as const,
         },
@@ -251,11 +252,10 @@ function hasImmutableOptionChange(
   origin: MongoSchemaCollectionOptions | undefined,
   dest: MongoSchemaCollectionOptions | undefined,
 ): string | undefined {
-  if (!origin || !dest) return undefined;
-  if (!deepEqual(origin.capped, dest.capped)) return 'capped';
-  if (!deepEqual(origin.timeseries, dest.timeseries)) return 'timeseries';
-  if (!deepEqual(origin.collation, dest.collation)) return 'collation';
-  if (!deepEqual(origin.clusteredIndex, dest.clusteredIndex)) return 'clusteredIndex';
+  if (!deepEqual(origin?.capped, dest?.capped)) return 'capped';
+  if (!deepEqual(origin?.timeseries, dest?.timeseries)) return 'timeseries';
+  if (!deepEqual(origin?.collation, dest?.collation)) return 'collation';
+  if (!deepEqual(origin?.clusteredIndex, dest?.clusteredIndex)) return 'clusteredIndex';
   return undefined;
 }
 

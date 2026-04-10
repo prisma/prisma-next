@@ -439,6 +439,24 @@ describe('indexesEquivalent', () => {
     });
     expect(indexesEquivalent(a, b)).toBe(false);
   });
+
+  it('treats object-valued options with different key order as equivalent', () => {
+    const a = new MongoSchemaIndex({
+      keys: [{ field: 'status', direction: 1 }],
+      partialFilterExpression: { status: 'active', age: { $gte: 18 } },
+      collation: { locale: 'en', strength: 2 },
+      weights: { title: 10, body: 5 },
+      wildcardProjection: { name: 1, email: 1 },
+    });
+    const b = new MongoSchemaIndex({
+      keys: [{ field: 'status', direction: 1 }],
+      partialFilterExpression: { age: { $gte: 18 }, status: 'active' },
+      collation: { strength: 2, locale: 'en' },
+      weights: { body: 5, title: 10 },
+      wildcardProjection: { email: 1, name: 1 },
+    });
+    expect(indexesEquivalent(a, b)).toBe(true);
+  });
 });
 
 describe('canonicalize', () => {
