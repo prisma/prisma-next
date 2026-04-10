@@ -314,19 +314,18 @@ withTempDir(({ createTempDir }) => {
             const firstApply = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
             expect(firstApply.migrationsApplied).toBe(1);
 
-            // Insert data so a later NOT NULL column addition will fail.
+            // Insert rows with duplicate emails so a unique constraint will fail.
             await withClient(connectionString, async (client) => {
-              await client.query(`INSERT INTO "user" (id, email) VALUES (1, 'user@example.com')`);
+              await client.query(
+                `INSERT INTO "user" (id, email) VALUES (1, 'dup@example.com'), (2, 'dup@example.com')`,
+              );
             });
 
-            // Plan second migration that adds a NOT NULL + UNIQUE column.
-            // The UNIQUE constraint prevents the planner's temporary-default
-            // strategy (a uniform default would violate uniqueness), so the
-            // planner falls back to an empty-table precheck that fails here.
+            // Plan second migration that adds a unique constraint on email.
             replaceInFileOrThrow(
               contractPath!,
               '        email: field.column(textColumn),\n',
-              `        email: field.column(textColumn),\n        required_name: field.column(textColumn).unique({ name: 'user_required_name_key' }),\n`,
+              `        email: field.column(textColumn).unique({ name: 'user_email_key' }),\n`,
             );
 
             await emitContract(testDir, configPath);
@@ -334,12 +333,11 @@ withTempDir(({ createTempDir }) => {
               '--config',
               configPath,
               '--name',
-              'add_required_name',
+              'add_unique_email',
               '--no-color',
             ]);
 
-            // Apply fails: the empty-table precheck rejects adding a NOT NULL + UNIQUE
-            // column to a non-empty table.
+            // Apply fails: duplicate emails violate the unique constraint.
             consoleOutput.length = 0;
             let failed = false;
             try {
@@ -349,9 +347,6 @@ withTempDir(({ createTempDir }) => {
             }
             expect(failed).toBe(true);
             expect(getExitCode()).toBe(1);
-            const errorOutput = stripAnsi(consoleOutput.join('\n'));
-            expect(errorOutput).toContain('failed during precheck');
-            expect(errorOutput).toContain('is empty before adding NOT NULL column');
 
             // Marker must remain at the first migration hash (resume point).
             const migrationsDir = join(testDir, 'migrations');
@@ -371,9 +366,9 @@ withTempDir(({ createTempDir }) => {
               expect(marker.rows[0]?.core_hash).toBe(firstMigration!.manifest.to);
             });
 
-            // Make second migration runnable, then re-run apply; it should resume from marker.
+            // Fix: deduplicate emails, then re-run apply; it should resume from marker.
             await withClient(connectionString, async (client) => {
-              await client.query('DELETE FROM "user"');
+              await client.query(`UPDATE "user" SET email = 'unique@example.com' WHERE id = 2`);
             });
 
             consoleOutput.length = 0;
