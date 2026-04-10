@@ -4,7 +4,15 @@ import type { OperationDescriptor } from '@prisma-next/framework-components/cont
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration } from '@prisma-next/migration-tools/dag';
-import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
+import {
+  formatMigrationDirName,
+  writeMigrationOps,
+  writeMigrationPackage,
+} from '@prisma-next/migration-tools/io';
+import {
+  evaluateMigrationTs,
+  scaffoldMigrationTs,
+} from '@prisma-next/migration-tools/migration-ts';
 import { type MigrationManifest, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -13,7 +21,7 @@ import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import {
   type CliErrorConflict,
-  type CliStructuredError,
+  CliStructuredError,
   errorContractValidationFailed,
   errorFileNotFound,
   errorMigrationPlanningFailed,
@@ -24,7 +32,7 @@ import {
 import {
   addGlobalOptions,
   getTargetMigrations,
-  loadMigrationBundles,
+  loadAllBundles,
   resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
@@ -63,6 +71,9 @@ export interface MigrationPlanResult {
 }
 
 function mapMigrationToolsError(error: unknown): CliStructuredError {
+  if (CliStructuredError.is(error)) {
+    return error;
+  }
   if (MigrationToolsError.is(error)) {
     return errorRuntime(error.message, {
       why: error.why,
@@ -159,7 +170,18 @@ async function executeMigrationPlanCommand(
   let fromHash: string = EMPTY_CONTRACT_HASH;
 
   try {
-    const { bundles, graph } = await loadMigrationBundles(migrationsDir);
+    const { attested: bundles, drafts, graph } = await loadAllBundles(migrationsDir);
+
+    // Check if a draft migration already targets this contract
+    const existingDraft = drafts.find((d) => d.manifest.to === toStorageHash);
+    if (existingDraft) {
+      return notOk(
+        errorRuntime('A draft migration to this contract already exists', {
+          why: `Draft migration at "${existingDraft.dirName}" already targets ${toStorageHash}`,
+          fix: `Run 'prisma-next migration verify --dir ${migrationsRelative}/${existingDraft.dirName}' to attest it, or delete it and re-plan.`,
+        }),
+      );
+    }
 
     if (options.from) {
       const resolved = resolveBundleByPrefix(bundles, options.from);
@@ -219,98 +241,144 @@ async function executeMigrationPlanCommand(
       }),
     );
   }
-  const stack = createControlStack({
-    family: config.family,
-    target: config.target,
-    adapter: config.adapter,
-    extensionPacks: config.extensionPacks ?? [],
-  });
-  const familyInstance = config.family.create(stack);
   const frameworkComponents = assertFrameworkComponentsCompatible(
     config.family.familyId,
     config.target.targetId,
     [config.target, config.adapter, ...(config.extensionPacks ?? [])],
   );
-  const planner = migrations.createPlanner(familyInstance);
-  const fromSchemaIR = migrations.contractToSchema(fromContract, frameworkComponents);
-  const plannerResult = planner.plan({
-    contract: toContractJson,
-    schema: fromSchemaIR,
-    policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
-    frameworkComponents,
-  });
 
-  if (plannerResult.kind === 'failure') {
-    return notOk(
-      errorMigrationPlanningFailed({
-        conflicts: plannerResult.conflicts as readonly CliErrorConflict[],
-      }),
-    );
-  }
+  // Use descriptor-based planner if available, fall back to old planner
+  if (migrations.planWithDescriptors) {
+    const descriptorResult = migrations.planWithDescriptors({
+      fromContract,
+      toContract: toContractJson,
+      frameworkComponents,
+    });
 
-  if (plannerResult.plan.operations.length === 0) {
-    return notOk(
-      errorMigrationPlanningFailed({
-        conflicts: [
-          {
-            kind: 'unsupportedChange',
-            summary:
-              'Contract changed but planner produced no operations. ' +
-              'This indicates unsupported or ignored changes (e.g. removals, type changes, or a planner/contract mismatch).',
-          },
-        ],
-      }),
-    );
-  }
+    if (!descriptorResult.ok) {
+      return notOk(
+        errorMigrationPlanningFailed({
+          conflicts: descriptorResult.conflicts as readonly CliErrorConflict[],
+        }),
+      );
+    }
 
-  // Build manifest and write migration package
-  const timestamp = new Date();
-  const slug = options.name ?? 'migration';
-  const dirName = formatMigrationDirName(timestamp, slug);
-  const packageDir = join(migrationsDir, dirName);
+    if (descriptorResult.descriptors.length === 0) {
+      return notOk(
+        errorMigrationPlanningFailed({
+          conflicts: [
+            {
+              kind: 'unsupportedChange',
+              summary:
+                'Contract changed but planner produced no operations. ' +
+                'This indicates unsupported or ignored changes.',
+            },
+          ],
+        }),
+      );
+    }
 
-  const manifest: MigrationManifest = {
-    from: fromHash,
-    to: toStorageHash,
-    migrationId: null,
-    kind: 'regular',
-    fromContract,
-    toContract: toContractJson,
-    hints: {
-      used: [],
-      applied: [],
-      plannerVersion: '1.0.0',
-      planningStrategy: 'diff',
-    },
-    labels: [],
-    createdAt: timestamp.toISOString(),
-  };
+    // Build manifest and write migration package
+    const timestamp = new Date();
+    const slug = options.name ?? 'migration';
+    const dirName = formatMigrationDirName(timestamp, slug);
+    const packageDir = join(migrationsDir, dirName);
 
-  try {
-    await writeMigrationPackage(packageDir, manifest, plannerResult.plan.operations);
-    const migrationId = await attestMigration(packageDir);
-
-    const sql = extractOperationStatements(config.family.familyId, plannerResult.plan.operations);
-    const result: MigrationPlanResult = {
-      ok: true,
-      noOp: false,
+    const manifest: MigrationManifest = {
       from: fromHash,
       to: toStorageHash,
-      migrationId,
-      dir: relative(process.cwd(), packageDir),
-      operations: plannerResult.plan.operations.map((op) => ({
-        id: op.id,
-        label: op.label,
-        operationClass: op.operationClass,
-      })),
-      sql,
-      summary: `Planned ${plannerResult.plan.operations.length} operation(s)`,
-      timings: { total: Date.now() - startTime },
+      migrationId: null,
+      kind: 'regular',
+      fromContract,
+      toContract: toContractJson,
+      hints: {
+        used: [],
+        applied: [],
+        plannerVersion: '2.0.0',
+        planningStrategy: 'descriptors',
+      },
+      labels: [],
+      createdAt: timestamp.toISOString(),
     };
-    return ok(result);
-  } catch (error) {
-    return notOk(mapMigrationToolsError(error));
+
+    try {
+      // Always write migration.ts with the descriptors
+      // Write package with empty ops first (draft)
+      await writeMigrationPackage(packageDir, manifest, []);
+      await scaffoldMigrationTs(packageDir, {
+        descriptors: descriptorResult.descriptors,
+        contractJsonPath: contractPathAbsolute,
+      });
+
+      if (descriptorResult.needsDataMigration) {
+        // Draft — user must fill in dataTransform and run verify
+        const result: MigrationPlanResult = {
+          ok: true,
+          noOp: false,
+          from: fromHash,
+          to: toStorageHash,
+          dir: relative(process.cwd(), packageDir),
+          operations: descriptorResult.descriptors.map((d) => ({
+            id: (d as { kind: string }).kind,
+            label: (d as { kind: string }).kind,
+            operationClass: 'data' as const,
+          })),
+          sql: [],
+          summary: `Planned ${descriptorResult.descriptors.length} operation(s) — data migration required. Edit migration.ts and run \`migration verify --dir ${relative(process.cwd(), packageDir)}\` to attest.`,
+          timings: { total: Date.now() - startTime },
+        };
+        return ok(result);
+      }
+
+      // No data migration — evaluate, resolve, write ops, attest
+      const evaluatedDescriptors = await evaluateMigrationTs(packageDir);
+
+      if (!migrations.resolveDescriptors) {
+        throw errorTargetMigrationNotSupported({
+          why: `Target "${config.target.targetId}" does not implement resolveDescriptors; cannot finalize migration plan with migration.ts`,
+        });
+      }
+
+      const resolvedOps = migrations.resolveDescriptors(
+        evaluatedDescriptors as OperationDescriptor[],
+        {
+          fromContract,
+          toContract: toContractJson,
+          frameworkComponents,
+        },
+      );
+
+      await writeMigrationOps(packageDir, resolvedOps);
+      const migrationId = await attestMigration(packageDir);
+
+      const sql = extractSqlDdl(resolvedOps);
+      const result: MigrationPlanResult = {
+        ok: true,
+        noOp: false,
+        from: fromHash,
+        to: toStorageHash,
+        migrationId,
+        dir: relative(process.cwd(), packageDir),
+        operations: resolvedOps.map((op) => ({
+          id: op.id,
+          label: op.label,
+          operationClass: op.operationClass,
+        })),
+        sql,
+        summary: `Planned ${resolvedOps.length} operation(s)`,
+        timings: { total: Date.now() - startTime },
+      };
+      return ok(result);
+    } catch (error) {
+      return notOk(mapMigrationToolsError(error));
+    }
   }
+
+  return notOk(
+    errorTargetMigrationNotSupported({
+      why: `Target "${config.target.id}" does not support planWithDescriptors`,
+    }),
+  );
 }
 
 export function createMigrationPlanCommand(): Command {
