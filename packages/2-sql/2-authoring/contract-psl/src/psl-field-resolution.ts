@@ -1,7 +1,7 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import type { PslField, PslModel } from '@prisma-next/psl-parser';
+import type { PslAttribute, PslField, PslModel } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ControlMutationDefaultRegistry,
@@ -60,6 +60,79 @@ export interface CollectResolvedFieldsInput {
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
 }
 
+const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
+  'id',
+  'unique',
+  'default',
+  'relation',
+  'map',
+]);
+
+function validateFieldAttributes(input: {
+  readonly model: PslModel;
+  readonly field: PslField;
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+}): void {
+  for (const attribute of input.field.attributes) {
+    if (BUILTIN_FIELD_ATTRIBUTE_NAMES.has(attribute.name)) {
+      continue;
+    }
+
+    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions);
+    if (uncomposedNamespace) {
+      reportUncomposedNamespace({
+        subjectLabel: `Attribute "@${attribute.name}"`,
+        namespace: uncomposedNamespace,
+        sourceId: input.sourceId,
+        span: attribute.span,
+        diagnostics: input.diagnostics,
+      });
+      continue;
+    }
+
+    input.diagnostics.push({
+      code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
+      message: `Field "${input.model.name}.${input.field.name}" uses unsupported attribute "@${attribute.name}"`,
+      sourceId: input.sourceId,
+      span: attribute.span,
+    });
+  }
+}
+
+function extractFieldConstraintNames(input: {
+  readonly model: PslModel;
+  readonly field: PslField;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): {
+  readonly idAttribute: PslAttribute | undefined;
+  readonly uniqueAttribute: PslAttribute | undefined;
+  readonly idName: string | undefined;
+  readonly uniqueName: string | undefined;
+} {
+  const idAttribute = getAttribute(input.field.attributes, 'id');
+  const uniqueAttribute = getAttribute(input.field.attributes, 'unique');
+  const idName = parseConstraintMapArgument({
+    attribute: idAttribute,
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+    entityLabel: `Field "${input.model.name}.${input.field.name}" @id`,
+    span: input.field.span,
+    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+  });
+  const uniqueName = parseConstraintMapArgument({
+    attribute: uniqueAttribute,
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+    entityLabel: `Field "${input.model.name}.${input.field.name}" @unique`,
+    span: input.field.span,
+    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+  });
+  return { idAttribute, uniqueAttribute, idName, uniqueName };
+}
+
 export function collectResolvedFields(input: CollectResolvedFieldsInput): ResolvedField[] {
   const {
     model,
@@ -85,36 +158,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       continue;
     }
 
-    for (const attribute of field.attributes) {
-      if (
-        attribute.name === 'id' ||
-        attribute.name === 'unique' ||
-        attribute.name === 'default' ||
-        attribute.name === 'relation' ||
-        attribute.name === 'map'
-      ) {
-        continue;
-      }
-
-      const uncomposedNamespace = checkUncomposedNamespace(attribute.name, composedExtensions);
-      if (uncomposedNamespace) {
-        reportUncomposedNamespace({
-          subjectLabel: `Attribute "@${attribute.name}"`,
-          namespace: uncomposedNamespace,
-          sourceId,
-          span: attribute.span,
-          diagnostics,
-        });
-        continue;
-      }
-
-      diagnostics.push({
-        code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
-        message: `Field "${model.name}.${field.name}" uses unsupported attribute "@${attribute.name}"`,
-        sourceId,
-        span: attribute.span,
-      });
-    }
+    validateFieldAttributes({ model, field, composedExtensions, diagnostics, sourceId });
 
     const relationAttribute = getAttribute(field.attributes, 'relation');
     if (relationAttribute && modelNames.has(field.typeName)) {
@@ -213,23 +257,11 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       }
     }
     const mappedColumnName = mapping.fieldColumns.get(field.name) ?? field.name;
-    const idAttribute = getAttribute(field.attributes, 'id');
-    const uniqueAttribute = getAttribute(field.attributes, 'unique');
-    const idName = parseConstraintMapArgument({
-      attribute: idAttribute,
+    const { idAttribute, uniqueAttribute, idName, uniqueName } = extractFieldConstraintNames({
+      model,
+      field,
       sourceId,
       diagnostics,
-      entityLabel: `Field "${model.name}.${field.name}" @id`,
-      span: field.span,
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-    });
-    const uniqueName = parseConstraintMapArgument({
-      attribute: uniqueAttribute,
-      sourceId,
-      diagnostics,
-      entityLabel: `Field "${model.name}.${field.name}" @unique`,
-      span: field.span,
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
     });
 
     resolvedFields.push({
