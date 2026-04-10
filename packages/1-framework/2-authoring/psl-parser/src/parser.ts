@@ -369,6 +369,8 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
       declarationValue,
       lineIndex,
       startColumn: declarationValueColumn,
+      invalidCode: 'PSL_INVALID_TYPES_MEMBER',
+      invalidMessage: (value) => `Invalid types declaration "${value}"`,
     });
     if (typeConstructor === 'malformed') {
       continue;
@@ -442,6 +444,8 @@ function parseTypeConstructorCall(
     readonly declarationValue: string;
     readonly lineIndex: number;
     readonly startColumn: number;
+    readonly invalidCode: PslDiagnosticCode;
+    readonly invalidMessage: (value: string) => string;
   },
 ): PslTypeConstructorCall | 'malformed' | undefined {
   const value = input.declarationValue.trim();
@@ -457,8 +461,8 @@ function parseTypeConstructorCall(
 
   if (openParen < 0 || closeParen !== value.length - 1) {
     pushDiagnostic(context, {
-      code: 'PSL_INVALID_TYPES_MEMBER',
-      message: `Invalid types declaration "${value}"`,
+      code: input.invalidCode,
+      message: input.invalidMessage(value),
       span: createInlineSpan(
         context,
         input.lineIndex,
@@ -483,7 +487,7 @@ function parseTypeConstructorCall(
       input.startColumn,
       input.startColumn + value.length,
     ),
-    invalidCode: 'PSL_INVALID_TYPES_MEMBER',
+    invalidCode: input.invalidCode,
     invalidEmptyArgumentMessage: `Invalid empty argument in type constructor "${value}"`,
     invalidNamedArgumentMessage: (part) =>
       `Invalid named argument syntax "${part}" in type constructor "${value}"`,
@@ -621,6 +625,8 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
     declarationValue: baseTypeSource,
     lineIndex,
     startColumn: typeStartColumn,
+    invalidCode: 'PSL_INVALID_MODEL_MEMBER',
+    invalidMessage: (value) => `Invalid field type constructor "${value}"`,
   });
   if (typeConstructor === 'malformed') {
     return undefined;
