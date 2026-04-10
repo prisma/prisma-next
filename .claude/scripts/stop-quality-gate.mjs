@@ -1,38 +1,44 @@
 #!/usr/bin/env node
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, openSync, closeSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { text } from 'node:stream/consumers';
 
 const hook = JSON.parse(await text(process.stdin));
 const cwd = hook.cwd;
 
 const checks = [
-  { name: 'tests', command: 'pnpm test:packages' },
-  { name: 'e2e', command: 'pnpm test:e2e' },
-  { name: 'typecheck', command: 'pnpm typecheck' },
-  { name: 'lint', command: 'pnpm lint' },
+  { name: 'tests', args: ['test:packages'] },
+  { name: 'e2e', args: ['test:e2e'] },
+  { name: 'typecheck', args: ['typecheck'] },
+  { name: 'lint', args: ['lint'] },
 ];
 
+const tmpDir = mkdtempSync(join(tmpdir(), 'quality-gate-'));
 const failures = [];
 
-for (const { name, command } of checks) {
+for (const { name, args } of checks) {
+  const stderrFile = join(tmpDir, `${name}.stderr`);
+  const fd = openSync(stderrFile, 'w');
   try {
-    execSync(command, { cwd, stdio: 'pipe', timeout: 300_000 });
-  } catch (err) {
-    const output = err.stderr?.toString() || err.stdout?.toString() || '';
-    const tail = output.split('\n').slice(-40).join('\n');
-    failures.push({ name, output: tail });
+    execFileSync('pnpm', args, { cwd, stdio: ['ignore', 'ignore', fd], timeout: 300_000 });
+  } catch {
+    failures.push({ name, stderrFile });
+  } finally {
+    closeSync(fd);
   }
 }
 
 if (failures.length > 0) {
-  const details = failures
-    .map((f) => `--- ${f.name} ---\n${f.output}`)
-    .join('\n\n');
+  const files = failures.map((f) => `- ${f.name}: ${f.stderrFile}`).join('\n');
   console.log(
     JSON.stringify({
       decision: 'block',
-      reason: `Quality gate failed: ${failures.map((f) => f.name).join(', ')}. Fix the issues before finishing.\n\n${details}`,
+      reason: `Quality gate failed: ${failures.map((f) => f.name).join(', ')}. Read the stderr logs and fix the issues before finishing.\n\n${files}`,
     }),
   );
+} else {
+  rmSync(tmpDir, { recursive: true, force: true });
 }
