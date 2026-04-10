@@ -1,5 +1,5 @@
 types {
-  Embedding = Bytes @pgvector.column(length: 1536)
+  Embedding = pgvector.Vector(1536)
 }
 
 model User {

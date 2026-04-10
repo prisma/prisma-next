@@ -1,5 +1,3 @@
-import type { FamilyPackRef } from '@prisma-next/framework-components/components';
-
 const mongoFamilyPack = {
   kind: 'family',
   id: 'mongo',
@@ -7,4 +5,4 @@ const mongoFamilyPack = {
   version: '0.0.1',
 } as const;
 
-export default mongoFamilyPack as typeof mongoFamilyPack & FamilyPackRef<'mongo'>;
+export default mongoFamilyPack;

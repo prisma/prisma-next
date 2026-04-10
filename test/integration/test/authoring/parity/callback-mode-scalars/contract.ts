@@ -7,7 +7,7 @@ export const contract = defineContract(
   { family: sqlFamily, target: postgresPack, extensionPacks: { pgvector } },
   ({ field, model, type }) => {
     const types = {
-      Embedding: type.pgvector.vector(1536),
+      Embedding: type.pgvector.Vector(1536),
     } as const;
     const User = model('User', {
       fields: {

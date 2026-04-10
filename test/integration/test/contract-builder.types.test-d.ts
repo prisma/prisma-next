@@ -187,9 +187,15 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
         models: {
           User: model('User', {
             fields: {
-              id: field.id.uuidv7(),
+              id: field.int().defaultSql('autoincrement()').id(),
+              email: field.text().unique(),
+              age: field.int(),
+              isActive: field.boolean().default(true),
+              score: field.float().optional(),
+              profile: field.json().optional(),
               role: field.namedType(Role),
               embedding: field.namedType(Embedding).optional(),
+              createdAt: field.createdAt(),
             },
           }).sql({
             table: 'user',
@@ -204,6 +210,15 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
   expectTypeOf<keyof CallbackStorageTypes>().toEqualTypeOf<'Role' | 'Embedding'>();
   expectTypeOf<CallbackStorageTypes['Role']['codecId']>().toEqualTypeOf<'pg/enum@1'>();
   expectTypeOf<CallbackStorageTypes['Embedding']['codecId']>().toEqualTypeOf<'pg/vector@1'>();
+  expectTypeOf(contract.storage.tables.user.columns.id.codecId).toEqualTypeOf<'pg/int4@1'>();
+  expectTypeOf(contract.storage.tables.user.columns.email.codecId).toEqualTypeOf<'pg/text@1'>();
+  expectTypeOf(contract.storage.tables.user.columns.age.codecId).toEqualTypeOf<'pg/int4@1'>();
+  expectTypeOf(contract.storage.tables.user.columns.isActive.codecId).toEqualTypeOf<'pg/bool@1'>();
+  expectTypeOf(contract.storage.tables.user.columns.score.codecId).toEqualTypeOf<'pg/float8@1'>();
+  expectTypeOf(contract.storage.tables.user.columns.profile.codecId).toEqualTypeOf<'pg/jsonb@1'>();
+  expectTypeOf(
+    contract.storage.tables.user.columns.createdAt.codecId,
+  ).toEqualTypeOf<'pg/timestamptz@1'>();
   expectTypeOf(contract.storage.tables.user.columns.role.typeRef).toEqualTypeOf<'Role'>();
   expectTypeOf(contract.storage.tables.user.columns.embedding.typeRef).toEqualTypeOf<'Embedding'>();
 });
