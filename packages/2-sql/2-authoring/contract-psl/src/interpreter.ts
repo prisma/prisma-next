@@ -54,7 +54,6 @@ import {
   checkUncomposedNamespace,
   getAuthoringTypeConstructor,
   instantiatePslTypeConstructor,
-  resolveColumnDescriptor,
   resolveDbNativeTypeAttribute,
   resolveFieldTypeDescriptor,
   resolvePslTypeConstructorDescriptor,

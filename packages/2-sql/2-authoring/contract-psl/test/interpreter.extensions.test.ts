@@ -325,7 +325,10 @@ model Document {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage.types).toEqual({});
+    const storage = result.value.storage as {
+      readonly types?: Record<string, unknown>;
+    };
+    expect(storage.types).toEqual({});
     expect(result.value.storage).toMatchObject({
       tables: {
         document: {
