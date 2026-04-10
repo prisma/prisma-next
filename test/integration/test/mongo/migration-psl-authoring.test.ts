@@ -159,9 +159,11 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpDbServer }
 
     const colls = await db.listCollections({ name: 'user' }).toArray();
     expect(colls).toHaveLength(1);
-    const options = colls[0]!['options'] as Record<string, unknown>;
+    const options = (colls[0] as Record<string, unknown>)['options'] as
+      | Record<string, unknown>
+      | undefined;
     expect(options?.['validator']).toBeDefined();
-    const validator = options['validator'] as Record<string, unknown>;
+    const validator = options!['validator'] as Record<string, unknown>;
     const schema = validator['$jsonSchema'] as Record<string, unknown>;
     expect(schema['bsonType']).toBe('object');
 
@@ -181,7 +183,10 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpDbServer }
       }
     `);
 
-    const storage = contract.storage as Record<string, Record<string, Record<string, unknown>>>;
+    const storage = contract.storage as unknown as Record<
+      string,
+      Record<string, Record<string, unknown>>
+    >;
     const postColl = storage['collections']?.['post'];
     expect(postColl?.['indexes']).toBeDefined();
     expect(postColl?.['validator']).toBeDefined();
@@ -193,7 +198,9 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpDbServer }
     expect(createdAtIdx).toBeDefined();
 
     const colls = await db.listCollections({ name: 'post' }).toArray();
-    const options = colls[0]!['options'] as Record<string, unknown>;
+    const options = (colls[0] as Record<string, unknown>)['options'] as
+      | Record<string, unknown>
+      | undefined;
     expect(options?.['validator']).toBeDefined();
   });
 
@@ -213,8 +220,10 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpDbServer }
     expect(idx).toBeDefined();
 
     const colls = await db.listCollections({ name: 'user' }).toArray();
-    const validator = colls[0]!['options']?.['validator'] as Record<string, unknown>;
-    const schema = validator['$jsonSchema'] as Record<string, unknown>;
+    const mapUserInfo = colls[0] as Record<string, unknown>;
+    const mapUserOpts = mapUserInfo['options'] as Record<string, unknown> | undefined;
+    const validator = mapUserOpts?.['validator'] as Record<string, unknown> | undefined;
+    const schema = validator!['$jsonSchema'] as Record<string, unknown>;
     const props = schema['properties'] as Record<string, unknown>;
     expect(props['first_name']).toBeDefined();
     expect(props['firstName']).toBeUndefined();
@@ -236,8 +245,10 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpDbServer }
     await planAndApply(replSetUri, null, contract);
 
     const colls = await db.listCollections({ name: 'user' }).toArray();
-    const validator = colls[0]!['options']?.['validator'] as Record<string, unknown>;
-    const schema = validator['$jsonSchema'] as Record<string, unknown>;
+    const voUserInfo = colls[0] as Record<string, unknown>;
+    const voUserOpts = voUserInfo['options'] as Record<string, unknown> | undefined;
+    const validator = voUserOpts?.['validator'] as Record<string, unknown> | undefined;
+    const schema = validator!['$jsonSchema'] as Record<string, unknown>;
     const props = schema['properties'] as Record<string, Record<string, unknown>>;
     expect(props['address']?.['bsonType']).toBe('object');
     const addressProps = props['address']?.['properties'] as Record<string, unknown>;

@@ -399,7 +399,9 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
 
       const colls = await db.listCollections({ name: 'users' }).toArray();
       expect(colls).toHaveLength(1);
-      const collOptions = colls[0]!['options'] as Record<string, unknown>;
+      const collOptions = (colls[0] as Record<string, unknown>)['options'] as
+        | Record<string, unknown>
+        | undefined;
       expect(collOptions?.['validator']).toBeDefined();
     });
 
@@ -437,11 +439,12 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
 
       const colls = await db.listCollections({ name: 'users' }).toArray();
       expect(colls).toHaveLength(1);
-      const collOptions = colls[0]!['options'] as Record<string, unknown>;
+      const collOptions = (colls[0] as Record<string, unknown>)['options'] as
+        | Record<string, unknown>
+        | undefined;
       const validator = collOptions?.['validator'] as Record<string, unknown> | undefined;
-      if (validator) {
-        expect(Object.keys(validator)).toHaveLength(0);
-      }
+      const isEffectivelyEmpty = !validator || Object.keys(validator).length === 0;
+      expect(isEffectivelyEmpty).toBe(true);
     });
   });
 
@@ -462,9 +465,11 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
 
       const colls = await db.listCollections({ name: 'logs' }).toArray();
       expect(colls).toHaveLength(1);
-      expect(colls[0]!['options']?.['capped']).toBe(true);
-      expect(colls[0]!['options']?.['size']).toBeGreaterThanOrEqual(10_000_000);
-      expect(colls[0]!['options']?.['max']).toBe(1000);
+      const logsInfo = colls[0] as Record<string, unknown>;
+      const logsOpts = logsInfo['options'] as Record<string, unknown> | undefined;
+      expect(logsOpts?.['capped']).toBe(true);
+      expect(logsOpts?.['size']).toBeGreaterThanOrEqual(10_000_000);
+      expect(logsOpts?.['max']).toBe(1000);
     });
 
     it('creates a collection with collation', async () => {
@@ -483,7 +488,9 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
 
       const colls = await db.listCollections({ name: 'posts' }).toArray();
       expect(colls).toHaveLength(1);
-      const collation = colls[0]!['options']?.['collation'] as Record<string, unknown> | undefined;
+      const postsInfo = colls[0] as Record<string, unknown>;
+      const postsOpts = postsInfo['options'] as Record<string, unknown> | undefined;
+      const collation = postsOpts?.['collation'] as Record<string, unknown> | undefined;
       expect(collation?.['locale']).toBe('en');
       expect(collation?.['strength']).toBe(2);
     });
@@ -504,8 +511,10 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
 
       let colls = await db.listCollections({ name: 'events' }).toArray();
       expect(colls).toHaveLength(1);
+      const eventsInfoV1 = colls[0] as Record<string, unknown>;
+      const eventsOptsV1 = eventsInfoV1['options'] as Record<string, unknown> | undefined;
       expect(
-        (colls[0]!['options']?.['changeStreamPreAndPostImages'] as Record<string, unknown>)?.[
+        (eventsOptsV1?.['changeStreamPreAndPostImages'] as Record<string, unknown> | undefined)?.[
           'enabled'
         ],
       ).toBe(true);
@@ -525,7 +534,9 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
 
       colls = await db.listCollections({ name: 'events' }).toArray();
       expect(colls).toHaveLength(1);
-      const csppiAfter = colls[0]!['options']?.['changeStreamPreAndPostImages'] as
+      const eventsInfoV2 = colls[0] as Record<string, unknown>;
+      const eventsOptsV2 = eventsInfoV2['options'] as Record<string, unknown> | undefined;
+      const csppiAfter = eventsOptsV2?.['changeStreamPreAndPostImages'] as
         | Record<string, unknown>
         | undefined;
       const disabledOrRemoved = csppiAfter === undefined || csppiAfter['enabled'] === false;
@@ -557,8 +568,10 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
 
       const colls = await db.listCollections({ name: 'metrics' }).toArray();
       expect(colls).toHaveLength(1);
-      expect(colls[0]!['type']).toBe('timeseries');
-      const tsOpts = colls[0]!['options']?.['timeseries'] as Record<string, unknown> | undefined;
+      const metricsInfo = colls[0] as Record<string, unknown>;
+      expect(metricsInfo['type']).toBe('timeseries');
+      const metricsOpts = metricsInfo['options'] as Record<string, unknown> | undefined;
+      const tsOpts = metricsOpts?.['timeseries'] as Record<string, unknown> | undefined;
       expect(tsOpts?.['timeField']).toBe('ts');
       expect(tsOpts?.['granularity']).toBe('hours');
     });
@@ -588,8 +601,9 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
 
       const colls = await db.listCollections({ name: 'clustered' }).toArray();
       expect(colls).toHaveLength(1);
-      const info = colls[0]!;
-      expect(info['options']?.['clusteredIndex']).toBeDefined();
+      const clusteredInfo = colls[0] as Record<string, unknown>;
+      const clusteredOpts = clusteredInfo['options'] as Record<string, unknown> | undefined;
+      expect(clusteredOpts?.['clusteredIndex']).toBeDefined();
     });
   });
 
@@ -695,7 +709,9 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
       expect(indexes.some((idx) => idx['key']?.['authorId'] === 1)).toBe(true);
 
       const colls = await db.listCollections({ name: 'articles' }).toArray();
-      expect(colls[0]!['options']?.['validator']).toBeDefined();
+      const articlesInfo = colls[0] as Record<string, unknown>;
+      const articlesOpts = articlesInfo['options'] as Record<string, unknown> | undefined;
+      expect(articlesOpts?.['validator']).toBeDefined();
 
       const v3 = makeContract(
         {
