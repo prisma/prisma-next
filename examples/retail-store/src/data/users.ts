@@ -8,3 +8,7 @@ export function findUsers(db: Db) {
 export function findUserById(db: Db, id: string) {
   return db.orm.users.where(objectIdEq('_id', id)).first();
 }
+
+export function createUser(db: Db, data: { name: string; email: string; address: null }) {
+  return db.orm.users.create(data);
+}
