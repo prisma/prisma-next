@@ -35,13 +35,20 @@ function buildIndexLookupKey(index: MongoSchemaIndex): string {
     index.unique ? 'unique' : '',
     index.sparse ? 'sparse' : '',
     index.expireAfterSeconds != null ? `ttl:${index.expireAfterSeconds}` : '',
-    index.partialFilterExpression ? `pfe:${JSON.stringify(index.partialFilterExpression)}` : '',
+    index.partialFilterExpression ? `pfe:${canonicalize(index.partialFilterExpression)}` : '',
+    index.wildcardProjection ? `wp:${canonicalize(index.wildcardProjection)}` : '',
+    index.collation ? `col:${canonicalize(index.collation)}` : '',
+    index.weights ? `wt:${canonicalize(index.weights)}` : '',
+    index.default_language ? `dl:${index.default_language}` : '',
+    index.language_override ? `lo:${index.language_override}` : '',
   ]
     .filter(Boolean)
     .join(';');
   return opts ? `${keys}|${opts}` : keys;
 }
 ```
+
+Object-valued options (`partialFilterExpression`, `wildcardProjection`, `collation`, `weights`) use `canonicalize()` — a key-order-independent serialization — so that `{ locale: 'en', strength: 2 }` and `{ strength: 2, locale: 'en' }` produce the same lookup key.
 
 Two indexes that produce the same lookup key are the same index. For example:
 
@@ -72,6 +79,11 @@ Each component is included because it changes the index's behavior at the databa
 - **`sparse`**. A sparse index omits documents missing the indexed field.
 - **`expireAfterSeconds`**. A TTL index with a 24-hour expiry is different from one with a 7-day expiry.
 - **`partialFilterExpression`**. A partial index scoped to `{ status: "active" }` is different from one scoped to `{ status: "archived" }`.
+- **`wildcardProjection`**. A wildcard index on `{ name: 1, email: 1 }` differs from `{ name: 1 }`.
+- **`collation`**. Per-index collation changes sort and comparison behavior.
+- **`weights`**. Text index weights change relevance scoring.
+- **`default_language`**. Changes how text indexes tokenize and stem words.
+- **`language_override`**. Changes the per-document field used to determine language.
 
 ### What the lookup key excludes
 
