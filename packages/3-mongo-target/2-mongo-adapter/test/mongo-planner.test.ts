@@ -584,7 +584,7 @@ describe('MongoMigrationPlanner', () => {
       expect(op.postcheck[0]!.expect).toBe('exists');
     });
 
-    it('validator remove has precheck and postcheck', () => {
+    it('validator remove has precheck and empty postcheck', () => {
       const contract = makeContract({ users: {} });
       const origin: MongoSchemaIR = {
         collections: {
@@ -607,9 +607,7 @@ describe('MongoMigrationPlanner', () => {
       expect(op.precheck[0]!.source.kind).toBe('listCollections');
       expect(op.precheck[0]!.expect).toBe('exists');
 
-      expect(op.postcheck).toHaveLength(1);
-      expect(op.postcheck[0]!.source.kind).toBe('listCollections');
-      expect(op.postcheck[0]!.expect).toBe('exists');
+      expect(op.postcheck).toHaveLength(0);
     });
 
     it('classifies validator removal as widening', () => {

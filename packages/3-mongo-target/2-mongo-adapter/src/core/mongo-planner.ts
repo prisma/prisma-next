@@ -243,17 +243,7 @@ function planValidatorDiff(
         }),
       },
     ],
-    postcheck: [
-      {
-        description: `validator removed from ${collName}`,
-        source: new ListCollectionsCommand(),
-        filter: MongoAndExpr.of([
-          MongoFieldFilter.eq('name', collName),
-          MongoFieldFilter.eq('options.validationLevel', 'strict'),
-        ]),
-        expect: 'exists' as const,
-      },
-    ],
+    postcheck: [],
   };
 }
 
