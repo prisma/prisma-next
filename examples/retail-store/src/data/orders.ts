@@ -1,7 +1,6 @@
-import { ObjectId } from 'mongodb';
 import type { Db } from '../db';
 import { collectFirstResult } from './execute-raw';
-import { objectIdEq } from './object-id-filter';
+import { objectIdEq, rawObjectIdFilter } from './object-id-filter';
 
 export function getUserOrders(db: Db, userId: string) {
   return db.orm.orders.where(objectIdEq('userId', userId)).all();
@@ -52,7 +51,7 @@ export async function updateOrderStatus(
 ) {
   const plan = db.raw
     .collection('orders')
-    .findOneAndUpdate({ _id: new ObjectId(orderId) }, { $push: { statusHistory: entry } })
+    .findOneAndUpdate(rawObjectIdFilter('_id', orderId), { $push: { statusHistory: entry } })
     .build();
   return collectFirstResult<Record<string, unknown>>(db, plan);
 }
