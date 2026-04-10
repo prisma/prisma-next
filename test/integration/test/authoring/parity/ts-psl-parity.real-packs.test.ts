@@ -18,17 +18,30 @@ const int4Column = {
   nativeType: 'int4',
 } as const;
 
-const representativePslSchema = `types {
-  ShortName = sql.String(length: 35)
-  Embedding1536 = pgvector.Vector(1536)
-}
+const REAL_PACK_CONTROLS = [
+  sqlFamilyControl,
+  postgresControl,
+  postgresAdapter,
+  pgvectorControl,
+] as const;
 
-model Document {
-  id Int @id(map: "document_pkey")
-  shortName ShortName @unique(map: "document_short_name_key")
-  embedding Embedding1536?
+const realPackAuthoringContributions = assembleAuthoringContributions([...REAL_PACK_CONTROLS]);
+const realPackPslInputs = assemblePslInterpretationContributions([...REAL_PACK_CONTROLS]);
+
+function interpretWithRealPacks(schema: string) {
+  return interpretPslDocumentToSqlContract({
+    document: parsePslDocument({ schema, sourceId: 'schema.prisma' }),
+    target: postgresPack,
+    scalarTypeDescriptors: realPackPslInputs.scalarTypeDescriptors,
+    controlMutationDefaults: {
+      defaultFunctionRegistry: realPackPslInputs.defaultFunctionRegistry,
+      generatorDescriptors: realPackPslInputs.generatorDescriptors,
+    },
+    authoringContributions: realPackAuthoringContributions,
+    composedExtensionPacks: [pgvectorControl.id],
+    composedExtensionPackRefs: [pgvectorPack],
+  });
 }
-`;
 
 describe('TS and PSL authoring parity with real packs', () => {
   it('lowers family-owned and extension-owned type constructors to identical output', () => {
@@ -63,36 +76,17 @@ describe('TS and PSL authoring parity with real packs', () => {
       },
     );
 
-    const document = parsePslDocument({
-      schema: representativePslSchema,
-      sourceId: 'schema.prisma',
-    });
+    const interpreted = interpretWithRealPacks(`types {
+  ShortName = sql.String(length: 35)
+  Embedding1536 = pgvector.Vector(1536)
+}
 
-    const authoringContributions = assembleAuthoringContributions([
-      sqlFamilyControl,
-      postgresControl,
-      postgresAdapter,
-      pgvectorControl,
-    ]);
-    const pslInputs = assemblePslInterpretationContributions([
-      sqlFamilyControl,
-      postgresControl,
-      postgresAdapter,
-      pgvectorControl,
-    ]);
-
-    const interpreted = interpretPslDocumentToSqlContract({
-      document,
-      target: postgresPack,
-      scalarTypeDescriptors: pslInputs.scalarTypeDescriptors,
-      controlMutationDefaults: {
-        defaultFunctionRegistry: pslInputs.defaultFunctionRegistry,
-        generatorDescriptors: pslInputs.generatorDescriptors,
-      },
-      authoringContributions,
-      composedExtensionPacks: [pgvectorControl.id],
-      composedExtensionPackRefs: [pgvectorPack],
-    });
+model Document {
+  id Int @id(map: "document_pkey")
+  shortName ShortName @unique(map: "document_short_name_key")
+  embedding Embedding1536?
+}
+`);
 
     expect(interpreted.ok).toBe(true);
     if (!interpreted.ok) return;
@@ -124,41 +118,12 @@ describe('TS and PSL authoring parity with real packs', () => {
       }),
     );
 
-    const document = parsePslDocument({
-      schema: `model Document {
+    const interpreted = interpretWithRealPacks(`model Document {
   id Int @id(map: "document_pkey")
   shortName sql.String(length: 35) @unique(map: "document_short_name_key")
   embedding pgvector.Vector(length: 1536)?
 }
-`,
-      sourceId: 'schema.prisma',
-    });
-
-    const authoringContributions = assembleAuthoringContributions([
-      sqlFamilyControl,
-      postgresControl,
-      postgresAdapter,
-      pgvectorControl,
-    ]);
-    const pslInputs = assemblePslInterpretationContributions([
-      sqlFamilyControl,
-      postgresControl,
-      postgresAdapter,
-      pgvectorControl,
-    ]);
-
-    const interpreted = interpretPslDocumentToSqlContract({
-      document,
-      target: postgresPack,
-      scalarTypeDescriptors: pslInputs.scalarTypeDescriptors,
-      controlMutationDefaults: {
-        defaultFunctionRegistry: pslInputs.defaultFunctionRegistry,
-        generatorDescriptors: pslInputs.generatorDescriptors,
-      },
-      authoringContributions,
-      composedExtensionPacks: [pgvectorControl.id],
-      composedExtensionPackRefs: [pgvectorPack],
-    });
+`);
 
     expect(interpreted.ok).toBe(true);
     if (!interpreted.ok) return;
