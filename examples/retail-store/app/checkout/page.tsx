@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Button } from '../../src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../src/components/ui/card';
 import { Separator } from '../../src/components/ui/separator';
 import { getCartByUserId } from '../../src/data/carts';
@@ -79,15 +78,6 @@ export default async function CheckoutPage() {
               image: { url: item.image.url as string },
             }))}
           />
-
-          {items.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted mb-4">Your cart is empty.</p>
-              <Button asChild>
-                <Link href="/">Browse Products</Link>
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
