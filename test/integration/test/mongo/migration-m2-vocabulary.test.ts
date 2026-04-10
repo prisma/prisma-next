@@ -1,0 +1,587 @@
+import {
+  contractToMongoSchemaIR,
+  MongoMigrationPlanner,
+  MongoMigrationRunner,
+  serializeMongoOps,
+} from '@prisma-next/adapter-mongo/control';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
+import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
+import { timeouts } from '@prisma-next/test-utils';
+import { type Db, MongoClient } from 'mongodb';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+const ALL_POLICY = {
+  allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
+};
+
+function makeContract(
+  collections: Record<string, MongoStorageCollection>,
+  hashSeed: string,
+): MongoContract {
+  return {
+    target: 'mongo',
+    targetFamily: 'mongo',
+    roots: Object.fromEntries(Object.keys(collections).map((c) => [c, c])),
+    models: Object.fromEntries(
+      Object.keys(collections).map((c) => [
+        c,
+        {
+          fields: {
+            _id: {
+              nullable: false,
+              type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
+            },
+          },
+          relations: {},
+          storage: { collection: c },
+        },
+      ]),
+    ),
+    storage: {
+      collections,
+      storageHash: coreHash(`sha256:${hashSeed}`),
+    },
+    capabilities: {},
+    extensionPacks: {},
+    profileHash: profileHash('sha256:test'),
+    meta: {},
+  };
+}
+
+async function planAndApply(
+  db: Db,
+  replSetUri: string,
+  origin: MongoContract | null,
+  destination: MongoContract,
+): Promise<void> {
+  const planner = new MongoMigrationPlanner();
+  const schema = contractToMongoSchemaIR(origin);
+  const result = planner.plan({
+    contract: destination,
+    schema,
+    policy: ALL_POLICY,
+    frameworkComponents: [],
+  });
+  if (result.kind !== 'success') {
+    throw new Error(`Plan failed: ${JSON.stringify(result)}`);
+  }
+
+  const ops = result.plan.operations as readonly MongoMigrationPlanOperation[];
+  if (ops.length === 0) return;
+
+  const serialized = JSON.parse(serializeMongoOps(ops));
+  const controlDriver = await mongoControlDriver.create(replSetUri);
+  try {
+    const runner = new MongoMigrationRunner();
+    const runResult = await runner.execute({
+      plan: {
+        targetId: 'mongo',
+        ...(origin ? { origin: { storageHash: origin.storage.storageHash } } : {}),
+        destination: { storageHash: destination.storage.storageHash },
+        operations: serialized,
+      },
+      driver: controlDriver,
+      destinationContract: destination,
+      policy: ALL_POLICY,
+      frameworkComponents: [],
+    });
+    if (!runResult.ok) {
+      throw new Error(`Apply failed: ${JSON.stringify(runResult)}`);
+    }
+  } finally {
+    await controlDriver.close();
+  }
+}
+
+describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServer }, () => {
+  let replSet: MongoMemoryReplSet;
+  let client: MongoClient;
+  let db: Db;
+  const dbName = 'migration_m2_test';
+  let replSetUri: string;
+
+  beforeAll(async () => {
+    replSet = await MongoMemoryReplSet.create({
+      instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+      replSet: { count: 1, storageEngine: 'wiredTiger' },
+    });
+    client = new MongoClient(replSet.getUri());
+    await client.connect();
+    db = client.db(dbName);
+    replSetUri = replSet.getUri(dbName);
+  }, timeouts.spinUpDbServer);
+
+  beforeEach(async () => {
+    await db.dropDatabase();
+  });
+
+  afterAll(async () => {
+    try {
+      await client?.close();
+      await replSet?.stop();
+    } catch {
+      // ignore
+    }
+  }, timeouts.spinUpDbServer);
+
+  describe('compound indexes', () => {
+    it('creates a compound ascending + descending index', async () => {
+      const contract = makeContract(
+        {
+          users: {
+            indexes: [
+              {
+                keys: [
+                  { field: 'lastName', direction: 1 },
+                  { field: 'firstName', direction: -1 },
+                ],
+              },
+            ],
+          },
+        },
+        'compound-idx',
+      );
+
+      await planAndApply(db, replSetUri, null, contract);
+
+      const indexes = await db.collection('users').listIndexes().toArray();
+      const compound = indexes.find(
+        (idx) => idx['key']?.['lastName'] === 1 && idx['key']?.['firstName'] === -1,
+      );
+      expect(compound).toBeDefined();
+    });
+  });
+
+  describe('text indexes', () => {
+    it('creates a text index with weights and default_language', async () => {
+      const contract = makeContract(
+        {
+          articles: {
+            indexes: [
+              {
+                keys: [
+                  { field: 'title', direction: 'text' },
+                  { field: 'body', direction: 'text' },
+                ],
+                weights: { title: 10, body: 5 },
+                default_language: 'english',
+              },
+            ],
+          },
+        },
+        'text-idx',
+      );
+
+      await planAndApply(db, replSetUri, null, contract);
+
+      const indexes = await db.collection('articles').listIndexes().toArray();
+      const textIdx = indexes.find((idx) => idx['key']?.['_fts'] === 'text');
+      expect(textIdx).toBeDefined();
+      expect(textIdx!['weights']).toEqual({ title: 10, body: 5 });
+      expect(textIdx!['default_language']).toBe('english');
+    });
+  });
+
+  describe('TTL indexes', () => {
+    it('creates a TTL index', async () => {
+      const contract = makeContract(
+        {
+          sessions: {
+            indexes: [
+              {
+                keys: [{ field: 'expiresAt', direction: 1 }],
+                expireAfterSeconds: 3600,
+              },
+            ],
+          },
+        },
+        'ttl-idx',
+      );
+
+      await planAndApply(db, replSetUri, null, contract);
+
+      const indexes = await db.collection('sessions').listIndexes().toArray();
+      const ttlIdx = indexes.find((idx) => idx['key']?.['expiresAt'] === 1);
+      expect(ttlIdx).toBeDefined();
+      expect(ttlIdx!['expireAfterSeconds']).toBe(3600);
+    });
+  });
+
+  describe('hashed indexes', () => {
+    it('creates a hashed index', async () => {
+      const contract = makeContract(
+        {
+          items: {
+            indexes: [{ keys: [{ field: 'shard_key', direction: 'hashed' }] }],
+          },
+        },
+        'hashed-idx',
+      );
+
+      await planAndApply(db, replSetUri, null, contract);
+
+      const indexes = await db.collection('items').listIndexes().toArray();
+      const hashIdx = indexes.find((idx) => idx['key']?.['shard_key'] === 'hashed');
+      expect(hashIdx).toBeDefined();
+    });
+  });
+
+  describe('2dsphere indexes', () => {
+    it('creates a 2dsphere geospatial index', async () => {
+      const contract = makeContract(
+        {
+          places: {
+            indexes: [{ keys: [{ field: 'location', direction: '2dsphere' }] }],
+          },
+        },
+        '2dsphere-idx',
+      );
+
+      await planAndApply(db, replSetUri, null, contract);
+
+      const indexes = await db.collection('places').listIndexes().toArray();
+      const geoIdx = indexes.find((idx) => idx['key']?.['location'] === '2dsphere');
+      expect(geoIdx).toBeDefined();
+    });
+  });
+
+  describe('partial indexes', () => {
+    it('creates a partial index with partialFilterExpression', async () => {
+      const contract = makeContract(
+        {
+          users: {
+            indexes: [
+              {
+                keys: [{ field: 'email', direction: 1 }],
+                unique: true,
+                partialFilterExpression: { email: { $exists: true } },
+              },
+            ],
+          },
+        },
+        'partial-idx',
+      );
+
+      await planAndApply(db, replSetUri, null, contract);
+
+      const indexes = await db.collection('users').listIndexes().toArray();
+      const partialIdx = indexes.find((idx) => idx['key']?.['email'] === 1);
+      expect(partialIdx).toBeDefined();
+      expect(partialIdx!['unique']).toBe(true);
+      expect(partialIdx!['partialFilterExpression']).toEqual({ email: { $exists: true } });
+    });
+  });
+
+  describe('indexes with collation', () => {
+    it('creates an index with case-insensitive collation', async () => {
+      const contract = makeContract(
+        {
+          users: {
+            indexes: [
+              {
+                keys: [{ field: 'name', direction: 1 }],
+                collation: { locale: 'en', strength: 2 },
+              },
+            ],
+          },
+        },
+        'collation-idx',
+      );
+
+      await planAndApply(db, replSetUri, null, contract);
+
+      const indexes = await db.collection('users').listIndexes().toArray();
+      const collIdx = indexes.find((idx) => idx['key']?.['name'] === 1);
+      expect(collIdx).toBeDefined();
+      expect(collIdx!['collation']?.['locale']).toBe('en');
+      expect(collIdx!['collation']?.['strength']).toBe(2);
+    });
+  });
+
+  describe('wildcard indexes', () => {
+    it('creates a wildcard index with wildcardProjection', async () => {
+      const contract = makeContract(
+        {
+          events: {
+            indexes: [
+              {
+                keys: [{ field: '$**', direction: 1 }],
+                wildcardProjection: { metadata: 1 },
+              },
+            ],
+          },
+        },
+        'wildcard-idx',
+      );
+
+      await planAndApply(db, replSetUri, null, contract);
+
+      const indexes = await db.collection('events').listIndexes().toArray();
+      const wcIdx = indexes.find((idx) => idx['key']?.['$**'] === 1);
+      expect(wcIdx).toBeDefined();
+    });
+  });
+
+  describe('modify indexes', () => {
+    it('drops old index and creates new index on change', async () => {
+      const v1 = makeContract(
+        {
+          users: {
+            indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
+          },
+        },
+        'modify-v1',
+      );
+
+      await planAndApply(db, replSetUri, null, v1);
+
+      let indexes = await db.collection('users').listIndexes().toArray();
+      expect(indexes.some((idx) => idx['key']?.['email'] === 1)).toBe(true);
+
+      const v2 = makeContract(
+        {
+          users: {
+            indexes: [{ keys: [{ field: 'name', direction: 1 }], sparse: true }],
+          },
+        },
+        'modify-v2',
+      );
+
+      await planAndApply(db, replSetUri, v1, v2);
+
+      indexes = await db.collection('users').listIndexes().toArray();
+      expect(indexes.some((idx) => idx['key']?.['email'] === 1)).toBe(false);
+      const nameIdx = indexes.find((idx) => idx['key']?.['name'] === 1);
+      expect(nameIdx).toBeDefined();
+      expect(nameIdx!['sparse']).toBe(true);
+    });
+  });
+
+  describe('validators via collMod', () => {
+    it('adds a validator to an existing collection', async () => {
+      const v1 = makeContract(
+        {
+          users: {
+            indexes: [{ keys: [{ field: 'email', direction: 1 }] }],
+          },
+        },
+        'validator-v1',
+      );
+
+      await planAndApply(db, replSetUri, null, v1);
+
+      const v2 = makeContract(
+        {
+          users: {
+            indexes: [{ keys: [{ field: 'email', direction: 1 }] }],
+            validator: {
+              jsonSchema: {
+                bsonType: 'object',
+                required: ['email'],
+                properties: {
+                  email: { bsonType: 'string' },
+                },
+              },
+              validationLevel: 'strict',
+              validationAction: 'error',
+            },
+          },
+        },
+        'validator-v2',
+      );
+
+      await planAndApply(db, replSetUri, v1, v2);
+
+      const colls = await db.listCollections({ name: 'users' }).toArray();
+      expect(colls).toHaveLength(1);
+      const collOptions = colls[0]!['options'] as Record<string, unknown>;
+      expect(collOptions?.['validator']).toBeDefined();
+    });
+
+    it('removes a validator from a collection', async () => {
+      const withValidator = makeContract(
+        {
+          users: {
+            indexes: [{ keys: [{ field: 'email', direction: 1 }] }],
+            validator: {
+              jsonSchema: {
+                bsonType: 'object',
+                required: ['email'],
+                properties: { email: { bsonType: 'string' } },
+              },
+              validationLevel: 'strict',
+              validationAction: 'error',
+            },
+          },
+        },
+        'val-remove-v1',
+      );
+
+      await planAndApply(db, replSetUri, null, withValidator);
+
+      const withoutValidator = makeContract(
+        {
+          users: {
+            indexes: [{ keys: [{ field: 'email', direction: 1 }] }],
+          },
+        },
+        'val-remove-v2',
+      );
+
+      await planAndApply(db, replSetUri, withValidator, withoutValidator);
+
+      const colls = await db.listCollections({ name: 'users' }).toArray();
+      expect(colls).toHaveLength(1);
+      const collOptions = colls[0]!['options'] as Record<string, unknown>;
+      const validator = collOptions?.['validator'] as Record<string, unknown> | undefined;
+      if (validator) {
+        expect(Object.keys(validator)).toHaveLength(0);
+      }
+    });
+  });
+
+  describe('collection with options', () => {
+    it('creates a capped collection', async () => {
+      const contract = makeContract(
+        {
+          logs: {
+            options: {
+              capped: { size: 10_000_000, max: 1000 },
+            },
+          },
+        },
+        'capped-coll',
+      );
+
+      await planAndApply(db, replSetUri, null, contract);
+
+      const colls = await db.listCollections({ name: 'logs' }).toArray();
+      expect(colls).toHaveLength(1);
+      expect(colls[0]!['options']?.['capped']).toBe(true);
+      expect(colls[0]!['options']?.['size']).toBeGreaterThanOrEqual(10_000_000);
+      expect(colls[0]!['options']?.['max']).toBe(1000);
+    });
+  });
+
+  describe('collection drops', () => {
+    it('drops a collection when it disappears from the destination contract', async () => {
+      const v1 = makeContract(
+        {
+          users: {
+            indexes: [{ keys: [{ field: 'email', direction: 1 }] }],
+          },
+          posts: {
+            indexes: [{ keys: [{ field: 'title', direction: 1 }] }],
+          },
+        },
+        'drop-v1',
+      );
+
+      await planAndApply(db, replSetUri, null, v1);
+
+      let collNames = (await db.listCollections().toArray()).map((c) => c['name']);
+      expect(collNames).toContain('users');
+      expect(collNames).toContain('posts');
+
+      const v2 = makeContract(
+        {
+          users: {
+            indexes: [{ keys: [{ field: 'email', direction: 1 }] }],
+          },
+        },
+        'drop-v2',
+      );
+
+      await planAndApply(db, replSetUri, v1, v2);
+
+      collNames = (await db.listCollections().toArray())
+        .map((c) => c['name'] as string)
+        .filter((n) => !n.startsWith('_prisma') && !n.startsWith('system.'));
+      expect(collNames).toContain('users');
+      expect(collNames).not.toContain('posts');
+    });
+  });
+
+  describe('full lifecycle: create → modify → remove', () => {
+    it('exercices a multi-step lifecycle for diverse index types', async () => {
+      const v1 = makeContract(
+        {
+          articles: {
+            indexes: [
+              {
+                keys: [
+                  { field: 'title', direction: 'text' },
+                  { field: 'body', direction: 'text' },
+                ],
+                weights: { title: 10, body: 5 },
+                default_language: 'english',
+              },
+              { keys: [{ field: 'createdAt', direction: 1 }], expireAfterSeconds: 86400 },
+            ],
+          },
+        },
+        'lifecycle-v1',
+      );
+
+      await planAndApply(db, replSetUri, null, v1);
+
+      let indexes = await db.collection('articles').listIndexes().toArray();
+      expect(indexes.some((idx) => idx['key']?.['_fts'] === 'text')).toBe(true);
+      expect(indexes.some((idx) => idx['key']?.['createdAt'] === 1)).toBe(true);
+
+      const v2 = makeContract(
+        {
+          articles: {
+            indexes: [
+              {
+                keys: [
+                  { field: 'title', direction: 'text' },
+                  { field: 'body', direction: 'text' },
+                ],
+                weights: { title: 10, body: 5 },
+                default_language: 'english',
+              },
+              { keys: [{ field: 'authorId', direction: 1 }] },
+            ],
+            validator: {
+              jsonSchema: {
+                bsonType: 'object',
+                required: ['title'],
+                properties: { title: { bsonType: 'string' } },
+              },
+              validationLevel: 'moderate',
+              validationAction: 'warn',
+            },
+          },
+        },
+        'lifecycle-v2',
+      );
+
+      await planAndApply(db, replSetUri, v1, v2);
+
+      indexes = await db.collection('articles').listIndexes().toArray();
+      expect(indexes.some((idx) => idx['key']?.['_fts'] === 'text')).toBe(true);
+      expect(indexes.some((idx) => idx['key']?.['createdAt'] === 1)).toBe(false);
+      expect(indexes.some((idx) => idx['key']?.['authorId'] === 1)).toBe(true);
+
+      const colls = await db.listCollections({ name: 'articles' }).toArray();
+      expect(colls[0]!['options']?.['validator']).toBeDefined();
+
+      const v3 = makeContract(
+        {
+          articles: {},
+        },
+        'lifecycle-v3',
+      );
+
+      await planAndApply(db, replSetUri, v2, v3);
+
+      indexes = await db.collection('articles').listIndexes().toArray();
+      const nonIdIndexes = indexes.filter((idx) => idx['name'] !== '_id_');
+      expect(nonIdIndexes).toHaveLength(0);
+    });
+  });
+});

@@ -54,10 +54,18 @@ function formatKeys(keys: ReadonlyArray<MongoIndexKey>): string {
   return keys.map((k) => `${k.field}:${k.direction}`).join(', ');
 }
 
+function isTextIndex(keys: ReadonlyArray<MongoIndexKey>): boolean {
+  return keys.some((k) => k.direction === 'text');
+}
+
 function planCreateIndex(collection: string, index: MongoSchemaIndex): MongoMigrationPlanOperation {
   const { keys } = index;
   const name = defaultMongoIndexName(keys);
-  const keyFilter = MongoFieldFilter.eq('key', keysToKeySpec(keys));
+
+  const textIndex = isTextIndex(keys);
+  const keyFilter = textIndex
+    ? MongoFieldFilter.eq('key._fts', 'text')
+    : MongoFieldFilter.eq('key', keysToKeySpec(keys));
   const fullFilter = index.unique
     ? MongoAndExpr.of([keyFilter, MongoFieldFilter.eq('unique', true)])
     : keyFilter;
@@ -105,7 +113,10 @@ function planCreateIndex(collection: string, index: MongoSchemaIndex): MongoMigr
 function planDropIndex(collection: string, index: MongoSchemaIndex): MongoMigrationPlanOperation {
   const { keys } = index;
   const indexName = defaultMongoIndexName(keys);
-  const keyFilter = MongoFieldFilter.eq('key', keysToKeySpec(keys));
+  const textIndex = isTextIndex(keys);
+  const keyFilter = textIndex
+    ? MongoFieldFilter.eq('key._fts', 'text')
+    : MongoFieldFilter.eq('key', keysToKeySpec(keys));
 
   return {
     id: buildIndexOpId('drop', collection, keys),
@@ -327,9 +338,7 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
           collCreates.push(planCreateCollection(collName, destColl));
         }
       } else if (originColl && !destColl) {
-        if (collectionHasOptions(originColl)) {
-          collDrops.push(planDropCollection(collName));
-        }
+        collDrops.push(planDropCollection(collName));
       } else if (originColl && destColl) {
         const immutableChange = hasImmutableOptionChange(originColl.options, destColl.options);
         if (immutableChange) {
