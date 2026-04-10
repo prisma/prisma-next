@@ -40,6 +40,9 @@
     },
     "clean": {
       "cache": false
+    },
+    "@prisma-next/sql-builder#emit": {
+      "dependsOn": ["@prisma-next/cli#build"]
     }
   }
 }

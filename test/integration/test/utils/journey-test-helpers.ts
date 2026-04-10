@@ -15,6 +15,7 @@ import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
+import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
 import { createMigrationRefCommand } from '@prisma-next/cli/commands/migration-ref';
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
@@ -175,6 +176,7 @@ export const contractFixtures = {
   'contract-phone-bio': join(JOURNEY_FIXTURES_DIR, 'contract-phone-bio.ts'),
   'contract-avatar': join(JOURNEY_FIXTURES_DIR, 'contract-avatar.ts'),
   'contract-all': join(JOURNEY_FIXTURES_DIR, 'contract-all.ts'),
+  'contract-unique-email': join(JOURNEY_FIXTURES_DIR, 'contract-unique-email.ts'),
 } as const;
 
 export type ContractVariant = keyof typeof contractFixtures;
@@ -337,6 +339,13 @@ export async function runMigrationPlan(
   return runCommand(createMigrationPlanCommand(), ctx, extraArgs);
 }
 
+export async function runMigrationNew(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  return runCommand(createMigrationNewCommand(), ctx, extraArgs);
+}
+
 export async function runMigrationApply(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
@@ -362,7 +371,6 @@ export async function runMigrationVerify(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
-  // migration verify doesn't support --config, use runCommandRaw
   return runCommandRaw(createMigrationVerifyCommand(), ctx.testDir, extraArgs);
 }
 
