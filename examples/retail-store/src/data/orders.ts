@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb';
 import type { Db } from '../db';
 import { objectIdEq } from './object-id-filter';
 
@@ -41,4 +42,19 @@ export function createOrder(
 
 export function deleteOrder(db: Db, id: string) {
   return db.orm.orders.where(objectIdEq('_id', id)).delete();
+}
+
+export async function updateOrderStatus(
+  db: Db,
+  orderId: string,
+  entry: { status: string; timestamp: Date },
+) {
+  const oid = orderId instanceof ObjectId ? orderId : new ObjectId(orderId as string);
+  const plan = db.raw
+    .collection('orders')
+    .updateOne({ _id: oid }, { $push: { statusHistory: entry } })
+    .build();
+  for await (const _ of db.runtime.execute(plan)) {
+    /* consume */
+  }
 }
