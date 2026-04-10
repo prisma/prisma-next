@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getAuthUser } from '../lib/auth';
+import { CartBadge } from './cart-badge';
 import { NavbarClient } from './navbar-client';
 
 export async function Navbar() {
@@ -19,9 +20,10 @@ export async function Navbar() {
         </Link>
         <Link
           href="/cart"
-          className="text-background/80 hover:text-background px-3 py-1.5 text-sm font-medium no-underline"
+          className="text-background/80 hover:text-background px-3 py-1.5 text-sm font-medium no-underline relative"
         >
           Cart
+          <CartBadge />
         </Link>
         <Link
           href="/orders"

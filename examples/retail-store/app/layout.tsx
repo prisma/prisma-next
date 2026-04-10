@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { CartProvider } from '../src/components/cart-provider';
 import { Navbar } from '../src/components/navbar';
 import './globals.css';
 
@@ -11,8 +12,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <Navbar />
-        <main className="max-w-6xl mx-auto px-6 py-8">{children}</main>
+        <CartProvider>
+          <Navbar />
+          <main className="max-w-6xl mx-auto px-6 py-8">{children}</main>
+        </CartProvider>
       </body>
     </html>
   );
