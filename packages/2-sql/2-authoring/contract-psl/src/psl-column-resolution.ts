@@ -421,6 +421,9 @@ function parsePslObjectLiteral(
     return INVALID_AUTHORING_ARGUMENT;
   }
 
+  // Structural narrowing leaves `parsed` as `object`; key-validation in
+  // `validateAuthoringArgument` (framework-authoring) enforces the record
+  // shape downstream.
   return parsed as Record<string, unknown>;
 }
 

@@ -453,4 +453,146 @@ model Document {
       },
     });
   });
+
+  describe('object literal constructor arguments', () => {
+    const objectArgContributions = {
+      type: {
+        sql: {
+          String: {
+            kind: 'typeConstructor' as const,
+            args: [
+              {
+                kind: 'object' as const,
+                properties: {
+                  length: { kind: 'number' as const, integer: true, minimum: 1 },
+                  label: { kind: 'string' as const, optional: true },
+                },
+              },
+            ],
+            output: {
+              codecId: 'custom/varchar@1',
+              nativeType: 'character varying',
+              typeParams: {
+                length: { kind: 'arg' as const, index: 0, path: ['length'] },
+                label: { kind: 'arg' as const, index: 0, path: ['label'] },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const interpretWith = (schema: string) =>
+      interpretPslDocumentToSqlContract({
+        ...baseInput,
+        document: parsePslDocument({ schema, sourceId: 'schema.prisma' }),
+        authoringContributions: objectArgContributions,
+      });
+
+    it('accepts strict JSON with double-quoted keys', () => {
+      const result = interpretWith(`types {
+  Short = sql.String({ "length": 35, "label": "short" })
+}
+
+model Doc {
+  id Int @id
+  s Short
+}
+`);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.storage).toMatchObject({
+        types: { Short: { typeParams: { length: 35, label: 'short' } } },
+      });
+    });
+
+    it('rejects an object literal that is missing a required property', () => {
+      const result = interpretWith(`types {
+  Short = sql.String({ label: 'short' })
+}
+
+model Doc {
+  id Int @id
+  s Short
+}
+`);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT' }),
+        ]),
+      );
+    });
+
+    it('rejects an object literal with an unknown property', () => {
+      const result = interpretWith(`types {
+  Short = sql.String({ length: 35, bogus: 'x' })
+}
+
+model Doc {
+  id Int @id
+  s Short
+}
+`);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT' }),
+        ]),
+      );
+    });
+
+    it('rejects an object literal with a wrong-typed property', () => {
+      const result = interpretWith(`types {
+  Short = sql.String({ length: 'not a number' })
+}
+
+model Doc {
+  id Int @id
+  s Short
+}
+`);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT' }),
+        ]),
+      );
+    });
+
+    it('rejects malformed object literal syntax (unclosed brace)', () => {
+      const result = interpretWith(`types {
+  Short = sql.String({ length: 35 )
+}
+
+model Doc {
+  id Int @id
+  s Short
+}
+`);
+      expect(result.ok).toBe(false);
+    });
+
+    it('rejects a top-level non-object literal', () => {
+      const result = interpretWith(`types {
+  Short = sql.String([1, 2, 3])
+}
+
+model Doc {
+  id Int @id
+  s Short
+}
+`);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT' }),
+        ]),
+      );
+    });
+  });
 });
