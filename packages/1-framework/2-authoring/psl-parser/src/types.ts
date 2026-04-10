@@ -136,6 +136,11 @@ export interface PslCompositeType {
 export interface PslNamedTypeDeclaration {
   readonly kind: 'namedType';
   readonly name: string;
+  /**
+   * Parser invariant: exactly one of `baseType` and `typeConstructor` is set.
+   * Expressing this as a discriminated union trips TypeScript narrowing when
+   * the declaration flows through helpers that accept the full union.
+   */
   readonly baseType?: string;
   readonly typeConstructor?: PslTypeConstructorCall;
   readonly attributes: readonly PslAttribute[];

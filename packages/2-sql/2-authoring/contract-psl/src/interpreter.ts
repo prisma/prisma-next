@@ -316,7 +316,10 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
       continue;
     }
 
-    if (!declaration.baseType) {
+    // Parser invariant: when typeConstructor is absent, baseType is defined.
+    // The check below narrows `baseType` for TypeScript and guards against a
+    // parser regression; it is unreachable under a correct parser.
+    if (declaration.baseType === undefined) {
       input.diagnostics.push({
         code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
         message: `Named type "${declaration.name}" must declare a base type or constructor`,
@@ -325,14 +328,13 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
       });
       continue;
     }
-
+    const { baseType } = declaration;
     const baseDescriptor =
-      input.enumTypeDescriptors.get(declaration.baseType) ??
-      input.scalarTypeDescriptors.get(declaration.baseType);
+      input.enumTypeDescriptors.get(baseType) ?? input.scalarTypeDescriptors.get(baseType);
     if (!baseDescriptor) {
       input.diagnostics.push({
         code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        message: `Named type "${declaration.name}" references unsupported base type "${declaration.baseType}"`,
+        message: `Named type "${declaration.name}" references unsupported base type "${baseType}"`,
         sourceId: input.sourceId,
         span: declaration.span,
       });
@@ -355,7 +357,7 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
     if (dbNativeTypeAttribute) {
       const descriptor = resolveDbNativeTypeAttribute({
         attribute: dbNativeTypeAttribute,
-        baseType: declaration.baseType,
+        baseType,
         baseDescriptor,
         diagnostics: input.diagnostics,
         sourceId: input.sourceId,
