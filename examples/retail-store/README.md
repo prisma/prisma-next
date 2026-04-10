@@ -14,7 +14,7 @@ An e-commerce example application demonstrating Prisma Next's MongoDB capabiliti
 | **Vector search** | `findSimilarProducts` via `$vectorSearch` (requires Atlas cluster) |
 | **Next.js integration** | Server-rendered pages and REST API routes backed by the data access layer |
 
-## Quick Start
+## Quick Start (tests only — no external DB)
 
 ```bash
 # 1. Build framework packages (from repo root)
@@ -23,15 +23,56 @@ pnpm build
 # 2. Emit contract
 pnpm emit
 
-# 3. Run tests (uses mongodb-memory-server, no external DB needed)
+# 3. Run tests (uses mongodb-memory-server)
 pnpm test
+```
 
-# 4. (Optional) Run with a real MongoDB instance
-export MONGODB_URL="mongodb://localhost:27017"
-export MONGODB_DB="retail_store"
+## Running with a Remote MongoDB Instance
+
+To run the full app (UI + API) against a real MongoDB cluster:
+
+**1. Create `.env` in `examples/retail-store/`:**
+
+```env
+MONGODB_URL=mongodb+srv://user:pass@your-cluster.mongodb.net
+MONGODB_DB=retail_store
+```
+
+**2. Seed the database:**
+
+```bash
 pnpm db:seed
+```
+
+This populates all 7 collections (products, users, carts, orders, locations, invoices, events) with sample data.
+
+**3. Get the demo user's ObjectId:**
+
+The cart and orders pages filter by a logged-in user. After seeding, grab Alice's `_id` hex string:
+
+```bash
+mongosh "$MONGODB_URL/$MONGODB_DB" --eval 'db.users.findOne({email:"alice@example.com"})._id.str'
+```
+
+Add it to `.env`:
+
+```env
+DEMO_USER_ID=<hex string from above>
+```
+
+Without `DEMO_USER_ID`, the cart and orders pages will show empty.
+
+**4. Start the dev server:**
+
+```bash
 pnpm dev
 ```
+
+Open [http://localhost:3000](http://localhost:3000) to browse the product catalog, view the cart, and see order history.
+
+### Vector Search (optional, Atlas only)
+
+To test `findSimilarProducts`, create a vector search index named `product_embedding_index` on the `products` collection's `embedding` field in Atlas, and populate the `embedding` arrays with actual vectors (the seed data sets `embedding: null` by default).
 
 ## Domain Model
 
