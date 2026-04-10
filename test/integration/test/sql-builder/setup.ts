@@ -3,6 +3,7 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { sql } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
@@ -16,9 +17,8 @@ import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll } from 'vitest';
-import { sql } from '../../src/runtime/sql';
-import { contract } from '../fixtures/contract';
-import type { Contract } from '../fixtures/generated/contract';
+import { contract } from './fixtures/contract';
+import type { Contract } from './fixtures/generated/contract';
 
 export { timeouts };
 
