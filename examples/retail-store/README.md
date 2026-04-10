@@ -34,7 +34,7 @@ To run the full app (UI + API) against a real MongoDB cluster:
 **1. Create `.env` in `examples/retail-store/`:**
 
 ```env
-MONGODB_URL=mongodb+srv://user:pass@your-cluster.mongodb.net
+DB_URL=mongodb+srv://user:pass@your-cluster.mongodb.net
 MONGODB_DB=retail_store
 ```
 

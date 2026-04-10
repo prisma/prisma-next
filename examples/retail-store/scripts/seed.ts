@@ -25,9 +25,9 @@ function upsertEnvVar(filePath: string, key: string, value: string) {
 }
 
 async function main() {
-  const url = process.env['MONGODB_URL'];
+  const url = process.env['DB_URL'];
   if (!url) {
-    console.error('MONGODB_URL is required. Set it in your environment or .env file.');
+    console.error('DB_URL is required. Set it in your environment or .env file.');
     process.exit(1);
   }
 
