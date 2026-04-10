@@ -33,6 +33,12 @@ export interface GraphEdge {
    * - `'unreachable'` — magenta (CVD-safe: DB on a different branch)
    */
   readonly colorHint?: 'applied' | 'pending' | 'unreachable';
+  /**
+   * Edge rendering style.
+   * - `'solid'` (default) — normal edge with `│` connector
+   * - `'dashed'` — draft/phantom edge with `┊` connector, excluded from path resolution
+   */
+  readonly style?: 'solid' | 'dashed';
 }
 
 /**

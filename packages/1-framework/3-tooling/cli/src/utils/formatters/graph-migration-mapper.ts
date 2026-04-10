@@ -39,6 +39,12 @@ export interface EdgeStatus {
   readonly status: EdgeStatusKind;
 }
 
+export interface DraftEdge {
+  readonly from: string;
+  readonly to: string;
+  readonly dirName: string;
+}
+
 export interface MigrationGraphInput {
   readonly graph: MigrationGraph;
   readonly mode: 'online' | 'offline';
@@ -52,6 +58,8 @@ export interface MigrationGraphInput {
    * icons (✓/⧗) are baked into edge labels. Undefined in offline mode.
    */
   readonly edgeStatuses?: readonly EdgeStatus[] | undefined;
+  /** Draft migrations to render as dashed edges. */
+  readonly draftEdges?: readonly DraftEdge[] | undefined;
 }
 
 export interface MigrationRenderInput {
@@ -99,22 +107,9 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
     });
   }
 
-  // Detached contract node (not in graph)
-  if (contractHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(contractHash)) {
-    const detachedMarkers: NodeMarker[] = [];
-    if (mode === 'online' && markerHash === contractHash) {
-      detachedMarkers.push({ kind: 'db' });
-    }
-    detachedMarkers.push({ kind: 'contract', planned: false });
-    nodeList.push({
-      id: shortHash(contractHash),
-      markers: detachedMarkers,
-      style: 'detached',
-    });
-  }
-
   // Build edges
   const edgeList: GraphEdge[] = [];
+
   for (const [, entries] of graph.forwardChain) {
     for (const entry of entries) {
       const status = statusByDirName.get(entry.dirName);
@@ -207,6 +202,30 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
   } else {
     const lastEdge = [...graph.forwardChain.values()].flat().pop();
     spineTargetHash = lastEdge?.to ?? EMPTY_CONTRACT_HASH;
+  }
+
+  // Contract not in attested graph — connect from spine target with a dashed edge
+  if (contractHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(contractHash)) {
+    const contractMarkers: NodeMarker[] = [];
+    if (mode === 'online' && markerHash === contractHash) {
+      contractMarkers.push({ kind: 'db' });
+    }
+    contractMarkers.push({ kind: 'contract', planned: false });
+    nodeList.push({
+      id: shortHash(contractHash),
+      markers: contractMarkers,
+    });
+
+    const matchingDraft = input.draftEdges?.find((d) => d.to === contractHash);
+    const fromHash = matchingDraft?.from ?? spineTargetHash;
+    if (graph.nodes.has(fromHash) || fromHash === spineTargetHash) {
+      edgeList.push({
+        from: toShortId(fromHash),
+        to: shortHash(contractHash),
+        ...ifDefined('label', matchingDraft ? `${matchingDraft.dirName} [draft]` : undefined),
+        style: 'dashed',
+      });
+    }
   }
 
   return {
