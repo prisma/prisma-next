@@ -591,4 +591,107 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     expect(cmd.validationAction).toBe('error');
     expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
   });
+
+  it('rejects and filter with non-array exprs', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [
+          {
+            description: 'test',
+            source: { kind: 'listIndexes', collection: 'users' },
+            filter: { kind: 'and', exprs: 'not-array' },
+            expect: 'exists',
+          },
+        ],
+        execute: [],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid and filter/);
+  });
+
+  it('rejects or filter with non-array exprs', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [
+          {
+            description: 'test',
+            source: { kind: 'listIndexes', collection: 'users' },
+            filter: { kind: 'or', exprs: 'not-array' },
+            expect: 'exists',
+          },
+        ],
+        execute: [],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid or filter/);
+  });
+
+  it('rejects not filter with missing expr', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [
+          {
+            description: 'test',
+            source: { kind: 'listIndexes', collection: 'users' },
+            filter: { kind: 'not' },
+            expect: 'exists',
+          },
+        ],
+        execute: [],
+        postcheck: [],
+      },
+    ];
+    expect(() => deserializeMongoOps(json)).toThrow(/Invalid not filter/);
+  });
+
+  it('round-trips createCollection with M2 options', () => {
+    const timeseries = { timeField: 'ts', metaField: 'meta', granularity: 'hours' as const };
+    const collation = { locale: 'en', strength: 2 };
+    const changeStreamPreAndPostImages = { enabled: true };
+    const clusteredIndex = { key: { _id: 1 }, unique: true, name: 'clustered' };
+    const op: MongoMigrationPlanOperation = {
+      id: 'coll.ts.create',
+      label: 'Create time series collection',
+      operationClass: 'additive',
+      precheck: [
+        {
+          description: 'collection does not exist',
+          source: new ListCollectionsCommand(),
+          filter: MongoFieldFilter.eq('name', 'metrics'),
+          expect: 'notExists',
+        },
+      ],
+      execute: [
+        {
+          description: 'create metrics collection',
+          command: new CreateCollectionCommand('metrics', {
+            timeseries,
+            collation,
+            changeStreamPreAndPostImages,
+            clusteredIndex,
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
+    const cmd = deserialized[0]!.execute[0]!.command as CreateCollectionCommand;
+    expect(cmd.kind).toBe('createCollection');
+    expect(cmd.collection).toBe('metrics');
+    expect(cmd.timeseries).toEqual(timeseries);
+    expect(cmd.collation).toEqual(collation);
+    expect(cmd.changeStreamPreAndPostImages).toEqual(changeStreamPreAndPostImages);
+    expect(cmd.clusteredIndex).toEqual(clusteredIndex);
+  });
 });
