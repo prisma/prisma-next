@@ -246,7 +246,11 @@ function planCreateCollection(
           timeseries: opts?.timeseries,
           collation: opts?.collation,
           clusteredIndex: opts?.clusteredIndex
-            ? { key: { _id: 1 }, unique: true, name: opts.clusteredIndex.name }
+            ? {
+                key: { _id: 1 } as Record<string, number>,
+                unique: true as boolean,
+                ...(opts.clusteredIndex.name != null ? { name: opts.clusteredIndex.name } : {}),
+              }
             : undefined,
           validator: validator ? { $jsonSchema: validator.jsonSchema } : undefined,
           validationLevel: validator?.validationLevel,

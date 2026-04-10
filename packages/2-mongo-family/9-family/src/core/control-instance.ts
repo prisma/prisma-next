@@ -32,8 +32,6 @@ function extractDb(driver: ControlDriverInstance<'mongo', string>): Db {
 class MongoFamilyInstance implements MongoControlFamilyInstance {
   readonly familyId = 'mongo' as const;
 
-  constructor(_controlStack: ControlStack) {}
-
   validateContract(contractJson: unknown): Contract {
     const validated = validateMongoContract<MongoContract>(contractJson);
     // MongoContract and Contract share structure but are typed independently;
@@ -77,6 +75,6 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
   }
 }
 
-export function createMongoFamilyInstance(controlStack: ControlStack): MongoControlFamilyInstance {
-  return new MongoFamilyInstance(controlStack);
+export function createMongoFamilyInstance(_controlStack: ControlStack): MongoControlFamilyInstance {
+  return new MongoFamilyInstance();
 }

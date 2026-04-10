@@ -209,30 +209,16 @@ describe('validateMongoContract()', () => {
       });
     });
 
-    it('rejects index with extra properties in partialFilterExpression container', () => {
+    it('rejects unknown collection option properties', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
           collections: {
             items: {
-              indexes: [
-                {
-                  keys: [{ field: 'name', direction: 'text' }],
-                  partialFilterExpression: {
-                    $or: [{ status: 'active' }, { updatedAt: 1n }],
-                  },
-                },
-              ],
+              options: {
+                unsupported: true,
+              },
             },
-          },
-        },
-        models: {
-          Item: {
-            fields: {
-              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
-              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
-            },
-            storage: { collection: 'items' },
           },
         },
       };

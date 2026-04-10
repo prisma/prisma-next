@@ -36,7 +36,7 @@ describe('contractToMongoSchemaIR', () => {
     const ir = contractToMongoSchemaIR(
       makeContract({
         users: {
-          indexes: [{ fields: { email: 1 } }],
+          indexes: [{ keys: [{ field: 'email', direction: 1 }] }],
         },
       }),
     );
@@ -50,7 +50,7 @@ describe('contractToMongoSchemaIR', () => {
     const ir = contractToMongoSchemaIR(
       makeContract({
         users: {
-          indexes: [{ fields: { email: 1 }, options: { unique: true } }],
+          indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
         },
       }),
     );
@@ -61,8 +61,8 @@ describe('contractToMongoSchemaIR', () => {
   it('converts multiple collections', () => {
     const ir = contractToMongoSchemaIR(
       makeContract({
-        users: { indexes: [{ fields: { email: 1 } }] },
-        posts: { indexes: [{ fields: { title: 1 } }] },
+        users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
+        posts: { indexes: [{ keys: [{ field: 'title', direction: 1 }] }] },
       }),
     );
     expect(Object.keys(ir.collections)).toHaveLength(2);
@@ -74,7 +74,7 @@ describe('contractToMongoSchemaIR', () => {
     const ir = contractToMongoSchemaIR(
       makeContract({
         users: {
-          indexes: [{ fields: { nickname: 1 }, options: { sparse: true } }],
+          indexes: [{ keys: [{ field: 'nickname', direction: 1 }], sparse: true }],
         },
       }),
     );
@@ -85,7 +85,7 @@ describe('contractToMongoSchemaIR', () => {
     const ir = contractToMongoSchemaIR(
       makeContract({
         users: {
-          indexes: [{ fields: { createdAt: 1 }, options: { expireAfterSeconds: 3600 } }],
+          indexes: [{ keys: [{ field: 'createdAt', direction: 1 }], expireAfterSeconds: 3600 }],
         },
       }),
     );
@@ -97,7 +97,7 @@ describe('contractToMongoSchemaIR', () => {
     const ir = contractToMongoSchemaIR(
       makeContract({
         users: {
-          indexes: [{ fields: { status: 1 }, options: { partialFilterExpression: pfe } }],
+          indexes: [{ keys: [{ field: 'status', direction: 1 }], partialFilterExpression: pfe }],
         },
       }),
     );
@@ -110,8 +110,11 @@ describe('contractToMongoSchemaIR', () => {
         users: {
           indexes: [
             {
-              fields: { email: 1, tenantId: 1 },
-              options: { unique: true },
+              keys: [
+                { field: 'email', direction: 1 },
+                { field: 'tenantId', direction: 1 },
+              ],
+              unique: true,
             },
           ],
         },

@@ -137,7 +137,7 @@ describe('MongoCommandExecutor', () => {
 
     const colls = await db.listCollections({ name: 'logs' }).toArray();
     expect(colls).toHaveLength(1);
-    expect(colls[0]!['options']?.['capped']).toBe(true);
+    expect((colls[0] as Record<string, unknown>)['options']).toHaveProperty('capped', true);
   });
 
   it('dropCollection drops an existing collection', async () => {
@@ -163,7 +163,7 @@ describe('MongoCommandExecutor', () => {
     await cmd.accept(executor);
 
     const colls = await db.listCollections({ name: 'docs' }).toArray();
-    expect(colls[0]!['options']?.['validator']).toBeDefined();
+    expect((colls[0] as Record<string, unknown>)['options']).toHaveProperty('validator');
   });
 });
 

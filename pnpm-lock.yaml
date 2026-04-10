@@ -22,7 +22,7 @@ catalogs:
       specifier: ^4.0.3
       version: 4.0.3
     mongodb:
-      specifier: ^6.21.0
+      specifier: ^6.16.0
       version: 6.21.0
     pg:
       specifier: 8.16.3
@@ -883,6 +883,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../../1-foundation/mongo-contract
       '@prisma-next/psl-parser':
         specifier: workspace:*
         version: link:../../../1-framework/2-authoring/psl-parser
