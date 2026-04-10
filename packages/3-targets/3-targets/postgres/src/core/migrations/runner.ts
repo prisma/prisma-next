@@ -17,6 +17,7 @@ import type {
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { readMarker } from '@prisma-next/family-sql/verify';
+import type { DataTransformOperation } from '@prisma-next/framework-components/control';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -45,6 +46,18 @@ const DEFAULT_CONFIG: RunnerConfig = {
 };
 
 const LOCK_DOMAIN = 'prisma_next.contract.marker';
+
+function isDataTransformOperation(op: unknown): op is DataTransformOperation {
+  return (
+    typeof op === 'object' &&
+    op !== null &&
+    'operationClass' in op &&
+    (op as { operationClass: string }).operationClass === 'data' &&
+    'name' in op &&
+    'check' in op &&
+    'run' in op
+  );
+}
 
 /**
  * Deep clones and freezes a record object to prevent mutation.
@@ -190,6 +203,19 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     for (const operation of options.plan.operations) {
       options.callbacks?.onOperationStart?.(operation);
       try {
+        // Data transform operations have a different execution lifecycle
+        if (operation.operationClass === 'data' && isDataTransformOperation(operation)) {
+          const dtResult = await this.executeDataTransform(driver, operation, {
+            runIdempotency,
+          });
+          if (!dtResult.ok) {
+            return dtResult;
+          }
+          executedOperations.push(operation);
+          operationsExecuted += 1;
+          continue;
+        }
+
         // Idempotency probe: only run if both postchecks and idempotency checks are enabled
         if (runPostchecks && runIdempotency) {
           const postcheckAlreadySatisfied = await this.expectationsAreSatisfied(
@@ -240,6 +266,80 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       }
     }
     return ok({ operationsExecuted, executedOperations });
+  }
+
+  /**
+   * Executes a data transform operation with the check → (skip or run) → check lifecycle.
+   *
+   * 1. If check is a query AST: render to SQL, execute. Empty result = already applied (skip).
+   * 2. If check is `true`: always skip. If `false`: always run.
+   * 3. Execute run ASTs (rendered to SQL) sequentially.
+   * 4. Re-execute check as post-run validation. If violations remain, fail.
+   */
+  private async executeDataTransform(
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    op: DataTransformOperation,
+    options: { runIdempotency: boolean },
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
+    // Step 1: Check (skip guard)
+    if (op.check === true) {
+      // Always skip, regardless of idempotency setting
+      return okVoid();
+    }
+    if (options.runIdempotency && op.check !== null && op.check !== false) {
+      const checkResult = await driver.query(op.check.sql, op.check.params);
+      if (checkResult.rows.length === 0) {
+        // No violations — already applied, skip
+        return okVoid();
+      }
+    }
+
+    // Step 2: Execute run steps
+    if (op.run) {
+      for (const plan of op.run) {
+        try {
+          await driver.query(plan.sql, plan.params);
+        } catch (error: unknown) {
+          if (SqlQueryError.is(error)) {
+            return runnerFailure(
+              'EXECUTION_FAILED',
+              `Data transform "${op.name}" failed: ${error.message}`,
+              {
+                why: error.message,
+                meta: {
+                  operationId: op.id,
+                  dataTransformName: op.name,
+                  sql: plan.sql,
+                  sqlState: error.sqlState,
+                },
+              },
+            );
+          }
+          throw error;
+        }
+      }
+    }
+
+    // Step 3: Post-run validation (check again)
+    if (op.check !== null && op.check !== false) {
+      const checkResult = await driver.query(op.check.sql, op.check.params);
+      if (checkResult.rows.length > 0) {
+        return runnerFailure(
+          'POSTCHECK_FAILED',
+          `Data transform "${op.name}" did not resolve all violations (${checkResult.rows.length} remaining)`,
+          {
+            why: `After executing the data transform, the check query still returns ${checkResult.rows.length} violation(s).`,
+            meta: {
+              operationId: op.id,
+              dataTransformName: op.name,
+              remainingViolations: checkResult.rows.length,
+            },
+          },
+        );
+      }
+    }
+
+    return okVoid();
   }
 
   private async ensureControlTables(

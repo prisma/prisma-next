@@ -54,7 +54,7 @@ export type MigrationOps = readonly MigrationPlanOperation[];
  * An on-disk migration directory containing a manifest and operations.
  * The manifest may be draft or attested.
  */
-export interface MigrationBundle {
+export interface BaseMigrationBundle {
   readonly dirName: string;
   readonly dirPath: string;
   readonly manifest: MigrationManifest;
@@ -65,8 +65,12 @@ export interface MigrationBundle {
  * A bundle known to be attested (migrationId is a string).
  * Use this after filtering bundles to attested-only.
  */
-export interface AttestedMigrationBundle extends MigrationBundle {
+export interface AttestedMigrationBundle extends BaseMigrationBundle {
   readonly manifest: AttestedMigrationManifest;
+}
+
+export interface DraftMigrationBundle extends BaseMigrationBundle {
+  readonly manifest: DraftMigrationManifest;
 }
 
 /**
@@ -93,6 +97,10 @@ export interface MigrationGraph {
  * Type guard that narrows a MigrationBundle to an AttestedMigrationBundle.
  * Use with `.filter(isAttested)` to get a typed array of attested bundles.
  */
-export function isAttested(bundle: MigrationBundle): bundle is AttestedMigrationBundle {
+export function isAttested(bundle: BaseMigrationBundle): bundle is AttestedMigrationBundle {
   return typeof bundle.manifest.migrationId === 'string';
+}
+
+export function isDraft(bundle: BaseMigrationBundle): bundle is DraftMigrationBundle {
+  return bundle.manifest.migrationId === null;
 }

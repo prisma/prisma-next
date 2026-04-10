@@ -22,6 +22,7 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../control-instance';
@@ -119,6 +120,8 @@ export interface SqlControlStaticContributions {
   readonly pslTypeDescriptors?: () => {
     readonly scalarTypeDescriptors: ReadonlyMap<string, PslScalarTypeDescriptor>;
   };
+  /** Query operation descriptors for the migration DSL client. Same static data as runtime descriptors. */
+  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
 }
 
 export interface ComponentDatabaseDependency<TTargetDetails> {

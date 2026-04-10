@@ -36,7 +36,7 @@ export interface VerifyDatabaseResult {
   };
 }
 
-export interface SchemaIssue {
+export interface BaseSchemaIssue {
   readonly kind:
     | 'missing_table'
     | 'missing_column'
@@ -63,10 +63,21 @@ export interface SchemaIssue {
   readonly column?: string;
   readonly indexOrConstraint?: string;
   readonly typeName?: string;
+  readonly dependencyId?: string;
   readonly expected?: string;
   readonly actual?: string;
   readonly message: string;
 }
+
+export interface EnumValuesChangedIssue {
+  readonly kind: 'enum_values_changed';
+  readonly typeName: string;
+  readonly addedValues: readonly string[];
+  readonly removedValues: readonly string[];
+  readonly message: string;
+}
+
+export type SchemaIssue = BaseSchemaIssue | EnumValuesChangedIssue;
 
 export interface SchemaVerificationNode {
   readonly status: 'pass' | 'warn' | 'fail';

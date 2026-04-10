@@ -12,6 +12,7 @@ import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
 import { createMigrationApplyCommand } from './commands/migration-apply';
+import { createMigrationNewCommand } from './commands/migration-new';
 import { createMigrationPlanCommand } from './commands/migration-plan';
 import { createMigrationRefCommand } from './commands/migration-ref';
 import { createMigrationShowCommand } from './commands/migration-show';
@@ -226,6 +227,9 @@ migrationCommand.configureHelp({
 
 const migrationPlanCommand = createMigrationPlanCommand();
 migrationCommand.addCommand(migrationPlanCommand);
+
+const migrationNewCommand = createMigrationNewCommand();
+migrationCommand.addCommand(migrationNewCommand);
 
 const migrationShowCommand = createMigrationShowCommand();
 migrationCommand.addCommand(migrationShowCommand);

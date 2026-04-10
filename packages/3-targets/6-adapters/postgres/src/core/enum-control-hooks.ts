@@ -130,7 +130,6 @@ function getEnumValues(typeInstance: StorageTypeInstance): readonly string[] | n
  * Uses optional chaining to simplify navigation through the annotations structure.
  */
 function readExistingEnumValues(schema: SqlSchemaIR, nativeType: string): readonly string[] | null {
-  // Schema annotations.pg.storageTypes is populated by introspection
   const storageTypes = (schema.annotations?.['pg'] as Record<string, unknown> | undefined)?.[
     'storageTypes'
   ] as Record<string, StorageTypeInstance> | undefined;
@@ -698,18 +697,24 @@ export const pgEnumControlHooks: CodecControlHooks = {
         },
       ];
     }
-    if (!arraysEqual(existing, desired)) {
-      return [
-        {
-          kind: 'type_values_mismatch',
-          typeName,
-          expected: desired.join(', '),
-          actual: existing.join(', '),
-          message: `Type "${typeName}" values do not match contract`,
-        },
-      ];
-    }
-    return [];
+    const diff = determineEnumDiff(existing, desired);
+    if (diff.kind === 'unchanged') return [];
+    const existingSet = new Set(existing);
+    const desiredSet = new Set(desired);
+    const addedValues = desired.filter((v) => !existingSet.has(v));
+    const removedValues = existing.filter((v) => !desiredSet.has(v));
+    return [
+      {
+        kind: 'enum_values_changed' as const,
+        typeName,
+        addedValues,
+        removedValues,
+        message:
+          diff.kind === 'add_values'
+            ? `Enum type "${typeName}" needs new values: ${addedValues.join(', ')}`
+            : `Enum type "${typeName}" values changed (requires rebuild): +[${addedValues.join(', ')}] -[${removedValues.join(', ')}]`,
+      },
+    ];
   },
   introspectTypes: async ({ driver, schemaName }) => {
     const namespace = schemaName ?? 'public';
