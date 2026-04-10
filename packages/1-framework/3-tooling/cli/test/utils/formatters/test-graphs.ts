@@ -25,6 +25,10 @@ function edge(from: string, to: string, label?: string): GraphEdge {
   return label !== undefined ? { from, to, label } : { from, to };
 }
 
+function dashedEdge(from: string, to: string, label?: string): GraphEdge {
+  return { from, to, style: 'dashed', ...(label !== undefined ? { label } : {}) };
+}
+
 const db: NodeMarker = { kind: 'db' };
 const contract: NodeMarker = { kind: 'contract', planned: true };
 const unplanned: NodeMarker = { kind: 'contract', planned: false };
@@ -295,11 +299,11 @@ const complex = testGraph(
   { spineTarget: 'F', rootId: '∅' },
 );
 
-// 19. Detached contract node
+// 19. Detached contract node (connected by dashed edge)
 const detachedContract = testGraph(
   'Detached contract node',
-  [...nodes('∅', 'A'), node('B', [ref('prod', true), db]), node('planned', [contract], 'detached')],
-  [edge('∅', 'A', 'init'), edge('A', 'B', 'add_users')],
+  [...nodes('∅', 'A'), node('B', [ref('prod', true), db]), node('planned', [unplanned])],
+  [edge('∅', 'A', 'init'), edge('A', 'B', 'add_users'), dashedEdge('B', 'planned')],
   { spineTarget: 'B', rootId: '∅' },
 );
 
@@ -498,7 +502,7 @@ const teamWorkflow = testGraph(
     ...nodes('sha256:∅', 'a1b2c3d', 'e4f5g6h', 'f7a8b9c', 'g0h1i2j', 'k3l4m5n'),
     node('p6q7r8s', [ref('prod', true), db]),
     node('t9u0v1w', [ref('staging')]),
-    node('x2y3z4a', [unplanned], 'detached'),
+    node('x2y3z4a', [unplanned]),
   ],
   [
     edge('sha256:∅', 'a1b2c3d', 'init'),
@@ -509,6 +513,7 @@ const teamWorkflow = testGraph(
     edge('g0h1i2j', 'k3l4m5n', 'merge_bob'),
     edge('k3l4m5n', 'p6q7r8s', 'add_tags'),
     edge('k3l4m5n', 't9u0v1w', 'staging_experiment'),
+    dashedEdge('p6q7r8s', 'x2y3z4a'),
   ],
   { spineTarget: 'p6q7r8s', rootId: 'sha256:∅' },
 );
@@ -531,7 +536,7 @@ const multiTeamWorkflow = testGraph(
     node('dev0002', [ref('dev-bob')]),
     node('pre0001', [ref('preview-1')]),
     node('pre0002', [ref('preview-2')]),
-    node('c0n7rac', [contract], 'detached'),
+    node('c0n7rac', [unplanned]),
   ],
   [
     edge('∅', 'abc1234', 'init'),
@@ -550,6 +555,7 @@ const multiTeamWorkflow = testGraph(
     edge('dev0002', 'pre0002', 'preview_bob'),
     edge('5ta9e01', 'mer9e01', 'rollback_staging'),
     edge('qa00001', 'f1x0001', 'rollback_qa'),
+    dashedEdge('re1ea5e', 'c0n7rac'),
   ],
   { spineTarget: 're1ea5e', rootId: '∅' },
 );
@@ -585,8 +591,7 @@ const longSpineWithBranches = testGraph(
     ...nodes('B4a', 'B4b', 'B4c'),
     ...nodes('R1'),
     node('B5a', [ref('staging')]),
-    // detached
-    node('planned', [contract], 'detached'),
+    node('planned', [unplanned]),
   ],
   [
     // spine
@@ -621,6 +626,8 @@ const longSpineWithBranches = testGraph(
     edge('R1', 'S09', '20260110_complete_rollback'),
     // branch: 1-edge from S12
     edge('S12', 'B5a', '20260112_staging_deploy'),
+    // dashed edge to contract
+    dashedEdge('S14', 'planned'),
   ],
   { spineTarget: 'S14', rootId: '∅' },
 );

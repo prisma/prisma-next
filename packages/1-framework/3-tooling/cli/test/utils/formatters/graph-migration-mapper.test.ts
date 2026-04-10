@@ -180,8 +180,8 @@ describe('migrationGraphToRenderInput', () => {
     }
   });
 
-  // Contract hash not in graph — a detached node is created with
-  // planned:false (contract exists but no migration targets it yet).
+  // Contract hash not in graph — a dashed edge connects the spine target
+  // to the contract node (planned:false).
   it('detached contract node — contract not in graph', () => {
     const graph = buildGraph([entry(ROOT, 'A', 'm1')]);
     const result = migrationGraphToRenderInput(
@@ -193,13 +193,16 @@ describe('migrationGraphToRenderInput', () => {
       }),
     );
 
-    const detached = result.graph.nodes.find((n) => n.style === 'detached');
-    expect(detached).toBeDefined();
-    expect(detached!.markers).toContainEqual({ kind: 'contract', planned: false });
+    const contractNode = result.graph.nodes.find((n) => n.id === sid('DETACHED_HASH'));
+    expect(contractNode).toBeDefined();
+    expect(contractNode!.markers).toContainEqual({ kind: 'contract', planned: false });
+    const dashedEdge = result.graph.edges.find((e) => e.style === 'dashed');
+    expect(dashedEdge).toBeDefined();
+    expect(dashedEdge!.to).toBe(sid('DETACHED_HASH'));
   });
 
-  // marker === contract, both off-graph. The single detached node should
-  // carry both db and contract markers.
+  // marker === contract, both off-graph. The contract node carries
+  // both db and contract markers, connected by a dashed edge.
   it('detached contract matching db marker — both markers on one node', () => {
     const graph = buildGraph([entry(ROOT, 'A', 'm1')]);
     const result = migrationGraphToRenderInput(
@@ -211,10 +214,13 @@ describe('migrationGraphToRenderInput', () => {
       }),
     );
 
-    const detached = result.graph.nodes.find((n) => n.style === 'detached');
-    expect(detached).toBeDefined();
-    expect(detached!.markers).toContainEqual({ kind: 'db' });
-    expect(detached!.markers).toContainEqual({ kind: 'contract', planned: false });
+    const contractNode = result.graph.nodes.find((n) => n.id === sid('OFF_GRAPH'));
+    expect(contractNode).toBeDefined();
+    expect(contractNode!.markers).toContainEqual({ kind: 'db' });
+    expect(contractNode!.markers).toContainEqual({ kind: 'contract', planned: false });
+    const dashedEdge = result.graph.edges.find((e) => e.style === 'dashed');
+    expect(dashedEdge).toBeDefined();
+    expect(dashedEdge!.to).toBe(sid('OFF_GRAPH'));
   });
 
   it('sha256:-prefixed hashes are shortened correctly', () => {
