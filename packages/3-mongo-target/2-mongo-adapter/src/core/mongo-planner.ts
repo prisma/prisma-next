@@ -25,7 +25,7 @@ import {
   canonicalize,
   deepEqual,
   type MongoSchemaCollection,
-  type MongoSchemaCollectionOptionsNode,
+  type MongoSchemaCollectionOptions,
   type MongoSchemaIndex,
   type MongoSchemaIR,
   type MongoSchemaValidator,
@@ -258,8 +258,8 @@ function planValidatorDiff(
 }
 
 function hasImmutableOptionChange(
-  origin: MongoSchemaCollectionOptionsNode | undefined,
-  dest: MongoSchemaCollectionOptionsNode | undefined,
+  origin: MongoSchemaCollectionOptions | undefined,
+  dest: MongoSchemaCollectionOptions | undefined,
 ): string | undefined {
   if (!origin || !dest) return undefined;
   if (!deepEqual(origin.capped, dest.capped)) return 'capped';
@@ -332,8 +332,8 @@ function planDropCollection(collName: string): MongoMigrationPlanOperation {
 
 function planMutableOptionsDiff(
   collName: string,
-  origin: MongoSchemaCollectionOptionsNode | undefined,
-  dest: MongoSchemaCollectionOptionsNode | undefined,
+  origin: MongoSchemaCollectionOptions | undefined,
+  dest: MongoSchemaCollectionOptions | undefined,
 ): MongoMigrationPlanOperation | undefined {
   const originCSPPI = origin?.changeStreamPreAndPostImages;
   const destCSPPI = dest?.changeStreamPreAndPostImages;

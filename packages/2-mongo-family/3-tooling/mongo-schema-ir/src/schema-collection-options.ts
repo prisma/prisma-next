@@ -13,7 +13,7 @@ export interface MongoSchemaCollectionOptionsInput {
   readonly clusteredIndex?: { name?: string };
 }
 
-export class MongoSchemaCollectionOptionsNode extends MongoSchemaNode {
+export class MongoSchemaCollectionOptions extends MongoSchemaNode {
   readonly kind = 'collectionOptions' as const;
   readonly capped?: { size: number; max?: number } | undefined;
   readonly timeseries?:

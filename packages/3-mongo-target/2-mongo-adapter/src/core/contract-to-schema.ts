@@ -7,7 +7,7 @@ import type {
 } from '@prisma-next/mongo-contract';
 import {
   MongoSchemaCollection,
-  MongoSchemaCollectionOptionsNode,
+  MongoSchemaCollectionOptions,
   MongoSchemaIndex,
   type MongoSchemaIR,
   MongoSchemaValidator,
@@ -36,8 +36,8 @@ function convertValidator(v: MongoStorageValidator): MongoSchemaValidator {
   });
 }
 
-function convertOptions(o: MongoStorageCollectionOptions): MongoSchemaCollectionOptionsNode {
-  return new MongoSchemaCollectionOptionsNode(o);
+function convertOptions(o: MongoStorageCollectionOptions): MongoSchemaCollectionOptions {
+  return new MongoSchemaCollectionOptions(o);
 }
 
 function convertCollection(name: string, def: MongoStorageCollection): MongoSchemaCollection {
