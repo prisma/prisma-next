@@ -218,14 +218,44 @@ describe('side-by-side contract examples', () => {
         enrichContract(providerResult.value, frameworkComponents),
       );
 
-      expect(normalizedTs).toEqual(normalizedPsl);
+      // PSL auto-derives validators from model schemas; TS builder doesn't yet.
+      // Compare everything except storage.collections[].validator and storageHash
+      // (which changes because the validator is part of the hashed storage).
+      const stripValidatorFields = (contract: typeof normalizedTs) => {
+        const storage = contract.storage as unknown as Record<string, unknown>;
+        const collections = storage['collections'] as Record<string, Record<string, unknown>>;
+        const stripped: Record<string, unknown> = {};
+        for (const [name, coll] of Object.entries(collections)) {
+          const { validator: _, ...rest } = coll;
+          stripped[name] = rest;
+        }
+        const { storageHash: _sh, ...restStorage } = storage;
+        return { ...contract, storage: { ...restStorage, collections: stripped } };
+      };
+      expect(stripValidatorFields(normalizedTs)).toEqual(stripValidatorFields(normalizedPsl));
 
       const emittedTs = await emit(normalizedTs, stack, mongoFamilyDescriptor.emission);
       const emittedPsl = await emit(normalizedPsl, stack, mongoFamilyDescriptor.emission);
 
-      expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
+      // Emitted JSON differs because PSL adds validators + different storageHash.
+      // Compare structurally without validators and storageHash.
+      const stripForComparison = (json: string) => {
+        const parsed = JSON.parse(json) as Record<string, unknown>;
+        const storage = parsed['storage'] as Record<string, unknown>;
+        const collections = storage['collections'] as Record<string, Record<string, unknown>>;
+        const strippedCollections: Record<string, unknown> = {};
+        for (const [name, coll] of Object.entries(collections)) {
+          const { validator: _, ...rest } = coll;
+          strippedCollections[name] = rest;
+        }
+        const { storageHash: _sh, ...restStorage } = storage;
+        return { ...parsed, storage: { ...restStorage, collections: strippedCollections } };
+      };
+      expect(stripForComparison(emittedTs.contractJson)).toEqual(
+        stripForComparison(emittedPsl.contractJson),
+      );
 
-      const emittedContractJson = parseContractJson(emittedTs.contractJson);
+      const emittedContractJson = parseContractJson(emittedPsl.contractJson);
       const validatedContract = validateEmittedMongoContract(emittedContractJson);
 
       expect(validatedContract.contract.roots).toEqual({
@@ -250,10 +280,10 @@ describe('side-by-side contract examples', () => {
       });
 
       if (shouldUpdateExpected) {
-        writeExpectedContractJson(fixtureCase, emittedTs.contractJson);
+        writeExpectedContractJson(fixtureCase, emittedPsl.contractJson);
       }
 
-      expect(emittedTs.contractJson).toBe(readExpectedContractJson(fixtureCase));
+      expect(emittedPsl.contractJson).toBe(readExpectedContractJson(fixtureCase));
     },
     timeouts.typeScriptCompilation,
   );
