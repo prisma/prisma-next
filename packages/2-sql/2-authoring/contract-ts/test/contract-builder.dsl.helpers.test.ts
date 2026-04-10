@@ -145,9 +145,9 @@ const pgvectorExtensionPack = {
   authoring: {
     type: {
       pgvector: {
-        vector: {
+        Vector: {
           kind: 'typeConstructor',
-          args: [{ kind: 'number', integer: true, minimum: 1, maximum: 2000 }],
+          args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, maximum: 2000 }],
           output: {
             codecId: 'pg/vector@1',
             nativeType: 'vector',
@@ -607,7 +607,7 @@ describe('contract DSL helper vocabulary', () => {
       },
       ({ type, field, model }) => {
         const types = {
-          Embedding1536: type.pgvector.vector(1536),
+          Embedding1536: type.pgvector.Vector(1536),
         } as const;
 
         return {

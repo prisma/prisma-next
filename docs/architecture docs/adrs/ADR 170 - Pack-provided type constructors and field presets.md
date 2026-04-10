@@ -65,10 +65,10 @@ Quite often we also need to say:
 - whether this is really a common preset, like an id column
 - and, sometimes, what constraints naturally come with that choice
 
-Today, PSL handles a lot of this by piling information into `@` attributes because the type position is too weak. That is how we end up with things like:
+Today, PSL handles a lot of this either by piling information into `@` attributes or by forcing pack-specific meaning into syntax that the type position does not own cleanly. That is how we end up with things like:
 
 - `String` plus extra attributes to describe the real storage type
-- extension-specific attributes like `@pgvector.column(1536)`
+- extension-specific attribute forms that push storage meaning outside the type position
 - `@default(uuid())` when what the author really means is something closer to “make this a UUID-backed id column”
 
 TS authoring has the same problem. We solved part of it there with helper functions, but we put some of those helpers in a low layer in `@prisma-next/ids`. That turned out to be the wrong place. It made concrete behavior feel “built in” even though it really belongs to targets, families, or packs.

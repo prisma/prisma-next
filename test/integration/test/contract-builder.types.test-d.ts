@@ -5,9 +5,9 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
+import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -21,31 +21,6 @@ import type { Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 const typecheckOnly = process.env['PN_TYPECHECK_ONLY'] === 'true';
-
-const pgvectorPack = {
-  kind: 'extension',
-  id: 'pgvector',
-  familyId: 'sql',
-  targetId: 'postgres',
-  version: '0.0.1',
-  authoring: {
-    type: {
-      pgvector: {
-        vector: {
-          kind: 'typeConstructor',
-          args: [{ kind: 'number', integer: true, minimum: 1, maximum: 2000 }],
-          output: {
-            codecId: 'pg/vector@1',
-            nativeType: 'vector',
-            typeParams: {
-              length: { kind: 'arg', index: 0 },
-            },
-          },
-        },
-      },
-    },
-  },
-} as const satisfies ExtensionPackRef<'sql', 'postgres'>;
 
 test('builder contract types match fixture contract types', () => {
   const builderContract = defineContract({
@@ -197,7 +172,7 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
     },
     ({ type, field, model }) => {
       const Role = type.enum('role', ['USER', 'ADMIN'] as const);
-      const Embedding = type.pgvector.vector(1536);
+      const Embedding = type.pgvector.Vector(1536);
 
       expectTypeOf(Role.codecId).toEqualTypeOf<'pg/enum@1'>();
       expectTypeOf(Role.typeParams.values).toEqualTypeOf<readonly ['USER', 'ADMIN']>();
@@ -244,7 +219,7 @@ test('integrated callback authoring hides extension namespaces when packs are ab
 
       if (typecheckOnly) {
         // @ts-expect-error extension-owned helper requires the corresponding pack
-        type.pgvector.vector(1536);
+        type.pgvector.Vector(1536);
       }
 
       return {

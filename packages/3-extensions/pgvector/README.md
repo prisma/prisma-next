@@ -193,7 +193,7 @@ const similarity = tables.post.columns.embedding.cosineSimilarity(param('queryVe
 
 The extension declares the following capabilities:
 
-- `pgvector/cosine`: Indicates support for cosine distance and similarity operations
+- `pgvector.cosine`: Indicates support for cosine distance and similarity operations
 
 ## References
 

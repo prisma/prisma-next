@@ -203,7 +203,7 @@ A small record stored in the database that tracks which contract is currently ap
 
 ### Namespace
 
-A unique name that identifies an extension. Namespaces keep extensions from colliding with each other and with built-in features. You'll see them in PSL attributes (`@pgvector.column()`), in the contract (`extensions.pgvector`), and in capability names (`pgvector.ivfflat`).
+A unique name that identifies an extension. Namespaces keep extensions from colliding with each other and with built-in features. You'll see them in PSL constructor expressions (`pgvector.Vector(...)`), in the contract (`extensions.pgvector`), and in capability names (`pgvector.ivfflat`).
 
 ---
 
@@ -217,5 +217,4 @@ Planned refactors to bring internal naming in line with user-facing terminology:
 | extension / `extensions`  | extension pack / `extensionPacks`   | Config property, types, docs, CLI output, error messages          | Pending |
 | middleware / `middleware` | plugin / `plugins`                  | Runtime options, types, docs                                      | Pending |
 | query builder             | query lane / lane                   | Architecture docs, package names, internal naming                 | Pending |
-
 

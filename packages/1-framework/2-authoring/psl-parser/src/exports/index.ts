@@ -24,5 +24,6 @@ export type {
   PslNamedTypeDeclaration,
   PslPosition,
   PslSpan,
+  PslTypeConstructorCall,
   PslTypesBlock,
 } from '../types';

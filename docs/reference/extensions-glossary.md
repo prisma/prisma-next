@@ -37,7 +37,7 @@ A TypeScript nominal type that carries semantic information about extension valu
 ## Extension Architecture
 
 ### Namespace
-A lowercase identifier (`^[a-z][a-z0-9_-]*$`) that uniquely identifies an extension pack. Each pack owns exactly one namespace and must not collide with core attributes or other packs. Used for PSL attributes (`@pgvector.column()`) and contract organization.
+A lowercase identifier (`^[a-z][a-z0-9_-]*$`) that uniquely identifies an extension pack. Each pack owns exactly one namespace and must not collide with core attributes or other packs. Used for PSL constructor paths (`pgvector.Vector(...)`) and contract organization.
 
 ### Contract Extensions
 A section in `contract.json` under `extensions.<namespace>` containing pack-specific decorations and constructs. Includes version pinning, capability claims, decorations (metadata attached to core nodes), and constructs (extension-owned entities).
@@ -71,7 +71,7 @@ Security checks for preflight bundles including integrity verification, policy c
 ## Authoring and Development
 
 ### PSL Extension Syntax
-Namespaced attributes in Prisma Schema Language (`@pgvector.column()`, `@@postgis.gistIndex()`) that map to contract decorations. Syntax is validated against pack schemas and emits deterministic JSON.
+The extension-owned syntax slots available in Prisma Schema Language. In the current SQL PSL surface this primarily means namespaced constructor expressions such as `pgvector.Vector(length: 1536)`. Other namespaced attribute forms are not broadly supported yet and are treated as strict errors unless explicitly implemented.
 
 ### TS Builder Integration
 TypeScript helpers for extension authoring that produce identical contract JSON to PSL-first mode. Includes typed decorators and extension registration APIs for pack integration.

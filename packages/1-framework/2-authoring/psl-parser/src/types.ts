@@ -58,6 +58,13 @@ export interface PslAttributeNamedArgument {
 
 export type PslAttributeArgument = PslAttributePositionalArgument | PslAttributeNamedArgument;
 
+export interface PslTypeConstructorCall {
+  readonly kind: 'typeConstructor';
+  readonly path: readonly string[];
+  readonly args: readonly PslAttributeArgument[];
+  readonly span: PslSpan;
+}
+
 export interface PslAttribute {
   readonly kind: 'attribute';
   readonly target: PslAttributeTarget;
@@ -74,6 +81,7 @@ export interface PslField {
   readonly kind: 'field';
   readonly name: string;
   readonly typeName: string;
+  readonly typeConstructor?: PslTypeConstructorCall;
   readonly optional: boolean;
   readonly list: boolean;
   readonly typeRef?: string;
@@ -128,7 +136,13 @@ export interface PslCompositeType {
 export interface PslNamedTypeDeclaration {
   readonly kind: 'namedType';
   readonly name: string;
-  readonly baseType: string;
+  /**
+   * Parser invariant: exactly one of `baseType` and `typeConstructor` is set.
+   * Expressing this as a discriminated union trips TypeScript narrowing when
+   * the declaration flows through helpers that accept the full union.
+   */
+  readonly baseType?: string;
+  readonly typeConstructor?: PslTypeConstructorCall;
   readonly attributes: readonly PslAttribute[];
   readonly span: PslSpan;
 }

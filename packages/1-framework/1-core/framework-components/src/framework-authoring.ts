@@ -16,27 +16,26 @@ export type AuthoringTemplateValue =
   | readonly AuthoringTemplateValue[]
   | { readonly [key: string]: AuthoringTemplateValue };
 
-export type AuthoringArgumentDescriptor =
-  | {
-      readonly kind: 'string';
-      readonly optional?: boolean;
-    }
-  | {
-      readonly kind: 'number';
-      readonly optional?: boolean;
-      readonly integer?: boolean;
-      readonly minimum?: number;
-      readonly maximum?: number;
-    }
-  | {
-      readonly kind: 'stringArray';
-      readonly optional?: boolean;
-    }
-  | {
-      readonly kind: 'object';
-      readonly optional?: boolean;
-      readonly properties: Record<string, AuthoringArgumentDescriptor>;
-    };
+interface AuthoringArgumentDescriptorCommon {
+  readonly name?: string;
+  readonly optional?: boolean;
+}
+
+export type AuthoringArgumentDescriptor = AuthoringArgumentDescriptorCommon &
+  (
+    | { readonly kind: 'string' }
+    | {
+        readonly kind: 'number';
+        readonly integer?: boolean;
+        readonly minimum?: number;
+        readonly maximum?: number;
+      }
+    | { readonly kind: 'stringArray' }
+    | {
+        readonly kind: 'object';
+        readonly properties: Record<string, AuthoringArgumentDescriptor>;
+      }
+  );
 
 export interface AuthoringStorageTypeTemplate {
   readonly codecId: string;

@@ -74,6 +74,40 @@ describe('serializeValue', () => {
   it('returns unknown for unsupported types', () => {
     expect(serializeValue(Symbol('test'))).toBe('unknown');
   });
+
+  describe('injection safety', () => {
+    // Lock the escape behavior so attacker-controlled (or merely weird) strings
+    // in a schema.prisma cannot break out of the emitted single-quoted literal
+    // and inject arbitrary TypeScript into contract.d.ts.
+
+    it('escapes a string attempting to terminate the literal', () => {
+      const injected = "x'; export let foo = 'bar";
+      const serialized = serializeValue(injected);
+      expect(serialized).toBe("'x\\'; export let foo = \\'bar'");
+      // The serialized form is a single valid string literal: exactly two
+      // outer single quotes, and every inner single quote is backslash-escaped.
+      expect(serialized.match(/(?<!\\)'/g)?.length).toBe(2);
+    });
+
+    it('escapes backslash-terminated strings (no lookahead break-out)', () => {
+      expect(serializeValue('ends with \\')).toBe("'ends with \\\\'");
+      expect(serializeValue('double\\\\back')).toBe("'double\\\\\\\\back'");
+    });
+
+    it('passes through control characters and line separators as raw bytes', () => {
+      // U+2028/U+2029 are JavaScript line terminators in legacy parsers.
+      // The current emitter does not escape them but they cannot break the
+      // single-quoted literal since they are not \' or \\. Pin the behavior.
+      expect(serializeValue('a\u2028b')).toBe("'a\u2028b'");
+      expect(serializeValue('a\u2029b')).toBe("'a\u2029b'");
+      expect(serializeValue('a\nb')).toBe("'a\nb'");
+    });
+
+    it('quotes object keys that look like identifier bypass attempts', () => {
+      expect(serializeObjectKey("k'; injected: 'v")).toBe("'k\\'; injected: \\'v'");
+      expect(serializeObjectKey('')).toBe("''");
+    });
+  });
 });
 
 describe('serializeObjectKey', () => {

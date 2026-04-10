@@ -1,3 +1,4 @@
+import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaults,
@@ -83,6 +84,28 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
   id: 'pgvector',
   version: '1.2.3-test',
 };
+
+/** Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather
+ *  than importing the real pgvector pack, so interpreter unit tests stay layer-isolated.
+ *  Real-pack parity is covered by
+ *  `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`. */
+export const pgvectorAuthoringContributions = {
+  type: {
+    pgvector: {
+      Vector: {
+        kind: 'typeConstructor',
+        args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, maximum: 2000 }],
+        output: {
+          codecId: 'pg/vector@1',
+          nativeType: 'vector',
+          typeParams: {
+            length: { kind: 'arg', index: 0 },
+          },
+        },
+      },
+    },
+  },
+} as const satisfies AuthoringContributions;
 
 export const postgresScalarTypeDescriptors = new Map([
   ['String', { codecId: 'pg/text@1', nativeType: 'text' }],

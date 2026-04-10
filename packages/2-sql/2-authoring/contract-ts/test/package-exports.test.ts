@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 function readPackageJson(): {
@@ -11,12 +11,9 @@ function readPackageJson(): {
 }
 
 describe('package exports', () => {
-  it('exports the SQL contract JSON schema via ./schema-sql', () => {
+  it('does not export the removed ./schema-sql entry', () => {
     const packageJson = readPackageJson();
 
-    expect(packageJson.exports?.['./schema-sql']).toBe('./schemas/data-contract-sql-v1.json');
-
-    const schemaUrl = new URL('../schemas/data-contract-sql-v1.json', import.meta.url);
-    expect(existsSync(schemaUrl)).toBe(true);
+    expect(packageJson.exports?.['./schema-sql']).toBeUndefined();
   });
 });

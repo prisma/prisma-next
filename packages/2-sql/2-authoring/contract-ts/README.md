@@ -18,7 +18,6 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 - the base structural helpers exported from `./contract-builder`: `field.column(...)`, `field.generated(...)`, `field.namedType(...)`, plus `model(...)` and `rel.*`
 - an optional callback overload that exposes pack-composed helper namespaces such as `field.id.uuidv7()`, `field.text()`, `field.createdAt()`, and `type.enum(...)`
 - lowering from authored model definitions into the canonical SQL `Contract`
-- a SQL contract JSON schema export via `./schema-sql`
 
 ## Responsibilities
 
@@ -26,7 +25,7 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 - **Pack-composed helper vocabulary**: Merge family, target, and extension authoring contributions into the callback helper namespaces
 - **Lowering pipeline**: Turn authored model definitions into the canonical SQL contract artifacts consumed by the rest of the stack
 - **Config helper**: Provide `typescriptContract(...)` for `prisma-next.config.ts`
-- **Schema export**: Publish the SQL JSON schema used by editors and tooling
+- **Schema validation**: Contract JSON validation integration via `@prisma-next/sql-contract/validate`
 
 ## Package Status
 
@@ -53,7 +52,6 @@ flowchart LR
 
 - `./contract-builder` - SQL contract DSL (`defineContract`, `field`, `model`, `rel`)
 - `./config-types` - `typescriptContract(...)` config helper
-- `./schema-sql` - SQL contract JSON schema (`data-contract-sql-v1.json`)
 
 ## Usage
 
@@ -111,7 +109,7 @@ export const contract = defineContract({
 
 ### Callback Helper Vocabulary
 
-Pack-provided helper presets are available through the callback overload. This is the surface that exposes `field.id.*`, `field.text()`, `field.createdAt()`, and `type.*`.
+Pack-provided helper presets are available through the callback overload. This is the surface that exposes `field.id.*`, `field.text()`, `field.createdAt()`, `type.sql.String(...)`, and extension helpers such as `type.pgvector.Vector(...)`.
 
 ```typescript
 import pgvector from '@prisma-next/extension-pgvector/pack';
@@ -127,13 +125,15 @@ export const contract = defineContract(
   },
   ({ type, field, model, rel }) => {
     const types = {
+      ShortName: type.sql.String(35),
       Role: type.enum('role', ['USER', 'ADMIN'] as const),
-      Embedding1536: type.pgvector.vector(1536),
+      Embedding1536: type.pgvector.Vector(1536),
     } as const;
 
     const User = model('User', {
       fields: {
         id: field.id.uuidv7().sql({ id: { name: 'user_pkey' } }),
+        shortName: field.namedType(types.ShortName),
         role: field.namedType(types.Role),
         embedding: field.namedType(types.Embedding1536).optional(),
       },

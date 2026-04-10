@@ -72,9 +72,9 @@ const pgvectorExtensionPack = {
   authoring: {
     type: {
       pgvector: {
-        vector: {
+        Vector: {
           kind: 'typeConstructor',
-          args: [{ kind: 'number', integer: true, minimum: 1, maximum: 2000 }],
+          args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, maximum: 2000 }],
           output: {
             codecId: 'pg/vector@1',
             nativeType: 'vector',
@@ -109,7 +109,7 @@ const int4Column = {
 } as const satisfies ColumnTypeDescriptor;
 
 const representativePslSchema = `types {
-  Embedding1536 = Bytes @pgvector.column(length: 1536)
+  Embedding1536 = pgvector.Vector(1536)
 }
 
 enum Role {
@@ -140,7 +140,7 @@ const representativeTsAuthoring = `defineContract(
   ({ type, field, model, rel }) => {
     const types = {
       Role: type.enum('Role', ['USER', 'ADMIN'] as const),
-      Embedding1536: type.pgvector.vector(1536),
+      Embedding1536: type.pgvector.Vector(1536),
     } as const;
     const User = model('User', {
       fields: {
@@ -178,7 +178,7 @@ function buildTsContract() {
     ({ type, field, model, rel }) => {
       const types = {
         Role: type.enum('Role', ['USER', 'ADMIN'] as const),
-        Embedding1536: type.pgvector.vector(1536),
+        Embedding1536: type.pgvector.Vector(1536),
       } as const;
 
       const UserBase = model('User', {

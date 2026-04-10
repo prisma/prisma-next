@@ -1022,7 +1022,7 @@
       "lateral": true,
       "limit": true,
       "orderBy": true,
-      "pgvector/cosine": true,
+      "pgvector.cosine": true,
       "returning": true
     },
     "sql": {
@@ -1035,7 +1035,7 @@
     "pgvector": {
       "capabilities": {
         "postgres": {
-          "pgvector/cosine": true
+          "pgvector.cosine": true
         }
       },
       "familyId": "sql",

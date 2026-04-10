@@ -21,7 +21,7 @@ Introduce Target Extension Packs as versioned, installable modules that declare 
 - Pure ESM, side-effect free at import, no network I/O, deterministic behavior
 - Exposes structured entry points for:
   - Contract schema and validators for its namespace
-  - PSL attribute bindings for PSL-first authoring
+  - PSL authoring bindings for PSL-first authoring
   - TS helpers for TS-first authoring
   - Optional adapter hints and lowerer fragments where relevant
   - Codecs for result decoding if the pack introduces new logical types
@@ -63,8 +63,8 @@ export interface ContractSPI {
 
 ### PSL SPI (optional)
 
-- Maps PSL attributes like `@pgvector.column(length: 1536, distance: "cosine")` to contract decorations
-- Validates attribute usage and emits deterministic errors
+- Maps supported PSL extension syntax like `pgvector.Vector(length: 1536)` to contract decorations
+- Validates supported syntax usage and emits deterministic errors
 
 ```typescript
 export interface PslSPI {
@@ -123,7 +123,7 @@ export interface LintSPI {
 
 ### Authoring
 
-- **PSL-first**: emitter loads installed packs, translates attributes to contract decorations, validates, canonicalizes, emits `contract.json`
+- **PSL-first**: emitter loads installed packs, translates supported extension constructor syntax to contract decorations, validates, canonicalizes, emits `contract.json`
 - **TS-first**: app or tool uses pack TS helpers to add decorations, then canonicalizes and emits `contract.json`
 
 ### Runtime/Adapter
@@ -198,7 +198,7 @@ The Conformance Kit (ADR 026) will include pack tests:
 
 ### Negative
 
-- Authors must install packs in authoring contexts to use PSL attributes
+- Authors must install packs in authoring contexts to use pack-owned PSL constructor syntax
 - Some features require adapter participation and will hard-fail on unsupported profiles
 - More moving parts to document and certify
 

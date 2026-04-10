@@ -22,7 +22,7 @@ In the provider-based authoring model, PSL providers call this parser and then r
 
 `@prisma-next/psl-parser` parses attributes **generically**:
 
-- Attributes may be **non-namespaced** (for example `@id`) or **namespaced** (for example `@pgvector.column`).
+- Attributes may be **non-namespaced** (for example `@id`) or **namespaced** (for example `@vendor.option`).
 - Attributes may include an **optional argument list**.
 - Arguments are parsed into positional/named entries with preserved raw values and source spans.
 - The parser owns **syntax + structure + spans**, not semantics.
@@ -73,4 +73,3 @@ flowchart LR
 - `docs/Architecture Overview.md`
 - `docs/architecture docs/subsystems/2. Contract Emitter & Types.md`
 - `docs/architecture docs/adrs/ADR 163 - Provider-invoked source interpretation packages.md`
-

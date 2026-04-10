@@ -76,7 +76,7 @@ describe('enrichContract', () => {
     });
     const extension = makeExtension({
       capabilities: {
-        postgres: { 'pgvector/cosine': true },
+        postgres: { 'pgvector.cosine': true },
       },
     });
 
@@ -86,7 +86,7 @@ describe('enrichContract', () => {
       postgres: {
         lateral: true,
         returning: true,
-        'pgvector/cosine': true,
+        'pgvector.cosine': true,
       },
     });
   });
@@ -111,7 +111,7 @@ describe('enrichContract', () => {
     const extension = makeExtension({
       id: 'pgvector',
       version: '0.0.2',
-      capabilities: { postgres: { 'pgvector/cosine': true } },
+      capabilities: { postgres: { 'pgvector.cosine': true } },
     });
 
     const result = enrichContract(makeIR(), [extension]);
@@ -123,14 +123,14 @@ describe('enrichContract', () => {
         familyId: 'sql',
         targetId: 'postgres',
         version: '0.0.2',
-        capabilities: { postgres: { 'pgvector/cosine': true } },
+        capabilities: { postgres: { 'pgvector.cosine': true } },
       },
     });
   });
 
   it('replaces runtime-only extension pack fields with normalized metadata', () => {
     const extension = makeExtension({
-      capabilities: { postgres: { 'pgvector/cosine': true } },
+      capabilities: { postgres: { 'pgvector.cosine': true } },
       types: {
         codecTypes: {
           import: {
@@ -166,7 +166,7 @@ describe('enrichContract', () => {
         familyId: 'sql',
         targetId: 'postgres',
         version: '0.0.1',
-        capabilities: { postgres: { 'pgvector/cosine': true } },
+        capabilities: { postgres: { 'pgvector.cosine': true } },
         types: {
           codecTypes: {
             import: {
