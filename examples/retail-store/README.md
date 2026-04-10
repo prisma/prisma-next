@@ -88,6 +88,8 @@ app/                      Next.js App Router (pages + API routes)
 - **Float scalar type**: Not in default Mongo PSL scalar descriptors; added via custom `scalarTypeDescriptors` in config
 - **ObjectId in filters**: `MongoFieldFilter.eq` with ObjectId values requires wrapping in `MongoParamRef` (see `src/data/object-id-filter.ts`)
 - **`@unique`/`@@index`**: Not supported in Mongo PSL interpreter; migration planner only generates index operations
+- **Schema migrations**: No migration artifacts committed; the migration planner cannot produce operations without index support, and MongoDB implicitly creates collections on first write. Migration scripts are wired up (`pnpm migration:plan` / `pnpm migration:apply`) for when the framework adds support.
 - **Typed `$push`/`$pull`**: ORM doesn't expose array update operators; use `mongoRaw` with untyped commands
+- **Pipeline output types**: The pipeline builder doesn't propagate output types through aggregation stages; results are cast to expected shapes at the call site
 - **Atlas Search**: Requires extension pack not yet available
 - **Change Streams**: Not yet supported in the framework

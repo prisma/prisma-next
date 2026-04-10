@@ -1,5 +1,6 @@
 import { ObjectId } from 'mongodb';
 import type { Db } from '../db';
+import { executeRaw } from './execute-raw';
 import { objectIdEq } from './object-id-filter';
 
 export function getCartByUserId(db: Db, userId: string) {
@@ -32,6 +33,9 @@ export function clearCart(db: Db, userId: string) {
   return db.orm.carts.where(objectIdEq('userId', userId)).update({ items: [] });
 }
 
+// Raw commands pass filter objects directly to the MongoDB driver, so bare
+// ObjectId values work without MongoParamRef wrapping (unlike ORM filters
+// which go through AST lowering — see objectIdEq).
 export async function addToCart(
   db: Db,
   userId: string,
@@ -48,9 +52,7 @@ export async function addToCart(
     .collection('carts')
     .updateOne({ userId: new ObjectId(userId) }, { $push: { items: item } })
     .build();
-  for await (const _ of db.runtime.execute(plan)) {
-    /* consume */
-  }
+  await executeRaw(db, plan);
 }
 
 export async function removeFromCart(db: Db, userId: string, productId: string) {
@@ -58,7 +60,5 @@ export async function removeFromCart(db: Db, userId: string, productId: string) 
     .collection('carts')
     .updateOne({ userId: new ObjectId(userId) }, { $pull: { items: { productId } } })
     .build();
-  for await (const _ of db.runtime.execute(plan)) {
-    /* consume */
-  }
+  await executeRaw(db, plan);
 }
