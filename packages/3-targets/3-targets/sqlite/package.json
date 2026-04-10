@@ -15,13 +15,18 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-errors": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
-    "@prisma-next/sql-runtime": "workspace:*"
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/sql-schema-ir": "workspace:*",
+    "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/adapter-sqlite": "workspace:*",
+    "@prisma-next/driver-sqlite": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
