@@ -1,3 +1,7 @@
+types {
+  Embedding = Bytes @pgvector.column(length: 1536)
+}
+
 model User {
   id Int @id @default(autoincrement())
   email String @unique
@@ -5,6 +9,7 @@ model User {
   isActive Boolean @default(true)
   score Float?
   profile Json?
+  embedding Embedding?
   createdAt DateTime @default(now())
 }
 

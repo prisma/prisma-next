@@ -90,6 +90,13 @@
             "kind": "scalar"
           }
         },
+        "embedding": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/vector@1",
+            "kind": "scalar"
+          }
+        },
         "id": {
           "nullable": false,
           "type": {
@@ -131,6 +138,9 @@
           "email": {
             "column": "email"
           },
+          "embedding": {
+            "column": "embedding"
+          },
           "id": {
             "column": "id"
           },
@@ -149,7 +159,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:b5d91d64118c026ef978b084441b127f0b5a8f8c1a1243290c2738a5ce088811",
+    "storageHash": "sha256:615d7f6e37b15d66c64b8e500ee79877eecae9bb484d48b429f3b3c1d1e21051",
     "tables": {
       "post": {
         "columns": {
@@ -218,6 +228,12 @@
             "nativeType": "text",
             "nullable": false
           },
+          "embedding": {
+            "codecId": "pg/vector@1",
+            "nativeType": "vector",
+            "nullable": true,
+            "typeRef": "Embedding"
+          },
           "id": {
             "codecId": "pg/int4@1",
             "default": {
@@ -258,6 +274,15 @@
           }
         ]
       }
+    },
+    "types": {
+      "Embedding": {
+        "codecId": "pg/vector@1",
+        "nativeType": "vector",
+        "typeParams": {
+          "length": 1536
+        }
+      }
     }
   },
   "capabilities": {
@@ -266,6 +291,7 @@
       "lateral": true,
       "limit": true,
       "orderBy": true,
+      "pgvector/cosine": true,
       "returning": true
     },
     "sql": {
@@ -274,7 +300,58 @@
       "returning": true
     }
   },
-  "extensionPacks": {},
+  "extensionPacks": {
+    "pgvector": {
+      "capabilities": {
+        "postgres": {
+          "pgvector/cosine": true
+        }
+      },
+      "familyId": "sql",
+      "id": "pgvector",
+      "kind": "extension",
+      "targetId": "postgres",
+      "types": {
+        "codecTypes": {
+          "import": {
+            "alias": "PgVectorTypes",
+            "named": "CodecTypes",
+            "package": "@prisma-next/extension-pgvector/codec-types"
+          },
+          "typeImports": [
+            {
+              "alias": "Vector",
+              "named": "Vector",
+              "package": "@prisma-next/extension-pgvector/codec-types"
+            }
+          ]
+        },
+        "operationTypes": {
+          "import": {
+            "alias": "PgVectorOperationTypes",
+            "named": "OperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
+        },
+        "queryOperationTypes": {
+          "import": {
+            "alias": "PgVectorQueryOperationTypes",
+            "named": "QueryOperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
+        },
+        "storage": [
+          {
+            "familyId": "sql",
+            "nativeType": "vector",
+            "targetId": "postgres",
+            "typeId": "pg/vector@1"
+          }
+        ]
+      },
+      "version": "0.0.1"
+    }
+  },
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
