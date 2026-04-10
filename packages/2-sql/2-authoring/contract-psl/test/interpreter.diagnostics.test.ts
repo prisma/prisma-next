@@ -1,3 +1,4 @@
+import type { ParsePslDocumentResult, PslSpan } from '@prisma-next/psl-parser';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
@@ -16,6 +17,10 @@ const baseInput = {
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
+const testSpan: PslSpan = {
+  start: { line: 1, column: 1, offset: 0 },
+  end: { line: 1, column: 7, offset: 6 },
+};
 
 describe('interpretPslDocumentToSqlContract diagnostics', () => {
   it('returns diagnostics when target context is missing', () => {
@@ -38,6 +43,50 @@ describe('interpretPslDocumentToSqlContract diagnostics', () => {
       expect.arrayContaining([
         expect.objectContaining({
           code: 'PSL_TARGET_CONTEXT_REQUIRED',
+        }),
+      ]),
+    );
+  });
+
+  it('guards against named type declarations missing both base type and constructor', () => {
+    const document = {
+      ok: true,
+      diagnostics: [],
+      ast: {
+        kind: 'document',
+        sourceId: 'schema.prisma',
+        models: [],
+        enums: [],
+        compositeTypes: [],
+        types: {
+          kind: 'types',
+          declarations: [
+            {
+              kind: 'namedType',
+              name: 'Broken',
+              attributes: [],
+              span: testSpan,
+            },
+          ],
+          span: testSpan,
+        },
+        span: testSpan,
+      },
+    } satisfies ParsePslDocumentResult;
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
+          message: 'Named type "Broken" must declare a base type or constructor',
         }),
       ]),
     );
