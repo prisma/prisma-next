@@ -431,24 +431,23 @@ function parsePslAuthoringArgumentValue(
   descriptor: AuthoringArgumentDescriptor,
   rawValue: string,
 ): unknown | typeof INVALID_AUTHORING_ARGUMENT {
-  if (descriptor.kind === 'string') {
-    return unquoteStringLiteral(rawValue);
+  switch (descriptor.kind) {
+    case 'string':
+      return unquoteStringLiteral(rawValue);
+    case 'number': {
+      const parsed = Number(unquoteStringLiteral(rawValue));
+      return Number.isNaN(parsed) ? INVALID_AUTHORING_ARGUMENT : parsed;
+    }
+    case 'stringArray':
+      return parseStringArrayLiteral(rawValue);
+    case 'object':
+      return parsePslObjectLiteral(rawValue);
+    default: {
+      const _exhaustive: never = descriptor;
+      void _exhaustive;
+      return INVALID_AUTHORING_ARGUMENT;
+    }
   }
-
-  if (descriptor.kind === 'number') {
-    const parsed = Number(unquoteStringLiteral(rawValue));
-    return Number.isNaN(parsed) ? INVALID_AUTHORING_ARGUMENT : parsed;
-  }
-
-  if (descriptor.kind === 'stringArray') {
-    return parseStringArrayLiteral(rawValue);
-  }
-
-  if (descriptor.kind === 'object') {
-    return parsePslObjectLiteral(rawValue);
-  }
-
-  return INVALID_AUTHORING_ARGUMENT;
 }
 
 function pushInvalidPslHelperArgument(input: {
@@ -479,13 +478,8 @@ function mapPslHelperArgs(input: {
 }): readonly unknown[] | undefined {
   const mappedArgs: unknown[] = input.descriptors.map(() => undefined);
 
-  const positionalArgs = input.args.filter(
-    (arg): arg is Extract<PslAttributeArgument, { kind: 'positional' }> =>
-      arg.kind === 'positional',
-  );
-  const namedArgs = input.args.filter(
-    (arg): arg is Extract<PslAttributeArgument, { kind: 'named' }> => arg.kind === 'named',
-  );
+  const positionalArgs = input.args.filter((arg) => arg.kind === 'positional');
+  const namedArgs = input.args.filter((arg) => arg.kind === 'named');
 
   if (positionalArgs.length > input.descriptors.length) {
     return pushInvalidPslHelperArgument({

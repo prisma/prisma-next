@@ -11,6 +11,6 @@ const sqlFamilyPack = {
     field: sqlFamilyAuthoringFieldPresets,
     type: sqlFamilyAuthoringTypes,
   },
-} as const;
+} as const satisfies FamilyPackRef<'sql'>;
 
-export default sqlFamilyPack as typeof sqlFamilyPack & FamilyPackRef<'sql'>;
+export default sqlFamilyPack;
