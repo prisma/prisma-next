@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useCart } from '../../src/components/cart-provider';
 import { Button } from '../../src/components/ui/button';
 
 interface CartActionsProps {
@@ -11,6 +12,7 @@ interface CartActionsProps {
 
 export function CartActions({ productId, mode }: CartActionsProps) {
   const router = useRouter();
+  const { invalidateCart } = useCart();
   const [loading, setLoading] = useState(false);
 
   async function handleAction() {
@@ -18,6 +20,7 @@ export function CartActions({ productId, mode }: CartActionsProps) {
     try {
       const url = mode === 'remove' ? `/api/cart?productId=${productId}` : '/api/cart';
       await fetch(url, { method: 'DELETE' });
+      invalidateCart();
       router.refresh();
     } finally {
       setLoading(false);
