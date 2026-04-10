@@ -118,6 +118,28 @@ function parseStringArrayLiteral(
     .map((entry) => unquoteStringLiteral(entry));
 }
 
+function parsePslObjectLiteral(
+  value: string,
+): Record<string, unknown> | typeof INVALID_AUTHORING_ARGUMENT {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+    return INVALID_AUTHORING_ARGUMENT;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return INVALID_AUTHORING_ARGUMENT;
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return INVALID_AUTHORING_ARGUMENT;
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
 function parsePslAuthoringArgumentValue(
   descriptor: AuthoringArgumentDescriptor,
   rawValue: string,
@@ -133,6 +155,10 @@ function parsePslAuthoringArgumentValue(
 
   if (descriptor.kind === 'stringArray') {
     return parseStringArrayLiteral(rawValue);
+  }
+
+  if (descriptor.kind === 'object') {
+    return parsePslObjectLiteral(rawValue);
   }
 
   return INVALID_AUTHORING_ARGUMENT;
