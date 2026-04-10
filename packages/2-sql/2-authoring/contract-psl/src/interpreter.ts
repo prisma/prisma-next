@@ -785,8 +785,8 @@ function buildValueObjects(input: BuildValueObjectsInput): Record<string, Contra
       }
       const descriptor = resolveFieldTypeDescriptor({
         field,
-        enumTypeDescriptors: enumTypeDescriptors as Map<string, ColumnDescriptor>,
-        namedTypeDescriptors: namedTypeDescriptors as Map<string, ColumnDescriptor>,
+        enumTypeDescriptors,
+        namedTypeDescriptors,
         scalarTypeDescriptors,
         authoringContributions,
         composedExtensions,

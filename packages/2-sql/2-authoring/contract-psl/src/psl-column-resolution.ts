@@ -657,8 +657,8 @@ export function resolvePslTypeConstructorDescriptor(input: {
 
 export function resolveFieldTypeDescriptor(input: {
   readonly field: PslField;
-  readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
-  readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
+  readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly composedExtensions: ReadonlySet<string>;
@@ -999,8 +999,8 @@ export function lowerDefaultForField(input: {
 
 export function resolveColumnDescriptor(
   field: PslField,
-  enumTypeDescriptors: Map<string, ColumnDescriptor>,
-  namedTypeDescriptors: Map<string, ColumnDescriptor>,
+  enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
+  namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
   scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
 ): ColumnDescriptor | undefined {
   if (field.typeRef && namedTypeDescriptors.has(field.typeRef)) {
