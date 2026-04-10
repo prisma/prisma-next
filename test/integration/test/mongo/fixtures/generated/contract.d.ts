@@ -57,7 +57,10 @@ type ContractBase = ContractType<
       readonly tasks: Record<string, never>;
       readonly users: {
         readonly indexes: readonly [
-          { readonly fields: { readonly email: 1 }; readonly options: { readonly unique: true } },
+          {
+            readonly keys: readonly [{ readonly field: 'email'; readonly direction: 1 }];
+            readonly unique: true;
+          },
         ];
         readonly options: { readonly collation: { readonly locale: 'en'; readonly strength: 2 } };
       };
