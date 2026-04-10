@@ -365,8 +365,23 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
     const valueOffset = line.indexOf(declarationValue);
     const declarationValueColumn = trimmedStartColumn + Math.max(valueOffset, 0);
 
+    const typeAndAttributeSplit = splitTypeAndAttributes(declarationValue);
+    if (!typeAndAttributeSplit) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_TYPES_MEMBER',
+        message: `Invalid types declaration "${line}"`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+
+    const typeSource = typeAndAttributeSplit.typeSource.trim();
+    const attributeSource = typeAndAttributeSplit.attributeSource.trimStart();
+    const leadingAttributeWhitespace =
+      typeAndAttributeSplit.attributeSource.length - attributeSource.length;
+
     const typeConstructor = parseTypeConstructorCall(context, {
-      declarationValue,
+      declarationValue: typeSource,
       lineIndex,
       startColumn: declarationValueColumn,
       invalidCode: 'PSL_INVALID_TYPES_MEMBER',
@@ -376,37 +391,11 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
       continue;
     }
 
-    if (typeConstructor) {
-      declarations.push({
-        kind: 'namedType',
-        name: declarationName,
-        typeConstructor,
-        attributes: [],
-        span: createTrimmedLineSpan(context, lineIndex),
-      });
-      continue;
-    }
-
-    const baseTypeMatch = declarationValue.match(/^([A-Za-z_]\w*)(.*)$/);
-    if (!baseTypeMatch) {
-      pushDiagnostic(context, {
-        code: 'PSL_INVALID_TYPES_MEMBER',
-        message: `Invalid types declaration "${line}"`,
-        span: createTrimmedLineSpan(context, lineIndex),
-      });
-      continue;
-    }
-
-    const baseType = baseTypeMatch[1] ?? '';
-    const attributePart = baseTypeMatch[2] ?? '';
-    const attributeOffset = declarationValue.length - attributePart.length;
-    const attributeSource = attributePart.trimStart();
-    const leadingAttributeWhitespace = attributePart.length - attributeSource.length;
     const attributeParse = extractAttributeTokensWithSpans(
       context,
       lineIndex,
       attributeSource,
-      declarationValueColumn + attributeOffset + leadingAttributeWhitespace,
+      declarationValueColumn + typeAndAttributeSplit.attributeOffset + leadingAttributeWhitespace,
     );
     if (!attributeParse.ok) {
       continue;
@@ -421,6 +410,29 @@ function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesB
         }),
       )
       .filter((attribute): attribute is PslAttribute => Boolean(attribute));
+
+    if (typeConstructor) {
+      declarations.push({
+        kind: 'namedType',
+        name: declarationName,
+        typeConstructor,
+        attributes,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+
+    const baseTypeMatch = typeSource.match(/^([A-Za-z_]\w*)$/);
+    if (!baseTypeMatch) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_TYPES_MEMBER',
+        message: `Invalid types declaration "${line}"`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+
+    const baseType = baseTypeMatch[1] ?? '';
 
     declarations.push({
       kind: 'namedType',
@@ -599,7 +611,7 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
   const fieldName = fieldMatch[1] ?? '';
   const separator = fieldMatch[2] ?? '';
   const remainder = fieldMatch[3] ?? '';
-  const typeAndAttributeSplit = splitFieldTypeAndAttributes(remainder);
+  const typeAndAttributeSplit = splitTypeAndAttributes(remainder);
   if (!typeAndAttributeSplit) {
     pushDiagnostic(context, {
       code: 'PSL_INVALID_MODEL_MEMBER',
@@ -693,7 +705,7 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
   };
 }
 
-function splitFieldTypeAndAttributes(value: string):
+function splitTypeAndAttributes(value: string):
   | {
       readonly typeSource: string;
       readonly attributeSource: string;
@@ -702,6 +714,7 @@ function splitFieldTypeAndAttributes(value: string):
   | undefined {
   let depthParen = 0;
   let depthBracket = 0;
+  let depthBrace = 0;
   let quote: '"' | "'" | null = null;
 
   for (let index = 0; index < value.length; index += 1) {
@@ -733,8 +746,16 @@ function splitFieldTypeAndAttributes(value: string):
       depthBracket = Math.max(0, depthBracket - 1);
       continue;
     }
+    if (character === '{') {
+      depthBrace += 1;
+      continue;
+    }
+    if (character === '}') {
+      depthBrace = Math.max(0, depthBrace - 1);
+      continue;
+    }
 
-    if (character === '@' && depthParen === 0 && depthBracket === 0) {
+    if (character === '@' && depthParen === 0 && depthBracket === 0 && depthBrace === 0) {
       return {
         typeSource: value.slice(0, index).trimEnd(),
         attributeSource: value.slice(index),
@@ -984,6 +1005,7 @@ function splitTopLevelSegments(value: string, separator: ',' | ':'): TopLevelSeg
   const parts: TopLevelSegment[] = [];
   let depthParen = 0;
   let depthBracket = 0;
+  let depthBrace = 0;
   let quote: '"' | "'" | null = null;
   let start = 0;
 
@@ -1017,8 +1039,16 @@ function splitTopLevelSegments(value: string, separator: ',' | ':'): TopLevelSeg
       depthBracket = Math.max(0, depthBracket - 1);
       continue;
     }
+    if (character === '{') {
+      depthBrace += 1;
+      continue;
+    }
+    if (character === '}') {
+      depthBrace = Math.max(0, depthBrace - 1);
+      continue;
+    }
 
-    if (character === separator && depthParen === 0 && depthBracket === 0) {
+    if (character === separator && depthParen === 0 && depthBracket === 0 && depthBrace === 0) {
       parts.push({
         value: value.slice(start, index),
         start,

@@ -98,6 +98,263 @@ export function checkUncomposedNamespace(
 
 const INVALID_AUTHORING_ARGUMENT = Symbol('invalidAuthoringArgument');
 
+type ParsedPslLiteral =
+  | string
+  | number
+  | boolean
+  | null
+  | ParsedPslLiteral[]
+  | { [key: string]: ParsedPslLiteral };
+
+function isIdentifierStartCharacter(character: string | undefined): boolean {
+  return character !== undefined && /[A-Za-z_$]/.test(character);
+}
+
+function isIdentifierCharacter(character: string | undefined): boolean {
+  return character !== undefined && /[A-Za-z0-9_$]/.test(character);
+}
+
+function parseJsLikeLiteral(value: string): ParsedPslLiteral | typeof INVALID_AUTHORING_ARGUMENT {
+  let index = 0;
+
+  function skipWhitespace() {
+    while (/\s/.test(value[index] ?? '')) {
+      index += 1;
+    }
+  }
+
+  function parseIdentifier(): string | typeof INVALID_AUTHORING_ARGUMENT {
+    const first = value[index];
+    if (!isIdentifierStartCharacter(first)) {
+      return INVALID_AUTHORING_ARGUMENT;
+    }
+
+    let end = index + 1;
+    while (isIdentifierCharacter(value[end])) {
+      end += 1;
+    }
+
+    const identifier = value.slice(index, end);
+    index = end;
+    return identifier;
+  }
+
+  function parseString(): string | typeof INVALID_AUTHORING_ARGUMENT {
+    const quote = value[index];
+    if (quote !== '"' && quote !== "'") {
+      return INVALID_AUTHORING_ARGUMENT;
+    }
+
+    index += 1;
+    let result = '';
+
+    while (index < value.length) {
+      const character = value[index];
+      index += 1;
+
+      if (character === undefined) {
+        return INVALID_AUTHORING_ARGUMENT;
+      }
+
+      if (character === quote) {
+        return result;
+      }
+
+      if (character !== '\\') {
+        result += character;
+        continue;
+      }
+
+      const escaped = value[index];
+      index += 1;
+
+      if (escaped === undefined) {
+        return INVALID_AUTHORING_ARGUMENT;
+      }
+
+      switch (escaped) {
+        case "'":
+        case '"':
+        case '\\':
+        case '/':
+          result += escaped;
+          break;
+        case 'b':
+          result += '\b';
+          break;
+        case 'f':
+          result += '\f';
+          break;
+        case 'n':
+          result += '\n';
+          break;
+        case 'r':
+          result += '\r';
+          break;
+        case 't':
+          result += '\t';
+          break;
+        case 'u': {
+          const hex = value.slice(index, index + 4);
+          if (!/^[0-9A-Fa-f]{4}$/.test(hex)) {
+            return INVALID_AUTHORING_ARGUMENT;
+          }
+          result += String.fromCharCode(Number.parseInt(hex, 16));
+          index += 4;
+          break;
+        }
+        default:
+          return INVALID_AUTHORING_ARGUMENT;
+      }
+    }
+
+    return INVALID_AUTHORING_ARGUMENT;
+  }
+
+  function parseNumber(): number | typeof INVALID_AUTHORING_ARGUMENT {
+    const match = value.slice(index).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+    const raw = match?.[0];
+    if (!raw) {
+      return INVALID_AUTHORING_ARGUMENT;
+    }
+
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      return INVALID_AUTHORING_ARGUMENT;
+    }
+
+    index += raw.length;
+    return parsed;
+  }
+
+  function parseArray(): ParsedPslLiteral[] | typeof INVALID_AUTHORING_ARGUMENT {
+    if (value[index] !== '[') {
+      return INVALID_AUTHORING_ARGUMENT;
+    }
+
+    index += 1;
+    const result: ParsedPslLiteral[] = [];
+
+    skipWhitespace();
+    if (value[index] === ']') {
+      index += 1;
+      return result;
+    }
+
+    while (index < value.length) {
+      const entry = parseValue();
+      if (entry === INVALID_AUTHORING_ARGUMENT) {
+        return INVALID_AUTHORING_ARGUMENT;
+      }
+      result.push(entry);
+
+      skipWhitespace();
+      if (value[index] === ',') {
+        index += 1;
+        skipWhitespace();
+        continue;
+      }
+      if (value[index] === ']') {
+        index += 1;
+        return result;
+      }
+      return INVALID_AUTHORING_ARGUMENT;
+    }
+
+    return INVALID_AUTHORING_ARGUMENT;
+  }
+
+  function parseObject(): { [key: string]: ParsedPslLiteral } | typeof INVALID_AUTHORING_ARGUMENT {
+    if (value[index] !== '{') {
+      return INVALID_AUTHORING_ARGUMENT;
+    }
+
+    index += 1;
+    const result: { [key: string]: ParsedPslLiteral } = {};
+
+    skipWhitespace();
+    if (value[index] === '}') {
+      index += 1;
+      return result;
+    }
+
+    while (index < value.length) {
+      skipWhitespace();
+      const key = value[index] === '"' || value[index] === "'" ? parseString() : parseIdentifier();
+      if (key === INVALID_AUTHORING_ARGUMENT) {
+        return INVALID_AUTHORING_ARGUMENT;
+      }
+
+      skipWhitespace();
+      if (value[index] !== ':') {
+        return INVALID_AUTHORING_ARGUMENT;
+      }
+
+      index += 1;
+      const entry = parseValue();
+      if (entry === INVALID_AUTHORING_ARGUMENT) {
+        return INVALID_AUTHORING_ARGUMENT;
+      }
+      result[key] = entry;
+
+      skipWhitespace();
+      if (value[index] === ',') {
+        index += 1;
+        skipWhitespace();
+        continue;
+      }
+      if (value[index] === '}') {
+        index += 1;
+        return result;
+      }
+      return INVALID_AUTHORING_ARGUMENT;
+    }
+
+    return INVALID_AUTHORING_ARGUMENT;
+  }
+
+  function parseValue(): ParsedPslLiteral | typeof INVALID_AUTHORING_ARGUMENT {
+    skipWhitespace();
+    const character = value[index];
+    if (character === '{') {
+      return parseObject();
+    }
+    if (character === '[') {
+      return parseArray();
+    }
+    if (character === '"' || character === "'") {
+      return parseString();
+    }
+    if (character === '-' || /\d/.test(character ?? '')) {
+      return parseNumber();
+    }
+
+    const identifier = parseIdentifier();
+    if (identifier === INVALID_AUTHORING_ARGUMENT) {
+      return INVALID_AUTHORING_ARGUMENT;
+    }
+    if (identifier === 'true') {
+      return true;
+    }
+    if (identifier === 'false') {
+      return false;
+    }
+    if (identifier === 'null') {
+      return null;
+    }
+    return INVALID_AUTHORING_ARGUMENT;
+  }
+
+  skipWhitespace();
+  const parsed = parseValue();
+  if (parsed === INVALID_AUTHORING_ARGUMENT) {
+    return parsed;
+  }
+
+  skipWhitespace();
+  return index === value.length ? parsed : INVALID_AUTHORING_ARGUMENT;
+}
+
 function parseStringArrayLiteral(
   value: string,
 ): readonly string[] | typeof INVALID_AUTHORING_ARGUMENT {
@@ -130,7 +387,10 @@ function parsePslObjectLiteral(
   try {
     parsed = JSON.parse(trimmed);
   } catch {
-    return INVALID_AUTHORING_ARGUMENT;
+    parsed = parseJsLikeLiteral(trimmed);
+    if (parsed === INVALID_AUTHORING_ARGUMENT) {
+      return INVALID_AUTHORING_ARGUMENT;
+    }
   }
 
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {

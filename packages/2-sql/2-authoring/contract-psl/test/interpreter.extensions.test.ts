@@ -71,6 +71,39 @@ model Document {
     );
   });
 
+  it('rejects attributes attached to constructor-based named types', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Embedding1536 = pgvector.Vector(1536) @db.VarChar(191)
+}
+
+model Document {
+  id Int @id
+  embedding Embedding1536
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: ['pgvector'],
+      authoringContributions: pgvectorAuthoringContributions,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
+          message: expect.stringContaining('db.VarChar'),
+        }),
+      ]),
+    );
+  });
+
   it('preserves composed extension pack versions when refs are provided', () => {
     const document = parsePslDocument({
       schema: `types {
@@ -342,6 +375,78 @@ model Document {
               codecId: 'custom/vector@1',
               nativeType: 'vector',
               nullable: true,
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('instantiates constructor expressions with JS-like object literal arguments', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  ShortName = sql.String({ length: 35, label: 'short' })
+}
+
+model Document {
+  id Int @id
+  shortName ShortName
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      authoringContributions: {
+        type: {
+          sql: {
+            String: {
+              kind: 'typeConstructor',
+              args: [
+                {
+                  kind: 'object',
+                  properties: {
+                    length: { kind: 'number', integer: true, minimum: 1 },
+                    label: { kind: 'string', optional: true },
+                  },
+                },
+              ],
+              output: {
+                codecId: 'custom/varchar@1',
+                nativeType: 'character varying',
+                typeParams: {
+                  length: { kind: 'arg', index: 0, path: ['length'] },
+                  label: { kind: 'arg', index: 0, path: ['label'] },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.storage).toMatchObject({
+      types: {
+        ShortName: {
+          codecId: 'custom/varchar@1',
+          nativeType: 'character varying',
+          typeParams: {
+            length: 35,
+            label: 'short',
+          },
+        },
+      },
+      tables: {
+        document: {
+          columns: {
+            shortName: {
+              codecId: 'custom/varchar@1',
+              nativeType: 'character varying',
+              typeRef: 'ShortName',
             },
           },
         },

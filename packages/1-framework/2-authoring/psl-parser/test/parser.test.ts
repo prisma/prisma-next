@@ -150,6 +150,41 @@ types {
     });
   });
 
+  it('parses attributes attached to named type constructor expressions', () => {
+    const schema = `
+types {
+  Embedding1536 = pgvector.Vector(1536) @db.VarChar(191)
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+
+    const embedding = result.ast.types?.declarations.find(
+      (entry) => entry.name === 'Embedding1536',
+    );
+    expect(embedding).toMatchObject({
+      kind: 'namedType',
+      name: 'Embedding1536',
+      typeConstructor: {
+        path: ['pgvector', 'Vector'],
+        args: [{ kind: 'positional', value: '1536' }],
+      },
+      attributes: [
+        {
+          kind: 'attribute',
+          target: 'namedType',
+          name: 'db.VarChar',
+          args: [{ kind: 'positional', value: '191' }],
+        },
+      ],
+    });
+  });
+
   it('parses inline field constructor expressions', () => {
     const schema = `
 model Document {
@@ -188,6 +223,31 @@ model Document {
       typeConstructor: {
         path: ['pgvector', 'Vector'],
         args: [{ kind: 'named', name: 'length', value: '1536' }],
+      },
+    });
+  });
+
+  it('parses JS-like object literals as constructor arguments', () => {
+    const schema = `
+types {
+  ShortName = sql.String({ length: 35, label: 'short' })
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+
+    const shortName = result.ast.types?.declarations.find((entry) => entry.name === 'ShortName');
+    expect(shortName).toMatchObject({
+      kind: 'namedType',
+      name: 'ShortName',
+      typeConstructor: {
+        path: ['sql', 'String'],
+        args: [{ kind: 'positional', value: "{ length: 35, label: 'short' }" }],
       },
     });
   });

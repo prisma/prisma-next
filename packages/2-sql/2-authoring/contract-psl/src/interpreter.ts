@@ -202,6 +202,50 @@ interface ResolveNamedTypeDeclarationsInput {
   readonly diagnostics: ContractSourceDiagnostic[];
 }
 
+function validateNamedTypeAttributes(input: {
+  readonly declaration: PslNamedTypeDeclaration;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly composedExtensions: ReadonlySet<string>;
+  readonly allowDbNativeType: boolean;
+}): {
+  readonly dbNativeTypeAttribute: PslAttribute | undefined;
+  readonly hasUnsupportedNamedTypeAttribute: boolean;
+} {
+  const dbNativeTypeAttribute = input.allowDbNativeType
+    ? input.declaration.attributes.find((attribute) => attribute.name.startsWith('db.'))
+    : undefined;
+  let hasUnsupportedNamedTypeAttribute = false;
+
+  for (const attribute of input.declaration.attributes) {
+    if (input.allowDbNativeType && attribute.name.startsWith('db.')) {
+      continue;
+    }
+
+    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions);
+    if (uncomposedNamespace) {
+      input.diagnostics.push({
+        code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+        message: `Attribute "@${attribute.name}" uses unrecognized namespace "${uncomposedNamespace}". Add extension pack "${uncomposedNamespace}" to extensionPacks in prisma-next.config.ts.`,
+        sourceId: input.sourceId,
+        span: attribute.span,
+      });
+      hasUnsupportedNamedTypeAttribute = true;
+      continue;
+    }
+
+    input.diagnostics.push({
+      code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
+      message: `Named type "${input.declaration.name}" uses unsupported attribute "${attribute.name}"`,
+      sourceId: input.sourceId,
+      span: attribute.span,
+    });
+    hasUnsupportedNamedTypeAttribute = true;
+  }
+
+  return { dbNativeTypeAttribute, hasUnsupportedNamedTypeAttribute };
+}
+
 function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput): {
   readonly storageTypes: Record<string, StorageTypeInstance>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
@@ -211,6 +255,17 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
 
   for (const declaration of input.declarations) {
     if (declaration.typeConstructor) {
+      const { hasUnsupportedNamedTypeAttribute } = validateNamedTypeAttributes({
+        declaration,
+        sourceId: input.sourceId,
+        diagnostics: input.diagnostics,
+        composedExtensions: input.composedExtensions,
+        allowDbNativeType: false,
+      });
+      if (hasUnsupportedNamedTypeAttribute) {
+        continue;
+      }
+
       const helperPath = declaration.typeConstructor.path.join('.');
       const typeConstructor = resolvePslTypeConstructorDescriptor({
         call: declaration.typeConstructor,
@@ -273,40 +328,15 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
       continue;
     }
 
-    const dbNativeTypeAttribute = declaration.attributes.find((attribute) =>
-      attribute.name.startsWith('db.'),
-    );
-    let hasUnsupportedNamedTypeAttribute = false;
-
-    for (const attribute of declaration.attributes) {
-      if (attribute.name.startsWith('db.')) {
-        continue;
-      }
-
-      const uncomposedNamespace = checkUncomposedNamespace(
-        attribute.name,
-        input.composedExtensions,
-      );
-      if (uncomposedNamespace) {
-        input.diagnostics.push({
-          code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-          message: `Attribute "@${attribute.name}" uses unrecognized namespace "${uncomposedNamespace}". Add extension pack "${uncomposedNamespace}" to extensionPacks in prisma-next.config.ts.`,
-          sourceId: input.sourceId,
-          span: attribute.span,
-        });
-        hasUnsupportedNamedTypeAttribute = true;
-        continue;
-      }
-
-      input.diagnostics.push({
-        code: 'PSL_UNSUPPORTED_NAMED_TYPE_ATTRIBUTE',
-        message: `Named type "${declaration.name}" uses unsupported attribute "${attribute.name}"`,
+    const { dbNativeTypeAttribute, hasUnsupportedNamedTypeAttribute } = validateNamedTypeAttributes(
+      {
+        declaration,
         sourceId: input.sourceId,
-        span: attribute.span,
-      });
-      hasUnsupportedNamedTypeAttribute = true;
-    }
-
+        diagnostics: input.diagnostics,
+        composedExtensions: input.composedExtensions,
+        allowDbNativeType: true,
+      },
+    );
     if (hasUnsupportedNamedTypeAttribute) {
       continue;
     }
