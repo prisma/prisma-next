@@ -160,6 +160,27 @@ function validatorsEqual(
   );
 }
 
+function classifyValidatorUpdate(
+  origin: MongoSchemaValidator,
+  dest: MongoSchemaValidator,
+): 'widening' | 'destructive' {
+  let hasDestructive = false;
+
+  if (!deepEqual(origin.jsonSchema, dest.jsonSchema)) {
+    hasDestructive = true;
+  }
+
+  if (origin.validationAction !== dest.validationAction) {
+    if (dest.validationAction === 'error') hasDestructive = true;
+  }
+
+  if (origin.validationLevel !== dest.validationLevel) {
+    if (dest.validationLevel === 'strict') hasDestructive = true;
+  }
+
+  return hasDestructive ? 'destructive' : 'widening';
+}
+
 function planValidatorDiff(
   collName: string,
   originValidator: MongoSchemaValidator | undefined,
@@ -167,12 +188,22 @@ function planValidatorDiff(
 ): MongoMigrationPlanOperation | undefined {
   if (validatorsEqual(originValidator, destValidator)) return undefined;
 
+  const collExistsPrecheck = {
+    description: `collection ${collName} exists`,
+    source: new ListCollectionsCommand(),
+    filter: MongoFieldFilter.eq('name', collName),
+    expect: 'exists' as const,
+  };
+
   if (destValidator) {
+    const operationClass = originValidator
+      ? classifyValidatorUpdate(originValidator, destValidator)
+      : 'destructive';
     return {
       id: `validator.${collName}.${originValidator ? 'update' : 'add'}`,
       label: `${originValidator ? 'Update' : 'Add'} validator on ${collName}`,
-      operationClass: 'destructive',
-      precheck: [],
+      operationClass,
+      precheck: [collExistsPrecheck],
       execute: [
         {
           description: `set validator on ${collName}`,
@@ -183,15 +214,25 @@ function planValidatorDiff(
           }),
         },
       ],
-      postcheck: [],
+      postcheck: [
+        {
+          description: `validator applied on ${collName}`,
+          source: new ListCollectionsCommand(),
+          filter: MongoAndExpr.of([
+            MongoFieldFilter.eq('name', collName),
+            MongoFieldFilter.eq('options.validationLevel', destValidator.validationLevel),
+          ]),
+          expect: 'exists' as const,
+        },
+      ],
     };
   }
 
   return {
     id: `validator.${collName}.remove`,
     label: `Remove validator on ${collName}`,
-    operationClass: 'destructive',
-    precheck: [],
+    operationClass: 'widening',
+    precheck: [collExistsPrecheck],
     execute: [
       {
         description: `remove validator on ${collName}`,
@@ -202,7 +243,17 @@ function planValidatorDiff(
         }),
       },
     ],
-    postcheck: [],
+    postcheck: [
+      {
+        description: `validator removed from ${collName}`,
+        source: new ListCollectionsCommand(),
+        filter: MongoAndExpr.of([
+          MongoFieldFilter.eq('name', collName),
+          MongoFieldFilter.eq('options.validationLevel', 'strict'),
+        ]),
+        expect: 'exists' as const,
+      },
+    ],
   };
 }
 
@@ -291,7 +342,7 @@ function planMutableOptionsDiff(
   return {
     id: `options.${collName}.update`,
     label: `Update mutable options on ${collName}`,
-    operationClass: 'widening',
+    operationClass: destCSPPI?.enabled ? 'widening' : 'destructive',
     precheck: [],
     execute: [
       {
