@@ -1,3 +1,4 @@
+import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
 import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast/execution';
 import {
   AggregateCommand,
@@ -369,5 +370,61 @@ describe('MongoAdapter', () => {
       const wire = narrowWire(adapter.lower(plan('users', command)), 'findOneAndDelete');
       expect(wire.filter).toEqual(filter);
     });
+  });
+});
+
+describe('MongoAdapter with codec registry', () => {
+  const uppercaseCodec = mongoCodec({
+    typeId: 'test/uppercase@1',
+    targetTypes: ['string'],
+    decode: (wire: string) => wire.toLowerCase(),
+    encode: (value: string) => value.toUpperCase(),
+  });
+
+  function registryWithUppercase() {
+    const registry = createMongoCodecRegistry();
+    registry.register(uppercaseCodec);
+    return registry;
+  }
+
+  const adapterWithCodecs = createMongoAdapter(registryWithUppercase());
+
+  it('encodes MongoParamRef with codecId in insertOne document', () => {
+    const command = new InsertOneCommand('users', {
+      name: new MongoParamRef('alice', { codecId: 'test/uppercase@1' }),
+      age: new MongoParamRef(30),
+    });
+    const wire = narrowWire(adapterWithCodecs.lower(plan('users', command)), 'insertOne');
+    expect(wire.document).toEqual({ name: 'ALICE', age: 30 });
+  });
+
+  it('encodes MongoParamRef with codecId in update $set', () => {
+    const command = new UpdateOneCommand(
+      'users',
+      MongoFieldFilter.eq('_id', new MongoParamRef('id-1')),
+      { $set: { name: new MongoParamRef('bob', { codecId: 'test/uppercase@1' }) } },
+    );
+    const wire = narrowWire(adapterWithCodecs.lower(plan('users', command)), 'updateOne');
+    expect(wire.update).toEqual({ $set: { name: 'BOB' } });
+  });
+
+  it('encodes MongoParamRef with codecId in findOneAndUpdate', () => {
+    const command = new FindOneAndUpdateCommand(
+      'users',
+      MongoFieldFilter.eq('_id', new MongoParamRef('id-1')),
+      { $set: { name: new MongoParamRef('charlie', { codecId: 'test/uppercase@1' }) } },
+      true,
+    );
+    const wire = narrowWire(adapterWithCodecs.lower(plan('users', command)), 'findOneAndUpdate');
+    expect(wire.update).toEqual({ $set: { name: 'CHARLIE' } });
+  });
+
+  it('encodes MongoParamRef with codecId in insertMany documents', () => {
+    const command = new InsertManyCommand('users', [
+      { name: new MongoParamRef('alice', { codecId: 'test/uppercase@1' }) },
+      { name: new MongoParamRef('bob', { codecId: 'test/uppercase@1' }) },
+    ]);
+    const wire = narrowWire(adapterWithCodecs.lower(plan('users', command)), 'insertMany');
+    expect(wire.documents).toEqual([{ name: 'ALICE' }, { name: 'BOB' }]);
   });
 });
