@@ -335,6 +335,8 @@ export function validateNavigationListFieldAttributes(input: {
   readonly sourceId: string;
   readonly composedExtensions: Set<string>;
   readonly diagnostics: ContractSourceDiagnostic[];
+  readonly familyId: string;
+  readonly targetId: string;
 }): boolean {
   let valid = true;
   for (const attribute of input.field.attributes) {
@@ -342,7 +344,10 @@ export function validateNavigationListFieldAttributes(input: {
       continue;
     }
 
-    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions);
+    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
+      familyId: input.familyId,
+      targetId: input.targetId,
+    });
     if (uncomposedNamespace) {
       reportUncomposedNamespace({
         subjectLabel: `Attribute "@${attribute.name}"`,

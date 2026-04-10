@@ -220,6 +220,8 @@ function validateNamedTypeAttributes(input: {
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly composedExtensions: ReadonlySet<string>;
   readonly allowDbNativeType: boolean;
+  readonly familyId: string;
+  readonly targetId: string;
 }): {
   readonly dbNativeTypeAttribute: PslAttribute | undefined;
   readonly hasUnsupportedNamedTypeAttribute: boolean;
@@ -234,7 +236,10 @@ function validateNamedTypeAttributes(input: {
       continue;
     }
 
-    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions);
+    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
+      familyId: input.familyId,
+      targetId: input.targetId,
+    });
     if (uncomposedNamespace) {
       reportUncomposedNamespace({
         subjectLabel: `Attribute "@${attribute.name}"`,
@@ -274,6 +279,8 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
         diagnostics: input.diagnostics,
         composedExtensions: input.composedExtensions,
         allowDbNativeType: false,
+        familyId: input.familyId,
+        targetId: input.targetId,
       });
       if (hasUnsupportedNamedTypeAttribute) {
         continue;
@@ -350,6 +357,8 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
         diagnostics: input.diagnostics,
         composedExtensions: input.composedExtensions,
         allowDbNativeType: true,
+        familyId: input.familyId,
+        targetId: input.targetId,
       },
     );
     if (hasUnsupportedNamedTypeAttribute) {
@@ -464,6 +473,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       sourceId,
       composedExtensions: input.composedExtensions,
       diagnostics,
+      familyId: input.familyId,
+      targetId: input.targetId,
     });
     const relationAttribute = getAttribute(field.attributes, 'relation');
     let relationName: string | undefined;
@@ -582,6 +593,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     const uncomposedNamespace = checkUncomposedNamespace(
       modelAttribute.name,
       input.composedExtensions,
+      { familyId: input.familyId, targetId: input.targetId },
     );
     if (uncomposedNamespace) {
       reportUncomposedNamespace({

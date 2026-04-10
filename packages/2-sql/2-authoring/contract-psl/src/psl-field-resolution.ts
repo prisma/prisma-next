@@ -74,13 +74,18 @@ function validateFieldAttributes(input: {
   readonly composedExtensions: ReadonlySet<string>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
+  readonly familyId: string;
+  readonly targetId: string;
 }): void {
   for (const attribute of input.field.attributes) {
     if (BUILTIN_FIELD_ATTRIBUTE_NAMES.has(attribute.name)) {
       continue;
     }
 
-    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions);
+    const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
+      familyId: input.familyId,
+      targetId: input.targetId,
+    });
     if (uncomposedNamespace) {
       reportUncomposedNamespace({
         subjectLabel: `Attribute "@${attribute.name}"`,
@@ -158,7 +163,15 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       continue;
     }
 
-    validateFieldAttributes({ model, field, composedExtensions, diagnostics, sourceId });
+    validateFieldAttributes({
+      model,
+      field,
+      composedExtensions,
+      diagnostics,
+      sourceId,
+      familyId,
+      targetId,
+    });
 
     const relationAttribute = getAttribute(field.attributes, 'relation');
     if (relationAttribute && modelNames.has(field.typeName)) {

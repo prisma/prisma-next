@@ -473,6 +473,37 @@ model User {
     );
   });
 
+  it('does not report family/target namespaces as uncomposed attribute namespaces', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id    Int    @id
+  name  String @sql.foo
+  email String @postgres.bar
+  @@sql.qux("x")
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: [],
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const codes = result.failure.diagnostics.map((d) => d.code);
+    expect(codes).not.toContain('PSL_EXTENSION_NAMESPACE_NOT_COMPOSED');
+    expect(codes).toEqual(
+      expect.arrayContaining([
+        'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
+        'PSL_UNSUPPORTED_MODEL_ATTRIBUTE',
+      ]),
+    );
+  });
+
   it('does not report db.* constructors as uncomposed namespace', () => {
     const document = parsePslDocument({
       schema: `types {
@@ -496,7 +527,7 @@ model User {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage.types?.Short).toBeDefined();
+    expect(result.value.storage).toMatchObject({ types: { Short: expect.any(Object) } });
   });
 
   it('surfaces value-object field errors through the diagnostics gate', () => {

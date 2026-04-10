@@ -68,16 +68,36 @@ export function getAuthoringTypeConstructor(
   return isAuthoringTypeConstructorDescriptor(current) ? current : undefined;
 }
 
+/**
+ * Returns the namespace prefix of `attributeName` if it references an
+ * unrecognized extension namespace, otherwise `undefined`. A namespace is
+ * considered recognized when it is:
+ *
+ * - `db` (native-type spec, always allowed),
+ * - the active family id (e.g. `sql`),
+ * - the active target id (e.g. `postgres`),
+ * - present in `composedExtensions`.
+ *
+ * Family/target namespaces are exempted so that e.g. `@sql.foo` surfaces as
+ * PSL_UNSUPPORTED_*_ATTRIBUTE (the attribute isn't defined) rather than
+ * PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (the namespace is already composed).
+ */
 export function checkUncomposedNamespace(
   attributeName: string,
   composedExtensions: ReadonlySet<string>,
+  context?: { readonly familyId?: string; readonly targetId?: string },
 ): string | undefined {
   const dotIndex = attributeName.indexOf('.');
   if (dotIndex <= 0 || dotIndex === attributeName.length - 1) {
     return undefined;
   }
   const namespace = attributeName.slice(0, dotIndex);
-  if (namespace === 'db' || composedExtensions.has(namespace)) {
+  if (
+    namespace === 'db' ||
+    namespace === context?.familyId ||
+    namespace === context?.targetId ||
+    composedExtensions.has(namespace)
+  ) {
     return undefined;
   }
   return namespace;
