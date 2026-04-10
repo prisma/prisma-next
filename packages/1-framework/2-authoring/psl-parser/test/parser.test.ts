@@ -625,6 +625,83 @@ model User {
     );
   });
 
+  it('returns PSL_INVALID_TYPES_MEMBER for a types-block constructor with trailing junk', () => {
+    const schema = `
+types {
+  ShortName = sql.String(35) trailing
+}
+
+model User {
+  id Int @id
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(false);
+    const messages = result.diagnostics
+      .filter((entry) => entry.code === 'PSL_INVALID_TYPES_MEMBER')
+      .map((entry) => entry.message);
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Invalid types declaration "sql.String(35) trailing"'),
+      ]),
+    );
+  });
+
+  it('returns PSL_INVALID_MODEL_MEMBER for an inline field constructor with trailing junk', () => {
+    const schema = `
+model User {
+  id    Int @id
+  name  sql.String(35) junk
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(false);
+    const messages = result.diagnostics
+      .filter((entry) => entry.code === 'PSL_INVALID_MODEL_MEMBER')
+      .map((entry) => entry.message);
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Invalid field type constructor "sql.String(35) junk"'),
+      ]),
+    );
+  });
+
+  it('returns a named-argument diagnostic for a malformed constructor call', () => {
+    const schema = `
+types {
+  ShortName = sql.String(length:)
+}
+
+model User {
+  id Int @id
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(false);
+    const messages = result.diagnostics.map((entry) => entry.message);
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Invalid named argument syntax'),
+        expect.stringContaining('type constructor'),
+      ]),
+    );
+  });
+
   it('returns diagnostics when named types collide with enum names', () => {
     const schema = `
 types {
