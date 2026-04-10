@@ -3,27 +3,71 @@ import { MongoFieldFilter } from '@prisma-next/mongo-query-ast/execution';
 import type { Db } from '../db';
 import { collectResults } from './execute-raw';
 
-export function createEvent(
+export function createViewProductEvent(
   db: Db,
   event: {
     userId: string;
     sessionId: string;
-    type: string;
     timestamp: Date;
-    metadata: {
-      productId: string | null;
-      subCategory: string | null;
-      brand: string | null;
-      query: string | null;
-      exitMethod: string | null;
-    };
+    productId: string;
+    subCategory: string;
+    brand: string;
+    exitMethod?: string | null;
   },
 ) {
-  return db.orm.events.create(event);
+  return db.orm.events.variant('ViewProductEvent').create({
+    userId: event.userId,
+    sessionId: event.sessionId,
+    timestamp: event.timestamp,
+    productId: event.productId,
+    subCategory: event.subCategory,
+    brand: event.brand,
+    exitMethod: event.exitMethod ?? null,
+  });
+}
+
+export function createSearchEvent(
+  db: Db,
+  event: {
+    userId: string;
+    sessionId: string;
+    timestamp: Date;
+    query: string;
+  },
+) {
+  return db.orm.events.variant('SearchEvent').create({
+    userId: event.userId,
+    sessionId: event.sessionId,
+    timestamp: event.timestamp,
+    query: event.query,
+  });
+}
+
+export function createAddToCartEvent(
+  db: Db,
+  event: {
+    userId: string;
+    sessionId: string;
+    timestamp: Date;
+    productId: string;
+    brand: string;
+  },
+) {
+  return db.orm.events.variant('AddToCartEvent').create({
+    userId: event.userId,
+    sessionId: event.sessionId,
+    timestamp: event.timestamp,
+    productId: event.productId,
+    brand: event.brand,
+  });
 }
 
 export function findEventsByUser(db: Db, userId: string) {
   return db.orm.events.where(MongoFieldFilter.eq('userId', userId)).all();
+}
+
+export function findSearchEventsByUser(db: Db, userId: string) {
+  return db.orm.events.variant('SearchEvent').where(MongoFieldFilter.eq('userId', userId)).all();
 }
 
 interface EventTypeCount {

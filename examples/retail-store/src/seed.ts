@@ -1,3 +1,4 @@
+import { createAddToCartEvent, createSearchEvent, createViewProductEvent } from './data/events';
 import type { Db } from './db';
 
 const productData = [
@@ -358,45 +359,27 @@ export async function seed(db: Db) {
     issuedAt: new Date('2026-03-01T10:05:00Z'),
   });
 
-  await db.orm.events.createAll([
-    {
-      userId: 'alice-session-1',
-      sessionId: 'sess-001',
-      type: 'view-product',
-      timestamp: new Date('2026-03-01T09:00:00Z'),
-      metadata: {
-        productId: String(p0._id),
-        subCategory: 'Topwear',
-        brand: 'Heritage',
-        query: null,
-        exitMethod: null,
-      },
-    },
-    {
-      userId: 'alice-session-1',
-      sessionId: 'sess-001',
-      type: 'add-to-cart',
-      timestamp: new Date('2026-03-01T09:05:00Z'),
-      metadata: {
-        productId: String(p0._id),
-        subCategory: 'Topwear',
-        brand: 'Heritage',
-        query: null,
-        exitMethod: null,
-      },
-    },
-    {
-      userId: 'bob-session-1',
-      sessionId: 'sess-002',
-      type: 'search',
-      timestamp: new Date('2026-03-01T09:30:00Z'),
-      metadata: {
-        productId: null,
-        subCategory: null,
-        brand: null,
-        query: 'leather bag',
-        exitMethod: null,
-      },
-    },
-  ]);
+  await createViewProductEvent(db, {
+    userId: 'alice-session-1',
+    sessionId: 'sess-001',
+    timestamp: new Date('2026-03-01T09:00:00Z'),
+    productId: String(p0._id),
+    subCategory: 'Topwear',
+    brand: 'Heritage',
+  });
+
+  await createAddToCartEvent(db, {
+    userId: 'alice-session-1',
+    sessionId: 'sess-001',
+    timestamp: new Date('2026-03-01T09:05:00Z'),
+    productId: String(p0._id),
+    brand: 'Heritage',
+  });
+
+  await createSearchEvent(db, {
+    userId: 'bob-session-1',
+    sessionId: 'sess-002',
+    timestamp: new Date('2026-03-01T09:30:00Z'),
+    query: 'leather bag',
+  });
 }

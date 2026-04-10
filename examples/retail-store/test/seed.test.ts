@@ -39,6 +39,9 @@ describe('seed', { timeout: timeouts.spinUpDbServer }, () => {
 
     const events = await ctx.db.orm.events.all();
     expect(events.length).toBeGreaterThanOrEqual(3);
-    expect(events[0]!.metadata).toBeDefined();
+    const types = events.map((e) => e.type);
+    expect(types).toContain('view-product');
+    expect(types).toContain('add-to-cart');
+    expect(types).toContain('search');
   });
 });

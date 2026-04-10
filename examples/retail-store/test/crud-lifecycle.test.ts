@@ -1,7 +1,7 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { clearCart, getCartByUserId, upsertCart } from '../src/data/carts';
-import { createEvent, findEventsByUser } from '../src/data/events';
+import { createViewProductEvent, findEventsByUser } from '../src/data/events';
 import { createInvoice, findInvoiceById } from '../src/data/invoices';
 import { findLocations } from '../src/data/locations';
 import { createOrder, deleteOrder, getOrderById, getUserOrders } from '../src/data/orders';
@@ -235,26 +235,22 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
     expect(found!.items[0]).toMatchObject({ name: 'Item', unitPrice: 100 });
   });
 
-  it('creates and reads events with embedded metadata', async () => {
-    await createEvent(ctx.db, {
+  it('creates and reads polymorphic events', async () => {
+    await createViewProductEvent(ctx.db, {
       userId: 'user-1',
       sessionId: 'sess-1',
-      type: 'view-product',
       timestamp: new Date('2026-03-01'),
-      metadata: {
-        productId: 'prod-1',
-        subCategory: 'Topwear',
-        brand: 'TestBrand',
-        query: null,
-        exitMethod: null,
-      },
+      productId: 'prod-1',
+      subCategory: 'Topwear',
+      brand: 'TestBrand',
     });
 
     const events = await findEventsByUser(ctx.db, 'user-1');
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       type: 'view-product',
-      metadata: { productId: 'prod-1', brand: 'TestBrand' },
+      productId: 'prod-1',
+      brand: 'TestBrand',
     });
   });
 });
