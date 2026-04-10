@@ -369,21 +369,14 @@ function parseJsLikeLiteral(value: string): ParsedPslLiteral | typeof INVALID_AU
 function parseStringArrayLiteral(
   value: string,
 ): readonly string[] | typeof INVALID_AUTHORING_ARGUMENT {
-  const trimmed = value.trim();
-  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
+  const parsed = parseJsLikeLiteral(value);
+  if (parsed === INVALID_AUTHORING_ARGUMENT || !Array.isArray(parsed)) {
     return INVALID_AUTHORING_ARGUMENT;
   }
-
-  const body = trimmed.slice(1, -1).trim();
-  if (body.length === 0) {
-    return [];
+  if (!parsed.every((item): item is string => typeof item === 'string')) {
+    return INVALID_AUTHORING_ARGUMENT;
   }
-
-  return body
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0)
-    .map((entry) => unquoteStringLiteral(entry));
+  return parsed;
 }
 
 function parsePslObjectLiteral(

@@ -223,6 +223,55 @@ model Document {
     });
   });
 
+  it('parses stringArray arguments whose elements contain commas', () => {
+    const document = parsePslDocument({
+      schema: `types {
+  Tag = sql.Enum('Tag', ["hello, world", "a,b,c", 'plain'])
+}
+
+model Post {
+  id Int @id
+  tag Tag
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      authoringContributions: {
+        type: {
+          sql: {
+            Enum: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'string' }, { kind: 'stringArray' }],
+              output: {
+                codecId: 'custom/enum@1',
+                nativeType: { kind: 'arg', index: 0 },
+                typeParams: {
+                  values: { kind: 'arg', index: 1 },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.storage).toMatchObject({
+      types: {
+        Tag: {
+          codecId: 'custom/enum@1',
+          nativeType: 'Tag',
+          typeParams: { values: ['hello, world', 'a,b,c', 'plain'] },
+        },
+      },
+    });
+  });
+
   it('instantiates family-owned and extension-owned constructor expressions from shared authoring contributions', () => {
     const document = parsePslDocument({
       schema: `types {
