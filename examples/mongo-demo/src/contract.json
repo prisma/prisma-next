@@ -220,8 +220,8 @@
       "users": {
         "indexes": [
           {
-            "keys": [{ "field": "email", "direction": 1 }],
-            "unique": true
+            "fields": { "email": 1 },
+            "options": { "unique": true }
           }
         ]
       }

@@ -59,7 +59,7 @@ const indexedContract: MongoContract = {
   storage: {
     collections: {
       users: {
-        indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
+        indexes: [{ fields: { email: 1 }, options: { unique: true } }],
       },
     },
     storageHash: coreHash('sha256:indexed-contract'),
