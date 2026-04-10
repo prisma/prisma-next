@@ -1,5 +1,6 @@
 import { ObjectId } from 'mongodb';
 import type { Db } from '../db';
+import { executeRaw } from './execute-raw';
 import { objectIdEq } from './object-id-filter';
 
 export function getUserOrders(db: Db, userId: string) {
@@ -53,7 +54,5 @@ export async function updateOrderStatus(
     .collection('orders')
     .updateOne({ _id: new ObjectId(orderId) }, { $push: { statusHistory: entry } })
     .build();
-  for await (const _ of db.runtime.execute(plan)) {
-    /* consume */
-  }
+  await executeRaw(db, plan);
 }

@@ -5,12 +5,14 @@ import { getDb } from '../../../src/db-singleton';
 const DEMO_USER_ID = process.env['DEMO_USER_ID'] ?? '';
 
 export async function GET() {
+  if (!DEMO_USER_ID) return NextResponse.json({ items: [] });
   const db = await getDb();
   const cart = await getCartByUserId(db, DEMO_USER_ID);
   return NextResponse.json(cart ?? { items: [] });
 }
 
 export async function POST(req: Request) {
+  if (!DEMO_USER_ID) return NextResponse.json({ error: 'DEMO_USER_ID not set' }, { status: 500 });
   const body = await req.json();
   const db = await getDb();
   await addToCart(db, DEMO_USER_ID, body);
@@ -19,6 +21,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  if (!DEMO_USER_ID) return NextResponse.json({ items: [] });
   const { searchParams } = new URL(req.url);
   const productId = searchParams.get('productId');
   const db = await getDb();

@@ -72,20 +72,20 @@ export async function seed(db: Db): Promise<SeedResult> {
   if (!alice || !bob) throw new Error('Failed to seed users');
 
   await db.orm.carts.create({
-    userId: alice._id as string,
+    userId: String(alice._id),
     items: [
       {
-        productId: product0._id as string,
-        name: product0.name as string,
-        brand: product0.brand as string,
+        productId: String(product0._id),
+        name: String(product0.name),
+        brand: String(product0.brand),
         amount: 1,
         price: { amount: 79.99, currency: 'USD' },
         image: { url: '/images/products/classic-oxford.jpg' },
       },
       {
-        productId: product1._id as string,
-        name: product1.name as string,
-        brand: product1.brand as string,
+        productId: String(product1._id),
+        name: String(product1.name),
+        brand: String(product1.brand),
         amount: 2,
         price: { amount: 59.99, currency: 'USD' },
         image: { url: '/images/products/slim-chinos.jpg' },
@@ -94,12 +94,12 @@ export async function seed(db: Db): Promise<SeedResult> {
   });
 
   const order = await db.orm.orders.create({
-    userId: bob._id as string,
+    userId: String(bob._id),
     items: [
       {
-        productId: product2._id as string,
-        name: product2.name as string,
-        brand: product2.brand as string,
+        productId: String(product2._id),
+        name: String(product2.name),
+        brand: String(product2.brand),
         amount: 1,
         price: { amount: 149.99, currency: 'USD' },
         image: { url: '/images/products/leather-crossbody.jpg' },
@@ -128,7 +128,7 @@ export async function seed(db: Db): Promise<SeedResult> {
   ]);
 
   await db.orm.invoices.create({
-    orderId: order._id as string,
+    orderId: String(order._id),
     items: [
       {
         name: 'Leather Crossbody Bag',
@@ -150,7 +150,7 @@ export async function seed(db: Db): Promise<SeedResult> {
       type: 'view-product',
       timestamp: new Date('2026-03-01T09:00:00Z'),
       metadata: {
-        productId: product0._id as string,
+        productId: String(product0._id),
         subCategory: 'Topwear',
         brand: 'Heritage',
         query: null,
@@ -163,7 +163,7 @@ export async function seed(db: Db): Promise<SeedResult> {
       type: 'add-to-cart',
       timestamp: new Date('2026-03-01T09:05:00Z'),
       metadata: {
-        productId: product0._id as string,
+        productId: String(product0._id),
         subCategory: 'Topwear',
         brand: 'Heritage',
         query: null,
