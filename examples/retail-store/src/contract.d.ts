@@ -13,7 +13,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:b2f017227576ceb083f5af0684ab88a70f7f5970ab4e636eb6c746aad588695f'>;
+  StorageHashBase<'sha256:71e1f44f6bba16b9ed93e3105524e31153ce2edae6780a600348566599591bc0'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -58,14 +58,11 @@ export type InvoiceLineItem = {
   readonly unitPrice: CodecTypes['mongo/double@1']['output'];
   readonly lineTotal: CodecTypes['mongo/double@1']['output'];
 };
-export type EventMetadata = {
-  readonly productId: CodecTypes['mongo/string@1']['output'] | null;
-  readonly subCategory: CodecTypes['mongo/string@1']['output'] | null;
-  readonly brand: CodecTypes['mongo/string@1']['output'] | null;
-  readonly query: CodecTypes['mongo/string@1']['output'] | null;
-  readonly exitMethod: CodecTypes['mongo/string@1']['output'] | null;
-};
 export type FieldOutputTypes = {
+  readonly AddToCartEvent: {
+    readonly productId: CodecTypes['mongo/string@1']['output'];
+    readonly brand: CodecTypes['mongo/string@1']['output'];
+  };
   readonly Cart: {
     readonly _id: CodecTypes['mongo/objectId@1']['output'];
     readonly userId: CodecTypes['mongo/objectId@1']['output'];
@@ -77,7 +74,6 @@ export type FieldOutputTypes = {
     readonly sessionId: CodecTypes['mongo/string@1']['output'];
     readonly type: CodecTypes['mongo/string@1']['output'];
     readonly timestamp: CodecTypes['mongo/date@1']['output'];
-    readonly metadata: EventMetadata;
   };
   readonly Invoice: {
     readonly _id: CodecTypes['mongo/objectId@1']['output'];
@@ -117,11 +113,18 @@ export type FieldOutputTypes = {
     readonly image: Image;
     readonly embedding: ReadonlyArray<CodecTypes['mongo/double@1']['output']> | null;
   };
+  readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['output'] };
   readonly User: {
     readonly _id: CodecTypes['mongo/objectId@1']['output'];
     readonly name: CodecTypes['mongo/string@1']['output'];
     readonly email: CodecTypes['mongo/string@1']['output'];
     readonly address: Address | null;
+  };
+  readonly ViewProductEvent: {
+    readonly productId: CodecTypes['mongo/string@1']['output'];
+    readonly subCategory: CodecTypes['mongo/string@1']['output'];
+    readonly brand: CodecTypes['mongo/string@1']['output'];
+    readonly exitMethod: CodecTypes['mongo/string@1']['output'] | null;
   };
 };
 export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes>;
@@ -136,10 +139,28 @@ type ContractBase = ContractType<
       readonly locations: Record<string, never>;
       readonly invoices: Record<string, never>;
       readonly events: Record<string, never>;
+      readonly viewProductEvent: Record<string, never>;
+      readonly searchEvent: Record<string, never>;
+      readonly addToCartEvent: Record<string, never>;
     };
     readonly storageHash: StorageHash;
   },
   {
+    readonly AddToCartEvent: {
+      readonly fields: {
+        readonly productId: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly brand: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: { readonly collection: 'events' };
+      readonly base: 'Event';
+    };
     readonly Cart: {
       readonly fields: {
         readonly _id: {
@@ -190,13 +211,15 @@ type ContractBase = ContractType<
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/date@1' };
         };
-        readonly metadata: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'valueObject'; readonly name: 'EventMetadata' };
-        };
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'events' };
+      readonly discriminator: { readonly field: 'type' };
+      readonly variants: {
+        readonly ViewProductEvent: { readonly value: 'view-product' };
+        readonly SearchEvent: { readonly value: 'search' };
+        readonly AddToCartEvent: { readonly value: 'add-to-cart' };
+      };
     };
     readonly Invoice: {
       readonly fields: {
@@ -372,6 +395,17 @@ type ContractBase = ContractType<
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'products' };
     };
+    readonly SearchEvent: {
+      readonly fields: {
+        readonly query: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: { readonly collection: 'events' };
+      readonly base: 'Event';
+    };
     readonly User: {
       readonly fields: {
         readonly _id: {
@@ -410,6 +444,29 @@ type ContractBase = ContractType<
         };
       };
       readonly storage: { readonly collection: 'users' };
+    };
+    readonly ViewProductEvent: {
+      readonly fields: {
+        readonly productId: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly subCategory: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly brand: {
+          readonly nullable: false;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+        readonly exitMethod: {
+          readonly nullable: true;
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+        };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: { readonly collection: 'events' };
+      readonly base: 'Event';
     };
   }
 > & {
@@ -553,30 +610,6 @@ type ContractBase = ContractType<
         readonly lineTotal: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
-        };
-      };
-    };
-    readonly EventMetadata: {
-      readonly fields: {
-        readonly productId: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-        };
-        readonly subCategory: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-        };
-        readonly brand: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-        };
-        readonly query: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-        };
-        readonly exitMethod: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
         };
       };
     };

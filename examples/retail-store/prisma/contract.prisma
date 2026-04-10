@@ -44,14 +44,6 @@ type InvoiceLineItem {
   lineTotal Float
 }
 
-type EventMetadata {
-  productId   String?
-  subCategory String?
-  brand       String?
-  query       String?
-  exitMethod  String?
-}
-
 model Product {
   id             ObjectId @id @map("_id")
   name           String
@@ -120,11 +112,30 @@ model Invoice {
 }
 
 model Event {
-  id        ObjectId      @id @map("_id")
+  id        ObjectId @id @map("_id")
   userId    String
   sessionId String
   type      String
   timestamp DateTime
-  metadata  EventMetadata
   @@map("events")
+  @@discriminator(type)
+}
+
+model ViewProductEvent {
+  productId   String
+  subCategory String
+  brand       String
+  exitMethod  String?
+  @@base(Event, "view-product")
+}
+
+model SearchEvent {
+  query String
+  @@base(Event, "search")
+}
+
+model AddToCartEvent {
+  productId String
+  brand     String
+  @@base(Event, "add-to-cart")
 }
