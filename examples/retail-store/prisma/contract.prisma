@@ -62,7 +62,7 @@ model Product {
 model User {
   id      ObjectId @id @map("_id")
   name    String
-  email   String
+  email   String   @unique
   address Address?
   carts   Cart[]
   orders  Order[]
@@ -75,6 +75,7 @@ model Cart {
   items  CartItem[]
   user   User       @relation(fields: [userId], references: [id])
   @@map("carts")
+  @@index([userId])
 }
 
 model Order {
@@ -87,6 +88,7 @@ model Order {
   user            User             @relation(fields: [userId], references: [id])
   invoices        Invoice[]
   @@map("orders")
+  @@index([userId])
 }
 
 model Location {
@@ -119,6 +121,7 @@ model Event {
   timestamp DateTime
   @@map("events")
   @@discriminator(type)
+  @@index([userId])
 }
 
 model ViewProductEvent {
