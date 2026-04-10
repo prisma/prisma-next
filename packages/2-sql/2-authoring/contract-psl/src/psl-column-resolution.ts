@@ -29,6 +29,7 @@ import {
   parseOptionalNumericArguments,
   parseOptionalSingleIntegerArgument,
   pushInvalidAttributeArgument,
+  unquoteStringLiteral,
 } from './psl-attribute-parsing';
 import { mapPslHelperArgs } from './psl-authoring-arguments';
 
