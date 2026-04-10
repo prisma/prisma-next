@@ -514,8 +514,91 @@ describe('MongoMigrationPlanner', () => {
       expect(cmd.validationLevel).toBe('strict');
     });
 
-    it('emits collMod when validator is removed', () => {
+    it('validator add has precheck (collection exists) and postcheck (validator applied)', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { bsonType: 'object' },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin = irWithCollection('users', []);
+      const plan = planSuccess(planner, contract, origin);
+      const op = (plan.operations as MongoMigrationPlanOperation[]).find(
+        (o) => o.execute[0]?.command.kind === 'collMod',
+      )!;
+
+      expect(op.precheck).toHaveLength(1);
+      expect(op.precheck[0]!.source.kind).toBe('listCollections');
+      expect(op.precheck[0]!.expect).toBe('exists');
+
+      expect(op.postcheck).toHaveLength(1);
+      expect(op.postcheck[0]!.source.kind).toBe('listCollections');
+      expect(op.postcheck[0]!.expect).toBe('exists');
+    });
+
+    it('validator remove has precheck and postcheck', () => {
       const contract = makeContract({ users: {} });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object' },
+              validationLevel: 'strict',
+              validationAction: 'error',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const op = (plan.operations as MongoMigrationPlanOperation[]).find(
+        (o) => o.execute[0]?.command.kind === 'collMod',
+      )!;
+
+      expect(op.precheck).toHaveLength(1);
+      expect(op.precheck[0]!.source.kind).toBe('listCollections');
+      expect(op.precheck[0]!.expect).toBe('exists');
+
+      expect(op.postcheck).toHaveLength(1);
+      expect(op.postcheck[0]!.source.kind).toBe('listCollections');
+      expect(op.postcheck[0]!.expect).toBe('exists');
+    });
+
+    it('classifies validator removal as widening', () => {
+      const contract = makeContract({ users: {} });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object' },
+              validationLevel: 'strict',
+              validationAction: 'error',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('widening');
+    });
+
+    it('classifies jsonSchema body change as destructive', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { bsonType: 'object', properties: { name: { bsonType: 'string' } } },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
       const origin: MongoSchemaIR = {
         collections: {
           users: new MongoSchemaCollection({
@@ -536,11 +619,41 @@ describe('MongoMigrationPlanner', () => {
       expect(collModOps[0]!.operationClass).toBe('destructive');
     });
 
-    it('emits collMod when validator changes', () => {
+    it('classifies validationAction error->warn as widening', () => {
       const contract = makeContract({
         users: {
           validator: {
-            jsonSchema: { bsonType: 'object', properties: { name: { bsonType: 'string' } } },
+            jsonSchema: { bsonType: 'object' },
+            validationLevel: 'strict',
+            validationAction: 'warn',
+          },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object' },
+              validationLevel: 'strict',
+              validationAction: 'error',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('widening');
+    });
+
+    it('classifies validationAction warn->error as destructive', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { bsonType: 'object' },
             validationLevel: 'strict',
             validationAction: 'error',
           },
@@ -553,7 +666,97 @@ describe('MongoMigrationPlanner', () => {
             validator: new MongoSchemaValidator({
               jsonSchema: { bsonType: 'object' },
               validationLevel: 'strict',
+              validationAction: 'warn',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('destructive');
+    });
+
+    it('classifies validationLevel strict->moderate as widening', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { bsonType: 'object' },
+            validationLevel: 'moderate',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object' },
+              validationLevel: 'strict',
               validationAction: 'error',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('widening');
+    });
+
+    it('classifies validationLevel moderate->strict as destructive', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { bsonType: 'object' },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object' },
+              validationLevel: 'moderate',
+              validationAction: 'error',
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('destructive');
+    });
+
+    it('classifies mixed widening+destructive changes as destructive', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { bsonType: 'object' },
+            validationLevel: 'moderate',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            validator: new MongoSchemaValidator({
+              jsonSchema: { bsonType: 'object' },
+              validationLevel: 'strict',
+              validationAction: 'warn',
             }),
           }),
         },
@@ -659,7 +862,7 @@ describe('MongoMigrationPlanner', () => {
       expect(result.conflicts.some((c) => c.summary.includes('immutable'))).toBe(true);
     });
 
-    it('emits collMod for mutable option change (changeStreamPreAndPostImages)', () => {
+    it('classifies enabling changeStreamPreAndPostImages as widening', () => {
       const contract = makeContract({
         events: {
           options: { changeStreamPreAndPostImages: { enabled: true } },
@@ -680,6 +883,31 @@ describe('MongoMigrationPlanner', () => {
         (op) => op.execute[0]?.command.kind === 'collMod',
       );
       expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('widening');
+    });
+
+    it('classifies disabling changeStreamPreAndPostImages as destructive', () => {
+      const contract = makeContract({
+        events: {
+          options: { changeStreamPreAndPostImages: { enabled: false } },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          events: new MongoSchemaCollection({
+            name: 'events',
+            options: new MongoSchemaCollectionOptionsNode({
+              changeStreamPreAndPostImages: { enabled: true },
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('destructive');
     });
 
     it('orders creates before indexes, drops after', () => {
