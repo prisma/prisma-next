@@ -1,22 +1,23 @@
 import { NextResponse } from 'next/server';
 import { createOrder, getUserOrders } from '../../../src/data/orders';
 import { getDb } from '../../../src/db-singleton';
-
-const DEMO_USER_ID = process.env['DEMO_USER_ID'] ?? '';
+import { getAuthUserId } from '../../../src/lib/auth';
 
 export async function GET() {
-  if (!DEMO_USER_ID) return NextResponse.json([]);
+  const userId = await getAuthUserId();
+  if (!userId) return NextResponse.json([], { status: 401 });
   const db = await getDb();
-  const orders = await getUserOrders(db, DEMO_USER_ID);
+  const orders = await getUserOrders(db, userId);
   return NextResponse.json(orders);
 }
 
 export async function POST(req: Request) {
-  if (!DEMO_USER_ID) return NextResponse.json({ error: 'DEMO_USER_ID not set' }, { status: 500 });
+  const userId = await getAuthUserId();
+  if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   const body = await req.json();
   const db = await getDb();
   const order = await createOrder(db, {
-    userId: DEMO_USER_ID,
+    userId,
     items: body.items,
     shippingAddress: body.shippingAddress,
     type: body.type ?? 'home',

@@ -1,37 +1,39 @@
 import { NextResponse } from 'next/server';
 import { addToCart, clearCart, getCartByUserId, removeFromCart } from '../../../src/data/carts';
 import { getDb } from '../../../src/db-singleton';
-
-const DEMO_USER_ID = process.env['DEMO_USER_ID'] ?? '';
+import { getAuthUserId } from '../../../src/lib/auth';
 
 export async function GET() {
-  if (!DEMO_USER_ID) return NextResponse.json({ items: [] });
+  const userId = await getAuthUserId();
+  if (!userId) return NextResponse.json({ items: [] }, { status: 401 });
   const db = await getDb();
-  const cart = await getCartByUserId(db, DEMO_USER_ID);
+  const cart = await getCartByUserId(db, userId);
   return NextResponse.json(cart ?? { items: [] });
 }
 
 export async function POST(req: Request) {
-  if (!DEMO_USER_ID) return NextResponse.json({ error: 'DEMO_USER_ID not set' }, { status: 500 });
+  const userId = await getAuthUserId();
+  if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   const body = await req.json();
   const db = await getDb();
-  await addToCart(db, DEMO_USER_ID, body);
-  const cart = await getCartByUserId(db, DEMO_USER_ID);
+  await addToCart(db, userId, body);
+  const cart = await getCartByUserId(db, userId);
   return NextResponse.json(cart ?? { items: [] });
 }
 
 export async function DELETE(req: Request) {
-  if (!DEMO_USER_ID) return NextResponse.json({ items: [] });
+  const userId = await getAuthUserId();
+  if (!userId) return NextResponse.json({ items: [] }, { status: 401 });
   const { searchParams } = new URL(req.url);
   const productId = searchParams.get('productId');
   const db = await getDb();
 
   if (productId) {
-    await removeFromCart(db, DEMO_USER_ID, productId);
+    await removeFromCart(db, userId, productId);
   } else {
-    await clearCart(db, DEMO_USER_ID);
+    await clearCart(db, userId);
   }
 
-  const cart = await getCartByUserId(db, DEMO_USER_ID);
+  const cart = await getCartByUserId(db, userId);
   return NextResponse.json(cart ?? { items: [] });
 }
