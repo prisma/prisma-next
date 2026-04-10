@@ -12,6 +12,7 @@ import type {
 import type { MongoIndexKeyDirection, MongoStorageIndex } from '@prisma-next/mongo-contract';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { deriveJsonSchema } from './derive-json-schema';
 import {
   getAttribute,
   getMapName,
@@ -541,6 +542,15 @@ export function interpretPslDocumentToMongoContract(
       fields[field.name] = resolved;
     }
     valueObjects[compositeType.name] = { fields };
+  }
+
+  for (const [, modelEntry] of Object.entries(models)) {
+    const collectionName = modelEntry.storage.collection;
+    const coll = collections[collectionName];
+    if (coll) {
+      const validator = deriveJsonSchema(modelEntry.fields, valueObjects);
+      coll['validator'] = validator;
+    }
   }
 
   const fkRelationsByPair = new Map<string, FkRelation[]>();

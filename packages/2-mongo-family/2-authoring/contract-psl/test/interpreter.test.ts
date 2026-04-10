@@ -739,8 +739,39 @@ describe('interpretPslDocumentToMongoContract', () => {
         storage: {
           storageHash: expect.stringMatching(/^sha256:/),
           collections: {
-            users: {},
-            posts: {},
+            users: {
+              validator: {
+                jsonSchema: {
+                  bsonType: 'object',
+                  required: ['_id', 'email', 'name'],
+                  properties: {
+                    _id: { bsonType: 'objectId' },
+                    name: { bsonType: 'string' },
+                    email: { bsonType: 'string' },
+                    bio: { bsonType: ['null', 'string'] },
+                  },
+                },
+                validationLevel: 'strict',
+                validationAction: 'error',
+              },
+            },
+            posts: {
+              validator: {
+                jsonSchema: {
+                  bsonType: 'object',
+                  required: ['_id', 'authorId', 'content', 'createdAt', 'title'],
+                  properties: {
+                    _id: { bsonType: 'objectId' },
+                    title: { bsonType: 'string' },
+                    content: { bsonType: 'string' },
+                    authorId: { bsonType: 'objectId' },
+                    createdAt: { bsonType: 'date' },
+                  },
+                },
+                validationLevel: 'strict',
+                validationAction: 'error',
+              },
+            },
           },
         },
         extensionPacks: {},
@@ -860,6 +891,130 @@ describe('interpretPslDocumentToMongoContract', () => {
       const coll = ir.storage as Record<string, Record<string, unknown>>;
       const userColl = (coll['collections'] as Record<string, Record<string, unknown>>)['user'];
       expect(userColl?.['indexes']).toBeUndefined();
+    });
+  });
+
+  describe('validator derivation', () => {
+    function getValidator(ir: Record<string, unknown>, collectionName: string) {
+      const storage = ir.storage as Record<string, Record<string, Record<string, unknown>>>;
+      return storage['collections']?.[collectionName]?.['validator'] as
+        | Record<string, unknown>
+        | undefined;
+    }
+
+    it('derives $jsonSchema from model fields', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          name  String
+          age   Int
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      expect(validator).toBeDefined();
+      expect(validator!['validationLevel']).toBe('strict');
+      expect(validator!['validationAction']).toBe('error');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      expect(schema['bsonType']).toBe('object');
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['_id']).toEqual({ bsonType: 'objectId' });
+      expect(props['name']).toEqual({ bsonType: 'string' });
+      expect(props['age']).toEqual({ bsonType: 'int' });
+    });
+
+    it('handles nullable fields with bsonType array', () => {
+      const ir = interpretOk(`
+        model User {
+          id   ObjectId @id @map("_id")
+          bio  String?
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['bio']).toEqual({ bsonType: ['null', 'string'] });
+    });
+
+    it('handles array fields', () => {
+      const ir = interpretOk(`
+        model User {
+          id   ObjectId @id @map("_id")
+          tags String[]
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['tags']).toEqual({ bsonType: 'array', items: { bsonType: 'string' } });
+    });
+
+    it('uses @map names in jsonSchema properties', () => {
+      const ir = interpretOk(`
+        model User {
+          id        ObjectId @id @map("_id")
+          firstName String   @map("first_name")
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['first_name']).toEqual({ bsonType: 'string' });
+      expect(props['firstName']).toBeUndefined();
+    });
+
+    it('includes non-nullable fields in required array', () => {
+      const ir = interpretOk(`
+        model User {
+          id   ObjectId @id @map("_id")
+          name String
+          bio  String?
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const required = schema['required'] as string[];
+      expect(required).toContain('_id');
+      expect(required).toContain('name');
+      expect(required).not.toContain('bio');
+    });
+
+    it('includes validator alongside indexes', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@index([email])
+        }
+      `);
+      const storage = ir.storage as Record<string, Record<string, Record<string, unknown>>>;
+      const userColl = storage['collections']?.['user'];
+      expect(userColl?.['indexes']).toBeDefined();
+      expect(userColl?.['validator']).toBeDefined();
+    });
+
+    it('handles value object fields as nested objects', () => {
+      const ir = interpretOk(`
+        type Address {
+          street String
+          city   String
+        }
+
+        model User {
+          id      ObjectId @id @map("_id")
+          address Address
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['address']).toEqual({
+        bsonType: 'object',
+        required: ['city', 'street'],
+        properties: {
+          street: { bsonType: 'string' },
+          city: { bsonType: 'string' },
+        },
+      });
     });
   });
 });
