@@ -743,17 +743,52 @@
   "storage": {
     "collections": {
       "addToCartEvent": {},
-      "carts": {},
-      "events": {},
+      "carts": {
+        "indexes": [
+          {
+            "fields": {
+              "userId": 1
+            }
+          }
+        ]
+      },
+      "events": {
+        "indexes": [
+          {
+            "fields": {
+              "userId": 1
+            }
+          }
+        ]
+      },
       "invoices": {},
       "locations": {},
-      "orders": {},
+      "orders": {
+        "indexes": [
+          {
+            "fields": {
+              "userId": 1
+            }
+          }
+        ]
+      },
       "products": {},
       "searchEvent": {},
-      "users": {},
+      "users": {
+        "indexes": [
+          {
+            "fields": {
+              "email": 1
+            },
+            "options": {
+              "unique": true
+            }
+          }
+        ]
+      },
       "viewProductEvent": {}
     },
-    "storageHash": "sha256:71e1f44f6bba16b9ed93e3105524e31153ce2edae6780a600348566599591bc0"
+    "storageHash": "sha256:50d2aad3ace4b58db948643b4a790cc8b2eb9bfeda129017dc44a04748292bfc"
   },
   "capabilities": {},
   "extensionPacks": {},
