@@ -23,7 +23,6 @@ import type {
   PslField,
   PslModel,
   PslNamedTypeDeclaration,
-  PslSpan,
 } from '@prisma-next/psl-parser';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
@@ -111,13 +110,25 @@ function buildComposedExtensionPackRefs(
   );
 }
 
-function hasSameSpan(a: PslSpan, b: ContractSourceDiagnosticSpan): boolean {
-  return (
-    a.start.offset === b.start.offset &&
-    a.end.offset === b.end.offset &&
-    a.start.line === b.start.line &&
-    a.end.line === b.end.line
-  );
+function diagnosticDedupKey(diagnostic: ContractSourceDiagnostic): string {
+  const span = diagnostic.span;
+  const spanKey = span
+    ? `${span.start.offset}:${span.end.offset}:${span.start.line}:${span.end.line}`
+    : '';
+  return `${diagnostic.code}\u0000${diagnostic.sourceId}\u0000${spanKey}\u0000${diagnostic.message}`;
+}
+
+function dedupeDiagnostics(
+  diagnostics: readonly ContractSourceDiagnostic[],
+): ContractSourceDiagnostic[] {
+  const seen = new Map<string, ContractSourceDiagnostic>();
+  for (const diagnostic of diagnostics) {
+    const key = diagnosticDedupKey(diagnostic);
+    if (!seen.has(key)) {
+      seen.set(key, diagnostic);
+    }
+  }
+  return [...seen.values()];
 }
 
 function compareStrings(left: string, right: string): -1 | 0 | 1 {
@@ -1182,21 +1193,9 @@ export function interpretPslDocumentToSqlContract(
   });
 
   if (diagnostics.length > 0) {
-    const dedupedDiagnostics = diagnostics.filter(
-      (diagnostic, index, allDiagnostics) =>
-        allDiagnostics.findIndex(
-          (candidate) =>
-            candidate.code === diagnostic.code &&
-            candidate.message === diagnostic.message &&
-            candidate.sourceId === diagnostic.sourceId &&
-            ((candidate.span && diagnostic.span && hasSameSpan(candidate.span, diagnostic.span)) ||
-              (!candidate.span && !diagnostic.span)),
-        ) === index,
-    );
-
     return notOk({
       summary: 'PSL to SQL contract interpretation failed',
-      diagnostics: dedupedDiagnostics,
+      diagnostics: dedupeDiagnostics(diagnostics),
     });
   }
 
