@@ -1,0 +1,792 @@
+{
+  "from": "sha256:empty",
+  "to": "sha256:50d2aad3ace4b58db948643b4a790cc8b2eb9bfeda129017dc44a04748292bfc",
+  "migrationId": "sha256:93f02933ee9a2164e5a50ca5019800987849aad80c25c946265eadedecce9d2c",
+  "kind": "regular",
+  "fromContract": null,
+  "toContract": {
+    "schemaVersion": "1",
+    "targetFamily": "mongo",
+    "target": "mongo",
+    "profileHash": "sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840",
+    "roots": {
+      "carts": "Cart",
+      "events": "Event",
+      "invoices": "Invoice",
+      "locations": "Location",
+      "orders": "Order",
+      "products": "Product",
+      "users": "User"
+    },
+    "models": {
+      "AddToCartEvent": {
+        "base": "Event",
+        "fields": {
+          "brand": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "productId": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {},
+        "storage": {
+          "collection": "events"
+        }
+      },
+      "Cart": {
+        "fields": {
+          "_id": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "items": {
+            "many": true,
+            "nullable": false,
+            "type": {
+              "kind": "valueObject",
+              "name": "CartItem"
+            }
+          },
+          "userId": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {
+          "user": {
+            "cardinality": "N:1",
+            "on": {
+              "localFields": ["userId"],
+              "targetFields": ["_id"]
+            },
+            "to": "User"
+          }
+        },
+        "storage": {
+          "collection": "carts"
+        }
+      },
+      "Event": {
+        "discriminator": {
+          "field": "type"
+        },
+        "fields": {
+          "_id": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "sessionId": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "timestamp": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/date@1",
+              "kind": "scalar"
+            }
+          },
+          "type": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "userId": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {},
+        "storage": {
+          "collection": "events"
+        },
+        "variants": {
+          "AddToCartEvent": {
+            "value": "add-to-cart"
+          },
+          "SearchEvent": {
+            "value": "search"
+          },
+          "ViewProductEvent": {
+            "value": "view-product"
+          }
+        }
+      },
+      "Invoice": {
+        "fields": {
+          "_id": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "issuedAt": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/date@1",
+              "kind": "scalar"
+            }
+          },
+          "items": {
+            "many": true,
+            "nullable": false,
+            "type": {
+              "kind": "valueObject",
+              "name": "InvoiceLineItem"
+            }
+          },
+          "orderId": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "subtotal": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/double@1",
+              "kind": "scalar"
+            }
+          },
+          "tax": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/double@1",
+              "kind": "scalar"
+            }
+          },
+          "total": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/double@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {
+          "order": {
+            "cardinality": "N:1",
+            "on": {
+              "localFields": ["orderId"],
+              "targetFields": ["_id"]
+            },
+            "to": "Order"
+          }
+        },
+        "storage": {
+          "collection": "invoices"
+        }
+      },
+      "Location": {
+        "fields": {
+          "_id": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "city": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "country": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "name": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "postalCode": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "streetAndNumber": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {},
+        "storage": {
+          "collection": "locations"
+        }
+      },
+      "Order": {
+        "fields": {
+          "_id": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "items": {
+            "many": true,
+            "nullable": false,
+            "type": {
+              "kind": "valueObject",
+              "name": "OrderLineItem"
+            }
+          },
+          "shippingAddress": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "statusHistory": {
+            "many": true,
+            "nullable": false,
+            "type": {
+              "kind": "valueObject",
+              "name": "StatusEntry"
+            }
+          },
+          "type": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "userId": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {
+          "invoices": {
+            "cardinality": "1:N",
+            "on": {
+              "localFields": ["_id"],
+              "targetFields": ["orderId"]
+            },
+            "to": "Invoice"
+          },
+          "user": {
+            "cardinality": "N:1",
+            "on": {
+              "localFields": ["userId"],
+              "targetFields": ["_id"]
+            },
+            "to": "User"
+          }
+        },
+        "storage": {
+          "collection": "orders"
+        }
+      },
+      "Product": {
+        "fields": {
+          "_id": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "articleType": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "brand": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "code": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "description": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "embedding": {
+            "many": true,
+            "nullable": true,
+            "type": {
+              "codecId": "mongo/double@1",
+              "kind": "scalar"
+            }
+          },
+          "image": {
+            "nullable": false,
+            "type": {
+              "kind": "valueObject",
+              "name": "Image"
+            }
+          },
+          "masterCategory": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "name": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "price": {
+            "nullable": false,
+            "type": {
+              "kind": "valueObject",
+              "name": "Price"
+            }
+          },
+          "subCategory": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {},
+        "storage": {
+          "collection": "products"
+        }
+      },
+      "SearchEvent": {
+        "base": "Event",
+        "fields": {
+          "query": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {},
+        "storage": {
+          "collection": "events"
+        }
+      },
+      "User": {
+        "fields": {
+          "_id": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/objectId@1",
+              "kind": "scalar"
+            }
+          },
+          "address": {
+            "nullable": true,
+            "type": {
+              "kind": "valueObject",
+              "name": "Address"
+            }
+          },
+          "email": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "name": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {
+          "carts": {
+            "cardinality": "1:N",
+            "on": {
+              "localFields": ["_id"],
+              "targetFields": ["userId"]
+            },
+            "to": "Cart"
+          },
+          "orders": {
+            "cardinality": "1:N",
+            "on": {
+              "localFields": ["_id"],
+              "targetFields": ["userId"]
+            },
+            "to": "Order"
+          }
+        },
+        "storage": {
+          "collection": "users"
+        }
+      },
+      "ViewProductEvent": {
+        "base": "Event",
+        "fields": {
+          "brand": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "exitMethod": {
+            "nullable": true,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "productId": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "subCategory": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        },
+        "relations": {},
+        "storage": {
+          "collection": "events"
+        }
+      }
+    },
+    "valueObjects": {
+      "Address": {
+        "fields": {
+          "city": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "country": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "postalCode": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "streetAndNumber": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        }
+      },
+      "CartItem": {
+        "fields": {
+          "amount": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/int32@1",
+              "kind": "scalar"
+            }
+          },
+          "brand": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "image": {
+            "nullable": false,
+            "type": {
+              "kind": "valueObject",
+              "name": "Image"
+            }
+          },
+          "name": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "price": {
+            "nullable": false,
+            "type": {
+              "kind": "valueObject",
+              "name": "Price"
+            }
+          },
+          "productId": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        }
+      },
+      "Image": {
+        "fields": {
+          "url": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        }
+      },
+      "InvoiceLineItem": {
+        "fields": {
+          "amount": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/int32@1",
+              "kind": "scalar"
+            }
+          },
+          "lineTotal": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/double@1",
+              "kind": "scalar"
+            }
+          },
+          "name": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "unitPrice": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/double@1",
+              "kind": "scalar"
+            }
+          }
+        }
+      },
+      "OrderLineItem": {
+        "fields": {
+          "amount": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/int32@1",
+              "kind": "scalar"
+            }
+          },
+          "brand": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "image": {
+            "nullable": false,
+            "type": {
+              "kind": "valueObject",
+              "name": "Image"
+            }
+          },
+          "name": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "price": {
+            "nullable": false,
+            "type": {
+              "kind": "valueObject",
+              "name": "Price"
+            }
+          },
+          "productId": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        }
+      },
+      "Price": {
+        "fields": {
+          "amount": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/double@1",
+              "kind": "scalar"
+            }
+          },
+          "currency": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          }
+        }
+      },
+      "StatusEntry": {
+        "fields": {
+          "status": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/string@1",
+              "kind": "scalar"
+            }
+          },
+          "timestamp": {
+            "nullable": false,
+            "type": {
+              "codecId": "mongo/date@1",
+              "kind": "scalar"
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "collections": {
+        "addToCartEvent": {},
+        "carts": {
+          "indexes": [
+            {
+              "fields": {
+                "userId": 1
+              }
+            }
+          ]
+        },
+        "events": {
+          "indexes": [
+            {
+              "fields": {
+                "userId": 1
+              }
+            }
+          ]
+        },
+        "invoices": {},
+        "locations": {},
+        "orders": {
+          "indexes": [
+            {
+              "fields": {
+                "userId": 1
+              }
+            }
+          ]
+        },
+        "products": {},
+        "searchEvent": {},
+        "users": {
+          "indexes": [
+            {
+              "fields": {
+                "email": 1
+              },
+              "options": {
+                "unique": true
+              }
+            }
+          ]
+        },
+        "viewProductEvent": {}
+      },
+      "storageHash": "sha256:50d2aad3ace4b58db948643b4a790cc8b2eb9bfeda129017dc44a04748292bfc"
+    },
+    "capabilities": {},
+    "extensionPacks": {},
+    "meta": {},
+    "_generated": {
+      "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+      "message": "This file is automatically generated by \"prisma-next contract emit\".",
+      "regenerate": "To regenerate, run: prisma-next contract emit"
+    }
+  },
+  "hints": {
+    "used": [],
+    "applied": [],
+    "plannerVersion": "1.0.0",
+    "planningStrategy": "diff"
+  },
+  "labels": [],
+  "createdAt": "2026-04-10T15:55:43.382Z"
+}

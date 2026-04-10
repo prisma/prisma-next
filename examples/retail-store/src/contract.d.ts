@@ -13,7 +13,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:71e1f44f6bba16b9ed93e3105524e31153ce2edae6780a600348566599591bc0'>;
+  StorageHashBase<'sha256:50d2aad3ace4b58db948643b4a790cc8b2eb9bfeda129017dc44a04748292bfc'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -133,12 +133,16 @@ type ContractBase = ContractType<
   {
     readonly collections: {
       readonly products: Record<string, never>;
-      readonly users: Record<string, never>;
-      readonly carts: Record<string, never>;
-      readonly orders: Record<string, never>;
+      readonly users: {
+        readonly indexes: readonly [
+          { readonly fields: { readonly email: 1 }; readonly options: { readonly unique: true } },
+        ];
+      };
+      readonly carts: { readonly indexes: readonly [{ readonly fields: { readonly userId: 1 } }] };
+      readonly orders: { readonly indexes: readonly [{ readonly fields: { readonly userId: 1 } }] };
       readonly locations: Record<string, never>;
       readonly invoices: Record<string, never>;
-      readonly events: Record<string, never>;
+      readonly events: { readonly indexes: readonly [{ readonly fields: { readonly userId: 1 } }] };
       readonly viewProductEvent: Record<string, never>;
       readonly searchEvent: Record<string, never>;
       readonly addToCartEvent: Record<string, never>;
