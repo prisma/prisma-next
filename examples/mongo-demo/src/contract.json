@@ -217,9 +217,16 @@
       "article": {},
       "posts": {},
       "tutorial": {},
-      "users": {}
+      "users": {
+        "indexes": [
+          {
+            "fields": { "email": 1 },
+            "options": { "unique": true }
+          }
+        ]
+      }
     },
-    "storageHash": "sha256:1d8e1aa7132561cb604442f3039a05dfac31fb0abc68d8d38eb77f5fb369ea51"
+    "storageHash": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe"
   },
   "capabilities": {},
   "extensionPacks": {},

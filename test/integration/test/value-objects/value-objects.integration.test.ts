@@ -129,7 +129,7 @@ describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {
       tags: [],
     });
 
-    const { MongoFieldFilter } = await import('@prisma-next/mongo-query-ast');
+    const { MongoFieldFilter } = await import('@prisma-next/mongo-query-ast/execution');
     const updated = await userCollection
       .where(MongoFieldFilter.eq('name', 'Bob'))
       .update({ homeAddress: { street: '789 Pine Rd', city: 'Capital City', zip: '99999' } });

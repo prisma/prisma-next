@@ -10,7 +10,7 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
-import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
+import { extractOperationStatements } from '../control-api/operations/extract-operation-statements';
 import {
   type CliErrorConflict,
   type CliStructuredError,
@@ -55,7 +55,7 @@ export interface MigrationPlanResult {
     readonly label: string;
     readonly operationClass: string;
   }[];
-  readonly sql?: readonly string[];
+  readonly sql?: readonly string[] | undefined;
   readonly summary: string;
   readonly timings: {
     readonly total: number;
@@ -290,7 +290,7 @@ async function executeMigrationPlanCommand(
     await writeMigrationPackage(packageDir, manifest, plannerResult.plan.operations);
     const migrationId = await attestMigration(packageDir);
 
-    const sql = extractSqlDdl(plannerResult.plan.operations);
+    const sql = extractOperationStatements(config.family.familyId, plannerResult.plan.operations);
     const result: MigrationPlanResult = {
       ok: true,
       noOp: false,

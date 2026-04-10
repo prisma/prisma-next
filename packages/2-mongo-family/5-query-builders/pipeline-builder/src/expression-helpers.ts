@@ -1,5 +1,9 @@
-import type { MongoAggExpr } from '@prisma-next/mongo-query-ast';
-import { MongoAggCond, MongoAggLiteral, MongoAggOperator } from '@prisma-next/mongo-query-ast';
+import type { MongoAggExpr } from '@prisma-next/mongo-query-ast/execution';
+import {
+  MongoAggCond,
+  MongoAggLiteral,
+  MongoAggOperator,
+} from '@prisma-next/mongo-query-ast/execution';
 import type {
   ArrayField,
   BooleanField,

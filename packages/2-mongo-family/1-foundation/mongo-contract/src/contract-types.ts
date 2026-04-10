@@ -104,10 +104,25 @@ export type MongoCollectionOptions = {
   readonly changeStreamPreAndPostImages?: MongoChangeStreamPreAndPostImagesOptions;
 };
 
-export type MongoStorageCollection = {
+export type MongoIndexKeyDirection = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
+
+export interface MongoIndexKey {
+  readonly field: string;
+  readonly direction: MongoIndexKeyDirection;
+}
+
+export interface MongoStorageIndex {
+  readonly keys: ReadonlyArray<MongoIndexKey>;
+  readonly unique?: boolean;
+  readonly sparse?: boolean;
+  readonly expireAfterSeconds?: number;
+  readonly partialFilterExpression?: Record<string, unknown>;
+}
+
+export interface MongoStorageCollection {
   readonly indexes?: readonly MongoIndex[];
   readonly options?: MongoCollectionOptions;
-};
+}
 
 export type MongoStorage<THash extends string = string> = StorageBase<THash> & {
   readonly collections: Record<string, MongoStorageCollection>;

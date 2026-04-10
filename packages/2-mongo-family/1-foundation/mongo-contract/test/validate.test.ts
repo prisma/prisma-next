@@ -473,6 +473,89 @@ describe('validateMongoContract()', () => {
     });
   });
 
+  describe('storage index validation', () => {
+    it('accepts collection with no indexes', () => {
+      const result = validateMongoContract(makeValidContractJson());
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts collection with valid indexes', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [
+          { fields: { name: 1 } },
+          { fields: { email: 1 }, options: { unique: true } },
+          {
+            fields: { createdAt: -1 },
+            options: { sparse: true, expireAfterSeconds: 3600 },
+          },
+          { fields: { a: 1, b: -1 } },
+          { fields: { description: 'text' } },
+          { fields: { location: '2dsphere' } },
+          { fields: { coords: '2d' } },
+          { fields: { hash: 'hashed' } },
+        ],
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts index with partialFilterExpression', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [
+          {
+            fields: { status: 1 },
+            options: { partialFilterExpression: { status: { $eq: 'active' } } },
+          },
+        ],
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('rejects index with empty fields', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [{ fields: {} }],
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects index field with invalid direction', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [{ fields: { name: 'invalid' } }],
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects index missing fields', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [{}],
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects index with extra properties', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [{ fields: { name: 1 }, extra: true }],
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects collection with extra properties', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [{ fields: { name: 1 } }],
+        extra: true,
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+  });
+
   describe('happy path', () => {
     it('validates the ORM test contract', () => {
       const result = validateMongoContract(ormContractJson);

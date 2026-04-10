@@ -1,4 +1,17 @@
 import type { ControlAdapterDescriptor } from '@prisma-next/framework-components/control';
+
+export { MongoCommandExecutor, MongoInspectionExecutor } from '../core/command-executor';
+export { contractToMongoSchemaIR } from '../core/contract-to-schema';
+export { formatMongoOperations } from '../core/ddl-formatter';
+export { initMarker, readMarker, updateMarker, writeLedgerEntry } from '../core/marker-ledger';
+export {
+  createMongoControlDriver,
+  type MongoControlDriverInstance,
+} from '../core/mongo-control-driver';
+export { deserializeMongoOps, serializeMongoOps } from '../core/mongo-ops-serializer';
+export { MongoMigrationPlanner } from '../core/mongo-planner';
+export { MongoMigrationRunner } from '../core/mongo-runner';
+
 import {
   mongoBooleanCodec,
   mongoDateCodec,

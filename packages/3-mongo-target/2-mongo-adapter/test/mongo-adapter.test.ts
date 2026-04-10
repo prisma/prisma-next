@@ -1,4 +1,4 @@
-import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast';
+import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast/execution';
 import {
   AggregateCommand,
   DeleteManyCommand,
@@ -24,7 +24,7 @@ import {
   RawUpdateOneCommand,
   UpdateManyCommand,
   UpdateOneCommand,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import { describe, expect, it } from 'vitest';

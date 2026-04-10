@@ -6,7 +6,7 @@ import type {
 } from '@prisma-next/mongo-contract';
 import { defineContract, field, model, rel } from '@prisma-next/mongo-contract-ts/contract-builder';
 import { acc, fn, mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
-import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import mongoTargetPack from '@prisma-next/target-mongo/pack';
 import { ObjectId } from 'mongodb';
 import { describe, expect, expectTypeOf, it } from 'vitest';

@@ -1,4 +1,4 @@
-import { MongoFieldFilter, UpdateOneCommand } from '@prisma-next/mongo-query-ast';
+import { MongoFieldFilter, UpdateOneCommand } from '@prisma-next/mongo-query-ast/execution';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { withMongod } from './setup';

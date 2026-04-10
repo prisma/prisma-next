@@ -1,5 +1,5 @@
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
-import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 
 export interface MongoRuntimeOptions {

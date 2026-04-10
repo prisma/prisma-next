@@ -10,7 +10,7 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbUpdateResult, DbUpdateSuccess, OnControlProgress } from '../types';
-import { extractSqlDdl } from './extract-sql-ddl';
+import { extractOperationStatements } from './extract-operation-statements';
 import { createOperationCallbacks, stripOperations } from './migration-helpers';
 
 // F12: db update allows additive, widening, and destructive operations.
@@ -110,8 +110,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
   const migrationPlan = plannerResult.plan;
 
   if (mode === 'plan') {
-    const planSql =
-      familyInstance.familyId === 'sql' ? extractSqlDdl(migrationPlan.operations) : undefined;
+    const planSql = extractOperationStatements(familyInstance.familyId, migrationPlan.operations);
     const result: DbUpdateSuccess = {
       mode: 'plan',
       plan: {

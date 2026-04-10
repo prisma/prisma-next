@@ -3,7 +3,7 @@ import type {
   MongoQueryPlan,
   MongoUpdatePipelineStage,
   MongoUpdateSpec,
-} from '@prisma-next/mongo-query-ast';
+} from '@prisma-next/mongo-query-ast/execution';
 import type { Document, MongoExpr } from '@prisma-next/mongo-value';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import {

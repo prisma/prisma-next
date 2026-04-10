@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-value": "workspace:*"
   },
   "devDependencies": {
@@ -31,9 +33,13 @@
     "src"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/exports/index.d.mts",
-      "import": "./dist/exports/index.mjs"
+    "./execution": {
+      "types": "./dist/exports/execution.d.mts",
+      "import": "./dist/exports/execution.mjs"
+    },
+    "./control": {
+      "types": "./dist/exports/control.d.mts",
+      "import": "./dist/exports/control.mjs"
     },
     "./package.json": "./package.json"
   },
