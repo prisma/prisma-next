@@ -1168,6 +1168,19 @@ export function interpretPslDocumentToSqlContract(
     diagnostics,
   );
 
+  const valueObjects = buildValueObjects({
+    compositeTypes,
+    enumTypeDescriptors: enumResult.enumTypeDescriptors,
+    namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
+    scalarTypeDescriptors: input.scalarTypeDescriptors,
+    composedExtensions,
+    familyId: input.target.familyId,
+    targetId: input.target.targetId,
+    authoringContributions: input.authoringContributions,
+    diagnostics,
+    sourceId,
+  });
+
   if (diagnostics.length > 0) {
     const dedupedDiagnostics = diagnostics.filter(
       (diagnostic, index, allDiagnostics) =>
@@ -1209,26 +1222,6 @@ export function interpretPslDocumentToSqlContract(
         : {}),
     })),
   });
-
-  const valueObjects = buildValueObjects({
-    compositeTypes,
-    enumTypeDescriptors: enumResult.enumTypeDescriptors,
-    namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
-    scalarTypeDescriptors: input.scalarTypeDescriptors,
-    composedExtensions,
-    familyId: input.target.familyId,
-    targetId: input.target.targetId,
-    authoringContributions: input.authoringContributions,
-    diagnostics,
-    sourceId,
-  });
-
-  if (diagnostics.length > 0) {
-    return notOk({
-      summary: 'PSL to SQL contract interpretation failed',
-      diagnostics,
-    });
-  }
 
   let patchedModels = patchModelDomainFields(
     contract.models as Record<string, ContractModel>,
