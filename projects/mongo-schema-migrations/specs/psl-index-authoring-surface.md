@@ -11,7 +11,6 @@ model User {
   bio   String
 
   @@index([email, bio])
-  @@index([bio], type: "text", weights: "{\"bio\": 10}")
 }
 ```
 
@@ -28,17 +27,19 @@ This design depends on the PSL value model extensions described in [PSL Language
 
 ## Decision summary
 
-**Four key decisions:**
+**Six key decisions:**
 
 1. **`wildcard()` function in field lists.** MongoDB's wildcard key is `$**`, but `$` and `*` would break the PSL grammar. Instead, users write `wildcard()` (optionally scoped: `wildcard(metadata)`). This maps to `$**` / `metadata.$**` in the contract. `wildcard` is a function scoped to the `@@index` attribute definition.
 
 2. **`@@textIndex` as a dedicated attribute.** Text indexes have a fundamentally different option set (`weights`, `language`, `languageOverride`) and different query semantics (queried via `$text`, not standard comparison). A separate `@@textIndex` attribute makes each form self-documenting, avoiding a complex compatibility matrix.
 
-3. **Object literals for structured options.** `collation` and `weights` use PSL object literals — `{ locale: "fr", strength: 2 }`, `{ title: 10, body: 5 }` — instead of escaped JSON strings. This is enabled by the typed value model extension to the PSL parser.
+3. **Object literals for structured options.** `collation` uses a PSL object literal — `{ locale: "fr", strength: 2 }` — instead of escaped JSON strings. This is enabled by the typed value model extension to the PSL parser.
 
-4. **`filter` as a typed dictionary.** The `filter` argument's top-level keys are model field references resolved by the binding layer (validated against the entity's fields). The values are opaque JSON structures validated against a JSON Schema constraining them to MongoDB's filter operators. Multiple keys are implicitly AND'd. Top-level `$or`/`$and` are not supported initially.
+4. **Typed dictionaries for `filter` and `weights`.** Both `filter` (on `@@index`) and `weights` (on `@@textIndex`) have top-level keys that are model field references, resolved by the binding layer. Values are opaque JSON validated against a JSON Schema. For `filter`, values are MongoDB filter operator expressions; for `weights`, values are positive numbers. This catches field name typos and keeps references consistent through renames.
 
 5. **`include`/`exclude` field lists for wildcard projections.** Rather than MongoDB's `0`/`1` projection document, users specify field lists: `include: [metadata, tags]`. The binding layer resolves these as field references in the enclosing entity's scope.
+
+6. **Varargs sugar for field lists.** When the positional argument is a simple field list, square brackets can be omitted: `@@index(status, tenantId)` instead of `@@index([status, tenantId])`. The binding layer normalizes both forms. The bracketed form remains valid and is required when the field list contains function calls mixed with named arguments that could be ambiguous.
 
 ## Syntax by example
 
@@ -53,17 +54,20 @@ model Events {
   tenantId  String
   expiresAt DateTime
 
-  @@index([status])                  // ascending on one field
-  @@index([status, tenantId])        // compound ascending
+  @@index(status)                    // ascending on one field
+  @@index(status, tenantId)          // compound ascending
+  @@index([status, tenantId])        // equivalent — brackets are optional
 }
 ```
+
+Square brackets around the field list are optional syntax sugar. `@@index(status, tenantId)` and `@@index([status, tenantId])` produce the same result. The binding layer normalizes positional arguments into a field list: all positional arguments before the first named argument are collected as fields.
 
 #### TTL and sparse
 
 A TTL index automatically deletes documents after a duration. `sparse` skips documents where the indexed field is missing.
 
 ```prisma
-  @@index([expiresAt], sparse: true, expireAfterSeconds: 3600)
+  @@index(expiresAt, sparse: true, expireAfterSeconds: 3600)
 ```
 
 #### Partial indexes with `filter`
@@ -71,9 +75,9 @@ A TTL index automatically deletes documents after a duration. `sparse` skips doc
 A *partial index* only covers documents matching a MongoDB query filter. This reduces index size and write cost when queries always target a subset.
 
 ```prisma
-  @@index([status], filter: { status: "active" })
-  @@index([age],    filter: { age: { "$gte": 18 } })
-  @@index([status, age], filter: { status: "active", age: { "$gte": 18, "$lte": 65 } })
+  @@index(status, filter: { status: "active" })
+  @@index(age,    filter: { age: { "$gte": 18 } })
+  @@index(status, age, filter: { status: "active", age: { "$gte": 18, "$lte": 65 } })
 ```
 
 `filter` is a **typed dictionary**: the top-level keys are model field references resolved by the binding layer against the enclosing entity's scope (catches typos and stale references on rename). The values are opaque JSON structures validated against a JSON Schema that constrains them to MongoDB's supported filter operators: `$eq` (implicit when value is a scalar), `$exists`, `$gt`, `$gte`, `$lt`, `$lte`, `$type`.
@@ -89,7 +93,7 @@ Multiple field keys in the same filter object are implicitly AND'd — `{ status
 Collation controls locale-aware string comparison for the index. A query can only *use* a collated index if it specifies the same collation, so this is a deliberate user choice.
 
 ```prisma
-  @@index([status], collation: { locale: "fr", strength: 2 })
+  @@index(status, collation: { locale: "fr", strength: 2 })
 ```
 
 `strength` controls what differences matter:
@@ -116,8 +120,8 @@ The full set of collation fields:
 These are rare, specialized index types. Hashed indexes are used for shard keys. Geospatial indexes (`2dsphere`, `2d`) support location queries. They stay under `@@index` with a `type` discriminator:
 
 ```prisma
-  @@index([tenantId], type: hashed)        // shard key
-  @@index([location], type: "2dsphere")    // geospatial
+  @@index(tenantId, type: hashed)          // shard key
+  @@index(location, type: "2dsphere")      // geospatial
 ```
 
 Hashed indexes must have exactly one field. Neither hashed nor geo indexes support wildcard fields or uniqueness.
@@ -136,13 +140,13 @@ model Events {
   tags     Json
 
   // All fields in the document
-  @@index([wildcard()])
+  @@index(wildcard())
 
   // Scoped to a subtree — all paths under metadata
-  @@index([wildcard(metadata)])
+  @@index(wildcard(metadata))
 
   // Compound wildcard (MongoDB 7.0+) — fixed field + wildcard
-  @@index([tenantId, wildcard(metadata)])
+  @@index(tenantId, wildcard(metadata))
 }
 ```
 
@@ -152,10 +156,10 @@ model Events {
 
 ```prisma
   // Only index metadata and tags subtrees
-  @@index([wildcard()], include: [metadata, tags])
+  @@index(wildcard(), include: [metadata, tags])
 
   // Index everything except _class and internalLog
-  @@index([wildcard()], exclude: [_class, internalLog])
+  @@index(wildcard(), exclude: [_class, internalLog])
 ```
 
 `include` and `exclude` are mutually exclusive. Both are field-reference lists resolved in the enclosing entity's scope. The interpreter converts them to the contract's `wildcardProjection`:
@@ -174,14 +178,16 @@ Shorthand for a regular index with `unique: true`. Supports `filter`, `collation
 
 ```prisma
 model User {
-  id    ObjectId @id @map("_id")
-  email String   @unique                          // field-level
+  id       ObjectId @id @map("_id")
+  email    String   @unique                                       // field-level
+  tenantId String
+  active   Boolean
 
-  @@unique([email, tenantId])                      // compound
+  @@unique(email, tenantId)                                       // compound
 
-  @@unique([email], collation: { locale: "en", strength: 2 })   // case-insensitive unique
+  @@unique(email, collation: { locale: "en", strength: 2 })       // case-insensitive unique
 
-  @@unique([email], filter: { active: true })      // partial unique
+  @@unique(email, filter: { active: true })                       // partial unique
 }
 ```
 
@@ -195,11 +201,13 @@ model Article {
   title String
   body  String
 
-  @@textIndex([title, body])
+  @@textIndex(title, body)
 
-  @@textIndex([title, body], weights: { title: 10, body: 5 }, language: "english", languageOverride: "idioma")
+  @@textIndex(title, body, weights: { title: 10, body: 5 }, language: "english", languageOverride: "idioma")
 }
 ```
+
+`weights` is a **typed dictionary**: the top-level keys are model field references resolved by the binding layer (must be fields listed in the `@@textIndex` field list). The values are positive numbers representing the relative importance of each field in text search scoring. If a field is not listed in `weights`, it defaults to weight 1.
 
 Only **one** `@@textIndex` is permitted per collection (MongoDB limitation).
 
@@ -219,6 +227,9 @@ The binding layer and interpreter validate these constraints at authoring time a
 10. **Filter keys are field references** — "Unknown field 'staus' in filter — did you mean 'status'?"
 11. **Filter values match JSON Schema** — "Invalid filter operator '$foo' for field 'age' — supported operators: $eq, $exists, $gt, $gte, $lt, $lte, $type"
 12. **No top-level logical operators in filter** — "Top-level $or/$and in filter is not supported — use multiple field keys for implicit AND"
+13. **Weights keys are field references** — "Unknown field 'titel' in weights — did you mean 'title'?"
+14. **Weights keys must be in field list** — "Field 'summary' in weights is not in the @@textIndex field list"
+15. **Weights values are positive numbers** — "Weight for field 'title' must be a positive number"
 
 ## Contract mapping
 
@@ -233,7 +244,7 @@ interface MongoStorageIndex {
   readonly partialFilterExpression?: Record<string, unknown>; // from filter: typed dictionary (field-ref keys, schema-validated values)
   readonly wildcardProjection?: Record<string, 0 | 1>;        // from include/exclude field lists
   readonly collation?: Record<string, unknown>;               // from collation: object literal
-  readonly weights?: Record<string, number>;                  // from weights: object literal (@@textIndex)
+  readonly weights?: Record<string, number>;                  // from weights: typed dictionary (field-ref keys, Number values) (@@textIndex)
   readonly default_language?: string;                         // from language: arg (@@textIndex)
   readonly language_override?: string;                        // from languageOverride: arg (@@textIndex)
 }
