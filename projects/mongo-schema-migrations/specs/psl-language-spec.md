@@ -180,7 +180,9 @@ NamedArgument      = Ident ":" Value
 
 ## Value model (target)
 
-PSL has seven primitive value types. These are the building blocks for all attribute and type constructor arguments.
+PSL has nine value types. These are the building blocks for all attribute and type constructor arguments.
+
+### Simple values
 
 | Type | Surface syntax | Examples |
 |------|---------------|----------|
@@ -188,26 +190,71 @@ PSL has seven primitive value types. These are the building blocks for all attri
 | **Number** | Digits, optional `-`, optional `.` | `42`, `-1`, `3.14` |
 | **String** | `"..."` with `\` escapes | `"hello"`, `"en"` |
 | **Identifier** | Bare word (not `true`/`false`) | `Cascade`, `Desc`, `hashed` |
+
+### Compound values
+
+| Type | Surface syntax | Examples |
+|------|---------------|----------|
 | **List** | `[` Value (`,` Value)* `]` | `[email, name]`, `[1, 2]` |
 | **Object** | `{` (Ident `:` Value (`,` ...)* )? `}` | `{ status: "active" }` |
-| **FunctionCall** | Ident `(` ArgumentList `)` | `now()`, `wildcard(metadata)` |
+| **FunctionCall** | DottedIdent `(` ArgumentList `)` | `now()`, `wildcard(metadata)` |
+
+### Extension values
+
+| Type | Surface syntax | Examples |
+|------|---------------|----------|
+| **TypeConstructor** | DottedIdent `(` ArgumentList `)` | `pgvector.zero(1536)` |
+| **TaggedLiteral** | DottedIdent `` ` `` ... `` ` `` | `` pg.sql`SELECT 1` `` |
 
 ### Grammar
 
 ```
-Value        = Boolean | Number | String | Identifier | List | Object | FunctionCall
-Boolean      = "true" | "false"
-Number       = "-"? Digit+ ("." Digit+)?
-String       = '"' (EscapeSeq | [^"\\])* '"'
-Identifier   = Ident  (where Ident ∉ { "true", "false" })
-List         = "[" (Value ("," Value)*)? "]"
-Object       = "{" (Ident ":" Value ("," Ident ":" Value)*)? "}"
-FunctionCall = Ident "(" (Argument ("," Argument)*)? ")"
+Value           = Boolean | Number | String | Identifier
+                | List | Object | FunctionCall
+                | TypeConstructor | TaggedLiteral
+
+Boolean         = "true" | "false"
+Number          = "-"? Digit+ ("." Digit+)?
+String          = '"' (EscapeSeq | [^"\\])* '"'
+Identifier      = Ident  (where Ident ∉ { "true", "false" })
+List            = "[" (Value ("," Value)*)? "]"
+Object          = "{" (Ident ":" Value ("," Ident ":" Value)*)? "}"
+FunctionCall    = DottedIdent "(" (Argument ("," Argument)*)? ")"
+TypeConstructor = DottedIdent "(" (Argument ("," Argument)*)? ")"
+TaggedLiteral   = DottedIdent "`" Body "`"
 ```
+
+### FunctionCall vs TypeConstructor
+
+`FunctionCall` and `TypeConstructor` have the same surface syntax: `Name(args)`. The parser produces them identically. The binding layer distinguishes them based on what the name resolves to in the active scope — if it resolves to a declared function, it's a `FunctionCall`; if it resolves to a type constructor, it's a `TypeConstructor`. This parallels how the same identifier `Role` could be a type name or something else depending on context.
+
+A `FunctionCall` invokes a function declared in the binding context (e.g. `now()`, `autoincrement()`, `wildcard(metadata)`). Functions are scoped to specific attributes — `wildcard` is available in `@@index`'s field list, `now` and `autoincrement` are available in `@default`.
+
+A `TypeConstructor` constructs a value of a non-primitive type. Where type constructor calls in type positions declare the *type* of a field (e.g. `embedding pgvector.Vector(1536)`), a `TypeConstructor` in value position constructs an *instance* of that type (e.g. `@default(pgvector.zero(1536))`). The binding layer resolves the name against available type constructors contributed by extension packs.
+
+### TaggedLiteral
+
+A tagged literal is an opaque, domain-specific text payload owned by an extension pack. It consists of a dotted identifier (the tag) followed by a backtick-delimited body:
+
+```prisma
+@@policy(pg.predicate`status = 'active' AND role = 'admin'`)
+
+view ActiveUsers {
+  definition pg.sql`
+    SELECT id, email FROM "User" WHERE status = 'active'
+  `
+}
+```
+
+The tag is a qualified identifier (`pack.flavor`) that the binding layer routes to the owning pack. The body is opaque to the parser and binding layer — the pack validates and normalizes it. No interpolation is allowed (`${` is a hard error).
+
+Tagged literals serve as an escape hatch for domain-specific sub-languages that PSL's value model cannot express natively: SQL expressions, query predicates, aggregation pipelines, policy definitions. Rather than embedding a sub-language into PSL's grammar, the tagged literal delegates ownership to the pack while preserving precise source spans for diagnostics.
+
+Canonicalization rules, contract encoding, and the full AST node type are defined in [ADR 129 — Template-Tagged Literals for Extensions](../../docs/architecture%20docs/adrs/ADR%20129%20-%20Template-Tagged%20Literals%20for%20Extensions.md).
 
 ### Type recursion
 
-Values are recursive — Lists and Objects contain Values, and FunctionCall arguments are Values:
+Values are recursive — Lists and Objects contain Values, and FunctionCall/TypeConstructor arguments are Values:
 
 ```prisma
 @@index([tenantId, wildcard(metadata)])
@@ -220,6 +267,10 @@ Values are recursive — Lists and Objects contain Values, and FunctionCall argu
 //                        ^^^^^^^^^^^^^^^^^^^^^^^^
 //                        Object containing:
 //                          "age" → Object { "$gte" → Number(18) }
+
+@@policy(pg.predicate`status = 'active'`)
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//       TaggedLiteral(tag: "pg.predicate", body: "status = 'active'")
 ```
 
 ### What identifiers mean
@@ -234,7 +285,7 @@ The parser produces the identifier; the binding layer resolves it against the ac
 
 ### Current implementation (current)
 
-The current parser stores all argument values as raw strings. The target value model described above is not yet implemented — interpreters manually parse raw strings using `parseBooleanArg`, `parseNumericArg`, `parseFieldList`, `parseJsonArg`, etc. Additionally, the parser special-cases `@default` to produce typed `PslDefaultFunctionValue` and `PslDefaultLiteralValue` nodes for `now()`, `autoincrement()`, `true`, `42`, and `"hello"`. Under the target value model, `@default` becomes a regular attribute — function calls (`now()`, `autoincrement()`) are just `FunctionCall` values, and literals (`true`, `42`) are just `Boolean` and `Number` values. No special case is needed.
+The current parser stores all argument values as raw strings. The target value model described above is not yet implemented — interpreters manually parse raw strings using `parseBooleanArg`, `parseNumericArg`, `parseFieldList`, `parseJsonArg`, etc. Additionally, the parser special-cases `@default` to produce typed `PslDefaultFunctionValue` and `PslDefaultLiteralValue` nodes for `now()`, `autoincrement()`, `true`, `42`, and `"hello"`. Under the target value model, `@default` becomes a regular attribute — function calls (`now()`, `autoincrement()`) are just `FunctionCall` values, and literals (`true`, `42`) are just `Boolean` and `Number` values. No special case is needed. `TypeConstructor` and `TaggedLiteral` are new value types not present in the current parser.
 
 ## Comments
 
@@ -262,4 +313,4 @@ Comments within quoted strings are not treated as comments.
 | Block attribute | `@@`-prefixed annotation | Inside an entity block |
 | Positional argument | Unnamed value in an argument list | Inside `(` `)` |
 | Named argument | `name: value` pair in an argument list | Inside `(` `)` |
-| Value | Boolean, Number, String, Identifier, List, Object, FunctionCall | Argument positions |
+| Value | Boolean, Number, String, Identifier, List, Object, FunctionCall, TypeConstructor, TaggedLiteral | Argument positions |

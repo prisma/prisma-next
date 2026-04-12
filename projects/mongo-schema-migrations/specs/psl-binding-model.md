@@ -42,6 +42,8 @@ interface BindingContext {
   readonly blockTypes: ReadonlyArray<BlockTypeDefinition>;
   readonly contextDirectives: ReadonlyArray<ContextDirectiveDefinition>;
   readonly builtinTypes: ReadonlyArray<BuiltinTypeEntry>;
+  readonly typeConstructors: ReadonlyArray<TypeConstructorDefinition>;
+  readonly tagHandlers: ReadonlyArray<TagHandlerDefinition>;
 }
 ```
 
@@ -231,6 +233,51 @@ Document scope
 
 Qualified name resolution (`analytics.Event`) traverses namespace scopes. The binding layer's resolution algorithm stays the same — it just follows dotted paths through nested scopes.
 
+### Type constructor resolution
+
+When the binding layer encounters a `DottedIdent(args)` value, it must determine whether this is a `FunctionCall` or a `TypeConstructor`. Resolution works as follows:
+
+1. Look up the name in the attribute's declared functions (from `AttributeDefinition.functions`). If found → `FunctionCall`.
+2. Look up the name in the binding context's type constructor registry. If found → `TypeConstructor`.
+3. If neither → binding error ("unknown function or type constructor").
+
+Type constructors are contributed by extension packs (e.g. `pgvector` registers `pgvector.zero`, `pgvector.random`). They produce a value of the corresponding type and are primarily useful in `@default` arguments:
+
+```prisma
+model Items {
+  embedding pgvector.Vector(1536) @default(pgvector.zero(1536))
+}
+```
+
+```typescript
+interface TypeConstructorDefinition {
+  readonly name: string;          // "pgvector.zero"
+  readonly producesType: string;  // "pgvector.Vector"
+  readonly arguments: ReadonlyArray<ArgumentDefinition>;
+}
+```
+
+### Tagged literal resolution
+
+When the binding layer encounters a `TaggedLiteral`, it resolves the tag (a dotted identifier) against registered tag handlers in the binding context:
+
+```typescript
+interface TagHandlerDefinition {
+  readonly tag: string;     // "pg.sql", "pg.predicate", "mongo.expr"
+  readonly packName: string;
+}
+```
+
+The binding layer verifies that the tag is registered, routes the body to the owning pack for validation, and produces a validated `TaggedLiteral` node. The body content is opaque to the binding layer — the pack determines whether it's valid SQL, a valid predicate expression, etc.
+
+```prisma
+@@policy(pg.predicate`status = 'active'`)
+// tag "pg.predicate" → look up in tag registry → found, owned by "pg" pack ✓
+// body "status = 'active'" → passed to pg pack for validation
+```
+
+If the tag is not registered, the binding layer reports an error: "unknown tag 'pg.predicate' — ensure the 'pg' extension pack is in extensionPacks."
+
 ## How framework components contribute
 
 The binding context is assembled from contributions. Each framework component declares what it adds:
@@ -291,14 +338,23 @@ Additional builtin types:
 
 ### SQL family
 
-Extends `model` with different attributes and may add new block types:
+Extends `model` with different attributes, extension values, and may add new block types:
 
 ```
 Future block types:
-  view    — same member structure as model
+  view    — same member structure as model, with tagged literal body
 
 Additional block attributes for model:
-  @@index — extended with: type (Hash | Gin | Gist | SpGist | Brin), etc.
+  @@index   — extended with: type (Hash | Gin | Gist | SpGist | Brin), etc.
+  @@policy  — positional TaggedLiteral argument (pg.predicate)
+
+Type constructors:
+  pgvector.zero(dimensions)       — produces pgvector.Vector
+  pgvector.random(dimensions)     — produces pgvector.Vector
+
+Tag handlers:
+  pg.sql        — SQL expression (view definitions, raw SQL)
+  pg.predicate  — SQL predicate (RLS policies, check constraints)
 ```
 
 ## Example: binding `@@index` in Mongo
@@ -334,6 +390,40 @@ The binding layer processes `@@index` as follows:
    - sparse: `Boolean(true)`
 
 The interpreter never parses raw strings. It receives typed, resolved values.
+
+## Example: binding extension values in SQL
+
+Given this PSL:
+
+```prisma
+model Items {
+  id        Int                @id
+  embedding pgvector.Vector(1536) @default(pgvector.zero(1536))
+
+  @@policy(pg.predicate`tenant_id = current_setting('app.tenant_id')`)
+}
+
+view ActiveUsers {
+  definition pg.sql`
+    SELECT id, email FROM "User" WHERE status = 'active'
+  `
+}
+```
+
+The binding layer processes these as follows:
+
+1. **Type constructor in `@default`** — The value `pgvector.zero(1536)` is a `DottedIdent(args)`.
+   - Not found in `@default`'s declared functions (`now`, `autoincrement`) → not a FunctionCall.
+   - Found in `typeConstructors` registry as `pgvector.zero` → TypeConstructor ✓
+   - Validates that `pgvector.zero` produces `pgvector.Vector`, matching the field's type ✓
+
+2. **Tagged literal in `@@policy`** — The value `` pg.predicate`tenant_id = ...` `` is a `TaggedLiteral`.
+   - Tag `pg.predicate` → look up in `tagHandlers` registry → found, owned by "pg" pack ✓
+   - Body passed to the pg pack for validation (is this a valid SQL predicate?) ✓
+
+3. **Tagged literal as member value** — In the `view` block, `definition` is a member with a tagged literal value.
+   - Tag `pg.sql` → found in `tagHandlers` registry ✓
+   - Body is a SQL SELECT statement → pg pack validates it ✓
 
 ## Design decisions
 
