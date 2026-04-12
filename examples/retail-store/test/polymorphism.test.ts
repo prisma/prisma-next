@@ -136,7 +136,7 @@ describe('polymorphic events', { timeout: timeouts.spinUpDbServer }, () => {
       subCategory: 'Bags',
       brand: 'LuxLine',
     });
-    expect(event.exitMethod).toBeNull();
+    expect(event).toHaveProperty('exitMethod', null);
     expect(event).not.toHaveProperty('metadata');
   });
 });
