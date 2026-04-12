@@ -121,6 +121,7 @@ interface ArgumentDefinition {
   readonly name?: string;            // undefined = positional
   readonly type: ValueTypeConstraint;
   readonly required: boolean;
+  readonly varargs?: boolean;        // collect multiple positional args into a list
   readonly scope?: ScopeDirective;   // how to narrow the scope for this argument's values
   readonly dictionary?: DictionaryConstraint;  // for typed dictionary arguments
   readonly valueSchema?: JsonSchema;           // JSON Schema applied to opaque values
@@ -154,15 +155,37 @@ This is distinct from:
 - A plain **Object** argument (fully opaque — no key resolution, no schema validation)
 - A **List** argument with scope (every element is resolved)
 
-The primary use case is `filter` on `@@index`, where keys are model field names (validated at authoring time) and values are MongoDB filter operator expressions (validated by JSON Schema):
+The primary use cases are:
+- `filter` on `@@index` — keys are model field names, values are MongoDB filter operator expressions
+- `weights` on `@@textIndex` — keys are model field names (from the text index's field list), values are positive numbers
 
 ```prisma
-@@index([status, age], filter: { status: "active", age: { "$gte": 18 } })
-//                               ^^^^^^                 ^^^
-//                               field ref ✓             field ref ✓
-//                                        ^^^^^^^^            ^^^^^^^^^^^^^
-//                                        opaque value        opaque value (schema-validated)
+@@index(status, age, filter: { status: "active", age: { "$gte": 18 } })
+//                             ^^^^^^                 ^^^
+//                             field ref ✓             field ref ✓
+//                                      ^^^^^^^^            ^^^^^^^^^^^^^
+//                                      opaque value        opaque value (schema-validated)
+
+@@textIndex(title, body, weights: { title: 10, body: 5 })
+//                                  ^^^^^       ^^^^
+//                                  field ref   field ref
+//                                         ^^         ^
+//                                         Number     Number (schema-validated)
 ```
+
+### Varargs positional arguments
+
+When an `ArgumentDefinition` has `varargs: true`, the binding layer collects all positional arguments (before the first named argument) into a single list, rather than requiring the user to wrap them in `[` `]`:
+
+```prisma
+// These are equivalent:
+@@index(status, tenantId, sparse: true)
+@@index([status, tenantId], sparse: true)
+```
+
+The binding layer normalizes the varargs form into a `List` before passing it to the interpreter — the interpreter always sees a list regardless of which syntax the user chose. At most one argument per attribute can be `varargs`.
+
+This improves ergonomics for the common case (single or few fields with no function calls), while the bracketed form remains available when clarity is preferred or when mixing positional function calls with named arguments.
 
 ## Scopes and name resolution
 
@@ -339,8 +362,8 @@ Common member attributes:
 
 Common block attributes:
   @@map       — positional String argument
-  @@index     — positional List<field ref>, named arguments (map, etc.)
-  @@unique    — positional List<field ref>, named arguments
+  @@index     — positional List<field ref> (varargs), named arguments (map, etc.)
+  @@unique    — positional List<field ref> (varargs), named arguments
 ```
 
 ### Mongo family
@@ -359,8 +382,8 @@ Additional block attributes for model:
                   exclude: List<field ref>
                 Functions: wildcard(field ref?)
 
-  @@textIndex — positional List<field ref>, named arguments:
-                  weights: Object (schema-validated)
+  @@textIndex — positional List<field ref> (varargs), named arguments:
+                  weights: TypedDictionary (keys: field refs, values: positive Number)
                   language: String
                   languageOverride: String
 
@@ -400,7 +423,7 @@ model Events {
   tenantId String
   metadata Json
 
-  @@index([tenantId, wildcard(metadata)], filter: { status: "active" }, sparse: true)
+  @@index(tenantId, wildcard(metadata), filter: { status: "active" }, sparse: true)
 }
 ```
 
@@ -408,7 +431,7 @@ The binding layer processes `@@index` as follows:
 
 1. **Locate the attribute definition** — `@@index` is a block attribute on the `model` block type. Found in the Mongo family's contribution.
 
-2. **Resolve the first positional argument** — expected type: `List`, scope: `enclosingEntity`.
+2. **Collect positional arguments as field list** — `@@index` accepts a varargs field list. All positional arguments before the first named argument are collected: `tenantId, wildcard(metadata)`. Scope: `enclosingEntity`.
    - `tenantId` → look up in entity "Events" scope → found, category: field ✓
    - `wildcard(metadata)` → `wildcard` is a function declared on `@@index`. Resolve its argument: `metadata` → look up in entity "Events" scope → found, category: field ✓
 
