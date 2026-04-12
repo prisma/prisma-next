@@ -6,7 +6,7 @@ export function resolveValue(value: MongoValue, codecs?: MongoCodecRegistry): un
   if (value instanceof MongoParamRef) {
     if (value.codecId && codecs) {
       const codec = codecs.get(value.codecId);
-      if (codec) return codec.encode(value.value);
+      if (codec?.encode) return codec.encode(value.value);
     }
     return value.value;
   }
