@@ -1,6 +1,6 @@
 # PSL Language Specification
 
-This document describes the Prisma Schema Language (PSL) as implemented by `@prisma-next/psl-parser`. It names every language construct, defines the grammar, and describes the current value model. This is a descriptive spec of the language as it exists today — future extensions are noted explicitly.
+This document specifies the Prisma Schema Language (PSL) grammar, value model, and document structure. It describes both the current implementation in `@prisma-next/psl-parser` and the target design we are evolving toward. Sections marked **(current)** describe what exists today; sections marked **(target)** describe the design direction.
 
 ## Lexical elements
 
@@ -28,26 +28,20 @@ The tokenizer produces the following token kinds:
 
 Key observations:
 - Identifiers support Unicode letters and hyphens (`my-pack`), but not `$` or `*`.
-- Only double-quoted strings are supported (no single quotes at the tokenizer level, though the parser's `splitTopLevelSegments` tracks single quotes for argument parsing).
-- There is no boolean literal token — `true` and `false` are `Ident` tokens.
+- Only double-quoted strings are supported.
+- There is no boolean literal token — `true` and `false` are `Ident` tokens distinguished by the value model (see below).
 
 ## Document structure
 
-A PSL document contains an ordered sequence of **top-level blocks**:
+A PSL document contains an ordered sequence of top-level constructs. These fall into two categories:
+
+### Entity declarations
+
+An entity declaration introduces a named thing with identity — a data model, an enum, an embedded type, a view. It has a keyword, a name, and a body containing members and block-level attributes.
 
 ```
-Document = (ModelBlock | EnumBlock | CompositeTypeBlock | TypesBlock)*
+EntityDeclaration = Keyword Ident "{" (Member | BlockAttribute)* "}"
 ```
-
-Unsupported top-level blocks (e.g. `datasource`, `generator`) produce diagnostics.
-
-### Model block
-
-```
-ModelBlock = "model" Ident "{" (Field | ModelAttribute)* "}"
-```
-
-A model declares a named data entity with fields and model-level attributes.
 
 ```prisma
 model User {
@@ -55,73 +49,65 @@ model User {
   email String @unique
   @@map("users")
 }
-```
 
-### Enum block
-
-```
-EnumBlock = "enum" Ident "{" (EnumValue | EnumAttribute)* "}"
-```
-
-Enum values are bare identifiers. The only supported enum attribute is `@@map`.
-
-```prisma
 enum Role {
   USER
   ADMIN
   @@map("user_role")
 }
-```
 
-### Composite type block
-
-```
-CompositeTypeBlock = "type" Ident "{" (Field | ModelAttribute)* "}"
-```
-
-Structurally identical to a model block. Used for embedded/value-object types.
-
-```prisma
 type Address {
   street String
   city   String
 }
 ```
 
-### Types block
+Entity declarations introduce a type name into the document scope. The keyword determines the entity's *category* (model, enum, compositeType, etc.), but the parser treats them uniformly — it does not assign special structure to any keyword. What members look like, what attributes are valid, and what the entity means are all determined by the binding layer (see [PSL Binding Model](psl-binding-model.md)).
+
+### Context directives
+
+A context directive modifies the interpretation environment. Unlike entity declarations, it does not introduce a named entity — it changes how the rest of the file is interpreted.
 
 ```
-TypesBlock = "types" "{" NamedTypeDeclaration* "}"
+ContextDirective = Keyword "{" ... "}"
 ```
 
-A single `types` block defines named type aliases.
+The `types` block is a context directive. It introduces type aliases that affect how field type expressions are resolved:
 
 ```prisma
 types {
   Email = String
   ShortName = sql.String(length: 35)
-  Embedding = pgvector.Vector(1536) @db.VarChar(191)
 }
 ```
 
-## Fields
+Context directives are analogous to `import` or `using` in other languages. They exist to configure the interpretation context, not to declare domain entities.
+
+### Current vs target (current)
+
+The current parser hardcodes four block types with distinct AST nodes (`PslModel`, `PslEnum`, `PslCompositeType`, `PslTypesBlock`). The target design replaces these with a single generic block AST node, where the keyword is a plain string and the binding layer determines what's valid.
+
+## Members
+
+Members are the declarations inside entity blocks. A member has a name and optional components depending on the entity's kind.
 
 ```
-Field = Ident TypeExpression FieldAttribute*
+Member = Ident TypeExpression? ("=" ValueExpression)? MemberAttribute*
 ```
 
-A field has a name, a type expression, and zero or more field-level attributes.
+The three observed member shapes:
 
-```prisma
-email     String          @unique @map("email_address")
-profile   Json?
-tags      String[]
-embedding pgvector.Vector(1536)?
-```
+| Shape | Example | Used by |
+|-------|---------|---------|
+| Field | `email String @unique` | model, compositeType, view |
+| Value | `USER` | enum |
+| Assignment | `Email = String` | types (context directive) |
+
+These are syntactic variations of the same member grammar. A field has a name and a type expression. An enum value has only a name (implicit type, no attributes). A type alias has a name and an assignment. The parser can treat all three as members with optional components; the binding layer validates that the member shape matches what the entity's block type expects.
 
 ### Type expressions
 
-A type expression specifies the field's type, with optional modifiers:
+A type expression specifies a member's type, with optional modifiers:
 
 ```
 TypeExpression = TypeBase ("?" | "[]")?
@@ -133,7 +119,7 @@ TypeBase       = Ident | TypeConstructorCall
 | `String` | Required scalar |
 | `String?` | Optional (nullable) |
 | `String[]` | List (array) |
-| `pgvector.Vector(1536)` | Type constructor call (see below) |
+| `pgvector.Vector(1536)` | Type constructor call |
 | `pgvector.Vector(1536)?` | Optional type constructor |
 
 Modifiers `?` (optional) and `[]` (list) are mutually exclusive.
@@ -145,54 +131,29 @@ TypeConstructorCall = DottedIdent "(" ArgumentList ")"
 DottedIdent         = Ident ("." Ident)*
 ```
 
-A type constructor call is a namespaced identifier with arguments. It can appear as:
-- A field type: `embedding pgvector.Vector(1536)`
-- A named type declaration: `Embedding = pgvector.Vector(1536)`
+A type constructor call is a namespaced identifier with arguments. It appears as a field type or a named type alias RHS.
+
+```prisma
+embedding pgvector.Vector(1536)
+```
 
 ## Attributes
 
-Attributes are annotations on fields, models, enums, and named types.
-
-### Field attributes
+Attributes are annotations on members and blocks. They have a prefix (`@` for member-level, `@@` for block-level), a dotted name, and an optional argument list.
 
 ```
-FieldAttribute = "@" DottedIdent ("(" ArgumentList ")")?
+MemberAttribute = "@" DottedIdent ("(" ArgumentList ")")?
+BlockAttribute  = "@@" DottedIdent ("(" ArgumentList ")")?
 ```
-
-Prefixed with a single `@`. Attached to the field on the same line.
 
 ```prisma
-id    Int    @id @default(autoincrement())
+id    Int    @id @default(42)
 email String @unique @map("email_address")
 data  Bytes  @vendor.column(length: 1536)
-```
 
-### Model attributes
-
-```
-ModelAttribute = "@@" DottedIdent ("(" ArgumentList ")")?
-```
-
-Prefixed with `@@`. Appear on their own line within a model block.
-
-```prisma
 @@map("users")
 @@index([email])
 @@unique([title, userId])
-```
-
-### Enum attributes
-
-Same syntax as model attributes (`@@`). Only `@@map` is currently valid.
-
-### Named type attributes
-
-Same syntax as field attributes (`@`). Attached after the type expression in a `types` block.
-
-```prisma
-types {
-  ShortName = sql.String(length: 35) @db.VarChar(191)
-}
 ```
 
 ### Attribute names
@@ -204,21 +165,7 @@ Attribute names are dotted identifiers: `Ident ("." Ident)*`. Each segment can c
 | Simple | `@id`, `@@map`, `@unique` |
 | Namespaced | `@db.VarChar`, `@vendor.column`, `@my-pack.column` |
 
-## Named type declarations
-
-```
-NamedTypeDeclaration = Ident "=" (TypeBase) Attribute*
-```
-
-A named type is either a simple alias or a type constructor call, optionally followed by attributes.
-
-```prisma
-types {
-  Email         = String                               // simple alias
-  ShortName     = sql.String(length: 35)               // constructor call
-  Embedding1536 = pgvector.Vector(1536) @db.VarChar(191) // constructor + attribute
-}
-```
+The parser does not validate attribute names — it accepts any dotted identifier. The binding layer determines which attributes are valid in which context.
 
 ## Arguments
 
@@ -231,52 +178,63 @@ PositionalArgument = Value
 NamedArgument      = Ident ":" Value
 ```
 
-### Values
+## Value model (target)
 
-**This is where the current language has a gap.**
+PSL has seven primitive value types. These are the building blocks for all attribute and type constructor arguments.
 
-The parser does not have a typed value model. All argument values — whether they look like numbers, booleans, identifiers, arrays, or object literals — are captured as **raw strings**. The parser tracks bracket/brace/paren depth and quoted strings to find argument boundaries, but it does not interpret the content.
+| Type | Surface syntax | Examples |
+|------|---------------|----------|
+| **Boolean** | `true` \| `false` | `true`, `false` |
+| **Number** | Digits, optional `-`, optional `.` | `42`, `-1`, `3.14` |
+| **String** | `"..."` with `\` escapes | `"hello"`, `"en"` |
+| **Identifier** | Bare word (not `true`/`false`) | `Cascade`, `Desc`, `hashed` |
+| **List** | `[` Value (`,` Value)* `]` | `[email, name]`, `[1, 2]` |
+| **Object** | `{` (Ident `:` Value (`,` ...)* )? `}` | `{ status: "active" }` |
+| **FunctionCall** | Ident `(` ArgumentList `)` | `now()`, `wildcard(metadata)` |
 
-The current value forms that the parser can *delimit* (but not type) are:
+### Grammar
 
-| Surface form | Example | Stored as |
-|-------------|---------|-----------|
-| Bare identifier | `true`, `Cascade`, `Desc` | `"true"`, `"Cascade"`, `"Desc"` |
-| Number | `42`, `3.14`, `-1` | `"42"`, `"3.14"`, `"-1"` |
-| Quoted string | `"hello"`, `"C:\\\\"` | `"\"hello\""`, `"\"C:\\\\\\\\\""` |
-| Bracket list | `[email, name]` | `"[email, name]"` |
-| Braced expression | `{ length: 35 }` | `"{ length: 35 }"` |
-| Function call | `autoincrement()`, `now()` | `"autoincrement()"`, `"now()"` |
-| Nested structure | `[userId(sort: Desc)]` | `"[userId(sort: Desc)]"` |
-
-All of these are stored as `string` in the AST's `PslAttributeArgument.value` field. **Interpretation is entirely the responsibility of downstream interpreters** (e.g. the Mongo PSL interpreter calls `parseFieldList`, `parseJsonArg`, `parseBooleanArg`, `parseNumericArg`, etc.).
-
-### Delimiter tracking
-
-The parser tracks three levels of nesting when splitting argument values:
-- `()` parentheses
-- `[]` brackets
-- `{}` braces
-
-A `,` or `:` only acts as a separator at the top level (depth 0 for all three). This means complex nested structures are preserved intact:
-
-```prisma
-@@relation(fields: [userId], references: [id], onDelete: Cascade)
-//         ^^^^^^^^^^^^^^    ^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^
-//         named arg         named arg          named arg
-//         value: "[userId]" value: "[id]"      value: "Cascade"
+```
+Value        = Boolean | Number | String | Identifier | List | Object | FunctionCall
+Boolean      = "true" | "false"
+Number       = "-"? Digit+ ("." Digit+)?
+String       = '"' (EscapeSeq | [^"\\])* '"'
+Identifier   = Ident  (where Ident ∉ { "true", "false" })
+List         = "[" (Value ("," Value)*)? "]"
+Object       = "{" (Ident ":" Value ("," Ident ":" Value)*)? "}"
+FunctionCall = Ident "(" (Argument ("," Argument)*)? ")"
 ```
 
-### Default values
+### Type recursion
 
-Field defaults are a special case. The parser recognizes two forms in `@default(...)`:
+Values are recursive — Lists and Objects contain Values, and FunctionCall arguments are Values:
 
-| Form | AST type | Example |
-|------|----------|---------|
-| Function call | `PslDefaultFunctionValue` | `@default(autoincrement())`, `@default(now())` |
-| Literal | `PslDefaultLiteralValue` | `@default(true)`, `@default(42)`, `@default("hello")` |
+```prisma
+@@index([tenantId, wildcard(metadata)])
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//      List containing:
+//        Identifier("tenantId")
+//        FunctionCall("wildcard", [Identifier("metadata")])
 
-These are the **only** place where the parser produces typed values instead of raw strings.
+@@index([status], filter: { age: { $gte: 18 } })
+//                        ^^^^^^^^^^^^^^^^^^^^^^^^
+//                        Object containing:
+//                          "age" → Object { "$gte" → Number(18) }
+```
+
+### What identifiers mean
+
+An `Identifier` value is a bare word that isn't `true` or `false`. What it *refers to* depends on where it appears — this is determined by the binding layer, not the parser. The same identifier `email` could be:
+
+- A type name in a field declaration: `email String` (the field name is `email`)
+- A field reference in an index: `@@index([email])` (refers to the `email` field)
+- A symbolic constant: `type: hashed` (a fixed domain value)
+
+The parser produces the identifier; the binding layer resolves it against the active scope.
+
+### Current implementation (current)
+
+The current parser stores all argument values as raw strings. The target value model described above is not yet implemented — interpreters manually parse raw strings using `parseBooleanArg`, `parseNumericArg`, `parseFieldList`, `parseJsonArg`, etc. Additionally, the parser special-cases `@default` to produce typed `PslDefaultFunctionValue` and `PslDefaultLiteralValue` nodes for `now()`, `autoincrement()`, `true`, `42`, and `"hello"`. Under the target value model, `@default` becomes a regular attribute — function calls (`now()`, `autoincrement()`) are just `FunctionCall` values, and literals (`true`, `42`) are just `Boolean` and `Number` values. No special case is needed.
 
 ## Comments
 
@@ -292,29 +250,16 @@ Comments within quoted strings are not treated as comments.
 
 ## Summary of language constructs
 
-| Construct | AST node | Context |
-|-----------|----------|---------|
-| Document | `PslDocumentAst` | Root |
-| Model | `PslModel` | Top-level block |
-| Enum | `PslEnum` | Top-level block |
-| Composite type | `PslCompositeType` | Top-level block |
-| Types block | `PslTypesBlock` | Top-level block (singular) |
-| Named type declaration | `PslNamedTypeDeclaration` | Inside `types` block |
-| Field | `PslField` | Inside model or composite type |
-| Enum value | `PslEnumValue` | Inside enum |
-| Attribute | `PslAttribute` | On fields, models, enums, named types |
-| Type constructor call | `PslTypeConstructorCall` | Field type or named type RHS |
-| Positional argument | `PslAttributePositionalArgument` | Inside attribute or constructor args |
-| Named argument | `PslAttributeNamedArgument` | Inside attribute or constructor args |
-
-## Current limitations
-
-1. **No typed value model.** Argument values are raw strings. The parser cannot distinguish between `true` (boolean), `Cascade` (enum-like identifier), `42` (number), `[a, b]` (list), and `{ x: 1 }` (object). Downstream interpreters must parse values themselves.
-
-2. **No scoping.** Attribute names (`@index`, `@@map`, `@db.VarChar`) are accepted by the parser without validation. The parser does not know which attributes are valid in which context, or which arguments an attribute accepts. All validation happens in interpreters.
-
-3. **No function-call values in arguments.** Although `@default(now())` is recognized specially, general function calls like `wildcard()` or `raw("...")` inside attribute argument lists are not parsed as structured AST nodes — they're stored as raw strings (e.g. `"wildcard()"`, `"raw(\"...\")"`).
-
-4. **Single-line constructs.** Fields and attributes must fit on one line. There is no multi-line continuation syntax.
-
-5. **No object literal AST.** The parser tracks `{}` for delimiter balancing, so `{ status: "active" }` won't break parsing, but it's stored as a raw string with no structure.
+| Construct | Description | Context |
+|-----------|------------|---------|
+| Document | Root container | — |
+| Entity declaration | Named block (`model`, `enum`, `type`, `view`, ...) | Top-level |
+| Context directive | Environment modifier (`types`, future imports) | Top-level |
+| Member | Named declaration within a block | Inside entity/directive |
+| Type expression | Type reference with optional `?`/`[]` | Field type position |
+| Type constructor call | Namespaced parameterized type | Type expression or alias RHS |
+| Member attribute | `@`-prefixed annotation | On a member |
+| Block attribute | `@@`-prefixed annotation | Inside an entity block |
+| Positional argument | Unnamed value in an argument list | Inside `(` `)` |
+| Named argument | `name: value` pair in an argument list | Inside `(` `)` |
+| Value | Boolean, Number, String, Identifier, List, Object, FunctionCall | Argument positions |
