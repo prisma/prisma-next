@@ -229,6 +229,200 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpDbServer }
     expect(props['firstName']).toBeUndefined();
   });
 
+  it('PSL with wildcard() produces wildcard index on MongoDB', async () => {
+    const contract = pslToContract(`
+      model Events {
+        id       ObjectId @id @map("_id")
+        metadata String
+        @@index([wildcard()])
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('events').listIndexes().toArray();
+    const wildcardIdx = indexes.find((idx) => idx['key']?.['$**'] === 1);
+    expect(wildcardIdx).toBeDefined();
+  });
+
+  it('PSL with scoped wildcard() produces scoped wildcard index', async () => {
+    const contract = pslToContract(`
+      model Events {
+        id       ObjectId @id @map("_id")
+        metadata String
+        @@index([wildcard(metadata)])
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('events').listIndexes().toArray();
+    const wildcardIdx = indexes.find((idx) => idx['key']?.['metadata.$**'] === 1);
+    expect(wildcardIdx).toBeDefined();
+  });
+
+  it('PSL with sort: Desc produces mixed-direction compound index', async () => {
+    const contract = pslToContract(`
+      model Events {
+        id        ObjectId @id @map("_id")
+        status    String
+        createdAt DateTime
+        @@index([status, createdAt(sort: Desc)])
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('events').listIndexes().toArray();
+    const compoundIdx = indexes.find(
+      (idx) => idx['key']?.['status'] === 1 && idx['key']?.['createdAt'] === -1,
+    );
+    expect(compoundIdx).toBeDefined();
+  });
+
+  it('PSL with filter produces partial filter expression index', async () => {
+    const contract = pslToContract(`
+      model Events {
+        id     ObjectId @id @map("_id")
+        status String
+        @@index([status], filter: "{\\"status\\": \\"active\\"}")
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('events').listIndexes().toArray();
+    const partialIdx = indexes.find(
+      (idx) => idx['key']?.['status'] === 1 && idx['partialFilterExpression'],
+    );
+    expect(partialIdx).toBeDefined();
+    expect(partialIdx!['partialFilterExpression']).toEqual({ status: 'active' });
+  });
+
+  it('PSL with collation produces collated index', async () => {
+    const contract = pslToContract(`
+      model User {
+        id    ObjectId @id @map("_id")
+        email String
+        @@index([email], collationLocale: "en", collationStrength: 2)
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('user').listIndexes().toArray();
+    const collatedIdx = indexes.find((idx) => idx['key']?.['email'] === 1 && idx['collation']);
+    expect(collatedIdx).toBeDefined();
+    expect(collatedIdx!['collation']?.['locale']).toBe('en');
+    expect(collatedIdx!['collation']?.['strength']).toBe(2);
+  });
+
+  it('PSL with wildcard + include produces wildcardProjection', async () => {
+    const contract = pslToContract(`
+      model Events {
+        id       ObjectId @id @map("_id")
+        metadata String
+        tags     String
+        @@index([wildcard()], include: "[metadata, tags]")
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('events').listIndexes().toArray();
+    const wcIdx = indexes.find((idx) => idx['key']?.['$**'] === 1);
+    expect(wcIdx).toBeDefined();
+    expect(wcIdx!['wildcardProjection']).toEqual({ metadata: 1, tags: 1 });
+  });
+
+  it('PSL with wildcard + exclude produces wildcardProjection', async () => {
+    const contract = pslToContract(`
+      model Events {
+        id       ObjectId @id @map("_id")
+        internal String
+        @@index([wildcard()], exclude: "[internal]")
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('events').listIndexes().toArray();
+    const wcIdx = indexes.find((idx) => idx['key']?.['$**'] === 1);
+    expect(wcIdx).toBeDefined();
+    expect(wcIdx!['wildcardProjection']).toEqual({ internal: 0 });
+  });
+
+  it('PSL with @@textIndex produces text index on MongoDB', async () => {
+    const contract = pslToContract(`
+      model Article {
+        id    ObjectId @id @map("_id")
+        title String
+        body  String
+        @@textIndex([title, body])
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('article').listIndexes().toArray();
+    const textIdx = indexes.find((idx) => idx['key']?.['_fts'] === 'text');
+    expect(textIdx).toBeDefined();
+    expect(textIdx!['weights']?.['title']).toBeDefined();
+    expect(textIdx!['weights']?.['body']).toBeDefined();
+  });
+
+  it('PSL with @@textIndex + weights produces weighted text index', async () => {
+    const contract = pslToContract(`
+      model Article {
+        id    ObjectId @id @map("_id")
+        title String
+        body  String
+        @@textIndex([title, body], weights: "{\\"title\\": 10, \\"body\\": 5}", language: "english")
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('article').listIndexes().toArray();
+    const textIdx = indexes.find((idx) => idx['key']?.['_fts'] === 'text');
+    expect(textIdx).toBeDefined();
+    expect(textIdx!['weights']?.['title']).toBe(10);
+    expect(textIdx!['weights']?.['body']).toBe(5);
+    expect(textIdx!['default_language']).toBe('english');
+  });
+
+  it('PSL with type: "hashed" produces hashed index', async () => {
+    const contract = pslToContract(`
+      model Events {
+        id       ObjectId @id @map("_id")
+        tenantId String
+        @@index([tenantId], type: "hashed")
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('events').listIndexes().toArray();
+    const hashedIdx = indexes.find((idx) => idx['key']?.['tenantId'] === 'hashed');
+    expect(hashedIdx).toBeDefined();
+  });
+
+  it('PSL with type: "2dsphere" produces 2dsphere index', async () => {
+    const contract = pslToContract(`
+      model Places {
+        id       ObjectId @id @map("_id")
+        location String
+        @@index([location], type: "2dsphere")
+      }
+    `);
+
+    await planAndApply(replSetUri, null, contract);
+
+    const indexes = await db.collection('places').listIndexes().toArray();
+    const geoIdx = indexes.find((idx) => idx['key']?.['location'] === '2dsphere');
+    expect(geoIdx).toBeDefined();
+  });
+
   it('PSL with value objects produces nested $jsonSchema', async () => {
     const contract = pslToContract(`
       type Address {
