@@ -34,9 +34,11 @@ This design depends on the PSL value model extensions described in [PSL Language
 
 2. **`@@textIndex` as a dedicated attribute.** Text indexes have a fundamentally different option set (`weights`, `language`, `languageOverride`) and different query semantics (queried via `$text`, not standard comparison). A separate `@@textIndex` attribute makes each form self-documenting, avoiding a complex compatibility matrix.
 
-3. **Object literals for structured options.** `filter`, `collation`, and `weights` use PSL object literals — `{ status: "active" }`, `{ locale: "fr", strength: 2 }`, `{ title: 10, body: 5 }` — instead of escaped JSON strings. This is enabled by the typed value model extension to the PSL parser.
+3. **Object literals for structured options.** `collation` and `weights` use PSL object literals — `{ locale: "fr", strength: 2 }`, `{ title: 10, body: 5 }` — instead of escaped JSON strings. This is enabled by the typed value model extension to the PSL parser.
 
-4. **`include`/`exclude` field lists for wildcard projections.** Rather than MongoDB's `0`/`1` projection document, users specify field lists: `include: [metadata, tags]`. The binding layer resolves these as field references in the enclosing entity's scope.
+4. **`filter` as a typed dictionary.** The `filter` argument's top-level keys are model field references resolved by the binding layer (validated against the entity's fields). The values are opaque JSON structures validated against a JSON Schema constraining them to MongoDB's filter operators. Multiple keys are implicitly AND'd. Top-level `$or`/`$and` are not supported initially.
+
+5. **`include`/`exclude` field lists for wildcard projections.** Rather than MongoDB's `0`/`1` projection document, users specify field lists: `include: [metadata, tags]`. The binding layer resolves these as field references in the enclosing entity's scope.
 
 ## Syntax by example
 
@@ -70,12 +72,17 @@ A *partial index* only covers documents matching a MongoDB query filter. This re
 
 ```prisma
   @@index([status], filter: { status: "active" })
-  @@index([email], filter: { email: { $exists: true } })
+  @@index([age],    filter: { age: { "$gte": 18 } })
+  @@index([status, age], filter: { status: "active", age: { "$gte": 18, "$lte": 65 } })
 ```
 
-The value is a PSL object literal. MongoDB restricts partial filter expressions to a small set of operators: `$eq` (implicit), `$exists`, `$gt`, `$gte`, `$lt`, `$lte`, `$type`, `$and`, `$or`.
+`filter` is a **typed dictionary**: the top-level keys are model field references resolved by the binding layer against the enclosing entity's scope (catches typos and stale references on rename). The values are opaque JSON structures validated against a JSON Schema that constrains them to MongoDB's supported filter operators: `$eq` (implicit when value is a scalar), `$exists`, `$gt`, `$gte`, `$lt`, `$lte`, `$type`.
 
-Note: `$`-prefixed keys like `$exists` require the tokenizer to support `$` in identifier positions within object literal keys, or for these keys to be quoted strings. This is an open tokenizer question (see [PSL Language Specification](psl-language-spec.md)).
+Multiple field keys in the same filter object are implicitly AND'd — `{ status: "active", age: { "$gte": 18 } }` means both conditions must hold. This covers the vast majority of real-world partial filter expressions.
+
+`$`-prefixed operator keys within values use quoted strings (`"$gte"`, `"$exists"`) since `$` is not a valid identifier character in PSL.
+
+**Scope limitation:** Top-level logical operators `$or` and explicit `$and` are not supported in this initial design. These are rare in partial filter expressions — implicit AND via multiple field keys handles nearly all cases. If logical operators are needed, the index can be created outside PSL.
 
 #### Collation
 
@@ -209,6 +216,9 @@ The binding layer and interpreter validate these constraints at authoring time a
 7. **One text index per collection** — "Only one @@textIndex is allowed per collection"
 8. **Hashed single-field** — "Hashed indexes must have exactly one field"
 9. **Collation locale required** — "`locale` is required in the collation object"
+10. **Filter keys are field references** — "Unknown field 'staus' in filter — did you mean 'status'?"
+11. **Filter values match JSON Schema** — "Invalid filter operator '$foo' for field 'age' — supported operators: $eq, $exists, $gt, $gte, $lt, $lte, $type"
+12. **No top-level logical operators in filter** — "Top-level $or/$and in filter is not supported — use multiple field keys for implicit AND"
 
 ## Contract mapping
 
@@ -220,7 +230,7 @@ interface MongoStorageIndex {
   readonly unique?: boolean;                                  // from @@unique or @unique
   readonly sparse?: boolean;                                  // from sparse: arg
   readonly expireAfterSeconds?: number;                       // from expireAfterSeconds: arg
-  readonly partialFilterExpression?: Record<string, unknown>; // from filter: object literal
+  readonly partialFilterExpression?: Record<string, unknown>; // from filter: typed dictionary (field-ref keys, schema-validated values)
   readonly wildcardProjection?: Record<string, 0 | 1>;        // from include/exclude field lists
   readonly collation?: Record<string, unknown>;               // from collation: object literal
   readonly weights?: Record<string, number>;                  // from weights: object literal (@@textIndex)
@@ -265,6 +275,14 @@ We considered `@@hashedIndex`, `@@geoIndex`, `@@wildcardIndex`, etc. We rejected
 - Hashed and geo are rare — dedicated attributes add surface area without much benefit
 - Wildcard is a field-level concern, not a type — a wildcard index is just a regular index with a glob field
 - Three attributes (`@@index`, `@@unique`, `@@textIndex`) cover the space well. The `type` discriminator handles the remaining rare cases.
+
+### Filter as a fully opaque Object
+
+We considered making `filter` a plain opaque Object with no key resolution — the binding layer would pass the entire structure through unvalidated. This is simpler but misses the opportunity to validate field names at authoring time. Since partial filter keys are almost always model field names, resolving them as field references catches typos and keeps filters consistent through renames. The opaque JSON values (with `$`-prefixed operators) are validated via JSON Schema instead.
+
+### Filter with top-level logical operators (`$or`, `$and`)
+
+We considered supporting `$or` and `$and` at the top level of filter expressions. This would require special-casing non-field keys or allowing quoted string keys to bypass field-ref resolution. We deferred this because: (a) implicit AND via multiple field keys covers the vast majority of real partial filters, (b) explicit `$and` is almost never needed (multiple operators on the same field go inside that field's value object), and (c) `$or` in a partial filter is genuinely rare. If needed, the index can be created outside PSL.
 
 ### Wildcard projections as a JSON-style projection document
 

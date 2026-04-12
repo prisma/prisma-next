@@ -122,6 +122,8 @@ interface ArgumentDefinition {
   readonly type: ValueTypeConstraint;
   readonly required: boolean;
   readonly scope?: ScopeDirective;   // how to narrow the scope for this argument's values
+  readonly dictionary?: DictionaryConstraint;  // for typed dictionary arguments
+  readonly valueSchema?: JsonSchema;           // JSON Schema applied to opaque values
 }
 
 interface FunctionDefinition {
@@ -131,6 +133,36 @@ interface FunctionDefinition {
 ```
 
 Functions declared on an attribute are available only within that attribute's argument values. For example, `wildcard()` is scoped to `@@index`'s field list.
+
+### Typed dictionary arguments
+
+A **typed dictionary** is an Object argument where the keys and values have separate validation strategies. This is declared via `dictionary` and `valueSchema` on an `ArgumentDefinition`:
+
+```typescript
+interface DictionaryConstraint {
+  readonly keyScope: ScopeDirective;    // how to resolve keys (e.g. as field refs)
+  readonly valueValidation: "opaque";   // values are not resolved, just schema-validated
+}
+```
+
+When `dictionary` is set, the binding layer:
+1. Resolves each top-level key as an identifier in the scope specified by `keyScope` (e.g. `enclosingEntity` for field references)
+2. Does **not** resolve identifiers within the values — they are opaque structured data
+3. If `valueSchema` is set, validates each value against the provided JSON Schema
+
+This is distinct from:
+- A plain **Object** argument (fully opaque — no key resolution, no schema validation)
+- A **List** argument with scope (every element is resolved)
+
+The primary use case is `filter` on `@@index`, where keys are model field names (validated at authoring time) and values are MongoDB filter operator expressions (validated by JSON Schema):
+
+```prisma
+@@index([status, age], filter: { status: "active", age: { "$gte": 18 } })
+//                               ^^^^^^                 ^^^
+//                               field ref ✓             field ref ✓
+//                                        ^^^^^^^^            ^^^^^^^^^^^^^
+//                                        opaque value        opaque value (schema-validated)
+```
 
 ## Scopes and name resolution
 
@@ -321,14 +353,14 @@ Additional block attributes for model:
                   type: Identifier (hashed | 2dsphere | 2d)
                   sparse: Boolean
                   expireAfterSeconds: Number
-                  filter: Object
-                  collation: Object
+                  filter: TypedDictionary (keys: field refs, values: schema-validated filter operators)
+                  collation: Object (schema-validated)
                   include: List<field ref>
                   exclude: List<field ref>
                 Functions: wildcard(field ref?)
 
   @@textIndex — positional List<field ref>, named arguments:
-                  weights: Object
+                  weights: Object (schema-validated)
                   language: String
                   languageOverride: String
 
@@ -381,12 +413,14 @@ The binding layer processes `@@index` as follows:
    - `wildcard(metadata)` → `wildcard` is a function declared on `@@index`. Resolve its argument: `metadata` → look up in entity "Events" scope → found, category: field ✓
 
 3. **Resolve named arguments**:
-   - `filter: { status: "active" }` → expected type: Object. No scope narrowing needed — object keys are not resolved as references.
+   - `filter: { status: "active" }` → typed dictionary argument. Resolve top-level keys:
+     - `status` → look up in entity "Events" scope → found, category: field ✓
+     - Value `String("active")` → validate against filter operator JSON Schema (implicit `$eq`) ✓
    - `sparse: true` → expected type: Boolean. Value is Boolean(true) ✓
 
 4. **Produce validated AST** — the interpreter receives:
    - fields: `[FieldRef("tenantId"), FunctionCall("wildcard", [FieldRef("metadata")])]`
-   - filter: `Object({ "status": String("active") })`
+   - filter: `TypedDictionary({ FieldRef("status"): String("active") })`
    - sparse: `Boolean(true)`
 
 The interpreter never parses raw strings. It receives typed, resolved values.
