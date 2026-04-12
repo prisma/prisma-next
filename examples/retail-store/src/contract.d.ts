@@ -13,7 +13,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:50d2aad3ace4b58db948643b4a790cc8b2eb9bfeda129017dc44a04748292bfc'>;
+  StorageHashBase<'sha256:844c1b104857432625f127e3c8a9bc59789d5e5bd6bd3d62104c80068c26b3e7'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -132,20 +132,345 @@ export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputType
 type ContractBase = ContractType<
   {
     readonly collections: {
-      readonly products: Record<string, never>;
+      readonly products: {
+        readonly indexes: readonly [
+          {
+            readonly keys: readonly [
+              { readonly field: 'name'; readonly direction: 'text' },
+              { readonly field: 'description'; readonly direction: 'text' },
+            ];
+            readonly weights: { readonly name: 10; readonly description: 1 };
+          },
+          {
+            readonly keys: readonly [
+              { readonly field: 'brand'; readonly direction: 1 },
+              { readonly field: 'subCategory'; readonly direction: 1 },
+            ];
+          },
+          { readonly keys: readonly [{ readonly field: 'code'; readonly direction: 'hashed' }] },
+        ];
+        readonly validator: {
+          readonly jsonSchema: {
+            readonly bsonType: 'object';
+            readonly properties: {
+              readonly _id: { readonly bsonType: 'objectId' };
+              readonly name: { readonly bsonType: 'string' };
+              readonly brand: { readonly bsonType: 'string' };
+              readonly code: { readonly bsonType: 'string' };
+              readonly description: { readonly bsonType: 'string' };
+              readonly masterCategory: { readonly bsonType: 'string' };
+              readonly subCategory: { readonly bsonType: 'string' };
+              readonly articleType: { readonly bsonType: 'string' };
+              readonly price: {
+                readonly bsonType: 'object';
+                readonly properties: { readonly currency: { readonly bsonType: 'string' } };
+                readonly required: readonly ['currency'];
+              };
+              readonly image: {
+                readonly bsonType: 'object';
+                readonly properties: { readonly url: { readonly bsonType: 'string' } };
+                readonly required: readonly ['url'];
+              };
+            };
+            readonly required: readonly [
+              '_id',
+              'articleType',
+              'brand',
+              'code',
+              'description',
+              'image',
+              'masterCategory',
+              'name',
+              'price',
+              'subCategory',
+            ];
+          };
+          readonly validationLevel: 'strict';
+          readonly validationAction: 'error';
+        };
+      };
       readonly users: {
         readonly indexes: readonly [
-          { readonly fields: { readonly email: 1 }; readonly options: { readonly unique: true } },
+          {
+            readonly keys: readonly [{ readonly field: 'email'; readonly direction: 1 }];
+            readonly unique: true;
+          },
         ];
+        readonly validator: {
+          readonly jsonSchema: {
+            readonly bsonType: 'object';
+            readonly properties: {
+              readonly _id: { readonly bsonType: 'objectId' };
+              readonly name: { readonly bsonType: 'string' };
+              readonly email: { readonly bsonType: 'string' };
+              readonly address: {
+                readonly bsonType: 'object';
+                readonly properties: {
+                  readonly streetAndNumber: { readonly bsonType: 'string' };
+                  readonly city: { readonly bsonType: 'string' };
+                  readonly postalCode: { readonly bsonType: 'string' };
+                  readonly country: { readonly bsonType: 'string' };
+                };
+                readonly required: readonly ['city', 'country', 'postalCode', 'streetAndNumber'];
+              };
+            };
+            readonly required: readonly ['_id', 'email', 'name'];
+          };
+          readonly validationLevel: 'strict';
+          readonly validationAction: 'error';
+        };
       };
-      readonly carts: { readonly indexes: readonly [{ readonly fields: { readonly userId: 1 } }] };
-      readonly orders: { readonly indexes: readonly [{ readonly fields: { readonly userId: 1 } }] };
-      readonly locations: Record<string, never>;
-      readonly invoices: Record<string, never>;
-      readonly events: { readonly indexes: readonly [{ readonly fields: { readonly userId: 1 } }] };
-      readonly viewProductEvent: Record<string, never>;
-      readonly searchEvent: Record<string, never>;
-      readonly addToCartEvent: Record<string, never>;
+      readonly carts: {
+        readonly indexes: readonly [
+          { readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }] },
+        ];
+        readonly validator: {
+          readonly jsonSchema: {
+            readonly bsonType: 'object';
+            readonly properties: {
+              readonly _id: { readonly bsonType: 'objectId' };
+              readonly userId: { readonly bsonType: 'objectId' };
+              readonly items: {
+                readonly bsonType: 'array';
+                readonly items: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly productId: { readonly bsonType: 'string' };
+                    readonly name: { readonly bsonType: 'string' };
+                    readonly brand: { readonly bsonType: 'string' };
+                    readonly amount: { readonly bsonType: 'int' };
+                    readonly price: {
+                      readonly bsonType: 'object';
+                      readonly properties: { readonly currency: { readonly bsonType: 'string' } };
+                      readonly required: readonly ['currency'];
+                    };
+                    readonly image: {
+                      readonly bsonType: 'object';
+                      readonly properties: { readonly url: { readonly bsonType: 'string' } };
+                      readonly required: readonly ['url'];
+                    };
+                  };
+                  readonly required: readonly [
+                    'amount',
+                    'brand',
+                    'image',
+                    'name',
+                    'price',
+                    'productId',
+                  ];
+                };
+              };
+            };
+            readonly required: readonly ['_id', 'items', 'userId'];
+          };
+          readonly validationLevel: 'strict';
+          readonly validationAction: 'error';
+        };
+      };
+      readonly orders: {
+        readonly indexes: readonly [
+          { readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }] },
+        ];
+        readonly validator: {
+          readonly jsonSchema: {
+            readonly bsonType: 'object';
+            readonly properties: {
+              readonly _id: { readonly bsonType: 'objectId' };
+              readonly userId: { readonly bsonType: 'objectId' };
+              readonly items: {
+                readonly bsonType: 'array';
+                readonly items: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly productId: { readonly bsonType: 'string' };
+                    readonly name: { readonly bsonType: 'string' };
+                    readonly brand: { readonly bsonType: 'string' };
+                    readonly amount: { readonly bsonType: 'int' };
+                    readonly price: {
+                      readonly bsonType: 'object';
+                      readonly properties: { readonly currency: { readonly bsonType: 'string' } };
+                      readonly required: readonly ['currency'];
+                    };
+                    readonly image: {
+                      readonly bsonType: 'object';
+                      readonly properties: { readonly url: { readonly bsonType: 'string' } };
+                      readonly required: readonly ['url'];
+                    };
+                  };
+                  readonly required: readonly [
+                    'amount',
+                    'brand',
+                    'image',
+                    'name',
+                    'price',
+                    'productId',
+                  ];
+                };
+              };
+              readonly shippingAddress: { readonly bsonType: 'string' };
+              readonly type: { readonly bsonType: 'string' };
+              readonly statusHistory: {
+                readonly bsonType: 'array';
+                readonly items: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly status: { readonly bsonType: 'string' };
+                    readonly timestamp: { readonly bsonType: 'date' };
+                  };
+                  readonly required: readonly ['status', 'timestamp'];
+                };
+              };
+            };
+            readonly required: readonly [
+              '_id',
+              'items',
+              'shippingAddress',
+              'statusHistory',
+              'type',
+              'userId',
+            ];
+          };
+          readonly validationLevel: 'strict';
+          readonly validationAction: 'error';
+        };
+      };
+      readonly locations: {
+        readonly indexes: readonly [
+          {
+            readonly keys: readonly [
+              { readonly field: 'city'; readonly direction: 1 },
+              { readonly field: 'country'; readonly direction: 1 },
+            ];
+            readonly collation: { readonly locale: 'en'; readonly strength: 2 };
+          },
+        ];
+        readonly validator: {
+          readonly jsonSchema: {
+            readonly bsonType: 'object';
+            readonly properties: {
+              readonly _id: { readonly bsonType: 'objectId' };
+              readonly name: { readonly bsonType: 'string' };
+              readonly streetAndNumber: { readonly bsonType: 'string' };
+              readonly city: { readonly bsonType: 'string' };
+              readonly postalCode: { readonly bsonType: 'string' };
+              readonly country: { readonly bsonType: 'string' };
+            };
+            readonly required: readonly [
+              '_id',
+              'city',
+              'country',
+              'name',
+              'postalCode',
+              'streetAndNumber',
+            ];
+          };
+          readonly validationLevel: 'strict';
+          readonly validationAction: 'error';
+        };
+      };
+      readonly invoices: {
+        readonly indexes: readonly [
+          { readonly keys: readonly [{ readonly field: 'orderId'; readonly direction: 1 }] },
+          {
+            readonly keys: readonly [{ readonly field: 'issuedAt'; readonly direction: -1 }];
+            readonly sparse: true;
+          },
+        ];
+        readonly validator: {
+          readonly jsonSchema: {
+            readonly bsonType: 'object';
+            readonly properties: {
+              readonly _id: { readonly bsonType: 'objectId' };
+              readonly orderId: { readonly bsonType: 'objectId' };
+              readonly items: {
+                readonly bsonType: 'array';
+                readonly items: {
+                  readonly bsonType: 'object';
+                  readonly properties: {
+                    readonly name: { readonly bsonType: 'string' };
+                    readonly amount: { readonly bsonType: 'int' };
+                  };
+                  readonly required: readonly ['amount', 'name'];
+                };
+              };
+              readonly issuedAt: { readonly bsonType: 'date' };
+            };
+            readonly required: readonly ['_id', 'issuedAt', 'items', 'orderId'];
+          };
+          readonly validationLevel: 'strict';
+          readonly validationAction: 'error';
+        };
+      };
+      readonly events: {
+        readonly indexes: readonly [
+          {
+            readonly keys: readonly [
+              { readonly field: 'userId'; readonly direction: 1 },
+              { readonly field: 'timestamp'; readonly direction: -1 },
+            ];
+          },
+          {
+            readonly keys: readonly [{ readonly field: 'timestamp'; readonly direction: 1 }];
+            readonly expireAfterSeconds: 7776000;
+          },
+        ];
+        readonly validator: {
+          readonly jsonSchema: {
+            readonly bsonType: 'object';
+            readonly properties: {
+              readonly _id: { readonly bsonType: 'objectId' };
+              readonly userId: { readonly bsonType: 'string' };
+              readonly sessionId: { readonly bsonType: 'string' };
+              readonly type: { readonly bsonType: 'string' };
+              readonly timestamp: { readonly bsonType: 'date' };
+            };
+            readonly required: readonly ['_id', 'sessionId', 'timestamp', 'type', 'userId'];
+          };
+          readonly validationLevel: 'strict';
+          readonly validationAction: 'error';
+        };
+      };
+      readonly viewProductEvent: {
+        readonly validator: {
+          readonly jsonSchema: {
+            readonly bsonType: 'object';
+            readonly properties: {
+              readonly productId: { readonly bsonType: 'string' };
+              readonly subCategory: { readonly bsonType: 'string' };
+              readonly brand: { readonly bsonType: 'string' };
+              readonly exitMethod: { readonly bsonType: readonly ['null', 'string'] };
+            };
+            readonly required: readonly ['brand', 'productId', 'subCategory'];
+          };
+          readonly validationLevel: 'strict';
+          readonly validationAction: 'error';
+        };
+      };
+      readonly searchEvent: {
+        readonly validator: {
+          readonly jsonSchema: {
+            readonly bsonType: 'object';
+            readonly properties: { readonly query: { readonly bsonType: 'string' } };
+            readonly required: readonly ['query'];
+          };
+          readonly validationLevel: 'strict';
+          readonly validationAction: 'error';
+        };
+      };
+      readonly addToCartEvent: {
+        readonly validator: {
+          readonly jsonSchema: {
+            readonly bsonType: 'object';
+            readonly properties: {
+              readonly productId: { readonly bsonType: 'string' };
+              readonly brand: { readonly bsonType: 'string' };
+            };
+            readonly required: readonly ['brand', 'productId'];
+          };
+          readonly validationLevel: 'strict';
+          readonly validationAction: 'error';
+        };
+      };
     };
     readonly storageHash: StorageHash;
   },
