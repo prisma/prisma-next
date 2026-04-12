@@ -313,7 +313,7 @@ function parseJsonArg(raw: string | undefined): Record<string, unknown> | undefi
 
 function parseCollation(
   attr: import('@prisma-next/psl-parser').PslAttribute,
-): Record<string, unknown> | undefined {
+): Record<string, unknown> | null | undefined {
   const locale = stripQuotesHelper(getNamedArgument(attr, 'collationLocale'));
   if (!locale) {
     const hasAnyCollationArg =
