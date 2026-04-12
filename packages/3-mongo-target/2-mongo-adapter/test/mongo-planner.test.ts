@@ -979,6 +979,26 @@ describe('MongoMigrationPlanner', () => {
       expect(result.conflicts.some((c) => c.summary.includes('immutable'))).toBe(true);
     });
 
+    it('treats reordered collation keys as equivalent (no conflict)', () => {
+      const contract = makeContract({
+        users: {
+          options: { collation: { strength: 2, locale: 'en' } },
+        },
+      });
+      const origin: MongoSchemaIR = {
+        collections: {
+          users: new MongoSchemaCollection({
+            name: 'users',
+            options: new MongoSchemaCollectionOptions({
+              collation: { locale: 'en', strength: 2 },
+            }),
+          }),
+        },
+      };
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(0);
+    });
+
     it('classifies enabling changeStreamPreAndPostImages as widening', () => {
       const contract = makeContract({
         events: {
