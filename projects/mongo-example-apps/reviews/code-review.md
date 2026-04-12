@@ -208,6 +208,8 @@ This is a consolidated list of every framework issue that forced a cast, workaro
 | F16 | `@unique`/`@@index` not supported in Mongo PSL | No indexes in schema; blocks F13 | — |
 | F17 | Change stream support not available | Can't demonstrate real-time order updates | — |
 | F18 | ORM doesn't expose typed `$push`/`$pull` array operators | Forced to use untyped `mongoRaw` | 3 data access functions |
+| F20 | Embedded models via `owner` not supported end-to-end | Contract schema and emitter accept `owner`, but PSL has no `@@owner` attribute and the ORM has no embedded entity CRUD handling. Can't demonstrate embedded entities (as distinct from value objects) in PSL-authored apps. | — |
+| F21 | Polymorphism not demonstrated in retail store | `@@discriminator`/`@@base` are supported in PSL and ORM, but the retail store doesn't use them. The `Event` model is a natural polymorphic collection (page view, search, add-to-cart events with different metadata shapes). | — |
 
 ## Deferred (out of scope)
 
