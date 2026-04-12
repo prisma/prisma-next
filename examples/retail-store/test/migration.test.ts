@@ -27,17 +27,14 @@ describe('migration', { timeout: timeouts.spinUpDbServer }, () => {
 
   it('contract contains expected index definitions', () => {
     const { contract } = validateMongoContract<Contract>(contractJson);
-    const collections = contract.storage.collections as Record<
-      string,
-      { indexes?: Array<{ fields: Record<string, number>; options?: { unique?: boolean } }> }
-    >;
+    const { collections } = contract.storage;
 
-    expect(collections['users']?.indexes).toEqual([
+    expect(collections.users.indexes).toEqual([
       { fields: { email: 1 }, options: { unique: true } },
     ]);
-    expect(collections['carts']?.indexes).toEqual([{ fields: { userId: 1 } }]);
-    expect(collections['orders']?.indexes).toEqual([{ fields: { userId: 1 } }]);
-    expect(collections['events']?.indexes).toEqual([{ fields: { userId: 1 } }]);
+    expect(collections.carts.indexes).toEqual([{ fields: { userId: 1 } }]);
+    expect(collections.orders.indexes).toEqual([{ fields: { userId: 1 } }]);
+    expect(collections.events.indexes).toEqual([{ fields: { userId: 1 } }]);
   });
 
   it('creates indexes from migration ops and verifies they exist', async () => {
