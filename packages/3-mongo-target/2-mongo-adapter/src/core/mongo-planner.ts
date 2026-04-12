@@ -252,10 +252,11 @@ function hasImmutableOptionChange(
   origin: MongoSchemaCollectionOptions | undefined,
   dest: MongoSchemaCollectionOptions | undefined,
 ): string | undefined {
-  if (!deepEqual(origin?.capped, dest?.capped)) return 'capped';
-  if (!deepEqual(origin?.timeseries, dest?.timeseries)) return 'timeseries';
-  if (!deepEqual(origin?.collation, dest?.collation)) return 'collation';
-  if (!deepEqual(origin?.clusteredIndex, dest?.clusteredIndex)) return 'clusteredIndex';
+  if (canonicalize(origin?.capped) !== canonicalize(dest?.capped)) return 'capped';
+  if (canonicalize(origin?.timeseries) !== canonicalize(dest?.timeseries)) return 'timeseries';
+  if (canonicalize(origin?.collation) !== canonicalize(dest?.collation)) return 'collation';
+  if (canonicalize(origin?.clusteredIndex) !== canonicalize(dest?.clusteredIndex))
+    return 'clusteredIndex';
   return undefined;
 }
 

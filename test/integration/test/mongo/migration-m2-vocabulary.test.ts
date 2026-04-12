@@ -581,7 +581,7 @@ describe('MongoDB migration M2 vocabulary E2E', { timeout: timeouts.spinUpDbServ
         {
           clustered: {
             options: {
-              clusteredIndex: { name: 'myCluster' },
+              clusteredIndex: { key: { _id: 1 }, unique: true, name: 'myCluster' },
             },
           },
         },
