@@ -829,7 +829,8 @@ model Post {
         expect(contractDts).toContain("readonly discriminator: { readonly field: 'type' }");
         expect(contractDts).toContain('readonly users: {');
         expect(contractDts).toContain('readonly indexes:');
-        expect(contractDts).toContain('readonly email: 1');
+        expect(contractDts).toContain("readonly field: 'email'");
+        expect(contractDts).toContain('readonly direction: 1');
         expect(contractDts).toContain('readonly unique: true');
         expect(contractDts).toContain('readonly options:');
         expect(contractDts).toContain(
