@@ -40,10 +40,14 @@ function interpretOk(
 }
 
 function getIndexes(
-  ir: Record<string, unknown>,
+  ir: unknown,
   collectionName: string,
 ): ReadonlyArray<Record<string, unknown>> | undefined {
-  const storage = ir.storage as unknown as Record<string, Record<string, Record<string, unknown>>>;
+  const contract = ir as Record<string, unknown>;
+  const storage = contract['storage'] as unknown as Record<
+    string,
+    Record<string, Record<string, unknown>>
+  >;
   return storage['collections']?.[collectionName]?.['indexes'] as
     | ReadonlyArray<Record<string, unknown>>
     | undefined;
