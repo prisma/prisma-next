@@ -13,7 +13,7 @@ async function main() {
     process.exit(1);
   }
 
-  const dbName = process.env['MONGODB_DB'] ?? 'retail_store';
+  const dbName = process.env['MONGODB_DB'] ?? 'retail-store';
 
   console.log('Connecting to MongoDB...');
   const db = await createClient(url, dbName);
