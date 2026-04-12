@@ -71,16 +71,18 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpDbServer }, 
       timestamp: new Date('2026-03-02T14:00:00Z'),
     });
     expect(shipped).not.toBeNull();
-    expect(shipped!.statusHistory).toHaveLength(2);
+    expect(shipped!['statusHistory']).toHaveLength(2);
 
     const delivered = await updateOrderStatus(ctx.db, order._id as string, {
       status: 'delivered',
       timestamp: new Date('2026-03-04T09:00:00Z'),
     });
     expect(delivered).not.toBeNull();
-    expect(delivered!.statusHistory).toHaveLength(3);
+    expect(delivered!['statusHistory']).toHaveLength(3);
 
-    const statuses = delivered!.statusHistory.map((s) => s.status);
+    const statuses = (delivered!['statusHistory'] as Array<{ status: string }>).map(
+      (s) => s.status,
+    );
     expect(statuses).toEqual(['placed', 'shipped', 'delivered']);
   });
 
