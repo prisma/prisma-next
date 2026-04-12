@@ -19,7 +19,7 @@ import {
   getNamedArgument,
   getPositionalArgument,
   lowerFirst,
-  parseFieldList,
+  parseIndexFieldList,
   parseQuotedStringLiteral,
   parseRelationAttribute,
 } from './psl-helpers';
@@ -299,7 +299,7 @@ function parseBooleanArg(raw: string | undefined): boolean | undefined {
 
 function parseJsonArg(raw: string | undefined): Record<string, unknown> | undefined {
   if (!raw) return undefined;
-  const stripped = raw.replace(/^["']/, '').replace(/["']$/, '');
+  const stripped = raw.replace(/^["']/, '').replace(/["']$/, '').replace(/\\"/g, '"');
   try {
     const parsed = JSON.parse(stripped);
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
@@ -311,12 +311,76 @@ function parseJsonArg(raw: string | undefined): Record<string, unknown> | undefi
   return undefined;
 }
 
+function parseCollation(
+  attr: import('@prisma-next/psl-parser').PslAttribute,
+): Record<string, unknown> | undefined {
+  const locale = stripQuotesHelper(getNamedArgument(attr, 'collationLocale'));
+  if (!locale) {
+    const hasAnyCollationArg =
+      getNamedArgument(attr, 'collationStrength') != null ||
+      getNamedArgument(attr, 'collationCaseLevel') != null ||
+      getNamedArgument(attr, 'collationCaseFirst') != null ||
+      getNamedArgument(attr, 'collationNumericOrdering') != null ||
+      getNamedArgument(attr, 'collationAlternate') != null ||
+      getNamedArgument(attr, 'collationMaxVariable') != null ||
+      getNamedArgument(attr, 'collationBackwards') != null ||
+      getNamedArgument(attr, 'collationNormalization') != null;
+    return hasAnyCollationArg ? null : undefined;
+  }
+
+  const collation: Record<string, unknown> = { locale };
+  const strength = parseNumericArg(getNamedArgument(attr, 'collationStrength'));
+  if (strength != null) collation['strength'] = strength;
+  const caseLevel = parseBooleanArg(getNamedArgument(attr, 'collationCaseLevel'));
+  if (caseLevel != null) collation['caseLevel'] = caseLevel;
+  const caseFirst = stripQuotesHelper(getNamedArgument(attr, 'collationCaseFirst'));
+  if (caseFirst != null) collation['caseFirst'] = caseFirst;
+  const numericOrdering = parseBooleanArg(getNamedArgument(attr, 'collationNumericOrdering'));
+  if (numericOrdering != null) collation['numericOrdering'] = numericOrdering;
+  const alternate = stripQuotesHelper(getNamedArgument(attr, 'collationAlternate'));
+  if (alternate != null) collation['alternate'] = alternate;
+  const maxVariable = stripQuotesHelper(getNamedArgument(attr, 'collationMaxVariable'));
+  if (maxVariable != null) collation['maxVariable'] = maxVariable;
+  const backwards = parseBooleanArg(getNamedArgument(attr, 'collationBackwards'));
+  if (backwards != null) collation['backwards'] = backwards;
+  const normalization = parseBooleanArg(getNamedArgument(attr, 'collationNormalization'));
+  if (normalization != null) collation['normalization'] = normalization;
+  return collation;
+}
+
+function stripQuotesHelper(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  return raw.replace(/^["']/, '').replace(/["']$/, '');
+}
+
+function parseProjectionList(
+  raw: string | undefined,
+  value: 0 | 1,
+): Record<string, 0 | 1> | undefined {
+  if (!raw) return undefined;
+  const stripped = raw.replace(/^["']/, '').replace(/["']$/, '');
+  const inner = stripped.replace(/^\[/, '').replace(/\]$/, '').trim();
+  if (inner.length === 0) return undefined;
+  const fields = inner
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  const result: Record<string, 0 | 1> = {};
+  for (const f of fields) {
+    result[f] = value;
+  }
+  return result;
+}
+
 function collectIndexes(
   pslModel: PslModel,
   fieldMappings: FieldMappings,
   modelNames: ReadonlySet<string>,
+  sourceId: string,
+  diagnostics: ContractSourceDiagnostic[],
 ): MongoStorageIndex[] {
   const indexes: MongoStorageIndex[] = [];
+  let textIndexCount = 0;
 
   for (const field of pslModel.fields) {
     if (modelNames.has(field.typeName)) continue;
@@ -330,24 +394,163 @@ function collectIndexes(
   }
 
   for (const attr of pslModel.attributes) {
-    if (attr.name !== 'index' && attr.name !== 'unique') continue;
+    const isIndex = attr.name === 'index';
+    const isUnique = attr.name === 'unique';
+    const isTextIndex = attr.name === 'textIndex';
+    if (!isIndex && !isUnique && !isTextIndex) continue;
 
     const fieldsArg = getPositionalArgument(attr, 0);
     if (!fieldsArg) continue;
-    const fieldNames = parseFieldList(fieldsArg);
-    if (fieldNames.length === 0) continue;
+    const parsedFields = parseIndexFieldList(fieldsArg);
+    if (parsedFields.length === 0) continue;
+
+    const hasWildcard = parsedFields.some((f) => f.isWildcard);
+    const wildcardCount = parsedFields.filter((f) => f.isWildcard).length;
+
+    if (wildcardCount > 1) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'An index can contain at most one wildcard() field',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    if (isUnique && hasWildcard) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'Unique indexes cannot use wildcard() fields',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    if (isTextIndex) {
+      textIndexCount++;
+      if (textIndexCount > 1) {
+        diagnostics.push({
+          code: 'PSL_INVALID_INDEX',
+          message: `Only one @@textIndex is allowed per collection (model "${pslModel.name}")`,
+          sourceId,
+          span: attr.span,
+        });
+        continue;
+      }
+
+      if (hasWildcard) {
+        diagnostics.push({
+          code: 'PSL_INVALID_INDEX',
+          message:
+            'wildcard() fields cannot be combined with type: hashed/2dsphere/2d or @@textIndex',
+          sourceId,
+          span: attr.span,
+        });
+        continue;
+      }
+    }
 
     const typeArg = getNamedArgument(attr, 'type');
-    const direction = parseIndexDirection(typeArg);
+    const defaultDirection: MongoIndexKeyDirection = isTextIndex
+      ? 'text'
+      : parseIndexDirection(typeArg);
 
-    const keys = fieldNames.map((name) => ({
-      field: fieldMappings.pslNameToMapped.get(name) ?? name,
-      direction,
-    }));
+    if (
+      hasWildcard &&
+      typeof defaultDirection === 'string' &&
+      ['hashed', '2dsphere', '2d'].includes(defaultDirection)
+    ) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: `wildcard() fields cannot be combined with type: ${defaultDirection}`,
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
 
-    const unique = attr.name === 'unique' ? true : undefined;
-    const sparse = parseBooleanArg(getNamedArgument(attr, 'sparse'));
-    const expireAfterSeconds = parseNumericArg(getNamedArgument(attr, 'expireAfterSeconds'));
+    if (defaultDirection === 'hashed' && parsedFields.length > 1) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'Hashed indexes must have exactly one field',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    const keys = parsedFields.map((pf) => {
+      const mappedName = pf.isWildcard
+        ? pf.name.replace(/^(.+)\.\$\*\*$/, (_, prefix: string) => {
+            const mapped = fieldMappings.pslNameToMapped.get(prefix);
+            return mapped ? `${mapped}.$**` : `${prefix}.$**`;
+          })
+        : (fieldMappings.pslNameToMapped.get(pf.name) ?? pf.name);
+      const direction: MongoIndexKeyDirection =
+        pf.direction != null ? (pf.direction as MongoIndexKeyDirection) : defaultDirection;
+      return { field: mappedName, direction };
+    });
+
+    const unique = isUnique ? true : undefined;
+    const sparse = isTextIndex ? undefined : parseBooleanArg(getNamedArgument(attr, 'sparse'));
+    const expireAfterSeconds = isTextIndex
+      ? undefined
+      : parseNumericArg(getNamedArgument(attr, 'expireAfterSeconds'));
+
+    if (hasWildcard && expireAfterSeconds != null) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'expireAfterSeconds cannot be combined with wildcard() fields',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    const partialFilterExpression = parseJsonArg(getNamedArgument(attr, 'filter'));
+
+    const includeArg = getNamedArgument(attr, 'include');
+    const excludeArg = getNamedArgument(attr, 'exclude');
+
+    if (includeArg != null && excludeArg != null) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'Cannot specify both include and exclude on the same index',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    if ((includeArg != null || excludeArg != null) && !hasWildcard) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message:
+          'include/exclude options are only valid when the index contains a wildcard() field',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    const wildcardProjection =
+      includeArg != null
+        ? parseProjectionList(includeArg, 1)
+        : excludeArg != null
+          ? parseProjectionList(excludeArg, 0)
+          : undefined;
+
+    const collation = parseCollation(attr);
+    if (collation === null) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'collationLocale is required when using collation options',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
 
     const rawWeights = parseJsonArg(getNamedArgument(attr, 'weights'));
     let weights: Record<string, number> | undefined;
@@ -358,21 +561,22 @@ function collectIndexes(
       }
     }
 
-    const rawDefaultLang = getNamedArgument(attr, 'default_language');
-    const default_language = rawDefaultLang
-      ? rawDefaultLang.replace(/^["']/, '').replace(/["']$/, '')
-      : undefined;
+    const rawDefaultLang = isTextIndex
+      ? getNamedArgument(attr, 'language')
+      : getNamedArgument(attr, 'default_language');
+    const default_language = stripQuotesHelper(rawDefaultLang);
 
-    const rawLangOverride = getNamedArgument(attr, 'language_override');
-    const language_override = rawLangOverride
-      ? rawLangOverride.replace(/^["']/, '').replace(/["']$/, '')
-      : undefined;
+    const rawLangOverride = getNamedArgument(attr, 'languageOverride');
+    const language_override = stripQuotesHelper(rawLangOverride);
 
     const index: MongoStorageIndex = {
       keys,
       ...(unique != null && { unique }),
       ...(sparse != null && { sparse }),
       ...(expireAfterSeconds != null && { expireAfterSeconds }),
+      ...(partialFilterExpression != null && { partialFilterExpression }),
+      ...(wildcardProjection != null && { wildcardProjection }),
+      ...(collation != null && { collation }),
       ...(weights != null && { weights }),
       ...(default_language != null && { default_language }),
       ...(language_override != null && { language_override }),
@@ -533,7 +737,7 @@ export function interpretPslDocumentToMongoContract(
     }
 
     models[pslModel.name] = { fields, relations, storage: { collection: collectionName } };
-    const modelIndexes = collectIndexes(pslModel, fieldMappings, modelNames);
+    const modelIndexes = collectIndexes(pslModel, fieldMappings, modelNames, sourceId, diagnostics);
     collections[collectionName] = modelIndexes.length > 0 ? { indexes: modelIndexes } : {};
     roots[collectionName] = pslModel.name;
   }
