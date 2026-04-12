@@ -57,6 +57,9 @@ model Product {
   image          Image
   embedding      Float[]?
   @@map("products")
+  @@textIndex([name, description], weights: "{\"name\": 10, \"description\": 1}")
+  @@index([brand, subCategory])
+  @@index([code], type: "hashed")
 }
 
 model User {
@@ -99,6 +102,7 @@ model Location {
   postalCode      String
   country         String
   @@map("locations")
+  @@index([city, country], collationLocale: "en", collationStrength: 2)
 }
 
 model Invoice {
@@ -111,6 +115,8 @@ model Invoice {
   issuedAt DateTime
   order    Order             @relation(fields: [orderId], references: [id])
   @@map("invoices")
+  @@index([orderId])
+  @@index([issuedAt(sort: Desc)], sparse: true)
 }
 
 model Event {
@@ -121,7 +127,8 @@ model Event {
   timestamp DateTime
   @@map("events")
   @@discriminator(type)
-  @@index([userId])
+  @@index([userId, timestamp(sort: Desc)])
+  @@index([timestamp], expireAfterSeconds: 7776000)
 }
 
 model ViewProductEvent {
