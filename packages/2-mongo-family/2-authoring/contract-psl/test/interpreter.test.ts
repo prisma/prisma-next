@@ -39,6 +39,16 @@ function interpretOk(
   return result.value;
 }
 
+function getIndexes(
+  ir: Record<string, unknown>,
+  collectionName: string,
+): ReadonlyArray<Record<string, unknown>> | undefined {
+  const storage = ir.storage as unknown as Record<string, Record<string, Record<string, unknown>>>;
+  return storage['collections']?.[collectionName]?.['indexes'] as
+    | ReadonlyArray<Record<string, unknown>>
+    | undefined;
+}
+
 describe('interpretPslDocumentToMongoContract', () => {
   describe('scalar type mapping', () => {
     it('maps standard PSL types to Mongo codec IDs', () => {
@@ -912,6 +922,406 @@ describe('interpretPslDocumentToMongoContract', () => {
       >;
       const userColl = storage['collections']?.['user'];
       expect(userColl?.['indexes']).toBeUndefined();
+    });
+
+    it('creates wildcard index from wildcard()', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard()])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['keys']).toEqual([{ field: '$**', direction: 1 }]);
+    });
+
+    it('creates scoped wildcard index from wildcard(field)', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard(metadata)])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['keys']).toEqual([{ field: 'metadata.$**', direction: 1 }]);
+    });
+
+    it('creates compound wildcard index', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          tenantId String
+          metadata String
+          @@index([tenantId, wildcard(metadata)])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['keys']).toEqual([
+        { field: 'tenantId', direction: 1 },
+        { field: 'metadata.$**', direction: 1 },
+      ]);
+    });
+
+    it('applies @map to scoped wildcard field', () => {
+      const ir = interpretOk(`
+        model Events {
+          id   ObjectId @id @map("_id")
+          meta String   @map("metadata")
+          @@index([wildcard(meta)])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['keys']).toEqual([{ field: 'metadata.$**', direction: 1 }]);
+    });
+
+    it('creates descending index from sort: Desc', () => {
+      const ir = interpretOk(`
+        model Events {
+          id        ObjectId @id @map("_id")
+          createdAt DateTime
+          @@index([createdAt(sort: Desc)])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['keys']).toEqual([{ field: 'createdAt', direction: -1 }]);
+    });
+
+    it('creates mixed-direction compound index', () => {
+      const ir = interpretOk(`
+        model Events {
+          id        ObjectId @id @map("_id")
+          status    String
+          createdAt DateTime
+          @@index([status, createdAt(sort: Desc)])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['keys']).toEqual([
+        { field: 'status', direction: 1 },
+        { field: 'createdAt', direction: -1 },
+      ]);
+    });
+
+    it('creates hashed index from type: "hashed"', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          tenantId String
+          @@index([tenantId], type: "hashed")
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['keys']).toEqual([{ field: 'tenantId', direction: 'hashed' }]);
+    });
+
+    it('creates 2dsphere index', () => {
+      const ir = interpretOk(`
+        model Places {
+          id       ObjectId @id @map("_id")
+          location String
+          @@index([location], type: "2dsphere")
+        }
+      `);
+      const indexes = getIndexes(ir, 'places');
+      expect(indexes![0]!['keys']).toEqual([{ field: 'location', direction: '2dsphere' }]);
+    });
+
+    it('parses filter as partialFilterExpression', () => {
+      const ir = interpretOk(`
+        model Events {
+          id     ObjectId @id @map("_id")
+          status String
+          @@index([status], filter: "{\\"status\\": \\"active\\"}")
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['partialFilterExpression']).toEqual({ status: 'active' });
+    });
+
+    it('parses collation from named scalar arguments', () => {
+      const ir = interpretOk(`
+        model Events {
+          id     ObjectId @id @map("_id")
+          status String
+          @@index([status], collationLocale: "fr", collationStrength: 2)
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['collation']).toEqual({ locale: 'fr', strength: 2 });
+    });
+
+    it('parses all collation arguments', () => {
+      const ir = interpretOk(`
+        model Events {
+          id     ObjectId @id @map("_id")
+          status String
+          @@index([status], collationLocale: "en", collationStrength: 2, collationCaseLevel: true, collationCaseFirst: "upper", collationNumericOrdering: true, collationAlternate: "shifted", collationMaxVariable: "punct", collationBackwards: false, collationNormalization: true)
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['collation']).toEqual({
+        locale: 'en',
+        strength: 2,
+        caseLevel: true,
+        caseFirst: 'upper',
+        numericOrdering: true,
+        alternate: 'shifted',
+        maxVariable: 'punct',
+        backwards: false,
+        normalization: true,
+      });
+    });
+
+    it('parses include as wildcardProjection with 1 values', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          tags     String
+          @@index([wildcard()], include: "[metadata, tags]")
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['wildcardProjection']).toEqual({ metadata: 1, tags: 1 });
+    });
+
+    it('parses exclude as wildcardProjection with 0 values', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          internal String
+          @@index([wildcard()], exclude: "[internal, _class]")
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['wildcardProjection']).toEqual({ internal: 0, _class: 0 });
+    });
+
+    it('creates @@textIndex with direction text', () => {
+      const ir = interpretOk(`
+        model Article {
+          id    ObjectId @id @map("_id")
+          title String
+          body  String
+          @@textIndex([title, body])
+        }
+      `);
+      const indexes = getIndexes(ir, 'article');
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['keys']).toEqual([
+        { field: 'title', direction: 'text' },
+        { field: 'body', direction: 'text' },
+      ]);
+    });
+
+    it('creates @@textIndex with weights and language options', () => {
+      const ir = interpretOk(`
+        model Article {
+          id    ObjectId @id @map("_id")
+          title String
+          body  String
+          @@textIndex([title, body], weights: "{\\"title\\": 10, \\"body\\": 5}", language: "english", languageOverride: "idioma")
+        }
+      `);
+      const indexes = getIndexes(ir, 'article');
+      expect(indexes![0]!['weights']).toEqual({ title: 10, body: 5 });
+      expect(indexes![0]!['default_language']).toBe('english');
+      expect(indexes![0]!['language_override']).toBe('idioma');
+    });
+
+    it('creates @@unique with collation', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@unique([email], collationLocale: "en", collationStrength: 2)
+        }
+      `);
+      const indexes = getIndexes(ir, 'user');
+      expect(indexes![0]!['unique']).toBe(true);
+      expect(indexes![0]!['collation']).toEqual({ locale: 'en', strength: 2 });
+    });
+
+    it('creates @@unique with filter', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@unique([email], filter: "{\\"active\\": true}")
+        }
+      `);
+      const indexes = getIndexes(ir, 'user');
+      expect(indexes![0]!['unique']).toBe(true);
+      expect(indexes![0]!['partialFilterExpression']).toEqual({ active: true });
+    });
+  });
+
+  describe('index validation', () => {
+    it('rejects multiple wildcard() fields in one index', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          tags     String
+          @@index([wildcard(metadata), wildcard(tags)])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) => d.message.includes('at most one wildcard()')),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects wildcard() in @@unique', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@unique([wildcard(metadata)])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('Unique indexes cannot use wildcard()'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects include and exclude on the same index', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard()], include: "[metadata]", exclude: "[_class]")
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('Cannot specify both include and exclude'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects include/exclude without wildcard', () => {
+      const result = interpret(`
+        model Events {
+          id     ObjectId @id @map("_id")
+          status String
+          @@index([status], include: "[status]")
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('only valid when the index contains a wildcard()'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects TTL with wildcard', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard()], expireAfterSeconds: 3600)
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('expireAfterSeconds cannot be combined with wildcard()'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects wildcard with hashed type', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard()], type: "hashed")
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('wildcard() fields cannot be combined with type'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects multiple @@textIndex on same collection', () => {
+      const result = interpret(`
+        model Article {
+          id    ObjectId @id @map("_id")
+          title String
+          body  String
+          @@textIndex([title])
+          @@textIndex([body])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('Only one @@textIndex is allowed'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects hashed index with multiple fields', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          tenantId String
+          status   String
+          @@index([tenantId, status], type: "hashed")
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('Hashed indexes must have exactly one field'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects collation options without collationLocale', () => {
+      const result = interpret(`
+        model Events {
+          id     ObjectId @id @map("_id")
+          status String
+          @@index([status], collationStrength: 2)
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) => d.message.includes('collationLocale is required')),
+        ).toBe(true);
+      }
     });
   });
 
