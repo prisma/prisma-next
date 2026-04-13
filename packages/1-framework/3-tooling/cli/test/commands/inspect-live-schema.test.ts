@@ -259,4 +259,23 @@ describe('inspectLiveSchema', () => {
     );
     expect(mocks.closeMock).toHaveBeenCalledTimes(1);
   });
+
+  it('passes non-SQL schema IR through without validatePrintableSqlSchemaIR', async () => {
+    const mongoSchemaIR = { collections: { users: { name: 'users', indexes: [] } } };
+    mocks.loadConfigMock.mockResolvedValue({
+      ...baseConfig,
+      family: { familyId: 'mongo' },
+      target: { targetId: 'mongo' },
+      db: { connection: 'mongodb://localhost:27017/test' },
+    });
+    mocks.introspectMock.mockResolvedValue(mongoSchemaIR);
+
+    const { flags, ui } = createUi();
+    const result = await inspectLiveSchema({}, flags, ui, 0, context);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.schema).toBe(mongoSchemaIR);
+    expect(result.value.target.familyId).toBe('mongo');
+  });
 });
