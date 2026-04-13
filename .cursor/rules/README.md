@@ -62,6 +62,9 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/declarative-config.mdc` — Prefer declarative configuration over hardcoded logic
 - `architecture.config.json` — Domain/Layer/Plane map
 
+## MongoDB
+- `.cursor/rules/mongo-no-obsolete-commands.mdc` — Use `aggregate` instead of obsolete `find`/`findOne`
+
 ## SQL & Query Patterns
 - `.cursor/rules/query-patterns.mdc` — Query DSL patterns
 - `.cursor/rules/kysely-lane-boundary.mdc` — Kysely lane ownership and build-only interop boundaries
