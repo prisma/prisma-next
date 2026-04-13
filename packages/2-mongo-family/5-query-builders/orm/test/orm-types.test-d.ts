@@ -2,6 +2,12 @@ import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import type { MongoCollection } from '../src/collection';
+import type {
+  DotPath,
+  FieldAccessor,
+  FieldExpression,
+  ResolveDotPathType,
+} from '../src/field-accessor';
 import type { MongoOrmClient } from '../src/mongo-orm';
 import type {
   CreateInput,
@@ -365,4 +371,34 @@ test('include() on 1:N reference relation all() returns array type', () => {
       InferRootRow<Contract, 'User'> & { tasks: InferFullRow<Contract, 'Task'>[] }
     >
   >();
+});
+
+// --- Field accessor types ---
+
+test('FieldAccessor has FieldExpression for scalar fields', () => {
+  type Accessor = FieldAccessor<Contract, 'User'>;
+  expectTypeOf<Accessor['name']>().toExtend<FieldExpression<string>>();
+  expectTypeOf<Accessor['loginCount']>().toExtend<FieldExpression<number>>();
+});
+
+test('FieldAccessor has FieldExpression for array fields', () => {
+  type Accessor = FieldAccessor<Contract, 'User'>;
+  expectTypeOf<Accessor['tags']>().toExtend<FieldExpression<string[]>>();
+});
+
+test('DotPath resolves value object dot-paths', () => {
+  type Paths = DotPath<Contract, 'User'>;
+  expectTypeOf<'homeAddress.city'>().toExtend<Paths>();
+  expectTypeOf<'homeAddress.country'>().toExtend<Paths>();
+});
+
+test('DotPath rejects invalid paths', () => {
+  type Paths = DotPath<Contract, 'User'>;
+  expectTypeOf<'homeAddress.nonexistent'>().not.toExtend<Paths>();
+  expectTypeOf<'nonexistent.field'>().not.toExtend<Paths>();
+});
+
+test('ResolveDotPathType resolves to scalar type', () => {
+  type CityType = ResolveDotPathType<Contract, 'User', 'homeAddress.city'>;
+  expectTypeOf<CityType>().toEqualTypeOf<string>();
 });

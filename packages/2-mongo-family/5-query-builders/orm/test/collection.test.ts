@@ -9,6 +9,7 @@ import {
   type MongoSkipStage,
   type MongoSortStage,
 } from '@prisma-next/mongo-query-ast/execution';
+import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
@@ -16,6 +17,12 @@ import type { Contract } from '../../../1-foundation/mongo-contract/test/fixture
 import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { createMongoCollection } from '../src/collection';
 import type { MongoQueryExecutor } from '../src/executor';
+import {
+  compileFieldOperations,
+  createFieldAccessor,
+  type FieldAccessor,
+  type FieldOperation,
+} from '../src/field-accessor';
 
 const contract = ormContractJson as unknown as Contract;
 
@@ -223,6 +230,120 @@ describe('MongoCollection object-based where()', () => {
     col.all();
     const match = executor.lastStages![0] as MongoMatchStage;
     expect(match.filter.kind).toBe('and');
+  });
+});
+
+describe('createFieldAccessor()', () => {
+  it('property access returns FieldExpression for top-level field', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.name.set('Bob');
+    expect(op.operator).toBe('$set');
+    expect(op.field).toBe('name');
+    expect((op.value as MongoParamRef).value).toBe('Bob');
+  });
+
+  it('set() produces $set operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.name.set('Alice');
+    expect(op.operator).toBe('$set');
+    expect(op.field).toBe('name');
+  });
+
+  it('unset() produces $unset operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.name.unset();
+    expect(op.operator).toBe('$unset');
+    expect(op.field).toBe('name');
+  });
+
+  it('inc() produces $inc operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.loginCount.inc(1);
+    expect(op.operator).toBe('$inc');
+    expect(op.field).toBe('loginCount');
+    expect((op.value as MongoParamRef).value).toBe(1);
+  });
+
+  it('mul() produces $mul operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.loginCount.mul(2);
+    expect(op.operator).toBe('$mul');
+    expect(op.field).toBe('loginCount');
+    expect((op.value as MongoParamRef).value).toBe(2);
+  });
+
+  it('push() produces $push operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.tags.push('admin');
+    expect(op.operator).toBe('$push');
+    expect(op.field).toBe('tags');
+    expect((op.value as MongoParamRef).value).toBe('admin');
+  });
+
+  it('pull() produces $pull operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.tags.pull('admin');
+    expect(op.operator).toBe('$pull');
+    expect(op.field).toBe('tags');
+    expect((op.value as MongoParamRef).value).toBe('admin');
+  });
+
+  it('addToSet() produces $addToSet operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.tags.addToSet('admin');
+    expect(op.operator).toBe('$addToSet');
+    expect(op.field).toBe('tags');
+  });
+
+  it('pop() produces $pop operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.tags.pop(1);
+    expect(op.operator).toBe('$pop');
+    expect(op.field).toBe('tags');
+    expect((op.value as MongoParamRef).value).toBe(1);
+  });
+
+  it('call signature returns FieldExpression for dot-path', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u('homeAddress.city').set('NYC');
+    expect(op.operator).toBe('$set');
+    expect(op.field).toBe('homeAddress.city');
+    expect((op.value as MongoParamRef).value).toBe('NYC');
+  });
+});
+
+describe('compileFieldOperations()', () => {
+  const identity = (_field: string, value: MongoValue) => value;
+
+  it('groups operations by operator', () => {
+    const ops: FieldOperation[] = [
+      { operator: '$set', field: 'name', value: new MongoParamRef('Alice') },
+      { operator: '$inc', field: 'loginCount', value: new MongoParamRef(1) },
+      { operator: '$set', field: 'email', value: new MongoParamRef('a@b.c') },
+    ];
+    const result = compileFieldOperations(ops, identity);
+    expect(result).toEqual({
+      $set: {
+        name: new MongoParamRef('Alice'),
+        email: new MongoParamRef('a@b.c'),
+      },
+      $inc: {
+        loginCount: new MongoParamRef(1),
+      },
+    });
+  });
+
+  it('applies wrapValue to each operation', () => {
+    const ops: FieldOperation[] = [
+      { operator: '$set', field: 'name', value: new MongoParamRef('Alice') },
+    ];
+    const wrap = (_field: string, value: MongoValue) =>
+      new MongoParamRef((value as MongoParamRef).value, { codecId: 'mongo/string@1' });
+    const result = compileFieldOperations(ops, wrap) as Record<
+      string,
+      Record<string, MongoParamRef>
+    >;
+    expect(result['$set']!['name']!.codecId).toBe('mongo/string@1');
   });
 });
 
@@ -514,6 +635,88 @@ describe('MongoCollection write methods', () => {
         const nameRef = update['$set']!['name']!;
         expect(nameRef).toBeInstanceOf(MongoParamRef);
         expect(nameRef.codecId).toBe('mongo/string@1');
+      }
+    });
+  });
+
+  describe('update() with callback', () => {
+    it('produces correct update doc from field operations', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1', name: 'Updated' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col
+        .where(MongoFieldFilter.eq('_id', 'id-1'))
+        .update((u) => [u.name.set('Updated'), u.loginCount.inc(1)]);
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('findOneAndUpdate');
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        expect(update['$set']!['name']).toBeInstanceOf(MongoParamRef);
+        expect(update['$inc']!['loginCount']).toBeInstanceOf(MongoParamRef);
+      }
+    });
+
+    it('applies codec to callback operations for scalar fields', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1', name: 'Updated' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update((u) => [u.name.set('Updated')]);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        expect(update['$set']!['name']!.codecId).toBe('mongo/string@1');
+      }
+    });
+
+    it('produces $push operations from callback', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update((u) => [u.tags.push('admin')]);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        expect(update['$push']).toBeDefined();
+        expect(update['$push']!['tags']).toBeInstanceOf(MongoParamRef);
+      }
+    });
+
+    it('produces dot-path operations from callback', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col
+        .where(MongoFieldFilter.eq('_id', 'id-1'))
+        .update((u) => [u('homeAddress.city').set('NYC')]);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        expect(update['$set']!['homeAddress.city']).toBeInstanceOf(MongoParamRef);
+        expect(update['$set']!['homeAddress.city']!.codecId).toBe('mongo/string@1');
+      }
+    });
+  });
+
+  describe('updateCount() with callback', () => {
+    it('produces correct update doc from field operations', async () => {
+      const executor = createMockExecutor([{ modifiedCount: 1 }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      const count = await col
+        .where(MongoFieldFilter.eq('email', 'a'))
+        .updateCount((u) => [u.name.set('X')]);
+      expect(count).toBe(1);
+    });
+  });
+
+  describe('upsert() with callback', () => {
+    it('uses field operations for update part', async () => {
+      const executor = createMockExecutor([{ _id: 'new-id' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
+        create: defaultUserData,
+        update: (u: FieldAccessor<Contract, 'User'>) => [u.loginCount.inc(1)],
+      });
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        expect(update['$inc']!['loginCount']).toBeInstanceOf(MongoParamRef);
+        expect(update['$setOnInsert']).toBeDefined();
       }
     });
   });
