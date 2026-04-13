@@ -1,4 +1,5 @@
 import { createDbSchemaCommand } from '@prisma-next/cli/commands/db-schema';
+import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -19,9 +20,7 @@ function extractJson(lines: string[]): unknown {
   return JSON.parse(joined.slice(start, end + 1));
 }
 
-const MONGO_STARTUP_TIMEOUT = 60_000;
-
-describe('mongo db schema command (e2e)', { timeout: MONGO_STARTUP_TIMEOUT }, () => {
+describe('mongo db schema command (e2e)', { timeout: timeouts.spinUpDbServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let db: Db;
@@ -30,7 +29,7 @@ describe('mongo db schema command (e2e)', { timeout: MONGO_STARTUP_TIMEOUT }, ()
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
-      instanceOpts: [{ launchTimeout: MONGO_STARTUP_TIMEOUT, storageEngine: 'wiredTiger' }],
+      instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
       replSet: { count: 1, storageEngine: 'wiredTiger', dbName },
     });
     const baseUri = replSet.getUri();
@@ -40,7 +39,7 @@ describe('mongo db schema command (e2e)', { timeout: MONGO_STARTUP_TIMEOUT }, ()
     client = new MongoClient(replSet.getUri());
     await client.connect();
     db = client.db(dbName);
-  }, MONGO_STARTUP_TIMEOUT);
+  }, timeouts.spinUpDbServer);
 
   beforeAll(async () => {
     await db.createCollection('users');
@@ -54,12 +53,12 @@ describe('mongo db schema command (e2e)', { timeout: MONGO_STARTUP_TIMEOUT }, ()
     } catch {
       // ignore cleanup errors
     }
-  }, MONGO_STARTUP_TIMEOUT);
+  }, timeouts.spinUpDbServer);
 
   withTempDir(({ createTempDir }) => {
     let consoleOutput: string[] = [];
     let consoleErrors: string[] = [];
-    let cleanupMocks: () => void;
+    let cleanupMocks: () => void = () => {};
 
     beforeEach(() => {
       const mocks = setupCommandMocks();
