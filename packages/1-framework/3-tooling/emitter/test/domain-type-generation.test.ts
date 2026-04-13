@@ -8,12 +8,12 @@ import type { TypesImportSpec } from '@prisma-next/framework-components/emission
 import { describe, expect, it, vi } from 'vitest';
 import {
   deduplicateImports,
+  generateBothFieldTypesMaps,
   generateCodecTypeIntersection,
   generateContractFieldDescriptor,
   generateFieldInputTypesMap,
   generateFieldOutputTypesMap,
   generateFieldResolvedType,
-  generateFieldTypesMap,
   generateHashTypeAliases,
   generateImportLines,
   generateModelFieldsType,
@@ -23,6 +23,7 @@ import {
   generateValueObjectsDescriptorType,
   generateValueObjectType,
   generateValueObjectTypeAliases,
+  resolveFieldType,
   serializeExecutionType,
   serializeObjectKey,
   serializeValue,
@@ -934,8 +935,8 @@ describe('generateFieldInputTypesMap', () => {
   });
 });
 
-describe('generateFieldTypesMap', () => {
-  it('generates output side map', () => {
+describe('generateBothFieldTypesMaps', () => {
+  it('generates both output and input maps in a single pass', () => {
     const models: Record<string, ContractModel> = {
       User: {
         fields: {
@@ -945,21 +946,52 @@ describe('generateFieldTypesMap', () => {
         storage: {},
       },
     };
-    const result = generateFieldTypesMap(models, 'output');
-    expect(result).toContain("CodecTypes['mongo/objectId@1']['output']");
+    const result = generateBothFieldTypesMaps(models);
+    expect(result.output).toContain("CodecTypes['mongo/objectId@1']['output']");
+    expect(result.input).toContain("CodecTypes['mongo/objectId@1']['input']");
   });
 
-  it('generates input side map', () => {
-    const models: Record<string, ContractModel> = {
-      User: {
-        fields: {
-          _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
-        },
-        relations: {},
-        storage: {},
-      },
+  it('returns Record<string, never> for empty models on both sides', () => {
+    const result = generateBothFieldTypesMaps(undefined);
+    expect(result.output).toBe('Record<string, never>');
+    expect(result.input).toBe('Record<string, never>');
+  });
+});
+
+describe('resolveFieldType', () => {
+  it('returns both input and output for scalar fields', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/string@1' },
     };
-    const result = generateFieldTypesMap(models, 'input');
-    expect(result).toContain("CodecTypes['mongo/objectId@1']['input']");
+    const result = resolveFieldType(field);
+    expect(result.output).toBe("CodecTypes['mongo/string@1']['output']");
+    expect(result.input).toBe("CodecTypes['mongo/string@1']['input']");
+  });
+
+  it('returns suffixed types for value object fields', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'valueObject', name: 'Price' },
+    };
+    const result = resolveFieldType(field);
+    expect(result.output).toBe('PriceOutput');
+    expect(result.input).toBe('PriceInput');
+  });
+
+  it('uses renderOutputType only for output side of parameterized codecs', () => {
+    const lookup = stubCodecLookup({
+      'pg/char@1': stubCodec({
+        id: 'pg/char@1',
+        renderOutputType: (p) => `Char<${p['length']}>`,
+      }),
+    });
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/char@1', typeParams: { length: 36 } },
+    };
+    const result = resolveFieldType(field, lookup);
+    expect(result.output).toBe('Char<36>');
+    expect(result.input).toBe("CodecTypes['pg/char@1']['input']");
   });
 });
