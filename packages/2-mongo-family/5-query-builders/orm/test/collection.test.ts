@@ -253,6 +253,20 @@ describe('MongoCollection include()', () => {
     // @ts-expect-error 'comments' is an embed relation, not a reference relation
     expect(() => col.include('comments')).toThrow('embed relation');
   });
+
+  it('produces $lookup without $unwind for 1:N reference relation', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor).include('tasks');
+    col.all();
+    const stages = executor.lastStages!;
+    const lookup = stages.find((s) => s.kind === 'lookup') as MongoLookupStage;
+    expect(lookup.from).toBe('tasks');
+    expect(lookup.localField).toBe('_id');
+    expect(lookup.foreignField).toBe('assigneeId');
+    expect(lookup.as).toBe('tasks');
+    const unwind = stages.find((s) => s.kind === 'unwind');
+    expect(unwind).toBeUndefined();
+  });
 });
 
 describe('MongoCollection terminal methods', () => {

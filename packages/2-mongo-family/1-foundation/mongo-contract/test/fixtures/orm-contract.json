@@ -83,6 +83,14 @@
         "addresses": {
           "to": "Address",
           "cardinality": "1:N"
+        },
+        "tasks": {
+          "to": "Task",
+          "cardinality": "1:N",
+          "on": {
+            "localFields": ["_id"],
+            "targetFields": ["assigneeId"]
+          }
         }
       }
     },

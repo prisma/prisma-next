@@ -87,9 +87,9 @@ test('MongoIncludeSpec only allows reference relation keys', () => {
   expectTypeOf<TaskInclude>().not.toHaveProperty('comments');
 });
 
-test('MongoIncludeSpec has no includable keys for models with only embed relations', () => {
+test('ReferenceRelationKeys picks reference relations on User', () => {
   type UserRefKeys = ReferenceRelationKeys<Contract, 'User'>;
-  expectTypeOf<UserRefKeys>().toBeNever();
+  expectTypeOf<UserRefKeys>().toEqualTypeOf<'tasks'>();
 });
 
 // --- Polymorphic root returns discriminated union ---
@@ -326,4 +326,24 @@ test('variant() preserves TVariant through chaining', () => {
   type CreateParam = Parameters<typeof chained.create>[0];
   expectTypeOf<CreateParam>().toHaveProperty('severity');
   expectTypeOf<CreateParam>().not.toHaveProperty('type');
+});
+
+// --- 1:N reference relation include ---
+
+test('include() on 1:N reference relation returns array type', () => {
+  const col = {} as MongoCollection<Contract, 'User'>;
+  const result = col.include('tasks').first();
+  expectTypeOf(result).toExtend<
+    Promise<(InferRootRow<Contract, 'User'> & { tasks: InferFullRow<Contract, 'Task'>[] }) | null>
+  >();
+});
+
+test('include() on 1:N reference relation all() returns array type', () => {
+  const col = {} as MongoCollection<Contract, 'User'>;
+  const result = col.include('tasks').all();
+  expectTypeOf(result).toExtend<
+    AsyncIterableResult<
+      InferRootRow<Contract, 'User'> & { tasks: InferFullRow<Contract, 'Task'>[] }
+    >
+  >();
 });
