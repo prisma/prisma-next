@@ -1,6 +1,7 @@
 import type { CoreSchemaView } from '@prisma-next/framework-components/control';
 import { SchemaTreeNode } from '@prisma-next/framework-components/control';
 import type { MongoSchemaCollection, MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 export function mongoSchemaToView(schema: MongoSchemaIR): CoreSchemaView {
   const collectionNodes = schema.collections.map((collection) =>
@@ -12,7 +13,7 @@ export function mongoSchemaToView(schema: MongoSchemaIR): CoreSchemaView {
       kind: 'root',
       id: 'mongo-schema',
       label: 'database',
-      ...(collectionNodes.length > 0 ? { children: collectionNodes } : {}),
+      ...ifDefined('children', collectionNodes.length > 0 ? collectionNodes : undefined),
     }),
   };
 }
@@ -43,13 +44,9 @@ function collectionToSchemaNode(name: string, collection: MongoSchemaCollection)
         meta: {
           keys: index.keys,
           unique: index.unique,
-          ...(index.sparse ? { sparse: index.sparse } : {}),
-          ...(index.expireAfterSeconds != null
-            ? { expireAfterSeconds: index.expireAfterSeconds }
-            : {}),
-          ...(index.partialFilterExpression
-            ? { partialFilterExpression: index.partialFilterExpression }
-            : {}),
+          ...ifDefined('sparse', index.sparse || undefined),
+          ...ifDefined('expireAfterSeconds', index.expireAfterSeconds ?? undefined),
+          ...ifDefined('partialFilterExpression', index.partialFilterExpression ?? undefined),
         },
       }),
     );
@@ -87,7 +84,7 @@ function collectionToSchemaNode(name: string, collection: MongoSchemaCollection)
           validationAction: collection.validator.validationAction,
           jsonSchema: collection.validator.jsonSchema,
         },
-        ...(validatorChildren.length > 0 ? { children: validatorChildren } : {}),
+        ...ifDefined('children', validatorChildren.length > 0 ? validatorChildren : undefined),
       }),
     );
   }
@@ -108,13 +105,14 @@ function collectionToSchemaNode(name: string, collection: MongoSchemaCollection)
           id: `options-${name}`,
           label: `options (${optLabels.join(', ')})`,
           meta: {
-            ...(opts.capped ? { capped: opts.capped } : {}),
-            ...(opts.timeseries ? { timeseries: opts.timeseries } : {}),
-            ...(opts.collation ? { collation: opts.collation } : {}),
-            ...(opts.changeStreamPreAndPostImages
-              ? { changeStreamPreAndPostImages: opts.changeStreamPreAndPostImages }
-              : {}),
-            ...(opts.clusteredIndex ? { clusteredIndex: opts.clusteredIndex } : {}),
+            ...ifDefined('capped', opts.capped ?? undefined),
+            ...ifDefined('timeseries', opts.timeseries ?? undefined),
+            ...ifDefined('collation', opts.collation ?? undefined),
+            ...ifDefined(
+              'changeStreamPreAndPostImages',
+              opts.changeStreamPreAndPostImages ?? undefined,
+            ),
+            ...ifDefined('clusteredIndex', opts.clusteredIndex ?? undefined),
           },
         }),
       );
@@ -125,6 +123,6 @@ function collectionToSchemaNode(name: string, collection: MongoSchemaCollection)
     kind: 'collection',
     id: `collection-${name}`,
     label: `collection ${name}`,
-    ...(children.length > 0 ? { children } : {}),
+    ...ifDefined('children', children.length > 0 ? children : undefined),
   });
 }

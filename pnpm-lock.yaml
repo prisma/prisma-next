@@ -1380,6 +1380,9 @@ importers:
       '@prisma-next/target-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/1-mongo-target
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/utils
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
