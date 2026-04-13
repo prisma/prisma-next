@@ -19,6 +19,7 @@ import type {
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Db } from 'mongodb';
 import { diffMongoSchemas } from './schema-diff';
 import { mongoSchemaToView } from './schema-to-view';
@@ -72,7 +73,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       contractProfileHash,
       expectedTargetId,
       contractPath,
-      ...(configPath ? { configPath } : {}),
+      ...ifDefined('configPath', configPath),
     };
 
     if (contractTarget !== expectedTargetId) {
@@ -154,17 +155,17 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
 
     return {
       ok,
-      ...(ok ? {} : { code: 'PN-RUN-3010' }),
+      ...ifDefined('code', ok ? undefined : 'PN-RUN-3010'),
       summary: ok ? 'Schema matches contract' : `Schema verification found ${counts.fail} issue(s)`,
       contract: {
         storageHash: contract.storage.storageHash,
-        ...(contract.profileHash ? { profileHash: contract.profileHash } : {}),
+        ...ifDefined('profileHash', contract.profileHash),
       },
       target: { expected: contract.target },
       schema: { issues, root, counts },
       meta: {
-        ...(contractPath ? { contractPath } : {}),
-        ...(configPath ? { configPath } : {}),
+        ...ifDefined('contractPath', contractPath),
+        ...ifDefined('configPath', configPath),
         strict,
       },
       timings: { total: Date.now() - startTime },
@@ -243,11 +244,11 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       marker: {
         created: markerCreated,
         updated: markerUpdated,
-        ...(previousHashes ? { previous: previousHashes } : {}),
+        ...ifDefined('previous', previousHashes),
       },
       meta: {
         contractPath,
-        ...(configPath ? { configPath } : {}),
+        ...ifDefined('configPath', configPath),
       },
       timings: {
         total: Date.now() - startTime,
@@ -290,22 +291,25 @@ function buildVerifyResult(opts: {
 }): VerifyDatabaseResult {
   return {
     ok: opts.ok,
-    ...(opts.code ? { code: opts.code } : {}),
+    ...ifDefined('code', opts.code),
     summary: opts.summary,
     contract: {
       storageHash: opts.contractStorageHash,
-      ...(opts.contractProfileHash ? { profileHash: opts.contractProfileHash } : {}),
+      ...ifDefined('profileHash', opts.contractProfileHash),
     },
-    ...(opts.marker
-      ? { marker: { storageHash: opts.marker.storageHash, profileHash: opts.marker.profileHash } }
-      : {}),
+    ...ifDefined(
+      'marker',
+      opts.marker
+        ? { storageHash: opts.marker.storageHash, profileHash: opts.marker.profileHash }
+        : undefined,
+    ),
     target: {
       expected: opts.expectedTargetId,
-      ...(opts.actualTargetId ? { actual: opts.actualTargetId } : {}),
+      ...ifDefined('actual', opts.actualTargetId),
     },
     meta: {
       contractPath: opts.contractPath,
-      ...(opts.configPath ? { configPath: opts.configPath } : {}),
+      ...ifDefined('configPath', opts.configPath),
     },
     timings: { total: opts.totalTime },
   };

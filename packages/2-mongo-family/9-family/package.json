@@ -20,6 +20,7 @@
     "@prisma-next/mongo-emitter": "workspace:*",
     "@prisma-next/mongo-schema-ir": "workspace:*",
     "@prisma-next/target-mongo": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "mongodb": "catalog:"
   },
   "devDependencies": {
