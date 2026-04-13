@@ -1,14 +1,15 @@
-// TODO(TML-2253): Migrate to typed query AST commands (RawFindOneCommand, RawInsertOneCommand, etc.)
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
-import type { Db } from 'mongodb';
+import type { Db, Document } from 'mongodb';
 
 const COLLECTION = '_prisma_migrations';
 const MARKER_ID = 'marker';
 
 export async function readMarker(db: Db): Promise<ContractMarkerRecord | null> {
-  const doc = await db
+  const docs: Document[] = await db
     .collection(COLLECTION)
-    .findOne({ _id: MARKER_ID } as Record<string, unknown>);
+    .aggregate([{ $match: { _id: MARKER_ID } }, { $limit: 1 }])
+    .toArray();
+  const doc = docs[0];
   if (!doc) return null;
   return {
     storageHash: doc['storageHash'] as string,
