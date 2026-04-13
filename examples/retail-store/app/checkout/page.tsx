@@ -32,7 +32,7 @@ export default async function CheckoutPage() {
 
   const locationList = locations.map((loc) => ({
     id: String(loc._id),
-    name: loc.name as string,
+    name: String(loc.name),
     address: `${loc.streetAndNumber}, ${loc.city}`,
   }));
 
@@ -70,12 +70,12 @@ export default async function CheckoutPage() {
             defaultAddress={userAddress}
             locations={locationList}
             cartItems={items.map((item) => ({
-              productId: item.productId as string,
-              name: item.name as string,
-              brand: item.brand as string,
+              productId: String(item.productId),
+              name: String(item.name),
+              brand: String(item.brand),
               amount: item.amount,
-              price: { amount: Number(item.price.amount), currency: item.price.currency as string },
-              image: { url: item.image.url as string },
+              price: { amount: Number(item.price.amount), currency: String(item.price.currency) },
+              image: { url: String(item.image.url) },
             }))}
           />
         </CardContent>

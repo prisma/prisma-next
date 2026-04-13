@@ -15,9 +15,9 @@ export async function POST(req: Request) {
   const userId = await getAuthUserId();
   if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   const body = await req.json();
-  if (!body.productId || !body.name || !body.price) {
+  if (!body.productId || !body.name || !body.brand || !body.amount || !body.price || !body.image) {
     return NextResponse.json(
-      { error: 'Missing required fields: productId, name, price' },
+      { error: 'Missing required fields: productId, name, brand, amount, price, image' },
       { status: 400 },
     );
   }

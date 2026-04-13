@@ -41,7 +41,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const invalidateCart = useCallback(() => {
     fetch('/api/cart/count')
       .then((res) => res.json())
-      .then((data: { count: number }) => setCount(data.count))
+      .then((data: { count: number }) => {
+        if (mountedRef.current) setCount(data.count);
+      })
       .catch(() => {});
   }, []);
 

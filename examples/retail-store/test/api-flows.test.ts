@@ -32,7 +32,7 @@ const ITEM_B = {
 describe('API flow: order ownership (auth guard)', { timeout: timeouts.spinUpDbServer }, () => {
   const ctx = setupTestDb('api_flows_order_auth');
 
-  it("user cannot access another user's order", async () => {
+  it('other user cannot see the order in their list', async () => {
     const alice = await ctx.db.orm.users.create({
       name: 'Alice',
       email: 'a@test.com',
@@ -52,7 +52,9 @@ describe('API flow: order ownership (auth guard)', { timeout: timeouts.spinUpDbS
     const fetched = await getOrderWithUser(ctx.db, orderId);
     expect(fetched).not.toBeNull();
     expect(String(fetched!.userId)).toBe(String(alice._id));
-    expect(String(fetched!.userId)).not.toBe(String(bob._id));
+
+    const bobOrders = await getUserOrders(ctx.db, bob._id as string);
+    expect(bobOrders).toHaveLength(0);
   });
 
   it('user can only see their own orders via getUserOrders', async () => {
@@ -266,8 +268,8 @@ describe('API flow: order status progression', { timeout: timeouts.spinUpDbServe
   });
 });
 
-describe('API flow: cart add idempotency', { timeout: timeouts.spinUpDbServer }, () => {
-  const ctx = setupTestDb('api_flows_cart_idempotency');
+describe('API flow: duplicate cart add behavior', { timeout: timeouts.spinUpDbServer }, () => {
+  const ctx = setupTestDb('api_flows_cart_duplicate');
 
   it('adding same product twice creates two separate line items', async () => {
     const user = await ctx.db.orm.users.create({
