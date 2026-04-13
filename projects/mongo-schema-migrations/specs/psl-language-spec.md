@@ -152,8 +152,9 @@ email String @unique @map("email_address")
 data  Bytes  @vendor.column(length: 1536)
 
 @@map("users")
-@@index([email])
-@@unique([title, userId])
+@@index(email)
+@@index(title, userId)
+@@unique(title, userId)
 ```
 
 ### Attribute names
@@ -177,6 +178,18 @@ Argument     = PositionalArgument | NamedArgument
 PositionalArgument = Value
 NamedArgument      = Ident ":" Value
 ```
+
+### Varargs sugar (target)
+
+When an attribute's argument definition declares a varargs positional parameter, multiple positional arguments are collected into a list without requiring explicit `[` `]` brackets:
+
+```prisma
+// These are equivalent — the binding layer normalizes both to a list:
+@@index(email, name, sparse: true)
+@@index([email, name], sparse: true)
+```
+
+All positional arguments before the first named argument are collected. The grammar itself does not change — the parser already accepts multiple positional arguments. The varargs normalization happens in the binding layer based on the attribute's argument definition. See [PSL Binding Model](psl-binding-model.md) for details.
 
 ## Value model (target)
 
@@ -257,16 +270,16 @@ Canonicalization rules, contract encoding, and the full AST node type are define
 Values are recursive — Lists and Objects contain Values, and FunctionCall/TypeConstructor arguments are Values:
 
 ```prisma
-@@index([tenantId, wildcard(metadata)])
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-//      List containing:
+@@index(tenantId, wildcard(metadata))
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//      Varargs positional arguments, normalized to List:
 //        Identifier("tenantId")
 //        FunctionCall("wildcard", [Identifier("metadata")])
 
-@@index([status], filter: { age: { $gte: 18 } })
-//                        ^^^^^^^^^^^^^^^^^^^^^^^^
-//                        Object containing:
-//                          "age" → Object { "$gte" → Number(18) }
+@@index(status, filter: { age: { "$gte": 18 } })
+//                       ^^^^^^^^^^^^^^^^^^^^^^^
+//                       Object containing:
+//                         "age" → Object { "$gte" → Number(18) }
 
 @@policy(pg.predicate`status = 'active'`)
 //       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
