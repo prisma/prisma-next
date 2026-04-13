@@ -6,7 +6,10 @@ import type { CoreSchemaView } from './control-schema-view';
 export interface MigratableTargetDescriptor<
   TFamilyId extends string,
   TTargetId extends string,
-  TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
+  TFamilyInstance extends ControlFamilyInstance<TFamilyId, unknown> = ControlFamilyInstance<
+    TFamilyId,
+    unknown
+  >,
 > extends ControlTargetDescriptor<TFamilyId, TTargetId> {
   readonly migrations: TargetMigrationsCapability<TFamilyId, TTargetId, TFamilyInstance>;
 }

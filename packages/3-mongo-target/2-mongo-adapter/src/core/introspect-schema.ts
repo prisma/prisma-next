@@ -22,7 +22,7 @@ function isDefaultIdIndex(doc: Document): boolean {
   const key = doc['key'] as Record<string, unknown> | undefined;
   if (!key) return false;
   const entries = Object.entries(key);
-  return entries.length === 1 && entries[0]![0] === '_id' && entries[0]![1] === 1;
+  return entries.length === 1 && entries[0]?.[0] === '_id' && entries[0]?.[1] === 1;
 }
 
 function parseIndex(doc: Document): MongoSchemaIndex {
