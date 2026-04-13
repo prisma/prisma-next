@@ -22,9 +22,6 @@ import type { MongoSchemaCollection, MongoSchemaIR } from '@prisma-next/mongo-sc
 import type { Db } from 'mongodb';
 import { diffMongoSchemas } from './schema-diff';
 
-const MIGRATIONS_COLLECTION = '_prisma_migrations';
-const MARKER_ID = 'marker';
-
 export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo', MongoSchemaIR> {
   validateContract(contractJson: unknown): Contract;
 }
@@ -67,9 +64,6 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     const contractProfileHash = contract.profileHash;
     const contractTarget = contract.target;
 
-    const db = extractDb(driver);
-    const marker = await readMarker(db);
-
     const baseOpts = {
       contractStorageHash,
       contractProfileHash,
@@ -78,24 +72,26 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       ...(configPath ? { configPath } : {}),
     };
 
-    if (!marker) {
-      return buildVerifyResult({
-        ...baseOpts,
-        ok: false,
-        code: 'PN-RUN-3001',
-        summary: 'Marker missing',
-        totalTime: Date.now() - startTime,
-      });
-    }
-
     if (contractTarget !== expectedTargetId) {
       return buildVerifyResult({
         ...baseOpts,
         ok: false,
         code: 'PN-RUN-3003',
         summary: 'Target mismatch',
-        marker,
         actualTargetId: contractTarget,
+        totalTime: Date.now() - startTime,
+      });
+    }
+
+    const db = extractDb(driver);
+    const marker = await readMarker(db);
+
+    if (!marker) {
+      return buildVerifyResult({
+        ...baseOpts,
+        ok: false,
+        code: 'PN-RUN-3001',
+        summary: 'Marker missing',
         totalTime: Date.now() - startTime,
       });
     }
@@ -260,19 +256,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     readonly driver: ControlDriverInstance<'mongo', string>;
   }): Promise<ContractMarkerRecord | null> {
     const db = extractDb(options.driver);
-    const doc = await db
-      .collection(MIGRATIONS_COLLECTION)
-      .findOne({ _id: MARKER_ID } as Record<string, unknown>);
-    if (!doc) return null;
-    return {
-      storageHash: doc['storageHash'] as string,
-      profileHash: doc['profileHash'] as string,
-      contractJson: (doc['contractJson'] as unknown) ?? null,
-      canonicalVersion: (doc['canonicalVersion'] as number) ?? null,
-      updatedAt: doc['updatedAt'] as Date,
-      appTag: (doc['appTag'] as string) ?? null,
-      meta: (doc['meta'] as Record<string, unknown>) ?? {},
-    };
+    return readMarker(db);
   }
 
   async introspect(options: {
