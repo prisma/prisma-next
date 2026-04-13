@@ -36,6 +36,10 @@ The scout. Ports real applications to Prisma Next, defines the public API surfac
 - Real-world schemas expose ORM, query builder, or migration gaps that block adoption
 - The side-by-side story with Prisma 7 doesn't work in practice
 
+#### Prerequisite: `init` command and Mongo facade
+
+Before porting apps, verify the onboarding path works. The `init` command (scaffolding config, contract, and scripts for a new project) is the first thing a new user runs. If it doesn't exist or is incomplete, implement it. Additionally, create `@prisma-next/mongo` facade package with the same structure as `@prisma-next/postgres` and `@prisma-next/sqlite`.
+
 #### Milestone 1: Management API — reads
 
 Port the Prisma Data Platform Management API's read endpoints to Prisma Next, running side by side with the existing Prisma 7 implementation. This is the gentlest forcing function — read queries against an existing database, no migrations, no writes.
@@ -98,6 +102,7 @@ The query surface is how users interact with their data. Transactions don't exis
 - Transaction semantics are complex and interact with connection pooling, error handling, and the adapter abstraction
 - The SQL query builder needs to graduate from PoC to something users can rely on as an ORM escape hatch
 - ORM gaps may require structural changes, not just additive features
+- The MongoDB ORM may have feature parity gaps compared to the SQL ORM that surface during WS1 or WS4 — monitor and address if they arise
 
 #### Milestone 1: Transactions end-to-end
 
@@ -150,7 +155,7 @@ The planner can't cover every schema change. When it can't, the user authors a m
 
 Tasks:
 
-1. **Refine the scaffold command** — `migration new` scaffolds a migration file with the correct graph coordinates pre-populated. The user writes their logic and it just works.
+1. **Refine the scaffold command** — the scaffold command (currently `migration new` or equivalent) produces a migration file with the correct graph coordinates pre-populated. The user writes their logic and it just works.
 2. **Manual migration for common unsupported cases** — test against the cases the planner can't handle today. The manual path must cover them seamlessly.
 3. **Graph integration** — manual migrations are indistinguishable from planner-generated migrations in the graph. `plan`, `apply`, `status` treat them identically.
 
@@ -166,6 +171,7 @@ Tasks:
 2. **`migration status` output** — unambiguous answer to "where am I?" and "what will run next?" relative to the migration graph.
 3. **`migration apply` output** — progress indication, success confirmation, and clear error messages on failure.
 4. **Error diagnostics** — every migration error tells the user what went wrong and suggests a next step. No stack traces without context.
+5. **`db verify` / `db sign` guidance** — ensure the workflow for verifying contracts against live databases and signing them for production is documented and produces clear output. These commands exist but their place in the user workflow needs to be made obvious.
 
 Checkpoint: A developer runs the full migration loop (plan → review → apply → verify) and always understands what's happening. "What migrations will run when I push this to production?" is trivially answerable from the CLI output.
 
@@ -257,15 +263,15 @@ The CLI is the primary interface for authoring, migration, and database manageme
 
 #### Milestone 1: Error envelope consistency
 
-All CLI commands and runtime operations return errors in a consistent format with a stable error code, a human-readable message, and a suggested next step.
+All CLI commands and runtime operations return errors in a consistent format with a stable error code, a human-readable message, and a suggested next step. This includes both CLI error output and runtime error envelopes returned by the query engine and adapters.
 
 Tasks:
 
-1. **Audit existing error paths** — catalog every CLI command and runtime operation's error output. Identify inconsistencies.
-2. **Define the error envelope** — stable error codes, human-readable messages, suggested remediation. Consistent across CLI and runtime.
+1. **Audit existing error paths** — catalog every CLI command and runtime operation's error output, including query engine and adapter errors. Identify inconsistencies.
+2. **Define the error envelope** — stable error codes, human-readable messages, suggested remediation. Consistent across CLI and runtime (query errors, connection errors, constraint violations).
 3. **Implement consistently** — update all commands and runtime error paths to use the standard envelope.
 
-Checkpoint: All CLI commands and runtime operations produce errors in a consistent envelope: stable error code, human-readable message, suggested next step. No raw stack traces appear in user-facing output.
+Checkpoint: All CLI commands and runtime operations produce errors in a consistent envelope: stable error code, human-readable message, suggested next step. No raw stack traces appear in user-facing output. Runtime query and adapter errors use the same envelope structure.
 
 #### Milestone 2: CLI output consistency
 
@@ -273,7 +279,7 @@ All CLI commands use consistent formatting, progress indication, and output mode
 
 Tasks:
 
-1. **Output audit** — catalog formatting across all commands. Identify inconsistencies.
+1. **Output audit** — catalog formatting across all commands, including undocumented or orphan commands (e.g. `inspect-live-schema`, `contract-infer-paths`). Clean up or remove commands that don't belong in the public CLI.
 2. **Standardize** — consistent headers, progress indicators, success/failure formatting.
 3. **Machine-readable mode** — all commands support a `--json` (or equivalent) flag for programmatic consumption.
 
