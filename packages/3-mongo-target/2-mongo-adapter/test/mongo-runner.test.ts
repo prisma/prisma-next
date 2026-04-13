@@ -1,5 +1,3 @@
-import * as markerLedger from '@prisma-next/driver-mongo/control';
-import { initMarker, readMarker } from '@prisma-next/driver-mongo/control';
 import type {
   MigrationPlan,
   MigrationPlanOperation,
@@ -10,6 +8,8 @@ import {
   MongoSchemaIndex,
   MongoSchemaIR,
 } from '@prisma-next/mongo-schema-ir';
+import * as markerLedger from '@prisma-next/target-mongo/control';
+import { initMarker, readMarker } from '@prisma-next/target-mongo/control';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';

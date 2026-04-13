@@ -5,7 +5,7 @@ export {
   readMarker,
   updateMarker,
   writeLedgerEntry,
-} from '@prisma-next/driver-mongo/control';
+} from '@prisma-next/target-mongo/control';
 export { MongoCommandExecutor, MongoInspectionExecutor } from '../core/command-executor';
 export { contractToMongoSchemaIR } from '../core/contract-to-schema';
 export { formatMongoOperations } from '../core/ddl-formatter';
