@@ -16,14 +16,14 @@ import type {
 
 export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
-  readonly familyInstance: ControlFamilyInstance<TFamilyId>;
+  readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   readonly originHash: string;
   readonly destinationHash: string;
   readonly pendingMigrations: readonly MigrationApplyStep[];
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
     TTargetId,
-    ControlFamilyInstance<TFamilyId>
+    ControlFamilyInstance<TFamilyId, unknown>
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly targetId: string;

@@ -24,13 +24,13 @@ const DB_UPDATE_POLICY = {
  */
 export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
-  readonly familyInstance: ControlFamilyInstance<TFamilyId>;
+  readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   readonly contract: Contract;
   readonly mode: 'plan' | 'apply';
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
     TTargetId,
-    ControlFamilyInstance<TFamilyId>
+    ControlFamilyInstance<TFamilyId, unknown>
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly acceptDataLoss?: boolean;

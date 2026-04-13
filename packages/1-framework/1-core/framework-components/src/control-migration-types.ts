@@ -253,7 +253,10 @@ export interface MigrationRunner<
 export interface TargetMigrationsCapability<
   TFamilyId extends string = string,
   TTargetId extends string = string,
-  TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
+  TFamilyInstance extends ControlFamilyInstance<TFamilyId, unknown> = ControlFamilyInstance<
+    TFamilyId,
+    unknown
+  >,
 > {
   createPlanner(family: TFamilyInstance): MigrationPlanner<TFamilyId, TTargetId>;
   createRunner(family: TFamilyInstance): MigrationRunner<TFamilyId, TTargetId>;

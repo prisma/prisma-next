@@ -30,7 +30,7 @@ const sqlFamilyDescriptor: ControlFamilyDescriptor<'sql'> = {
   create: (_stack) =>
     ({
       familyId: 'sql',
-    }) as unknown as ControlFamilyInstance<'sql'>,
+    }) as unknown as ControlFamilyInstance<'sql', unknown>,
 };
 
 const postgresTargetDescriptor: ControlTargetDescriptor<'sql', 'postgres'> = {

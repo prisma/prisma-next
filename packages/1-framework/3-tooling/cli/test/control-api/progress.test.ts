@@ -21,7 +21,7 @@ describe('executeDbInit progress emission', () => {
       introspect: async () => ({}),
       validateContract: () => ({}) as Contract,
       readMarker: async () => null,
-    } as unknown as ControlFamilyInstance<string>;
+    } as unknown as ControlFamilyInstance<string, unknown>;
 
     const mockMigrations = {
       createPlanner: () => ({
@@ -35,7 +35,11 @@ describe('executeDbInit progress emission', () => {
         }),
       }),
       createRunner: () => ({}),
-    } as unknown as TargetMigrationsCapability<string, string, ControlFamilyInstance<string>>;
+    } as unknown as TargetMigrationsCapability<
+      string,
+      string,
+      ControlFamilyInstance<string, unknown>
+    >;
 
     const mockFrameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<string, string>> =
       [];
@@ -87,7 +91,7 @@ describe('executeDbInit progress emission', () => {
       introspect: async () => ({}),
       validateContract: () => ({}) as Contract,
       readMarker: async () => null,
-    } as unknown as ControlFamilyInstance<string>;
+    } as unknown as ControlFamilyInstance<string, unknown>;
 
     const mockOperations = [
       { id: 'op-1', label: 'Create table users', operationClass: 'additive' },
@@ -123,7 +127,11 @@ describe('executeDbInit progress emission', () => {
           };
         },
       }),
-    } as unknown as TargetMigrationsCapability<string, string, ControlFamilyInstance<string>>;
+    } as unknown as TargetMigrationsCapability<
+      string,
+      string,
+      ControlFamilyInstance<string, unknown>
+    >;
 
     const mockFrameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<string, string>> =
       [];
@@ -170,7 +178,7 @@ describe('executeDbInit progress emission', () => {
       introspect: async () => ({}),
       validateContract: () => ({}) as Contract,
       readMarker: async () => null,
-    } as unknown as ControlFamilyInstance<string>;
+    } as unknown as ControlFamilyInstance<string, unknown>;
 
     const mockMigrations = {
       createPlanner: () => ({
@@ -184,7 +192,11 @@ describe('executeDbInit progress emission', () => {
         }),
       }),
       createRunner: () => ({}),
-    } as unknown as TargetMigrationsCapability<string, string, ControlFamilyInstance<string>>;
+    } as unknown as TargetMigrationsCapability<
+      string,
+      string,
+      ControlFamilyInstance<string, unknown>
+    >;
 
     const mockFrameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<string, string>> =
       [];

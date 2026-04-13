@@ -13,7 +13,7 @@ import type {
   TargetInstance,
 } from './framework-components';
 
-export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unknown>
+export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
   extends FamilyInstance<TFamilyId> {
   validateContract(contractJson: unknown): Contract;
 

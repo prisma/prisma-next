@@ -181,7 +181,7 @@ export interface SchemaVerifyOptions {
 }
 
 export interface SqlControlFamilyInstance
-  extends ControlFamilyInstance<'sql'>,
+  extends ControlFamilyInstance<'sql', SqlSchemaIR>,
     SchemaViewCapable<SqlSchemaIR>,
     SqlFamilyInstanceState {
   validateContract(contractJson: unknown): Contract;

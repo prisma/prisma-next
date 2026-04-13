@@ -26,7 +26,7 @@ function createMockFamilyInstance(overrides?: {
     readMarker: overrides?.readMarker ?? (async () => null),
     introspect: overrides?.introspect ?? (async () => ({ tables: {}, dependencies: [] })),
     validateContract: (ir: unknown) => ir as Contract,
-  } as unknown as ControlFamilyInstance<'sql'>;
+  } as unknown as ControlFamilyInstance<'sql', unknown>;
 }
 
 function createMockMigrations(overrides?: {
@@ -58,7 +58,11 @@ function createMockMigrations(overrides?: {
     createRunner: () => ({
       execute: vi.fn().mockResolvedValue(runnerResult),
     }),
-  } as unknown as TargetMigrationsCapability<'sql', 'postgres', ControlFamilyInstance<'sql'>>;
+  } as unknown as TargetMigrationsCapability<
+    'sql',
+    'postgres',
+    ControlFamilyInstance<'sql', unknown>
+  >;
 }
 
 const dummyContract = { schemaVersion: '1', target: 'postgres' } as unknown as Contract;
@@ -133,7 +137,11 @@ describe('executeDbUpdate', () => {
       createRunner: () => ({
         execute: runnerExecute,
       }),
-    } as unknown as TargetMigrationsCapability<'sql', 'postgres', ControlFamilyInstance<'sql'>>;
+    } as unknown as TargetMigrationsCapability<
+      'sql',
+      'postgres',
+      ControlFamilyInstance<'sql', unknown>
+    >;
 
     const result = await executeDbUpdate({
       driver: createMockDriver(),
@@ -273,7 +281,11 @@ describe('executeDbUpdate', () => {
       createRunner: () => ({
         execute: runnerExecute,
       }),
-    } as unknown as TargetMigrationsCapability<'sql', 'postgres', ControlFamilyInstance<'sql'>>;
+    } as unknown as TargetMigrationsCapability<
+      'sql',
+      'postgres',
+      ControlFamilyInstance<'sql', unknown>
+    >;
 
     const result = await executeDbUpdate({
       driver: createMockDriver(),
@@ -311,7 +323,11 @@ describe('executeDbUpdate', () => {
     const migrations = {
       createPlanner: () => ({ plan: planFn }),
       createRunner: () => ({ execute: vi.fn() }),
-    } as unknown as TargetMigrationsCapability<'sql', 'postgres', ControlFamilyInstance<'sql'>>;
+    } as unknown as TargetMigrationsCapability<
+      'sql',
+      'postgres',
+      ControlFamilyInstance<'sql', unknown>
+    >;
 
     await executeDbUpdate({
       driver: createMockDriver(),
@@ -444,7 +460,11 @@ describe('executeDbUpdate', () => {
       createRunner: () => ({
         execute: runnerExecute,
       }),
-    } as unknown as TargetMigrationsCapability<'sql', 'postgres', ControlFamilyInstance<'sql'>>;
+    } as unknown as TargetMigrationsCapability<
+      'sql',
+      'postgres',
+      ControlFamilyInstance<'sql', unknown>
+    >;
 
     const result = await executeDbUpdate({
       driver: createMockDriver(),
