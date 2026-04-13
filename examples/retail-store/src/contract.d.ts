@@ -13,7 +13,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d'>;
+  StorageHashBase<'sha256:5f5aee268e41d345787b7c5d396778443a977b10dc2ec9f14c913171fd6d1411'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -232,7 +232,10 @@ type ContractBase = ContractType<
       };
       readonly carts: {
         readonly indexes: readonly [
-          { readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }] },
+          {
+            readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }];
+            readonly unique: true;
+          },
         ];
         readonly validator: {
           readonly jsonSchema: {
