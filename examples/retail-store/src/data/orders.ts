@@ -1,17 +1,15 @@
 import type { Db } from '../db';
-import { collectFirstResult } from './execute-raw';
-import { objectIdEq, rawObjectIdFilter } from './object-id-filter';
 
 export function getUserOrders(db: Db, userId: string) {
-  return db.orm.orders.where(objectIdEq('userId', userId)).all();
+  return db.orm.orders.where({ userId }).all();
 }
 
 export function getOrderById(db: Db, id: string) {
-  return db.orm.orders.where(objectIdEq('_id', id)).first();
+  return db.orm.orders.where({ _id: id }).first();
 }
 
 export function getOrderWithUser(db: Db, id: string) {
-  return db.orm.orders.include('user').where(objectIdEq('_id', id)).first();
+  return db.orm.orders.include('user').where({ _id: id }).first();
 }
 
 export function createOrder(
@@ -41,17 +39,13 @@ export function createOrder(
 }
 
 export function deleteOrder(db: Db, id: string) {
-  return db.orm.orders.where(objectIdEq('_id', id)).delete();
+  return db.orm.orders.where({ _id: id }).delete();
 }
 
-export async function updateOrderStatus(
+export function updateOrderStatus(
   db: Db,
   orderId: string,
   entry: { status: string; timestamp: Date },
 ) {
-  const plan = db.raw
-    .collection('orders')
-    .findOneAndUpdate(rawObjectIdFilter('_id', orderId), { $push: { statusHistory: entry } })
-    .build();
-  return collectFirstResult<Record<string, unknown>>(db, plan);
+  return db.orm.orders.where({ _id: orderId }).update((u) => [u.statusHistory.push(entry)]);
 }

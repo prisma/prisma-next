@@ -3,7 +3,6 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
 import type { FieldOutputTypes } from '../contract';
 import type { Db } from '../db';
 import { collectResults } from './execute-raw';
-import { objectIdEq } from './object-id-filter';
 
 type Product = FieldOutputTypes['Product'];
 
@@ -21,7 +20,7 @@ export async function findProductsPaginated(
 }
 
 export function findProductById(db: Db, id: string) {
-  return db.orm.products.where(objectIdEq('_id', id)).first();
+  return db.orm.products.where({ _id: id }).first();
 }
 
 function escapeRegex(str: string) {
