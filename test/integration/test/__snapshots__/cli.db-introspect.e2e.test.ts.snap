@@ -20,7 +20,7 @@ exports[`live schema CLI commands (e2e) > db schema > prints the live schema tre
 │ Read more             https://pris.ly/db-schema
 └
 
-│  contract
+│  database
 │  ├─ table post
 │  │  ├─ columns
 │  │  │  ├─ id: int4 (not nullable)
