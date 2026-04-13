@@ -11,6 +11,7 @@ import type {
   ControlFamilyInstance,
   ControlStack,
   CoreSchemaView,
+  SchemaViewCapable,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -22,7 +23,9 @@ import type { Db } from 'mongodb';
 import { diffMongoSchemas } from './schema-diff';
 import { mongoSchemaToView } from './schema-to-view';
 
-export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo', MongoSchemaIR> {
+export interface MongoControlFamilyInstance
+  extends ControlFamilyInstance<'mongo', MongoSchemaIR>,
+    SchemaViewCapable<MongoSchemaIR> {
   validateContract(contractJson: unknown): Contract;
 }
 

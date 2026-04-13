@@ -17,13 +17,13 @@ export function hasMigrations<TFamilyId extends string, TTargetId extends string
   return 'migrations' in target && !!(target as Record<string, unknown>)['migrations'];
 }
 
-export interface SchemaViewCapable {
-  toSchemaView(schema: unknown): CoreSchemaView;
+export interface SchemaViewCapable<TSchemaIR = unknown> {
+  toSchemaView(schema: TSchemaIR): CoreSchemaView;
 }
 
 export function hasSchemaView<TFamilyId extends string, TSchemaIR>(
   instance: ControlFamilyInstance<TFamilyId, TSchemaIR>,
-): instance is ControlFamilyInstance<TFamilyId, TSchemaIR> & SchemaViewCapable {
+): instance is ControlFamilyInstance<TFamilyId, TSchemaIR> & SchemaViewCapable<TSchemaIR> {
   return (
     'toSchemaView' in instance &&
     typeof (instance as Record<string, unknown>)['toSchemaView'] === 'function'
