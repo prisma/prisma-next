@@ -171,10 +171,15 @@ export type MongoTypeMaps<
     string,
     Record<string, unknown>
   >,
+  TFieldInputTypes extends Record<string, Record<string, unknown>> = Record<
+    string,
+    Record<string, unknown>
+  >,
 > = {
   readonly codecTypes: TCodecTypes;
   readonly operationTypes: TOperationTypes;
   readonly fieldOutputTypes: TFieldOutputTypes;
+  readonly fieldInputTypes: TFieldInputTypes;
 };
 
 export type MongoTypeMapsPhantomKey = '__@prisma-next/mongo-core/typeMaps@__';
@@ -196,6 +201,13 @@ export type ExtractMongoCodecTypes<T> =
 
 export type ExtractMongoFieldOutputTypes<T> =
   ExtractMongoTypeMaps<T> extends { fieldOutputTypes: infer F }
+    ? F extends Record<string, Record<string, unknown>>
+      ? F
+      : Record<string, never>
+    : Record<string, never>;
+
+export type ExtractMongoFieldInputTypes<T> =
+  ExtractMongoTypeMaps<T> extends { fieldInputTypes: infer F }
     ? F extends Record<string, Record<string, unknown>>
       ? F
       : Record<string, never>

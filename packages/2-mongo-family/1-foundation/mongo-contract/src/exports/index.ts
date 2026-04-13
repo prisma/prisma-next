@@ -1,5 +1,6 @@
 export type {
   ExtractMongoCodecTypes,
+  ExtractMongoFieldInputTypes,
   ExtractMongoFieldOutputTypes,
   ExtractMongoTypeMaps,
   InferModelRow,
