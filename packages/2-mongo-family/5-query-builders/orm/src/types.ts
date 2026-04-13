@@ -229,6 +229,10 @@ type DiscriminatorField<
   ? F
   : never;
 
+// TODO(TML-2229): VariantModelRow flows through ResolvedOutputRow, so variant
+// domain fields use output types. Only the _id pick uses ResolvedInputRow.
+// When input/output types diverge (parameterized codecs), this needs an
+// input-side VariantModelRow.
 export type VariantCreateInput<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
