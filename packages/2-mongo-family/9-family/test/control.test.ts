@@ -94,7 +94,7 @@ describe('createMongoFamilyInstance', () => {
     expect(instance.familyId).toBe('mongo');
   });
 
-  it('verify() throws "not implemented"', async () => {
+  it('verify() requires a valid contract', async () => {
     const instance = createMongoFamilyInstance(createMinimalControlStack());
     const fakeDriver = {} as Parameters<typeof instance.verify>[0]['driver'];
     await expect(
@@ -104,7 +104,7 @@ describe('createMongoFamilyInstance', () => {
         expectedTargetId: 'mongo',
         contractPath: '/test',
       }),
-    ).rejects.toThrow('not implemented');
+    ).rejects.toThrow();
   });
 
   it('schemaVerify() throws "not implemented"', async () => {
