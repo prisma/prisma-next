@@ -8,5 +8,8 @@
   "files.associations": {
     "**/packages/0-config/tsconfig/base.json": "jsonc",
     "**/packages/0-config/tsconfig/prod.json": "jsonc"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome"
   }
 }
