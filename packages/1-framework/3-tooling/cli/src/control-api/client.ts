@@ -64,7 +64,7 @@ class ControlClientImpl implements ControlClient {
   private readonly options: ControlClientOptions;
   private stack: ControlStack | null = null;
   private driver: ControlDriverInstance<string, string> | null = null;
-  private familyInstance: ControlFamilyInstance<string> | null = null;
+  private familyInstance: ControlFamilyInstance<string, unknown> | null = null;
   private frameworkComponents: ReadonlyArray<
     TargetBoundComponentDescriptor<string, string>
   > | null = null;
@@ -142,7 +142,7 @@ class ControlClientImpl implements ControlClient {
 
   private async ensureConnected(): Promise<{
     driver: ControlDriverInstance<string, string>;
-    familyInstance: ControlFamilyInstance<string>;
+    familyInstance: ControlFamilyInstance<string, unknown>;
     frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<string, string>>;
   }> {
     // Auto-init if needed

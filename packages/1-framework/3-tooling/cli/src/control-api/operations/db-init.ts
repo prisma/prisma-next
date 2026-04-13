@@ -19,13 +19,13 @@ import { createOperationCallbacks, stripOperations } from './migration-helpers';
  */
 export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
-  readonly familyInstance: ControlFamilyInstance<TFamilyId>;
+  readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   readonly contract: Contract;
   readonly mode: 'plan' | 'apply';
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
     TTargetId,
-    ControlFamilyInstance<TFamilyId>
+    ControlFamilyInstance<TFamilyId, unknown>
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   /** Optional progress callback for observing operation progress */
