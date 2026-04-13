@@ -325,7 +325,7 @@ export const sqlEmission = {
   },
 
   getTypeMapsExpression(): string {
-    return 'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes>';
+    return 'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes>';
   },
 
   getContractWrapper(contractBaseName: string, typeMapsName: string): string {

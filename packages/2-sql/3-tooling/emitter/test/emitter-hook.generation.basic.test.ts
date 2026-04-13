@@ -101,7 +101,7 @@ describe('sql-target-family-hook', () => {
       });
       const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
       expect(types).toContain(
-        'export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes>',
+        'export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes>',
       );
     });
 
@@ -112,7 +112,7 @@ describe('sql-target-family-hook', () => {
       });
       const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
       expect(types).toContain(
-        'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes>',
+        'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes>',
       );
     });
 
