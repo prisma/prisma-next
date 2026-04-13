@@ -1,4 +1,3 @@
-import type { MongoIndexKey } from '@prisma-next/mongo-contract';
 import {
   indexesEquivalent,
   MongoSchemaCollection,
@@ -10,10 +9,7 @@ import {
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { MongoInspectionExecutor } from '../src/core/command-executor';
-import { contractToMongoSchemaIR } from '../src/core/contract-to-schema';
 import { introspectSchema } from '../src/core/introspect-schema';
-import { MongoMigrationRunner } from '../src/core/mongo-runner';
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;

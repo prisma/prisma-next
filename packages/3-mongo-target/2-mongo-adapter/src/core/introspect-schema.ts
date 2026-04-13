@@ -100,7 +100,8 @@ export async function introspectSchema(db: Db): Promise<MongoSchemaIR> {
     const indexDocs = await db.collection(name).listIndexes().toArray();
     const indexes = indexDocs.filter((doc) => !isDefaultIdIndex(doc)).map(parseIndex);
 
-    const validator = parseValidator(info['options'] ?? {});
+    const infoOptions = 'options' in info ? (info['options'] as Record<string, unknown>) : {};
+    const validator = parseValidator(infoOptions);
     const options = parseCollectionOptions(info);
 
     collections.push(
