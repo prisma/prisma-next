@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { printPsl } from '@prisma-next/psl-printer';
+import { type PslPrintableSqlSchemaIR, printPsl } from '@prisma-next/psl-printer';
 import {
   createPostgresDefaultMapping,
   createPostgresTypeMap,
@@ -58,7 +58,8 @@ async function executeContractInferCommand(
     return inspectResult;
   }
 
-  const { config, schema, target, meta } = inspectResult.value;
+  const { config, target, meta } = inspectResult.value;
+  const schema = inspectResult.value.schema as PslPrintableSqlSchemaIR;
   const outputPath = resolveContractInferOutputPath(options, config.contract?.output);
   const enumInfo = extractEnumInfo(schema.annotations);
   const pslContent = printPsl(schema, {
