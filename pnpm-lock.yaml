@@ -2313,6 +2313,9 @@ importers:
       '@prisma-next/mongo-lowering':
         specifier: workspace:*
         version: link:../../2-mongo-family/6-transport/mongo-lowering
+      '@prisma-next/mongo-query-ast':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/4-query/query-ast
       '@prisma-next/mongo-wire':
         specifier: workspace:*
         version: link:../../2-mongo-family/6-transport/mongo-wire

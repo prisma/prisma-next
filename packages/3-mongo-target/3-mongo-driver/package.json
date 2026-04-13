@@ -19,6 +19,7 @@
     "@prisma-next/errors": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/mongo-lowering": "workspace:*",
+    "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/mongo-wire": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "mongodb": "catalog:"
