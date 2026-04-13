@@ -5,10 +5,9 @@ import { useState } from 'react';
 import { useCart } from '../../src/components/cart-provider';
 import { Button } from '../../src/components/ui/button';
 
-interface CartActionsProps {
-  productId?: string;
-  mode: 'remove' | 'clear';
-}
+type CartActionsProps =
+  | { mode: 'remove'; productId: string }
+  | { mode: 'clear'; productId?: never };
 
 export function CartActions({ productId, mode }: CartActionsProps) {
   const router = useRouter();
@@ -18,8 +17,12 @@ export function CartActions({ productId, mode }: CartActionsProps) {
   async function handleAction() {
     setLoading(true);
     try {
-      const url = mode === 'remove' ? `/api/cart?productId=${productId}` : '/api/cart';
-      await fetch(url, { method: 'DELETE' });
+      const url =
+        mode === 'remove'
+          ? `/api/cart?${new URLSearchParams({ productId }).toString()}`
+          : '/api/cart';
+      const res = await fetch(url, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`Cart action failed (${res.status})`);
       invalidateCart();
       router.refresh();
     } finally {
