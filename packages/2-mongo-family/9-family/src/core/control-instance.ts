@@ -4,13 +4,15 @@ import type {
   ControlDriverInstance,
   ControlFamilyInstance,
   ControlStack,
+  CoreSchemaView,
+  SchemaTreeNode,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
-import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import type { MongoSchemaCollection, MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import type { Db } from 'mongodb';
 
 const MIGRATIONS_COLLECTION = '_prisma_migrations';
@@ -97,6 +99,99 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     const db = extractDb(options.driver);
     return introspectSchema(db);
   }
+
+  toSchemaView(schema: MongoSchemaIR): CoreSchemaView {
+    const collectionNodes: SchemaTreeNode[] = Object.entries(schema.collections).map(
+      ([name, collection]) => collectionToSchemaNode(name, collection),
+    );
+
+    return {
+      root: {
+        kind: 'root',
+        id: 'mongo-schema',
+        label: 'contract',
+        ...(collectionNodes.length > 0 ? { children: collectionNodes } : {}),
+      },
+    };
+  }
+}
+
+function collectionToSchemaNode(name: string, collection: MongoSchemaCollection): SchemaTreeNode {
+  const children: SchemaTreeNode[] = [];
+
+  for (const index of collection.indexes) {
+    const keysSummary = index.keys.map((k) => `${k.field}: ${k.direction}`).join(', ');
+    const prefix = index.unique ? 'unique index' : 'index';
+    const options: string[] = [];
+    if (index.sparse) options.push('sparse');
+    if (index.expireAfterSeconds != null) options.push(`ttl: ${index.expireAfterSeconds}s`);
+    if (index.partialFilterExpression) options.push('partial');
+    const optsSuffix = options.length > 0 ? ` (${options.join(', ')})` : '';
+
+    children.push({
+      kind: 'index',
+      id: `index-${name}-${index.keys.map((k) => `${k.field}_${k.direction}`).join('_')}`,
+      label: `${prefix} (${keysSummary})${optsSuffix}`,
+      meta: {
+        keys: index.keys,
+        unique: index.unique,
+        ...(index.sparse ? { sparse: index.sparse } : {}),
+        ...(index.expireAfterSeconds != null
+          ? { expireAfterSeconds: index.expireAfterSeconds }
+          : {}),
+        ...(index.partialFilterExpression
+          ? { partialFilterExpression: index.partialFilterExpression }
+          : {}),
+      },
+    });
+  }
+
+  if (collection.validator) {
+    children.push({
+      kind: 'field',
+      id: `validator-${name}`,
+      label: `validator (${collection.validator.validationLevel}, ${collection.validator.validationAction})`,
+      meta: {
+        validationLevel: collection.validator.validationLevel,
+        validationAction: collection.validator.validationAction,
+        jsonSchema: collection.validator.jsonSchema,
+      },
+    });
+  }
+
+  if (collection.options) {
+    const opts = collection.options;
+    const optLabels: string[] = [];
+    if (opts.capped) optLabels.push('capped');
+    if (opts.timeseries) optLabels.push('timeseries');
+    if (opts.collation) optLabels.push('collation');
+    if (opts.changeStreamPreAndPostImages) optLabels.push('changeStreamPreAndPostImages');
+    if (opts.clusteredIndex) optLabels.push('clusteredIndex');
+
+    if (optLabels.length > 0) {
+      children.push({
+        kind: 'field',
+        id: `options-${name}`,
+        label: `options (${optLabels.join(', ')})`,
+        meta: {
+          ...(opts.capped ? { capped: opts.capped } : {}),
+          ...(opts.timeseries ? { timeseries: opts.timeseries } : {}),
+          ...(opts.collation ? { collation: opts.collation } : {}),
+          ...(opts.changeStreamPreAndPostImages
+            ? { changeStreamPreAndPostImages: opts.changeStreamPreAndPostImages }
+            : {}),
+          ...(opts.clusteredIndex ? { clusteredIndex: opts.clusteredIndex } : {}),
+        },
+      });
+    }
+  }
+
+  return {
+    kind: 'collection',
+    id: `collection-${name}`,
+    label: `collection ${name}`,
+    ...(children.length > 0 ? { children } : {}),
+  };
 }
 
 export function createMongoFamilyInstance(_controlStack: ControlStack): MongoControlFamilyInstance {
