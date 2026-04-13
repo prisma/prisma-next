@@ -258,6 +258,15 @@ export async function seed(db: Db) {
   const p2 = products[11];
   if (!p0 || !p1 || !p2) throw new Error('Failed to seed products');
 
+  function lineItemFrom(product: (typeof products)[number]) {
+    return {
+      productId: String(product._id),
+      name: String(product.name),
+      brand: String(product.brand),
+      image: { url: `/images/products/${String(product.code).toLowerCase()}.jpg` },
+    };
+  }
+
   const users = await db.orm.users.createAll([
     {
       name: 'Alice Chen',
@@ -284,20 +293,14 @@ export async function seed(db: Db) {
     userId: String(alice._id),
     items: [
       {
-        productId: String(p0._id),
-        name: String(p0.name),
-        brand: String(p0.brand),
+        ...lineItemFrom(p0),
         amount: 1,
         price: { amount: 79.99, currency: 'USD' },
-        image: { url: `/images/products/${String(p0.code).toLowerCase()}.jpg` },
       },
       {
-        productId: String(p1._id),
-        name: String(p1.name),
-        brand: String(p1.brand),
+        ...lineItemFrom(p1),
         amount: 2,
         price: { amount: 89.99, currency: 'USD' },
-        image: { url: `/images/products/${String(p1.code).toLowerCase()}.jpg` },
       },
     ],
   });
@@ -306,12 +309,9 @@ export async function seed(db: Db) {
     userId: String(bob._id),
     items: [
       {
-        productId: String(p2._id),
-        name: String(p2.name),
-        brand: String(p2.brand),
+        ...lineItemFrom(p2),
         amount: 1,
         price: { amount: 149.99, currency: 'USD' },
-        image: { url: `/images/products/${String(p2.code).toLowerCase()}.jpg` },
       },
     ],
     shippingAddress: '456 Oak Ave, Portland, OR 97201',
