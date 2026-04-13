@@ -51,8 +51,8 @@ export default async function ProductCatalog({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {products.map((product) => (
           <Link
-            key={String(product._id)}
-            href={`/products/${String(product._id)}`}
+            key={product._id}
+            href={`/products/${product._id}`}
             className="no-underline text-inherit"
           >
             <Card className="h-full hover:shadow-md transition-shadow">
@@ -68,9 +68,7 @@ export default async function ProductCatalog({
                 <p className="text-sm text-muted line-clamp-2">{product.description}</p>
               </CardContent>
               <CardFooter>
-                <span className="font-bold text-accent">
-                  ${Number(product.price.amount).toFixed(2)}
-                </span>
+                <span className="font-bold text-accent">${product.price.amount.toFixed(2)}</span>
               </CardFooter>
             </Card>
           </Link>

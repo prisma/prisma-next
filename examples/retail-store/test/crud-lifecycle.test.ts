@@ -34,7 +34,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     expect(all).toHaveLength(1);
     expect(all[0]).toMatchObject({ name: 'Test Shirt', brand: 'TestBrand' });
 
-    const found = await findProductById(ctx.db, product._id as string);
+    const found = await findProductById(ctx.db, product._id);
     expect(found).not.toBeNull();
     expect(found!.name).toBe('Test Shirt');
   });
@@ -54,7 +54,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
 
     expect(user.address).toEqual(address);
 
-    const found = await findUserById(ctx.db, user._id as string);
+    const found = await findUserById(ctx.db, user._id);
     expect(found).not.toBeNull();
     expect(found!.address).toEqual(address);
   });
@@ -104,7 +104,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     });
 
     const order = await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: [
         {
           productId: 'prod-1',
@@ -126,17 +126,17 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     expect(order.statusHistory).toHaveLength(1);
     expect(order.statusHistory[0]).toMatchObject({ status: 'placed' });
 
-    const userOrders = await getUserOrders(ctx.db, user._id as string);
+    const userOrders = await getUserOrders(ctx.db, user._id);
     expect(userOrders).toHaveLength(1);
 
-    const found = await getOrderById(ctx.db, order._id as string);
+    const found = await getOrderById(ctx.db, order._id);
     expect(found).not.toBeNull();
     expect(found!.shippingAddress).toBe('456 Test Ave');
 
-    const deleted = await deleteOrder(ctx.db, order._id as string);
+    const deleted = await deleteOrder(ctx.db, order._id);
     expect(deleted).not.toBeNull();
 
-    const afterDelete = await getUserOrders(ctx.db, user._id as string);
+    const afterDelete = await getUserOrders(ctx.db, user._id);
     expect(afterDelete).toHaveLength(0);
   });
 
@@ -156,15 +156,15 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       image: { url: '/widget.jpg' },
     };
 
-    await upsertCart(ctx.db, user._id as string, [item]);
-    const cart = await getCartByUserId(ctx.db, user._id as string);
+    await upsertCart(ctx.db, user._id, [item]);
+    const cart = await getCartByUserId(ctx.db, user._id);
     expect(cart).not.toBeNull();
     expect(cart!.items).toHaveLength(1);
     expect(cart!.items[0]).toMatchObject({ name: 'Widget' });
 
     const updatedItem = { ...item, amount: 3 };
-    await upsertCart(ctx.db, user._id as string, [updatedItem]);
-    const updatedCart = await getCartByUserId(ctx.db, user._id as string);
+    await upsertCart(ctx.db, user._id, [updatedItem]);
+    const updatedCart = await getCartByUserId(ctx.db, user._id);
     expect(updatedCart).not.toBeNull();
     expect(updatedCart!.items).toHaveLength(1);
     expect(updatedCart!.items[0]!.amount).toBe(3);
@@ -177,7 +177,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       address: null,
     });
 
-    await upsertCart(ctx.db, user._id as string, [
+    await upsertCart(ctx.db, user._id, [
       {
         productId: 'prod-1',
         name: 'Widget',
@@ -188,8 +188,8 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       },
     ]);
 
-    await clearCart(ctx.db, user._id as string);
-    const cart = await getCartByUserId(ctx.db, user._id as string);
+    await clearCart(ctx.db, user._id);
+    const cart = await getCartByUserId(ctx.db, user._id);
     expect(cart).not.toBeNull();
     expect(cart!.items).toHaveLength(0);
   });
@@ -201,7 +201,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       address: null,
     });
     const order = await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: [
         {
           productId: 'prod-1',
@@ -218,7 +218,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     });
 
     const invoice = await createInvoice(ctx.db, {
-      orderId: order._id as string,
+      orderId: order._id,
       items: [{ name: 'Item', amount: 1, unitPrice: 100, lineTotal: 100 }],
       subtotal: 100,
       tax: 8.5,
@@ -230,7 +230,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     expect(invoice.items).toHaveLength(1);
     expect(invoice.total).toBe(108.5);
 
-    const found = await findInvoiceById(ctx.db, invoice._id as string);
+    const found = await findInvoiceById(ctx.db, invoice._id);
     expect(found).not.toBeNull();
     expect(found!.items[0]).toMatchObject({ name: 'Item', unitPrice: 100 });
   });

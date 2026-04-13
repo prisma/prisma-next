@@ -14,7 +14,7 @@ describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }
       address: null,
     });
 
-    await upsertCart(ctx.db, user._id as string, [
+    await upsertCart(ctx.db, user._id, [
       {
         productId: 'prod-1',
         name: 'Shirt',
@@ -25,7 +25,7 @@ describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }
       },
     ]);
 
-    await addToCart(ctx.db, user._id as string, {
+    await addToCart(ctx.db, user._id, {
       productId: 'prod-2',
       name: 'Chinos',
       brand: 'UrbanEdge',
@@ -34,7 +34,7 @@ describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }
       image: { url: '/chinos.jpg' },
     });
 
-    const cart = await getCartByUserId(ctx.db, user._id as string);
+    const cart = await getCartByUserId(ctx.db, user._id);
     expect(cart).not.toBeNull();
     expect(cart!.items).toHaveLength(2);
     const names = cart!.items.map((i) => i.name).sort();
@@ -48,7 +48,7 @@ describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }
       address: null,
     });
 
-    await upsertCart(ctx.db, user._id as string, [
+    await upsertCart(ctx.db, user._id, [
       {
         productId: 'prod-1',
         name: 'Shirt',
@@ -67,9 +67,9 @@ describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }
       },
     ]);
 
-    await removeFromCart(ctx.db, user._id as string, 'prod-1');
+    await removeFromCart(ctx.db, user._id, 'prod-1');
 
-    const cart = await getCartByUserId(ctx.db, user._id as string);
+    const cart = await getCartByUserId(ctx.db, user._id);
     expect(cart).not.toBeNull();
     expect(cart!.items).toHaveLength(1);
     expect(cart!.items[0]!.productId).toBe('prod-2');
@@ -83,7 +83,7 @@ describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }
     });
 
     const order = await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: [
         {
           productId: 'prod-1',
@@ -99,17 +99,17 @@ describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-03-01T10:00:00Z') }],
     });
 
-    await updateOrderStatus(ctx.db, order._id as string, {
+    await updateOrderStatus(ctx.db, order._id, {
       status: 'shipped',
       timestamp: new Date('2026-03-02T14:00:00Z'),
     });
 
-    await updateOrderStatus(ctx.db, order._id as string, {
+    await updateOrderStatus(ctx.db, order._id, {
       status: 'delivered',
       timestamp: new Date('2026-03-04T09:00:00Z'),
     });
 
-    const updated = await getOrderById(ctx.db, order._id as string);
+    const updated = await getOrderById(ctx.db, order._id);
     expect(updated).not.toBeNull();
     expect(updated!.statusHistory).toHaveLength(3);
     const statuses = updated!.statusHistory.map((s) => s.status);

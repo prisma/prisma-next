@@ -25,13 +25,13 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
   const db = await getDb();
   const order = await getOrderWithUser(db, id);
 
-  if (!order || String(order.userId) !== userId) {
+  if (!order || order.userId !== userId) {
     notFound();
   }
 
-  const total = order.items.reduce((sum, item) => sum + Number(item.price.amount) * item.amount, 0);
+  const total = order.items.reduce((sum, item) => sum + item.price.amount * item.amount, 0);
   const lastEntry = order.statusHistory[order.statusHistory.length - 1];
-  const lastStatus = lastEntry ? String(lastEntry.status) : 'placed';
+  const lastStatus = lastEntry ? lastEntry.status : 'placed';
 
   return (
     <div className="max-w-2xl">
@@ -63,7 +63,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
                     <span className="font-medium">{item.name}</span>
                     <span className="text-muted ml-2">×{item.amount}</span>
                   </div>
-                  <span>${(Number(item.price.amount) * item.amount).toFixed(2)}</span>
+                  <span>${(item.price.amount * item.amount).toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -76,15 +76,15 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
             <h2 className="font-semibold mb-3">Status History</h2>
             <div className="flex flex-col gap-2">
               {order.statusHistory.map((entry) => {
-                const s = entry.status as string;
+                const s = entry.status;
                 return (
                   <div
-                    key={`${s}-${String(entry.timestamp)}`}
+                    key={`${s}-${entry.timestamp}`}
                     className="flex justify-between items-center"
                   >
                     <Badge variant={statusVariant[s] ?? 'outline'}>{s}</Badge>
                     <span className="text-sm text-muted">
-                      {new Date(String(entry.timestamp)).toLocaleString()}
+                      {new Date(entry.timestamp).toLocaleString()}
                     </span>
                   </div>
                 );

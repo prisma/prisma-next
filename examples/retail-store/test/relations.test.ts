@@ -15,7 +15,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
       address: null,
     });
 
-    await upsertCart(ctx.db, user._id as string, [
+    await upsertCart(ctx.db, user._id, [
       {
         productId: 'prod-1',
         name: 'Widget',
@@ -26,7 +26,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
       },
     ]);
 
-    const cartWithUser = await getCartWithUser(ctx.db, user._id as string);
+    const cartWithUser = await getCartWithUser(ctx.db, user._id);
     expect(cartWithUser).not.toBeNull();
     expect(cartWithUser!.user).toMatchObject({
       name: 'Alice',
@@ -43,7 +43,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
     });
 
     const order = await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: [
         {
           productId: 'prod-1',
@@ -59,7 +59,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
-    const orderWithUser = await getOrderWithUser(ctx.db, order._id as string);
+    const orderWithUser = await getOrderWithUser(ctx.db, order._id);
     expect(orderWithUser).not.toBeNull();
     expect(orderWithUser!.user).toMatchObject({
       name: 'Bob',
@@ -75,7 +75,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
     });
 
     const order = await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: [
         {
           productId: 'prod-1',
@@ -92,7 +92,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
     });
 
     const invoice = await createInvoice(ctx.db, {
-      orderId: order._id as string,
+      orderId: order._id,
       items: [{ name: 'Item', amount: 1, unitPrice: 100, lineTotal: 100 }],
       subtotal: 100,
       tax: 8.5,
@@ -100,7 +100,7 @@ describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemorySe
       issuedAt: new Date('2026-03-15'),
     });
 
-    const invoiceWithOrder = await findInvoiceWithOrder(ctx.db, invoice._id as string);
+    const invoiceWithOrder = await findInvoiceWithOrder(ctx.db, invoice._id);
     expect(invoiceWithOrder).not.toBeNull();
     expect(invoiceWithOrder!.order).toMatchObject({
       shippingAddress: '789 St',
