@@ -1076,5 +1076,11 @@ describe('MongoMigrationPlanner', () => {
       const plan = planSuccess(planner, contract, emptyIR());
       expect(plan.destination.storageHash).toBe('sha256:test-storage');
     });
+
+    it('sets destination profileHash from contract', () => {
+      const contract = makeContract({ users: {} });
+      const plan = planSuccess(planner, contract, emptyIR());
+      expect(plan.destination.profileHash).toBe('sha256:test-profile');
+    });
   });
 });
