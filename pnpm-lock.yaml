@@ -2925,21 +2925,33 @@ importers:
 
   test/integration/test/fixtures/cli/cli-e2e-test-app:
     dependencies:
+      '@prisma-next/adapter-mongo':
+        specifier: workspace:*
+        version: link:../../../../../../packages/3-mongo-target/2-mongo-adapter
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../../../../../../packages/3-targets/6-adapters/postgres
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../../../../../packages/1-framework/3-tooling/cli
+      '@prisma-next/driver-mongo':
+        specifier: workspace:*
+        version: link:../../../../../../packages/3-mongo-target/3-mongo-driver
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../../../../../packages/3-targets/7-drivers/postgres
+      '@prisma-next/family-mongo':
+        specifier: workspace:*
+        version: link:../../../../../../packages/2-mongo-family/9-family
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../../../../packages/2-sql/9-family
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../../../../../packages/1-framework/1-core/framework-components
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../../../../../../packages/2-mongo-family/1-foundation/mongo-contract
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../../../../packages/2-sql/2-authoring/contract-ts
@@ -2949,6 +2961,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../../../../../packages/1-framework/0-foundation/utils
+      mongodb:
+        specifier: 'catalog:'
+        version: 6.21.0
       pg:
         specifier: 'catalog:'
         version: 8.16.3
