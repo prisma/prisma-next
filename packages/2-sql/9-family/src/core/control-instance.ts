@@ -10,6 +10,7 @@ import type {
   ControlStack,
   CoreSchemaView,
   OperationContext,
+  SchemaViewCapable,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -176,6 +177,7 @@ export interface SchemaVerifyOptions {
 
 export interface SqlControlFamilyInstance
   extends ControlFamilyInstance<'sql'>,
+    SchemaViewCapable<SqlSchemaIR>,
     SqlFamilyInstanceState {
   validateContract(contractJson: unknown): Contract;
 
@@ -200,8 +202,6 @@ export interface SqlControlFamilyInstance
     readonly driver: ControlDriverInstance<'sql', string>;
     readonly contract?: unknown;
   }): Promise<SqlSchemaIR>;
-
-  toSchemaView(schema: SqlSchemaIR): CoreSchemaView;
 }
 
 export type SqlFamilyInstance = SqlControlFamilyInstance;
