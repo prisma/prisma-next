@@ -1458,5 +1458,37 @@ describe('interpretPslDocumentToMongoContract', () => {
         },
       });
     });
+
+    it('handles nullable value object fields with oneOf null or object', () => {
+      const ir = interpretOk(`
+        type Address {
+          street String
+          city   String
+        }
+
+        model User {
+          id      ObjectId @id @map("_id")
+          address Address?
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['address']).toEqual({
+        oneOf: [
+          { bsonType: 'null' },
+          {
+            bsonType: 'object',
+            required: ['city', 'street'],
+            properties: {
+              street: { bsonType: 'string' },
+              city: { bsonType: 'string' },
+            },
+          },
+        ],
+      });
+      const required = schema['required'] as string[];
+      expect(required).not.toContain('address');
+    });
   });
 });
