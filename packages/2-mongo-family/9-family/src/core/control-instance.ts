@@ -181,7 +181,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     const contract = validated.contract;
 
     const contractStorageHash = contract.storage.storageHash;
-    const contractProfileHash = contract.profileHash ?? contractStorageHash;
+    const contractProfileHash = contract.profileHash;
 
     const db = extractDb(driver);
 

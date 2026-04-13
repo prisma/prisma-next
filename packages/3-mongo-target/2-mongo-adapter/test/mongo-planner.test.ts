@@ -1077,10 +1077,10 @@ describe('MongoMigrationPlanner', () => {
       expect(plan.destination.storageHash).toBe('sha256:test-storage');
     });
 
-    it('sets destination profileHash from contract', () => {
+    it('does not include profileHash in destination (migrations use storageHash only)', () => {
       const contract = makeContract({ users: {} });
       const plan = planSuccess(planner, contract, emptyIR());
-      expect(plan.destination.profileHash).toBe('sha256:test-profile');
+      expect(plan.destination).not.toHaveProperty('profileHash');
     });
   });
 });

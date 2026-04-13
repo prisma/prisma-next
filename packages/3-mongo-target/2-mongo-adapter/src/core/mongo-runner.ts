@@ -137,12 +137,13 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
     }
 
     const destination = options.plan.destination;
-    const destinationProfileHash = destination.profileHash ?? destination.storageHash;
+    const contract = options.destinationContract as { profileHash?: string };
+    const profileHash = contract.profileHash ?? destination.storageHash;
 
     if (
       operationsExecuted === 0 &&
       existingMarker?.storageHash === destination.storageHash &&
-      existingMarker.profileHash === destinationProfileHash
+      existingMarker.profileHash === profileHash
     ) {
       return ok({ operationsPlanned: operations.length, operationsExecuted });
     }
@@ -150,7 +151,7 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
     if (existingMarker) {
       const updated = await updateMarker(db, existingMarker.storageHash, {
         storageHash: destination.storageHash,
-        profileHash: destinationProfileHash,
+        profileHash,
       });
       if (!updated) {
         return runnerFailure(
@@ -167,7 +168,7 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
     } else {
       await initMarker(db, {
         storageHash: destination.storageHash,
-        profileHash: destinationProfileHash,
+        profileHash,
       });
     }
 
