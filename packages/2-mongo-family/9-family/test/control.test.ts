@@ -1,4 +1,15 @@
-import { createControlStack, hasMigrations } from '@prisma-next/framework-components/control';
+import {
+  createControlStack,
+  hasMigrations,
+  hasSchemaView,
+} from '@prisma-next/framework-components/control';
+import {
+  MongoSchemaCollection,
+  MongoSchemaCollectionOptions,
+  MongoSchemaIndex,
+  type MongoSchemaIR,
+  MongoSchemaValidator,
+} from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
@@ -124,5 +135,131 @@ describe('createMongoFamilyInstance', () => {
     await expect(instance.introspect({ driver: fakeDriver })).rejects.toThrow(
       'does not expose a db property',
     );
+  });
+
+  it('implements SchemaViewCapable', () => {
+    const instance = createMongoFamilyInstance(createMinimalControlStack());
+    expect(hasSchemaView(instance)).toBe(true);
+  });
+});
+
+describe('toSchemaView', () => {
+  function createInstance() {
+    return createMongoFamilyInstance(createMinimalControlStack());
+  }
+
+  it('returns an empty root for an empty schema', () => {
+    const instance = createInstance();
+    const ir: MongoSchemaIR = { collections: {} };
+
+    const view = instance.toSchemaView(ir);
+
+    expect(view.root.kind).toBe('root');
+    expect(view.root.id).toBe('mongo-schema');
+    expect(view.root.label).toBe('contract');
+    expect(view.root.children).toBeUndefined();
+  });
+
+  it('maps collections to collection nodes', () => {
+    const instance = createInstance();
+    const ir: MongoSchemaIR = {
+      collections: {
+        users: new MongoSchemaCollection({ name: 'users' }),
+        posts: new MongoSchemaCollection({ name: 'posts' }),
+      },
+    };
+
+    const view = instance.toSchemaView(ir);
+
+    expect(view.root.children).toHaveLength(2);
+    const userNode = view.root.children!.find((n) => n.id === 'collection-users');
+    expect(userNode).toBeDefined();
+    expect(userNode!.kind).toBe('collection');
+    expect(userNode!.label).toBe('collection users');
+  });
+
+  it('maps indexes to child nodes', () => {
+    const instance = createInstance();
+    const ir: MongoSchemaIR = {
+      collections: {
+        users: new MongoSchemaCollection({
+          name: 'users',
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [{ field: 'email', direction: 1 }],
+              unique: true,
+            }),
+            new MongoSchemaIndex({
+              keys: [
+                { field: 'lastName', direction: 1 },
+                { field: 'firstName', direction: 1 },
+              ],
+            }),
+          ],
+        }),
+      },
+    };
+
+    const view = instance.toSchemaView(ir);
+
+    const usersNode = view.root.children![0]!;
+    expect(usersNode.children).toHaveLength(2);
+
+    const emailIdx = usersNode.children![0]!;
+    expect(emailIdx.kind).toBe('index');
+    expect(emailIdx.label).toContain('unique index');
+    expect(emailIdx.label).toContain('email');
+
+    const compoundIdx = usersNode.children![1]!;
+    expect(compoundIdx.kind).toBe('index');
+    expect(compoundIdx.label).not.toContain('unique');
+    expect(compoundIdx.label).toContain('lastName');
+    expect(compoundIdx.label).toContain('firstName');
+  });
+
+  it('maps validator to a child node', () => {
+    const instance = createInstance();
+    const ir: MongoSchemaIR = {
+      collections: {
+        products: new MongoSchemaCollection({
+          name: 'products',
+          validator: new MongoSchemaValidator({
+            jsonSchema: { bsonType: 'object' },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          }),
+        }),
+      },
+    };
+
+    const view = instance.toSchemaView(ir);
+
+    const productsNode = view.root.children![0]!;
+    const validatorNode = productsNode.children!.find((n) => n.id === 'validator-products');
+    expect(validatorNode).toBeDefined();
+    expect(validatorNode!.label).toContain('strict');
+    expect(validatorNode!.label).toContain('error');
+  });
+
+  it('maps collection options to a child node', () => {
+    const instance = createInstance();
+    const ir: MongoSchemaIR = {
+      collections: {
+        logs: new MongoSchemaCollection({
+          name: 'logs',
+          options: new MongoSchemaCollectionOptions({
+            capped: { size: 1048576, max: 1000 },
+          }),
+        }),
+      },
+    };
+
+    const view = instance.toSchemaView(ir);
+
+    const logsNode = view.root.children![0]!;
+    const optionsNode = logsNode.children!.find((n) => n.id === 'options-logs');
+    expect(optionsNode).toBeDefined();
+    expect(optionsNode!.label).toContain('capped');
+    expect(optionsNode!.meta!['capped']).toEqual({ size: 1048576, max: 1000 });
   });
 });
