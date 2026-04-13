@@ -87,6 +87,8 @@ Tasks:
 3. **Basic query port** — port a small number of queries to PN. Exercise both ORM and SQL DSL.
 4. **Document the adoption path** — write up what worked, what didn't, and what a Cal.com developer would need to know. Hand off to DevRel.
 
+**Risk**: Cal.com runs on Next.js, which may surface framework-specific lifecycle issues not seen in simpler setups — transaction cleanup on request abort, connection release under RSC concurrency, etc. April validates RSC concurrency and zero-config contract emission, but real integration under load may uncover follow-on work. If significant, escalate to WS7.
+
 Checkpoint: A written assessment of the Cal.com adoption path exists, with concrete evidence (working queries or documented blockers). A Cal.com developer could follow the documented path without our help. This is an evaluation, not a full port.
 
 ---
@@ -333,6 +335,49 @@ Tasks:
 3. **Clear guidance on `db update` vs migrations** — when `db update` can't handle a change, the error should guide the user to use migrations instead.
 
 Checkpoint: `db update` handles common development-cycle schema changes without errors on all three targets. `db init` creates a correct database on Postgres, SQLite, and MongoDB. When `db update` hits a case it can't handle, the error message directs the user to use migrations.
+
+---
+
+## WS7: Developer tooling
+
+**People**: queued (picked up when an earlier workstream completes)
+
+Query observability and query intelligence. When something goes wrong, the developer needs to see what's happening. When something is subtly wrong — like a query missing an index — the developer needs to be told. Prisma Next's contract-first architecture makes static query analysis uniquely possible; this workstream turns that architectural advantage into user-facing value.
+
+**Key risks**:
+
+- Logging infrastructure may need to integrate with multiple runtime paths (ORM, SQL DSL, raw SQL) and multiple adapters
+- Query linting is a differentiator but the PoC may not be ready to generalize — scope carefully to avoid over-promising
+
+#### Milestone 1: Query logging and observability
+
+Users need to see what SQL is being generated, especially when debugging unexpected behavior. This is table stakes for any ORM.
+
+Tasks:
+
+1. **Query logging** — enable logging of generated SQL with parameters, timing, and target information. Support configurable log levels (off, query, query+params, verbose).
+2. **Connection diagnostics** — surface connection pool state, connection errors, and retry behavior in a way the developer can inspect.
+3. **Multi-target** — logging works consistently across Postgres, SQLite, and MongoDB adapters.
+
+Checkpoint: A developer enables query logging, runs a query, and sees the generated SQL with parameters and timing. Connection errors surface with enough context to diagnose the issue. Logging output is consistent across all three targets.
+
+#### Milestone 2: Query linting
+
+Prisma Next can statically analyze queries against the contract and warn about common mistakes — queries that don't use an index, unbounded result sets, N+1 patterns. This is a unique value proposition. Extend the existing PoC query linting and query budgeting plugins into something users can enable and get value from.
+
+Tasks:
+
+1. **Missing index warnings** — warn when a query filters or sorts on a column that isn't indexed, using the contract's index definitions.
+2. **Unbounded result set warnings** — warn when a query has no limit and the table is expected to be large.
+3. **Plugin activation UX** — enabling query linting is a single configuration option, not a complex setup. Results are clear and actionable.
+
+Checkpoint: A developer enables the query linting plugin, writes a query that filters on a non-indexed column, and receives a clear warning identifying the issue and suggesting a fix. The plugin works with both ORM and SQL DSL queries.
+
+#### Milestone 3: VS Code extension (conditional)
+
+If April's language server work doesn't fully land PN-aware PSL validation and completions, pick up the remaining work here. The VS Code extension must load `prisma-next.config.ts`, validate PSL against the PN grammar and active vocabulary, and provide meaningful diagnostics and completions.
+
+Checkpoint: The VS Code extension provides PSL validation and completions that reflect the active Prisma Next configuration. Diagnostics are accurate and helpful. If April fully delivers this, this milestone is skipped.
 
 ---
 
