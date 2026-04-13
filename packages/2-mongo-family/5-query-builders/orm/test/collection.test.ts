@@ -144,6 +144,80 @@ describe('MongoCollection chaining', () => {
   });
 });
 
+describe('MongoCollection object-based where()', () => {
+  it('produces eq filter with string codecId for string field', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor).where({ name: 'Alice' });
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('field');
+    if (match.filter.kind === 'field') {
+      expect(match.filter.field).toBe('name');
+      expect(match.filter.op).toBe('$eq');
+      const ref = match.filter.value as MongoParamRef;
+      expect(ref).toBeInstanceOf(MongoParamRef);
+      expect(ref.codecId).toBe('mongo/string@1');
+      expect(ref.value).toBe('Alice');
+    }
+  });
+
+  it('produces eq filter with objectId codecId for ObjectId field', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'Task', executor).where({
+      assigneeId: 'abc123',
+    });
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('field');
+    if (match.filter.kind === 'field') {
+      expect(match.filter.field).toBe('assigneeId');
+      expect(match.filter.op).toBe('$eq');
+      const ref = match.filter.value as MongoParamRef;
+      expect(ref).toBeInstanceOf(MongoParamRef);
+      expect(ref.codecId).toBe('mongo/objectId@1');
+      expect(ref.value).toBe('abc123');
+    }
+  });
+
+  it('produces AND of multiple eq filters for multi-field object', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor).where({
+      name: 'Alice',
+      email: 'a@b.c',
+    });
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('and');
+    if (match.filter.kind === 'and') {
+      expect(match.filter.exprs).toHaveLength(2);
+      const first = match.filter.exprs[0]!;
+      const second = match.filter.exprs[1]!;
+      expect(first.kind).toBe('field');
+      expect(second.kind).toBe('field');
+    }
+  });
+
+  it('chains with MongoFilterExpr where()', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor)
+      .where({ name: 'Alice' })
+      .where(MongoFieldFilter.gte('email', 'a'));
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('and');
+  });
+
+  it('chains MongoFilterExpr where() then object where()', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor)
+      .where(MongoFieldFilter.eq('_id', 'id-1'))
+      .where({ name: 'Alice' });
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('and');
+  });
+});
+
 describe('MongoCollection variant()', () => {
   it('returns a new instance from variant()', () => {
     const executor = createMockExecutor();
