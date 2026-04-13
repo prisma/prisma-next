@@ -13,7 +13,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:844c1b104857432625f127e3c8a9bc59789d5e5bd6bd3d62104c80068c26b3e7'>;
+  StorageHashBase<'sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -204,14 +204,24 @@ type ContractBase = ContractType<
               readonly name: { readonly bsonType: 'string' };
               readonly email: { readonly bsonType: 'string' };
               readonly address: {
-                readonly bsonType: 'object';
-                readonly properties: {
-                  readonly streetAndNumber: { readonly bsonType: 'string' };
-                  readonly city: { readonly bsonType: 'string' };
-                  readonly postalCode: { readonly bsonType: 'string' };
-                  readonly country: { readonly bsonType: 'string' };
-                };
-                readonly required: readonly ['city', 'country', 'postalCode', 'streetAndNumber'];
+                readonly oneOf: readonly [
+                  { readonly bsonType: 'null' },
+                  {
+                    readonly bsonType: 'object';
+                    readonly properties: {
+                      readonly streetAndNumber: { readonly bsonType: 'string' };
+                      readonly city: { readonly bsonType: 'string' };
+                      readonly postalCode: { readonly bsonType: 'string' };
+                      readonly country: { readonly bsonType: 'string' };
+                    };
+                    readonly required: readonly [
+                      'city',
+                      'country',
+                      'postalCode',
+                      'streetAndNumber',
+                    ];
+                  },
+                ];
               };
             };
             readonly required: readonly ['_id', 'email', 'name'];

@@ -1,7 +1,7 @@
 {
   "from": "sha256:empty",
-  "to": "sha256:844c1b104857432625f127e3c8a9bc59789d5e5bd6bd3d62104c80068c26b3e7",
-  "migrationId": "sha256:d5a78c199a25f975be3cfc50cb9517cd2bb70a0a2951ac3f6697a6e71a2a5997",
+  "to": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d",
+  "migrationId": "sha256:e3960312bdd88da15123ae50c272af5fb45c6cc0cc3f0ff187937b50773b5d13",
   "kind": "regular",
   "fromContract": null,
   "toContract": {
@@ -1188,22 +1188,29 @@
                   "bsonType": "objectId"
                 },
                 "address": {
-                  "bsonType": "object",
-                  "properties": {
-                    "city": {
-                      "bsonType": "string"
+                  "oneOf": [
+                    {
+                      "bsonType": "null"
                     },
-                    "country": {
-                      "bsonType": "string"
-                    },
-                    "postalCode": {
-                      "bsonType": "string"
-                    },
-                    "streetAndNumber": {
-                      "bsonType": "string"
+                    {
+                      "bsonType": "object",
+                      "properties": {
+                        "city": {
+                          "bsonType": "string"
+                        },
+                        "country": {
+                          "bsonType": "string"
+                        },
+                        "postalCode": {
+                          "bsonType": "string"
+                        },
+                        "streetAndNumber": {
+                          "bsonType": "string"
+                        }
+                      },
+                      "required": ["city", "country", "postalCode", "streetAndNumber"]
                     }
-                  },
-                  "required": ["city", "country", "postalCode", "streetAndNumber"]
+                  ]
                 },
                 "email": {
                   "bsonType": "string"
@@ -1243,7 +1250,7 @@
           }
         }
       },
-      "storageHash": "sha256:844c1b104857432625f127e3c8a9bc59789d5e5bd6bd3d62104c80068c26b3e7"
+      "storageHash": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d"
     },
     "capabilities": {},
     "extensionPacks": {},
@@ -1261,5 +1268,5 @@
     "planningStrategy": "diff"
   },
   "labels": [],
-  "createdAt": "2026-04-12T17:03:08.211Z"
+  "createdAt": "2026-04-13T03:14:54.111Z"
 }
