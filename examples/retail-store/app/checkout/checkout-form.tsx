@@ -43,15 +43,24 @@ export function CheckoutForm({ defaultAddress, locations, cartItems }: CheckoutF
   const [address, setAddress] = useState(defaultAddress);
   const [locationId, setLocationId] = useState(locations[0]?.id ?? '');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     setLoading(true);
     try {
       const shippingAddress =
-        orderType === 'home'
-          ? address
-          : (locations.find((l) => l.id === locationId)?.address ?? '');
+        orderType === 'home' ? address : locations.find((l) => l.id === locationId)?.address;
+
+      if (!shippingAddress?.trim()) {
+        setError(
+          orderType === 'home'
+            ? 'Please enter a shipping address.'
+            : 'Please select a pickup location.',
+        );
+        return;
+      }
 
       const res = await fetch('/api/orders', {
         method: 'POST',
@@ -130,6 +139,7 @@ export function CheckoutForm({ defaultAddress, locations, cartItems }: CheckoutF
         </div>
       )}
 
+      {error && <p className="text-destructive text-sm mb-3">{error}</p>}
       <Button type="submit" disabled={loading} className="w-full">
         {loading ? 'Placing Order...' : 'Place Order'}
       </Button>
