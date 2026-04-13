@@ -10,11 +10,11 @@ import type {
   ControlStack,
   CoreSchemaView,
   OperationContext,
-  SchemaTreeNode,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { SchemaTreeNode } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
@@ -564,8 +564,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
 
     toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
-      const rootLabel = 'database';
-
       const tableNodes: readonly SchemaTreeNode[] = Object.entries(schema.tables).map(
         ([tableName, table]: [string, SqlTableIR]) => {
           const children: SchemaTreeNode[] = [];
@@ -575,66 +573,76 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             const typeDisplay = column.nativeType;
             const nullability = column.nullable ? 'nullable' : 'not nullable';
             const label = `${columnName}: ${typeDisplay} (${nullability})`;
-            columnNodes.push({
-              kind: 'field',
-              id: `column-${tableName}-${columnName}`,
-              label,
-              meta: {
-                nativeType: column.nativeType,
-                nullable: column.nullable,
-                ...ifDefined('default', column.default),
-              },
-            });
+            columnNodes.push(
+              new SchemaTreeNode({
+                kind: 'field',
+                id: `column-${tableName}-${columnName}`,
+                label,
+                meta: {
+                  nativeType: column.nativeType,
+                  nullable: column.nullable,
+                  ...ifDefined('default', column.default),
+                },
+              }),
+            );
           }
 
           if (columnNodes.length > 0) {
-            children.push({
-              kind: 'collection',
-              id: `columns-${tableName}`,
-              label: 'columns',
-              children: columnNodes,
-            });
+            children.push(
+              new SchemaTreeNode({
+                kind: 'collection',
+                id: `columns-${tableName}`,
+                label: 'columns',
+                children: columnNodes,
+              }),
+            );
           }
 
           if (table.primaryKey) {
             const pkColumns = table.primaryKey.columns.join(', ');
-            children.push({
-              kind: 'index',
-              id: `primary-key-${tableName}`,
-              label: `primary key: ${pkColumns}`,
-              meta: {
-                columns: table.primaryKey.columns,
-                ...(table.primaryKey.name ? { name: table.primaryKey.name } : {}),
-              },
-            });
+            children.push(
+              new SchemaTreeNode({
+                kind: 'index',
+                id: `primary-key-${tableName}`,
+                label: `primary key: ${pkColumns}`,
+                meta: {
+                  columns: table.primaryKey.columns,
+                  ...(table.primaryKey.name ? { name: table.primaryKey.name } : {}),
+                },
+              }),
+            );
           }
 
           for (const unique of table.uniques) {
             const name = unique.name ?? `${tableName}_${unique.columns.join('_')}_unique`;
             const label = `unique ${name}`;
-            children.push({
-              kind: 'index',
-              id: `unique-${tableName}-${name}`,
-              label,
-              meta: {
-                columns: unique.columns,
-                unique: true,
-              },
-            });
+            children.push(
+              new SchemaTreeNode({
+                kind: 'index',
+                id: `unique-${tableName}-${name}`,
+                label,
+                meta: {
+                  columns: unique.columns,
+                  unique: true,
+                },
+              }),
+            );
           }
 
           for (const index of table.indexes) {
             const name = index.name ?? defaultIndexName(tableName, index.columns);
             const label = index.unique ? `unique index ${name}` : `index ${name}`;
-            children.push({
-              kind: 'index',
-              id: `index-${tableName}-${name}`,
-              label,
-              meta: {
-                columns: index.columns,
-                unique: index.unique,
-              },
-            });
+            children.push(
+              new SchemaTreeNode({
+                kind: 'index',
+                id: `index-${tableName}-${name}`,
+                label,
+                meta: {
+                  columns: index.columns,
+                  unique: index.unique,
+                },
+              }),
+            );
           }
 
           const tableMeta: Record<string, unknown> = {};
@@ -653,37 +661,34 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             }));
           }
 
-          const node: SchemaTreeNode = {
+          return new SchemaTreeNode({
             kind: 'entity',
             id: `table-${tableName}`,
             label: `table ${tableName}`,
             ...(Object.keys(tableMeta).length > 0 ? { meta: tableMeta } : {}),
-            ...(children.length > 0 ? { children: children as readonly SchemaTreeNode[] } : {}),
-          };
-          return node;
+            ...(children.length > 0 ? { children } : {}),
+          });
         },
       );
 
       const dependencyNodes: readonly SchemaTreeNode[] = schema.dependencies.map((dep) => {
         const shortName = dep.id.split('.').pop() ?? dep.id;
-        return {
+        return new SchemaTreeNode({
           kind: 'dependency',
           id: `dependency-${dep.id}`,
           label: `${shortName} dependency is installed`,
-        };
+        });
       });
 
       const rootChildren = [...tableNodes, ...dependencyNodes];
 
-      const rootNode: SchemaTreeNode = {
-        kind: 'root',
-        id: 'sql-schema',
-        label: rootLabel,
-        ...(rootChildren.length > 0 ? { children: rootChildren } : {}),
-      };
-
       return {
-        root: rootNode,
+        root: new SchemaTreeNode({
+          kind: 'root',
+          id: 'sql-schema',
+          label: 'database',
+          ...(rootChildren.length > 0 ? { children: rootChildren } : {}),
+        }),
       };
     },
   };

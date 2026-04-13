@@ -5,6 +5,7 @@ import type {
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { SchemaTreeNode } from '@prisma-next/framework-components/control';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import {
@@ -19,47 +20,47 @@ import { parseGlobalFlags } from '../src/utils/global-flags';
 
 describe('formatIntrospectOutput', () => {
   const createSchemaView = (): CoreSchemaView => ({
-    root: {
+    root: new SchemaTreeNode({
       kind: 'root',
       id: 'sql-schema',
       label: 'sql schema (tables: 2)',
       children: [
-        {
+        new SchemaTreeNode({
           kind: 'entity',
           id: 'table-user',
           label: 'table user',
           children: [
-            {
+            new SchemaTreeNode({
               kind: 'field',
               id: 'column-id',
               label: 'id: pg/int4@1 (not null)',
-            },
-            {
+            }),
+            new SchemaTreeNode({
               kind: 'field',
               id: 'column-email',
               label: 'email: pg/text@1 (not null)',
-            },
-            {
+            }),
+            new SchemaTreeNode({
               kind: 'index',
               id: 'index-user-email',
               label: 'index user_email_unique',
-            },
+            }),
           ],
-        },
-        {
+        }),
+        new SchemaTreeNode({
           kind: 'entity',
           id: 'table-post',
           label: 'table post',
           children: [
-            {
+            new SchemaTreeNode({
               kind: 'field',
               id: 'column-id',
               label: 'id: pg/int4@1 (not null)',
-            },
+            }),
           ],
-        },
+        }),
       ],
-    },
+    }),
   });
 
   const createResult = (): IntrospectSchemaResult<unknown> => ({
@@ -123,11 +124,11 @@ describe('formatIntrospectOutput', () => {
 
   it('renders root with no children', () => {
     const schemaView: CoreSchemaView = {
-      root: {
+      root: new SchemaTreeNode({
         kind: 'root',
         id: 'sql-schema',
         label: 'sql schema (tables: 0)',
-      },
+      }),
     };
     const result = createResult();
     const flags = parseGlobalFlags({ 'no-color': true });
