@@ -93,8 +93,9 @@ describe('mongo db schema command (e2e)', { timeout: timeouts.spinUpDbServer }, 
       expect(parsed).toMatchObject({
         ok: true,
         schema: {
-          collections: expect.objectContaining({
-            users: expect.objectContaining({
+          collections: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'users',
               indexes: expect.arrayContaining([
                 expect.objectContaining({
                   keys: [{ field: 'email', direction: 1 }],
@@ -102,7 +103,7 @@ describe('mongo db schema command (e2e)', { timeout: timeouts.spinUpDbServer }, 
                 }),
               ]),
             }),
-          }),
+          ]),
         },
         target: {
           familyId: 'mongo',
