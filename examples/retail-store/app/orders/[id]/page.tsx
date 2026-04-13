@@ -30,7 +30,8 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
   }
 
   const total = order.items.reduce((sum, item) => sum + Number(item.price.amount) * item.amount, 0);
-  const lastStatus = order.statusHistory[order.statusHistory.length - 1]?.status as string;
+  const lastEntry = order.statusHistory[order.statusHistory.length - 1];
+  const lastStatus = lastEntry ? String(lastEntry.status) : 'placed';
 
   return (
     <div className="max-w-2xl">
@@ -83,7 +84,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
                   >
                     <Badge variant={statusVariant[s] ?? 'outline'}>{s}</Badge>
                     <span className="text-sm text-muted">
-                      {new Date(entry.timestamp as unknown as string).toLocaleString()}
+                      {new Date(String(entry.timestamp)).toLocaleString()}
                     </span>
                   </div>
                 );
