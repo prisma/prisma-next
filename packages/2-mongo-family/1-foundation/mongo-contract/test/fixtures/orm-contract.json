@@ -77,7 +77,20 @@
       "fields": {
         "_id": { "type": { "kind": "scalar", "codecId": "mongo/objectId@1" }, "nullable": false },
         "name": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
-        "email": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false }
+        "email": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
+        "loginCount": {
+          "type": { "kind": "scalar", "codecId": "mongo/int32@1" },
+          "nullable": false
+        },
+        "tags": {
+          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "nullable": false,
+          "many": true
+        },
+        "homeAddress": {
+          "type": { "kind": "valueObject", "name": "HomeAddress" },
+          "nullable": true
+        }
       },
       "relations": {
         "addresses": {
@@ -113,6 +126,14 @@
       },
       "relations": {},
       "owner": "Task"
+    }
+  },
+  "valueObjects": {
+    "HomeAddress": {
+      "fields": {
+        "city": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
+        "country": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false }
+      }
     }
   }
 }

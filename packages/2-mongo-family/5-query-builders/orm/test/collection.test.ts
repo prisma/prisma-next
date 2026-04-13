@@ -19,6 +19,14 @@ import type { MongoQueryExecutor } from '../src/executor';
 
 const contract = ormContractJson as unknown as Contract;
 
+const defaultUserData = {
+  name: 'Alice',
+  email: 'a@b.c',
+  loginCount: 0,
+  tags: [] as string[],
+  homeAddress: null,
+};
+
 function createMockExecutor(...responses: unknown[][]): MongoQueryExecutor & {
   lastPlan: MongoQueryPlan | undefined;
   readonly lastCommand: MongoQueryPlan['command'] | undefined;
@@ -386,14 +394,14 @@ describe('MongoCollection write methods', () => {
     it('returns created row with _id from insertedId', async () => {
       const executor = createMockExecutor([{ insertedId: 'new-id-1' }]);
       const col = createMongoCollection(contract, 'User', executor);
-      const result = await col.create({ name: 'Alice', email: 'a@b.c' });
-      expect(result).toEqual({ _id: 'new-id-1', name: 'Alice', email: 'a@b.c' });
+      const result = await col.create(defaultUserData);
+      expect(result).toEqual({ _id: 'new-id-1', ...defaultUserData });
     });
 
     it('sends an InsertOneCommand', async () => {
       const executor = createMockExecutor([{ insertedId: 'id' }]);
       const col = createMongoCollection(contract, 'User', executor);
-      await col.create({ name: 'Bob', email: 'b@b.c' });
+      await col.create({ ...defaultUserData, name: 'Bob', email: 'b@b.c' });
       expect(executor.lastCommand).toBeDefined();
       expect(executor.lastCommand!.kind).toBe('insertOne');
       expect(executor.lastCommand!.collection).toBe('users');
@@ -402,7 +410,7 @@ describe('MongoCollection write methods', () => {
     it('attaches codecId from contract fields to MongoParamRef in document', async () => {
       const executor = createMockExecutor([{ insertedId: 'id' }]);
       const col = createMongoCollection(contract, 'User', executor);
-      await col.create({ name: 'Alice', email: 'a@b.c' });
+      await col.create(defaultUserData);
       const command = executor.lastCommand!;
       expect(command.kind).toBe('insertOne');
       if (command.kind === 'insertOne') {
@@ -435,14 +443,14 @@ describe('MongoCollection write methods', () => {
       const col = createMongoCollection(contract, 'User', executor);
       const rows: unknown[] = [];
       for await (const row of col.createAll([
-        { name: 'Alice', email: 'a@b.c' },
-        { name: 'Bob', email: 'b@b.c' },
+        defaultUserData,
+        { ...defaultUserData, name: 'Bob', email: 'b@b.c' },
       ])) {
         rows.push(row);
       }
       expect(rows).toEqual([
-        { _id: 'id-1', name: 'Alice', email: 'a@b.c' },
-        { _id: 'id-2', name: 'Bob', email: 'b@b.c' },
+        { _id: 'id-1', ...defaultUserData },
+        { _id: 'id-2', ...defaultUserData, name: 'Bob', email: 'b@b.c' },
       ]);
     });
   });
@@ -452,8 +460,8 @@ describe('MongoCollection write methods', () => {
       const executor = createMockExecutor([{ insertedIds: ['a', 'b'], insertedCount: 2 }]);
       const col = createMongoCollection(contract, 'User', executor);
       const count = await col.createCount([
-        { name: 'Alice', email: 'a@b.c' },
-        { name: 'Bob', email: 'b@b.c' },
+        defaultUserData,
+        { ...defaultUserData, name: 'Bob', email: 'b@b.c' },
       ]);
       expect(count).toBe(2);
     });
@@ -579,7 +587,7 @@ describe('MongoCollection write methods', () => {
       const executor = createMockExecutor([{ _id: 'new-id', name: 'Alice', email: 'a@b.c' }]);
       const col = createMongoCollection(contract, 'User', executor);
       const result = await col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
-        create: { name: 'Alice', email: 'a@b.c' },
+        create: defaultUserData,
         update: { name: 'Alice Updated' },
       });
       expect(result).toEqual({ _id: 'new-id', name: 'Alice', email: 'a@b.c' });
@@ -591,7 +599,7 @@ describe('MongoCollection write methods', () => {
       const col = createMongoCollection(contract, 'User', executor);
       await expect(
         col.upsert({
-          create: { name: 'A', email: 'a@b.c' },
+          create: { ...defaultUserData, name: 'A' },
           update: { name: 'B' },
         }),
       ).rejects.toThrow('requires a .where()');
@@ -648,7 +656,7 @@ describe('MongoCollection write methods', () => {
       await expect(
         withFilter(executor)
           .take(1)
-          .upsert({ create: { name: 'A', email: 'a@b.c' }, update: { name: 'B' } }),
+          .upsert({ create: { ...defaultUserData, name: 'A' }, update: { name: 'B' } }),
       ).rejects.toThrow('orderBy/skip/take');
     });
   });
@@ -791,7 +799,7 @@ describe('MongoCollection write methods', () => {
       const col = createMongoCollection(contract, 'User', executor);
       await expect(
         col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
-          create: { name: 'Alice', email: 'a@b.c' },
+          create: defaultUserData,
           update: { _id: 'new-id', name: 'B' },
         }),
       ).rejects.toThrow('_id');
@@ -802,7 +810,7 @@ describe('MongoCollection write methods', () => {
     it('write methods do not mutate collection state', async () => {
       const executor = createMockExecutor([{ insertedId: 'x' }]);
       const col = createMongoCollection(contract, 'User', executor);
-      await col.create({ name: 'Alice', email: 'a@b.c' });
+      await col.create(defaultUserData);
       const filtered = col.where(MongoFieldFilter.eq('name', 'Alice'));
       expect(filtered).not.toBe(col);
     });

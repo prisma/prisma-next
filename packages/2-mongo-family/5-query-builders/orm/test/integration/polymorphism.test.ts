@@ -42,7 +42,13 @@ describe(
 
     it('base query returns rows with discriminator values', async () => {
       const orm = mongoOrm({ contract, executor: runtime });
-      const user = await orm.users.create({ name: 'Alice', email: 'alice@test.com' });
+      const user = await orm.users.create({
+        name: 'Alice',
+        email: 'alice@test.com',
+        loginCount: 0,
+        tags: [] as string[],
+        homeAddress: null,
+      });
 
       await orm.tasks.create({
         title: 'Fix crash',
@@ -63,7 +69,13 @@ describe(
 
     it('variant("Bug") filters to only Bug rows', async () => {
       const orm = mongoOrm({ contract, executor: runtime });
-      const user = await orm.users.create({ name: 'Alice', email: 'alice@test.com' });
+      const user = await orm.users.create({
+        name: 'Alice',
+        email: 'alice@test.com',
+        loginCount: 0,
+        tags: [] as string[],
+        homeAddress: null,
+      });
 
       await orm.tasks.create({
         title: 'Fix crash',
@@ -84,7 +96,13 @@ describe(
 
     it('variant("Feature") filters to only Feature rows', async () => {
       const orm = mongoOrm({ contract, executor: runtime });
-      const user = await orm.users.create({ name: 'Alice', email: 'alice@test.com' });
+      const user = await orm.users.create({
+        name: 'Alice',
+        email: 'alice@test.com',
+        loginCount: 0,
+        tags: [] as string[],
+        homeAddress: null,
+      });
 
       await orm.tasks.create({
         title: 'Fix crash',
@@ -105,7 +123,13 @@ describe(
 
     it('variant create injects discriminator and persists it', async () => {
       const orm = mongoOrm({ contract, executor: runtime });
-      const user = await orm.users.create({ name: 'Alice', email: 'alice@test.com' });
+      const user = await orm.users.create({
+        name: 'Alice',
+        email: 'alice@test.com',
+        loginCount: 0,
+        tags: [] as string[],
+        homeAddress: null,
+      });
 
       const bug = await orm.tasks.variant('Bug').create({
         title: 'Null pointer',
@@ -123,7 +147,13 @@ describe(
 
     it('round-trip: create via variant, read back via base', async () => {
       const orm = mongoOrm({ contract, executor: runtime });
-      const user = await orm.users.create({ name: 'Alice', email: 'alice@test.com' });
+      const user = await orm.users.create({
+        name: 'Alice',
+        email: 'alice@test.com',
+        loginCount: 0,
+        tags: [] as string[],
+        homeAddress: null,
+      });
 
       await orm.tasks.variant('Bug').create({
         title: 'Memory leak',
@@ -150,8 +180,20 @@ describe(
       const orm = mongoOrm({ contract, executor: runtime });
 
       await orm.users.createAll([
-        { name: 'Alice', email: 'alice@test.com' },
-        { name: 'Bob', email: 'bob@test.com' },
+        {
+          name: 'Alice',
+          email: 'alice@test.com',
+          loginCount: 0,
+          tags: [] as string[],
+          homeAddress: null,
+        },
+        {
+          name: 'Bob',
+          email: 'bob@test.com',
+          loginCount: 0,
+          tags: [] as string[],
+          homeAddress: null,
+        },
       ]);
 
       const users = await orm.users.all();
@@ -162,7 +204,13 @@ describe(
 
     it('variant().first() returns narrowed result', async () => {
       const orm = mongoOrm({ contract, executor: runtime });
-      const user = await orm.users.create({ name: 'Alice', email: 'alice@test.com' });
+      const user = await orm.users.create({
+        name: 'Alice',
+        email: 'alice@test.com',
+        loginCount: 0,
+        tags: [] as string[],
+        homeAddress: null,
+      });
 
       await orm.tasks.variant('Bug').create({
         title: 'Fix crash',
@@ -178,7 +226,13 @@ describe(
 
     it('variant createAll injects discriminator into each document', async () => {
       const orm = mongoOrm({ contract, executor: runtime });
-      const user = await orm.users.create({ name: 'Alice', email: 'alice@test.com' });
+      const user = await orm.users.create({
+        name: 'Alice',
+        email: 'alice@test.com',
+        loginCount: 0,
+        tags: [] as string[],
+        homeAddress: null,
+      });
 
       await orm.tasks.variant('Bug').createAll([
         { title: 'Bug 1', severity: 'low', assigneeId: user._id as string },
