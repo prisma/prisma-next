@@ -462,6 +462,7 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
         targetId: 'mongo',
         destination: {
           storageHash: contract.storage.storageHash,
+          profileHash: contract.profileHash,
         },
         operations: allOps,
       },

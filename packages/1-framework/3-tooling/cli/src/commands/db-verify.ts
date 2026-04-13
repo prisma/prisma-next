@@ -62,9 +62,25 @@ function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredErro
       return errorMarkerMissing();
     }
     if (verifyResult.code === 'PN-RUN-3002') {
+      const storageMatch = verifyResult.marker?.storageHash === verifyResult.contract.storageHash;
+      const profileMatch =
+        !verifyResult.contract.profileHash ||
+        verifyResult.marker?.profileHash === verifyResult.contract.profileHash;
+
+      if (!storageMatch) {
+        return errorHashMismatch({
+          why: 'Contract storageHash does not match database marker',
+          expected: verifyResult.contract.storageHash,
+          ...ifDefined('actual', verifyResult.marker?.storageHash),
+        });
+      }
+
       return errorHashMismatch({
-        expected: verifyResult.contract.storageHash,
-        ...ifDefined('actual', verifyResult.marker?.storageHash),
+        why: profileMatch
+          ? 'Contract hash does not match database marker'
+          : 'Contract profileHash does not match database marker',
+        expected: verifyResult.contract.profileHash,
+        ...ifDefined('actual', verifyResult.marker?.profileHash),
       });
     }
     if (verifyResult.code === 'PN-RUN-3003') {
