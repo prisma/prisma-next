@@ -36,7 +36,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const userId = await getAuthUserId();
   if (!userId) return unauthorized();
   const { id } = await params;
-  const body = await req.json();
+  let body: { status: string };
+  try {
+    const raw = await req.json();
+    if (typeof raw?.status !== 'string' || !raw.status) {
+      return NextResponse.json({ error: 'Missing required field: status' }, { status: 400 });
+    }
+    body = raw;
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
   const db = await getDb();
   const order = await getOrderById(db, id);
   if (!order || String(order.userId) !== userId) return notFound();

@@ -58,7 +58,7 @@ This populates all 7 collections with 24 products across 5 brands, 4 store locat
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). You'll be redirected to the sign-up page — click "Sign Up" to create a user and start browsing.
+Open [http://localhost:3000](http://localhost:3000). You'll be redirected to the login page — click "Sign Up" to create a user and start browsing.
 
 ### User Flow
 
@@ -76,7 +76,7 @@ To test `findSimilarProducts`, create a vector search index named `product_embed
 
 ## Domain Model
 
-```
+```text
 Products  ─── Price, Image (embedded value objects)
 Users     ─── Address? (optional embedded)
 Carts     ──→ User (reference relation), CartItem[] (embedded array)
@@ -91,7 +91,7 @@ Events    ─── polymorphic (@@discriminator on type)
 
 ## Project Structure
 
-```
+```text
 prisma/contract.prisma    PSL schema with types and models
 src/contract.json         Generated contract (machine-readable)
 src/contract.d.ts         Generated types (compile-time safety)
