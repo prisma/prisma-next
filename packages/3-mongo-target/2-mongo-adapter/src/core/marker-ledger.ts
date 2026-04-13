@@ -1,3 +1,4 @@
+// TODO(TML-2253): Migrate to typed query AST commands (RawFindOneCommand, RawInsertOneCommand, etc.)
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { Db } from 'mongodb';
 
