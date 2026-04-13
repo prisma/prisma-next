@@ -37,7 +37,7 @@ export interface InsertQuery<
       ...columns: Columns
     ) => InsertQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>
   >;
-  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>>;
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>;
 }
 
 export interface UpdateQuery<
@@ -53,7 +53,7 @@ export interface UpdateQuery<
       ...columns: Columns
     ) => UpdateQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>
   >;
-  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>>;
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>;
 }
 
 export interface DeleteQuery<
@@ -69,5 +69,5 @@ export interface DeleteQuery<
       ...columns: Columns
     ) => DeleteQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>
   >;
-  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>>;
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>;
 }

@@ -281,6 +281,7 @@ describe('extension functions', () => {
       readonly codecTypes: Record<string, { readonly input: unknown; readonly output: unknown }>;
       readonly capabilities: Record<string, Record<string, boolean>>;
       readonly queryOperationTypes: typeof opTypes;
+      readonly resolvedColumnOutputTypes: Record<string, never>;
     };
     const typedFns = fns as unknown as Functions<TestQC>;
     const result = typedFns.cosineDistance(expr1, expr2);

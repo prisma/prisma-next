@@ -1,3 +1,4 @@
+import type { Char } from '@prisma-next/adapter-postgres/codec-types';
 import { describe, expect, it } from 'vitest';
 import { setupIntegrationTest } from './setup';
 
@@ -16,7 +17,7 @@ describe('integration: mutation defaults', () => {
   });
 
   it('INSERT respects user-provided value over execution default', async () => {
-    const explicitId = '00000000-0000-4000-8000-000000000001';
+    const explicitId = '00000000-0000-4000-8000-000000000001' as Char<36>;
     const row = await runtime()
       .execute(
         db()
