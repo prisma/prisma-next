@@ -1,3 +1,4 @@
+import { introspectSchema } from '@prisma-next/adapter-mongo/control';
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ControlDriverInstance,
@@ -9,12 +10,13 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
+import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import type { Db } from 'mongodb';
 
 const MIGRATIONS_COLLECTION = '_prisma_migrations';
 const MARKER_ID = 'marker';
 
-export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo'> {
+export interface MongoControlFamilyInstance extends ControlFamilyInstance<'mongo', MongoSchemaIR> {
   validateContract(contractJson: unknown): Contract;
 }
 
@@ -39,15 +41,33 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     return validated.contract as unknown as Contract;
   }
 
-  async verify(): Promise<VerifyDatabaseResult> {
+  async verify(_options: {
+    readonly driver: ControlDriverInstance<'mongo', string>;
+    readonly contract: unknown;
+    readonly expectedTargetId: string;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<VerifyDatabaseResult> {
     throw new Error('Mongo verify is not implemented');
   }
 
-  async schemaVerify(): Promise<VerifyDatabaseSchemaResult> {
+  async schemaVerify(_options: {
+    readonly driver: ControlDriverInstance<'mongo', string>;
+    readonly contract: unknown;
+    readonly strict: boolean;
+    readonly contractPath: string;
+    readonly configPath?: string;
+    readonly frameworkComponents: ReadonlyArray<unknown>;
+  }): Promise<VerifyDatabaseSchemaResult> {
     throw new Error('Mongo schemaVerify is not implemented');
   }
 
-  async sign(): Promise<SignDatabaseResult> {
+  async sign(_options: {
+    readonly driver: ControlDriverInstance<'mongo', string>;
+    readonly contract: unknown;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<SignDatabaseResult> {
     throw new Error('Mongo sign is not implemented');
   }
 
@@ -70,8 +90,12 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     };
   }
 
-  async introspect() {
-    throw new Error('Mongo introspect is not implemented');
+  async introspect(options: {
+    readonly driver: ControlDriverInstance<'mongo', string>;
+    readonly contract?: unknown;
+  }): Promise<MongoSchemaIR> {
+    const db = extractDb(options.driver);
+    return introspectSchema(db);
   }
 }
 

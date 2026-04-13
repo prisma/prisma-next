@@ -1374,6 +1374,9 @@ importers:
       '@prisma-next/mongo-emitter':
         specifier: workspace:*
         version: link:../3-tooling/emitter
+      '@prisma-next/mongo-schema-ir':
+        specifier: workspace:*
+        version: link:../3-tooling/mongo-schema-ir
       '@prisma-next/target-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/1-mongo-target
