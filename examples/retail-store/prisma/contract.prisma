@@ -78,7 +78,7 @@ model Cart {
   items  CartItem[]
   user   User       @relation(fields: [userId], references: [id])
   @@map("carts")
-  @@index([userId])
+  @@unique([userId])
 }
 
 model Order {

@@ -11,8 +11,13 @@ export function findProducts(db: Db) {
   return db.orm.products.all();
 }
 
-export function findProductsPaginated(db: Db, skip: number, take: number) {
-  return db.orm.products.skip(skip).take(take).all();
+export async function findProductsPaginated(
+  db: Db,
+  skip: number,
+  take: number,
+): Promise<Product[]> {
+  const plan = db.pipeline.from('products').sort({ _id: 1 }).skip(skip).limit(take).build();
+  return collectResults<Product>(db, plan);
 }
 
 export function findProductById(db: Db, id: string) {
