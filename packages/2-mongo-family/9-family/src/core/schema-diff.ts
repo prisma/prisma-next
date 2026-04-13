@@ -77,9 +77,11 @@ export function diffMongoSchemas(
       continue;
     }
 
-    const indexChildren = diffIndexes(name, liveColl!, expectedColl!, strict, issues);
-    const validatorChildren = diffValidator(name, liveColl!, expectedColl!, strict, issues);
-    const optionsChildren = diffOptions(name, liveColl!, expectedColl!, strict, issues);
+    const lc = liveColl as MongoSchemaCollection;
+    const ec = expectedColl as MongoSchemaCollection;
+    const indexChildren = diffIndexes(name, lc, ec, strict, issues);
+    const validatorChildren = diffValidator(name, lc, ec, strict, issues);
+    const optionsChildren = diffOptions(name, lc, ec, strict, issues);
     const children = [...indexChildren, ...validatorChildren, ...optionsChildren];
 
     const worstStatus = children.reduce<'pass' | 'warn' | 'fail'>(
@@ -272,13 +274,15 @@ function diffValidator(
     ];
   }
 
-  const liveSchema = canonicalize(live.validator!.jsonSchema);
-  const expectedSchema = canonicalize(expected.validator!.jsonSchema);
+  const liveVal = live.validator as NonNullable<typeof live.validator>;
+  const expectedVal = expected.validator as NonNullable<typeof expected.validator>;
+  const liveSchema = canonicalize(liveVal.jsonSchema);
+  const expectedSchema = canonicalize(expectedVal.jsonSchema);
 
   if (
     liveSchema !== expectedSchema ||
-    live.validator!.validationLevel !== expected.validator!.validationLevel ||
-    live.validator!.validationAction !== expected.validator!.validationAction
+    liveVal.validationLevel !== expectedVal.validationLevel ||
+    liveVal.validationAction !== expectedVal.validationAction
   ) {
     issues.push({
       kind: 'type_mismatch',
@@ -296,14 +300,14 @@ function diffValidator(
         code: 'VALIDATOR_MISMATCH',
         message: 'Validator mismatch',
         expected: {
-          jsonSchema: expected.validator!.jsonSchema,
-          validationLevel: expected.validator!.validationLevel,
-          validationAction: expected.validator!.validationAction,
+          jsonSchema: expectedVal.jsonSchema,
+          validationLevel: expectedVal.validationLevel,
+          validationAction: expectedVal.validationAction,
         },
         actual: {
-          jsonSchema: live.validator!.jsonSchema,
-          validationLevel: live.validator!.validationLevel,
-          validationAction: live.validator!.validationAction,
+          jsonSchema: liveVal.jsonSchema,
+          validationLevel: liveVal.validationLevel,
+          validationAction: liveVal.validationAction,
         },
         children: [],
       },
@@ -339,7 +343,6 @@ function diffOptions(
     issues.push({
       kind: 'type_mismatch',
       table: collName,
-      expected: null,
       actual: canonicalize(live.options),
       message: `Extra collection options on "${collName}"`,
     });
