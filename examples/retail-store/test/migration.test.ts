@@ -50,7 +50,9 @@ describe('migration', { timeout: timeouts.spinUpDbServer }, () => {
       { keys: [{ field: 'email', direction: 1 }], unique: true },
     ]);
 
-    expect(collections.carts.indexes).toEqual([{ keys: [{ field: 'userId', direction: 1 }] }]);
+    expect(collections.carts.indexes).toEqual([
+      { keys: [{ field: 'userId', direction: 1 }], unique: true },
+    ]);
 
     expect(collections.orders.indexes).toEqual([{ keys: [{ field: 'userId', direction: 1 }] }]);
 
@@ -90,7 +92,7 @@ describe('migration', { timeout: timeouts.spinUpDbServer }, () => {
     await db.collection('products').createIndex({ brand: 1, subCategory: 1 });
     await db.collection('products').createIndex({ code: 'hashed' });
     await db.collection('users').createIndex({ email: 1 }, { unique: true });
-    await db.collection('carts').createIndex({ userId: 1 });
+    await db.collection('carts').createIndex({ userId: 1 }, { unique: true });
     await db.collection('orders').createIndex({ userId: 1 });
     await db.collection('events').createIndex({ userId: 1, timestamp: -1 });
     await db.collection('events').createIndex({ timestamp: 1 }, { expireAfterSeconds: 7776000 });
