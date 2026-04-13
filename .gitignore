@@ -26,6 +26,9 @@ CLAUDE.local.md
 **/reviews/code-review.md
 **/reviews/walkthrough.md
 
+# Local review artifacts
+projects/**/reviews/
+
 # Generated contract files in test fixtures
 test/**/fixtures/generated/
 !test/e2e/framework/test/fixtures/generated/
