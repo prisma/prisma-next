@@ -78,6 +78,7 @@ export type QueryContext = {
   readonly codecTypes: CodecTypesBase;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly queryOperationTypes: QueryOperationTypesBase;
+  readonly resolvedColumnOutputTypes: Record<string, unknown>;
 };
 
 export type { CodecTypesBase, StorageTable };
