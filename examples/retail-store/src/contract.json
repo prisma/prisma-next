@@ -1272,26 +1272,33 @@
                 "bsonType": "objectId"
               },
               "address": {
-                "bsonType": "object",
-                "properties": {
-                  "city": {
-                    "bsonType": "string"
+                "oneOf": [
+                  {
+                    "bsonType": "null"
                   },
-                  "country": {
-                    "bsonType": "string"
-                  },
-                  "postalCode": {
-                    "bsonType": "string"
-                  },
-                  "streetAndNumber": {
-                    "bsonType": "string"
+                  {
+                    "bsonType": "object",
+                    "properties": {
+                      "city": {
+                        "bsonType": "string"
+                      },
+                      "country": {
+                        "bsonType": "string"
+                      },
+                      "postalCode": {
+                        "bsonType": "string"
+                      },
+                      "streetAndNumber": {
+                        "bsonType": "string"
+                      }
+                    },
+                    "required": [
+                      "city",
+                      "country",
+                      "postalCode",
+                      "streetAndNumber"
+                    ]
                   }
-                },
-                "required": [
-                  "city",
-                  "country",
-                  "postalCode",
-                  "streetAndNumber"
                 ]
               },
               "email": {
@@ -1343,7 +1350,7 @@
         }
       }
     },
-    "storageHash": "sha256:844c1b104857432625f127e3c8a9bc59789d5e5bd6bd3d62104c80068c26b3e7"
+    "storageHash": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d"
   },
   "capabilities": {},
   "extensionPacks": {},

@@ -582,22 +582,29 @@
                   "bsonType": "objectId"
                 },
                 "address": {
-                  "bsonType": "object",
-                  "properties": {
-                    "city": {
-                      "bsonType": "string"
+                  "oneOf": [
+                    {
+                      "bsonType": "null"
                     },
-                    "country": {
-                      "bsonType": "string"
-                    },
-                    "postalCode": {
-                      "bsonType": "string"
-                    },
-                    "streetAndNumber": {
-                      "bsonType": "string"
+                    {
+                      "bsonType": "object",
+                      "properties": {
+                        "city": {
+                          "bsonType": "string"
+                        },
+                        "country": {
+                          "bsonType": "string"
+                        },
+                        "postalCode": {
+                          "bsonType": "string"
+                        },
+                        "streetAndNumber": {
+                          "bsonType": "string"
+                        }
+                      },
+                      "required": ["city", "country", "postalCode", "streetAndNumber"]
                     }
-                  },
-                  "required": ["city", "country", "postalCode", "streetAndNumber"]
+                  ]
                 },
                 "email": {
                   "bsonType": "string"
