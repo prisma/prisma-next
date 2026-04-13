@@ -65,7 +65,7 @@ Full details in [projects/mongo-example-apps/framework-limitations.md](../../../
 | FL-03 | Timestamp codec type incompatible with `Date`/`string` | Type ergonomics |
 | FL-04 | No typed `$push`/`$pull`/`$inc` | ORM mutations |
 | FL-05 | Pipeline/raw results untyped | Query results |
-| FL-06 | ObjectId filter requires manual `MongoParamRef` wrapping | ORM queries |
+| FL-06 | `where()` does not encode filter values through codecs | ORM queries |
 | FL-07 | No `$vectorSearch` in pipeline builder | Extension (deferred) |
 | FL-08 | 1:N back-relation loading not available/tested | ORM queries |
 | FL-09 | Migration planner creates separate collections for variants | Migration bugs |
@@ -110,10 +110,10 @@ Full details in [projects/mongo-example-apps/framework-limitations.md](../../../
 **Scope**:
 
 - **FL-04**: Implement dot-path field accessor mutations — `$push`, `$pull`, `$inc`, `$set` on nested paths via `u("field.path")` (deferred Phase 1.5 M4). Maps to [ADR 180](../../architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md).
-- **FL-06**: ORM `where()` should auto-encode ObjectId-typed fields. When a contract field has `codecId: 'mongo/objectId@1'`, the ORM should wrap the value in `MongoParamRef` automatically instead of requiring the user to construct it manually.
+- **FL-06**: ORM `where()` should encode filter values through codecs, the same way mutations already do. When a contract field has a `codecId`, the ORM should wrap the value in `MongoParamRef` with that codec automatically. Most visible with ObjectId (string → BSON ObjectId), but applies to any codec with a non-identity `encode`.
 - **FL-08**: Validate and test 1:N back-relation loading via `include()`. If it works, add test coverage. If it doesn't, implement it.
 
-**Proof**: The retail store's `mongoRaw` calls for cart add/remove and order status update are replaced with ORM `update()` calls. ObjectId filter helpers (`objectIdEq()`) are removed.
+**Proof**: The retail store's `mongoRaw` calls for cart add/remove and order status update are replaced with ORM `update()` calls. Manual filter helpers (`objectIdEq()`, `rawObjectIdFilter()`) are removed — `where({ userId })` encodes values through codecs automatically.
 
 **Depends on**: Area 1 (type fixes reduce noise, but not a hard blocker).
 
