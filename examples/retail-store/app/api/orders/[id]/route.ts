@@ -17,7 +17,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const db = await getDb();
   const order = await getOrderWithUser(db, id);
-  if (!order || String(order.userId) !== userId) return notFound();
+  if (!order || order.userId !== userId) return notFound();
   return NextResponse.json(order);
 }
 
@@ -27,7 +27,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const db = await getDb();
   const order = await getOrderById(db, id);
-  if (!order || String(order.userId) !== userId) return notFound();
+  if (!order || order.userId !== userId) return notFound();
   const deleted = await deleteOrder(db, id);
   return NextResponse.json(deleted);
 }
@@ -48,7 +48,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   const db = await getDb();
   const order = await getOrderById(db, id);
-  if (!order || String(order.userId) !== userId) return notFound();
+  if (!order || order.userId !== userId) return notFound();
   await updateOrderStatus(db, id, {
     status: body.status,
     timestamp: new Date(),

@@ -30,12 +30,12 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       address: null,
     });
 
-    await addToCart(ctx.db, user._id as string, ITEM);
-    const cart = await getCartByUserId(ctx.db, user._id as string);
+    await addToCart(ctx.db, user._id, ITEM);
+    const cart = await getCartByUserId(ctx.db, user._id);
     expect(cart!.items).toHaveLength(1);
 
     const order = await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: cart!.items,
       shippingAddress: '123 Main St',
       type: 'home',
@@ -46,8 +46,8 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
     expect(order.items).toHaveLength(1);
     expect(order.statusHistory[0]).toMatchObject({ status: 'placed' });
 
-    await clearCart(ctx.db, user._id as string);
-    const clearedCart = await getCartByUserId(ctx.db, user._id as string);
+    await clearCart(ctx.db, user._id);
+    const clearedCart = await getCartByUserId(ctx.db, user._id);
     expect(clearedCart!.items).toHaveLength(0);
   });
 
@@ -59,21 +59,21 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
     });
 
     const order = await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: [ITEM],
       shippingAddress: '456 Oak Ave',
       type: 'home',
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-03-01T10:00:00Z') }],
     });
 
-    const shipped = await updateOrderStatus(ctx.db, order._id as string, {
+    const shipped = await updateOrderStatus(ctx.db, order._id, {
       status: 'shipped',
       timestamp: new Date('2026-03-02T14:00:00Z'),
     });
     expect(shipped).not.toBeNull();
     expect(shipped!['statusHistory']).toHaveLength(2);
 
-    const delivered = await updateOrderStatus(ctx.db, order._id as string, {
+    const delivered = await updateOrderStatus(ctx.db, order._id, {
       status: 'delivered',
       timestamp: new Date('2026-03-04T09:00:00Z'),
     });
@@ -102,14 +102,14 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
     });
 
     const order = await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: [ITEM],
       shippingAddress: '789 Elm',
       type: 'home',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
-    const withUser = await getOrderWithUser(ctx.db, order._id as string);
+    const withUser = await getOrderWithUser(ctx.db, order._id);
     expect(withUser).not.toBeNull();
     expect(withUser!.user).toMatchObject({ name: 'Carol', email: 'carol@example.com' });
   });
@@ -122,21 +122,21 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
     });
 
     await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: [ITEM],
       shippingAddress: 'Addr 1',
       type: 'home',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
     await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: [{ ...ITEM, productId: 'prod-2', name: 'Chinos' }],
       shippingAddress: 'Addr 2',
       type: 'bopis',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
-    const orders = await getUserOrders(ctx.db, user._id as string);
+    const orders = await getUserOrders(ctx.db, user._id);
     expect(orders).toHaveLength(2);
   });
 
@@ -148,15 +148,15 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
     });
 
     const order = await createOrder(ctx.db, {
-      userId: user._id as string,
+      userId: user._id,
       items: [ITEM],
       shippingAddress: '101 Pine',
       type: 'home',
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
-    await deleteOrder(ctx.db, order._id as string);
-    const found = await getOrderById(ctx.db, order._id as string);
+    await deleteOrder(ctx.db, order._id);
+    const found = await getOrderById(ctx.db, order._id);
     expect(found).toBeNull();
   });
 });

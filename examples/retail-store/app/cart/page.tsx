@@ -18,7 +18,7 @@ export default async function CartPage() {
   const cart = await getCartByUserId(db, userId);
   const items = cart?.items ?? [];
 
-  const total = items.reduce((sum, item) => sum + Number(item.price.amount) * item.amount, 0);
+  const total = items.reduce((sum, item) => sum + item.price.amount * item.amount, 0);
 
   return (
     <div className="max-w-2xl">
@@ -45,9 +45,9 @@ export default async function CartPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-semibold">
-                      ${(Number(item.price.amount) * item.amount).toFixed(2)}
+                      ${(item.price.amount * item.amount).toFixed(2)}
                     </span>
-                    <CartActions productId={item.productId as string} mode="remove" />
+                    <CartActions productId={item.productId} mode="remove" />
                   </div>
                 </CardContent>
               </Card>

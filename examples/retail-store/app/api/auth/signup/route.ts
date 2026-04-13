@@ -13,12 +13,12 @@ export async function POST() {
   });
 
   const cookieStore = await cookies();
-  cookieStore.set('userId', String(user._id), {
+  cookieStore.set('userId', user._id, {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 30,
   });
 
-  return NextResponse.json({ id: String(user._id), name: user.name });
+  return NextResponse.json({ id: user._id, name: user.name });
 }

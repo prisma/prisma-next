@@ -33,14 +33,14 @@ export default async function OrdersPage() {
           {orders.map((order) => {
             const lastStatus = order.statusHistory[order.statusHistory.length - 1];
             const total = order.items.reduce(
-              (sum, item) => sum + Number(item.price.amount) * item.amount,
+              (sum, item) => sum + item.price.amount * item.amount,
               0,
             );
-            const status = lastStatus?.status as string;
+            const status = lastStatus?.status;
             return (
               <Link
-                key={String(order._id)}
-                href={`/orders/${String(order._id)}`}
+                key={order._id}
+                href={`/orders/${order._id}`}
                 className="no-underline text-inherit"
               >
                 <Card className="hover:shadow-md transition-shadow">

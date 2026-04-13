@@ -38,18 +38,18 @@ export default async function ProductDetail({ params }: { params: Promise<{ id: 
             <Badge variant="outline">{product.articleType}</Badge>
           </div>
           <div className="text-2xl font-bold text-accent">
-            ${Number(product.price.amount).toFixed(2)} {product.price.currency}
+            ${product.price.amount.toFixed(2)} {product.price.currency}
           </div>
           <AddToCartButton
             product={{
-              _id: String(product._id),
-              name: product.name as string,
-              brand: product.brand as string,
+              _id: product._id,
+              name: product.name,
+              brand: product.brand,
               price: {
-                amount: Number(product.price.amount),
-                currency: product.price.currency as string,
+                amount: product.price.amount,
+                currency: product.price.currency,
               },
-              image: { url: product.image.url as string },
+              image: { url: product.image.url },
             }}
           />
           <p className="text-xs text-muted">Code: {product.code}</p>

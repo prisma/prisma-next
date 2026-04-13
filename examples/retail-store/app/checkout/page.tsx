@@ -24,15 +24,15 @@ export default async function CheckoutPage() {
   const items = cart?.items ?? [];
   if (items.length === 0) redirect('/cart');
 
-  const total = items.reduce((sum, item) => sum + Number(item.price.amount) * item.amount, 0);
+  const total = items.reduce((sum, item) => sum + item.price.amount * item.amount, 0);
 
   const userAddress = user?.address
     ? `${user.address.streetAndNumber}, ${user.address.city}, ${user.address.postalCode}, ${user.address.country}`
     : '';
 
   const locationList = locations.map((loc) => ({
-    id: String(loc._id),
-    name: String(loc.name),
+    id: loc._id,
+    name: loc.name,
     address: `${loc.streetAndNumber}, ${loc.city}`,
   }));
 
@@ -56,7 +56,7 @@ export default async function CheckoutPage() {
                 <span>
                   {item.name} ×{item.amount}
                 </span>
-                <span>${(Number(item.price.amount) * item.amount).toFixed(2)}</span>
+                <span>${(item.price.amount * item.amount).toFixed(2)}</span>
               </div>
             ))}
           </div>
@@ -70,12 +70,12 @@ export default async function CheckoutPage() {
             defaultAddress={userAddress}
             locations={locationList}
             cartItems={items.map((item) => ({
-              productId: String(item.productId),
-              name: String(item.name),
-              brand: String(item.brand),
+              productId: item.productId,
+              name: item.name,
+              brand: item.brand,
               amount: item.amount,
-              price: { amount: Number(item.price.amount), currency: String(item.price.currency) },
-              image: { url: String(item.image.url) },
+              price: { amount: item.price.amount, currency: item.price.currency },
+              image: { url: item.image.url },
             }))}
           />
         </CardContent>
