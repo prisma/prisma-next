@@ -29,17 +29,15 @@ function parseIndex(doc: Document): MongoSchemaIndex {
   const keySpec = doc['key'] as Record<string, unknown>;
   return new MongoSchemaIndex({
     keys: parseIndexKeys(keySpec),
-    unique: (doc['unique'] as boolean | undefined) ?? undefined,
-    sparse: (doc['sparse'] as boolean | undefined) ?? undefined,
-    expireAfterSeconds: (doc['expireAfterSeconds'] as number | undefined) ?? undefined,
-    partialFilterExpression:
-      (doc['partialFilterExpression'] as Record<string, unknown> | undefined) ?? undefined,
-    wildcardProjection:
-      (doc['wildcardProjection'] as Record<string, 0 | 1> | undefined) ?? undefined,
-    collation: (doc['collation'] as Record<string, unknown> | undefined) ?? undefined,
-    weights: (doc['weights'] as Record<string, number> | undefined) ?? undefined,
-    default_language: (doc['default_language'] as string | undefined) ?? undefined,
-    language_override: (doc['language_override'] as string | undefined) ?? undefined,
+    unique: doc['unique'] as boolean | undefined,
+    sparse: doc['sparse'] as boolean | undefined,
+    expireAfterSeconds: doc['expireAfterSeconds'] as number | undefined,
+    partialFilterExpression: doc['partialFilterExpression'] as Record<string, unknown> | undefined,
+    wildcardProjection: doc['wildcardProjection'] as Record<string, 0 | 1> | undefined,
+    collation: doc['collation'] as Record<string, unknown> | undefined,
+    weights: doc['weights'] as Record<string, number> | undefined,
+    default_language: doc['default_language'] as string | undefined,
+    language_override: doc['language_override'] as string | undefined,
   });
 }
 
