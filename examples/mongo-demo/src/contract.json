@@ -214,19 +214,146 @@
   },
   "storage": {
     "collections": {
-      "article": {},
-      "posts": {},
-      "tutorial": {},
+      "article": {
+        "validator": {
+          "jsonSchema": {
+            "bsonType": "object",
+            "properties": {
+              "summary": {
+                "bsonType": "string"
+              }
+            },
+            "required": [
+              "summary"
+            ]
+          },
+          "validationAction": "error",
+          "validationLevel": "strict"
+        }
+      },
+      "posts": {
+        "validator": {
+          "jsonSchema": {
+            "bsonType": "object",
+            "properties": {
+              "_id": {
+                "bsonType": "objectId"
+              },
+              "authorId": {
+                "bsonType": "objectId"
+              },
+              "content": {
+                "bsonType": "string"
+              },
+              "createdAt": {
+                "bsonType": "date"
+              },
+              "kind": {
+                "bsonType": "string"
+              },
+              "title": {
+                "bsonType": "string"
+              }
+            },
+            "required": [
+              "_id",
+              "authorId",
+              "content",
+              "createdAt",
+              "kind",
+              "title"
+            ]
+          },
+          "validationAction": "error",
+          "validationLevel": "strict"
+        }
+      },
+      "tutorial": {
+        "validator": {
+          "jsonSchema": {
+            "bsonType": "object",
+            "properties": {
+              "difficulty": {
+                "bsonType": "string"
+              },
+              "duration": {
+                "bsonType": "int"
+              }
+            },
+            "required": [
+              "difficulty",
+              "duration"
+            ]
+          },
+          "validationAction": "error",
+          "validationLevel": "strict"
+        }
+      },
       "users": {
-        "indexes": [
-          {
-            "keys": [{ "field": "email", "direction": 1 }],
-            "unique": true
-          }
-        ]
+        "validator": {
+          "jsonSchema": {
+            "bsonType": "object",
+            "properties": {
+              "_id": {
+                "bsonType": "objectId"
+              },
+              "address": {
+                "oneOf": [
+                  {
+                    "bsonType": "null"
+                  },
+                  {
+                    "bsonType": "object",
+                    "properties": {
+                      "city": {
+                        "bsonType": "string"
+                      },
+                      "country": {
+                        "bsonType": "string"
+                      },
+                      "street": {
+                        "bsonType": "string"
+                      },
+                      "zip": {
+                        "bsonType": [
+                          "null",
+                          "string"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "city",
+                      "country",
+                      "street"
+                    ]
+                  }
+                ]
+              },
+              "bio": {
+                "bsonType": [
+                  "null",
+                  "string"
+                ]
+              },
+              "email": {
+                "bsonType": "string"
+              },
+              "name": {
+                "bsonType": "string"
+              }
+            },
+            "required": [
+              "_id",
+              "email",
+              "name"
+            ]
+          },
+          "validationAction": "error",
+          "validationLevel": "strict"
+        }
       }
     },
-    "storageHash": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe"
+    "storageHash": "sha256:75b661bfd9821fea5cf1d87c416de45ea331e58ba65787c853bb1ee3642fa116"
   },
   "capabilities": {},
   "extensionPacks": {},

@@ -21,42 +21,79 @@ export type ProfileHash =
 export type CodecTypes = MongoCodecTypes;
 export type OperationTypes = Record<string, never>;
 
-export type Price = {
+export type PriceOutput = {
   readonly amount: CodecTypes['mongo/double@1']['output'];
   readonly currency: CodecTypes['mongo/string@1']['output'];
 };
-export type Image = { readonly url: CodecTypes['mongo/string@1']['output'] };
-export type Address = {
+export type PriceInput = {
+  readonly amount: CodecTypes['mongo/double@1']['input'];
+  readonly currency: CodecTypes['mongo/string@1']['input'];
+};
+export type ImageOutput = { readonly url: CodecTypes['mongo/string@1']['output'] };
+export type ImageInput = { readonly url: CodecTypes['mongo/string@1']['input'] };
+export type AddressOutput = {
   readonly streetAndNumber: CodecTypes['mongo/string@1']['output'];
   readonly city: CodecTypes['mongo/string@1']['output'];
   readonly postalCode: CodecTypes['mongo/string@1']['output'];
   readonly country: CodecTypes['mongo/string@1']['output'];
 };
-export type CartItem = {
+export type AddressInput = {
+  readonly streetAndNumber: CodecTypes['mongo/string@1']['input'];
+  readonly city: CodecTypes['mongo/string@1']['input'];
+  readonly postalCode: CodecTypes['mongo/string@1']['input'];
+  readonly country: CodecTypes['mongo/string@1']['input'];
+};
+export type CartItemOutput = {
   readonly productId: CodecTypes['mongo/string@1']['output'];
   readonly name: CodecTypes['mongo/string@1']['output'];
   readonly brand: CodecTypes['mongo/string@1']['output'];
   readonly amount: CodecTypes['mongo/int32@1']['output'];
-  readonly price: Price;
-  readonly image: Image;
+  readonly price: PriceOutput;
+  readonly image: ImageOutput;
 };
-export type OrderLineItem = {
+export type CartItemInput = {
+  readonly productId: CodecTypes['mongo/string@1']['input'];
+  readonly name: CodecTypes['mongo/string@1']['input'];
+  readonly brand: CodecTypes['mongo/string@1']['input'];
+  readonly amount: CodecTypes['mongo/int32@1']['input'];
+  readonly price: PriceInput;
+  readonly image: ImageInput;
+};
+export type OrderLineItemOutput = {
   readonly productId: CodecTypes['mongo/string@1']['output'];
   readonly name: CodecTypes['mongo/string@1']['output'];
   readonly brand: CodecTypes['mongo/string@1']['output'];
   readonly amount: CodecTypes['mongo/int32@1']['output'];
-  readonly price: Price;
-  readonly image: Image;
+  readonly price: PriceOutput;
+  readonly image: ImageOutput;
 };
-export type StatusEntry = {
+export type OrderLineItemInput = {
+  readonly productId: CodecTypes['mongo/string@1']['input'];
+  readonly name: CodecTypes['mongo/string@1']['input'];
+  readonly brand: CodecTypes['mongo/string@1']['input'];
+  readonly amount: CodecTypes['mongo/int32@1']['input'];
+  readonly price: PriceInput;
+  readonly image: ImageInput;
+};
+export type StatusEntryOutput = {
   readonly status: CodecTypes['mongo/string@1']['output'];
   readonly timestamp: CodecTypes['mongo/date@1']['output'];
 };
-export type InvoiceLineItem = {
+export type StatusEntryInput = {
+  readonly status: CodecTypes['mongo/string@1']['input'];
+  readonly timestamp: CodecTypes['mongo/date@1']['input'];
+};
+export type InvoiceLineItemOutput = {
   readonly name: CodecTypes['mongo/string@1']['output'];
   readonly amount: CodecTypes['mongo/int32@1']['output'];
   readonly unitPrice: CodecTypes['mongo/double@1']['output'];
   readonly lineTotal: CodecTypes['mongo/double@1']['output'];
+};
+export type InvoiceLineItemInput = {
+  readonly name: CodecTypes['mongo/string@1']['input'];
+  readonly amount: CodecTypes['mongo/int32@1']['input'];
+  readonly unitPrice: CodecTypes['mongo/double@1']['input'];
+  readonly lineTotal: CodecTypes['mongo/double@1']['input'];
 };
 export type FieldOutputTypes = {
   readonly AddToCartEvent: {
@@ -66,7 +103,7 @@ export type FieldOutputTypes = {
   readonly Cart: {
     readonly _id: CodecTypes['mongo/objectId@1']['output'];
     readonly userId: CodecTypes['mongo/objectId@1']['output'];
-    readonly items: ReadonlyArray<CartItem>;
+    readonly items: ReadonlyArray<CartItemOutput>;
   };
   readonly Event: {
     readonly _id: CodecTypes['mongo/objectId@1']['output'];
@@ -78,7 +115,7 @@ export type FieldOutputTypes = {
   readonly Invoice: {
     readonly _id: CodecTypes['mongo/objectId@1']['output'];
     readonly orderId: CodecTypes['mongo/objectId@1']['output'];
-    readonly items: ReadonlyArray<InvoiceLineItem>;
+    readonly items: ReadonlyArray<InvoiceLineItemOutput>;
     readonly subtotal: CodecTypes['mongo/double@1']['output'];
     readonly tax: CodecTypes['mongo/double@1']['output'];
     readonly total: CodecTypes['mongo/double@1']['output'];
@@ -95,10 +132,10 @@ export type FieldOutputTypes = {
   readonly Order: {
     readonly _id: CodecTypes['mongo/objectId@1']['output'];
     readonly userId: CodecTypes['mongo/objectId@1']['output'];
-    readonly items: ReadonlyArray<OrderLineItem>;
+    readonly items: ReadonlyArray<OrderLineItemOutput>;
     readonly shippingAddress: CodecTypes['mongo/string@1']['output'];
     readonly type: CodecTypes['mongo/string@1']['output'];
-    readonly statusHistory: ReadonlyArray<StatusEntry>;
+    readonly statusHistory: ReadonlyArray<StatusEntryOutput>;
   };
   readonly Product: {
     readonly _id: CodecTypes['mongo/objectId@1']['output'];
@@ -109,8 +146,8 @@ export type FieldOutputTypes = {
     readonly masterCategory: CodecTypes['mongo/string@1']['output'];
     readonly subCategory: CodecTypes['mongo/string@1']['output'];
     readonly articleType: CodecTypes['mongo/string@1']['output'];
-    readonly price: Price;
-    readonly image: Image;
+    readonly price: PriceOutput;
+    readonly image: ImageOutput;
     readonly embedding: ReadonlyArray<CodecTypes['mongo/double@1']['output']> | null;
   };
   readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['output'] };
@@ -118,7 +155,7 @@ export type FieldOutputTypes = {
     readonly _id: CodecTypes['mongo/objectId@1']['output'];
     readonly name: CodecTypes['mongo/string@1']['output'];
     readonly email: CodecTypes['mongo/string@1']['output'];
-    readonly address: Address | null;
+    readonly address: AddressOutput | null;
   };
   readonly ViewProductEvent: {
     readonly productId: CodecTypes['mongo/string@1']['output'];
@@ -127,7 +164,76 @@ export type FieldOutputTypes = {
     readonly exitMethod: CodecTypes['mongo/string@1']['output'] | null;
   };
 };
-export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes>;
+export type FieldInputTypes = {
+  readonly AddToCartEvent: {
+    readonly productId: CodecTypes['mongo/string@1']['input'];
+    readonly brand: CodecTypes['mongo/string@1']['input'];
+  };
+  readonly Cart: {
+    readonly _id: CodecTypes['mongo/objectId@1']['input'];
+    readonly userId: CodecTypes['mongo/objectId@1']['input'];
+    readonly items: ReadonlyArray<CartItemInput>;
+  };
+  readonly Event: {
+    readonly _id: CodecTypes['mongo/objectId@1']['input'];
+    readonly userId: CodecTypes['mongo/string@1']['input'];
+    readonly sessionId: CodecTypes['mongo/string@1']['input'];
+    readonly type: CodecTypes['mongo/string@1']['input'];
+    readonly timestamp: CodecTypes['mongo/date@1']['input'];
+  };
+  readonly Invoice: {
+    readonly _id: CodecTypes['mongo/objectId@1']['input'];
+    readonly orderId: CodecTypes['mongo/objectId@1']['input'];
+    readonly items: ReadonlyArray<InvoiceLineItemInput>;
+    readonly subtotal: CodecTypes['mongo/double@1']['input'];
+    readonly tax: CodecTypes['mongo/double@1']['input'];
+    readonly total: CodecTypes['mongo/double@1']['input'];
+    readonly issuedAt: CodecTypes['mongo/date@1']['input'];
+  };
+  readonly Location: {
+    readonly _id: CodecTypes['mongo/objectId@1']['input'];
+    readonly name: CodecTypes['mongo/string@1']['input'];
+    readonly streetAndNumber: CodecTypes['mongo/string@1']['input'];
+    readonly city: CodecTypes['mongo/string@1']['input'];
+    readonly postalCode: CodecTypes['mongo/string@1']['input'];
+    readonly country: CodecTypes['mongo/string@1']['input'];
+  };
+  readonly Order: {
+    readonly _id: CodecTypes['mongo/objectId@1']['input'];
+    readonly userId: CodecTypes['mongo/objectId@1']['input'];
+    readonly items: ReadonlyArray<OrderLineItemInput>;
+    readonly shippingAddress: CodecTypes['mongo/string@1']['input'];
+    readonly type: CodecTypes['mongo/string@1']['input'];
+    readonly statusHistory: ReadonlyArray<StatusEntryInput>;
+  };
+  readonly Product: {
+    readonly _id: CodecTypes['mongo/objectId@1']['input'];
+    readonly name: CodecTypes['mongo/string@1']['input'];
+    readonly brand: CodecTypes['mongo/string@1']['input'];
+    readonly code: CodecTypes['mongo/string@1']['input'];
+    readonly description: CodecTypes['mongo/string@1']['input'];
+    readonly masterCategory: CodecTypes['mongo/string@1']['input'];
+    readonly subCategory: CodecTypes['mongo/string@1']['input'];
+    readonly articleType: CodecTypes['mongo/string@1']['input'];
+    readonly price: PriceInput;
+    readonly image: ImageInput;
+    readonly embedding: ReadonlyArray<CodecTypes['mongo/double@1']['input']> | null;
+  };
+  readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['input'] };
+  readonly User: {
+    readonly _id: CodecTypes['mongo/objectId@1']['input'];
+    readonly name: CodecTypes['mongo/string@1']['input'];
+    readonly email: CodecTypes['mongo/string@1']['input'];
+    readonly address: AddressInput | null;
+  };
+  readonly ViewProductEvent: {
+    readonly productId: CodecTypes['mongo/string@1']['input'];
+    readonly subCategory: CodecTypes['mongo/string@1']['input'];
+    readonly brand: CodecTypes['mongo/string@1']['input'];
+    readonly exitMethod: CodecTypes['mongo/string@1']['input'] | null;
+  };
+};
+export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = ContractType<
   {
