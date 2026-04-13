@@ -84,7 +84,7 @@ function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredErro
         why: profileMatch
           ? 'Contract hash does not match database marker'
           : 'Contract profileHash does not match database marker',
-        expected: verifyResult.contract.profileHash,
+        ...ifDefined('expected', verifyResult.contract.profileHash),
         ...ifDefined('actual', verifyResult.marker?.profileHash),
       });
     }
