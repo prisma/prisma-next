@@ -83,12 +83,46 @@ describe('createMongoFamilyInstance', () => {
     expect(instance.familyId).toBe('mongo');
   });
 
-  const stubMethods = ['verify', 'schemaVerify', 'sign', 'introspect'] as const;
+  it('verify() throws "not implemented"', async () => {
+    const instance = createMongoFamilyInstance(createMinimalControlStack());
+    const fakeDriver = {} as Parameters<typeof instance.verify>[0]['driver'];
+    await expect(
+      instance.verify({
+        driver: fakeDriver,
+        contract: {},
+        expectedTargetId: 'mongo',
+        contractPath: '/test',
+      }),
+    ).rejects.toThrow('not implemented');
+  });
 
-  for (const method of stubMethods) {
-    it(`${method}() throws "not implemented"`, async () => {
-      const instance = createMongoFamilyInstance(createMinimalControlStack());
-      await expect(instance[method]()).rejects.toThrow('not implemented');
-    });
-  }
+  it('schemaVerify() throws "not implemented"', async () => {
+    const instance = createMongoFamilyInstance(createMinimalControlStack());
+    const fakeDriver = {} as Parameters<typeof instance.schemaVerify>[0]['driver'];
+    await expect(
+      instance.schemaVerify({
+        driver: fakeDriver,
+        contract: {},
+        strict: false,
+        contractPath: '/test',
+        frameworkComponents: [],
+      }),
+    ).rejects.toThrow('not implemented');
+  });
+
+  it('sign() throws "not implemented"', async () => {
+    const instance = createMongoFamilyInstance(createMinimalControlStack());
+    const fakeDriver = {} as Parameters<typeof instance.sign>[0]['driver'];
+    await expect(
+      instance.sign({ driver: fakeDriver, contract: {}, contractPath: '/test' }),
+    ).rejects.toThrow('not implemented');
+  });
+
+  it('introspect() delegates to introspectSchema', async () => {
+    const instance = createMongoFamilyInstance(createMinimalControlStack());
+    const fakeDriver = {} as Parameters<typeof instance.introspect>[0]['driver'];
+    await expect(instance.introspect({ driver: fakeDriver })).rejects.toThrow(
+      'does not expose a db property',
+    );
+  });
 });
