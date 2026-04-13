@@ -1,4 +1,4 @@
-import { introspectSchema } from '@prisma-next/adapter-mongo/control';
+import { introspectSchema, readMarker } from '@prisma-next/adapter-mongo/control';
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ControlDriverInstance,
@@ -43,14 +43,85 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     return validated.contract as unknown as Contract;
   }
 
-  async verify(_options: {
+  async verify(options: {
     readonly driver: ControlDriverInstance<'mongo', string>;
     readonly contract: unknown;
     readonly expectedTargetId: string;
     readonly contractPath: string;
     readonly configPath?: string;
   }): Promise<VerifyDatabaseResult> {
-    throw new Error('Mongo verify is not implemented');
+    const { driver, contract: rawContract, expectedTargetId, contractPath, configPath } = options;
+    const startTime = Date.now();
+
+    const validated = validateMongoContract<MongoContract>(rawContract);
+    const contract = validated.contract;
+
+    const contractStorageHash = contract.storage.storageHash;
+    const contractProfileHash = contract.profileHash;
+    const contractTarget = contract.target;
+
+    const db = extractDb(driver);
+    const marker = await readMarker(db);
+
+    const baseOpts = {
+      contractStorageHash,
+      contractProfileHash,
+      expectedTargetId,
+      contractPath,
+      ...(configPath ? { configPath } : {}),
+    };
+
+    if (!marker) {
+      return buildVerifyResult({
+        ...baseOpts,
+        ok: false,
+        code: 'PN-RUN-3001',
+        summary: 'Marker missing',
+        totalTime: Date.now() - startTime,
+      });
+    }
+
+    if (contractTarget !== expectedTargetId) {
+      return buildVerifyResult({
+        ...baseOpts,
+        ok: false,
+        code: 'PN-RUN-3003',
+        summary: 'Target mismatch',
+        marker,
+        actualTargetId: contractTarget,
+        totalTime: Date.now() - startTime,
+      });
+    }
+
+    if (marker.storageHash !== contractStorageHash) {
+      return buildVerifyResult({
+        ...baseOpts,
+        ok: false,
+        code: 'PN-RUN-3002',
+        summary: 'Hash mismatch',
+        marker,
+        totalTime: Date.now() - startTime,
+      });
+    }
+
+    if (contractProfileHash && marker.profileHash !== contractProfileHash) {
+      return buildVerifyResult({
+        ...baseOpts,
+        ok: false,
+        code: 'PN-RUN-3002',
+        summary: 'Hash mismatch',
+        marker,
+        totalTime: Date.now() - startTime,
+      });
+    }
+
+    return buildVerifyResult({
+      ...baseOpts,
+      ok: true,
+      summary: 'Database matches contract',
+      marker,
+      totalTime: Date.now() - startTime,
+    });
   }
 
   async schemaVerify(_options: {
@@ -114,6 +185,42 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       },
     };
   }
+}
+
+function buildVerifyResult(opts: {
+  ok: boolean;
+  code?: string;
+  summary: string;
+  contractStorageHash: string;
+  contractProfileHash?: string;
+  marker?: ContractMarkerRecord;
+  expectedTargetId: string;
+  actualTargetId?: string;
+  contractPath: string;
+  configPath?: string;
+  totalTime: number;
+}): VerifyDatabaseResult {
+  return {
+    ok: opts.ok,
+    ...(opts.code ? { code: opts.code } : {}),
+    summary: opts.summary,
+    contract: {
+      storageHash: opts.contractStorageHash,
+      ...(opts.contractProfileHash ? { profileHash: opts.contractProfileHash } : {}),
+    },
+    ...(opts.marker
+      ? { marker: { storageHash: opts.marker.storageHash, profileHash: opts.marker.profileHash } }
+      : {}),
+    target: {
+      expected: opts.expectedTargetId,
+      ...(opts.actualTargetId ? { actual: opts.actualTargetId } : {}),
+    },
+    meta: {
+      contractPath: opts.contractPath,
+      ...(opts.configPath ? { configPath: opts.configPath } : {}),
+    },
+    timings: { total: opts.totalTime },
+  };
 }
 
 function collectionToSchemaNode(name: string, collection: MongoSchemaCollection): SchemaTreeNode {
