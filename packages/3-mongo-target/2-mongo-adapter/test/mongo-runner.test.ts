@@ -3,6 +3,11 @@ import type {
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
+import {
+  MongoSchemaCollection,
+  MongoSchemaIndex,
+  MongoSchemaIR,
+} from '@prisma-next/mongo-schema-ir';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -66,7 +71,7 @@ function makeContract(
 
 function planForContract(
   contract: ReturnType<typeof makeContract>,
-  origin: { collections: Record<string, { indexes: never[] }> } = { collections: {} },
+  origin: MongoSchemaIR = new MongoSchemaIR([]),
 ) {
   const planner = new MongoMigrationPlanner();
   const result = planner.plan({
@@ -122,23 +127,18 @@ describe('MongoMigrationRunner', () => {
     await db.createCollection('posts');
     await db.collection('posts').createIndex({ title: 1 }, { name: 'title_1' });
 
-    const originIR = {
-      collections: {
-        posts: {
-          name: 'posts',
-          indexes: [
-            {
-              name: 'title_1',
-              keys: [{ field: 'title', direction: 1 as const }],
-              unique: false,
-              sparse: false,
-            },
-          ],
-        },
-      },
-    };
+    const originIR = new MongoSchemaIR([
+      new MongoSchemaCollection({
+        name: 'posts',
+        indexes: [
+          new MongoSchemaIndex({
+            keys: [{ field: 'title', direction: 1 }],
+          }),
+        ],
+      }),
+    ]);
     const contract = makeContract({ posts: {} }, 'sha256:dropped');
-    const plan = planForContract(contract, originIR as never);
+    const plan = planForContract(contract, originIR);
     const serialized = serializePlan(plan);
 
     const runner = new MongoMigrationRunner();

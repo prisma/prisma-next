@@ -24,14 +24,11 @@ export function diffMongoSchemas(
   let warn = 0;
   let fail = 0;
 
-  const allNames = new Set([
-    ...Object.keys(live.collections),
-    ...Object.keys(expected.collections),
-  ]);
+  const allNames = new Set([...live.collectionNames, ...expected.collectionNames]);
 
   for (const name of [...allNames].sort()) {
-    const liveColl = live.collections[name];
-    const expectedColl = expected.collections[name];
+    const liveColl = live.collection(name);
+    const expectedColl = expected.collection(name);
 
     if (!liveColl && expectedColl) {
       issues.push({

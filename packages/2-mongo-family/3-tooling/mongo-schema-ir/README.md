@@ -8,7 +8,7 @@ This package defines the in-memory representation of MongoDB collection schemas 
 
 ## Responsibilities
 
-- **Schema AST nodes**: `MongoSchemaCollection`, `MongoSchemaIndex`, `MongoSchemaValidator`, `MongoSchemaCollectionOptions` — frozen, visitable AST nodes representing MongoDB schema elements.
+- **Schema AST nodes**: `MongoSchemaIR` (root), `MongoSchemaCollection`, `MongoSchemaIndex`, `MongoSchemaValidator`, `MongoSchemaCollectionOptions` — frozen, visitable AST nodes representing MongoDB schema elements. `MongoSchemaIR` is the root node holding collections as sorted children with name-based lookup via `collection(name)`.
 - **Index equivalence**: `indexesEquivalent()` compares two `MongoSchemaIndex` nodes field-by-field (keys, direction, unique, sparse, TTL, partial filter, wildcardProjection, collation, weights, default_language, language_override). Used by the planner to decide create/drop operations.
 - **Deep equality**: `deepEqual()` provides key-order-sensitive structural comparison for MongoDB values. For key-order-independent comparison, use `canonicalize()`.
 - **Canonical serialization**: `canonicalize()` produces a key-order-independent string representation of values. Used by the planner for index lookup keys.
@@ -26,6 +26,7 @@ This package defines the in-memory representation of MongoDB collection schemas 
 
 ```typescript
 import {
+  MongoSchemaIR,
   MongoSchemaCollection,
   MongoSchemaIndex,
   indexesEquivalent,
@@ -41,12 +42,13 @@ const collection = new MongoSchemaCollection({
   indexes: [index],
 });
 
-// Compare indexes for equivalence
-const other = new MongoSchemaIndex({
-  keys: [{ field: 'email', direction: 1 }],
-  unique: true,
-});
-indexesEquivalent(index, other); // true
+const ir = new MongoSchemaIR([collection]);
+
+ir.collection('users');     // MongoSchemaCollection
+ir.collectionNames;         // ['users']
+ir.collections;             // sorted ReadonlyArray<MongoSchemaCollection>
+
+indexesEquivalent(index, index); // true
 ```
 
 ## Architecture

@@ -268,8 +268,8 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
   }
 
   toSchemaView(schema: MongoSchemaIR): CoreSchemaView {
-    const collectionNodes: SchemaTreeNode[] = Object.entries(schema.collections).map(
-      ([name, collection]) => collectionToSchemaNode(name, collection),
+    const collectionNodes: SchemaTreeNode[] = schema.collections.map((collection) =>
+      collectionToSchemaNode(collection.name, collection),
     );
 
     return {

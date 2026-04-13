@@ -2,16 +2,16 @@ import {
   MongoSchemaCollection,
   MongoSchemaCollectionOptions,
   MongoSchemaIndex,
-  type MongoSchemaIR,
+  MongoSchemaIR,
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
 import { diffMongoSchemas } from '../src/core/schema-diff';
 
-const emptyIR: MongoSchemaIR = { collections: {} };
+const emptyIR = new MongoSchemaIR([]);
 
 function ir(collections: Record<string, MongoSchemaCollection>): MongoSchemaIR {
-  return { collections };
+  return new MongoSchemaIR(Object.values(collections));
 }
 
 function coll(

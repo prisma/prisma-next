@@ -22,14 +22,14 @@ function makeContract(collections: Record<string, MongoStorageCollection>): Mong
 describe('contractToMongoSchemaIR', () => {
   it('returns empty IR for null contract', () => {
     const ir = contractToMongoSchemaIR(null);
-    expect(ir.collections).toEqual({});
+    expect(ir.collections).toEqual([]);
   });
 
   it('converts empty collection (no indexes)', () => {
     const ir = contractToMongoSchemaIR(makeContract({ users: {} }));
-    expect(ir.collections['users']).toBeDefined();
-    expect(ir.collections['users']!.name).toBe('users');
-    expect(ir.collections['users']!.indexes).toEqual([]);
+    expect(ir.collection('users')).toBeDefined();
+    expect(ir.collection('users')!.name).toBe('users');
+    expect(ir.collection('users')!.indexes).toEqual([]);
   });
 
   it('converts collection with one ascending index', () => {
@@ -40,7 +40,7 @@ describe('contractToMongoSchemaIR', () => {
         },
       }),
     );
-    const coll = ir.collections['users']!;
+    const coll = ir.collection('users')!;
     expect(coll.indexes).toHaveLength(1);
     expect(coll.indexes[0]!.keys).toEqual([{ field: 'email', direction: 1 }]);
     expect(coll.indexes[0]!.unique).toBe(false);
@@ -54,7 +54,7 @@ describe('contractToMongoSchemaIR', () => {
         },
       }),
     );
-    const idx = ir.collections['users']!.indexes[0]!;
+    const idx = ir.collection('users')!.indexes[0]!;
     expect(idx.unique).toBe(true);
   });
 
@@ -65,9 +65,9 @@ describe('contractToMongoSchemaIR', () => {
         posts: { indexes: [{ keys: [{ field: 'title', direction: 1 }] }] },
       }),
     );
-    expect(Object.keys(ir.collections)).toHaveLength(2);
-    expect(ir.collections['users']).toBeDefined();
-    expect(ir.collections['posts']).toBeDefined();
+    expect(ir.collections).toHaveLength(2);
+    expect(ir.collection('users')).toBeDefined();
+    expect(ir.collection('posts')).toBeDefined();
   });
 
   it('preserves sparse option', () => {
@@ -78,7 +78,7 @@ describe('contractToMongoSchemaIR', () => {
         },
       }),
     );
-    expect(ir.collections['users']!.indexes[0]!.sparse).toBe(true);
+    expect(ir.collection('users')!.indexes[0]!.sparse).toBe(true);
   });
 
   it('preserves TTL option', () => {
@@ -89,7 +89,7 @@ describe('contractToMongoSchemaIR', () => {
         },
       }),
     );
-    expect(ir.collections['users']!.indexes[0]!.expireAfterSeconds).toBe(3600);
+    expect(ir.collection('users')!.indexes[0]!.expireAfterSeconds).toBe(3600);
   });
 
   it('preserves partialFilterExpression', () => {
@@ -101,7 +101,7 @@ describe('contractToMongoSchemaIR', () => {
         },
       }),
     );
-    expect(ir.collections['users']!.indexes[0]!.partialFilterExpression).toEqual(pfe);
+    expect(ir.collection('users')!.indexes[0]!.partialFilterExpression).toEqual(pfe);
   });
 
   it('converts compound index', () => {
@@ -120,7 +120,7 @@ describe('contractToMongoSchemaIR', () => {
         },
       }),
     );
-    const idx = ir.collections['users']!.indexes[0]!;
+    const idx = ir.collection('users')!.indexes[0]!;
     expect(idx.keys).toHaveLength(2);
     expect(idx.keys[0]!.field).toBe('email');
     expect(idx.keys[1]!.field).toBe('tenantId');
@@ -147,13 +147,13 @@ describe('contractToMongoSchemaIR', () => {
         },
       }),
     );
-    const textIdx = ir.collections['users']!.indexes[0]!;
+    const textIdx = ir.collection('users')!.indexes[0]!;
     expect(textIdx.weights).toEqual({ bio: 10 });
     expect(textIdx.default_language).toBe('english');
     expect(textIdx.language_override).toBe('lang');
     expect(textIdx.collation).toEqual({ locale: 'en', strength: 2 });
 
-    const wildcardIdx = ir.collections['users']!.indexes[1]!;
+    const wildcardIdx = ir.collection('users')!.indexes[1]!;
     expect(wildcardIdx.wildcardProjection).toEqual({ name: 1, email: 1 });
   });
 
@@ -169,7 +169,7 @@ describe('contractToMongoSchemaIR', () => {
         },
       }),
     );
-    const coll = ir.collections['users']!;
+    const coll = ir.collection('users')!;
     expect(coll.validator).toBeDefined();
     expect(coll.validator!.jsonSchema).toEqual({
       bsonType: 'object',
@@ -192,7 +192,7 @@ describe('contractToMongoSchemaIR', () => {
         },
       }),
     );
-    const coll = ir.collections['events']!;
+    const coll = ir.collection('events')!;
     expect(coll.options).toBeDefined();
     expect(coll.options!.capped).toEqual({ size: 1048576, max: 1000 });
     expect(coll.options!.collation).toEqual({ locale: 'en' });
@@ -210,7 +210,7 @@ describe('contractToMongoSchemaIR', () => {
         },
       }),
     );
-    const coll = ir.collections['metrics']!;
+    const coll = ir.collection('metrics')!;
     expect(coll.options!.timeseries).toEqual({
       timeField: 'ts',
       metaField: 'meta',
@@ -220,7 +220,7 @@ describe('contractToMongoSchemaIR', () => {
 
   it('collection without validator or options has undefined for both', () => {
     const ir = contractToMongoSchemaIR(makeContract({ users: {} }));
-    expect(ir.collections['users']!.validator).toBeUndefined();
-    expect(ir.collections['users']!.options).toBeUndefined();
+    expect(ir.collection('users')!.validator).toBeUndefined();
+    expect(ir.collection('users')!.options).toBeUndefined();
   });
 });

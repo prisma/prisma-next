@@ -371,13 +371,13 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
     const conflicts: MigrationPlannerConflict[] = [];
 
     const allCollectionNames = new Set([
-      ...Object.keys(originIR.collections),
-      ...Object.keys(destinationIR.collections),
+      ...originIR.collectionNames,
+      ...destinationIR.collectionNames,
     ]);
 
     for (const collName of [...allCollectionNames].sort()) {
-      const originColl = originIR.collections[collName];
-      const destColl = destinationIR.collections[collName];
+      const originColl = originIR.collection(collName);
+      const destColl = destinationIR.collection(collName);
 
       if (!originColl && destColl) {
         if (collectionHasOptions(destColl)) {
