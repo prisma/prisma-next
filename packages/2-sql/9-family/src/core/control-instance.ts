@@ -15,7 +15,12 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import { SchemaTreeNode } from '@prisma-next/framework-components/control';
+import {
+  SchemaTreeNode,
+  VERIFY_CODE_HASH_MISMATCH,
+  VERIFY_CODE_MARKER_MISSING,
+  VERIFY_CODE_TARGET_MISMATCH,
+} from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
@@ -343,7 +348,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RUN-3001',
+          code: VERIFY_CODE_MARKER_MISSING,
           summary: 'Marker missing',
           contractStorageHash,
           expectedTargetId,
@@ -360,7 +365,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RUN-3003',
+          code: VERIFY_CODE_TARGET_MISMATCH,
           summary: 'Target mismatch',
           contractStorageHash,
           marker,
@@ -379,7 +384,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RUN-3002',
+          code: VERIFY_CODE_HASH_MISMATCH,
           summary: 'Hash mismatch',
           contractStorageHash,
           marker,
@@ -397,7 +402,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
-          code: 'PN-RUN-3002',
+          code: VERIFY_CODE_HASH_MISMATCH,
           summary: 'Hash mismatch',
           contractStorageHash,
           contractProfileHash,

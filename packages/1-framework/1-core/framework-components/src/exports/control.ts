@@ -41,6 +41,12 @@ export type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '../control-result-types';
+export {
+  VERIFY_CODE_HASH_MISMATCH,
+  VERIFY_CODE_MARKER_MISSING,
+  VERIFY_CODE_SCHEMA_FAILURE,
+  VERIFY_CODE_TARGET_MISMATCH,
+} from '../control-result-types';
 export type {
   CoreSchemaView,
   SchemaNodeKind,

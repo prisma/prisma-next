@@ -16,6 +16,12 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import {
+  VERIFY_CODE_HASH_MISMATCH,
+  VERIFY_CODE_MARKER_MISSING,
+  VERIFY_CODE_SCHEMA_FAILURE,
+  VERIFY_CODE_TARGET_MISMATCH,
+} from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
@@ -80,7 +86,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       return buildVerifyResult({
         ...baseOpts,
         ok: false,
-        code: 'PN-RUN-3003',
+        code: VERIFY_CODE_TARGET_MISMATCH,
         summary: 'Target mismatch',
         actualTargetId: contractTarget,
         totalTime: Date.now() - startTime,
@@ -94,7 +100,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       return buildVerifyResult({
         ...baseOpts,
         ok: false,
-        code: 'PN-RUN-3001',
+        code: VERIFY_CODE_MARKER_MISSING,
         summary: 'Marker missing',
         totalTime: Date.now() - startTime,
       });
@@ -104,7 +110,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       return buildVerifyResult({
         ...baseOpts,
         ok: false,
-        code: 'PN-RUN-3002',
+        code: VERIFY_CODE_HASH_MISMATCH,
         summary: 'Hash mismatch',
         marker,
         totalTime: Date.now() - startTime,
@@ -115,7 +121,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       return buildVerifyResult({
         ...baseOpts,
         ok: false,
-        code: 'PN-RUN-3002',
+        code: VERIFY_CODE_HASH_MISMATCH,
         summary: 'Hash mismatch',
         marker,
         totalTime: Date.now() - startTime,
@@ -155,7 +161,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
 
     return {
       ok,
-      ...ifDefined('code', ok ? undefined : 'PN-RUN-3010'),
+      ...ifDefined('code', ok ? undefined : VERIFY_CODE_SCHEMA_FAILURE),
       summary: ok ? 'Schema matches contract' : `Schema verification found ${counts.fail} issue(s)`,
       contract: {
         storageHash: contract.storage.storageHash,

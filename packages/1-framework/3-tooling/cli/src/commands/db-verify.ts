@@ -3,6 +3,11 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import {
+  VERIFY_CODE_HASH_MISMATCH,
+  VERIFY_CODE_MARKER_MISSING,
+  VERIFY_CODE_TARGET_MISMATCH,
+} from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -58,10 +63,10 @@ type DbVerifyMode = 'full' | 'marker-only' | 'schema-only';
  */
 function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredError {
   if (!verifyResult.ok && verifyResult.code) {
-    if (verifyResult.code === 'PN-RUN-3001') {
+    if (verifyResult.code === VERIFY_CODE_MARKER_MISSING) {
       return errorMarkerMissing();
     }
-    if (verifyResult.code === 'PN-RUN-3002') {
+    if (verifyResult.code === VERIFY_CODE_HASH_MISMATCH) {
       const storageMatch = verifyResult.marker?.storageHash === verifyResult.contract.storageHash;
       const profileMatch =
         !verifyResult.contract.profileHash ||
@@ -83,7 +88,7 @@ function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredErro
         ...ifDefined('actual', verifyResult.marker?.profileHash),
       });
     }
-    if (verifyResult.code === 'PN-RUN-3003') {
+    if (verifyResult.code === VERIFY_CODE_TARGET_MISMATCH) {
       return errorTargetMismatch(
         verifyResult.target.expected,
         verifyResult.target.actual ?? 'unknown',

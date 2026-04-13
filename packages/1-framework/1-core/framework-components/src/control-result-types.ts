@@ -1,3 +1,8 @@
+export const VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001';
+export const VERIFY_CODE_HASH_MISMATCH = 'PN-RUN-3002';
+export const VERIFY_CODE_TARGET_MISMATCH = 'PN-RUN-3003';
+export const VERIFY_CODE_SCHEMA_FAILURE = 'PN-RUN-3010';
+
 export interface OperationContext {
   readonly contractPath?: string;
   readonly configPath?: string;
