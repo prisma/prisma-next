@@ -2,6 +2,15 @@ export type { MongoCollection } from '../collection';
 export { createMongoCollection } from '../collection';
 export { compileMongoQuery } from '../compile';
 export type { MongoQueryExecutor } from '../executor';
+export type {
+  DotPath,
+  FieldAccessor,
+  FieldExpression,
+  FieldOperation,
+  ResolveDotPathType,
+  UpdateOperator,
+} from '../field-accessor';
+export { createFieldAccessor } from '../field-accessor';
 export type { MongoOrmClient, MongoOrmOptions } from '../mongo-orm';
 export { mongoOrm } from '../mongo-orm';
 export type { MongoRawClient } from '../mongo-raw';
