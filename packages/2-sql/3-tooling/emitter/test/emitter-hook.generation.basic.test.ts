@@ -1069,7 +1069,9 @@ describe('sql-target-family-hook', () => {
         },
       });
       const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
-      expect(types).toContain('export type Address =');
+      expect(types).toContain('export type AddressOutput =');
+      expect(types).toContain('export type AddressInput =');
+      expect(types).not.toMatch(/export type Address =/);
       expect(types).toContain("readonly street: CodecTypes['pg/text@1']['output']");
       expect(types).toContain("readonly city: CodecTypes['pg/text@1']['output']");
     });
@@ -1206,8 +1208,9 @@ describe('sql-target-family-hook', () => {
         storage: { tables: {} },
       });
       const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
-      expect(types).toContain('export type NavItem =');
-      expect(types).toContain('readonly children: ReadonlyArray<NavItem>');
+      expect(types).toContain('export type NavItemOutput =');
+      expect(types).toContain('export type NavItemInput =');
+      expect(types).toContain('readonly children: ReadonlyArray<NavItemOutput>');
     });
 
     it('omits valueObjects when none exist', () => {
