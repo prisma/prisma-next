@@ -14,7 +14,7 @@ describe('mongoEmission.generateContractTypes', () => {
       'export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>',
     );
     expect(types).toContain(
-      'export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes>',
+      'export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>',
     );
   });
 
@@ -342,7 +342,7 @@ describe('mongoEmission.generateContractTypes', () => {
   });
 
   describe('value object type generation', () => {
-    it('emits named value object type aliases', () => {
+    it('emits split value object type aliases (Output and Input)', () => {
       const contract = createMongoContract({
         models: {
           User: {
@@ -364,9 +364,9 @@ describe('mongoEmission.generateContractTypes', () => {
         storage: { collections: { users: {} } },
       });
       const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
-      expect(types).toContain('export type Address =');
-      expect(types).toContain("readonly street: CodecTypes['mongo/string@1']['output']");
-      expect(types).toContain("readonly city: CodecTypes['mongo/string@1']['output']");
+      expect(types).toContain('export type AddressOutput =');
+      expect(types).toContain('export type AddressInput =');
+      expect(types).not.toMatch(/export type Address =/);
     });
 
     it('emits valueObjects descriptor on ContractBase', () => {
@@ -461,8 +461,9 @@ describe('mongoEmission.generateContractTypes', () => {
         },
       });
       const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
-      expect(types).toContain('export type NavItem =');
-      expect(types).toContain('readonly children: ReadonlyArray<NavItem>');
+      expect(types).toContain('export type NavItemOutput =');
+      expect(types).toContain('export type NavItemInput =');
+      expect(types).toContain('readonly children: ReadonlyArray<NavItemOutput>');
     });
 
     it('omits valueObjects when none exist', () => {
@@ -483,6 +484,27 @@ describe('mongoEmission.generateContractTypes', () => {
       });
       const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
       expect(types).toContain("readonly zip: CodecTypes['mongo/string@1']['output'] | null");
+    });
+
+    it('emits FieldInputTypes alongside FieldOutputTypes', () => {
+      const contract = createMongoContract({
+        models: {
+          User: {
+            fields: {
+              _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+              name: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
+            relations: {},
+            storage: { collection: 'users' },
+          },
+        },
+        storage: { collections: { users: {} } },
+      });
+      const types = generateContractDts(contract, mongoEmission, [], [], testHashes);
+      expect(types).toContain('export type FieldOutputTypes =');
+      expect(types).toContain('export type FieldInputTypes =');
+      expect(types).toContain("CodecTypes['mongo/objectId@1']['input']");
+      expect(types).toContain("CodecTypes['mongo/string@1']['input']");
     });
   });
 });

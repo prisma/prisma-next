@@ -33,7 +33,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
       'export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>',
     );
     expect(types).toContain(
-      'export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes>',
+      'export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>',
     );
     expect(types).toContain('export type CodecTypes = MongoCodecTypes');
 

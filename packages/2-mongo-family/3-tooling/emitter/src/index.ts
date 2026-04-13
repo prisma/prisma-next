@@ -194,7 +194,7 @@ export const mongoEmission = {
   },
 
   getTypeMapsExpression(): string {
-    return 'MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes>';
+    return 'MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>';
   },
 
   getContractWrapper(contractBaseName: string, typeMapsName: string): string {

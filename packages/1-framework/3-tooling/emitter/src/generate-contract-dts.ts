@@ -8,6 +8,7 @@ import type {
 import {
   deduplicateImports,
   generateCodecTypeIntersection,
+  generateFieldInputTypesMap,
   generateFieldOutputTypesMap,
   generateHashTypeAliases,
   generateImportLines,
@@ -73,6 +74,11 @@ export function generateContractDts(
     codecLookup,
   );
 
+  const fieldInputTypesMap = generateFieldInputTypesMap(
+    contract.models as Record<string, ContractModel> | undefined,
+    codecLookup,
+  );
+
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');
 
   return `// ⚠️  GENERATED FILE - DO NOT EDIT
@@ -95,6 +101,7 @@ export type OperationTypes = ${operationTypes};
 ${familyTypeAliases}
 ${valueObjectTypeAliases}
 export type FieldOutputTypes = ${fieldOutputTypesMap};
+export type FieldInputTypes = ${fieldInputTypesMap};
 export type TypeMaps = ${typeMapsExpr};
 
 type ContractBase = ContractType<
