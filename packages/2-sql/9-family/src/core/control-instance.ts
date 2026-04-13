@@ -564,7 +564,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
 
     toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
-      const rootLabel = 'contract';
+      const rootLabel = 'database';
 
       const tableNodes: readonly SchemaTreeNode[] = Object.entries(schema.tables).map(
         ([tableName, table]: [string, SqlTableIR]) => {

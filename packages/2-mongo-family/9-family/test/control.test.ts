@@ -156,7 +156,7 @@ describe('toSchemaView', () => {
 
     expect(view.root.kind).toBe('root');
     expect(view.root.id).toBe('mongo-schema');
-    expect(view.root.label).toBe('contract');
+    expect(view.root.label).toBe('database');
     expect(view.root.children).toBeUndefined();
   });
 
