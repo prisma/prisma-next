@@ -83,7 +83,10 @@ Carts     ──→ User (reference relation), CartItem[] (embedded array)
 Orders    ──→ User (reference relation), OrderLineItem[], StatusEntry[]
 Locations ─── flat fields
 Invoices  ──→ Order (reference relation), InvoiceLineItem[]
-Events    ─── EventMetadata (embedded)
+Events    ─── polymorphic (@@discriminator on type)
+              ├── ViewProductEvent  (productId, subCategory, brand)
+              ├── SearchEvent       (query)
+              └── AddToCartEvent    (productId, brand)
 ```
 
 ## Project Structure
@@ -107,8 +110,7 @@ middleware.ts             Auth middleware (redirects to /login)
 
 - **Float scalar type**: Not in default Mongo PSL scalar descriptors; added via custom `scalarTypeDescriptors` in config
 - **ObjectId in filters**: `MongoFieldFilter.eq` with ObjectId values requires wrapping in `MongoParamRef` (see `src/data/object-id-filter.ts`)
-- **`@unique`/`@@index`**: Not supported in Mongo PSL interpreter; migration planner only generates index operations
-- **Schema migrations**: No migration artifacts committed; the migration planner cannot produce operations without index support, and MongoDB implicitly creates collections on first write. Migration scripts are wired up (`pnpm migration:plan` / `pnpm migration:apply`) for when the framework adds support.
+- **Schema migrations**: Migration artifacts are committed under `migrations/`; run `pnpm migration:apply` to apply. The planner handles indexes and collection validators but not all schema-level operations.
 - **Typed `$push`/`$pull`**: ORM doesn't expose array update operators; use `mongoRaw` with untyped commands
 - **Pipeline output types**: The pipeline builder doesn't propagate output types through aggregation stages; results are cast to expected shapes at the call site
 - **Atlas Search**: Requires extension pack not yet available
