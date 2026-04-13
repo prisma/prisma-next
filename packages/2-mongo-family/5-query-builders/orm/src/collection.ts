@@ -470,10 +470,17 @@ class MongoCollectionImpl<
       }
     }
 
-    const setKeys = new Set(Object.keys((updateDoc['$set'] as Record<string, unknown>) ?? {}));
+    const updatedFields = new Set<string>();
+    for (const operatorGroup of Object.values(updateDoc)) {
+      if (typeof operatorGroup === 'object' && operatorGroup !== null) {
+        for (const fieldPath of Object.keys(operatorGroup as Record<string, unknown>)) {
+          updatedFields.add(fieldPath.split('.')[0]!);
+        }
+      }
+    }
     const insertOnlyFields: Record<string, MongoValue> = {};
     for (const [key, value] of Object.entries(allCreateFields)) {
-      if (!setKeys.has(key)) {
+      if (!updatedFields.has(key)) {
         insertOnlyFields[key] = value;
       }
     }

@@ -1,13 +1,11 @@
 import type { Db } from '../db';
-import { executeRaw } from './execute-raw';
-import { objectIdEq, rawObjectIdFilter } from './object-id-filter';
 
 export function getCartByUserId(db: Db, userId: string) {
-  return db.orm.carts.where(objectIdEq('userId', userId)).first();
+  return db.orm.carts.where({ userId }).first();
 }
 
 export function getCartWithUser(db: Db, userId: string) {
-  return db.orm.carts.include('user').where(objectIdEq('userId', userId)).first();
+  return db.orm.carts.include('user').where({ userId }).first();
 }
 
 export function upsertCart(
@@ -22,17 +20,17 @@ export function upsertCart(
     image: { url: string };
   }>,
 ) {
-  return db.orm.carts.where(objectIdEq('userId', userId)).upsert({
+  return db.orm.carts.where({ userId }).upsert({
     create: { userId, items: [...items] },
     update: { items: [...items] },
   });
 }
 
 export function clearCart(db: Db, userId: string) {
-  return db.orm.carts.where(objectIdEq('userId', userId)).update({ items: [] });
+  return db.orm.carts.where({ userId }).update({ items: [] });
 }
 
-export async function addToCart(
+export function addToCart(
   db: Db,
   userId: string,
   item: {
@@ -44,21 +42,12 @@ export async function addToCart(
     image: { url: string };
   },
 ) {
-  const plan = db.raw
-    .collection('carts')
-    .findOneAndUpdate(
-      rawObjectIdFilter('userId', userId),
-      { $push: { items: item }, $setOnInsert: rawObjectIdFilter('userId', userId) },
-      { upsert: true },
-    )
-    .build();
-  await executeRaw(db, plan);
+  return db.orm.carts.where({ userId }).upsert({
+    create: { userId, items: [item] },
+    update: (u) => [u.items.push(item)],
+  });
 }
 
-export async function removeFromCart(db: Db, userId: string, productId: string) {
-  const plan = db.raw
-    .collection('carts')
-    .updateOne(rawObjectIdFilter('userId', userId), { $pull: { items: { productId } } })
-    .build();
-  await executeRaw(db, plan);
+export function removeFromCart(db: Db, userId: string, productId: string) {
+  return db.orm.carts.where({ userId }).update((u) => [u.items.pull({ productId })]);
 }

@@ -1,12 +1,11 @@
 import type { Db } from '../db';
-import { objectIdEq } from './object-id-filter';
 
 export function findInvoiceById(db: Db, id: string) {
-  return db.orm.invoices.where(objectIdEq('_id', id)).first();
+  return db.orm.invoices.where({ _id: id }).first();
 }
 
 export function findInvoiceWithOrder(db: Db, id: string) {
-  return db.orm.invoices.include('order').where(objectIdEq('_id', id)).first();
+  return db.orm.invoices.include('order').where({ _id: id }).first();
 }
 
 export function createInvoice(
