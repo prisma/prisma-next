@@ -88,6 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_MULTIPLIER: 2
+      MONGOMS_VERSION: 7.0.11
     services:
       postgres:
         image: postgres:15
@@ -125,6 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_MULTIPLIER: 2
+      MONGOMS_VERSION: 7.0.11
     services:
       postgres:
         image: postgres:15
@@ -158,6 +160,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_MULTIPLIER: 2
+      MONGOMS_VERSION: 7.0.11
     services:
       postgres:
         image: postgres:15
@@ -191,6 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_MULTIPLIER: 2
+      MONGOMS_VERSION: 7.0.11
     services:
       postgres:
         image: postgres:15
