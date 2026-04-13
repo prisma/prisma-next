@@ -25,11 +25,12 @@ export function OrderStatusButtons({
   async function handleAdvance() {
     setLoading(true);
     try {
-      await fetch(`/api/orders/${orderId}`, {
+      const res = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus }),
       });
+      if (!res.ok) throw new Error(`Failed to update order status (${res.status})`);
       router.refresh();
     } finally {
       setLoading(false);

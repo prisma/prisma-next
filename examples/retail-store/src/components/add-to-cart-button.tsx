@@ -21,7 +21,7 @@ export function AddToCartButton({ product }: AddToCartButtonProps) {
   async function handleAdd() {
     setState('loading');
     try {
-      await fetch('/api/cart', {
+      const res = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -33,6 +33,7 @@ export function AddToCartButton({ product }: AddToCartButtonProps) {
           image: product.image,
         }),
       });
+      if (!res.ok) throw new Error(`Add to cart failed (${res.status})`);
       invalidateCart();
       setState('added');
       setTimeout(() => setState('idle'), 1500);
