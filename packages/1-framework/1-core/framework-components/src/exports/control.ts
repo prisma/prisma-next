@@ -41,7 +41,13 @@ export type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '../control-result-types';
-export type { CoreSchemaView, SchemaNodeKind, SchemaTreeNode } from '../control-schema-view';
+export type {
+  CoreSchemaView,
+  SchemaNodeKind,
+  SchemaTreeNodeOptions,
+  SchemaTreeVisitor,
+} from '../control-schema-view';
+export { SchemaTreeNode } from '../control-schema-view';
 export type {
   AssembledAuthoringContributions,
   ControlStack,

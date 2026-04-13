@@ -6,65 +6,8 @@
  *
  * Families can optionally project their family-specific Schema IR into this
  * core view via the `toSchemaView` method on `FamilyInstance`.
- *
- * ## Example: SQL Family Mapping
- *
- * For the SQL family, `SqlSchemaIR` can be mapped to `CoreSchemaView` as follows:
- *
- * ```ts
- * // SqlSchemaIR structure:
- * // {
- * //   tables: { user: { columns: {...}, primaryKey: {...}, ... }, ... },
- * //   dependencies: [{ id: 'postgres.extension.vector' }],
- * //   annotations: {...}
- * // }
- *
- * // CoreSchemaView mapping:
- * // {
- * //   root: {
- * //     kind: 'root',
- * //     id: 'sql-schema',
- * //     label: 'sql schema (tables: 2)',
- * //     children: [
- * //       {
- * //         kind: 'entity',
- * //         id: 'table-user',
- * //         label: 'table user',
- * //         meta: { primaryKey: ['id'], ... },
- * //         children: [
- * //           {
- * //             kind: 'field',
- * //             id: 'column-id',
- * //             label: 'id: int4 (pg/int4@1, not null)',
- * //             meta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false, ... }
- * //           },
- * //           {
- * //             kind: 'index',
- * //             id: 'index-user-email',
- * //             label: 'index user_email_unique',
- * //             meta: { columns: ['email'], unique: true, ... }
- * //           }
- * //         ]
- * //       },
- * //       {
- * //         kind: 'dependency',
- * //         id: 'dependency-postgres.extension.pgvector',
- * //         label: 'pgvector extension is enabled',
- * //         meta: { ... }
- * //       }
- * //     ]
- * //   }
- * // }
- * ```
- *
- * This mapping demonstrates that the core view types are expressive enough
- * to represent SQL schemas without being SQL-specific.
  */
 
-/**
- * Node kinds for schema tree nodes.
- * Designed to be generic enough for SQL, document, KV, and future families.
- */
 export type SchemaNodeKind =
   | 'root'
   | 'namespace'
@@ -74,16 +17,37 @@ export type SchemaNodeKind =
   | 'index'
   | 'dependency';
 
-/**
- * A node in the schema tree.
- * Tree-shaped structure good for Command Tree-style CLI output.
- */
-export interface SchemaTreeNode {
+export interface SchemaTreeVisitor<R> {
+  visit(node: SchemaTreeNode): R;
+}
+
+export interface SchemaTreeNodeOptions {
   readonly kind: SchemaNodeKind;
   readonly id: string;
   readonly label: string;
   readonly meta?: Record<string, unknown>;
   readonly children?: readonly SchemaTreeNode[];
+}
+
+export class SchemaTreeNode {
+  readonly kind: SchemaNodeKind;
+  readonly id: string;
+  readonly label: string;
+  readonly meta?: Record<string, unknown>;
+  readonly children?: readonly SchemaTreeNode[];
+
+  constructor(options: SchemaTreeNodeOptions) {
+    this.kind = options.kind;
+    this.id = options.id;
+    this.label = options.label;
+    if (options.meta !== undefined) this.meta = options.meta;
+    if (options.children !== undefined) this.children = options.children;
+    Object.freeze(this);
+  }
+
+  accept<R>(visitor: SchemaTreeVisitor<R>): R {
+    return visitor.visit(this);
+  }
 }
 
 /**
