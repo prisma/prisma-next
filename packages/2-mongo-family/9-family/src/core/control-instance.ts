@@ -276,7 +276,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       root: {
         kind: 'root',
         id: 'mongo-schema',
-        label: 'contract',
+        label: 'database',
         ...(collectionNodes.length > 0 ? { children: collectionNodes } : {}),
       },
     };
