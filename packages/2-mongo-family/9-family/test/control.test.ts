@@ -121,12 +121,12 @@ describe('createMongoFamilyInstance', () => {
     ).rejects.toThrow();
   });
 
-  it('sign() throws "not implemented"', async () => {
+  it('sign() requires a valid contract', async () => {
     const instance = createMongoFamilyInstance(createMinimalControlStack());
     const fakeDriver = {} as Parameters<typeof instance.sign>[0]['driver'];
     await expect(
       instance.sign({ driver: fakeDriver, contract: {}, contractPath: '/test' }),
-    ).rejects.toThrow('not implemented');
+    ).rejects.toThrow();
   });
 
   it('introspect() delegates to introspectSchema', async () => {
