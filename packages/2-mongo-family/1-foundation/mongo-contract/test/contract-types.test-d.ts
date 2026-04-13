@@ -1,6 +1,7 @@
 import type { ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type {
+  ExtractMongoFieldInputTypes,
   ExtractMongoFieldOutputTypes,
   InferModelRow,
   MongoCollectionOptions,
@@ -16,6 +17,10 @@ type TestCodecTypes = {
 };
 
 type TestFieldOutputTypes = {
+  readonly User: { readonly age: number };
+};
+
+type TestFieldInputTypes = {
   readonly User: { readonly age: number };
 };
 
@@ -138,6 +143,56 @@ test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () 
     TM
   >;
   expectTypeOf<ExtractMongoFieldOutputTypes<C>>().toEqualTypeOf<TestFieldOutputTypes>();
+});
+
+test('MongoTypeMaps accepts a 4th fieldInputTypes parameter', () => {
+  type TM = MongoTypeMaps<
+    TestCodecTypes,
+    Record<string, never>,
+    TestFieldOutputTypes,
+    TestFieldInputTypes
+  >;
+  expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<TestFieldInputTypes>();
+});
+
+test('MongoTypeMaps defaults fieldInputTypes to Record<string, Record<string, unknown>>', () => {
+  type TM = MongoTypeMaps<TestCodecTypes>;
+  expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
+});
+
+test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () => {
+  type TM = MongoTypeMaps<
+    TestCodecTypes,
+    Record<string, never>,
+    TestFieldOutputTypes,
+    TestFieldInputTypes
+  >;
+  type C = MongoContractWithTypeMaps<
+    {
+      readonly target: 'mongo';
+      readonly targetFamily: 'mongo';
+      readonly profileHash: ProfileHashBase<'sha256:test'>;
+      readonly capabilities: Record<string, never>;
+      readonly extensionPacks: Record<string, never>;
+      readonly meta: Record<string, never>;
+      readonly roots: Record<string, never>;
+      readonly models: Record<string, never>;
+      readonly valueObjects: Record<string, never>;
+      readonly storage: {
+        readonly collections: Record<string, never>;
+        readonly storageHash: StorageHashBase<'sha256:s'>;
+      };
+    },
+    TM
+  >;
+  expectTypeOf<ExtractMongoFieldInputTypes<C>>().toEqualTypeOf<TestFieldInputTypes>();
+});
+
+test('backward compat: MongoTypeMaps with 2 params still compiles', () => {
+  type TM = MongoTypeMaps<TestCodecTypes, Record<string, never>>;
+  expectTypeOf<TM['codecTypes']>().toEqualTypeOf<TestCodecTypes>();
+  expectTypeOf<TM['fieldOutputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
+  expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
 });
 
 test('Mongo index and collection option types stay specific', () => {
