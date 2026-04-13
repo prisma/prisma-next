@@ -4,11 +4,10 @@ import { initMarker } from '@prisma-next/adapter-mongo/control';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MongoContract } from '@prisma-next/mongo-contract';
+import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-
-const MONGO_STARTUP_TIMEOUT = 60_000;
 
 import {
   executeCommand,
@@ -62,7 +61,7 @@ function writeContractJson(testDir: string, contract: MongoContract): void {
   writeFileSync(resolve(outputDir, 'contract.json'), JSON.stringify(contract, null, 2), 'utf-8');
 }
 
-describe('mongo db verify command (e2e)', { timeout: MONGO_STARTUP_TIMEOUT }, () => {
+describe('mongo db verify command (e2e)', { timeout: timeouts.spinUpDbServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let db: Db;
@@ -71,7 +70,7 @@ describe('mongo db verify command (e2e)', { timeout: MONGO_STARTUP_TIMEOUT }, ()
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
-      instanceOpts: [{ launchTimeout: MONGO_STARTUP_TIMEOUT, storageEngine: 'wiredTiger' }],
+      instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
       replSet: { count: 1, storageEngine: 'wiredTiger', dbName },
     });
     const baseUri = replSet.getUri();
@@ -81,7 +80,7 @@ describe('mongo db verify command (e2e)', { timeout: MONGO_STARTUP_TIMEOUT }, ()
     client = new MongoClient(replSet.getUri());
     await client.connect();
     db = client.db(dbName);
-  }, MONGO_STARTUP_TIMEOUT);
+  }, timeouts.spinUpDbServer);
 
   afterAll(async () => {
     try {
@@ -90,11 +89,11 @@ describe('mongo db verify command (e2e)', { timeout: MONGO_STARTUP_TIMEOUT }, ()
     } catch {
       // ignore cleanup errors
     }
-  }, MONGO_STARTUP_TIMEOUT);
+  }, timeouts.spinUpDbServer);
 
   withTempDir(({ createTempDir }) => {
     let consoleOutput: string[] = [];
-    let cleanupMocks: () => void;
+    let cleanupMocks: () => void = () => {};
 
     beforeEach(async () => {
       await db.dropDatabase();

@@ -256,6 +256,11 @@ function diffValidator(
 
   if (!expected.validator && live.validator) {
     const status = strict ? 'fail' : 'warn';
+    issues.push({
+      kind: 'extra_validator',
+      table: collName,
+      message: `Extra validator on collection "${collName}"`,
+    });
     return [
       {
         status,

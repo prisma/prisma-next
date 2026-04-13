@@ -46,6 +46,7 @@ export interface SchemaIssue {
     | 'extra_foreign_key'
     | 'extra_unique_constraint'
     | 'extra_index'
+    | 'extra_validator'
     | 'type_mismatch'
     | 'type_missing'
     | 'type_values_mismatch'
