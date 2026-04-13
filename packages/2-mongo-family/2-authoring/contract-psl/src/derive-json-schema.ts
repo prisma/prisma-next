@@ -35,6 +35,9 @@ function fieldToBsonSchema(
     if ('many' in field && field.many) {
       return { bsonType: 'array', items: voSchema };
     }
+    if (field.nullable) {
+      return { oneOf: [{ bsonType: 'null' }, voSchema] };
+    }
     return voSchema;
   }
 
