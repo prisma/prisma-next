@@ -1,7 +1,9 @@
 import {
   contractToMongoSchemaIR,
+  initMarker,
   introspectSchema,
   readMarker,
+  updateMarker,
 } from '@prisma-next/adapter-mongo/control';
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
@@ -176,13 +178,88 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     };
   }
 
-  async sign(_options: {
+  async sign(options: {
     readonly driver: ControlDriverInstance<'mongo', string>;
     readonly contract: unknown;
     readonly contractPath: string;
     readonly configPath?: string;
   }): Promise<SignDatabaseResult> {
-    throw new Error('Mongo sign is not implemented');
+    const { driver, contract: rawContract, contractPath, configPath } = options;
+    const startTime = Date.now();
+
+    const validated = validateMongoContract<MongoContract>(rawContract);
+    const contract = validated.contract;
+
+    const contractStorageHash = contract.storage.storageHash;
+    const contractProfileHash = contract.profileHash ?? contractStorageHash;
+
+    const db = extractDb(driver);
+
+    const existingMarker = await readMarker(db);
+
+    let markerCreated = false;
+    let markerUpdated = false;
+    let previousHashes: { storageHash?: string; profileHash?: string } | undefined;
+
+    if (!existingMarker) {
+      await initMarker(db, {
+        storageHash: contractStorageHash,
+        profileHash: contractProfileHash,
+      });
+      markerCreated = true;
+    } else {
+      const storageHashMatches = existingMarker.storageHash === contractStorageHash;
+      const profileHashMatches = existingMarker.profileHash === contractProfileHash;
+
+      if (!storageHashMatches || !profileHashMatches) {
+        previousHashes = {
+          storageHash: existingMarker.storageHash,
+          profileHash: existingMarker.profileHash,
+        };
+        const updated = await updateMarker(db, existingMarker.storageHash, {
+          storageHash: contractStorageHash,
+          profileHash: contractProfileHash,
+        });
+        if (!updated) {
+          throw new Error('CAS conflict: marker was modified by another process during sign');
+        }
+        markerUpdated = true;
+      }
+    }
+
+    let summary: string;
+    if (markerCreated) {
+      summary = 'Database signed (marker created)';
+    } else if (markerUpdated) {
+      summary = `Database signed (marker updated from ${previousHashes?.storageHash ?? 'unknown'})`;
+    } else {
+      summary = 'Database already signed with this contract';
+    }
+
+    return {
+      ok: true,
+      summary,
+      contract: {
+        storageHash: contractStorageHash,
+        profileHash: contractProfileHash,
+      },
+      target: {
+        expected: contract.target,
+        actual: contract.target,
+      },
+      marker: {
+        created: markerCreated,
+        updated: markerUpdated,
+        ...(previousHashes ? { previous: previousHashes } : {}),
+      },
+      meta: {
+        contractPath,
+        ...(configPath ? { configPath } : {}),
+      },
+      timings: {
+        total: Date.now() - startTime,
+      },
+    };
   }
 
   async readMarker(options: {
