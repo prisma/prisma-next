@@ -9,7 +9,7 @@ import {
   MongoSchemaCollection,
   MongoSchemaCollectionOptions,
   MongoSchemaIndex,
-  type MongoSchemaIR,
+  MongoSchemaIR,
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 
@@ -52,14 +52,12 @@ function convertCollection(name: string, def: MongoStorageCollection): MongoSche
 
 export function contractToMongoSchemaIR(contract: MongoContract | null): MongoSchemaIR {
   if (!contract) {
-    return { collections: {} };
+    return new MongoSchemaIR([]);
   }
 
-  const collections: Record<string, MongoSchemaCollection> = {};
+  const collections = Object.entries(contract.storage.collections).map(([name, def]) =>
+    convertCollection(name, def),
+  );
 
-  for (const [collectionName, collectionDef] of Object.entries(contract.storage.collections)) {
-    collections[collectionName] = convertCollection(collectionName, collectionDef);
-  }
-
-  return { collections };
+  return new MongoSchemaIR(collections);
 }

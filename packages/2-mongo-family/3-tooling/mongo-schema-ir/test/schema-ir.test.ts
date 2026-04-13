@@ -4,6 +4,7 @@ import { indexesEquivalent } from '../src/index-equivalence';
 import { MongoSchemaCollection } from '../src/schema-collection';
 import { MongoSchemaCollectionOptions } from '../src/schema-collection-options';
 import { MongoSchemaIndex } from '../src/schema-index';
+import { MongoSchemaIR } from '../src/schema-ir';
 import { MongoSchemaValidator } from '../src/schema-validator';
 import type { MongoSchemaVisitor } from '../src/visitor';
 
@@ -68,6 +69,7 @@ describe('MongoSchemaIndex', () => {
       keys: [{ field: 'email', direction: 1 }],
     });
     const visitor: MongoSchemaVisitor<string> = {
+      schema: () => 'schema',
       collection: () => 'collection',
       index: (node) => `index:${node.keys[0]!.field}`,
       validator: () => 'validator',
@@ -106,6 +108,7 @@ describe('MongoSchemaCollection', () => {
   it('dispatches via visitor', () => {
     const coll = new MongoSchemaCollection({ name: 'users' });
     const visitor: MongoSchemaVisitor<string> = {
+      schema: () => 'schema',
       collection: (node) => `collection:${node.name}`,
       index: () => 'index',
       validator: () => 'validator',
@@ -147,6 +150,7 @@ describe('MongoSchemaValidator', () => {
       validationAction: 'error',
     });
     const visitor: MongoSchemaVisitor<string> = {
+      schema: () => 'schema',
       collection: () => 'collection',
       index: () => 'index',
       validator: (node) => `validator:${node.validationLevel}`,
@@ -190,6 +194,7 @@ describe('MongoSchemaCollectionOptions', () => {
   it('dispatches via visitor', () => {
     const opts = new MongoSchemaCollectionOptions({ capped: { size: 100 } });
     const visitor: MongoSchemaVisitor<string> = {
+      schema: () => 'schema',
       collection: () => 'collection',
       index: () => 'index',
       validator: () => 'validator',
@@ -456,6 +461,57 @@ describe('indexesEquivalent', () => {
       wildcardProjection: { email: 1, name: 1 },
     });
     expect(indexesEquivalent(a, b)).toBe(true);
+  });
+});
+
+describe('MongoSchemaIR', () => {
+  it('constructs with empty collections', () => {
+    const ir = new MongoSchemaIR([]);
+    expect(ir.kind).toBe('schema');
+    expect(ir.collections).toEqual([]);
+  });
+
+  it('constructs with collections sorted by name', () => {
+    const users = new MongoSchemaCollection({ name: 'users' });
+    const posts = new MongoSchemaCollection({ name: 'posts' });
+    const ir = new MongoSchemaIR([users, posts]);
+    expect(ir.collections).toHaveLength(2);
+    expect(ir.collections[0]).toBe(posts);
+    expect(ir.collections[1]).toBe(users);
+  });
+
+  it('is frozen after construction', () => {
+    const ir = new MongoSchemaIR([]);
+    expect(Object.isFrozen(ir)).toBe(true);
+  });
+
+  it('dispatches via visitor', () => {
+    const ir = new MongoSchemaIR([new MongoSchemaCollection({ name: 'users' })]);
+    const visitor: MongoSchemaVisitor<string> = {
+      schema: (node) => `schema:${node.collections.length}`,
+      collection: () => 'collection',
+      index: () => 'index',
+      validator: () => 'validator',
+      collectionOptions: () => 'collectionOptions',
+    };
+    expect(ir.accept(visitor)).toBe('schema:1');
+  });
+
+  it('looks up collection by name', () => {
+    const users = new MongoSchemaCollection({ name: 'users' });
+    const posts = new MongoSchemaCollection({ name: 'posts' });
+    const ir = new MongoSchemaIR([users, posts]);
+    expect(ir.collection('users')).toBe(users);
+    expect(ir.collection('posts')).toBe(posts);
+    expect(ir.collection('missing')).toBeUndefined();
+  });
+
+  it('exposes sorted collection names', () => {
+    const ir = new MongoSchemaIR([
+      new MongoSchemaCollection({ name: 'zebra' }),
+      new MongoSchemaCollection({ name: 'alpha' }),
+    ]);
+    expect(ir.collectionNames).toEqual(['alpha', 'zebra']);
   });
 });
 

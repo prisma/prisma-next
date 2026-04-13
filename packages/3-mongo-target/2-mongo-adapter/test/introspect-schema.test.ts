@@ -4,7 +4,7 @@ import {
   MongoSchemaCollection,
   MongoSchemaCollectionOptions,
   MongoSchemaIndex,
-  type MongoSchemaIR,
+  MongoSchemaIR,
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import { type Db, MongoClient } from 'mongodb';
@@ -47,7 +47,8 @@ describe('introspectSchema', () => {
   it('returns empty IR for empty database', async () => {
     const ir = await introspectSchema(db);
 
-    expect(ir).toEqual({ collections: {} });
+    expect(ir).toBeInstanceOf(MongoSchemaIR);
+    expect(ir.collections).toEqual([]);
   });
 
   it('introspects a collection with no user indexes', async () => {
@@ -55,8 +56,8 @@ describe('introspectSchema', () => {
 
     const ir = await introspectSchema(db);
 
-    expect(Object.keys(ir.collections)).toEqual(['users']);
-    const users = ir.collections['users']!;
+    expect(ir.collectionNames).toEqual(['users']);
+    const users = ir.collection('users')!;
     expect(users).toBeInstanceOf(MongoSchemaCollection);
     expect(users.name).toBe('users');
     expect(users.indexes).toEqual([]);
@@ -70,7 +71,7 @@ describe('introspectSchema', () => {
 
     const ir = await introspectSchema(db);
 
-    const users = ir.collections['users']!;
+    const users = ir.collection('users')!;
     expect(users.indexes).toHaveLength(3);
 
     const emailIdx = users.indexes.find((i) => i.keys.some((k) => k.field === 'email'))!;
@@ -95,7 +96,7 @@ describe('introspectSchema', () => {
 
     const ir = await introspectSchema(db);
 
-    const sessions = ir.collections['sessions']!;
+    const sessions = ir.collection('sessions')!;
     const sparseIdx = sessions.indexes.find((i) => i.keys.some((k) => k.field === 'token'))!;
     expect(sparseIdx.sparse).toBe(true);
 
@@ -111,7 +112,7 @@ describe('introspectSchema', () => {
 
     const ir = await introspectSchema(db);
 
-    const orders = ir.collections['orders']!;
+    const orders = ir.collection('orders')!;
     const partialIdx = orders.indexes.find((i) => i.keys.some((k) => k.field === 'status'))!;
     expect(partialIdx.partialFilterExpression).toEqual({ status: 'active' });
   });
@@ -134,7 +135,7 @@ describe('introspectSchema', () => {
 
     const ir = await introspectSchema(db);
 
-    const products = ir.collections['products']!;
+    const products = ir.collection('products')!;
     expect(products.validator).toBeInstanceOf(MongoSchemaValidator);
     expect(products.validator!.validationLevel).toBe('strict');
     expect(products.validator!.validationAction).toBe('error');
@@ -157,7 +158,7 @@ describe('introspectSchema', () => {
 
     const ir = await introspectSchema(db);
 
-    const logs = ir.collections['logs']!;
+    const logs = ir.collection('logs')!;
     expect(logs.options).toBeInstanceOf(MongoSchemaCollectionOptions);
     expect(logs.options!.capped).toEqual({ size: 1048576, max: 1000 });
   });
@@ -168,7 +169,7 @@ describe('introspectSchema', () => {
 
     const ir = await introspectSchema(db);
 
-    expect(Object.keys(ir.collections)).toEqual(['users']);
+    expect(ir.collectionNames).toEqual(['users']);
   });
 
   it('skips views', async () => {
@@ -182,8 +183,8 @@ describe('introspectSchema', () => {
 
     const ir = await introspectSchema(db);
 
-    expect(ir.collections['user_view']).toBeUndefined();
-    expect(ir.collections['users']).toBeDefined();
+    expect(ir.collection('user_view')).toBeUndefined();
+    expect(ir.collection('users')).toBeDefined();
   });
 
   it('filters out the default _id_ index', async () => {
@@ -192,7 +193,7 @@ describe('introspectSchema', () => {
 
     const ir = await introspectSchema(db);
 
-    const users = ir.collections['users']!;
+    const users = ir.collection('users')!;
     const idIndex = users.indexes.find((i) => i.keys.some((k) => k.field === '_id'));
     expect(idIndex).toBeUndefined();
     expect(users.indexes).toHaveLength(1);
@@ -207,32 +208,30 @@ describe('introspectSchema', () => {
 
     const ir = await introspectSchema(db);
 
-    expect(Object.keys(ir.collections).sort()).toEqual(['posts', 'users']);
-    expect(ir.collections['users']!.indexes).toHaveLength(1);
-    expect(ir.collections['posts']!.indexes).toHaveLength(1);
+    expect(ir.collectionNames).toEqual(['posts', 'users']);
+    expect(ir.collection('users')!.indexes).toHaveLength(1);
+    expect(ir.collection('posts')!.indexes).toHaveLength(1);
   });
 
   describe('round-trip with contractToMongoSchemaIR', () => {
     it('produces equivalent IR through contract -> apply -> introspect', async () => {
-      const contractIR: MongoSchemaIR = {
-        collections: {
-          users: new MongoSchemaCollection({
-            name: 'users',
-            indexes: [
-              new MongoSchemaIndex({
-                keys: [{ field: 'email', direction: 1 }],
-                unique: true,
-              }),
-              new MongoSchemaIndex({
-                keys: [
-                  { field: 'lastName', direction: 1 },
-                  { field: 'firstName', direction: 1 },
-                ],
-              }),
-            ],
-          }),
-        },
-      };
+      const contractIR = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'users',
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [{ field: 'email', direction: 1 }],
+              unique: true,
+            }),
+            new MongoSchemaIndex({
+              keys: [
+                { field: 'lastName', direction: 1 },
+                { field: 'firstName', direction: 1 },
+              ],
+            }),
+          ],
+        }),
+      ]);
 
       await db.createCollection('users');
       await db.collection('users').createIndex({ email: 1 }, { unique: true });
@@ -240,8 +239,8 @@ describe('introspectSchema', () => {
 
       const liveIR = await introspectSchema(db);
 
-      const liveUsers = liveIR.collections['users']!;
-      const contractUsers = contractIR.collections['users']!;
+      const liveUsers = liveIR.collection('users')!;
+      const contractUsers = contractIR.collection('users')!;
 
       expect(liveUsers.indexes).toHaveLength(contractUsers.indexes.length);
 

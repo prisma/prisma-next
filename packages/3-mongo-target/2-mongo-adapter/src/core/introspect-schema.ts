@@ -3,7 +3,7 @@ import {
   MongoSchemaCollection,
   MongoSchemaCollectionOptions,
   MongoSchemaIndex,
-  type MongoSchemaIR,
+  MongoSchemaIR,
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import type { Db, Document } from 'mongodb';
@@ -87,7 +87,7 @@ function parseCollectionOptions(info: Document): MongoSchemaCollectionOptions | 
 export async function introspectSchema(db: Db): Promise<MongoSchemaIR> {
   const collectionInfos = await db.listCollections().toArray();
 
-  const collections: Record<string, MongoSchemaCollection> = {};
+  const collections: MongoSchemaCollection[] = [];
 
   for (const info of collectionInfos) {
     const name = info['name'] as string;
@@ -103,13 +103,15 @@ export async function introspectSchema(db: Db): Promise<MongoSchemaIR> {
     const validator = parseValidator(info['options'] ?? {});
     const options = parseCollectionOptions(info);
 
-    collections[name] = new MongoSchemaCollection({
-      name,
-      indexes,
-      ...(validator ? { validator } : {}),
-      ...(options ? { options } : {}),
-    });
+    collections.push(
+      new MongoSchemaCollection({
+        name,
+        indexes,
+        ...(validator ? { validator } : {}),
+        ...(options ? { options } : {}),
+      }),
+    );
   }
 
-  return { collections };
+  return new MongoSchemaIR(collections);
 }
