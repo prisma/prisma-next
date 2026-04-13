@@ -464,6 +464,7 @@ describe('mongoEmission.generateContractTypes', () => {
       expect(types).toContain('export type NavItemOutput =');
       expect(types).toContain('export type NavItemInput =');
       expect(types).toContain('readonly children: ReadonlyArray<NavItemOutput>');
+      expect(types).toContain('readonly children: ReadonlyArray<NavItemInput>');
     });
 
     it('omits valueObjects when none exist', () => {
