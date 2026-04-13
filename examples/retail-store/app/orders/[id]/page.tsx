@@ -1,10 +1,11 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { Badge } from '../../../src/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../src/components/ui/card';
 import { Separator } from '../../../src/components/ui/separator';
 import { getOrderWithUser } from '../../../src/data/orders';
 import { getDb } from '../../../src/db-singleton';
+import { getAuthUserId } from '../../../src/lib/auth';
 import { OrderStatusButtons } from './order-status-buttons';
 
 export const dynamic = 'force-dynamic';
@@ -17,11 +18,14 @@ const statusVariant: Record<string, 'default' | 'warning' | 'success' | 'destruc
 };
 
 export default async function OrderDetail({ params }: { params: Promise<{ id: string }> }) {
+  const userId = await getAuthUserId();
+  if (!userId) redirect('/login');
+
   const { id } = await params;
   const db = await getDb();
   const order = await getOrderWithUser(db, id);
 
-  if (!order) {
+  if (!order || String(order.userId) !== userId) {
     notFound();
   }
 
