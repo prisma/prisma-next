@@ -1,6 +1,8 @@
 import type { ContractReferenceRelation } from '@prisma-next/contract/types';
 import type {
   ExtractMongoCodecTypes,
+  ExtractMongoFieldInputTypes,
+  ExtractMongoFieldOutputTypes,
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
@@ -48,6 +50,28 @@ export type EmbedRelationKeys<
     : K;
 }[keyof ModelRelations<TContract, ModelName>];
 
+type ResolvedOutputRow<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+> = string extends keyof ExtractMongoFieldOutputTypes<TContract>
+  ? InferModelRow<TContract, ModelName>
+  : ModelName extends keyof ExtractMongoFieldOutputTypes<TContract>
+    ? {
+        -readonly [K in keyof ExtractMongoFieldOutputTypes<TContract>[ModelName]]: ExtractMongoFieldOutputTypes<TContract>[ModelName][K];
+      }
+    : InferModelRow<TContract, ModelName>;
+
+type ResolvedInputRow<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+> = string extends keyof ExtractMongoFieldInputTypes<TContract>
+  ? InferModelRow<TContract, ModelName>
+  : ModelName extends keyof ExtractMongoFieldInputTypes<TContract>
+    ? {
+        -readonly [K in keyof ExtractMongoFieldInputTypes<TContract>[ModelName]]: ExtractMongoFieldInputTypes<TContract>[ModelName][K];
+      }
+    : InferModelRow<TContract, ModelName>;
+
 type EmbedRelationRowType<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
@@ -59,16 +83,16 @@ type EmbedRelationRowType<
   ? ModelRelations<TContract, ModelName>[RelKey] extends ContractReferenceRelation
     ? never
     : C extends '1:N'
-      ? InferModelRow<TContract, To>[]
-      : InferModelRow<TContract, To>
+      ? ResolvedOutputRow<TContract, To>[]
+      : ResolvedOutputRow<TContract, To>
   : never;
 
 export type InferFullRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
 > = EmbedRelationKeys<TContract, ModelName> extends never
-  ? InferModelRow<TContract, ModelName>
-  : InferModelRow<TContract, ModelName> & {
+  ? ResolvedOutputRow<TContract, ModelName>
+  : ResolvedOutputRow<TContract, ModelName> & {
       -readonly [K in EmbedRelationKeys<TContract, ModelName> &
         keyof ModelRelations<TContract, ModelName>]: EmbedRelationRowType<TContract, ModelName, K>;
     };
@@ -183,14 +207,17 @@ export type IncludedRow<
 export type DefaultModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
-> = InferModelRow<TContract, ModelName>;
+> = ResolvedOutputRow<TContract, ModelName>;
 
 export type CreateInput<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
-> = Omit<InferModelRow<TContract, ModelName>, '_id'> &
+> = Omit<ResolvedInputRow<TContract, ModelName>, '_id'> &
   Partial<
-    Pick<InferModelRow<TContract, ModelName>, '_id' & keyof InferModelRow<TContract, ModelName>>
+    Pick<
+      ResolvedInputRow<TContract, ModelName>,
+      '_id' & keyof ResolvedInputRow<TContract, ModelName>
+    >
   >;
 
 type DiscriminatorField<
@@ -211,7 +238,10 @@ export type VariantCreateInput<
   '_id' | DiscriminatorField<TContract, ModelName>
 > &
   Partial<
-    Pick<InferModelRow<TContract, ModelName>, '_id' & keyof InferModelRow<TContract, ModelName>>
+    Pick<
+      ResolvedInputRow<TContract, ModelName>,
+      '_id' & keyof ResolvedInputRow<TContract, ModelName>
+    >
   >;
 
 export type ResolvedCreateInput<

@@ -116,3 +116,106 @@ test('update input accepts null for nullable value object field', () => {
   const input: UpdateInput = { contactInfo: null };
   expectTypeOf(input).toExtend<UpdateInput>();
 });
+
+// --- Contracts with FieldOutputTypes / FieldInputTypes ---
+
+type FieldOutputTypesForUser = {
+  readonly User: {
+    readonly _id: string;
+    readonly name: string;
+    readonly contactInfo: { phone: string; website: string | null } | null;
+    readonly tags: string[];
+  };
+};
+
+type FieldInputTypesForUser = {
+  readonly User: {
+    readonly _id: string;
+    readonly name: string;
+    readonly contactInfo: { phone: string; website: string | null } | null;
+    readonly tags: string[];
+  };
+};
+
+type TypeMapsWithFieldTypes = MongoTypeMaps<
+  TestCodecTypes,
+  Record<string, never>,
+  FieldOutputTypesForUser,
+  FieldInputTypesForUser
+>;
+
+type VOContractWithFieldTypes = MongoContractWithTypeMaps<
+  {
+    readonly target: 'mongo';
+    readonly targetFamily: 'mongo';
+    readonly profileHash: ProfileHashBase<'sha256:test'>;
+    readonly capabilities: Record<string, never>;
+    readonly extensionPacks: Record<string, never>;
+    readonly meta: Record<string, never>;
+    readonly roots: { readonly users: 'User' };
+    readonly models: {
+      readonly User: {
+        readonly fields: {
+          readonly _id: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+          };
+          readonly name: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          };
+          readonly contactInfo: {
+            readonly nullable: true;
+            readonly type: { readonly kind: 'valueObject'; readonly name: 'ContactInfo' };
+          };
+          readonly tags: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+            readonly many: true;
+          };
+        };
+        readonly relations: Record<string, never>;
+        readonly storage: { readonly collection: 'users' };
+      };
+    };
+    readonly valueObjects: {
+      readonly ContactInfo: {
+        readonly fields: {
+          readonly phone: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          };
+          readonly website: {
+            readonly nullable: true;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          };
+        };
+      };
+    };
+    readonly storage: {
+      readonly collections: { readonly users: Record<string, never> };
+      readonly storageHash: StorageHashBase<'sha256:test-storage'>;
+    };
+  },
+  TypeMapsWithFieldTypes
+>;
+
+test('DefaultModelRow resolves to primitives when FieldOutputTypes is present', () => {
+  type Row = DefaultModelRow<VOContractWithFieldTypes, 'User'>;
+  expectTypeOf<Row['_id']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['tags']>().toEqualTypeOf<string[]>();
+  expectTypeOf<Row['contactInfo']>().toEqualTypeOf<ContactInfoShape | null>();
+});
+
+test('DefaultModelRow falls back to InferModelRow when FieldOutputTypes is absent', () => {
+  type Row = DefaultModelRow<VOContract, 'User'>;
+  expectTypeOf<Row['_id']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+});
+
+test('CreateInput resolves via FieldInputTypes when present', () => {
+  type Input = CreateInput<VOContractWithFieldTypes, 'User'>;
+  expectTypeOf<Input['name']>().toEqualTypeOf<string>();
+  expectTypeOf<Input['contactInfo']>().toEqualTypeOf<ContactInfoShape | null>();
+});
