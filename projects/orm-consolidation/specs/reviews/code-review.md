@@ -26,17 +26,9 @@ This change wires pre-resolved `FieldOutputTypes` and a new `FieldInputTypes` fr
 
 ## Deferred (Out of Scope)
 
-### F08 — SQL query builders still resolve types through `CodecTypes` conditionals instead of pre-resolved field type maps
-
-- **Why deferred**: The SQL builder operates at the **table/column** level (storage), while `FieldOutputTypes`/`FieldInputTypes` are keyed by **model/field** names (domain). Wiring them requires: (1) exporting `ExtractTableToModel`/`ExtractColumnToField` from `relational-core`, (2) widening `TableProxyContract` to include model information (currently only `{ storage, capabilities }`), and (3) for `ResolveRow`, propagating model context through the scope system (currently scopes only carry `{ codecId, nullable }` per column). The Mongo ORM's `ResolvedOutputRow` was simple because the ORM already worked at the model/field level. Additionally, the SQL builder's `CodecTypes[Row[K]['codecId']]['output']` is a simple single-level indexed access — not the deep conditional chain (`InferModelRow` → `InferFieldBaseType` → ...) that caused opaque types in the Mongo ORM. The SQL builder does not suffer from this issue today. `ComputeColumnJsType` in `relational-core` already demonstrates the complexity: it's a 5-level nested conditional type that does the table→model→column→field→`FieldOutputTypes` resolution with fallbacks. An analogous input-side type would need the same depth.
-
 ### F05 — `VariantRow` / `InferFullRow` still use `InferModelRow` internally for non-model-row parts
 
 - **Why deferred**: `InferFullRow` intersects `ResolvedOutputRow` with embedded relation types (which also use `ResolvedOutputRow`). The `VariantRow` type still uses `InferFullRow` correctly. The type chain for variant discrimination uses `Record<DiscField, V[VK]['value']>` which is a literal string — not derived from codecs. Fixing this would require rethinking the variant type resolution, which is beyond this PR's scope.
-
-### F06-partial — SQL query builders do not consume `FieldInputTypes` via extractors
-
-- **Why deferred**: The SQL `TypeMaps` now carries `TFieldInputTypes` and the SQL emitter passes it, but the SQL query builders (`packages/2-sql/4-lanes/`) do not yet consume `FieldInputTypes` for mutation input typing. There is no SQL ORM today, so this is acceptable. When the SQL query builders need input-typed mutations, they should add `ResolvedInputRow`-style helpers mirroring the Mongo ORM pattern. See also F08 for the architectural complexity involved.
 
 ## Already Addressed
 
@@ -46,8 +38,9 @@ This change wires pre-resolved `FieldOutputTypes` and a new `FieldInputTypes` fr
 | F02 | `renderOutputType` used on input side for parameterized codecs | `b9a94cd33` — `resolveFieldType` returns both sides; `renderOutputType` now only fires for output side; test verifies the asymmetry |
 | F03 | No type-level tests for `VariantCreateInput`, `InferFullRow`, `IncludedRow` with field type maps | `17ff685c2` — Added type-level tests for all three |
 | F04 | `FieldInputTypes` children reference `NavItemOutput` in self-referencing value objects | `17ff685c2` — Added assertion for `NavItemInput` self-reference |
-| F06 | SQL `TypeMaps` does not carry `FieldInputTypes`; emitter does not pass it | `f7e664124` — Added `TFieldInputTypes` 5th parameter to SQL `TypeMaps`, `FieldInputTypesOf` extractor, `ExtractFieldInputTypes`, updated SQL emitter `getTypeMapsExpression`. Query builder consumption remains open (F08). |
-| F07 | `generateFieldResolvedType` uses a `side` flag instead of returning both sides | `b9a94cd33` — Refactored to `resolveFieldType` returning `{ input, output }`, single-pass maps via `generateBothFieldTypesMaps` |
+| F06 | SQL `TypeMaps` does not carry `FieldInputTypes`; emitter does not pass it | `f7e664124` — Added `TFieldInputTypes` 5th parameter to SQL `TypeMaps`, `FieldInputTypesOf` extractor, `ExtractFieldInputTypes`, updated SQL emitter `getTypeMapsExpression`. |
+| F07 | `generateFieldResolvedType` uses a `side` flag instead of returning both sides | `b9a94cd33`
+|| F08 | SQL query builders resolve types through `CodecTypes` conditionals instead of pre-resolved field type maps | `945471aed` — Refactored to `resolveFieldType` returning `{ input, output }`, single-pass maps via `generateBothFieldTypesMaps` |
 
 ## Acceptance-Criteria Traceability
 
