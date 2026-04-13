@@ -16,6 +16,12 @@ export async function POST(req: Request) {
   const userId = await getAuthUserId();
   if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   const body = await req.json();
+  if (!Array.isArray(body.items) || body.items.length === 0 || !body.shippingAddress) {
+    return NextResponse.json(
+      { error: 'Missing required fields: items, shippingAddress' },
+      { status: 400 },
+    );
+  }
   const db = await getDb();
   const order = await createOrder(db, {
     userId,

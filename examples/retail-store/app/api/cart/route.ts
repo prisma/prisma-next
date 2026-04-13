@@ -15,6 +15,12 @@ export async function POST(req: Request) {
   const userId = await getAuthUserId();
   if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   const body = await req.json();
+  if (!body.productId || !body.name || !body.price) {
+    return NextResponse.json(
+      { error: 'Missing required fields: productId, name, price' },
+      { status: 400 },
+    );
+  }
   const db = await getDb();
 
   await addToCart(db, userId, body);
