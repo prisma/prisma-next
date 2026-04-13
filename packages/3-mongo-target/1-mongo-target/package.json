@@ -15,11 +15,15 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/framework-components": "workspace:*"
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/mongo-query-ast": "workspace:*",
+    "mongodb": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
+    "mongodb-memory-server": "^10.4.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
@@ -30,6 +34,7 @@
   ],
   "exports": {
     "./codec-types": "./dist/codec-types.mjs",
+    "./control": "./dist/control.mjs",
     "./pack": "./dist/pack.mjs",
     "./package.json": "./package.json"
   },

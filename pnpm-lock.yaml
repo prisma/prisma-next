@@ -2209,9 +2209,18 @@ importers:
 
   packages/3-mongo-target/1-mongo-target:
     dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/contract
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/mongo-query-ast':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/4-query/query-ast
+      mongodb:
+        specifier: 'catalog:'
+        version: 6.21.0
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
@@ -2219,6 +2228,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../0-config/tsdown
+      mongodb-memory-server:
+        specifier: ^10.4.0
+        version: 10.4.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
@@ -2237,9 +2249,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
-      '@prisma-next/driver-mongo':
-        specifier: workspace:*
-        version: link:../3-mongo-driver
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
@@ -2267,6 +2276,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
+      '@prisma-next/target-mongo':
+        specifier: workspace:*
+        version: link:../1-mongo-target
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/utils
@@ -2301,9 +2313,6 @@ importers:
 
   packages/3-mongo-target/3-mongo-driver:
     dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../1-framework/0-foundation/contract
       '@prisma-next/errors':
         specifier: workspace:*
         version: link:../../1-framework/1-core/errors
@@ -2313,9 +2322,6 @@ importers:
       '@prisma-next/mongo-lowering':
         specifier: workspace:*
         version: link:../../2-mongo-family/6-transport/mongo-lowering
-      '@prisma-next/mongo-query-ast':
-        specifier: workspace:*
-        version: link:../../2-mongo-family/4-query/query-ast
       '@prisma-next/mongo-wire':
         specifier: workspace:*
         version: link:../../2-mongo-family/6-transport/mongo-wire

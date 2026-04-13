@@ -1,9 +1,3 @@
-import {
-  initMarker,
-  readMarker,
-  updateMarker,
-  writeLedgerEntry,
-} from '@prisma-next/driver-mongo/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
@@ -19,6 +13,12 @@ import type {
   MongoMigrationCheck,
   MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
+import {
+  initMarker,
+  readMarker,
+  updateMarker,
+  writeLedgerEntry,
+} from '@prisma-next/target-mongo/control';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { Db } from 'mongodb';
 import { MongoCommandExecutor, MongoInspectionExecutor } from './command-executor';

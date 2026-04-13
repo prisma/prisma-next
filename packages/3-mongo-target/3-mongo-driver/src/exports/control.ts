@@ -1,5 +1,3 @@
-export { initMarker, readMarker, updateMarker, writeLedgerEntry } from '../core/marker-ledger';
-
 import { errorRuntime } from '@prisma-next/errors/execution';
 import type {
   ControlDriverDescriptor,
