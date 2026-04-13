@@ -36,6 +36,7 @@ import type {
   DefaultModelRow,
   IncludedRow,
   MongoIncludeSpec,
+  MongoWhereFilter,
   NoIncludes,
   ReferenceRelationKeys,
   ResolvedCreateInput,
@@ -57,7 +58,11 @@ export interface MongoCollection<
   variant<V extends VariantNames<TContract, ModelName>>(
     variantName: V,
   ): MongoCollection<TContract, ModelName, TIncludes, V>;
-  /** Appends a filter condition. Returns a new immutable collection. */
+  /** Appends equality filters from a plain object. Values are encoded through codecs. */
+  where(
+    filter: MongoWhereFilter<TContract, ModelName>,
+  ): MongoCollection<TContract, ModelName, TIncludes, TVariant>;
+  /** Appends a filter condition from a raw filter expression. */
   where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes, TVariant>;
   /** Restricts returned fields to the given subset. Returns a new immutable collection. */
   select(
@@ -171,10 +176,14 @@ class MongoCollectionImpl<
     );
   }
 
-  where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
-    return this.#clone({
-      filters: [...this.#state.filters, filter],
-    });
+  where(
+    filter: MongoWhereFilter<TContract, ModelName> | MongoFilterExpr,
+  ): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
+    if (this.#isFilterExpr(filter)) {
+      return this.#clone({ filters: [...this.#state.filters, filter] });
+    }
+    const compiled = this.#compileWhereObject(filter as Record<string, unknown>);
+    return this.#clone({ filters: [...this.#state.filters, ...compiled] });
   }
 
   select(
@@ -476,6 +485,21 @@ class MongoCollectionImpl<
   #modelFields(): Record<string, ContractField> {
     const model = this.#contract.models[this.#modelName] as MongoModelDefinition | undefined;
     return model?.fields ?? {};
+  }
+
+  #isFilterExpr(filter: unknown): filter is MongoFilterExpr {
+    return typeof filter === 'object' && filter !== null && 'kind' in filter;
+  }
+
+  #compileWhereObject(data: Record<string, unknown>): MongoFilterExpr[] {
+    const fields = this.#modelFields();
+    const filters: MongoFilterExpr[] = [];
+    for (const [key, value] of Object.entries(data)) {
+      if (value === undefined) continue;
+      const wrapped = this.#wrapFieldValue(value, fields[key]);
+      filters.push(MongoFieldFilter.eq(key, wrapped));
+    }
+    return filters;
   }
 
   #wrapFieldValue(value: unknown, field: ContractField | undefined): MongoValue {

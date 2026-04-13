@@ -69,6 +69,25 @@ test('where filter keys are constrained to model field names', () => {
   expectTypeOf<UserFilter>().toHaveProperty('email');
 });
 
+test('where filter rejects invalid field names', () => {
+  type UserFilter = MongoWhereFilter<Contract, 'User'>;
+  // @ts-expect-error 'nonexistent' is not a field on User
+  void ({ nonexistent: 'value' } satisfies UserFilter);
+});
+
+test('where filter enforces value types from codec', () => {
+  type UserFilter = MongoWhereFilter<Contract, 'User'>;
+  void ({ name: 'Alice' } satisfies UserFilter);
+  // @ts-expect-error number is not assignable to string field
+  void ({ name: 123 } satisfies UserFilter);
+});
+
+test('object-based where() accepts MongoWhereFilter', () => {
+  const col = {} as MongoCollection<Contract, 'User'>;
+  const filtered = col.where({ name: 'Alice' });
+  expectTypeOf(filtered).toExtend<MongoCollection<Contract, 'User'>>();
+});
+
 // --- Include constrained to reference relations only ---
 
 test('ReferenceRelationKeys picks only reference relations', () => {

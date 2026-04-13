@@ -183,7 +183,10 @@ export type MongoWhereFilter<
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
 > = {
   readonly [K in keyof TContract['models'][ModelName]['fields']]?: TContract['models'][ModelName]['fields'][K] extends {
-    readonly codecId: infer CId extends string & keyof TCodecTypes;
+    readonly type: {
+      readonly kind: 'scalar';
+      readonly codecId: infer CId extends string & keyof TCodecTypes;
+    };
   }
     ? TCodecTypes[CId]['output']
     : unknown;
