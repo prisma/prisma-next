@@ -323,7 +323,13 @@ function collectionToSchemaNode(name: string, collection: MongoSchemaCollection)
   const children: SchemaTreeNode[] = [];
 
   for (const index of collection.indexes) {
-    const keysSummary = index.keys.map((k) => `${k.field}: ${k.direction}`).join(', ');
+    const keysSummary = index.keys
+      .map((k) => {
+        if (k.direction === 1) return k.field;
+        if (k.direction === -1) return `${k.field} desc`;
+        return `${k.field} ${k.direction}`;
+      })
+      .join(', ');
     const prefix = index.unique ? 'unique index' : 'index';
     const options: string[] = [];
     if (index.sparse) options.push('sparse');
@@ -350,15 +356,33 @@ function collectionToSchemaNode(name: string, collection: MongoSchemaCollection)
   }
 
   if (collection.validator) {
+    const validatorChildren: SchemaTreeNode[] = [];
+    const schema = collection.validator.jsonSchema as Record<string, unknown>;
+    const properties = schema['properties'] as Record<string, Record<string, unknown>> | undefined;
+    const required = new Set((schema['required'] as string[] | undefined) ?? []);
+
+    if (properties) {
+      for (const [propName, propDef] of Object.entries(properties)) {
+        const bsonType = (propDef['bsonType'] as string) ?? 'unknown';
+        const suffix = required.has(propName) ? ' (required)' : '';
+        validatorChildren.push({
+          kind: 'field',
+          id: `field-${name}-${propName}`,
+          label: `${propName}: ${bsonType}${suffix}`,
+        });
+      }
+    }
+
     children.push({
       kind: 'field',
       id: `validator-${name}`,
-      label: `validator (${collection.validator.validationLevel}, ${collection.validator.validationAction})`,
+      label: `validator (level: ${collection.validator.validationLevel}, action: ${collection.validator.validationAction})`,
       meta: {
         validationLevel: collection.validator.validationLevel,
         validationAction: collection.validator.validationAction,
         jsonSchema: collection.validator.jsonSchema,
       },
+      ...(validatorChildren.length > 0 ? { children: validatorChildren } : {}),
     });
   }
 

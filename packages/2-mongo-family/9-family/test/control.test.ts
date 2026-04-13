@@ -178,7 +178,7 @@ describe('toSchemaView', () => {
     expect(userNode!.label).toBe('collection users');
   });
 
-  it('maps indexes to child nodes', () => {
+  it('maps ascending indexes omitting direction', () => {
     const instance = createInstance();
     const ir: MongoSchemaIR = {
       collections: {
@@ -207,17 +207,66 @@ describe('toSchemaView', () => {
 
     const emailIdx = usersNode.children![0]!;
     expect(emailIdx.kind).toBe('index');
-    expect(emailIdx.label).toContain('unique index');
-    expect(emailIdx.label).toContain('email');
+    expect(emailIdx.label).toBe('unique index (email)');
 
     const compoundIdx = usersNode.children![1]!;
     expect(compoundIdx.kind).toBe('index');
-    expect(compoundIdx.label).not.toContain('unique');
-    expect(compoundIdx.label).toContain('lastName');
-    expect(compoundIdx.label).toContain('firstName');
+    expect(compoundIdx.label).toBe('index (lastName, firstName)');
   });
 
-  it('maps validator to a child node', () => {
+  it('shows descending direction as "desc"', () => {
+    const instance = createInstance();
+    const ir: MongoSchemaIR = {
+      collections: {
+        events: new MongoSchemaCollection({
+          name: 'events',
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [
+                { field: 'userId', direction: 1 },
+                { field: 'timestamp', direction: -1 },
+              ],
+            }),
+          ],
+        }),
+      },
+    };
+
+    const view = instance.toSchemaView(ir);
+
+    const eventsNode = view.root.children![0]!;
+    expect(eventsNode.children![0]!.label).toBe('index (userId, timestamp desc)');
+  });
+
+  it('shows special index types as-is', () => {
+    const instance = createInstance();
+    const ir: MongoSchemaIR = {
+      collections: {
+        products: new MongoSchemaCollection({
+          name: 'products',
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [{ field: 'code', direction: 'hashed' }],
+            }),
+            new MongoSchemaIndex({
+              keys: [
+                { field: '_fts', direction: 'text' },
+                { field: '_ftsx', direction: 1 },
+              ],
+            }),
+          ],
+        }),
+      },
+    };
+
+    const view = instance.toSchemaView(ir);
+
+    const productsNode = view.root.children![0]!;
+    expect(productsNode.children![0]!.label).toBe('index (code hashed)');
+    expect(productsNode.children![1]!.label).toBe('index (_fts text, _ftsx)');
+  });
+
+  it('maps validator with labeled level and action', () => {
     const instance = createInstance();
     const ir: MongoSchemaIR = {
       collections: {
@@ -237,8 +286,43 @@ describe('toSchemaView', () => {
     const productsNode = view.root.children![0]!;
     const validatorNode = productsNode.children!.find((n) => n.id === 'validator-products');
     expect(validatorNode).toBeDefined();
-    expect(validatorNode!.label).toContain('strict');
-    expect(validatorNode!.label).toContain('error');
+    expect(validatorNode!.label).toBe('validator (level: strict, action: error)');
+  });
+
+  it('expands validator properties as child nodes', () => {
+    const instance = createInstance();
+    const ir: MongoSchemaIR = {
+      collections: {
+        users: new MongoSchemaCollection({
+          name: 'users',
+          validator: new MongoSchemaValidator({
+            jsonSchema: {
+              bsonType: 'object',
+              required: ['_id', 'email'],
+              properties: {
+                _id: { bsonType: 'objectId' },
+                email: { bsonType: 'string' },
+                name: { bsonType: 'string' },
+                age: { bsonType: 'int' },
+              },
+            },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          }),
+        }),
+      },
+    };
+
+    const view = instance.toSchemaView(ir);
+
+    const usersNode = view.root.children![0]!;
+    const validatorNode = usersNode.children!.find((n) => n.id === 'validator-users')!;
+    expect(validatorNode.children).toHaveLength(4);
+
+    expect(validatorNode.children![0]!.label).toBe('_id: objectId (required)');
+    expect(validatorNode.children![1]!.label).toBe('email: string (required)');
+    expect(validatorNode.children![2]!.label).toBe('name: string');
+    expect(validatorNode.children![3]!.label).toBe('age: int');
   });
 
   it('maps collection options to a child node', () => {
