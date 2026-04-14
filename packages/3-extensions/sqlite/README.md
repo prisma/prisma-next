@@ -65,5 +65,5 @@ flowchart TD
 ## Related Docs
 
 - Architecture: `docs/Architecture Overview.md`
-- Subsystem: `docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md`
+- Subsystem: `docs/architecture docs/subsystems/4. Runtime & Middleware Framework.md`
 - Subsystem: `docs/architecture docs/subsystems/5. Adapters & Targets.md`

@@ -56,7 +56,7 @@ Proves the architecture with a generic middleware running across both families, 
 ### Close-out
 
 - [x] **C.1 Verify all acceptance criteria in `projects/cross-family-middleware-spi/spec.md`.**
-- [x] **C.2 Update Runtime & Plugin Framework subsystem doc** (`docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md`): rename "plugin" to "middleware" throughout, document the `RuntimeExecutor` SPI, document `RuntimeMiddleware`/`SqlMiddleware`/`MongoMiddleware` hierarchy, document compatibility validation.
+- [x] **C.2 Update Runtime & Plugin Framework subsystem doc** (`docs/architecture docs/subsystems/4. Runtime & Middleware Framework.md`): rename "plugin" to "middleware" throughout, document the `RuntimeExecutor` SPI, document `RuntimeMiddleware`/`SqlMiddleware`/`MongoMiddleware` hierarchy, document compatibility validation.
 - [ ] **C.3 Strip repo-wide references to `projects/cross-family-middleware-spi/**`.** Replace with canonical `docs/` links or remove. *(Close-out happens after merge.)*
 - [ ] **C.4 Delete `projects/cross-family-middleware-spi/`.** *(Close-out happens after merge.)*
 
