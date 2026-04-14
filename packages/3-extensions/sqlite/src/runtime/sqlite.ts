@@ -11,7 +11,7 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type {
   ExecutionContext,
-  Plugin,
+  Middleware,
   Runtime,
   RuntimeVerifyOptions,
   SqlExecutionStackWithDriver,
@@ -39,7 +39,7 @@ export interface SqliteClient<TContract extends Contract<SqlStorage>> {
 
 export interface SqliteOptionsBase<TContract extends Contract<SqlStorage>> {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<SqliteTargetId>[];
-  readonly plugins?: readonly Plugin<TContract>[];
+  readonly middlewares?: readonly Middleware<TContract>[];
   readonly verify?: RuntimeVerifyOptions;
 }
 
@@ -144,7 +144,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       context,
       driver,
       verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-      ...(options.plugins ? { plugins: options.plugins } : {}),
+      ...(options.middlewares ? { middlewares: options.middlewares } : {}),
     });
 
     return runtimeInstance;

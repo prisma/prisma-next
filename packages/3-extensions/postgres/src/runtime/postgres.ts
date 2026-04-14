@@ -10,7 +10,7 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type {
   ExecutionContext,
-  Plugin,
+  Middleware,
   Runtime,
   RuntimeVerifyOptions,
   SqlExecutionStackWithDriver,
@@ -44,7 +44,7 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>> {
 
 export interface PostgresOptionsBase<TContract extends Contract<SqlStorage>> {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
-  readonly plugins?: readonly Plugin<TContract>[];
+  readonly middlewares?: readonly Middleware<TContract>[];
   readonly verify?: RuntimeVerifyOptions;
   readonly poolOptions?: {
     readonly connectionTimeoutMillis?: number;
@@ -190,7 +190,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       context,
       driver,
       verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-      ...(options.plugins ? { plugins: options.plugins } : {}),
+      ...(options.middlewares ? { middlewares: options.middlewares } : {}),
     });
 
     return runtimeInstance;

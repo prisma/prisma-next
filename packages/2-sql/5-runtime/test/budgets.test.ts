@@ -1,5 +1,5 @@
 import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
-import type { AfterExecuteResult, PluginContext } from '@prisma-next/runtime-executor';
+import type { AfterExecuteResult, MiddlewareContext } from '@prisma-next/runtime-executor';
 import {
   AggregateExpr,
   ColumnRef,
@@ -15,9 +15,9 @@ import { budgets } from '../src/plugins/budgets';
 const userTable = TableSource.named('user');
 const idCol = ColumnRef.of('user', 'id');
 
-function createPluginContext(
-  overrides?: Partial<PluginContext<unknown, unknown, unknown>>,
-): PluginContext<unknown, unknown, unknown> {
+function createMiddlewareContext(
+  overrides?: Partial<MiddlewareContext<unknown, unknown, unknown>>,
+): MiddlewareContext<unknown, unknown, unknown> {
   return {
     contract: {},
     adapter: {},
@@ -62,7 +62,7 @@ describe('budgets plugin', () => {
           meta: { refs: { tables: ['user'] } },
         });
         const plugin = budgets({ maxRows: 50, defaultTableRows: 10_000 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
@@ -79,7 +79,7 @@ describe('budgets plugin', () => {
           sql: 'SELECT 1',
         });
         const plugin = budgets({ maxRows: 50 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
@@ -100,7 +100,7 @@ describe('budgets plugin', () => {
           },
         });
         const plugin = budgets({ maxRows: 10_000, defaultTableRows: 10_000 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await plugin.beforeExecute?.(plan, ctx);
         expect(ctx.log.warn).not.toHaveBeenCalled();
@@ -119,7 +119,7 @@ describe('budgets plugin', () => {
           },
         });
         const plugin = budgets({ maxRows: 50, defaultTableRows: 10_000 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
@@ -138,7 +138,7 @@ describe('budgets plugin', () => {
           meta: { refs: { tables: ['user'] } },
         });
         const plugin = budgets({ maxRows: 100, tableRows: { user: 50 } });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
@@ -154,7 +154,7 @@ describe('budgets plugin', () => {
           sql: 'INSERT INTO "user" (id, email) VALUES ($1, $2)',
         });
         const plugin = budgets({ maxRows: 1 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await plugin.beforeExecute?.(plan, ctx);
       },
@@ -170,7 +170,7 @@ describe('budgets plugin', () => {
         const plan = createPlan({
           sql: 'INSERT INTO "user" (id) VALUES ($1)',
         });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await plugin.beforeExecute?.(plan, ctx);
         await plugin.onRow?.({}, plan, ctx);
@@ -189,8 +189,8 @@ describe('budgets plugin', () => {
         const plugin = budgets({ maxRows: 2 });
         const planA = createPlan({ sql: 'INSERT INTO "user" (id) VALUES ($1)' });
         const planB = createPlan({ sql: 'INSERT INTO "user" (id) VALUES ($2)' });
-        const ctxA = createPluginContext();
-        const ctxB = createPluginContext();
+        const ctxA = createMiddlewareContext();
+        const ctxB = createMiddlewareContext();
 
         await plugin.beforeExecute?.(planA, ctxA);
         await plugin.beforeExecute?.(planB, ctxB);
@@ -217,7 +217,7 @@ describe('budgets plugin', () => {
       async () => {
         const plugin = budgets({ maxLatencyMs: 100, severities: { latency: 'warn' } });
         const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
-        const ctx = createPluginContext({ mode: 'permissive' });
+        const ctx = createMiddlewareContext({ mode: 'permissive' });
         const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
 
         await plugin.afterExecute?.(plan, result, ctx);
@@ -233,7 +233,7 @@ describe('budgets plugin', () => {
       async () => {
         const plugin = budgets({ maxLatencyMs: 100, severities: { latency: 'error' } });
         const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
-        const ctx = createPluginContext({ mode: 'strict' });
+        const ctx = createMiddlewareContext({ mode: 'strict' });
         const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
 
         await expect(plugin.afterExecute?.(plan, result, ctx)).rejects.toMatchObject({
@@ -249,7 +249,7 @@ describe('budgets plugin', () => {
       async () => {
         const plugin = budgets({ maxLatencyMs: 100, severities: { latency: 'warn' } });
         const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
-        const ctx = createPluginContext({ mode: 'strict' });
+        const ctx = createMiddlewareContext({ mode: 'strict' });
         const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
 
         await expect(plugin.afterExecute?.(plan, result, ctx)).rejects.toMatchObject({
@@ -265,7 +265,7 @@ describe('budgets plugin', () => {
       async () => {
         const plugin = budgets({ maxLatencyMs: 1000 });
         const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
         const result: AfterExecuteResult = { rowCount: 1, latencyMs: 50, completed: true };
 
         await plugin.afterExecute?.(plan, result, ctx);
@@ -290,7 +290,7 @@ describe('budgets plugin', () => {
           meta: { annotations: { limit: 100 } },
         });
         const plugin = budgets({ maxRows: 10_000, explain: { enabled: true } });
-        const ctx = createPluginContext({ driver: explainDriver });
+        const ctx = createMiddlewareContext({ driver: explainDriver });
 
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
@@ -315,7 +315,7 @@ describe('budgets plugin', () => {
           meta: { annotations: { limit: 100 } },
         });
         const plugin = budgets({ maxRows: 10_000, explain: { enabled: true } });
-        const ctx = createPluginContext({ driver: explainDriver });
+        const ctx = createMiddlewareContext({ driver: explainDriver });
 
         await plugin.beforeExecute?.(plan, ctx);
       },
@@ -336,7 +336,7 @@ describe('budgets plugin', () => {
           defaultTableRows: 10_000,
           severities: { rowCount: 'warn' },
         });
-        const ctx = createPluginContext({ mode: 'permissive' });
+        const ctx = createMiddlewareContext({ mode: 'permissive' });
 
         await plugin.beforeExecute?.(plan, ctx);
         expect(ctx.log.warn).toHaveBeenCalledWith(
@@ -359,7 +359,7 @@ describe('budgets plugin', () => {
           meta: { refs: { tables: ['user'] } },
         });
         const plugin = budgets({ maxRows: 10_000, defaultTableRows: 10_000 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await plugin.beforeExecute?.(plan, ctx);
         expect(ctx.log.warn).not.toHaveBeenCalled();
@@ -376,7 +376,7 @@ describe('budgets plugin', () => {
           meta: { refs: { tables: ['user'] } },
         });
         const plugin = budgets({ maxRows: 50, defaultTableRows: 10_000 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
@@ -393,7 +393,7 @@ describe('budgets plugin', () => {
         const ast = SelectAst.from(userTable).withProjection([ProjectionItem.of('id', idCol)]);
         const plan = createPlan({ ast });
         const plugin = budgets({ maxRows: 50 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
@@ -417,7 +417,7 @@ describe('budgets plugin', () => {
           },
         });
         const plugin = budgets({ maxRows: 10_000, defaultTableRows: 10_000 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await plugin.beforeExecute?.(plan, ctx);
         expect(ctx.log.warn).not.toHaveBeenCalled();
@@ -431,7 +431,7 @@ describe('budgets plugin', () => {
         const ast = DeleteAst.from(userTable);
         const plan = createPlan({ ast });
         const plugin = budgets({ maxRows: 1 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await plugin.beforeExecute?.(plan, ctx);
       },
@@ -449,7 +449,7 @@ describe('budgets plugin', () => {
           meta: { refs: { tables: ['user'] } },
         });
         const plugin = budgets({ maxRows: 1, defaultTableRows: 10_000 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await plugin.beforeExecute?.(plan, ctx);
         expect(ctx.log.warn).not.toHaveBeenCalled();
@@ -468,7 +468,7 @@ describe('budgets plugin', () => {
           meta: { refs: { tables: ['user'] } },
         });
         const plugin = budgets({ maxRows: 50, defaultTableRows: 10_000 });
-        const ctx = createPluginContext();
+        const ctx = createMiddlewareContext();
 
         await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',

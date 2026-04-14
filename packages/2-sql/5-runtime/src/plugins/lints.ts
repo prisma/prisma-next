@@ -1,5 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type { Plugin, PluginContext } from '@prisma-next/runtime-executor';
+import type { Middleware, MiddlewareContext } from '@prisma-next/runtime-executor';
 import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
 import {
   type AnyFromSource,
@@ -158,13 +158,13 @@ function getConfiguredSeverity(code: string, options?: LintsOptions): 'warn' | '
  */
 export function lints<TContract = unknown, TAdapter = unknown, TDriver = unknown>(
   options?: LintsOptions,
-): Plugin<TContract, TAdapter, TDriver> {
+): Middleware<TContract, TAdapter, TDriver> {
   const fallback = options?.fallbackWhenAstMissing ?? 'raw';
 
   return Object.freeze({
     name: 'lints',
 
-    async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
+    async beforeExecute(plan: ExecutionPlan, ctx: MiddlewareContext<TContract, TAdapter, TDriver>) {
       if (isQueryAst(plan.ast)) {
         const findings = evaluateAstLints(plan.ast);
 

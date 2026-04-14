@@ -1,5 +1,9 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type { AfterExecuteResult, Plugin, PluginContext } from '@prisma-next/runtime-executor';
+import type {
+  AfterExecuteResult,
+  Middleware,
+  MiddlewareContext,
+} from '@prisma-next/runtime-executor';
 import { isQueryAst, type SelectAst } from '@prisma-next/sql-relational-core/ast';
 
 export interface BudgetsOptions {
@@ -174,7 +178,7 @@ function hasDetectableLimitFromHeuristics(plan: ExecutionPlan): boolean {
 function emitBudgetViolation(
   error: ReturnType<typeof budgetError>,
   shouldBlock: boolean,
-  ctx: PluginContext<unknown, unknown, unknown>,
+  ctx: MiddlewareContext<unknown, unknown, unknown>,
 ): void {
   if (shouldBlock) {
     throw error;
@@ -188,7 +192,7 @@ function emitBudgetViolation(
 
 export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unknown>(
   options?: BudgetsOptions,
-): Plugin<TContract, TAdapter, TDriver> {
+): Middleware<TContract, TAdapter, TDriver> {
   const maxRows = options?.maxRows ?? 10_000;
   const defaultTableRows = options?.defaultTableRows ?? 10_000;
   const tableRows = options?.tableRows ?? {};
@@ -200,7 +204,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
   return Object.freeze({
     name: 'budgets',
 
-    async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
+    async beforeExecute(plan: ExecutionPlan, ctx: MiddlewareContext<TContract, TAdapter, TDriver>) {
       observedRowsByPlan.set(plan, { count: 0 });
 
       if (isQueryAst(plan.ast)) {
@@ -216,7 +220,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     async onRow(
       _row: Record<string, unknown>,
       plan: ExecutionPlan,
-      _ctx: PluginContext<TContract, TAdapter, TDriver>,
+      _ctx: MiddlewareContext<TContract, TAdapter, TDriver>,
     ) {
       const state = observedRowsByPlan.get(plan);
       if (!state) return;
@@ -233,7 +237,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     async afterExecute(
       _plan: ExecutionPlan,
       result: AfterExecuteResult,
-      ctx: PluginContext<TContract, TAdapter, TDriver>,
+      ctx: MiddlewareContext<TContract, TAdapter, TDriver>,
     ) {
       const latencyMs = result.latencyMs;
       if (latencyMs > maxLatencyMs) {
@@ -244,7 +248,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
             maxLatencyMs,
           }),
           shouldBlock,
-          ctx as PluginContext<unknown, unknown, unknown>,
+          ctx as MiddlewareContext<unknown, unknown, unknown>,
         );
       }
     },
@@ -253,7 +257,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
   function evaluateSelectAst(
     plan: ExecutionPlan,
     ast: SelectAst,
-    ctx: PluginContext<TContract, TAdapter, TDriver>,
+    ctx: MiddlewareContext<TContract, TAdapter, TDriver>,
   ) {
     const hasAggNoGroup = hasAggregateWithoutGroupBy(ast);
     const estimated = estimateRowsFromAst(
@@ -275,7 +279,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
             maxRows,
           }),
           shouldBlock,
-          ctx as PluginContext<unknown, unknown, unknown>,
+          ctx as MiddlewareContext<unknown, unknown, unknown>,
         );
         return;
       }
@@ -286,7 +290,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
           maxRows,
         }),
         shouldBlock,
-        ctx as PluginContext<unknown, unknown, unknown>,
+        ctx as MiddlewareContext<unknown, unknown, unknown>,
       );
       return;
     }
@@ -299,14 +303,14 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
           maxRows,
         }),
         shouldBlock,
-        ctx as PluginContext<unknown, unknown, unknown>,
+        ctx as MiddlewareContext<unknown, unknown, unknown>,
       );
     }
   }
 
   async function evaluateWithHeuristics(
     plan: ExecutionPlan,
-    ctx: PluginContext<TContract, TAdapter, TDriver>,
+    ctx: MiddlewareContext<TContract, TAdapter, TDriver>,
   ) {
     const estimated = estimateRowsFromHeuristics(plan, tableRows, defaultTableRows);
     const isUnbounded = !hasDetectableLimitFromHeuristics(plan);
@@ -323,7 +327,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
             maxRows,
           }),
           shouldBlock,
-          ctx as PluginContext<unknown, unknown, unknown>,
+          ctx as MiddlewareContext<unknown, unknown, unknown>,
         );
         return;
       }
@@ -334,7 +338,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
           maxRows,
         }),
         shouldBlock,
-        ctx as PluginContext<unknown, unknown, unknown>,
+        ctx as MiddlewareContext<unknown, unknown, unknown>,
       );
       return;
     }
@@ -348,7 +352,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
             maxRows,
           }),
           shouldBlock,
-          ctx as PluginContext<unknown, unknown, unknown>,
+          ctx as MiddlewareContext<unknown, unknown, unknown>,
         );
       }
       return;
@@ -366,7 +370,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
               maxRows,
             }),
             shouldBlock,
-            ctx as PluginContext<unknown, unknown, unknown>,
+            ctx as MiddlewareContext<unknown, unknown, unknown>,
           );
         }
       }

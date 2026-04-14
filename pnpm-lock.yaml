@@ -893,6 +893,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../0-foundation/contract
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../1-core/framework-components
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-core/operations

@@ -1,8 +1,8 @@
 export type {
   AfterExecuteResult,
   Log,
-  Plugin,
-  PluginContext,
+  Middleware,
+  MiddlewareContext,
 } from '@prisma-next/runtime-executor';
 export {
   extractCodecIds,
