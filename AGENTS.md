@@ -157,7 +157,7 @@ See `docs/architecture docs/subsystems/`:
 1. **Data Contract** — Contract structure and semantics
 2. **Contract Emitter & Types** — How contracts are generated
 3. **Query Lanes** — SQL DSL, ORM, Raw SQL surfaces
-4. **Runtime & Plugin Framework** — Execution pipeline and plugins
+4. **Runtime & Middleware Framework** — Execution pipeline and middlewares
 5. **Adapters & Targets** — Postgres adapter, capability gating
 6. **Error Handling** — Error envelope and stable codes
 7. **Migration System** — Schema migrations
