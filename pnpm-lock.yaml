@@ -2042,12 +2042,18 @@ importers:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../../3-targets/6-adapters/postgres
+      '@prisma-next/config':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/config
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../3-targets/7-drivers/postgres
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../2-sql/9-family
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
@@ -2057,6 +2063,12 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../2-sql/1-core/contract
+      '@prisma-next/sql-contract-psl':
+        specifier: workspace:*
+        version: link:../../2-sql/2-authoring/contract-psl
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../2-sql/2-authoring/contract-ts
       '@prisma-next/sql-orm-client':
         specifier: workspace:*
         version: link:../sql-orm-client
@@ -2069,6 +2081,9 @@ importers:
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../3-targets/3-targets/postgres
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       pg:
         specifier: 'catalog:'
         version: 8.16.3

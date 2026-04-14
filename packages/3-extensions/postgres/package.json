@@ -16,15 +16,20 @@
   },
   "dependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/config": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-psl": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-builder": "workspace:*",
     "@prisma-next/sql-orm-client": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
+    "pathe": "^2.0.3",
     "pg": "catalog:"
   },
   "devDependencies": {
@@ -49,6 +54,7 @@
     "node": ">=20"
   },
   "exports": {
+    "./config": "./dist/config.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
