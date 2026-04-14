@@ -4,7 +4,7 @@ import { AsyncIterableResult } from './async-iterable-result';
 import { runtimeError } from './errors';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow } from './marker';
-import type { Log, Middleware, MiddlewareContext } from './plugins/types';
+import type { Log, Middleware, MiddlewareContext } from './middleware/types';
 import type { RuntimeFamilyAdapter } from './runtime-spi';
 
 export interface RuntimeVerifyOptions {

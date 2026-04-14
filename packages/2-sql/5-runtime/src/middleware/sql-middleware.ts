@@ -1,6 +1,7 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type {
   AfterExecuteResult,
+  RuntimeMiddleware,
   RuntimeMiddlewareContext,
 } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -18,10 +19,8 @@ export interface SqlMiddlewareContext extends RuntimeMiddlewareContext {
   readonly driver: SqlDriver<unknown>;
 }
 
-export interface SqlMiddleware {
-  readonly name: string;
+export interface SqlMiddleware extends RuntimeMiddleware {
   readonly familyId: 'sql';
-  readonly targetId?: string;
   beforeExecute?(plan: ExecutionPlan, ctx: SqlMiddlewareContext): Promise<void>;
   onRow?(
     row: Record<string, unknown>,

@@ -7,7 +7,7 @@ import { db } from '../prisma/db';
  * exceeds the budget (default: 10,000 rows).
  *
  * This demonstrates the budget workflow:
- * 1. Budget plugin checks the query before execution
+ * 1. Budget middleware checks the query before execution
  * 2. Detects unbounded SELECT (no LIMIT)
  * 3. Throws BUDGET.ROWS_EXCEEDED error
  * 4. Query execution is blocked
