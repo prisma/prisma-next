@@ -156,16 +156,14 @@ function getConfiguredSeverity(code: string, options?: LintsOptions): 'warn' | '
  * Fallback: When ast is missing, `fallbackWhenAstMissing: 'raw'` uses heuristic
  * SQL parsing; `'skip'` skips all lints. Default is `'raw'`.
  */
-export function lints<TContract = unknown, TAdapter = unknown, TDriver = unknown>(
-  options?: LintsOptions,
-): Middleware<TContract, TAdapter, TDriver> {
+export function lints<TContract = unknown>(options?: LintsOptions): Middleware<TContract> {
   const fallback = options?.fallbackWhenAstMissing ?? 'raw';
 
   return Object.freeze({
     name: 'lints',
     familyId: 'sql' as const,
 
-    async beforeExecute(plan: ExecutionPlan, ctx: MiddlewareContext<TContract, TAdapter, TDriver>) {
+    async beforeExecute(plan: ExecutionPlan, ctx: MiddlewareContext<TContract>) {
       if (isQueryAst(plan.ast)) {
         const findings = evaluateAstLints(plan.ast);
 

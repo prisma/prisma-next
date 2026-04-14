@@ -20,7 +20,6 @@ import type {
   AnyQueryAst,
   CodecRegistry,
   LoweredStatement,
-  SelectAst,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -42,11 +41,7 @@ export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contrac
   readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
-  readonly middlewares?: readonly Middleware<
-    TContract,
-    Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
-    SqlDriver<unknown>
-  >[];
+  readonly middlewares?: readonly Middleware<TContract>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -65,11 +60,7 @@ export interface CreateRuntimeOptions<
   readonly context: ExecutionContext<TContract>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
-  readonly middlewares?: readonly Middleware<
-    TContract,
-    Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
-    SqlDriver<unknown>
-  >[];
+  readonly middlewares?: readonly Middleware<TContract>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -105,11 +96,7 @@ export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
 class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   implements Runtime
 {
-  private readonly core: RuntimeCore<
-    TContract,
-    Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
-    SqlDriver<unknown>
-  >;
+  private readonly core: RuntimeCore<TContract, SqlDriver<unknown>>;
   private readonly contract: TContract;
   private readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   private readonly codecRegistry: CodecRegistry;
@@ -133,19 +120,11 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
     const familyAdapter = new SqlFamilyAdapter(context.contract, adapter.profile);
 
-    const coreOptions: RuntimeCoreOptions<
-      TContract,
-      Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
-      SqlDriver<unknown>
-    > = {
+    const coreOptions: RuntimeCoreOptions<TContract, SqlDriver<unknown>> = {
       familyAdapter,
       driver,
       verify,
-      middlewares: middlewares as readonly Middleware<
-        TContract,
-        Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
-        SqlDriver<unknown>
-      >[],
+      middlewares,
       ...ifDefined('mode', mode),
       ...ifDefined('log', log),
     };
