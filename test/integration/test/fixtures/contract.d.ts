@@ -46,11 +46,19 @@ export type FieldOutputTypes = {
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
   };
 };
+export type FieldInputTypes = {
+  readonly User: {
+    readonly id: CodecTypes['pg/int4@1']['input'];
+    readonly email: CodecTypes['pg/text@1']['input'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   OperationTypes,
   QueryOperationTypes,
-  FieldOutputTypes
+  FieldOutputTypes,
+  FieldInputTypes
 >;
 
 type ContractBase = ContractType<
