@@ -201,6 +201,13 @@ async function executeContractEmitCommand(
     writeFileSync(outputJsonPath, result.value.contractJson, 'utf-8');
     writeFileSync(outputDtsPath, result.value.contractDts, 'utf-8');
 
+    // Validate that contract.d.ts type imports are resolvable
+    const { validateContractDeps } = await import('../utils/validate-contract-deps');
+    const depsValidation = validateContractDeps(result.value.contractDts, configDir);
+    if (depsValidation.warning) {
+      ui.warn(depsValidation.warning);
+    }
+
     // Convert success result to CLI output format
     const emitResult: EmitContractResult = {
       storageHash: result.value.storageHash,
