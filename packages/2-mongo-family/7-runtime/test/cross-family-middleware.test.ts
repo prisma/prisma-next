@@ -194,6 +194,7 @@ describe('cross-family middleware proof', () => {
         { _id: '1', name: 'Bob' },
         { _id: '2', name: 'Carol' },
       ]),
+      contract: {},
       middlewares: [telemetry],
     });
 
@@ -236,6 +237,7 @@ describe('cross-family middleware proof', () => {
     const mongoRuntime = createMongoRuntime({
       adapter: createMockMongoAdapter(),
       driver: createMockMongoDriver([{ _id: '1' }]),
+      contract: {},
       middlewares: [telemetry],
     });
 
