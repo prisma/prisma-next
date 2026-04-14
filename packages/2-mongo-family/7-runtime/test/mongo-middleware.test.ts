@@ -61,6 +61,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     const runtime = createMongoRuntime({
       adapter: createMockAdapter(),
       driver: createMockDriver([{ _id: '1', name: 'Alice' }]),
+      contract: {},
       middlewares: [middleware],
     });
 
@@ -76,6 +77,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     const runtime = createMongoRuntime({
       adapter: createMockAdapter(),
       driver: createMockDriver([{ _id: '1' }]),
+      contract: {},
     });
 
     const results: unknown[] = [];
@@ -98,6 +100,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     const runtime = createMongoRuntime({
       adapter: createMockAdapter(),
       driver: createMockDriver([]),
+      contract: {},
       middlewares: [middleware],
     });
 
@@ -131,6 +134,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     const runtime = createMongoRuntime({
       adapter: createMockAdapter(),
       driver: failingDriver,
+      contract: {},
       middlewares: [middleware],
     });
 
@@ -155,6 +159,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     const runtime = createMongoRuntime({
       adapter: createMockAdapter(),
       driver: createMockDriver([{ _id: '1' }, { _id: '2' }, { _id: '3' }]),
+      contract: {},
       middlewares: [middleware],
     });
 
@@ -173,6 +178,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
       createMongoRuntime({
         adapter: createMockAdapter(),
         driver: createMockDriver(),
+        contract: {},
         middlewares: [middleware],
       }),
     ).not.toThrow();
@@ -184,6 +190,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
       createMongoRuntime({
         adapter: createMockAdapter(),
         driver: createMockDriver(),
+        contract: {},
         middlewares: [middleware],
       }),
     ).not.toThrow();
@@ -195,6 +202,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
       createMongoRuntime({
         adapter: createMockAdapter(),
         driver: createMockDriver(),
+        contract: {},
         middlewares: [middleware],
       }),
     ).toThrow(
