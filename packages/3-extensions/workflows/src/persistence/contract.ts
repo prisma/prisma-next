@@ -67,6 +67,13 @@ const WorkflowEvent = model('WorkflowEvent', {
 export const workflowsContract = defineContract({
   family: sqlFamily,
   target: postgresPack,
+  capabilities: {
+    postgres: {
+      returning: true,
+      'defaults.autoincrement': true,
+      'defaults.now': true,
+    },
+  },
   models: {
     WorkflowRun,
     WorkflowStateField,
