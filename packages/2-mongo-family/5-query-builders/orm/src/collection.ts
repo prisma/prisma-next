@@ -460,6 +460,10 @@ class MongoCollectionImpl<
     if (typeof input.update === 'function') {
       const accessor = createFieldAccessor<TContract, ModelName>();
       const ops = input.update(accessor);
+      const idOp = ops.find((op) => op.field === '_id');
+      if (idOp) {
+        throw new Error('Mutation payloads cannot modify `_id`');
+      }
       const dotPathOp = ops.find((op) => op.field.includes('.'));
       if (dotPathOp) {
         throw new Error(
@@ -646,6 +650,10 @@ class MongoCollectionImpl<
     if (typeof dataOrCallback === 'function') {
       const accessor = createFieldAccessor<TContract, ModelName>();
       const ops = dataOrCallback(accessor);
+      const idOp = ops.find((op) => op.field === '_id');
+      if (idOp) {
+        throw new Error('Mutation payloads cannot modify `_id`');
+      }
       return compileFieldOperations(ops, (field, value, operator) =>
         this.#wrapFieldOpValue(field, value, operator),
       );
