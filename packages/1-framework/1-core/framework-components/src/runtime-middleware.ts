@@ -1,4 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
+import type { AsyncIterableResult } from './async-iterable-result';
 
 export interface RuntimeLog {
   info(event: unknown): void;
@@ -37,7 +38,7 @@ export interface RuntimeMiddleware {
 }
 
 export interface RuntimeExecutor<TPlan extends { readonly meta: PlanMeta }> {
-  execute<Row>(plan: TPlan): AsyncIterable<Row>;
+  execute<Row>(plan: TPlan): AsyncIterableResult<Row>;
   close(): Promise<void>;
 }
 

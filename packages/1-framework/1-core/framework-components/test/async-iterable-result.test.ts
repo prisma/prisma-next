@@ -156,7 +156,6 @@ describe('AsyncIterableResult', () => {
       { id: 2, name: 'test2' },
     ]);
 
-    // Type check: items should be TestRow[]
     const firstItem = items[0];
     expectDefined(firstItem);
     expect(typeof firstItem.id).toBe('number');
