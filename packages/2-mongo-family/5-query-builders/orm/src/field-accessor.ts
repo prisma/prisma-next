@@ -74,16 +74,19 @@ type ResolveFieldType<
     ? TCodecTypes[CId]['output']
     : unknown;
 
-export interface FieldExpression<T = unknown> {
-  set(value: T): FieldOperation;
-  unset(): FieldOperation;
+type NumericOps = {
   inc(value: number): FieldOperation;
   mul(value: number): FieldOperation;
+};
+
+export type FieldExpression<T = unknown> = {
+  set(value: T): FieldOperation;
+  unset(): FieldOperation;
   push(value: T extends readonly (infer E)[] ? E : unknown): FieldOperation;
   pull(match: T extends readonly (infer E)[] ? E | Partial<E> : unknown): FieldOperation;
   addToSet(value: T extends readonly (infer E)[] ? E : unknown): FieldOperation;
   pop(end: 1 | -1): FieldOperation;
-}
+} & (T extends number ? NumericOps : unknown);
 
 type HasValueObjects = { readonly valueObjects?: Record<string, ContractValueObject> };
 
@@ -193,7 +196,17 @@ export type FieldAccessor<
 
 // ── Runtime implementation ───────────────────────────────────────────────────
 
-function createFieldExpression(fieldPath: string): FieldExpression {
+// Runtime expression has all methods; type-level gating happens via FieldExpression<T>
+interface RuntimeFieldExpression extends NumericOps {
+  set(value: unknown): FieldOperation;
+  unset(): FieldOperation;
+  push(value: unknown): FieldOperation;
+  pull(match: unknown): FieldOperation;
+  addToSet(value: unknown): FieldOperation;
+  pop(end: 1 | -1): FieldOperation;
+}
+
+function createFieldExpression(fieldPath: string): RuntimeFieldExpression {
   return {
     set(value: unknown): FieldOperation {
       return { operator: '$set', field: fieldPath, value: new MongoParamRef(value) };
@@ -227,10 +240,10 @@ export function createFieldAccessor<
   ModelName extends string & keyof TContract['models'],
 >(): FieldAccessor<TContract, ModelName> {
   return new Proxy((() => {}) as unknown as FieldAccessor<TContract, ModelName>, {
-    get(_target, prop: string): FieldExpression {
+    get(_target, prop: string): RuntimeFieldExpression {
       return createFieldExpression(prop);
     },
-    apply(_target, _thisArg, args: [string]): FieldExpression {
+    apply(_target, _thisArg, args: [string]): RuntimeFieldExpression {
       return createFieldExpression(args[0]);
     },
   });

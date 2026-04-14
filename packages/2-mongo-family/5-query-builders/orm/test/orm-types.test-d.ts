@@ -402,3 +402,16 @@ test('ResolveDotPathType resolves to scalar type', () => {
   type CityType = ResolveDotPathType<Contract, 'User', 'homeAddress.city'>;
   expectTypeOf<CityType>().toEqualTypeOf<string>();
 });
+
+test('FieldExpression inc/mul restricted to numeric types', () => {
+  type StringExpr = FieldExpression<string>;
+  type NumberExpr = FieldExpression<number>;
+
+  // @ts-expect-error inc is not available on string fields
+  void ({} as StringExpr).inc(1);
+  // @ts-expect-error mul is not available on string fields
+  void ({} as StringExpr).mul(2);
+
+  void ({} as NumberExpr).inc(1);
+  void ({} as NumberExpr).mul(2);
+});
