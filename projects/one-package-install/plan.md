@@ -6,20 +6,15 @@ Deliver a seamless Prisma Next setup experience: a single `prisma-next init` com
 
 **Spec:** [spec.md](spec.md)
 
-## Collaborators
-
-| Role | Person/Team | Context |
-|---|---|---|
-| Maker | TBD | Drives execution |
-| Reviewer | TBD | Architectural review (facade crosses control/runtime boundary) |
-
 ## Milestones
 
-### Milestone 1: Postgres `/config` facade
+### Milestone 1: Target `/config` facades (Postgres + Mongo)
 
-The foundation — `@prisma-next/postgres` exports a simplified `defineConfig` that pre-wires all Postgres internals. Validated when a config using the facade produces byte-identical emit output to the equivalent manually-wired config.
+The foundation — `@prisma-next/postgres` and `@prisma-next/mongo` each export a simplified `defineConfig` that pre-wires all target internals. Validated when a config using each facade produces byte-identical emit output to the equivalent manually-wired config.
 
 **Tasks:**
+
+#### Postgres
 
 - [ ] **1.1 Add control-plane dependencies to `@prisma-next/postgres`** — Add `@prisma-next/family-sql`, `@prisma-next/target-postgres`, `@prisma-next/driver-postgres`, `@prisma-next/sql-contract-psl`, `@prisma-next/sql-contract-ts`, `@prisma-next/config`, and `@prisma-next/framework-components` to `package.json` dependencies. Verify that this set, combined with existing deps (`@prisma-next/adapter-postgres`, `@prisma-next/sql-contract`, `@prisma-next/contract`), covers all packages referenced in a Postgres `contract.d.ts`.
 - [ ] **1.2 Implement `defineConfig` facade** — Create `src/config/define-config.ts` in the postgres package. Accepts `PostgresConfigOptions` (`{ contract: string, db?, extensions?, migrations? }`). Internally: detects contract provider from file extension (`.prisma` → `prismaContract`, `.ts` → `typescriptContract`), derives output path by swapping extension to `.json`, assembles contributions, and delegates to the low-level `defineConfig` from `@prisma-next/config`. See spec section "The `/config` Facade API" → "What it does internally" for the exact wiring steps.
@@ -30,6 +25,12 @@ The foundation — `@prisma-next/postgres` exports a simplified `defineConfig` t
   - `contract: './foo/bar.ts'` selects the TypeScript contract provider (AC8).
   - Extensions passed via `extensions` are correctly wired into authoring and PSL interpretation contributions.
 - [ ] **1.5 Build and verify** — Run `pnpm build` for the postgres package, verify the `/config` export resolves, run typecheck.
+
+#### Mongo
+
+- [ ] **1.6 Create `@prisma-next/mongo` package** — Create a new package at `packages/3-extensions/mongo/` following the same structure as `@prisma-next/postgres`. Add dependencies covering all Mongo contract type imports: `@prisma-next/adapter-mongo`, `@prisma-next/driver-mongo`, `@prisma-next/family-mongo`, `@prisma-next/mongo-contract`, `@prisma-next/mongo-contract-psl`, `@prisma-next/mongo-runtime`, `@prisma-next/mongo-orm`, `@prisma-next/mongo-pipeline-builder`, `@prisma-next/contract`, `@prisma-next/config`, `@prisma-next/framework-components`. Include a `/runtime` export wrapping the Mongo runtime facade (analogous to the Postgres runtime facade) and a `/config` export.
+- [ ] **1.7 Implement Mongo `defineConfig` facade** — Create `src/config/define-config.ts` in the mongo package. Accepts `MongoConfigOptions` (`{ contract: string, db?, extensions? }`). Internally wires `mongoFamilyDescriptor`, `mongoTargetDescriptor`, `mongoAdapter`, `mongoDriver`, and `mongoContract` provider. The same file-extension detection applies (`.prisma` → PSL, `.ts` → TypeScript).
+- [ ] **1.8 Write Mongo facade tests** — Same test patterns as 1.4 but for the Mongo stack. Verify facade output matches a manually-wired Mongo config.
 
 ### Milestone 2: Post-emit dependency validation
 
@@ -109,6 +110,4 @@ Full integration validation and project wrap-up.
 
 ## Open Items
 
-- **Mongo facade (`@prisma-next/mongo`)**: The spec includes F13/F16 requiring a `@prisma-next/mongo` package with the same pattern. No `@prisma-next/mongo` package exists today — it needs to be created from scratch. This is scoped to the project but deferred to after Postgres is working. The Postgres implementation serves as the template.
-- **Collaborators**: Maker and reviewer TBD — fill in before execution begins.
-- **Published package versions**: The init command needs to install packages from npm. For internal testing within the monorepo, the install step will need to be mocked or use `workspace:*` protocol. Real end-to-end testing against published packages requires a publish step or a local registry.
+- **Published package versions**: The init command installs packages from npm. For internal testing within the monorepo, the install step will need to be mocked or use `workspace:*` protocol. The implementer should determine the right approach — options include mocking `execFileSync` in unit tests (already planned in 3.5) and using a local verdaccio registry or `pnpm link` for E2E tests.
