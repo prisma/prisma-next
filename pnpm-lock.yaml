@@ -1951,6 +1951,64 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
 
+  packages/3-extensions/mongo:
+    dependencies:
+      '@prisma-next/adapter-mongo':
+        specifier: workspace:*
+        version: link:../../3-mongo-target/2-mongo-adapter
+      '@prisma-next/config':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/config
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/contract
+      '@prisma-next/driver-mongo':
+        specifier: workspace:*
+        version: link:../../3-mongo-target/3-mongo-driver
+      '@prisma-next/family-mongo':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/9-family
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/1-foundation/mongo-contract
+      '@prisma-next/mongo-contract-psl':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/2-authoring/contract-psl
+      '@prisma-next/mongo-contract-ts':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/2-authoring/contract-ts
+      '@prisma-next/mongo-runtime':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/7-runtime
+      '@prisma-next/target-mongo':
+        specifier: workspace:*
+        version: link:../../3-mongo-target/1-mongo-target
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+
   packages/3-extensions/paradedb:
     dependencies:
       '@prisma-next/contract':
