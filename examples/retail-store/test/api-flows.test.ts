@@ -58,7 +58,7 @@ describe(
       const orderId = order._id;
       const fetched = await getOrderWithUser(ctx.db, orderId);
       expect(fetched).not.toBeNull();
-      expect(fetched!.userId).toBe(alice._id);
+      expect(fetched!.userId).toEqual(alice._id);
 
       const bobOrders = await getUserOrders(ctx.db, bob._id);
       expect(bobOrders).toHaveLength(0);
