@@ -5,7 +5,7 @@ import type {
 } from '@prisma-next/framework-components/execution';
 import type {
   Log,
-  Plugin,
+  Middleware,
   RuntimeCore,
   RuntimeCoreOptions,
   RuntimeTelemetryEvent,
@@ -41,7 +41,7 @@ export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contrac
   readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
-  readonly plugins?: readonly Plugin<
+  readonly middlewares?: readonly Middleware<
     TContract,
     Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
     SqlDriver<unknown>
@@ -64,7 +64,7 @@ export interface CreateRuntimeOptions<
   readonly context: ExecutionContext<TContract>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
-  readonly plugins?: readonly Plugin<
+  readonly middlewares?: readonly Middleware<
     TContract,
     Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
     SqlDriver<unknown>
@@ -116,7 +116,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
-    const { context, adapter, driver, verify, plugins, mode, log } = options;
+    const { context, adapter, driver, verify, middlewares, mode, log } = options;
     this.contract = context.contract;
     this.adapter = adapter;
     this.codecRegistry = context.codecs;
@@ -133,7 +133,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       familyAdapter,
       driver,
       verify,
-      plugins: plugins as readonly Plugin<
+      middlewares: middlewares as readonly Middleware<
         TContract,
         Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
         SqlDriver<unknown>
@@ -241,14 +241,14 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 export function createRuntime<TContract extends Contract<SqlStorage>, TTargetId extends string>(
   options: CreateRuntimeOptions<TContract, TTargetId>,
 ): Runtime {
-  const { stackInstance, context, driver, verify, plugins, mode, log } = options;
+  const { stackInstance, context, driver, verify, middlewares, mode, log } = options;
 
   return new SqlRuntimeImpl({
     context,
     adapter: stackInstance.adapter,
     driver,
     verify,
-    ...ifDefined('plugins', plugins),
+    ...ifDefined('middlewares', middlewares),
     ...ifDefined('mode', mode),
     ...ifDefined('log', log),
   });

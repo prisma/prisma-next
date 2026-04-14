@@ -1,42 +1,37 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type {
+  AfterExecuteResult,
+  RuntimeLog,
+  RuntimeMiddlewareContext,
+} from '@prisma-next/framework-components/runtime';
 
 export type Severity = 'error' | 'warn' | 'info';
 
-export interface Log {
-  info(event: unknown): void;
-  warn(event: unknown): void;
-  error(event: unknown): void;
-}
+export type { AfterExecuteResult, RuntimeLog as Log };
 
-export interface PluginContext<TContract = unknown, TAdapter = unknown, TDriver = unknown> {
+export interface MiddlewareContext<TContract = unknown, TAdapter = unknown, TDriver = unknown>
+  extends RuntimeMiddlewareContext {
   readonly contract: TContract;
   readonly adapter: TAdapter;
   readonly driver: TDriver;
-  readonly mode: 'strict' | 'permissive';
-  readonly now: () => number;
-  readonly log: Log;
 }
 
-export interface AfterExecuteResult {
-  readonly rowCount: number;
-  readonly latencyMs: number;
-  readonly completed: boolean;
-}
-
-export interface Plugin<TContract = unknown, TAdapter = unknown, TDriver = unknown> {
+export interface Middleware<TContract = unknown, TAdapter = unknown, TDriver = unknown> {
   readonly name: string;
+  readonly familyId?: string;
+  readonly targetId?: string;
   beforeExecute?(
     plan: ExecutionPlan,
-    ctx: PluginContext<TContract, TAdapter, TDriver>,
+    ctx: MiddlewareContext<TContract, TAdapter, TDriver>,
   ): Promise<void>;
   onRow?(
     row: Record<string, unknown>,
     plan: ExecutionPlan,
-    ctx: PluginContext<TContract, TAdapter, TDriver>,
+    ctx: MiddlewareContext<TContract, TAdapter, TDriver>,
   ): Promise<void>;
   afterExecute?(
     plan: ExecutionPlan,
     result: AfterExecuteResult,
-    ctx: PluginContext<TContract, TAdapter, TDriver>,
+    ctx: MiddlewareContext<TContract, TAdapter, TDriver>,
   ): Promise<void>;
 }

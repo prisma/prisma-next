@@ -1,5 +1,5 @@
 import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
-import type { PluginContext } from '@prisma-next/runtime-executor';
+import type { MiddlewareContext } from '@prisma-next/runtime-executor';
 import {
   BinaryExpr,
   ColumnRef,
@@ -15,7 +15,7 @@ import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { lints } from '../src/plugins/lints';
 
-function createPluginContext(): PluginContext<unknown, unknown, unknown> {
+function createMiddlewareContext(): MiddlewareContext<unknown, unknown, unknown> {
   return {
     contract: {},
     adapter: {},
@@ -58,7 +58,7 @@ describe('lints plugin', () => {
     async () => {
       const plan = createPlan({ ast: DeleteAst.from(userTable) });
       const plugin = lints();
-      const ctx = createPluginContext();
+      const ctx = createMiddlewareContext();
 
       await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'LINT.DELETE_WITHOUT_WHERE',
@@ -77,7 +77,7 @@ describe('lints plugin', () => {
         }),
       });
       const plugin = lints();
-      const ctx = createPluginContext();
+      const ctx = createMiddlewareContext();
 
       await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'LINT.UPDATE_WITHOUT_WHERE',
@@ -95,7 +95,7 @@ describe('lints plugin', () => {
         .withSelectAllIntent({ table: 'user' });
       const plan = createPlan({ ast });
       const plugin = lints();
-      const ctx = createPluginContext();
+      const ctx = createMiddlewareContext();
 
       await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).toHaveBeenCalledWith(
@@ -120,7 +120,7 @@ describe('lints plugin', () => {
       ]);
       const plan = createPlan({ ast });
       const plugin = lints();
-      const ctx = createPluginContext();
+      const ctx = createMiddlewareContext();
 
       await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).toHaveBeenCalledWith(
@@ -150,7 +150,7 @@ describe('lints plugin', () => {
           .withWhere(BinaryExpr.eq(idCol, ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }))),
       });
       const plugin = lints();
-      const ctx = createPluginContext();
+      const ctx = createMiddlewareContext();
 
       await plugin.beforeExecute?.(selectPlan, ctx);
       await plugin.beforeExecute?.(updatePlan, ctx);

@@ -8,8 +8,8 @@ export { parseContractMarkerRow } from '../marker';
 export type {
   AfterExecuteResult,
   Log,
-  Plugin,
-  PluginContext,
+  Middleware,
+  MiddlewareContext,
   Severity,
 } from '../plugins/types';
 export type {

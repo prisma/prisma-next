@@ -3,7 +3,7 @@ import { AsyncIterableResult } from './async-iterable-result';
 import { runtimeError } from './errors';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow } from './marker';
-import type { Log, Plugin, PluginContext } from './plugins/types';
+import type { Log, Middleware, MiddlewareContext } from './plugins/types';
 import type { RuntimeFamilyAdapter } from './runtime-spi';
 
 export interface RuntimeVerifyOptions {
@@ -25,7 +25,7 @@ export interface RuntimeCoreOptions<TContract = unknown, TAdapter = unknown, TDr
   readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   readonly driver: TDriver;
   readonly verify: RuntimeVerifyOptions;
-  readonly plugins?: readonly Plugin<TContract, TAdapter, TDriver>[];
+  readonly middlewares?: readonly Middleware<TContract, TAdapter, TDriver>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -93,10 +93,10 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
   private readonly contract: TContract;
   private readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   private readonly driver: TDriver;
-  private readonly plugins: readonly Plugin<TContract, TAdapter, TDriver>[];
+  private readonly middlewares: readonly Middleware<TContract, TAdapter, TDriver>[];
   private readonly mode: 'strict' | 'permissive';
   private readonly verify: RuntimeVerifyOptions;
-  private readonly pluginContext: PluginContext<TContract, TAdapter, TDriver>;
+  private readonly middlewareContext: MiddlewareContext<TContract, TAdapter, TDriver>;
 
   private verified: boolean;
   private startupVerified: boolean;
@@ -107,14 +107,14 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
     this.contract = familyAdapter.contract;
     this.familyAdapter = familyAdapter;
     this.driver = driver;
-    this.plugins = options.plugins ?? [];
+    this.middlewares = options.middlewares ?? [];
     this.mode = options.mode ?? 'strict';
     this.verify = options.verify;
     this.verified = options.verify.mode === 'startup' ? false : options.verify.mode === 'always';
     this.startupVerified = false;
     this._telemetry = null;
 
-    this.pluginContext = {
+    this.middlewareContext = {
       contract: this.contract,
       adapter: options.familyAdapter as unknown as TAdapter,
       driver: this.driver,
@@ -287,9 +287,9 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
           await self.verifyPlanIfNeeded(plan);
         }
 
-        for (const plugin of self.plugins) {
-          if (plugin.beforeExecute) {
-            await plugin.beforeExecute(plan, self.pluginContext);
+        for (const mw of self.middlewares) {
+          if (mw.beforeExecute) {
+            await mw.beforeExecute(plan, self.middlewareContext);
           }
         }
 
@@ -299,9 +299,9 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
           sql: plan.sql,
           params: encodedParams,
         })) {
-          for (const plugin of self.plugins) {
-            if (plugin.onRow) {
-              await plugin.onRow(row, plan, self.pluginContext);
+          for (const mw of self.middlewares) {
+            if (mw.onRow) {
+              await mw.onRow(row, plan, self.middlewareContext);
             }
           }
           rowCount++;
@@ -316,13 +316,13 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
         }
 
         const latencyMs = Date.now() - startedAt;
-        for (const plugin of self.plugins) {
-          if (plugin.afterExecute) {
+        for (const mw of self.middlewares) {
+          if (mw.afterExecute) {
             try {
-              await plugin.afterExecute(
+              await mw.afterExecute(
                 plan,
                 { rowCount, latencyMs, completed },
-                self.pluginContext,
+                self.middlewareContext,
               );
             } catch {
               // Ignore errors from afterExecute hooks
@@ -334,9 +334,9 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
       }
 
       const latencyMs = Date.now() - startedAt;
-      for (const plugin of self.plugins) {
-        if (plugin.afterExecute) {
-          await plugin.afterExecute(plan, { rowCount, latencyMs, completed }, self.pluginContext);
+      for (const mw of self.middlewares) {
+        if (mw.afterExecute) {
+          await mw.afterExecute(plan, { rowCount, latencyMs, completed }, self.middlewareContext);
         }
       }
     };
