@@ -1,0 +1,56 @@
+{
+  "name": "@prisma-next/mongo",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "description": "One-package Mongo setup for Prisma Next",
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-mongo": "workspace:*",
+    "@prisma-next/config": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/driver-mongo": "workspace:*",
+    "@prisma-next/family-mongo": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/mongo-contract": "workspace:*",
+    "@prisma-next/mongo-contract-psl": "workspace:*",
+    "@prisma-next/mongo-contract-ts": "workspace:*",
+    "@prisma-next/mongo-runtime": "workspace:*",
+    "@prisma-next/target-mongo": "workspace:*",
+    "pathe": "^2.0.3"
+  },
+  "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-extensions/mongo"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    "./config": "./dist/config.mjs",
+    "./runtime": "./dist/runtime.mjs",
+    "./package.json": "./package.json"
+  }
+}
