@@ -128,6 +128,15 @@ const mongoMeta: PlanMeta = {
   paramDescriptors: [],
 };
 
+function createMongoPlan(meta: PlanMeta = mongoMeta): MongoQueryPlan {
+  // MongoQueryPlan has a complex command union; safe to bypass for test mocks
+  return {
+    collection: 'users',
+    command: { kind: 'find', filter: {} },
+    meta,
+  } as unknown as MongoQueryPlan;
+}
+
 describe('cross-family middleware proof', () => {
   it('same middleware observes queries from an SQL runtime', async () => {
     const telemetry = createTelemetryMiddleware();
@@ -188,11 +197,7 @@ describe('cross-family middleware proof', () => {
       middlewares: [telemetry],
     });
 
-    const plan: MongoQueryPlan = {
-      collection: 'users',
-      command: { kind: 'find', filter: {} },
-      meta: mongoMeta,
-    } as MongoQueryPlan;
+    const plan = createMongoPlan(mongoMeta);
 
     for await (const _row of mongoRuntime.execute(plan)) {
       void _row;
@@ -247,17 +252,13 @@ describe('cross-family middleware proof', () => {
       void _row;
     }
 
-    const mongoPlan: MongoQueryPlan = {
-      collection: 'users',
-      command: { kind: 'find', filter: {} },
-      meta: {
-        target: 'mongo',
-        targetFamily: 'mongo',
-        storageHash: 'sha256:mongo-hash',
-        lane: 'orm',
-        paramDescriptors: [],
-      },
-    } as MongoQueryPlan;
+    const mongoPlan = createMongoPlan({
+      target: 'mongo',
+      targetFamily: 'mongo',
+      storageHash: 'sha256:mongo-hash',
+      lane: 'orm',
+      paramDescriptors: [],
+    });
 
     for await (const _row of mongoRuntime.execute(mongoPlan)) {
       void _row;

@@ -1,4 +1,3 @@
-import { expectDefined } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import { AsyncIterableResult } from '../src/async-iterable-result';
 
@@ -157,9 +156,9 @@ describe('AsyncIterableResult', () => {
     ]);
 
     const firstItem = items[0];
-    expectDefined(firstItem);
-    expect(typeof firstItem.id).toBe('number');
-    expect(typeof firstItem.name).toBe('string');
+    expect(firstItem).toBeDefined();
+    expect(typeof firstItem!.id).toBe('number');
+    expect(typeof firstItem!.name).toBe('string');
   });
 
   it('throws error when iterating after toArray', async () => {
