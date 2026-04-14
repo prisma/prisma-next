@@ -1332,6 +1332,9 @@ importers:
       '@prisma-next/mongo-value':
         specifier: workspace:*
         version: link:../1-foundation/mongo-value
+      '@prisma-next/runtime-executor':
+        specifier: workspace:*
+        version: link:../../1-framework/4-runtime/runtime-executor
       '@prisma-next/target-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/1-mongo-target

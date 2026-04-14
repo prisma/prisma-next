@@ -3,9 +3,16 @@ import type {
   AfterExecuteResult,
   RuntimeMiddleware,
 } from '@prisma-next/framework-components/runtime';
-import { describe, expect, it } from 'vitest';
-import { createRuntimeCore } from '../src/runtime-core';
-import type { MarkerReader, MarkerStatement, RuntimeFamilyAdapter } from '../src/runtime-spi';
+import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import {
+  createRuntimeCore,
+  type MarkerReader,
+  type MarkerStatement,
+  type RuntimeFamilyAdapter,
+} from '@prisma-next/runtime-executor';
+import { describe, expect, it, vi } from 'vitest';
+import { createMongoRuntime } from '../src/mongo-runtime';
 
 interface TelemetryRecord {
   readonly phase: 'before' | 'after';
@@ -52,22 +59,22 @@ class MockMarkerReader implements MarkerReader {
   }
 }
 
-interface MockContract {
+interface MockSqlContract {
   readonly target: string;
   readonly targetFamily: string;
   readonly storageHash: string;
 }
 
-class MockFamilyAdapter implements RuntimeFamilyAdapter<MockContract> {
-  readonly contract: MockContract;
+class MockFamilyAdapter implements RuntimeFamilyAdapter<MockSqlContract> {
+  readonly contract: MockSqlContract;
   readonly markerReader: MarkerReader;
 
-  constructor(contract: MockContract) {
+  constructor(contract: MockSqlContract) {
     this.contract = contract;
     this.markerReader = new MockMarkerReader();
   }
 
-  validatePlan(_plan: ExecutionPlan, _contract: MockContract): void {}
+  validatePlan(_plan: ExecutionPlan, _contract: MockSqlContract): void {}
 }
 
 class MockSqlDriver {
@@ -93,11 +100,39 @@ class MockSqlDriver {
   async close(): Promise<void> {}
 }
 
+function createMockMongoAdapter(): MongoAdapter {
+  return {
+    lower: vi.fn((plan: MongoQueryPlan) => ({
+      collection: plan.collection,
+      command: plan.command,
+    })),
+  } as unknown as MongoAdapter;
+}
+
+function createMockMongoDriver(rows: Record<string, unknown>[] = []): MongoDriver {
+  return {
+    execute: vi.fn(async function* <Row>() {
+      for (const row of rows) {
+        yield row as Row;
+      }
+    }),
+    close: vi.fn(async () => {}),
+  } as unknown as MongoDriver;
+}
+
+const mongoMeta: PlanMeta = {
+  target: 'mongo',
+  targetFamily: 'mongo',
+  storageHash: 'sha256:mongo-test',
+  lane: 'orm',
+  paramDescriptors: [],
+};
+
 describe('cross-family middleware proof', () => {
-  it('same middleware observes queries from an SQL-like runtime', async () => {
+  it('same middleware observes queries from an SQL runtime', async () => {
     const telemetry = createTelemetryMiddleware();
 
-    const sqlContract: MockContract = {
+    const sqlContract: MockSqlContract = {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:sql-test',
@@ -141,37 +176,25 @@ describe('cross-family middleware proof', () => {
     });
   });
 
-  it('generic middleware uses only PlanMeta — no family-specific plan fields', async () => {
+  it('same middleware observes queries from a Mongo runtime', async () => {
     const telemetry = createTelemetryMiddleware();
 
-    const contract: MockContract = {
-      target: 'mongo',
-      targetFamily: 'mongo',
-      storageHash: 'sha256:mongo-test',
-    };
-
-    const runtime = createRuntimeCore({
-      familyAdapter: new MockFamilyAdapter(contract),
-      driver: new MockSqlDriver([
+    const mongoRuntime = createMongoRuntime({
+      adapter: createMockMongoAdapter(),
+      driver: createMockMongoDriver([
         { _id: '1', name: 'Bob' },
         { _id: '2', name: 'Carol' },
       ]),
-      verify: { mode: 'onFirstUse', requireMarker: false },
       middlewares: [telemetry],
     });
 
-    const plan: ExecutionPlan = {
-      sql: 'placeholder',
-      params: [],
-      meta: {
-        target: 'mongo',
-        storageHash: 'sha256:mongo-test',
-        lane: 'orm',
-        paramDescriptors: [],
-      },
-    };
+    const plan: MongoQueryPlan = {
+      collection: 'users',
+      command: { kind: 'find', filter: {} },
+      meta: mongoMeta,
+    } as MongoQueryPlan;
 
-    for await (const _row of runtime.execute(plan)) {
+    for await (const _row of mongoRuntime.execute(plan)) {
       void _row;
     }
 
@@ -189,18 +212,13 @@ describe('cross-family middleware proof', () => {
     });
   });
 
-  it('same middleware instance works across multiple runtimes', async () => {
+  it('same middleware instance works across SQL and Mongo runtimes', async () => {
     const telemetry = createTelemetryMiddleware();
 
-    const sqlContract: MockContract = {
+    const sqlContract: MockSqlContract = {
       target: 'postgres',
       targetFamily: 'sql',
       storageHash: 'sha256:sql-hash',
-    };
-    const mongoContract: MockContract = {
-      target: 'mongo',
-      targetFamily: 'mongo',
-      storageHash: 'sha256:mongo-hash',
     };
 
     const sqlRuntime = createRuntimeCore({
@@ -210,10 +228,9 @@ describe('cross-family middleware proof', () => {
       middlewares: [telemetry],
     });
 
-    const mongoRuntime = createRuntimeCore({
-      familyAdapter: new MockFamilyAdapter(mongoContract),
-      driver: new MockSqlDriver([{ _id: '1' }]),
-      verify: { mode: 'onFirstUse', requireMarker: false },
+    const mongoRuntime = createMongoRuntime({
+      adapter: createMockMongoAdapter(),
+      driver: createMockMongoDriver([{ _id: '1' }]),
       middlewares: [telemetry],
     });
 
@@ -230,16 +247,19 @@ describe('cross-family middleware proof', () => {
       void _row;
     }
 
-    for await (const _row of mongoRuntime.execute({
-      sql: 'placeholder',
-      params: [],
+    const mongoPlan: MongoQueryPlan = {
+      collection: 'users',
+      command: { kind: 'find', filter: {} },
       meta: {
         target: 'mongo',
+        targetFamily: 'mongo',
         storageHash: 'sha256:mongo-hash',
         lane: 'orm',
         paramDescriptors: [],
       },
-    })) {
+    } as MongoQueryPlan;
+
+    for await (const _row of mongoRuntime.execute(mongoPlan)) {
       void _row;
     }
 
