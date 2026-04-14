@@ -71,7 +71,10 @@ export type FieldOutputTypes = {
   };
 };
 export type FieldInputTypes = {
-  readonly Article: { readonly id: Char<36>; readonly title: CodecTypes['pg/text@1']['input'] };
+  readonly Article: {
+    readonly id: CodecTypes['sql/char@1']['input'];
+    readonly title: CodecTypes['pg/text@1']['input'];
+  };
   readonly Comment: {
     readonly id: CodecTypes['pg/int4@1']['input'];
     readonly body: CodecTypes['pg/text@1']['input'];

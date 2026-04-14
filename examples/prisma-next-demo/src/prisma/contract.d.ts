@@ -43,11 +43,17 @@ export type QueryOperationTypes = PgVectorQueryOperationTypes;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
-export type Address = {
+export type AddressOutput = {
   readonly street: CodecTypes['pg/text@1']['output'];
   readonly city: CodecTypes['pg/text@1']['output'];
   readonly zip: CodecTypes['pg/text@1']['output'] | null;
   readonly country: CodecTypes['pg/text@1']['output'];
+};
+export type AddressInput = {
+  readonly street: CodecTypes['pg/text@1']['input'];
+  readonly city: CodecTypes['pg/text@1']['input'];
+  readonly zip: CodecTypes['pg/text@1']['input'] | null;
+  readonly country: CodecTypes['pg/text@1']['input'];
 };
 export type FieldOutputTypes = {
   readonly Bug: {
@@ -79,14 +85,48 @@ export type FieldOutputTypes = {
     readonly email: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
     readonly kind: CodecTypes['pg/enum@1']['output'];
-    readonly address: Address | null;
+    readonly address: AddressOutput | null;
+  };
+};
+export type FieldInputTypes = {
+  readonly Bug: {
+    readonly severity: CodecTypes['pg/text@1']['input'];
+    readonly stepsToRepro: CodecTypes['pg/text@1']['input'] | null;
+  };
+  readonly Feature: {
+    readonly priority: CodecTypes['pg/text@1']['input'];
+    readonly targetRelease: CodecTypes['pg/text@1']['input'] | null;
+  };
+  readonly Post: {
+    readonly id: CodecTypes['sql/char@1']['input'];
+    readonly title: CodecTypes['pg/text@1']['input'];
+    readonly userId: CodecTypes['pg/text@1']['input'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+    readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
+  };
+  readonly Task: {
+    readonly id: CodecTypes['sql/char@1']['input'];
+    readonly title: CodecTypes['pg/text@1']['input'];
+    readonly description: CodecTypes['pg/text@1']['input'] | null;
+    readonly status: CodecTypes['pg/text@1']['input'];
+    readonly type: CodecTypes['pg/text@1']['input'];
+    readonly userId: CodecTypes['pg/text@1']['input'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+  };
+  readonly User: {
+    readonly id: CodecTypes['sql/char@1']['input'];
+    readonly email: CodecTypes['pg/text@1']['input'];
+    readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+    readonly kind: CodecTypes['pg/enum@1']['input'];
+    readonly address: AddressInput | null;
   };
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   OperationTypes,
   QueryOperationTypes,
-  FieldOutputTypes
+  FieldOutputTypes,
+  FieldInputTypes
 >;
 
 type ContractBase = ContractType<
