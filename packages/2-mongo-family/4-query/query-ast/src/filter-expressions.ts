@@ -3,7 +3,10 @@ import type { MongoAggExpr } from './aggregation-expressions';
 import { MongoAstNode } from './ast-node';
 import type { MongoFilterRewriter, MongoFilterVisitor } from './visitors';
 
+export const mongoFilterBrand: unique symbol = Symbol('MongoFilterExpr');
+
 abstract class MongoFilterExpression extends MongoAstNode {
+  readonly [mongoFilterBrand] = true as const;
   abstract accept<R>(visitor: MongoFilterVisitor<R>): R;
   abstract rewrite(rewriter: MongoFilterRewriter): MongoFilterExpr;
 

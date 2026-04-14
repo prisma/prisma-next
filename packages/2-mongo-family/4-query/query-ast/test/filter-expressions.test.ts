@@ -8,6 +8,7 @@ import {
   MongoFieldFilter,
   MongoNotExpr,
   MongoOrExpr,
+  mongoFilterBrand,
 } from '../src/filter-expressions';
 import type { MongoFilterRewriter, MongoFilterVisitor } from '../src/visitors';
 
@@ -261,6 +262,26 @@ describe('MongoFilterRewriter', () => {
     const original = MongoExprFilter.of(MongoAggFieldRef.of('x'));
     const rewritten = original.rewrite(rewriter);
     expect(rewritten.kind).toBe('field');
+  });
+});
+
+describe('mongoFilterBrand', () => {
+  it('is present on all filter expression types', () => {
+    const field = MongoFieldFilter.eq('x', 1);
+    const and = MongoAndExpr.of([field]);
+    const or = MongoOrExpr.of([field]);
+    const not = new MongoNotExpr(field);
+    const exists = MongoExistsExpr.exists('x');
+    const expr = MongoExprFilter.of(MongoAggFieldRef.of('x'));
+
+    for (const node of [field, and, or, not, exists, expr]) {
+      expect(mongoFilterBrand in node).toBe(true);
+    }
+  });
+
+  it('is absent on plain objects with a kind property', () => {
+    const impersonator = { kind: 'field', field: 'x', op: '$eq', value: 1 };
+    expect(mongoFilterBrand in impersonator).toBe(false);
   });
 });
 

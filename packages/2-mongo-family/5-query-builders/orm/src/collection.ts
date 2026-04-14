@@ -23,6 +23,7 @@ import {
   InsertOneCommand,
   MongoAndExpr,
   MongoFieldFilter,
+  mongoFilterBrand,
   UpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
@@ -539,7 +540,7 @@ class MongoCollectionImpl<
   }
 
   #isFilterExpr(filter: unknown): filter is MongoFilterExpr {
-    return typeof filter === 'object' && filter !== null && 'kind' in filter;
+    return typeof filter === 'object' && filter !== null && mongoFilterBrand in filter;
   }
 
   #compileWhereObject(data: Record<string, unknown>): MongoFilterExpr[] {
