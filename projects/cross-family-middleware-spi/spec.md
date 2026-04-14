@@ -31,16 +31,18 @@ The solution follows the same pattern used for other framework components (adapt
 ### Framework-level runtime executor SPI
 
 1. **Define a framework-level `RuntimeExecutor` interface.** The common shape that all family runtimes satisfy:
-   - `execute<Row>(plan: TPlan): AsyncIterableResult<Row>` — execute a query plan and return results
+   - `execute<Row>(plan: TPlan): AsyncIterable<Row>` — execute a query plan and return results
    - `close(): Promise<void>` — release resources
 
    The interface is parameterized on the plan type (`TPlan`). At the framework level, the plan type constraint is `{ readonly meta: PlanMeta }` — the minimum both `ExecutionPlan` and `MongoQueryPlan` satisfy. Family-specific runtime interfaces narrow `TPlan` to their concrete plan type.
 
+   The return type is `AsyncIterable<Row>` (not `AsyncIterableResult<Row>`) because `AsyncIterableResult` lives in `@prisma-next/runtime-executor` (a higher layer) and importing it would create a circular dependency. Family-specific runtimes may return `AsyncIterableResult<Row>` (which implements `AsyncIterable<Row>`), preserving full API compatibility.
+
    This interface lives in `@prisma-next/framework-components` alongside the other cross-family SPIs (component descriptors, execution stack).
 
 2. **Define family-specific runtime interfaces that extend `RuntimeExecutor`.** Each family narrows the plan type:
-   - SQL: `RuntimeCore` (existing) extends `RuntimeExecutor<ExecutionPlan>`, adding `connection()`, `transaction()`, `telemetry()`
-   - Mongo: `MongoRuntime` (existing) extends `RuntimeExecutor<MongoQueryPlan>`
+   - SQL: `RuntimeCore` (existing) nominally extends `RuntimeExecutor<ExecutionPlan>`, adding `connection()`, `transaction()`, `telemetry()`
+   - Mongo: `MongoRuntime` (existing) is structurally compatible with `RuntimeExecutor<MongoQueryPlan>` (verified by type test) but does not nominally extend it, because `MongoQueryPlan<Row>` has a phantom `Row` type parameter that creates type variance issues with the `TPlan` constraint. Structural compatibility is sufficient for the SPI contract.
 
    Family-specific methods (`connection()`, `transaction()`, etc.) remain on the family interface — they are not part of the framework SPI. The framework SPI is the common denominator: execute a plan, get rows.
 
@@ -141,42 +143,42 @@ The solution follows the same pattern used for other framework components (adapt
 # Acceptance Criteria
 
 ### Runtime executor SPI
-- [ ] `RuntimeExecutor<TPlan>` interface exists at the framework level with `execute` and `close`
-- [ ] `TPlan` constraint is `{ readonly meta: PlanMeta }` — the minimum both `ExecutionPlan` and `MongoQueryPlan` satisfy
-- [ ] `RuntimeCore` (SQL) extends `RuntimeExecutor<ExecutionPlan>`
-- [ ] `MongoRuntime` extends `RuntimeExecutor<MongoQueryPlan>`
-- [ ] Both return `AsyncIterableResult<Row>` from `execute`
+- [x] `RuntimeExecutor<TPlan>` interface exists at the framework level with `execute` and `close`
+- [x] `TPlan` constraint is `{ readonly meta: PlanMeta }` — the minimum both `ExecutionPlan` and `MongoQueryPlan` satisfy
+- [x] `RuntimeCore` (SQL) nominally extends `RuntimeExecutor<ExecutionPlan>`
+- [x] `MongoRuntime` is structurally compatible with `RuntimeExecutor<MongoQueryPlan>` (verified by type test)
+- [x] `RuntimeExecutor.execute` returns `AsyncIterable<Row>` (framework level); family runtimes return `AsyncIterableResult<Row>` which implements `AsyncIterable<Row>`
 
 ### Middleware SPI
-- [ ] `RuntimeMiddleware` interface exists at the framework level (`@prisma-next/framework-components`)
-- [ ] `RuntimeMiddlewareContext` interface exists at the framework level (`@prisma-next/framework-components`)
-- [ ] `RuntimeMiddleware` uses the same plan base type as `RuntimeExecutor` (`{ readonly meta: PlanMeta }`)
-- [ ] `RuntimeMiddleware` carries optional `familyId` and `targetId` for binding
+- [x] `RuntimeMiddleware` interface exists at the framework level (`@prisma-next/framework-components`)
+- [x] `RuntimeMiddlewareContext` interface exists at the framework level (`@prisma-next/framework-components`)
+- [x] `RuntimeMiddleware` uses the same plan base type as `RuntimeExecutor` (`{ readonly meta: PlanMeta }`)
+- [x] `RuntimeMiddleware` carries optional `familyId` and `targetId` for binding
 
 ### Family-specific interfaces
-- [ ] `SqlMiddleware` interface extends `RuntimeMiddleware` with `familyId: 'sql'` and SQL-specific plan/context types
-- [ ] `MongoMiddleware` interface extends `RuntimeMiddleware` with `familyId: 'mongo'` and Mongo-specific plan/context types
+- [x] `SqlMiddleware` interface extends `RuntimeMiddleware` with `familyId: 'sql'` and SQL-specific plan/context types
+- [x] `MongoMiddleware` interface extends `RuntimeMiddleware` with `familyId: 'mongo'` and Mongo-specific plan/context types
 
 ### Compatibility validation
-- [ ] Runtime construction validates middleware `familyId`/`targetId` compatibility
-- [ ] Mismatched `familyId` produces a clear error message naming the middleware and the mismatch
-- [ ] Generic middlewares (no `familyId`) pass validation for any runtime
+- [x] Runtime construction validates middleware `familyId`/`targetId` compatibility
+- [x] Mismatched `familyId` produces a clear error message naming the middleware and the mismatch
+- [x] Generic middlewares (no `familyId`) pass validation for any runtime
 
 ### Mongo middleware lifecycle
-- [ ] `MongoRuntime` accepts an optional `middlewares` parameter
-- [ ] `MongoRuntime` calls `beforeExecute`, `onRow`, `afterExecute` around query execution
-- [ ] Middleware lifecycle in Mongo handles errors (calls `afterExecute` with `completed: false`, then rethrows)
+- [x] `MongoRuntime` accepts an optional `middlewares` parameter
+- [x] `MongoRuntime` calls `beforeExecute`, `onRow`, `afterExecute` around query execution
+- [x] Middleware lifecycle in Mongo handles errors (calls `afterExecute` with `completed: false`, then rethrows)
 
 ### Rename and migration
-- [ ] `Plugin` renamed to `RuntimeMiddleware` across all production code
-- [ ] `PluginContext` renamed to `RuntimeMiddlewareContext` across all production code
-- [ ] `plugins` option renamed to `middlewares` across all production code
-- [ ] Existing `budgets` and `lints` middlewares work without API changes to their consumers
+- [x] `Plugin` renamed to `RuntimeMiddleware` across all production code
+- [x] `PluginContext` renamed to `RuntimeMiddlewareContext` across all production code
+- [x] `plugins` option renamed to `middlewares` across all production code
+- [x] Existing `budgets` and `lints` middlewares work without API changes to their consumers
 
 ### Cross-family proof
-- [ ] A generic middleware (no `familyId`) runs in both SQL and Mongo runtimes
-- [ ] Integration test verifies the same middleware instance observes queries from both families
-- [ ] The generic middleware uses only `PlanMeta` and `AfterExecuteResult` — no family-specific plan fields
+- [x] A generic middleware (no `familyId`) runs in both SQL and Mongo runtimes
+- [x] Integration test verifies the same middleware instance observes queries from both families
+- [x] The generic middleware uses only `PlanMeta` and `AfterExecuteResult` — no family-specific plan fields
 
 # Other Considerations
 
@@ -196,13 +198,13 @@ The solution follows the same pattern used for other framework components (adapt
 - [May milestone plan](../../docs/planning/may-milestone.md) § WS4 (multi-target test harness assumes cross-family middleware is validated)
 - Framework component descriptors: `packages/1-framework/1-core/framework-components/src/framework-components.ts` — `TargetBoundComponentDescriptor`, `checkContractComponentRequirements`
 - Execution stack: `packages/1-framework/1-core/framework-components/src/execution-stack.ts` — `ExecutionStackInstance`
-- Current middleware interface: `packages/1-framework/4-runtime/runtime-executor/src/plugins/types.ts` — `Plugin`, `PluginContext`, `AfterExecuteResult`
+- Current middleware interface: `packages/1-framework/4-runtime/runtime-executor/src/middleware/types.ts` — `Middleware`, `MiddlewareContext`, `AfterExecuteResult`
 - Current middleware orchestration: `packages/1-framework/4-runtime/runtime-executor/src/runtime-core.ts` — `RuntimeCoreImpl`
 - Current runtime SPI: `packages/1-framework/4-runtime/runtime-executor/src/runtime-spi.ts` — `RuntimeFamilyAdapter`
 - Current `RuntimeCore`/`RuntimeQueryable` interfaces: `packages/1-framework/4-runtime/runtime-executor/src/runtime-core.ts`
 - `AsyncIterableResult`: `packages/1-framework/4-runtime/runtime-executor/src/async-iterable-result.ts`
 - SQL runtime: `packages/2-sql/5-runtime/src/sql-runtime.ts` — `createRuntime`, middleware wiring
-- SQL middlewares: `packages/2-sql/5-runtime/src/plugins/budgets.ts`, `packages/2-sql/5-runtime/src/plugins/lints.ts`
+- SQL middlewares: `packages/2-sql/5-runtime/src/middleware/budgets.ts`, `packages/2-sql/5-runtime/src/middleware/lints.ts`
 - Mongo runtime: `packages/2-mongo-family/7-runtime/src/mongo-runtime.ts` — `MongoRuntime`, no middleware support
 - Mongo query plan: `packages/2-mongo-family/4-query/query-ast/src/query-plan.ts` — `MongoQueryPlan`
 - Mongo executor: `packages/2-mongo-family/5-query-builders/orm/src/executor.ts` — `MongoQueryExecutor`
