@@ -1,138 +1,284 @@
 # Summary
 
-Reduce the Prisma Next setup experience from a multi-step, error-prone process requiring deep architecture knowledge to a single `init` command that scaffolds files, installs dependencies, and leaves the user with a working, fully-typed project.
+Reduce the Prisma Next setup experience from a multi-step, error-prone process requiring deep architecture knowledge to a single `prisma-next init` command that leaves the user with a fully-typed, working project.
 
 # Description
 
-Today, setting up Prisma Next in a new app requires the user to: manually create a config file with ~10 imports from ~6 packages referencing internal architecture concepts; figure out which of ~24 `@prisma-next/*` packages to install; write a runtime setup file (`db.ts`) by copying from examples; and debug silent type failures caused by missing transitive type dependencies that `skipLibCheck: true` hides.
+Today, setting up Prisma Next in a new app requires the user to: manually create a config file with ~10 imports from ~6 packages referencing internal architecture concepts; figure out which of ~24 `@prisma-next/*` packages to install; write a runtime setup file by copying from examples; and debug silent type failures caused by missing transitive type dependencies that `skipLibCheck: true` hides. The full user journey and roadblock catalog are documented in [user-journey.md](user-journey.md).
 
-The full user journey and roadblock catalog are documented in [user-journey.md](user-journey.md).
+This project eliminates these roadblocks through three changes:
 
-This project delivers three changes that eliminate these roadblocks:
+1. **`prisma-next init` command** — scaffolds files, installs dependencies, and emits the contract in one step.
+2. **One-package-per-target facades** — `@prisma-next/postgres` (and `@prisma-next/mongo`) export simplified `/config` and `/runtime` entry points, and their transitive dependencies guarantee that emitted contract types resolve.
+3. **Post-emit dependency validation** — the emitter checks that all packages referenced in `contract.d.ts` are installed, and warns if any are missing.
 
-1. **`prisma-next init` command** — an interactive CLI command that scaffolds all required files (`contract.prisma`, `prisma-next.config.ts`, `db.ts`), detects the user's package manager, and installs the required dependencies automatically.
+# Target User Experience
 
-2. **One-package-per-target facades** — extend `@prisma-next/postgres` (and create `@prisma-next/mongo`) to export both a `/config` and `/runtime` entry point. The config entry point provides a simplified `defineConfig` that pre-wires target internals. The package's transitive dependencies ensure that all packages referenced by the emitted `contract.d.ts` are always installed.
+This section describes what the user sees end-to-end. Everything below is the source of truth for the design; the requirements section captures edge cases and constraints around it.
 
-3. **Post-emit dependency validation** — after writing `contract.d.ts`, the emitter checks that every package referenced in its import statements is resolvable from the user's project. If any are missing, it prints a clear warning with the install command.
+## Step 1: Run init
+
+The user has a Next.js app (or any Node project with a `package.json`). They run:
+
+```bash
+pnpm dlx @prisma-next/cli init
+```
+
+(Or `npx @prisma-next/cli init`, `bunx @prisma-next/cli init`, `yarn dlx @prisma-next/cli init`.)
+
+The CLI prompts:
+
+```
+◆  What database are you using?
+│  ● PostgreSQL
+│  ○ MongoDB
+│
+◆  Where should the schema file go?
+│  prisma/contract.prisma
+│
+◆  Where should the contract be emitted?
+│  src/prisma/contract.json
+│
+◇  Detecting package manager... pnpm
+◇  Installing @prisma-next/postgres and @prisma-next/cli...
+◇  Emitting contract...
+│
+◆  Done! Created:
+│
+│  prisma/contract.prisma     — your schema
+│  prisma-next.config.ts      — Prisma Next config
+│  src/prisma/db.ts            — runtime client
+│  src/prisma/contract.json    — emitted contract
+│  src/prisma/contract.d.ts    — emitted contract types
+│
+│  Next steps:
+│  1. Edit prisma/contract.prisma with your models
+│  2. Run: pnpm prisma-next contract emit
+│  3. Import db from ./src/prisma/db in your app
+```
+
+## Step 2: Generated files
+
+After init, the user has five files on disk. Three are scaffolded, two are emitted.
+
+### `prisma/contract.prisma`
+
+```prisma
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  posts     Post[]
+  createdAt DateTime @default(now())
+}
+
+model Post {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String?
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+  createdAt DateTime @default(now())
+}
+```
+
+### `prisma-next.config.ts`
+
+```typescript
+import { defineConfig } from '@prisma-next/postgres/config';
+
+export default defineConfig({
+  schema: './prisma/contract.prisma',
+  output: 'src/prisma/contract.json',
+  db: {
+    connection: process.env['DATABASE_URL']!,
+  },
+});
+```
+
+One import. One function call. No adapters, drivers, targets, families, contribution assemblers, or contract providers.
+
+### `src/prisma/db.ts`
+
+```typescript
+import postgres from '@prisma-next/postgres/runtime';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
+
+export const db = postgres<Contract>({ contractJson });
+```
+
+### `src/prisma/contract.json` and `src/prisma/contract.d.ts`
+
+These are emitted by `prisma-next contract emit` (which init runs automatically). The `.d.ts` file imports types from packages like `@prisma-next/adapter-postgres/codec-types`, `@prisma-next/sql-contract/types`, and `@prisma-next/contract/types`. Because these are all transitive dependencies of `@prisma-next/postgres`, the imports resolve without the user installing anything extra.
+
+## Step 3: Use it
+
+The user opens `db.ts` in their editor. Types work. Autocompletion works. They can write queries immediately:
+
+```typescript
+import { db } from './prisma/db';
+
+const users = await db.sql
+  .from(db.schema.tables.user)
+  .select({
+    id: db.schema.tables.user.columns.id,
+    email: db.schema.tables.user.columns.email,
+  })
+  .build();
+```
+
+When they edit `prisma/contract.prisma` and re-run `prisma-next contract emit`, the types update and everything stays typed.
+
+## Packages installed
+
+After init, the user's `package.json` has exactly two new entries:
+
+```json
+{
+  "dependencies": {
+    "@prisma-next/postgres": "^x.y.z"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "^x.y.z"
+  }
+}
+```
+
+Everything else (`@prisma-next/adapter-postgres`, `@prisma-next/sql-contract`, `@prisma-next/contract`, `@prisma-next/target-postgres`, etc.) is pulled in as transitive dependencies of `@prisma-next/postgres`.
+
+# The `/config` Facade API
+
+`@prisma-next/postgres` gains a new `/config` export. Its `defineConfig` function wraps the low-level config API (`defineConfig` from `@prisma-next/cli/config-types`), pre-wiring all Postgres-specific internals.
+
+## Signature
+
+```typescript
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
+
+interface PostgresConfigOptions {
+  readonly schema: string;
+  readonly output: string;
+  readonly db?: {
+    readonly connection?: string;
+  };
+  readonly extensions?: readonly ControlExtensionDescriptor<'sql', 'postgres'>[];
+  readonly migrations?: {
+    readonly dir?: string;
+  };
+}
+
+export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'sql', 'postgres'>;
+```
+
+## What it does internally
+
+The facade constructs the full `PrismaNextConfig` by:
+
+1. Importing `sql` (family), `postgres` (target), `postgresAdapter`, `postgresDriver`, and `prismaContract` from the respective internal packages.
+2. Calling `assembleAuthoringContributions` and `assemblePslInterpretationContributions` with `[postgres, postgresAdapter, ...extensions]`.
+3. Calling `prismaContract(options.schema, { output: options.output, target: postgres, authoringContributions, scalarTypeDescriptors, controlMutationDefaults, composedExtensionPacks })`.
+4. Returning the result of the low-level `defineConfig({ family: sql, target: postgres, adapter: postgresAdapter, driver: postgresDriver, extensionPacks: extensions, contract, db: options.db, migrations: options.migrations })`.
+
+The user never sees any of this. Extensions are the one escape hatch — the user imports an extension descriptor (e.g. `pgvector` from `@prisma-next/extension-pgvector/control`) and passes it in the `extensions` array:
+
+```typescript
+import { defineConfig } from '@prisma-next/postgres/config';
+import pgvector from '@prisma-next/extension-pgvector/control';
+
+export default defineConfig({
+  schema: './prisma/contract.prisma',
+  output: 'src/prisma/contract.json',
+  extensions: [pgvector],
+  db: {
+    connection: process.env['DATABASE_URL']!,
+  },
+});
+```
+
+# Post-Emit Dependency Validation
+
+After writing `contract.d.ts`, the emitter extracts every `import type … from '<package>'` line and attempts to resolve each package from the user's project root (using Node module resolution). If any package is not resolvable, the emitter prints a warning:
+
+```
+⚠ contract.d.ts imports types from packages that are not installed:
+  - @prisma-next/adapter-postgres
+  - @prisma-next/sql-contract
+
+  Install them:
+    pnpm add @prisma-next/adapter-postgres @prisma-next/sql-contract
+```
+
+The emit still succeeds — the warning is informational, not blocking. This acts as a safety net for cases the one-package approach doesn't cover (e.g. extensions that add type imports, or corrupted `node_modules`).
 
 # Requirements
 
 ## Functional Requirements
 
-### `prisma-next init` command
+### Init command
 
-- F1: The CLI exposes a `prisma-next init` command, usable via `pnpm dlx @prisma-next/cli init` (or `npx`, `bunx`, `yarn dlx`) without prior installation.
-- F2: The init command prompts the user for their target database (Postgres or Mongo).
-- F3: The init command prompts for schema file location (default: `prisma/contract.prisma`) and contract output location (default: `src/prisma/contract.json`).
-- F4: The init command generates three files:
-  - `prisma/contract.prisma` — a starter schema with example models (e.g. `User` and `Post`).
-  - `prisma-next.config.ts` — a complete, working config file that imports from the target facade package's `/config` export.
-  - A `db.ts` file at a location relative to the contract output (e.g. `src/prisma/db.ts`) that imports from the target facade package's `/runtime` export, plus the emitted contract types and JSON.
-- F5: The init command detects the user's package manager (pnpm, npm, yarn, bun) from lockfiles or project configuration.
-- F6: The init command installs the required dependencies using the detected package manager:
-  - The target facade package (e.g. `@prisma-next/postgres`) as a runtime dependency.
-  - `@prisma-next/cli` as a dev dependency.
-- F7: The init command provides a `--no-install` flag (or equivalent) to skip automatic dependency installation and instead print the install commands for the user to run manually.
-- F8: The init command does not overwrite existing files without confirmation.
-- F9: After installing dependencies, the init command runs `prisma-next contract emit` automatically to produce `contract.json` and `contract.d.ts`. This ensures the generated `db.ts` has valid imports and the user has a fully-typed, working setup immediately.
-- F10: After completion, the init command prints a summary of what was created and the next steps (e.g. "edit your schema and re-run `prisma-next contract emit`").
+- F1: The CLI exposes `prisma-next init`, usable via `pnpm dlx` / `npx` / `bunx` / `yarn dlx` without prior installation.
+- F2: Init prompts for target (Postgres or Mongo), schema location (default: `prisma/contract.prisma`), and contract output location (default: `src/prisma/contract.json`).
+- F3: Init scaffolds three files as shown in the "Generated files" section above.
+- F4: Init detects the user's package manager from lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lockb`) or project configuration.
+- F5: Init installs the target facade package as a dependency and `@prisma-next/cli` as a dev dependency using the detected package manager.
+- F6: Init runs `prisma-next contract emit` after installation to produce `contract.json` and `contract.d.ts`.
+- F7: Init does not overwrite existing files without confirmation.
+- F8: `--no-install` skips dependency installation and contract emission, and prints the manual commands instead.
+- F9: Init prints a summary of created files and next steps on completion.
 
-### Target facade packages
+### Facade packages
 
-- F11: `@prisma-next/postgres` exports a `/config` entry point that provides a `defineConfig` function. This function accepts a simplified options object (schema path, output path, db connection, optional extensions list) and returns a fully-wired config object compatible with the CLI's existing config loader.
-- F12: `@prisma-next/postgres`'s `/config` `defineConfig` handles all internal wiring: family, target, adapter, driver, contribution assembly (`assembleAuthoringContributions`, `assemblePslInterpretationContributions`), and PSL contract provider setup. The user does not interact with these concepts.
-- F13: `@prisma-next/postgres`'s `/config` `defineConfig` accepts an `extensions` option — a flat array of extension descriptors (e.g. `[pgvector]`). The facade wires extensions into both authoring and PSL interpretation contributions internally.
-- F14: `@prisma-next/postgres`'s `dependencies` in `package.json` include all packages that the emitted `contract.d.ts` imports from for a Postgres target (at minimum: `@prisma-next/adapter-postgres`, `@prisma-next/sql-contract`, `@prisma-next/contract`). This ensures that installing `@prisma-next/postgres` alone makes all contract type imports resolvable.
-- F15: `@prisma-next/postgres`'s existing `/runtime` export continues to work unchanged.
-- F16: A `@prisma-next/mongo` package is created with the same pattern: `/config` and `/runtime` exports, with transitive dependencies covering all Mongo contract type imports.
+- F10: `@prisma-next/postgres` exports `/config` with the `defineConfig` API described above.
+- F11: `@prisma-next/postgres`'s `package.json` dependencies include all packages that the emitted `contract.d.ts` references for a Postgres target.
+- F12: `@prisma-next/postgres`'s existing `/runtime` export continues to work unchanged.
+- F13: `@prisma-next/mongo` is created with the same pattern: `/config` and `/runtime` exports, with transitive dependencies covering all Mongo contract type imports.
 
-### Post-emit dependency validation
+### Post-emit validation
 
-- F17: After writing `contract.d.ts`, the emitter resolves every `import type … from '<package>'` statement in the generated file against the user's project root.
-- F18: If any imported package is not resolvable, the emitter prints a warning listing the missing packages and the install command to fix it (using the detected or assumed package manager).
-- F19: The validation is a warning, not an error — the emit still succeeds and writes the files. The user may have legitimate reasons for the packages to be temporarily missing.
+- F14: After writing `contract.d.ts`, the emitter checks that every imported package is resolvable from the user's project root.
+- F15: Missing packages produce a warning with the package names and install command. The emit still succeeds.
 
 ## Non-Functional Requirements
 
-- NF1: The init command completes in under 30 seconds (excluding dependency installation time, which depends on network).
-- NF2: The simplified `defineConfig` in the facade packages produces a config object that is semantically identical to a manually-wired config using the low-level API. There is no behavioral difference at emit time or runtime.
-- NF3: The post-emit validation adds negligible time to the emit process (< 500ms for checking package resolution).
+- NF1: The facade `defineConfig` produces a config object that is semantically identical to a manually-wired config. There is no behavioral difference at emit time or runtime.
+- NF2: Post-emit validation adds < 500ms to the emit process.
 
 ## Non-goals
 
-- An `init` command that supports every possible configuration option. The init command covers the common case; power users can edit the generated files afterward.
-- Replacing the low-level config API (`defineConfig` from `@prisma-next/cli/config-types`). The facade's `defineConfig` delegates to it. The low-level API remains available for advanced use cases and extension authors.
-- A plugin or template system for the init command. Hard-coded templates for Postgres and Mongo are sufficient. Additional targets can be added as simple template additions.
-- Migrating existing projects. The init command targets new projects. Existing projects can adopt the simplified config manually if desired.
-- Interactive schema editing or model generation during init. The starter schema is a static template.
+- An `init` command that supports every configuration option. Init covers the common case; power users edit the generated files.
+- Replacing the low-level config API. The facade delegates to it. The low-level API remains available for advanced use cases and extension authors.
+- A plugin or template system for init. Hard-coded templates for Postgres and Mongo are sufficient.
+- Migrating existing projects. Init targets new projects.
+- Interactive schema editing during init. The starter schema is a static template.
 
 # Acceptance Criteria
 
-## Init command
-
-- [ ] Running `pnpm dlx @prisma-next/cli init` in an empty directory (with a `package.json`) scaffolds `contract.prisma`, `prisma-next.config.ts`, and `db.ts`.
-- [ ] The generated `prisma-next.config.ts` has a single import from the target facade package's `/config` export.
-- [ ] The generated `db.ts` imports from the target facade package's `/runtime` export.
-- [ ] The init command detects pnpm, npm, yarn, and bun from their respective lockfiles.
-- [ ] The init command installs the target facade package and `@prisma-next/cli` using the detected package manager.
-- [ ] The init command runs `contract emit` after installation, producing `contract.json` and `contract.d.ts`.
-- [ ] After init completes, the emitted `contract.d.ts` type imports all resolve without additional package installations.
-- [ ] After init completes, the generated `db.ts` has valid imports (contract types and JSON exist).
-- [ ] `--no-install` skips installation and emit, and prints the manual commands instead.
-- [ ] The init command does not overwrite existing files without prompting.
-
-## Facade `/config` export
-
-- [ ] `@prisma-next/postgres` exports a `defineConfig` from `/config` that accepts `{ schema, output, db, extensions? }` and returns a valid CLI config.
-- [ ] A config using the facade `defineConfig` produces identical emit output to the equivalent manually-wired config.
-- [ ] Extensions passed via the `extensions` option are correctly wired into both authoring and PSL interpretation contributions.
-
-## Transitive dependency coverage
-
-- [ ] Installing only `@prisma-next/postgres` makes all `contract.d.ts` imports resolvable for a Postgres target (including `@prisma-next/adapter-postgres/codec-types`, `@prisma-next/sql-contract/types`, `@prisma-next/contract/types`).
-- [ ] Installing only `@prisma-next/mongo` makes all `contract.d.ts` imports resolvable for a Mongo target.
-
-## Post-emit validation
-
-- [ ] When `contract.d.ts` references a package not installed in the user's project, the emitter prints a warning naming the missing package(s) and the install command.
-- [ ] The warning does not prevent the emit from completing successfully.
-- [ ] When all packages are installed, no warning is printed.
-
-# Other Considerations
-
-## Security
-
-No new security considerations. The init command runs locally, generates local files, and installs packages from the npm registry using the user's existing package manager. No credentials, secrets, or network services are involved beyond standard npm registry access.
-
-## Cost
-
-No infrastructure or runtime cost. This is a developer tooling change. The only "cost" is the additional transitive dependencies pulled into `node_modules`, which is negligible.
-
-## Observability
-
-Not applicable — this is CLI tooling with direct terminal output. Errors and warnings are printed to stderr/stdout.
-
-## Data Protection
-
-Not applicable — no user data is collected, stored, or transmitted.
-
-## Analytics
-
-**Assumption:** No telemetry or analytics are collected by the CLI today, and none are added by this project. If telemetry is introduced in the future, `init` command usage would be a natural event to track.
+- [ ] `pnpm dlx @prisma-next/cli init` (selecting Postgres) in a directory with only a `package.json` produces the five files shown in "Generated files" with no errors.
+- [ ] The generated `prisma-next.config.ts` has exactly one import line (from `@prisma-next/postgres/config`).
+- [ ] The generated `db.ts` has exactly one `@prisma-next` import (from `@prisma-next/postgres/runtime`).
+- [ ] After init, `tsc --noEmit` reports no type errors in `db.ts` (with `skipLibCheck: true`).
+- [ ] After init, renaming `contract.d.ts` to `contract.ts` and running `tsc --noEmit` reports no errors (proving that type imports actually resolve).
+- [ ] A config using the facade `defineConfig` and a config using the low-level API with equivalent manual wiring produce byte-identical `contract.json` and `contract.d.ts` output.
+- [ ] Init detects pnpm, npm, yarn, and bun from their respective lockfiles.
+- [ ] Init with `--no-install` produces the three scaffolded files but not `contract.json`/`contract.d.ts`, and prints install + emit commands.
+- [ ] Init does not overwrite existing files without prompting.
+- [ ] Emitting a contract when `@prisma-next/adapter-postgres` is not installed prints a warning naming the missing package and the install command.
+- [ ] Emitting a contract when all packages are installed prints no warning.
 
 # References
 
-- [User journey and roadblock catalog](user-journey.md) — documents the current setup experience and the specific pain points this project addresses.
+- [User journey and roadblock catalog](user-journey.md)
 - Existing `@prisma-next/postgres` package: `packages/3-extensions/postgres/`
 - CLI package: `packages/1-framework/3-tooling/cli/`
 - Example configs: `examples/prisma-next-demo/prisma-next.config.ts`, `examples/mongo-demo/prisma-next.config.ts`
+- Low-level config types: `packages/1-framework/1-core/config/src/config-types.ts`
 
 # Open Questions
 
-None — all questions resolved during spec drafting. Decisions recorded in the functional requirements above:
+None — all resolved during spec drafting. Decisions:
 
-- **Init runs `contract emit` automatically** (F9) — the user gets a fully working, typed setup. They can edit the schema and re-emit trivially.
-- **`db.ts` is colocated with the contract output** (F4) — e.g. `src/prisma/db.ts` alongside `src/prisma/contract.json`.
-- **Facade `defineConfig` delegates to the existing config infrastructure** (F10, F11) — it's a thin wrapper that constructs the same config object the low-level API produces.
-- **Starter schema contains `User` and `Post` models** (F4) — gives the user something concrete with a relation to emit and query immediately.
+- **Init runs `contract emit` automatically** — the user gets a fully working, typed setup out of the box.
+- **`db.ts` is colocated with the contract output** — e.g. `src/prisma/db.ts` alongside `src/prisma/contract.json`.
+- **Facade `defineConfig` delegates to the existing config infrastructure** — thin wrapper, not a replacement.
+- **Starter schema contains `User` and `Post` with a relation** — gives the user something concrete to query immediately.
