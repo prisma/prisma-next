@@ -21,7 +21,7 @@ const ITEM_CHINOS = {
   image: { url: '/chinos.jpg' },
 };
 
-describe('cart lifecycle (integration)', { timeout: timeouts.spinUpDbServer }, () => {
+describe('cart lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   const ctx = setupTestDb('cart_lifecycle_test');
 
   it('addToCart creates a cart when none exists', async () => {

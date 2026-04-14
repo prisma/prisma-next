@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { seed } from '../src/seed';
 import { setupTestDb } from './setup';
 
-describe('seed', { timeout: timeouts.spinUpDbServer }, () => {
+describe('seed', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   const ctx = setupTestDb('seed_test');
 
   it('populates all 7 collections and data is queryable', async () => {

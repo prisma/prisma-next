@@ -7,7 +7,7 @@ export default defineConfig({
     pool: 'threads',
     maxWorkers: 1,
     isolate: false,
-    testTimeout: timeouts.spinUpDbServer,
-    hookTimeout: timeouts.spinUpDbServer,
+    testTimeout: timeouts.spinUpMongoMemoryServer,
+    hookTimeout: timeouts.spinUpMongoMemoryServer,
   },
 });

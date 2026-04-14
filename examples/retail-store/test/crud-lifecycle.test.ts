@@ -9,7 +9,7 @@ import { findProductById, findProducts } from '../src/data/products';
 import { findUserById, findUsers } from '../src/data/users';
 import { setupTestDb } from './setup';
 
-describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
+describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   const ctx = setupTestDb('crud_lifecycle_test');
 
   it('creates and reads products with embedded Price and Image', async () => {

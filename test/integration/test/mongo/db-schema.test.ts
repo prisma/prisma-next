@@ -18,7 +18,7 @@ function createInstance() {
   return createMongoFamilyInstance(stack);
 }
 
-describe('db schema for Mongo (end-to-end)', { timeout: timeouts.spinUpDbServer }, () => {
+describe('db schema for Mongo (end-to-end)', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let db: Db;
@@ -26,18 +26,20 @@ describe('db schema for Mongo (end-to-end)', { timeout: timeouts.spinUpDbServer 
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
-      instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
       replSet: { count: 1 },
     });
     client = new MongoClient(replSet.getUri());
     await client.connect();
     db = client.db(dbName);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   afterAll(async () => {
     await client?.close();
     await replSet?.stop();
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   beforeEach(async () => {
     const collections = await db.listCollections().toArray();

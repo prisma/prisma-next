@@ -20,7 +20,7 @@ const ITEM = {
   image: { url: '/shirt.jpg' },
 };
 
-describe('order lifecycle (integration)', { timeout: timeouts.spinUpDbServer }, () => {
+describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   const ctx = setupTestDb('order_lifecycle_test');
 
   it('creates an order from cart items and clears the cart', async () => {

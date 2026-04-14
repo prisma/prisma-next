@@ -23,7 +23,9 @@ const stubMeta: PlanMeta = {
 
 export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Promise<T> {
   const replSet = await MongoMemoryReplSet.create({
-    instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+    instanceOpts: [
+      { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+    ],
     replSet: { count: 1, storageEngine: 'wiredTiger' },
   });
   const connectionUri = replSet.getUri();
