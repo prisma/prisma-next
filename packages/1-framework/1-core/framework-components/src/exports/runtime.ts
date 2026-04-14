@@ -1,3 +1,5 @@
+export type { RuntimeErrorEnvelope } from '../runtime-error';
+export { runtimeError } from '../runtime-error';
 export type {
   AfterExecuteResult,
   RuntimeExecutor,

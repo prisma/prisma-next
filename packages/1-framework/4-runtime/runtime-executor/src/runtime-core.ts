@@ -1,7 +1,7 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { RuntimeExecutor } from '@prisma-next/framework-components/runtime';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { AsyncIterableResult } from './async-iterable-result';
-import { runtimeError } from './errors';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow } from './marker';
 import type { Log, Middleware, MiddlewareContext } from './middleware/types';
