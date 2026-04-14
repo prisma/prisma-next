@@ -1066,6 +1066,38 @@ describe('MongoCollection write methods', () => {
         }),
       ).rejects.toThrow('_id');
     });
+
+    it('update() with callback throws when _id is targeted', async () => {
+      const executor = createMockExecutor();
+      const col = createMongoCollection(contract, 'User', executor);
+      await expect(
+        col.where(MongoFieldFilter.eq('_id', 'id-1')).update((u) => [u._id.set('new-id')]),
+      ).rejects.toThrow('_id');
+    });
+
+    it('updateAll() with callback throws when _id is targeted', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      const result = col
+        .where(MongoFieldFilter.eq('_id', 'id-1'))
+        .updateAll((u: FieldAccessor<Contract, 'User'>) => [u._id.set('new-id')]);
+      await expect(async () => {
+        for await (const _ of result) {
+          /* drain */
+        }
+      }).rejects.toThrow('_id');
+    });
+
+    it('upsert() with callback throws when _id is targeted', async () => {
+      const executor = createMockExecutor();
+      const col = createMongoCollection(contract, 'User', executor);
+      await expect(
+        col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
+          create: defaultUserData,
+          update: (u) => [u._id.set('new-id')],
+        }),
+      ).rejects.toThrow('_id');
+    });
   });
 
   describe('immutability', () => {
