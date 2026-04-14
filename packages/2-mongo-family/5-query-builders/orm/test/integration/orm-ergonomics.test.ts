@@ -162,6 +162,19 @@ describe(
       });
     });
 
+    describe('upsert() dot-path guard', () => {
+      it('throws when callback uses a dot-path operation', async () => {
+        const orm = mongoOrm({ contract, executor: runtime });
+        await orm.users.create(defaultUserData);
+        await expect(
+          orm.users.where({ name: 'Alice' }).upsert({
+            create: { ...defaultUserData, homeAddress: { city: 'SF', country: 'US' } },
+            update: (u) => [u('homeAddress.city').set('LA')],
+          }),
+        ).rejects.toThrow('dot-path');
+      });
+    });
+
     describe('FL-08: 1:N reference relation include', () => {
       it('include() on 1:N relation returns array of related documents', async () => {
         const orm = mongoOrm({ contract, executor: runtime });

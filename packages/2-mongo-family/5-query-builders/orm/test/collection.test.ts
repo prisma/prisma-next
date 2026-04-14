@@ -767,6 +767,17 @@ describe('MongoCollection write methods', () => {
         expect(update['$setOnInsert']).toBeDefined();
       }
     });
+
+    it('throws when callback produces dot-path operations', async () => {
+      const executor = createMockExecutor();
+      const col = createMongoCollection(contract, 'User', executor);
+      await expect(
+        col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
+          create: { ...defaultUserData, homeAddress: { city: 'SF', country: 'US' } },
+          update: (u) => [u('homeAddress.city').set('LA')],
+        }),
+      ).rejects.toThrow('dot-path');
+    });
   });
 
   describe('updateCount()', () => {
