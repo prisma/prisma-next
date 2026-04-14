@@ -162,6 +162,13 @@ export async function executeContractEmit(
   await unlessAborted(writeFile(outputJsonPath, emitResult.contractJson, 'utf-8'));
   await unlessAborted(writeFile(outputDtsPath, emitResult.contractDts, 'utf-8'));
 
+  // Validate that contract.d.ts type imports are resolvable
+  const { validateContractDeps } = await import('../../utils/validate-contract-deps');
+  const depsValidation = validateContractDeps(emitResult.contractDts, dirname(outputDtsPath));
+  if (depsValidation.warning) {
+    process.stderr.write(`\n⚠ ${depsValidation.warning}\n`);
+  }
+
   return {
     storageHash: emitResult.storageHash,
     ...ifDefined('executionHash', emitResult.executionHash),
