@@ -36,7 +36,7 @@ The solution follows the same pattern used for other framework components (adapt
 
    The interface is parameterized on the plan type (`TPlan`). At the framework level, the plan type constraint is `{ readonly meta: PlanMeta }` — the minimum both `ExecutionPlan` and `MongoQueryPlan` satisfy. Family-specific runtime interfaces narrow `TPlan` to their concrete plan type.
 
-   The return type is `AsyncIterable<Row>` (not `AsyncIterableResult<Row>`) because `AsyncIterableResult` lives in `@prisma-next/runtime-executor` (a higher layer) and importing it would create a circular dependency. Family-specific runtimes may return `AsyncIterableResult<Row>` (which implements `AsyncIterable<Row>`), preserving full API compatibility.
+   The return type is `AsyncIterableResult<Row>`. `AsyncIterableResult` lives in `@prisma-next/framework-components` alongside the SPI, so there is no layering issue. The `execute` method uses a `_row` phantom intersection (`plan: TPlan & { readonly _row?: Row }`) to connect the `Row` type parameter to the plan, mirroring how `ExecutionPlan<Row>` carries a phantom `_row?: Row` property.
 
    This interface lives in `@prisma-next/framework-components` alongside the other cross-family SPIs (component descriptors, execution stack).
 
@@ -147,7 +147,7 @@ The solution follows the same pattern used for other framework components (adapt
 - [x] `TPlan` constraint is `{ readonly meta: PlanMeta }` — the minimum both `ExecutionPlan` and `MongoQueryPlan` satisfy
 - [x] `RuntimeCore` (SQL) nominally extends `RuntimeExecutor<ExecutionPlan>`
 - [x] `MongoRuntime` is structurally compatible with `RuntimeExecutor<MongoQueryPlan>` (verified by type test)
-- [x] `RuntimeExecutor.execute` returns `AsyncIterable<Row>` (framework level); family runtimes return `AsyncIterableResult<Row>` which implements `AsyncIterable<Row>`
+- [x] `RuntimeExecutor.execute` returns `AsyncIterableResult<Row>` (both at framework level and in family runtimes)
 
 ### Middleware SPI
 - [x] `RuntimeMiddleware` interface exists at the framework level (`@prisma-next/framework-components`)
