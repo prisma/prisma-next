@@ -18,6 +18,9 @@ test('InferModelRow resolves User fields', () => {
     _id: string;
     name: string;
     email: string;
+    loginCount: number;
+    tags: string[];
+    homeAddress: { city: string; country: string } | null;
   }>();
 });
 
