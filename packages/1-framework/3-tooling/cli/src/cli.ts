@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { createContractEmitCommand } from './commands/contract-emit';
 import { createContractInferCommand } from './commands/contract-infer';
+import { createInitCommand } from './commands/init';
 import { installShutdownHandlers } from './utils/shutdown';
 
 // Install SIGINT/SIGTERM handlers before anything else
@@ -247,6 +248,10 @@ const migrationRefCommand = createMigrationRefCommand();
 migrationCommand.addCommand(migrationRefCommand);
 
 program.addCommand(migrationCommand);
+
+// Register init command (top-level, not nested)
+const initCommand = createInitCommand();
+program.addCommand(initCommand);
 
 // Create help command
 const helpCommand = new Command('help')

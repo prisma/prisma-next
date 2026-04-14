@@ -1,0 +1,148 @@
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import * as clack from '@clack/prompts';
+import { dirname, join, relative } from 'pathe';
+import { TerminalUI } from '../../utils/terminal-ui';
+import { detectPackageManager } from './detect-package-manager';
+import { configFile, dbFile, starterSchema, type TargetId, targetPackageName } from './templates';
+
+export interface InitOptions {
+  readonly noInstall?: boolean;
+}
+
+interface FileEntry {
+  readonly path: string;
+  readonly content: string;
+}
+
+export async function runInit(baseDir: string, options: InitOptions): Promise<void> {
+  const ui = new TerminalUI();
+
+  clack.intro('prisma-next init', { output: process.stderr });
+
+  const targetResult = await clack.select({
+    message: 'What database are you using?',
+    options: [
+      { value: 'postgres' as TargetId, label: 'PostgreSQL' },
+      { value: 'mongo' as TargetId, label: 'MongoDB' },
+    ],
+    output: process.stderr,
+  });
+  if (clack.isCancel(targetResult)) {
+    clack.cancel('Init cancelled.', { output: process.stderr });
+    process.exit(0);
+  }
+  const target = targetResult as TargetId;
+
+  const schemaPathResult = await clack.text({
+    message: 'Where should the schema file go?',
+    initialValue: 'prisma/contract.prisma',
+    output: process.stderr,
+  });
+  if (clack.isCancel(schemaPathResult)) {
+    clack.cancel('Init cancelled.', { output: process.stderr });
+    process.exit(0);
+  }
+  const schemaPath = schemaPathResult as string;
+
+  const schemaDir = dirname(schemaPath);
+  const configPath = `./${schemaPath}`;
+
+  const files: FileEntry[] = [
+    { path: schemaPath, content: starterSchema() },
+    { path: 'prisma-next.config.ts', content: configFile(target, configPath) },
+    { path: join(schemaDir, 'db.ts'), content: dbFile(target) },
+  ];
+
+  for (const file of files) {
+    const fullPath = join(baseDir, file.path);
+    if (existsSync(fullPath)) {
+      const overwrite = await clack.confirm({
+        message: `${file.path} already exists. Overwrite?`,
+        initialValue: false,
+        output: process.stderr,
+      });
+      if (clack.isCancel(overwrite) || !overwrite) {
+        ui.log(`Skipping ${file.path}`);
+        continue;
+      }
+    }
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, file.content, 'utf-8');
+  }
+
+  if (options.noInstall) {
+    const pkg = targetPackageName(target);
+    ui.note(
+      [
+        'Run the following commands to complete setup:',
+        '',
+        '  1. Install dependencies:',
+        `     pnpm add ${pkg} && pnpm add -D @prisma-next/cli`,
+        '',
+        '  2. Emit the contract:',
+        '     pnpm prisma-next contract emit',
+      ].join('\n'),
+      'Manual steps',
+    );
+  } else {
+    const pm = detectPackageManager(baseDir);
+    ui.log(`Detected package manager: ${pm}`);
+
+    const pkg = targetPackageName(target);
+    const spinner = ui.spinner();
+
+    spinner.start(`Installing ${pkg} and @prisma-next/cli...`);
+    try {
+      execFileSync(pm, ['add', pkg], { cwd: baseDir, stdio: 'pipe' });
+      execFileSync(pm, ['add', '-D', '@prisma-next/cli'], { cwd: baseDir, stdio: 'pipe' });
+      spinner.stop(`Installed ${pkg} and @prisma-next/cli`);
+    } catch {
+      spinner.stop('Installation failed');
+      ui.warn(
+        [
+          'Could not install dependencies automatically. Run manually:',
+          `  ${pm} add ${pkg}`,
+          `  ${pm} add -D @prisma-next/cli`,
+        ].join('\n'),
+      );
+    }
+
+    spinner.start('Emitting contract...');
+    try {
+      const { executeContractEmit } = await import('../../control-api/operations/contract-emit');
+      const configFilePath = join(baseDir, 'prisma-next.config.ts');
+      await executeContractEmit({ configPath: configFilePath });
+      spinner.stop('Contract emitted');
+    } catch {
+      spinner.stop('Contract emission failed');
+      ui.warn(
+        [
+          'Could not emit contract automatically. Run manually:',
+          '  pnpm prisma-next contract emit',
+        ].join('\n'),
+      );
+    }
+  }
+
+  const createdFiles = files.map((f) => `  ${f.path}`);
+  if (!options.noInstall) {
+    const schemaDir2 = dirname(schemaPath);
+    createdFiles.push(`  ${join(schemaDir2, 'contract.json')}`);
+    createdFiles.push(`  ${join(schemaDir2, 'contract.d.ts')}`);
+  }
+
+  clack.outro(
+    [
+      'Done! Created:',
+      '',
+      ...createdFiles,
+      '',
+      'Next steps:',
+      `  1. Edit ${schemaPath} with your models`,
+      '  2. Run: pnpm prisma-next contract emit',
+      `  3. Import db from ./${dirname(schemaPath)}/db in your app`,
+    ].join('\n'),
+    { output: process.stderr },
+  );
+}
