@@ -410,8 +410,8 @@ test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
   // so ResultType falls back to never. The chain builder's explicit
   // <CodecTypes> parameter resolved this to unknown. Tracked as a known
   // DSL type-inference gap to fix when __codecTypes becomes required on packs.
-  expectTypeOf<Row['payload']>().toEqualTypeOf<never>();
-  expectTypeOf<Row['meta']>().toEqualTypeOf<never>();
+  expectTypeOf<Row['payload']>().toEqualTypeOf(undefined as never);
+  expectTypeOf<Row['meta']>().toEqualTypeOf(undefined as never);
 });
 
 type ResolveStandardSchemaOutput<P> = P extends { readonly schema: infer Schema }
