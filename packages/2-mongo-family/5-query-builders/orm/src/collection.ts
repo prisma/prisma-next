@@ -455,12 +455,12 @@ class MongoCollectionImpl<
       this.#injectDiscriminator(input.create as Record<string, unknown>),
     );
 
-    let updateDoc: Record<string, MongoValue>;
+    let updateDoc: Record<string, Record<string, MongoValue>>;
     if (typeof input.update === 'function') {
       const accessor = createFieldAccessor<TContract, ModelName>();
       const ops = input.update(accessor);
-      updateDoc = compileFieldOperations(ops, (field, value) =>
-        this.#wrapFieldOpValue(field, value),
+      updateDoc = compileFieldOperations(ops, (field, value, operator) =>
+        this.#wrapFieldOpValue(field, value, operator),
       );
     } else {
       const setFields = this.#toSetFields(input.update as Record<string, unknown>);
@@ -472,10 +472,8 @@ class MongoCollectionImpl<
 
     const updatedFields = new Set<string>();
     for (const operatorGroup of Object.values(updateDoc)) {
-      if (typeof operatorGroup === 'object' && operatorGroup !== null) {
-        for (const fieldPath of Object.keys(operatorGroup as Record<string, unknown>)) {
-          updatedFields.add(fieldPath.split('.')[0]!);
-        }
+      for (const fieldPath of Object.keys(operatorGroup)) {
+        updatedFields.add(fieldPath.split('.')[0]!);
       }
     }
     const insertOnlyFields: Record<string, MongoValue> = {};
@@ -627,7 +625,7 @@ class MongoCollectionImpl<
     return result;
   }
 
-  #toUpdateDocument(data: Record<string, unknown>): Record<string, MongoValue> {
+  #toUpdateDocument(data: Record<string, unknown>): Record<string, Record<string, MongoValue>> {
     return { $set: this.#toSetFields(data) };
   }
 
@@ -635,16 +633,20 @@ class MongoCollectionImpl<
     dataOrCallback:
       | Partial<DefaultModelRow<TContract, ModelName>>
       | ((u: FieldAccessor<TContract, ModelName>) => FieldOperation[]),
-  ): Record<string, MongoValue> {
+  ): Record<string, Record<string, MongoValue>> {
     if (typeof dataOrCallback === 'function') {
       const accessor = createFieldAccessor<TContract, ModelName>();
       const ops = dataOrCallback(accessor);
-      return compileFieldOperations(ops, (field, value) => this.#wrapFieldOpValue(field, value));
+      return compileFieldOperations(ops, (field, value, operator) =>
+        this.#wrapFieldOpValue(field, value, operator),
+      );
     }
     return this.#toUpdateDocument(dataOrCallback as Record<string, unknown>);
   }
 
-  #wrapFieldOpValue(field: string, value: MongoValue): MongoValue {
+  #wrapFieldOpValue(field: string, value: MongoValue, operator?: string): MongoValue {
+    if (operator === '$unset') return value;
+
     const topLevelField = field.split('.')[0]!;
     const fields = this.#modelFields();
     const contractField = fields[topLevelField];
