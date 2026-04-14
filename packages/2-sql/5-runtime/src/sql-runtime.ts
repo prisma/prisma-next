@@ -124,7 +124,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       familyAdapter,
       driver,
       verify,
-      middlewares,
+      ...ifDefined('middlewares', middlewares),
       ...ifDefined('mode', mode),
       ...ifDefined('log', log),
     };

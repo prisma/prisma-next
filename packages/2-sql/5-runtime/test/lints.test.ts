@@ -15,11 +15,9 @@ import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { lints } from '../src/middleware/lints';
 
-function createMiddlewareContext(): MiddlewareContext<unknown, unknown, unknown> {
+function createMiddlewareContext(): MiddlewareContext<unknown> {
   return {
     contract: {},
-    adapter: {},
-    driver: {},
     mode: 'strict' as const,
     now: () => Date.now(),
     log: {
