@@ -1,4 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { RuntimeExecutor } from '@prisma-next/framework-components/runtime';
 import { AsyncIterableResult } from './async-iterable-result';
 import { runtimeError } from './errors';
 import { computeSqlFingerprint } from './fingerprint';
@@ -31,8 +32,8 @@ export interface RuntimeCoreOptions<TContract = unknown, TAdapter = unknown, TDr
 }
 
 export interface RuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = unknown>
-  extends RuntimeQueryable {
-  // Type parameters are used in the implementation for type safety
+  extends RuntimeQueryable,
+    RuntimeExecutor<ExecutionPlan> {
   readonly _typeContract?: TContract;
   readonly _typeAdapter?: TAdapter;
   readonly _typeDriver?: TDriver;
