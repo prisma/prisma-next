@@ -163,6 +163,7 @@ export function lints<TContract = unknown, TAdapter = unknown, TDriver = unknown
 
   return Object.freeze({
     name: 'lints',
+    familyId: 'sql' as const,
 
     async beforeExecute(plan: ExecutionPlan, ctx: MiddlewareContext<TContract, TAdapter, TDriver>) {
       if (isQueryAst(plan.ast)) {

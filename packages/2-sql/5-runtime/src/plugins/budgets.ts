@@ -203,6 +203,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
 
   return Object.freeze({
     name: 'budgets',
+    familyId: 'sql' as const,
 
     async beforeExecute(plan: ExecutionPlan, ctx: MiddlewareContext<TContract, TAdapter, TDriver>) {
       observedRowsByPlan.set(plan, { count: 0 });

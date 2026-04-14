@@ -14,6 +14,7 @@ export type { BudgetsOptions } from '../plugins/budgets';
 export { budgets } from '../plugins/budgets';
 export type { LintsOptions } from '../plugins/lints';
 export { lints } from '../plugins/lints';
+export type { SqlMiddleware, SqlMiddlewareContext } from '../plugins/sql-middleware';
 export type {
   ExecutionContext,
   RuntimeMutationDefaultGenerator,

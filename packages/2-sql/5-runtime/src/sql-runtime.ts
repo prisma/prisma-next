@@ -3,6 +3,7 @@ import type {
   ExecutionStackInstance,
   RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
+import { checkMiddlewareCompatibility } from '@prisma-next/framework-components/runtime';
 import type {
   Log,
   Middleware,
@@ -122,6 +123,13 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.codecRegistry = context.codecs;
     this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.codecRegistryValidated = false;
+
+    if (middlewares) {
+      const targetId = (context.contract as { target?: string }).target;
+      for (const mw of middlewares) {
+        checkMiddlewareCompatibility(mw, 'sql', targetId);
+      }
+    }
 
     const familyAdapter = new SqlFamilyAdapter(context.contract, adapter.profile);
 
