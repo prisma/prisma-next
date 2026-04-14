@@ -16,12 +16,10 @@ const userTable = TableSource.named('user');
 const idCol = ColumnRef.of('user', 'id');
 
 function createMiddlewareContext(
-  overrides?: Partial<MiddlewareContext<unknown, unknown, unknown>>,
-): MiddlewareContext<unknown, unknown, unknown> {
+  overrides?: Partial<MiddlewareContext<unknown>>,
+): MiddlewareContext<unknown> {
   return {
     contract: {},
-    adapter: {},
-    driver: {},
     mode: 'strict' as const,
     now: () => Date.now(),
     log: {

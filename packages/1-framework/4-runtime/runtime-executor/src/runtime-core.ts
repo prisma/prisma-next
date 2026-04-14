@@ -1,5 +1,4 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type { RuntimeExecutor } from '@prisma-next/framework-components/runtime';
 import { AsyncIterableResult, runtimeError } from '@prisma-next/framework-components/runtime';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow } from './marker';
@@ -30,9 +29,7 @@ export interface RuntimeCoreOptions<TContract = unknown, TDriver = unknown> {
   readonly log?: Log;
 }
 
-export interface RuntimeCore<TContract = unknown, TDriver = unknown>
-  extends RuntimeQueryable,
-    RuntimeExecutor<ExecutionPlan> {
+export interface RuntimeCore<TContract = unknown, TDriver = unknown> extends RuntimeQueryable {
   readonly _typeContract?: TContract;
   readonly _typeDriver?: TDriver;
   connection(): Promise<RuntimeConnection>;

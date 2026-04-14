@@ -183,7 +183,7 @@ describe('runtime-core with mock family', () => {
     let onRowCalled = false;
     let afterExecuteCalled = false;
 
-    const middleware: Middleware<MockContract, unknown, MockDriver> = {
+    const middleware: Middleware<MockContract> = {
       name: 'test-middleware',
       async beforeExecute(plan, ctx) {
         void plan;
