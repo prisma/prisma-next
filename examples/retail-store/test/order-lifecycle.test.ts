@@ -80,7 +80,7 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
     expect(delivered).not.toBeNull();
     expect(delivered!['statusHistory']).toHaveLength(3);
 
-    const statuses = (delivered!['statusHistory'] as Array<{ status: string }>).map(
+    const statuses = (delivered!['statusHistory'] as ReadonlyArray<{ status: string }>).map(
       (s) => s.status,
     );
     expect(statuses).toEqual(['placed', 'shipped', 'delivered']);
