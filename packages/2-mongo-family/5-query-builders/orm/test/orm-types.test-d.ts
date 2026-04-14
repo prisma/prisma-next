@@ -1,4 +1,4 @@
-import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import type { MongoCollection } from '../src/collection';

@@ -2,10 +2,12 @@ import type {
   RuntimeMiddleware,
   RuntimeMiddlewareContext,
 } from '@prisma-next/framework-components/runtime';
-import { checkMiddlewareCompatibility } from '@prisma-next/framework-components/runtime';
+import {
+  AsyncIterableResult,
+  checkMiddlewareCompatibility,
+} from '@prisma-next/framework-components/runtime';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 
 export interface MongoRuntimeOptions {
   readonly adapter: MongoAdapter;

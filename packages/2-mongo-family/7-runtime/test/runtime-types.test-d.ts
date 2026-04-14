@@ -1,3 +1,4 @@
+import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -5,7 +6,6 @@ import type {
 } from '@prisma-next/mongo-contract';
 import { mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
-import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { expectTypeOf } from 'vitest';
 import type { MongoRuntime } from '../src/mongo-runtime';
 
