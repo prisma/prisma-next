@@ -1,4 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { RuntimeExecutor } from '@prisma-next/framework-components/runtime';
 import { AsyncIterableResult, runtimeError } from '@prisma-next/framework-components/runtime';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow } from './marker';
@@ -29,7 +30,9 @@ export interface RuntimeCoreOptions<TContract = unknown, TDriver = unknown> {
   readonly log?: Log;
 }
 
-export interface RuntimeCore<TContract = unknown, TDriver = unknown> extends RuntimeQueryable {
+export interface RuntimeCore<TContract = unknown, TDriver = unknown>
+  extends RuntimeQueryable,
+    RuntimeExecutor<ExecutionPlan> {
   readonly _typeContract?: TContract;
   readonly _typeDriver?: TDriver;
   connection(): Promise<RuntimeConnection>;
@@ -47,8 +50,19 @@ export interface RuntimeTransaction extends RuntimeQueryable {
   rollback(): Promise<void>;
 }
 
+/**
+ * Shared query execution trait for anything that can run an ExecutionPlan:
+ * RuntimeCore, RuntimeConnection, and RuntimeTransaction. This is a
+ * SQL-domain internal mixin — it is NOT the cross-family SPI.
+ *
+ * For the cross-family SPI, see RuntimeExecutor in framework-components.
+ * RuntimeCore nominally extends both this interface and RuntimeExecutor.
+ *
+ * The execute signature uses the same `_row` phantom intersection as
+ * RuntimeExecutor so that RuntimeCore can extend both without conflicts.
+ */
 export interface RuntimeQueryable {
-  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row>;
+  execute<Row>(plan: ExecutionPlan & { readonly _row?: Row }): AsyncIterableResult<Row>;
 }
 
 interface DriverWithQuery<_TDriver> {

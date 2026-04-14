@@ -37,8 +37,16 @@ export interface RuntimeMiddleware {
   ): Promise<void>;
 }
 
+/**
+ * Cross-family SPI for any runtime that can execute plans and be shut down.
+ * Each family runtime (SQL, Mongo) satisfies this interface — SQL nominally,
+ * Mongo structurally (due to its phantom Row parameter using a unique symbol).
+ *
+ * The `_row` intersection on `execute` connects the `Row` type parameter to the
+ * plan, mirroring how `ExecutionPlan<Row>` carries a phantom `_row?: Row`.
+ */
 export interface RuntimeExecutor<TPlan extends { readonly meta: PlanMeta }> {
-  execute<Row>(plan: TPlan): AsyncIterableResult<Row>;
+  execute<Row>(plan: TPlan & { readonly _row?: Row }): AsyncIterableResult<Row>;
   close(): Promise<void>;
 }
 
