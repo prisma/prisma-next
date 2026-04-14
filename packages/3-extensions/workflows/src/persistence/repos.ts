@@ -128,8 +128,11 @@ export function createRepos(orm: WorkflowsOrm): WorkflowRepos {
     },
 
     async loadCompletedStepIds(runId) {
-      const rows = await orm.WorkflowStepRun.where({ runId, status: 'completed' }).all().toArray();
-      return new Set(rows.map((r) => r.stepId));
+      const ids = new Set<string>();
+      for await (const row of orm.WorkflowStepRun.where({ runId, status: 'completed' }).all()) {
+        ids.add(row.stepId);
+      }
+      return ids;
     },
 
     async appendEvent({ eventType, runId, stepId, attempt, signalId, message }) {

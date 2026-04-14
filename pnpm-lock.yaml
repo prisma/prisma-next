@@ -2224,6 +2224,9 @@ importers:
       '@prisma-next/ids':
         specifier: workspace:*
         version: link:../../1-framework/2-authoring/ids
+      '@prisma-next/postgres':
+        specifier: workspace:*
+        version: link:../postgres
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../2-sql/2-authoring/contract-ts
@@ -2237,6 +2240,12 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../0-config/tsdown
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.16.0
+      pg:
+        specifier: 'catalog:'
+        version: 8.16.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
