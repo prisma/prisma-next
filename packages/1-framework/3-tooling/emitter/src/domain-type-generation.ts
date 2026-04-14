@@ -344,19 +344,21 @@ export function generateValueObjectType(
   vo: ContractValueObject,
   _valueObjects: Record<string, ContractValueObject>,
   side: 'input' | 'output' = 'output',
+  codecLookup?: CodecLookup,
 ): string {
-  return resolveValueObjectType(_voName, vo, _valueObjects)[side];
+  return resolveValueObjectType(_voName, vo, _valueObjects, codecLookup)[side];
 }
 
 export function resolveValueObjectType(
   _voName: string,
   vo: ContractValueObject,
   _valueObjects: Record<string, ContractValueObject>,
+  codecLookup?: CodecLookup,
 ): ResolvedFieldType {
   const outputEntries: string[] = [];
   const inputEntries: string[] = [];
   for (const [fieldName, field] of Object.entries(vo.fields)) {
-    const resolved = resolveFieldType(field);
+    const resolved = resolveFieldType(field, codecLookup);
     const key = `readonly ${serializeObjectKey(fieldName)}`;
     outputEntries.push(`${key}: ${resolved.output}`);
     inputEntries.push(`${key}: ${resolved.input}`);
@@ -411,6 +413,7 @@ export function generateValueObjectsDescriptorType(
 
 export function generateValueObjectTypeAliases(
   valueObjects: Record<string, ContractValueObject> | undefined,
+  codecLookup?: CodecLookup,
 ): string {
   if (!valueObjects || Object.keys(valueObjects).length === 0) {
     return '';
@@ -418,7 +421,7 @@ export function generateValueObjectTypeAliases(
 
   const aliases: string[] = [];
   for (const [voName, vo] of Object.entries(valueObjects)) {
-    const resolved = resolveValueObjectType(voName, vo, valueObjects);
+    const resolved = resolveValueObjectType(voName, vo, valueObjects, codecLookup);
     aliases.push(`export type ${voName}Output = ${resolved.output};`);
     aliases.push(`export type ${voName}Input = ${resolved.input};`);
   }

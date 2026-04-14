@@ -60,7 +60,7 @@ export function generateContractDts(
   const rootsType = generateRootsType(contract.roots);
 
   const valueObjects = contract.valueObjects as Record<string, ContractValueObject> | undefined;
-  const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects);
+  const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects, codecLookup);
   const valueObjectsDescriptor = generateValueObjectsDescriptorType(valueObjects);
 
   const executionClause =
