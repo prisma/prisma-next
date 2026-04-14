@@ -21,13 +21,13 @@ Defines the framework-level interfaces (`RuntimeExecutor`, `RuntimeMiddleware`, 
 
 **Tasks:**
 
-- [ ] **1.1 Define `RuntimeExecutor<TPlan>` interface.** Add to `@prisma-next/framework-components`. Parameterized on `TPlan extends { readonly meta: PlanMeta }`. Methods: `execute<Row>(plan: TPlan): AsyncIterableResult<Row>`, `close(): Promise<void>`. Write type tests verifying both `ExecutionPlan` and `MongoQueryPlan` satisfy the constraint.
-- [ ] **1.2 Define `RuntimeMiddleware` and `RuntimeMiddlewareContext` interfaces.** Add to `@prisma-next/framework-components`. `RuntimeMiddleware` carries `name`, optional `familyId`/`targetId`, and lifecycle hooks (`beforeExecute`, `onRow`, `afterExecute`) with the plan typed as `{ readonly meta: PlanMeta }`. `RuntimeMiddlewareContext` carries `contract: unknown`, `mode`, `log`, `now` (no adapter/driver — those are family-specific). Write type tests.
-- [ ] **1.3 Define `checkMiddlewareCompatibility` validation function.** Add to `@prisma-next/framework-components`. Validates a middleware's `familyId`/`targetId` against a runtime's family/target. Throws on incompatibility with a clear error message naming the middleware and the mismatch. Simple function — does not use the `TargetBoundComponentDescriptor` pattern. Write unit tests: generic middleware passes all runtimes, family-matched passes, family-mismatched fails with clear message, `targetId` without `familyId` fails.
-- [ ] **1.4 Rename `Plugin` → `RuntimeMiddleware` in framework layer.** Rename in `plugins/types.ts` (or move to new file), update `runtime-core.ts` (`RuntimeCoreOptions.plugins` → `.middlewares`, internal references), update `exports/index.ts`. Rename `PluginContext` → `RuntimeMiddlewareContext`. Update `mock-family.test.ts` to use new names. Verify all existing tests pass.
-- [ ] **1.5 Rename `Plugin` → `RuntimeMiddleware` in SQL runtime.** Update `sql-runtime.ts` (`RuntimeOptions.plugins` → `.middlewares`, `CreateRuntimeOptions.plugins` → `.middlewares`), update `budgets.ts` and `lints.ts` imports and return types, update `exports/index.ts`. Update `lints.test.ts` and `budgets.test.ts` to use new names. Verify all existing tests pass.
-- [ ] **1.6 Rename `plugins` → `middlewares` in facade packages.** Update `packages/3-extensions/postgres/src/runtime/postgres.ts` and `packages/3-extensions/sqlite/src/runtime/sqlite.ts`. Verify all existing tests pass.
-- [ ] **1.7 Make `RuntimeCore` extend `RuntimeExecutor<ExecutionPlan>`.** Update the `RuntimeCore` interface in `runtime-core.ts` to extend `RuntimeExecutor<ExecutionPlan>`. Verify structural compatibility (existing `execute` and `close` methods already satisfy it). Verify all existing tests pass.
+- [x] **1.1 Define `RuntimeExecutor<TPlan>` interface.** Add to `@prisma-next/framework-components`. Parameterized on `TPlan extends { readonly meta: PlanMeta }`. Methods: `execute<Row>(plan: TPlan): AsyncIterableResult<Row>`, `close(): Promise<void>`. Write type tests verifying both `ExecutionPlan` and `MongoQueryPlan` satisfy the constraint.
+- [x] **1.2 Define `RuntimeMiddleware` and `RuntimeMiddlewareContext` interfaces.** Add to `@prisma-next/framework-components`. `RuntimeMiddleware` carries `name`, optional `familyId`/`targetId`, and lifecycle hooks (`beforeExecute`, `onRow`, `afterExecute`) with the plan typed as `{ readonly meta: PlanMeta }`. `RuntimeMiddlewareContext` carries `contract: unknown`, `mode`, `log`, `now` (no adapter/driver — those are family-specific). Write type tests.
+- [x] **1.3 Define `checkMiddlewareCompatibility` validation function.** Add to `@prisma-next/framework-components`. Validates a middleware's `familyId`/`targetId` against a runtime's family/target. Throws on incompatibility with a clear error message naming the middleware and the mismatch. Simple function — does not use the `TargetBoundComponentDescriptor` pattern. Write unit tests: generic middleware passes all runtimes, family-matched passes, family-mismatched fails with clear message, `targetId` without `familyId` fails.
+- [x] **1.4 Rename `Plugin` → `RuntimeMiddleware` in framework layer.** Rename in `plugins/types.ts` (or move to new file), update `runtime-core.ts` (`RuntimeCoreOptions.plugins` → `.middlewares`, internal references), update `exports/index.ts`. Rename `PluginContext` → `RuntimeMiddlewareContext`. Update `mock-family.test.ts` to use new names. Verify all existing tests pass.
+- [x] **1.5 Rename `Plugin` → `RuntimeMiddleware` in SQL runtime.** Update `sql-runtime.ts` (`RuntimeOptions.plugins` → `.middlewares`, `CreateRuntimeOptions.plugins` → `.middlewares`), update `budgets.ts` and `lints.ts` imports and return types, update `exports/index.ts`. Update `lints.test.ts` and `budgets.test.ts` to use new names. Verify all existing tests pass.
+- [x] **1.6 Rename `plugins` → `middlewares` in facade packages.** Update `packages/3-extensions/postgres/src/runtime/postgres.ts` and `packages/3-extensions/sqlite/src/runtime/sqlite.ts`. Verify all existing tests pass.
+- [x] **1.7 Make `RuntimeCore` extend `RuntimeExecutor<ExecutionPlan>`.** Update the `RuntimeCore` interface in `runtime-core.ts` to extend `RuntimeExecutor<ExecutionPlan>`. Verify structural compatibility (existing `execute` and `close` methods already satisfy it). Verify all existing tests pass.
 
 ### Milestone 2: Family-specific interfaces + Mongo middleware lifecycle
 
@@ -35,13 +35,13 @@ Defines `SqlMiddleware` and `MongoMiddleware`, wires middleware lifecycle into `
 
 **Tasks:**
 
-- [ ] **2.1 Define `SqlMiddleware` interface.** Add to `@prisma-next/sql-runtime`. Extends `RuntimeMiddleware` with `familyId: 'sql'`, narrowed plan type (`ExecutionPlan`), narrowed context type (SQL adapter/driver via `SqlMiddlewareContext`). Write type tests.
-- [ ] **2.2 Migrate `budgets` and `lints` to `SqlMiddleware`.** Update both middlewares to implement `SqlMiddleware` (add `familyId: 'sql'`). Verify existing consumer APIs (`budgets()`, `lints()`) continue to work. Verify all existing tests pass (tests already renamed in 1.5).
-- [ ] **2.3 Add compatibility validation to SQL runtime construction.** Call `checkMiddlewareCompatibility` in `createRuntime` / `SqlRuntimeImpl` constructor for each provided middleware against `familyId: 'sql'` and the target's `targetId`. Write tests: generic middleware accepted, `SqlMiddleware` accepted, `MongoMiddleware` rejected with clear error.
-- [ ] **2.4 Define `MongoMiddleware` interface.** Add to `@prisma-next/mongo-family-runtime` (or the appropriate Mongo runtime package). Extends `RuntimeMiddleware` with `familyId: 'mongo'`, narrowed plan type (`MongoQueryPlan`), narrowed context type (Mongo adapter/driver via `MongoMiddlewareContext`). Write type tests.
-- [ ] **2.5 Add middleware lifecycle to `MongoRuntime`.** Update `MongoRuntimeOptions` to accept optional `middlewares: readonly RuntimeMiddleware[]`. Wrap execution in `execute()` with `beforeExecute` → `onRow` → `afterExecute` lifecycle, mirroring `RuntimeCoreImpl.#executeWith`. Handle errors (call `afterExecute` with `completed: false`, rethrow). Write unit tests: middleware hooks called in correct order, error handling works, no middlewares = no-op.
-- [ ] **2.6 Add compatibility validation to Mongo runtime construction.** Call `checkMiddlewareCompatibility` in `createMongoRuntime` for each provided middleware against `familyId: 'mongo'`. Write tests: generic middleware accepted, `MongoMiddleware` accepted, `SqlMiddleware` rejected with clear error.
-- [ ] **2.7 Make `MongoRuntime` extend `RuntimeExecutor<MongoQueryPlan>`.** Update the `MongoRuntime` interface to extend `RuntimeExecutor<MongoQueryPlan>`. Verify structural compatibility. Verify all existing tests pass.
+- [x] **2.1 Define `SqlMiddleware` interface.** Add to `@prisma-next/sql-runtime`. Extends `RuntimeMiddleware` with `familyId: 'sql'`, narrowed plan type (`ExecutionPlan`), narrowed context type (SQL adapter/driver via `SqlMiddlewareContext`). Write type tests.
+- [x] **2.2 Migrate `budgets` and `lints` to `SqlMiddleware`.** Update both middlewares to implement `SqlMiddleware` (add `familyId: 'sql'`). Verify existing consumer APIs (`budgets()`, `lints()`) continue to work. Verify all existing tests pass (tests already renamed in 1.5).
+- [x] **2.3 Add compatibility validation to SQL runtime construction.** Call `checkMiddlewareCompatibility` in `createRuntime` / `SqlRuntimeImpl` constructor for each provided middleware against `familyId: 'sql'` and the target's `targetId`. Write tests: generic middleware accepted, `SqlMiddleware` accepted, `MongoMiddleware` rejected with clear error.
+- [x] **2.4 Define `MongoMiddleware` interface.** Add to `@prisma-next/mongo-family-runtime` (or the appropriate Mongo runtime package). Extends `RuntimeMiddleware` with `familyId: 'mongo'`, narrowed plan type (`MongoQueryPlan`), narrowed context type (Mongo adapter/driver via `MongoMiddlewareContext`). Write type tests.
+- [x] **2.5 Add middleware lifecycle to `MongoRuntime`.** Update `MongoRuntimeOptions` to accept optional `middlewares: readonly RuntimeMiddleware[]`. Wrap execution in `execute()` with `beforeExecute` → `onRow` → `afterExecute` lifecycle, mirroring `RuntimeCoreImpl.#executeWith`. Handle errors (call `afterExecute` with `completed: false`, rethrow). Write unit tests: middleware hooks called in correct order, error handling works, no middlewares = no-op.
+- [x] **2.6 Add compatibility validation to Mongo runtime construction.** Call `checkMiddlewareCompatibility` in `createMongoRuntime` for each provided middleware against `familyId: 'mongo'`. Write tests: generic middleware accepted, `MongoMiddleware` accepted, `SqlMiddleware` rejected with clear error.
+- [x] **2.7 Make `MongoRuntime` extend `RuntimeExecutor<MongoQueryPlan>`.** Update the `MongoRuntime` interface to extend `RuntimeExecutor<MongoQueryPlan>`. Verify structural compatibility. Verify all existing tests pass.
 
 ### Milestone 3: Cross-family proof
 
@@ -49,16 +49,16 @@ Proves the architecture with a generic middleware running across both families, 
 
 **Tasks:**
 
-- [ ] **3.1 Implement a generic telemetry/logging middleware.** Written against `RuntimeMiddleware` (no `familyId`). Records `meta.lane`, `meta.target`, `meta.storageHash` from `beforeExecute`, and `rowCount`/`latencyMs` from `afterExecute`. Lives in `@prisma-next/runtime-executor` (or a test utility).
-- [ ] **3.2 Integration test: same middleware, both runtimes.** Create a test that instantiates both a SQL runtime (mock or real) and a Mongo runtime (mock or real) with the same generic middleware instance. Execute a query through each. Verify the middleware was called in both cases with correct plan metadata. Verify no family-specific plan fields are accessed.
-- [ ] **3.3 Update mock-family test.** Update the existing `mock-family.test.ts` to use `RuntimeMiddleware` and `middlewares` naming. Verify it continues to demonstrate family-agnostic middleware operation.
+- [x] **3.1 Implement a generic telemetry/logging middleware.** Written against `RuntimeMiddleware` (no `familyId`). Records `meta.lane`, `meta.target`, `meta.storageHash` from `beforeExecute`, and `rowCount`/`latencyMs` from `afterExecute`. Lives in `@prisma-next/runtime-executor` (or a test utility).
+- [x] **3.2 Integration test: same middleware, both runtimes.** Create a test that instantiates both a SQL runtime (mock or real) and a Mongo runtime (mock or real) with the same generic middleware instance. Execute a query through each. Verify the middleware was called in both cases with correct plan metadata. Verify no family-specific plan fields are accessed.
+- [x] **3.3 Update mock-family test.** Update the existing `mock-family.test.ts` to use `RuntimeMiddleware` and `middlewares` naming. Verify it continues to demonstrate family-agnostic middleware operation.
 
 ### Close-out
 
-- [ ] **C.1 Verify all acceptance criteria in `projects/cross-family-middleware-spi/spec.md`.**
-- [ ] **C.2 Update Runtime & Plugin Framework subsystem doc** (`docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md`): rename "plugin" to "middleware" throughout, document the `RuntimeExecutor` SPI, document `RuntimeMiddleware`/`SqlMiddleware`/`MongoMiddleware` hierarchy, document compatibility validation.
-- [ ] **C.3 Strip repo-wide references to `projects/cross-family-middleware-spi/**`.** Replace with canonical `docs/` links or remove.
-- [ ] **C.4 Delete `projects/cross-family-middleware-spi/`.**
+- [x] **C.1 Verify all acceptance criteria in `projects/cross-family-middleware-spi/spec.md`.**
+- [x] **C.2 Update Runtime & Plugin Framework subsystem doc** (`docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md`): rename "plugin" to "middleware" throughout, document the `RuntimeExecutor` SPI, document `RuntimeMiddleware`/`SqlMiddleware`/`MongoMiddleware` hierarchy, document compatibility validation.
+- [x] **C.3 Strip repo-wide references to `projects/cross-family-middleware-spi/**`.** Replace with canonical `docs/` links or remove.
+- [x] **C.4 Delete `projects/cross-family-middleware-spi/`.**
 
 ## Test Coverage
 
