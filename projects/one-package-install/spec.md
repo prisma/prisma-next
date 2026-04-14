@@ -36,9 +36,6 @@ The CLI prompts:
 ◆  Where should the schema file go?
 │  prisma/contract.prisma
 │
-◆  Where should the contract be emitted?
-│  src/prisma/contract.json
-│
 ◇  Detecting package manager... pnpm
 ◇  Installing @prisma-next/postgres and @prisma-next/cli...
 ◇  Emitting contract...
@@ -46,20 +43,29 @@ The CLI prompts:
 ◆  Done! Created:
 │
 │  prisma/contract.prisma     — your schema
+│  prisma/contract.json       — emitted contract
+│  prisma/contract.d.ts       — emitted contract types
+│  prisma/db.ts               — runtime client
 │  prisma-next.config.ts      — Prisma Next config
-│  src/prisma/db.ts            — runtime client
-│  src/prisma/contract.json    — emitted contract
-│  src/prisma/contract.d.ts    — emitted contract types
 │
 │  Next steps:
 │  1. Edit prisma/contract.prisma with your models
 │  2. Run: pnpm prisma-next contract emit
-│  3. Import db from ./src/prisma/db in your app
+│  3. Import db from ./prisma/db in your app
 ```
 
 ## Step 2: Generated files
 
-After init, the user has five files on disk. Three are scaffolded, two are emitted.
+After init, the user has five files on disk. Three are scaffolded, two are emitted. Everything Prisma Next-related lives in `prisma/` (plus the config at the project root).
+
+```
+prisma/
+  contract.prisma      — schema (scaffolded)
+  contract.json        — emitted contract
+  contract.d.ts        — emitted contract types
+  db.ts                — runtime client (scaffolded)
+prisma-next.config.ts  — config (scaffolded)
+```
 
 ### `prisma/contract.prisma`
 
@@ -88,17 +94,16 @@ model Post {
 import { defineConfig } from '@prisma-next/postgres/config';
 
 export default defineConfig({
-  schema: './prisma/contract.prisma',
-  output: 'src/prisma/contract.json',
+  contract: './prisma/contract.prisma',
   db: {
     connection: process.env['DATABASE_URL']!,
   },
 });
 ```
 
-One import. One function call. No adapters, drivers, targets, families, contribution assemblers, or contract providers.
+One import. One function call. The contract output path is derived automatically — `contract.prisma` → `contract.json` + `contract.d.ts` in the same directory. No adapters, drivers, targets, families, contribution assemblers, or contract providers.
 
-### `src/prisma/db.ts`
+### `prisma/db.ts`
 
 ```typescript
 import postgres from '@prisma-next/postgres/runtime';
@@ -108,13 +113,13 @@ import contractJson from './contract.json' with { type: 'json' };
 export const db = postgres<Contract>({ contractJson });
 ```
 
-### `src/prisma/contract.json` and `src/prisma/contract.d.ts`
+### `prisma/contract.json` and `prisma/contract.d.ts`
 
 These are emitted by `prisma-next contract emit` (which init runs automatically). The `.d.ts` file imports types from packages like `@prisma-next/adapter-postgres/codec-types`, `@prisma-next/sql-contract/types`, and `@prisma-next/contract/types`. Because these are all transitive dependencies of `@prisma-next/postgres`, the imports resolve without the user installing anything extra.
 
 ## Step 3: Use it
 
-The user opens `db.ts` in their editor. Types work. Autocompletion works. They can write queries immediately:
+The user opens `prisma/db.ts` in their editor. Types work. Autocompletion works. They can write queries immediately:
 
 ```typescript
 import { db } from './prisma/db';
@@ -155,10 +160,10 @@ Everything else (`@prisma-next/adapter-postgres`, `@prisma-next/sql-contract`, `
 
 ```typescript
 import type { PrismaNextConfig } from '@prisma-next/config/config-types';
+import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 
 interface PostgresConfigOptions {
-  readonly schema: string;
-  readonly output: string;
+  readonly contract: string;
   readonly db?: {
     readonly connection?: string;
   };
@@ -171,14 +176,22 @@ interface PostgresConfigOptions {
 export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'sql', 'postgres'>;
 ```
 
+`contract` is a path to the schema source file. The output path is derived by replacing the file extension with `.json` — e.g. `'./prisma/contract.prisma'` → output at `'./prisma/contract.json'` (and `contract.d.ts` colocated alongside it).
+
+The contract provider is selected by file extension:
+- `.prisma` → uses `prismaContract` from `@prisma-next/sql-contract-psl/provider`
+- `.ts` → uses `typescriptContract` from `@prisma-next/sql-contract-ts/config-types`
+
 ## What it does internally
 
 The facade constructs the full `PrismaNextConfig` by:
 
-1. Importing `sql` (family), `postgres` (target), `postgresAdapter`, `postgresDriver`, and `prismaContract` from the respective internal packages.
-2. Calling `assembleAuthoringContributions` and `assemblePslInterpretationContributions` with `[postgres, postgresAdapter, ...extensions]`.
-3. Calling `prismaContract(options.schema, { output: options.output, target: postgres, authoringContributions, scalarTypeDescriptors, controlMutationDefaults, composedExtensionPacks })`.
-4. Returning the result of the low-level `defineConfig({ family: sql, target: postgres, adapter: postgresAdapter, driver: postgresDriver, extensionPacks: extensions, contract, db: options.db, migrations: options.migrations })`.
+1. Importing `sql` (family), `postgres` (target), `postgresAdapter`, `postgresDriver` from the respective internal packages.
+2. Detecting the contract provider from the file extension of `options.contract`.
+3. Deriving the output path by replacing the extension with `.json`.
+4. Calling `assembleAuthoringContributions` and `assemblePslInterpretationContributions` with `[postgres, postgresAdapter, ...extensions]`.
+5. Calling the appropriate contract provider (e.g. `prismaContract(options.contract, { output, target: postgres, authoringContributions, scalarTypeDescriptors, controlMutationDefaults, composedExtensionPacks })`).
+6. Returning the result of the low-level `defineConfig({ family: sql, target: postgres, adapter: postgresAdapter, driver: postgresDriver, extensionPacks: extensions, contract, db: options.db, migrations: options.migrations })`.
 
 The user never sees any of this. Extensions are the one escape hatch — the user imports an extension descriptor (e.g. `pgvector` from `@prisma-next/extension-pgvector/control`) and passes it in the `extensions` array:
 
@@ -187,8 +200,7 @@ import { defineConfig } from '@prisma-next/postgres/config';
 import pgvector from '@prisma-next/extension-pgvector/control';
 
 export default defineConfig({
-  schema: './prisma/contract.prisma',
-  output: 'src/prisma/contract.json',
+  contract: './prisma/contract.prisma',
   extensions: [pgvector],
   db: {
     connection: process.env['DATABASE_URL']!,
@@ -218,7 +230,7 @@ The emit still succeeds — the warning is informational, not blocking. This act
 ### Init command
 
 - F1: The CLI exposes `prisma-next init`, usable via `pnpm dlx` / `npx` / `bunx` / `yarn dlx` without prior installation.
-- F2: Init prompts for target (Postgres or Mongo), schema location (default: `prisma/contract.prisma`), and contract output location (default: `src/prisma/contract.json`).
+- F2: Init prompts for target (Postgres or Mongo) and schema location (default: `prisma/contract.prisma`). The contract output location is derived automatically (same directory, `.json` extension).
 - F3: Init scaffolds three files as shown in the "Generated files" section above.
 - F4: Init detects the user's package manager from lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lockb`) or project configuration.
 - F5: Init installs the target facade package as a dependency and `@prisma-next/cli` as a dev dependency using the detected package manager.
@@ -254,12 +266,14 @@ The emit still succeeds — the warning is informational, not blocking. This act
 
 # Acceptance Criteria
 
-- [ ] `pnpm dlx @prisma-next/cli init` (selecting Postgres) in a directory with only a `package.json` produces the five files shown in "Generated files" with no errors.
-- [ ] The generated `prisma-next.config.ts` has exactly one import line (from `@prisma-next/postgres/config`).
-- [ ] The generated `db.ts` has exactly one `@prisma-next` import (from `@prisma-next/postgres/runtime`).
-- [ ] After init, `tsc --noEmit` reports no type errors in `db.ts` (with `skipLibCheck: true`).
-- [ ] After init, renaming `contract.d.ts` to `contract.ts` and running `tsc --noEmit` reports no errors (proving that type imports actually resolve).
+- [ ] `pnpm dlx @prisma-next/cli init` (selecting Postgres) in a directory with only a `package.json` produces the file layout shown in "Generated files" with no errors.
+- [ ] The generated `prisma-next.config.ts` has exactly one import line (from `@prisma-next/postgres/config`) and passes `contract` as a string path.
+- [ ] The generated `prisma/db.ts` has exactly one `@prisma-next` import (from `@prisma-next/postgres/runtime`).
+- [ ] After init, `tsc --noEmit` reports no type errors in `prisma/db.ts` (with `skipLibCheck: true`).
+- [ ] After init, renaming `prisma/contract.d.ts` to `prisma/contract.ts` and running `tsc --noEmit` reports no errors (proving that type imports actually resolve).
 - [ ] A config using the facade `defineConfig` and a config using the low-level API with equivalent manual wiring produce byte-identical `contract.json` and `contract.d.ts` output.
+- [ ] The facade `defineConfig` with `contract: './prisma/contract.prisma'` emits output to `./prisma/contract.json` (derived path).
+- [ ] The facade `defineConfig` with `contract: './prisma/contract.ts'` uses the TypeScript contract provider instead of the PSL provider.
 - [ ] Init detects pnpm, npm, yarn, and bun from their respective lockfiles.
 - [ ] Init with `--no-install` produces the three scaffolded files but not `contract.json`/`contract.d.ts`, and prints install + emit commands.
 - [ ] Init does not overwrite existing files without prompting.
@@ -314,12 +328,11 @@ Use string templates (template literals), not a template engine. The generated f
 Keep templates as functions in a dedicated module (e.g. `src/commands/init/templates.ts`), one per target, returning the file content as a string. Example:
 
 ```typescript
-export function postgresConfig(schemaPath: string, outputPath: string): string {
+export function postgresConfig(contractPath: string): string {
   return `import { defineConfig } from '@prisma-next/postgres/config';
 
 export default defineConfig({
-  schema: '${schemaPath}',
-  output: '${outputPath}',
+  contract: '${contractPath}',
   db: {
     connection: process.env['DATABASE_URL']!,
   },
@@ -374,6 +387,7 @@ Register in the CLI's main command setup alongside existing commands (`contract 
 None — all resolved during spec drafting. Decisions:
 
 - **Init runs `contract emit` automatically** — the user gets a fully working, typed setup out of the box.
-- **`db.ts` is colocated with the contract output** — e.g. `src/prisma/db.ts` alongside `src/prisma/contract.json`.
+- **All Prisma Next files colocated in `prisma/`** — schema, emitted contract, types, and `db.ts` all live together. Config stays at the project root.
+- **`contract` is a string path** — the facade derives the output path (swap extension to `.json`) and selects the contract provider by extension (`.prisma` → PSL, `.ts` → TypeScript).
 - **Facade `defineConfig` delegates to the existing config infrastructure** — thin wrapper, not a replacement.
 - **Starter schema contains `User` and `Post` with a relation** — gives the user something concrete to query immediately.
