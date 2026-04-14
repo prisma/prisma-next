@@ -12,6 +12,7 @@ import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 export interface MongoRuntimeOptions {
   readonly adapter: MongoAdapter;
   readonly driver: MongoDriver;
+  readonly contract?: unknown;
   readonly middlewares?: readonly RuntimeMiddleware[];
   readonly mode?: 'strict' | 'permissive';
 }
@@ -39,7 +40,7 @@ class MongoRuntimeImpl implements MongoRuntime {
     }
 
     this.#middlewareContext = {
-      contract: undefined,
+      contract: options.contract,
       mode: options.mode ?? 'strict',
       now: () => Date.now(),
       log: {

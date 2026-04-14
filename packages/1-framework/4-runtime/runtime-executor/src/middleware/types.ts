@@ -2,6 +2,7 @@ import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type {
   AfterExecuteResult,
   RuntimeLog,
+  RuntimeMiddleware,
   RuntimeMiddlewareContext,
 } from '@prisma-next/framework-components/runtime';
 
@@ -13,10 +14,7 @@ export interface MiddlewareContext<TContract = unknown> extends RuntimeMiddlewar
   readonly contract: TContract;
 }
 
-export interface Middleware<TContract = unknown> {
-  readonly name: string;
-  readonly familyId?: string;
-  readonly targetId?: string;
+export interface Middleware<TContract = unknown> extends RuntimeMiddleware {
   beforeExecute?(plan: ExecutionPlan, ctx: MiddlewareContext<TContract>): Promise<void>;
   onRow?(
     row: Record<string, unknown>,
