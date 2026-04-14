@@ -4,7 +4,7 @@ import { addToCart, getCartByUserId, removeFromCart, upsertCart } from '../src/d
 import { createOrder, getOrderById, updateOrderStatus } from '../src/data/orders';
 import { setupTestDb } from './setup';
 
-describe('array update operators', { timeout: timeouts.spinUpDbServer }, () => {
+describe('array update operators', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   const ctx = setupTestDb('update_operators_test');
 
   it('$push adds item to cart', async () => {

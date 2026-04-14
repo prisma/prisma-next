@@ -35,7 +35,7 @@ export function setupTestDb(dbName: string) {
     const orm = mongoOrm({ contract, executor: runtime });
 
     db = { orm, runtime, pipeline, raw, contract };
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   beforeEach(async () => {
     await client.db(dbName).dropDatabase();
@@ -43,7 +43,7 @@ export function setupTestDb(dbName: string) {
 
   afterAll(async () => {
     await Promise.allSettled([runtime?.close(), client?.close(), replSet?.stop()]);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   return {
     get db() {

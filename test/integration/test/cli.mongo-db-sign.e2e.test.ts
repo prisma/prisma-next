@@ -61,7 +61,7 @@ function writeContractJson(testDir: string, contract: MongoContract): void {
   writeFileSync(resolve(outputDir, 'contract.json'), JSON.stringify(contract, null, 2), 'utf-8');
 }
 
-describe('mongo db sign command (e2e)', { timeout: timeouts.spinUpDbServer }, () => {
+describe('mongo db sign command (e2e)', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let db: Db;
@@ -70,7 +70,9 @@ describe('mongo db sign command (e2e)', { timeout: timeouts.spinUpDbServer }, ()
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
-      instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
       replSet: { count: 1, storageEngine: 'wiredTiger', dbName },
     });
     const baseUri = replSet.getUri();
@@ -80,7 +82,7 @@ describe('mongo db sign command (e2e)', { timeout: timeouts.spinUpDbServer }, ()
     client = new MongoClient(replSet.getUri());
     await client.connect();
     db = client.db(dbName);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   afterAll(async () => {
     try {
@@ -89,7 +91,7 @@ describe('mongo db sign command (e2e)', { timeout: timeouts.spinUpDbServer }, ()
     } catch {
       // ignore cleanup errors
     }
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   withTempDir(({ createTempDir }) => {
     let consoleOutput: string[] = [];

@@ -20,7 +20,7 @@ function extractJson(lines: string[]): unknown {
   return JSON.parse(joined.slice(start, end + 1));
 }
 
-describe('mongo db schema command (e2e)', { timeout: timeouts.spinUpDbServer }, () => {
+describe('mongo db schema command (e2e)', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let db: Db;
@@ -29,7 +29,9 @@ describe('mongo db schema command (e2e)', { timeout: timeouts.spinUpDbServer }, 
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
-      instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
       replSet: { count: 1, storageEngine: 'wiredTiger', dbName },
     });
     const baseUri = replSet.getUri();
@@ -39,7 +41,7 @@ describe('mongo db schema command (e2e)', { timeout: timeouts.spinUpDbServer }, 
     client = new MongoClient(replSet.getUri());
     await client.connect();
     db = client.db(dbName);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   beforeAll(async () => {
     await db.createCollection('users');
@@ -53,7 +55,7 @@ describe('mongo db schema command (e2e)', { timeout: timeouts.spinUpDbServer }, 
     } catch {
       // ignore cleanup errors
     }
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   withTempDir(({ createTempDir }) => {
     let consoleOutput: string[] = [];

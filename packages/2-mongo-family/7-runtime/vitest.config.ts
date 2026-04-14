@@ -5,8 +5,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    testTimeout: timeouts.spinUpDbServer,
-    hookTimeout: timeouts.spinUpDbServer,
+    testTimeout: timeouts.spinUpMongoMemoryServer,
+    hookTimeout: timeouts.spinUpMongoMemoryServer,
     fileParallelism: false,
     typecheck: {
       enabled: true,

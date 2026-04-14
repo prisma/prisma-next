@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 
-describe('migration', { timeout: timeouts.spinUpDbServer }, () => {
+describe('migration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let db: Db;
@@ -19,11 +19,11 @@ describe('migration', { timeout: timeouts.spinUpDbServer }, () => {
     client = new MongoClient(replSet.getUri());
     await client.connect();
     db = client.db(dbName);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   afterAll(async () => {
     await Promise.allSettled([client?.close(), replSet?.stop()]);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   it('contract contains expected index definitions', () => {
     const { contract } = validateMongoContract<Contract>(contractJson);

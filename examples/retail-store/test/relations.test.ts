@@ -5,7 +5,7 @@ import { createInvoice, findInvoiceWithOrder } from '../src/data/invoices';
 import { createOrder, getOrderWithUser } from '../src/data/orders';
 import { setupTestDb } from './setup';
 
-describe('relation loading via $lookup', { timeout: timeouts.spinUpDbServer }, () => {
+describe('relation loading via $lookup', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   const ctx = setupTestDb('relations_test');
 
   it('loads cart with user via include()', async () => {

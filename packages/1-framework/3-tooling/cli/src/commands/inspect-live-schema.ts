@@ -126,6 +126,7 @@ export async function inspectLiveSchema(
       connection: dbConnection,
       onProgress,
     });
+    // TODO(TML-2251): Remove SQL-specific branching — SQL should use the same family-agnostic path as Mongo.
     const schema =
       config.family.familyId === 'sql' ? validatePrintableSqlSchemaIR(schemaIR) : schemaIR;
     const schemaView = client.toSchemaView(schema);

@@ -29,262 +29,290 @@ const ITEM_B = {
   image: { url: '/images/products/chinos.jpg' },
 };
 
-describe('API flow: order ownership (auth guard)', { timeout: timeouts.spinUpDbServer }, () => {
-  const ctx = setupTestDb('api_flows_order_auth');
+describe(
+  'API flow: order ownership (auth guard)',
+  { timeout: timeouts.spinUpMongoMemoryServer },
+  () => {
+    const ctx = setupTestDb('api_flows_order_auth');
 
-  it('other user cannot see the order in their list', async () => {
-    const alice = await ctx.db.orm.users.create({
-      name: 'Alice',
-      email: 'a@test.com',
-      address: null,
-    });
-    const bob = await ctx.db.orm.users.create({ name: 'Bob', email: 'b@test.com', address: null });
+    it('other user cannot see the order in their list', async () => {
+      const alice = await ctx.db.orm.users.create({
+        name: 'Alice',
+        email: 'a@test.com',
+        address: null,
+      });
+      const bob = await ctx.db.orm.users.create({
+        name: 'Bob',
+        email: 'b@test.com',
+        address: null,
+      });
 
-    const order = await createOrder(ctx.db, {
-      userId: alice._id as string,
-      items: [ITEM_A],
-      shippingAddress: '123 Main St',
-      type: 'home',
-      statusHistory: [{ status: 'placed', timestamp: new Date() }],
-    });
+      const order = await createOrder(ctx.db, {
+        userId: alice._id as string,
+        items: [ITEM_A],
+        shippingAddress: '123 Main St',
+        type: 'home',
+        statusHistory: [{ status: 'placed', timestamp: new Date() }],
+      });
 
-    const orderId = order._id as string;
-    const fetched = await getOrderWithUser(ctx.db, orderId);
-    expect(fetched).not.toBeNull();
-    expect(String(fetched!.userId)).toBe(String(alice._id));
+      const orderId = order._id as string;
+      const fetched = await getOrderWithUser(ctx.db, orderId);
+      expect(fetched).not.toBeNull();
+      expect(String(fetched!.userId)).toBe(String(alice._id));
 
-    const bobOrders = await getUserOrders(ctx.db, bob._id as string);
-    expect(bobOrders).toHaveLength(0);
-  });
-
-  it('user can only see their own orders via getUserOrders', async () => {
-    const alice = await ctx.db.orm.users.create({
-      name: 'Alice',
-      email: 'a@test.com',
-      address: null,
-    });
-    const bob = await ctx.db.orm.users.create({ name: 'Bob', email: 'b@test.com', address: null });
-
-    await createOrder(ctx.db, {
-      userId: alice._id as string,
-      items: [ITEM_A],
-      shippingAddress: '123 Main St',
-      type: 'home',
-      statusHistory: [{ status: 'placed', timestamp: new Date() }],
+      const bobOrders = await getUserOrders(ctx.db, bob._id as string);
+      expect(bobOrders).toHaveLength(0);
     });
 
-    await createOrder(ctx.db, {
-      userId: bob._id as string,
-      items: [ITEM_B],
-      shippingAddress: '456 Oak Ave',
-      type: 'bopis',
-      statusHistory: [{ status: 'placed', timestamp: new Date() }],
+    it('user can only see their own orders via getUserOrders', async () => {
+      const alice = await ctx.db.orm.users.create({
+        name: 'Alice',
+        email: 'a@test.com',
+        address: null,
+      });
+      const bob = await ctx.db.orm.users.create({
+        name: 'Bob',
+        email: 'b@test.com',
+        address: null,
+      });
+
+      await createOrder(ctx.db, {
+        userId: alice._id as string,
+        items: [ITEM_A],
+        shippingAddress: '123 Main St',
+        type: 'home',
+        statusHistory: [{ status: 'placed', timestamp: new Date() }],
+      });
+
+      await createOrder(ctx.db, {
+        userId: bob._id as string,
+        items: [ITEM_B],
+        shippingAddress: '456 Oak Ave',
+        type: 'bopis',
+        statusHistory: [{ status: 'placed', timestamp: new Date() }],
+      });
+
+      const aliceOrders = await getUserOrders(ctx.db, alice._id as string);
+      const bobOrders = await getUserOrders(ctx.db, bob._id as string);
+
+      expect(aliceOrders).toHaveLength(1);
+      expect(bobOrders).toHaveLength(1);
+      expect(aliceOrders[0]!.shippingAddress).toBe('123 Main St');
+      expect(bobOrders[0]!.shippingAddress).toBe('456 Oak Ave');
     });
 
-    const aliceOrders = await getUserOrders(ctx.db, alice._id as string);
-    const bobOrders = await getUserOrders(ctx.db, bob._id as string);
+    it('deleteOrder only removes the targeted order', async () => {
+      const alice = await ctx.db.orm.users.create({
+        name: 'Alice',
+        email: 'a@test.com',
+        address: null,
+      });
 
-    expect(aliceOrders).toHaveLength(1);
-    expect(bobOrders).toHaveLength(1);
-    expect(aliceOrders[0]!.shippingAddress).toBe('123 Main St');
-    expect(bobOrders[0]!.shippingAddress).toBe('456 Oak Ave');
-  });
+      const order1 = await createOrder(ctx.db, {
+        userId: alice._id as string,
+        items: [ITEM_A],
+        shippingAddress: '123 Main St',
+        type: 'home',
+        statusHistory: [{ status: 'placed', timestamp: new Date() }],
+      });
 
-  it('deleteOrder only removes the targeted order', async () => {
-    const alice = await ctx.db.orm.users.create({
-      name: 'Alice',
-      email: 'a@test.com',
-      address: null,
+      const order2 = await createOrder(ctx.db, {
+        userId: alice._id as string,
+        items: [ITEM_B],
+        shippingAddress: '456 Oak Ave',
+        type: 'home',
+        statusHistory: [{ status: 'placed', timestamp: new Date() }],
+      });
+
+      await deleteOrder(ctx.db, order1._id as string);
+
+      const remaining = await getUserOrders(ctx.db, alice._id as string);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]!._id).toEqual(order2._id);
+    });
+  },
+);
+
+describe(
+  'API flow: checkout (cart → order → clear)',
+  { timeout: timeouts.spinUpMongoMemoryServer },
+  () => {
+    const ctx = setupTestDb('api_flows_checkout');
+
+    it('creates order from cart items and clears the cart server-side', async () => {
+      const user = await ctx.db.orm.users.create({
+        name: 'Carol',
+        email: 'c@test.com',
+        address: null,
+      });
+      const userId = user._id as string;
+
+      await addToCart(ctx.db, userId, ITEM_A);
+      await addToCart(ctx.db, userId, ITEM_B);
+
+      const cart = await getCartByUserId(ctx.db, userId);
+      expect(cart!.items).toHaveLength(2);
+
+      const order = await createOrder(ctx.db, {
+        userId,
+        items: cart!.items.map((item) => ({
+          productId: item.productId as string,
+          name: item.name as string,
+          brand: item.brand as string,
+          amount: item.amount,
+          price: { amount: Number(item.price.amount), currency: item.price.currency as string },
+          image: { url: item.image.url as string },
+        })),
+        shippingAddress: '789 Elm Blvd',
+        type: 'home',
+        statusHistory: [{ status: 'placed', timestamp: new Date() }],
+      });
+
+      await clearCart(ctx.db, userId);
+
+      expect(order.items).toHaveLength(2);
+      expect(order.statusHistory).toHaveLength(1);
+      expect(order.statusHistory[0]).toMatchObject({ status: 'placed' });
+
+      const clearedCart = await getCartByUserId(ctx.db, userId);
+      expect(clearedCart!.items).toHaveLength(0);
     });
 
-    const order1 = await createOrder(ctx.db, {
-      userId: alice._id as string,
-      items: [ITEM_A],
-      shippingAddress: '123 Main St',
-      type: 'home',
-      statusHistory: [{ status: 'placed', timestamp: new Date() }],
+    it('order retains items after cart is cleared', async () => {
+      const user = await ctx.db.orm.users.create({
+        name: 'Dave',
+        email: 'd@test.com',
+        address: null,
+      });
+      const userId = user._id as string;
+
+      await addToCart(ctx.db, userId, ITEM_A);
+      const cart = await getCartByUserId(ctx.db, userId);
+
+      const order = await createOrder(ctx.db, {
+        userId,
+        items: cart!.items.map((item) => ({
+          productId: item.productId as string,
+          name: item.name as string,
+          brand: item.brand as string,
+          amount: item.amount,
+          price: { amount: Number(item.price.amount), currency: item.price.currency as string },
+          image: { url: item.image.url as string },
+        })),
+        shippingAddress: '101 Pine',
+        type: 'bopis',
+        statusHistory: [{ status: 'placed', timestamp: new Date() }],
+      });
+
+      await clearCart(ctx.db, userId);
+
+      const fetchedOrder = await getOrderById(ctx.db, order._id as string);
+      expect(fetchedOrder).not.toBeNull();
+      expect(fetchedOrder!.items).toHaveLength(1);
+      expect(fetchedOrder!.items[0]).toMatchObject({ name: 'Shirt' });
+    });
+  },
+);
+
+describe(
+  'API flow: order status progression',
+  { timeout: timeouts.spinUpMongoMemoryServer },
+  () => {
+    const ctx = setupTestDb('api_flows_order_status');
+
+    it('advances through placed → shipped → delivered', async () => {
+      const user = await ctx.db.orm.users.create({
+        name: 'Eve',
+        email: 'e@test.com',
+        address: null,
+      });
+
+      const order = await createOrder(ctx.db, {
+        userId: user._id as string,
+        items: [ITEM_A],
+        shippingAddress: '200 Cedar',
+        type: 'home',
+        statusHistory: [{ status: 'placed', timestamp: new Date('2026-04-01T10:00:00Z') }],
+      });
+
+      await updateOrderStatus(ctx.db, order._id as string, {
+        status: 'shipped',
+        timestamp: new Date('2026-04-02T14:00:00Z'),
+      });
+
+      await updateOrderStatus(ctx.db, order._id as string, {
+        status: 'delivered',
+        timestamp: new Date('2026-04-04T09:00:00Z'),
+      });
+
+      const final = await getOrderById(ctx.db, order._id as string);
+      expect(final!.statusHistory).toHaveLength(3);
+      const statuses = final!.statusHistory.map((s) => s.status);
+      expect(statuses).toEqual(['placed', 'shipped', 'delivered']);
     });
 
-    const order2 = await createOrder(ctx.db, {
-      userId: alice._id as string,
-      items: [ITEM_B],
-      shippingAddress: '456 Oak Ave',
-      type: 'home',
-      statusHistory: [{ status: 'placed', timestamp: new Date() }],
+    it('updateOrderStatus on non-existent order returns null', async () => {
+      const result = await updateOrderStatus(ctx.db, '000000000000000000000000', {
+        status: 'shipped',
+        timestamp: new Date(),
+      });
+      expect(result).toBeNull();
     });
 
-    await deleteOrder(ctx.db, order1._id as string);
+    it('order with user relation includes user data after status update', async () => {
+      const user = await ctx.db.orm.users.create({
+        name: 'Frank',
+        email: 'f@test.com',
+        address: {
+          streetAndNumber: '300 Maple',
+          city: 'Springfield',
+          postalCode: '62701',
+          country: 'US',
+        },
+      });
 
-    const remaining = await getUserOrders(ctx.db, alice._id as string);
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0]!._id).toEqual(order2._id);
-  });
-});
+      const order = await createOrder(ctx.db, {
+        userId: user._id as string,
+        items: [ITEM_A],
+        shippingAddress: '300 Maple',
+        type: 'home',
+        statusHistory: [{ status: 'placed', timestamp: new Date() }],
+      });
 
-describe('API flow: checkout (cart → order → clear)', { timeout: timeouts.spinUpDbServer }, () => {
-  const ctx = setupTestDb('api_flows_checkout');
+      await updateOrderStatus(ctx.db, order._id as string, {
+        status: 'shipped',
+        timestamp: new Date(),
+      });
 
-  it('creates order from cart items and clears the cart server-side', async () => {
-    const user = await ctx.db.orm.users.create({
-      name: 'Carol',
-      email: 'c@test.com',
-      address: null,
+      const withUser = await getOrderWithUser(ctx.db, order._id as string);
+      expect(withUser).not.toBeNull();
+      expect(withUser!.user).toMatchObject({ name: 'Frank', email: 'f@test.com' });
+      expect(withUser!.statusHistory).toHaveLength(2);
     });
-    const userId = user._id as string;
+  },
+);
 
-    await addToCart(ctx.db, userId, ITEM_A);
-    await addToCart(ctx.db, userId, ITEM_B);
+describe(
+  'API flow: duplicate cart add behavior',
+  { timeout: timeouts.spinUpMongoMemoryServer },
+  () => {
+    const ctx = setupTestDb('api_flows_cart_duplicate');
 
-    const cart = await getCartByUserId(ctx.db, userId);
-    expect(cart!.items).toHaveLength(2);
+    it('adding same product twice creates two separate line items', async () => {
+      const user = await ctx.db.orm.users.create({
+        name: 'Grace',
+        email: 'g@test.com',
+        address: null,
+      });
+      const userId = user._id as string;
 
-    const order = await createOrder(ctx.db, {
-      userId,
-      items: cart!.items.map((item) => ({
-        productId: item.productId as string,
-        name: item.name as string,
-        brand: item.brand as string,
-        amount: item.amount,
-        price: { amount: Number(item.price.amount), currency: item.price.currency as string },
-        image: { url: item.image.url as string },
-      })),
-      shippingAddress: '789 Elm Blvd',
-      type: 'home',
-      statusHistory: [{ status: 'placed', timestamp: new Date() }],
+      await addToCart(ctx.db, userId, ITEM_A);
+      await addToCart(ctx.db, userId, ITEM_A);
+
+      const cart = await getCartByUserId(ctx.db, userId);
+      expect(cart!.items).toHaveLength(2);
+      expect(cart!.items[0]!.productId).toBe('prod-1');
+      expect(cart!.items[1]!.productId).toBe('prod-1');
     });
-
-    await clearCart(ctx.db, userId);
-
-    expect(order.items).toHaveLength(2);
-    expect(order.statusHistory).toHaveLength(1);
-    expect(order.statusHistory[0]).toMatchObject({ status: 'placed' });
-
-    const clearedCart = await getCartByUserId(ctx.db, userId);
-    expect(clearedCart!.items).toHaveLength(0);
-  });
-
-  it('order retains items after cart is cleared', async () => {
-    const user = await ctx.db.orm.users.create({
-      name: 'Dave',
-      email: 'd@test.com',
-      address: null,
-    });
-    const userId = user._id as string;
-
-    await addToCart(ctx.db, userId, ITEM_A);
-    const cart = await getCartByUserId(ctx.db, userId);
-
-    const order = await createOrder(ctx.db, {
-      userId,
-      items: cart!.items.map((item) => ({
-        productId: item.productId as string,
-        name: item.name as string,
-        brand: item.brand as string,
-        amount: item.amount,
-        price: { amount: Number(item.price.amount), currency: item.price.currency as string },
-        image: { url: item.image.url as string },
-      })),
-      shippingAddress: '101 Pine',
-      type: 'bopis',
-      statusHistory: [{ status: 'placed', timestamp: new Date() }],
-    });
-
-    await clearCart(ctx.db, userId);
-
-    const fetchedOrder = await getOrderById(ctx.db, order._id as string);
-    expect(fetchedOrder).not.toBeNull();
-    expect(fetchedOrder!.items).toHaveLength(1);
-    expect(fetchedOrder!.items[0]).toMatchObject({ name: 'Shirt' });
-  });
-});
-
-describe('API flow: order status progression', { timeout: timeouts.spinUpDbServer }, () => {
-  const ctx = setupTestDb('api_flows_order_status');
-
-  it('advances through placed → shipped → delivered', async () => {
-    const user = await ctx.db.orm.users.create({ name: 'Eve', email: 'e@test.com', address: null });
-
-    const order = await createOrder(ctx.db, {
-      userId: user._id as string,
-      items: [ITEM_A],
-      shippingAddress: '200 Cedar',
-      type: 'home',
-      statusHistory: [{ status: 'placed', timestamp: new Date('2026-04-01T10:00:00Z') }],
-    });
-
-    await updateOrderStatus(ctx.db, order._id as string, {
-      status: 'shipped',
-      timestamp: new Date('2026-04-02T14:00:00Z'),
-    });
-
-    await updateOrderStatus(ctx.db, order._id as string, {
-      status: 'delivered',
-      timestamp: new Date('2026-04-04T09:00:00Z'),
-    });
-
-    const final = await getOrderById(ctx.db, order._id as string);
-    expect(final!.statusHistory).toHaveLength(3);
-    const statuses = final!.statusHistory.map((s) => s.status);
-    expect(statuses).toEqual(['placed', 'shipped', 'delivered']);
-  });
-
-  it('updateOrderStatus on non-existent order returns null', async () => {
-    const result = await updateOrderStatus(ctx.db, '000000000000000000000000', {
-      status: 'shipped',
-      timestamp: new Date(),
-    });
-    expect(result).toBeNull();
-  });
-
-  it('order with user relation includes user data after status update', async () => {
-    const user = await ctx.db.orm.users.create({
-      name: 'Frank',
-      email: 'f@test.com',
-      address: {
-        streetAndNumber: '300 Maple',
-        city: 'Springfield',
-        postalCode: '62701',
-        country: 'US',
-      },
-    });
-
-    const order = await createOrder(ctx.db, {
-      userId: user._id as string,
-      items: [ITEM_A],
-      shippingAddress: '300 Maple',
-      type: 'home',
-      statusHistory: [{ status: 'placed', timestamp: new Date() }],
-    });
-
-    await updateOrderStatus(ctx.db, order._id as string, {
-      status: 'shipped',
-      timestamp: new Date(),
-    });
-
-    const withUser = await getOrderWithUser(ctx.db, order._id as string);
-    expect(withUser).not.toBeNull();
-    expect(withUser!.user).toMatchObject({ name: 'Frank', email: 'f@test.com' });
-    expect(withUser!.statusHistory).toHaveLength(2);
-  });
-});
-
-describe('API flow: duplicate cart add behavior', { timeout: timeouts.spinUpDbServer }, () => {
-  const ctx = setupTestDb('api_flows_cart_duplicate');
-
-  it('adding same product twice creates two separate line items', async () => {
-    const user = await ctx.db.orm.users.create({
-      name: 'Grace',
-      email: 'g@test.com',
-      address: null,
-    });
-    const userId = user._id as string;
-
-    await addToCart(ctx.db, userId, ITEM_A);
-    await addToCart(ctx.db, userId, ITEM_A);
-
-    const cart = await getCartByUserId(ctx.db, userId);
-    expect(cart!.items).toHaveLength(2);
-    expect(cart!.items[0]!.productId).toBe('prod-1');
-    expect(cart!.items[1]!.productId).toBe('prod-1');
-  });
-});
+  },
+);

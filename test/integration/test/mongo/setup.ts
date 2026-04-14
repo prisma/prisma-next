@@ -14,7 +14,7 @@ export interface MongodContext {
 }
 
 export function describeWithMongoDB(name: string, fn: (ctx: MongodContext) => void): void {
-  describe(name, { timeout: timeouts.spinUpDbServer }, () => {
+  describe(name, { timeout: timeouts.spinUpMongoMemoryServer }, () => {
     let replSet: MongoMemoryReplSet;
     let client: MongoClient;
     let runtime: MongoRuntime;
@@ -35,7 +35,9 @@ export function describeWithMongoDB(name: string, fn: (ctx: MongodContext) => vo
 
     beforeAll(async () => {
       replSet = await MongoMemoryReplSet.create({
-        instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+        instanceOpts: [
+          { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+        ],
         replSet: { count: 1, storageEngine: 'wiredTiger' },
       });
       client = new MongoClient(replSet.getUri());
@@ -44,7 +46,7 @@ export function describeWithMongoDB(name: string, fn: (ctx: MongodContext) => vo
       const adapter = createMongoAdapter();
       const driver = await createMongoDriver(replSet.getUri(), dbName);
       runtime = createMongoRuntime({ adapter, driver });
-    }, timeouts.spinUpDbServer);
+    }, timeouts.spinUpMongoMemoryServer);
 
     beforeEach(async () => {
       await client.db(dbName).dropDatabase();
@@ -58,7 +60,7 @@ export function describeWithMongoDB(name: string, fn: (ctx: MongodContext) => vo
       } catch {
         // Ignore cleanup errors
       }
-    }, timeouts.spinUpDbServer);
+    }, timeouts.spinUpMongoMemoryServer);
 
     fn(ctx);
   });

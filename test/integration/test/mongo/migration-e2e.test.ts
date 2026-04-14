@@ -74,7 +74,7 @@ const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 };
 
-describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
+describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let db: Db;
@@ -82,13 +82,15 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
-      instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
       replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
     client = new MongoClient(replSet.getUri());
     await client.connect();
     db = client.db(dbName);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   beforeEach(async () => {
     await db.dropDatabase();
@@ -101,7 +103,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
     } catch {
       // Ignore cleanup errors
     }
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   describe('plan + apply create index', () => {
     it('plans a createIndex operation from empty to indexed contract', () => {

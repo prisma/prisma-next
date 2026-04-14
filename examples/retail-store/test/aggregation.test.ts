@@ -9,7 +9,7 @@ import {
 import { getRandomProducts } from '../src/data/products';
 import { setupTestDb } from './setup';
 
-describe('aggregation pipelines', { timeout: timeouts.spinUpDbServer }, () => {
+describe('aggregation pipelines', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   const ctx = setupTestDb('aggregation_test');
 
   it('aggregates events by type for a user', async () => {

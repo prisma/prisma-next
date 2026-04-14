@@ -12,7 +12,7 @@ import contractJson from '../src/contract.json' with { type: 'json' };
 
 const { contract } = validateMongoContract<Contract>(contractJson);
 
-describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, () => {
+describe('mongo-demo blog integration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let runtime: MongoRuntime;
@@ -28,7 +28,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
     const adapter = createMongoAdapter();
     const driver = await createMongoDriver(replSet.getUri(), dbName);
     runtime = createMongoRuntime({ adapter, driver });
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   beforeEach(async () => {
     await client.db(dbName).dropDatabase();
@@ -36,7 +36,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpDbServer }, ()
 
   afterAll(async () => {
     await Promise.allSettled([runtime?.close(), client?.close(), replSet?.stop()]);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   it('all() returns seeded users with embedded address value objects', async () => {
     const orm = mongoOrm({ contract, executor: runtime });

@@ -31,6 +31,19 @@ describe('readMarker', () => {
     const marker = await readMarker(db);
     expect(marker).toBeNull();
   });
+
+  it('defaults meta to empty object when absent from document', async () => {
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+      updatedAt: new Date(),
+    });
+
+    const marker = await readMarker(db);
+    expect(marker).not.toBeNull();
+    expect(marker?.meta).toEqual({});
+  });
 });
 
 describe('initMarker', () => {

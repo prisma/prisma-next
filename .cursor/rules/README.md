@@ -63,7 +63,8 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `architecture.config.json` — Domain/Layer/Plane map
 
 ## MongoDB
-- `.cursor/rules/mongo-no-obsolete-commands.mdc` — Use `aggregate` instead of obsolete `find`/`findOne`
+- `.cursor/rules/mongo-no-obsolete-commands.mdc` — Use `aggregate` instead of obsolete `find`/`findOne` (symlink to `.agents/rules/mongo-no-obsolete-commands.mdc`)
+- `.cursor/rules/mongodb-memory-server-setup.mdc` — MMS version pinning, vitest timeouts, and new-package checklist (symlink to `.agents/rules/mongodb-memory-server-setup.mdc`)
 
 ## SQL & Query Patterns
 - `.cursor/rules/query-patterns.mdc` — Query DSL patterns

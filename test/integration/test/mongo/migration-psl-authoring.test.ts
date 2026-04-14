@@ -76,7 +76,7 @@ async function planAndApply(
   }
 }
 
-describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
+describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let db: Db;
@@ -85,14 +85,16 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpDbServer }
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
-      instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
       replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
     client = new MongoClient(replSet.getUri());
     await client.connect();
     db = client.db(dbName);
     replSetUri = replSet.getUri(dbName);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   beforeEach(async () => {
     await db.dropDatabase();
@@ -105,7 +107,7 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpDbServer }
     } catch {
       // ignore
     }
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   it('PSL with @@index produces indexes on MongoDB', async () => {
     const contract = pslToContract(`

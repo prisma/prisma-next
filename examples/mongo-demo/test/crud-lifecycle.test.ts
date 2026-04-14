@@ -13,7 +13,7 @@ import contractJson from '../src/contract.json' with { type: 'json' };
 
 const { contract } = validateMongoContract<Contract>(contractJson);
 
-describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
+describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let runtime: MongoRuntime;
@@ -29,7 +29,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
     const adapter = createMongoAdapter();
     const driver = await createMongoDriver(replSet.getUri(), dbName);
     runtime = createMongoRuntime({ adapter, driver });
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   beforeEach(async () => {
     await client.db(dbName).dropDatabase();
@@ -37,7 +37,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpDbServer }, () => {
 
   afterAll(async () => {
     await Promise.allSettled([runtime?.close(), client?.close(), replSet?.stop()]);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   it('create → read → update → read → delete → read', async () => {
     const orm = mongoOrm({ contract, executor: runtime });

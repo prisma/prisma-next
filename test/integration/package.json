@@ -60,7 +60,7 @@
     "@types/pg": "catalog:",
     "commander": "^12.1.0",
     "mongodb": "catalog:",
-    "mongodb-memory-server": "^10.4.0",
+    "mongodb-memory-server": "catalog:",
     "pathe": "^2.0.3",
     "pg": "catalog:",
     "strip-ansi": "^7.1.0",

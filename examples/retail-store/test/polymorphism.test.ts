@@ -9,7 +9,7 @@ import {
 } from '../src/data/events';
 import { setupTestDb } from './setup';
 
-describe('polymorphic events', { timeout: timeouts.spinUpDbServer }, () => {
+describe('polymorphic events', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   const ctx = setupTestDb('polymorphism_test');
 
   it('creates variant events with auto-injected discriminator', async () => {
