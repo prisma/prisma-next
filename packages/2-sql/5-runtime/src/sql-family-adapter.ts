@@ -1,6 +1,6 @@
 import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { MarkerReader, RuntimeFamilyAdapter } from '@prisma-next/runtime-executor';
-import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AdapterProfile } from '@prisma-next/sql-relational-core/ast';
 
