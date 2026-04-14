@@ -1,3 +1,4 @@
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import {
   MongoFieldFilter,
@@ -11,7 +12,6 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';

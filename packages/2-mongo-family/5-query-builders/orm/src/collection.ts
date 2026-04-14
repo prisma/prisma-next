@@ -4,6 +4,7 @@ import type {
   ContractValueObject,
   PlanMeta,
 } from '@prisma-next/contract/types';
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -28,7 +29,6 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';
 import { compileMongoQuery } from './compile';

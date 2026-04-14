@@ -1171,6 +1171,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../1-foundation/mongo-contract
@@ -1180,9 +1183,6 @@ importers:
       '@prisma-next/mongo-value':
         specifier: workspace:*
         version: link:../../1-foundation/mongo-value
-      '@prisma-next/runtime-executor':
-        specifier: workspace:*
-        version: link:../../../1-framework/4-runtime/runtime-executor
     devDependencies:
       '@prisma-next/adapter-mongo':
         specifier: workspace:*
@@ -1310,9 +1310,6 @@ importers:
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../4-query/query-ast
-      '@prisma-next/runtime-executor':
-        specifier: workspace:*
-        version: link:../../1-framework/4-runtime/runtime-executor
     devDependencies:
       '@prisma-next/adapter-mongo':
         specifier: workspace:*
