@@ -5,7 +5,8 @@ const IMPORT_PATTERN = /import\s+type\s+.*?\s+from\s+'(@[^/]+\/[^/']+)/g;
 export function extractPackageSpecifiers(dtsContent: string): string[] {
   const packages = new Set<string>();
   for (const match of dtsContent.matchAll(IMPORT_PATTERN)) {
-    packages.add(match[1]);
+    const pkg = match[1];
+    if (pkg) packages.add(pkg);
   }
   return [...packages];
 }

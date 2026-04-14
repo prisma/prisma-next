@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import * as clack from '@clack/prompts';
-import { dirname, join, relative } from 'pathe';
+import { dirname, join } from 'pathe';
 import { TerminalUI } from '../../utils/terminal-ui';
 import { detectPackageManager } from './detect-package-manager';
 import { configFile, dbFile, starterSchema, type TargetId, targetPackageName } from './templates';
