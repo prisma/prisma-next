@@ -255,10 +255,12 @@ export function compileFieldOperations(
 ): Record<string, Record<string, MongoValue>> {
   const grouped: Record<string, Record<string, MongoValue>> = {};
   for (const op of ops) {
-    if (!grouped[op.operator]) {
-      grouped[op.operator] = {};
+    let group = grouped[op.operator];
+    if (!group) {
+      group = {};
+      grouped[op.operator] = group;
     }
-    grouped[op.operator]![op.field] = wrapValue(op.field, op.value, op.operator);
+    group[op.field] = wrapValue(op.field, op.value, op.operator);
   }
   return grouped;
 }
