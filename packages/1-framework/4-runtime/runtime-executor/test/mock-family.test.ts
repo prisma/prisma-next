@@ -1,6 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import type { Middleware } from '../src/plugins/types';
+import type { Middleware } from '../src/middleware/types';
 import { createRuntimeCore } from '../src/runtime-core';
 import type { MarkerReader, MarkerStatement, RuntimeFamilyAdapter } from '../src/runtime-spi';
 

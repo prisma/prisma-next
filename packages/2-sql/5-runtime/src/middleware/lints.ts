@@ -143,7 +143,7 @@ function getConfiguredSeverity(code: string, options?: LintsOptions): 'warn' | '
 }
 
 /**
- * AST-first lint plugin for SQL plans. When `plan.ast` is a SQL QueryAst, inspects
+ * AST-first lint middleware for SQL plans. When `plan.ast` is a SQL QueryAst, inspects
  * the AST structurally. When `plan.ast` is missing, falls back to raw heuristic
  * guardrails or skips linting depending on `fallbackWhenAstMissing`.
  *

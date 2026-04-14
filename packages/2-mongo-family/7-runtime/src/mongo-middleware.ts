@@ -1,5 +1,6 @@
 import type {
   AfterExecuteResult,
+  RuntimeMiddleware,
   RuntimeMiddlewareContext,
 } from '@prisma-next/framework-components/runtime';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
@@ -10,10 +11,8 @@ export interface MongoMiddlewareContext extends RuntimeMiddlewareContext {
   readonly driver: MongoDriver;
 }
 
-export interface MongoMiddleware {
-  readonly name: string;
+export interface MongoMiddleware extends RuntimeMiddleware {
   readonly familyId: 'mongo';
-  readonly targetId?: string;
   beforeExecute?(plan: MongoQueryPlan, ctx: MongoMiddlewareContext): Promise<void>;
   onRow?(
     row: Record<string, unknown>,

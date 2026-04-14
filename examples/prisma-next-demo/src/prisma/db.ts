@@ -7,7 +7,7 @@ import contractJson from './contract.json' with { type: 'json' };
 export const db = postgres<Contract>({
   contractJson,
   extensions: [pgvector],
-  plugins: [
+  middlewares: [
     lints(),
     budgets({
       maxRows: 10_000,

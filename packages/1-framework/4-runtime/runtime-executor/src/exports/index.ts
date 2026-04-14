@@ -11,7 +11,7 @@ export type {
   Middleware,
   MiddlewareContext,
   Severity,
-} from '../plugins/types';
+} from '../middleware/types';
 export type {
   RuntimeConnection,
   RuntimeCore,
