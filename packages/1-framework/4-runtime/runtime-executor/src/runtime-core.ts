@@ -22,20 +22,19 @@ export interface RuntimeTelemetryEvent {
   readonly durationMs?: number;
 }
 
-export interface RuntimeCoreOptions<TContract = unknown, TAdapter = unknown, TDriver = unknown> {
+export interface RuntimeCoreOptions<TContract = unknown, TDriver = unknown> {
   readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   readonly driver: TDriver;
   readonly verify: RuntimeVerifyOptions;
-  readonly middlewares?: readonly Middleware<TContract, TAdapter, TDriver>[];
+  readonly middlewares?: readonly Middleware<TContract>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
 
-export interface RuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = unknown>
+export interface RuntimeCore<TContract = unknown, TDriver = unknown>
   extends RuntimeQueryable,
     RuntimeExecutor<ExecutionPlan> {
   readonly _typeContract?: TContract;
-  readonly _typeAdapter?: TAdapter;
   readonly _typeDriver?: TDriver;
   connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
@@ -85,25 +84,24 @@ interface DriverWithClose<_TDriver> {
   close(): Promise<void>;
 }
 
-class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown>
-  implements RuntimeCore<TContract, TAdapter, TDriver>
+class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
+  implements RuntimeCore<TContract, TDriver>
 {
   readonly _typeContract?: TContract;
-  readonly _typeAdapter?: TAdapter;
   readonly _typeDriver?: TDriver;
   private readonly contract: TContract;
   private readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   private readonly driver: TDriver;
-  private readonly middlewares: readonly Middleware<TContract, TAdapter, TDriver>[];
+  private readonly middlewares: readonly Middleware<TContract>[];
   private readonly mode: 'strict' | 'permissive';
   private readonly verify: RuntimeVerifyOptions;
-  private readonly middlewareContext: MiddlewareContext<TContract, TAdapter, TDriver>;
+  private readonly middlewareContext: MiddlewareContext<TContract>;
 
   private verified: boolean;
   private startupVerified: boolean;
   private _telemetry: RuntimeTelemetryEvent | null;
 
-  constructor(options: RuntimeCoreOptions<TContract, TAdapter, TDriver>) {
+  constructor(options: RuntimeCoreOptions<TContract, TDriver>) {
     const { familyAdapter, driver } = options;
     this.contract = familyAdapter.contract;
     this.familyAdapter = familyAdapter;
@@ -117,20 +115,12 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
 
     this.middlewareContext = {
       contract: this.contract,
-      adapter: options.familyAdapter as unknown as TAdapter,
-      driver: this.driver,
       mode: this.mode,
       now: () => Date.now(),
       log: options.log ?? {
-        info: () => {
-          // No-op in MVP - diagnostics stay out of runtime core
-        },
-        warn: () => {
-          // No-op in MVP - diagnostics stay out of runtime core
-        },
-        error: () => {
-          // No-op in MVP - diagnostics stay out of runtime core
-        },
+        info: () => {},
+        warn: () => {},
+        error: () => {},
       },
     };
   }
@@ -269,7 +259,7 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
     this._telemetry = null;
 
     const iterator = async function* (
-      self: RuntimeCoreImpl<TContract, TAdapter, TDriver>,
+      self: RuntimeCoreImpl<TContract, TDriver>,
     ): AsyncGenerator<Row, void, unknown> {
       const startedAt = Date.now();
       let rowCount = 0;
@@ -346,8 +336,8 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
   }
 }
 
-export function createRuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = unknown>(
-  options: RuntimeCoreOptions<TContract, TAdapter, TDriver>,
-): RuntimeCore<TContract, TAdapter, TDriver> {
+export function createRuntimeCore<TContract = unknown, TDriver = unknown>(
+  options: RuntimeCoreOptions<TContract, TDriver>,
+): RuntimeCore<TContract, TDriver> {
   return new RuntimeCoreImpl(options);
 }

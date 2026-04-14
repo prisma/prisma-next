@@ -3,13 +3,9 @@ import type {
   RuntimeMiddleware,
   RuntimeMiddlewareContext,
 } from '@prisma-next/framework-components/runtime';
-import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 
-export interface MongoMiddlewareContext extends RuntimeMiddlewareContext {
-  readonly adapter: MongoAdapter;
-  readonly driver: MongoDriver;
-}
+export interface MongoMiddlewareContext extends RuntimeMiddlewareContext {}
 
 export interface MongoMiddleware extends RuntimeMiddleware {
   readonly familyId: 'mongo';

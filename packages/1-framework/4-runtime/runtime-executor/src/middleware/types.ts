@@ -9,29 +9,23 @@ export type Severity = 'error' | 'warn' | 'info';
 
 export type { AfterExecuteResult, RuntimeLog as Log };
 
-export interface MiddlewareContext<TContract = unknown, TAdapter = unknown, TDriver = unknown>
-  extends RuntimeMiddlewareContext {
+export interface MiddlewareContext<TContract = unknown> extends RuntimeMiddlewareContext {
   readonly contract: TContract;
-  readonly adapter: TAdapter;
-  readonly driver: TDriver;
 }
 
-export interface Middleware<TContract = unknown, TAdapter = unknown, TDriver = unknown> {
+export interface Middleware<TContract = unknown> {
   readonly name: string;
   readonly familyId?: string;
   readonly targetId?: string;
-  beforeExecute?(
-    plan: ExecutionPlan,
-    ctx: MiddlewareContext<TContract, TAdapter, TDriver>,
-  ): Promise<void>;
+  beforeExecute?(plan: ExecutionPlan, ctx: MiddlewareContext<TContract>): Promise<void>;
   onRow?(
     row: Record<string, unknown>,
     plan: ExecutionPlan,
-    ctx: MiddlewareContext<TContract, TAdapter, TDriver>,
+    ctx: MiddlewareContext<TContract>,
   ): Promise<void>;
   afterExecute?(
     plan: ExecutionPlan,
     result: AfterExecuteResult,
-    ctx: MiddlewareContext<TContract, TAdapter, TDriver>,
+    ctx: MiddlewareContext<TContract>,
   ): Promise<void>;
 }

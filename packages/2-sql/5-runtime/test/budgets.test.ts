@@ -275,54 +275,6 @@ describe('budgets middleware', () => {
     );
   });
 
-  describe('EXPLAIN fallback', () => {
-    it(
-      'uses EXPLAIN when enabled and driver supports it',
-      async () => {
-        const explainDriver = {
-          explain: vi.fn().mockResolvedValue({
-            rows: [{ 'Plan Rows': 50_000 }],
-          }),
-        };
-        const plan = createPlan({
-          sql: 'SELECT id FROM "user" LIMIT 100',
-          params: ['a', 'b'],
-          meta: { annotations: { limit: 100 } },
-        });
-        const mw = budgets({ maxRows: 10_000, explain: { enabled: true } });
-        const ctx = createMiddlewareContext({ driver: explainDriver });
-
-        await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
-          code: 'BUDGET.ROWS_EXCEEDED',
-          details: expect.objectContaining({ source: 'explain' }),
-        });
-        expect(explainDriver.explain).toHaveBeenCalledWith({
-          sql: plan.sql,
-          params: plan.params,
-        });
-      },
-      timeouts.default,
-    );
-
-    it(
-      'falls back gracefully when EXPLAIN fails',
-      async () => {
-        const explainDriver = {
-          explain: vi.fn().mockRejectedValue(new Error('EXPLAIN failed')),
-        };
-        const plan = createPlan({
-          sql: 'SELECT id FROM "user" LIMIT 100',
-          meta: { annotations: { limit: 100 } },
-        });
-        const mw = budgets({ maxRows: 10_000, explain: { enabled: true } });
-        const ctx = createMiddlewareContext({ driver: explainDriver });
-
-        await mw.beforeExecute?.(plan, ctx);
-      },
-      timeouts.default,
-    );
-  });
-
   describe('severity configuration', () => {
     it(
       'warns instead of throwing when rowCount severity is warn and mode is permissive',
