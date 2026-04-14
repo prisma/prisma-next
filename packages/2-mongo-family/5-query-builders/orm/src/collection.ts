@@ -460,6 +460,14 @@ class MongoCollectionImpl<
     if (typeof input.update === 'function') {
       const accessor = createFieldAccessor<TContract, ModelName>();
       const ops = input.update(accessor);
+      const dotPathOp = ops.find((op) => op.field.includes('.'));
+      if (dotPathOp) {
+        throw new Error(
+          `upsert() does not support dot-path field operations (found "${dotPathOp.field}"). ` +
+            'Dot-path updates conflict with $setOnInsert on the insert path, producing incomplete documents. ' +
+            'Use top-level field operations instead.',
+        );
+      }
       updateDoc = compileFieldOperations(ops, (field, value, operator) =>
         this.#wrapFieldOpValue(field, value, operator),
       );
