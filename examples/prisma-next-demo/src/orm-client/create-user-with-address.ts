@@ -1,6 +1,6 @@
 import type { DefaultModelRow } from '@prisma-next/sql-orm-client';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import type { AddressInput, Contract } from '../prisma/contract.d';
+import type { AddressInput, Contract } from '../prisma/contract';
 import { createOrmClient } from './client';
 
 type UserRow = DefaultModelRow<Contract, 'User'>;
