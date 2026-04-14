@@ -238,14 +238,14 @@ export function createFieldAccessor<
 
 export function compileFieldOperations(
   ops: readonly FieldOperation[],
-  wrapValue: (field: string, value: MongoValue) => MongoValue,
-): Record<string, MongoValue> {
+  wrapValue: (field: string, value: MongoValue, operator: UpdateOperator) => MongoValue,
+): Record<string, Record<string, MongoValue>> {
   const grouped: Record<string, Record<string, MongoValue>> = {};
   for (const op of ops) {
     if (!grouped[op.operator]) {
       grouped[op.operator] = {};
     }
-    grouped[op.operator]![op.field] = wrapValue(op.field, op.value);
+    grouped[op.operator]![op.field] = wrapValue(op.field, op.value, op.operator);
   }
-  return grouped as Record<string, MongoValue>;
+  return grouped;
 }

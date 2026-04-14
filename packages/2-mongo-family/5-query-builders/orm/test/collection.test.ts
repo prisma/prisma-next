@@ -339,11 +339,22 @@ describe('compileFieldOperations()', () => {
     ];
     const wrap = (_field: string, value: MongoValue) =>
       new MongoParamRef((value as MongoParamRef).value, { codecId: 'mongo/string@1' });
-    const result = compileFieldOperations(ops, wrap) as Record<
-      string,
-      Record<string, MongoParamRef>
-    >;
-    expect(result['$set']!['name']!.codecId).toBe('mongo/string@1');
+    const result = compileFieldOperations(ops, wrap);
+    expect(result['$set']!['name']!).toBeInstanceOf(MongoParamRef);
+    expect((result['$set']!['name']! as MongoParamRef).codecId).toBe('mongo/string@1');
+  });
+
+  it('passes operator to wrapValue callback', () => {
+    const ops: FieldOperation[] = [
+      { operator: '$set', field: 'name', value: new MongoParamRef('Alice') },
+      { operator: '$unset', field: 'email', value: new MongoParamRef('') },
+    ];
+    const operators: string[] = [];
+    compileFieldOperations(ops, (_field, value, operator) => {
+      operators.push(operator);
+      return value;
+    });
+    expect(operators).toEqual(['$set', '$unset']);
   });
 });
 
@@ -678,6 +689,20 @@ describe('MongoCollection write methods', () => {
       }
     });
 
+    it('does not attach codecId to $unset sentinel value', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update((u) => [u.name.unset()]);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        const unsetRef = update['$unset']!['name']!;
+        expect(unsetRef).toBeInstanceOf(MongoParamRef);
+        expect(unsetRef.codecId).toBeUndefined();
+        expect(unsetRef.value).toBe('');
+      }
+    });
+
     it('produces dot-path operations from callback', async () => {
       const executor = createMockExecutor([{ _id: 'id-1' }]);
       const col = createMongoCollection(contract, 'User', executor);
@@ -690,6 +715,29 @@ describe('MongoCollection write methods', () => {
         expect(update['$set']!['homeAddress.city']).toBeInstanceOf(MongoParamRef);
         expect(update['$set']!['homeAddress.city']!.codecId).toBe('mongo/string@1');
       }
+    });
+  });
+
+  describe('updateAll() with callback', () => {
+    it('produces correct update doc from field operations', async () => {
+      const executor = createMockExecutor(
+        [{ _id: 'id-1' }, { _id: 'id-2' }],
+        [{ matchedCount: 2, modifiedCount: 2 }],
+        [
+          { _id: 'id-1', name: 'Alice', loginCount: 1 },
+          { _id: 'id-2', name: 'Bob', loginCount: 1 },
+        ],
+      );
+      const col = createMongoCollection(contract, 'User', executor);
+      const rows: unknown[] = [];
+      for await (const row of col
+        .where(MongoFieldFilter.eq('email', 'a@b.c'))
+        .updateAll((u) => [u.loginCount.inc(1)])) {
+        rows.push(row);
+      }
+      expect(rows).toHaveLength(2);
+      const updateCommand = executor.lastPlan;
+      expect(updateCommand).toBeDefined();
     });
   });
 
