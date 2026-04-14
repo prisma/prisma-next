@@ -266,6 +266,101 @@ The emit still succeeds — the warning is informational, not blocking. This act
 - [ ] Emitting a contract when `@prisma-next/adapter-postgres` is not installed prints a warning naming the missing package and the install command.
 - [ ] Emitting a contract when all packages are installed prints no warning.
 
+# Implementation Guidance
+
+This section captures tooling choices and patterns for the implementing agent. It is informed by an analysis of the Prisma ORM `prisma bootstrap` command ([`packages/cli/src/bootstrap/`](https://github.com/prisma/prisma) in the Prisma repo) and our existing CLI infrastructure.
+
+## Existing CLI infrastructure to use
+
+Our CLI (`packages/1-framework/3-tooling/cli/`) already has the building blocks needed for init:
+
+- **`TerminalUI`** (`src/utils/terminal-ui.ts`) — wraps `@clack/prompts` and `colorette` with proper stdout/stderr separation, delayed spinners, and TTY detection. Use this for all output, prompts, and spinners. Do not add `ora`, `kleur`, `@inquirer/prompts`, or any other output/prompting library.
+- **`@clack/prompts`** — already a dependency. Use `clack.select()` for the target database prompt, `clack.text()` for schema/output location prompts (with defaults), and `clack.confirm()` for overwrite confirmation. Access these through `TerminalUI` where possible, or directly from `@clack/prompts` for prompts that `TerminalUI` doesn't wrap (like `select` and `text`).
+- **`colorette`** — already a dependency. Use for all color/style formatting.
+- **`commander`** — already used for CLI command registration. Register `init` as a new command in the existing command structure.
+- **`c12`** — already used for config loading. The init command should produce a `prisma-next.config.ts` that `c12` loads without changes to the config loader.
+- **`pathe`** — use instead of `node:path` for all path operations (per repo convention).
+
+## Package manager detection
+
+Adopt the same lockfile-detection pattern used by Prisma ORM's `detectPackageManager`:
+
+1. Check for lockfiles: `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `bun.lock`/`bun.lockb` → bun.
+2. Fall back to `package.json` `packageManager` field.
+3. Default to `npm`.
+
+This should be a small utility function in the init command's module (e.g. `src/commands/init/detect-package-manager.ts`). Don't add an external dependency for this — it's a handful of `fs.existsSync` checks.
+
+## Dependency installation
+
+Shell out to the detected package manager to install dependencies. Use `execFileSync` (not `exec`) to avoid shell injection. Example:
+
+```typescript
+// pnpm add @prisma-next/postgres && pnpm add -D @prisma-next/cli
+execFileSync(pm, ['add', '@prisma-next/postgres'], { cwd: baseDir, stdio: 'pipe' });
+execFileSync(pm, ['add', '-D', '@prisma-next/cli'], { cwd: baseDir, stdio: 'pipe' });
+```
+
+Wrap with a spinner from `TerminalUI`. If installation fails, print the manual install commands and exit gracefully (don't crash).
+
+## Contract emission after install
+
+After dependencies are installed, run `prisma-next contract emit` programmatically — not by shelling out, but by calling the existing `executeContractEmit` function from `src/control-api/operations/contract-emit.ts` (or the `ContractEmit` command class). This avoids the need to locate a local binary and ensures we use the same version of the emitter.
+
+## File generation
+
+Use string templates (template literals), not a template engine. The generated files are small and static — `contract.prisma` is ~15 lines, `prisma-next.config.ts` is ~8 lines, `db.ts` is ~5 lines. Parameterize the templates with the target package name, schema path, and output path.
+
+Keep templates as functions in a dedicated module (e.g. `src/commands/init/templates.ts`), one per target, returning the file content as a string. Example:
+
+```typescript
+export function postgresConfig(schemaPath: string, outputPath: string): string {
+  return `import { defineConfig } from '@prisma-next/postgres/config';
+
+export default defineConfig({
+  schema: '${schemaPath}',
+  output: '${outputPath}',
+  db: {
+    connection: process.env['DATABASE_URL']!,
+  },
+});
+`;
+}
+```
+
+## File overwrite protection
+
+Before writing each file, check if it already exists. If it does, prompt for confirmation using `clack.confirm()`. If the user declines, skip that file and continue with the rest. This matches the Prisma ORM approach where `Init.ts` exits if `schema.prisma` or a `prisma/` folder already exists — but we prefer prompting over hard-failing, since the user may want to keep some files and regenerate others.
+
+## Testing approach
+
+Follow the pattern from Prisma ORM's `Bootstrap.vitest.ts`:
+
+- Create tests in `packages/1-framework/3-tooling/cli/test/commands/init/`.
+- Use a temporary directory (`fs.mkdtempSync`) for each test, with cleanup in `afterEach`.
+- Mock `@clack/prompts` to simulate user input (target selection, path defaults, confirmations).
+- Mock `execFileSync` to avoid actual package installation in tests.
+- Mock or stub the contract emit operation.
+- Test the key flows:
+  - Happy path: empty directory with `package.json` → all files created.
+  - Existing files: confirm overwrite prompt behavior.
+  - `--no-install`: files scaffolded, no install/emit, manual commands printed.
+  - Package manager detection from each lockfile type.
+
+## Command structure
+
+Add the init command at `packages/1-framework/3-tooling/cli/src/commands/init/`. Suggested file layout:
+
+```
+src/commands/init/
+  index.ts              — command registration (commander)
+  init.ts               — main init flow
+  detect-package-manager.ts
+  templates.ts          — file content generators per target
+```
+
+Register in the CLI's main command setup alongside existing commands (`contract emit`, `db init`, etc.).
+
 # References
 
 - [User journey and roadblock catalog](user-journey.md)
