@@ -482,7 +482,7 @@ class MongoCollectionImpl<
     const updatedFields = new Set<string>();
     for (const operatorGroup of Object.values(updateDoc)) {
       for (const fieldPath of Object.keys(operatorGroup)) {
-        updatedFields.add(fieldPath.split('.')[0]!);
+        updatedFields.add(fieldPath.split('.')[0] ?? fieldPath);
       }
     }
     const insertOnlyFields: Record<string, MongoValue> = {};
@@ -656,7 +656,7 @@ class MongoCollectionImpl<
   #wrapFieldOpValue(field: string, value: MongoValue, operator?: string): MongoValue {
     if (operator === '$unset') return value;
 
-    const topLevelField = field.split('.')[0]!;
+    const topLevelField = field.split('.')[0] ?? field;
     const fields = this.#modelFields();
     const contractField = fields[topLevelField];
     if (!contractField) return value;
@@ -674,7 +674,7 @@ class MongoCollectionImpl<
   #wrapDotPathValue(dotPath: string, value: MongoValue): MongoValue {
     const parts = dotPath.split('.');
     const fields = this.#modelFields();
-    let currentField: ContractField | undefined = fields[parts[0]!];
+    let currentField: ContractField | undefined = parts[0] ? fields[parts[0]] : undefined;
 
     for (let i = 1; i < parts.length; i++) {
       if (!currentField || currentField.type.kind !== 'valueObject') return value;
@@ -682,7 +682,8 @@ class MongoCollectionImpl<
       const voDef = (this.#contract as { valueObjects?: Record<string, ContractValueObject> })
         .valueObjects?.[voName];
       if (!voDef) return value;
-      currentField = voDef.fields[parts[i]!];
+      const partKey = parts[i];
+      currentField = partKey ? voDef.fields[partKey] : undefined;
     }
 
     if (currentField?.type.kind === 'scalar' && value instanceof MongoParamRef) {
