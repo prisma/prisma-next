@@ -15,11 +15,12 @@ import {
 } from '@prisma-next/mongo-query-ast/control';
 import { describe, expect, it } from 'vitest';
 import {
-  collMod,
   createCollection,
   createIndex,
   dropCollection,
   dropIndex,
+  setValidation,
+  validatedCollection,
 } from '../src/core/migration-factories';
 
 describe('createIndex', () => {
@@ -272,52 +273,95 @@ describe('dropCollection', () => {
   });
 });
 
-describe('collMod', () => {
+describe('setValidation', () => {
   it('produces correct operation structure', () => {
-    const op = collMod('users', {
-      validator: { $jsonSchema: { required: ['email'] } },
-      validationLevel: 'strict',
-    });
+    const op = setValidation('users', { required: ['email'] });
 
-    expect(op.id).toBe('collMod.users');
-    expect(op.label).toBe('Modify collection users');
+    expect(op.id).toBe('collection.users.setValidation');
+    expect(op.label).toBe('Set validation on users');
     expect(op.operationClass).toBe('destructive');
   });
 
-  it('includes execute with CollModCommand', () => {
-    const op = collMod('users', {
-      validator: { $jsonSchema: { required: ['email'] } },
-    });
+  it('wraps schema in $jsonSchema validator', () => {
+    const schema = { required: ['email'], properties: { email: { bsonType: 'string' } } };
+    const op = setValidation('users', schema);
 
     const cmd = op.execute[0]!.command as CollModCommand;
     expect(cmd).toBeInstanceOf(CollModCommand);
     expect(cmd.collection).toBe('users');
-    expect(cmd.validator).toEqual({ $jsonSchema: { required: ['email'] } });
+    expect(cmd.validator).toEqual({ $jsonSchema: schema });
   });
 
-  it('passes through changeStreamPreAndPostImages', () => {
-    const op = collMod('users', {
-      changeStreamPreAndPostImages: { enabled: true },
-    });
+  it('passes through validationLevel and validationAction', () => {
+    const op = setValidation(
+      'users',
+      { required: ['email'] },
+      {
+        validationLevel: 'moderate',
+        validationAction: 'warn',
+      },
+    );
 
     const cmd = op.execute[0]!.command as CollModCommand;
-    expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
+    expect(cmd.validationLevel).toBe('moderate');
+    expect(cmd.validationAction).toBe('warn');
   });
 
   it('has empty precheck and postcheck', () => {
-    const op = collMod('users', { validator: {} });
+    const op = setValidation('users', { required: ['email'] });
     expect(op.precheck).toHaveLength(0);
     expect(op.postcheck).toHaveLength(0);
   });
 
-  it('defaults operationClass to destructive', () => {
-    const op = collMod('users', { validator: {} });
-    expect(op.operationClass).toBe('destructive');
+  it('round-trips through JSON', () => {
+    const op = setValidation('users', { required: ['email'] }, { validationLevel: 'strict' });
+    const json = JSON.parse(JSON.stringify(op));
+
+    expect(json.execute[0].command.kind).toBe('collMod');
+    expect(json.execute[0].command.validator).toEqual({
+      $jsonSchema: { required: ['email'] },
+    });
+  });
+});
+
+describe('validatedCollection', () => {
+  it('creates collection with schema validation', () => {
+    const ops = validatedCollection('users', { required: ['email'] }, []);
+
+    expect(ops).toHaveLength(1);
+    expect(ops[0]!.id).toBe('collection.users.create');
+
+    const cmd = ops[0]!.execute[0]!.command as CreateCollectionCommand;
+    expect(cmd.validator).toEqual({ $jsonSchema: { required: ['email'] } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
   });
 
-  it('accepts operationClass override', () => {
-    const op = collMod('users', { validator: {} }, { operationClass: 'widening' });
-    expect(op.operationClass).toBe('widening');
+  it('includes indexes after collection creation', () => {
+    const ops = validatedCollection('users', { required: ['email'] }, [
+      { keys: [{ field: 'email', direction: 1 }], unique: true },
+      { keys: [{ field: 'name', direction: 1 }] },
+    ]);
+
+    expect(ops).toHaveLength(3);
+    expect(ops[0]!.id).toBe('collection.users.create');
+
+    const idx1 = ops[1]!.execute[0]!.command as CreateIndexCommand;
+    expect(idx1.collection).toBe('users');
+    expect(idx1.unique).toBe(true);
+
+    const idx2 = ops[2]!.execute[0]!.command as CreateIndexCommand;
+    expect(idx2.collection).toBe('users');
+    expect(idx2.unique).toBeUndefined();
+  });
+
+  it('returns flat array of operations', () => {
+    const ops = validatedCollection('users', { required: ['email'] }, [
+      { keys: [{ field: 'email', direction: 1 }] },
+    ]);
+
+    expect(Array.isArray(ops)).toBe(true);
+    expect(ops.every((op) => 'id' in op && 'execute' in op)).toBe(true);
   });
 });
 
@@ -359,17 +403,6 @@ describe('serialization round-trip', () => {
     const json = JSON.parse(JSON.stringify(op));
 
     expect(json.execute[0].command.kind).toBe('dropCollection');
-  });
-
-  it('collMod round-trips through JSON', () => {
-    const op = collMod('users', {
-      validator: { $jsonSchema: { required: ['email'] } },
-      validationLevel: 'strict',
-    });
-    const json = JSON.parse(JSON.stringify(op));
-
-    expect(json.execute[0].command.kind).toBe('collMod');
-    expect(json.execute[0].command.validationLevel).toBe('strict');
   });
 
   it('factory output matches planner-equivalent createIndex structure', () => {

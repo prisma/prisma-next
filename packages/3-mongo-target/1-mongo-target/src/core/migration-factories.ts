@@ -1,9 +1,7 @@
-import type { MigrationOperationClass } from '@prisma-next/framework-components/control';
 import type { MongoIndexKey } from '@prisma-next/mongo-query-ast/control';
 import {
   buildIndexOpId,
   CollModCommand,
-  type CollModOptions,
   CreateCollectionCommand,
   type CreateCollectionOptions,
   CreateIndexCommand,
@@ -155,22 +153,41 @@ export function dropCollection(collection: string): MongoMigrationPlanOperation 
   };
 }
 
-export function collMod(
+export function setValidation(
   collection: string,
-  options: CollModOptions,
-  overrides?: { operationClass?: MigrationOperationClass },
+  schema: Record<string, unknown>,
+  options?: { validationLevel?: string; validationAction?: string },
 ): MongoMigrationPlanOperation {
   return {
-    id: `collMod.${collection}`,
-    label: `Modify collection ${collection}`,
-    operationClass: overrides?.operationClass ?? 'destructive',
+    id: `collection.${collection}.setValidation`,
+    label: `Set validation on ${collection}`,
+    operationClass: 'destructive',
     precheck: [],
     execute: [
       {
-        description: `modify collection ${collection}`,
-        command: new CollModCommand(collection, options),
+        description: `set validation on ${collection}`,
+        command: new CollModCommand(collection, {
+          validator: { $jsonSchema: schema },
+          validationLevel: options?.validationLevel,
+          validationAction: options?.validationAction,
+        }),
       },
     ],
     postcheck: [],
   };
+}
+
+export function validatedCollection(
+  name: string,
+  schema: Record<string, unknown>,
+  indexes: ReadonlyArray<{ keys: MongoIndexKey[]; unique?: boolean }>,
+): MongoMigrationPlanOperation[] {
+  return [
+    createCollection(name, {
+      validator: { $jsonSchema: schema },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    }),
+    ...indexes.map((idx) => createIndex(name, idx.keys, { unique: idx.unique })),
+  ];
 }

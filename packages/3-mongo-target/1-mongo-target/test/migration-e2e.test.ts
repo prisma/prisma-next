@@ -138,14 +138,14 @@ describe('migration file E2E', () => {
     it('produces JSON that the runner can consume (correct kind discriminants)', async () => {
       const migration = [
         `import { Migration } from '${migrationExport}';`,
-        `import { createIndex, dropIndex, createCollection, dropCollection, collMod } from '${factoryExport}';`,
+        `import { createIndex, dropIndex, createCollection, dropCollection, setValidation } from '${factoryExport}';`,
         '',
         'export default class extends Migration {',
         '  plan() {',
         '    return [',
         '      createCollection("users"),',
         '      createIndex("users", [{ field: "email", direction: 1 }]),',
-        '      collMod("users", { validator: { $jsonSchema: { required: ["email"] } } }),',
+        '      setValidation("users", { required: ["email"] }),',
         '      dropIndex("users", [{ field: "email", direction: 1 }]),',
         '      dropCollection("users"),',
         '    ];',
