@@ -1094,7 +1094,7 @@ describe('MongoCollection write methods', () => {
       await expect(
         col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
           create: defaultUserData,
-          update: (u) => [u._id.set('new-id')],
+          update: (u: FieldAccessor<Contract, 'User'>) => [u._id.set('new-id')],
         }),
       ).rejects.toThrow('_id');
     });
