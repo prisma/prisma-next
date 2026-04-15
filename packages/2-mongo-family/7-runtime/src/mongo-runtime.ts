@@ -9,6 +9,11 @@ import {
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 
+function noop() {}
+function now() {
+  return Date.now();
+}
+
 export interface MongoRuntimeOptions {
   readonly adapter: MongoAdapter;
   readonly driver: MongoDriver;
@@ -42,12 +47,8 @@ class MongoRuntimeImpl implements MongoRuntime {
     this.#middlewareContext = {
       contract: options.contract,
       mode: options.mode ?? 'strict',
-      now: () => Date.now(),
-      log: {
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-      },
+      now,
+      log: { info: noop, warn: noop, error: noop },
     };
   }
 
