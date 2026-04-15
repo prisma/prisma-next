@@ -2,8 +2,19 @@ import { realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'pathe';
 
+export interface MigrationMeta {
+  readonly from: string;
+  readonly to: string;
+  readonly kind?: 'regular' | 'baseline';
+  readonly labels?: readonly string[];
+}
+
 export abstract class Migration<TOperation = unknown> {
   abstract plan(): TOperation[];
+
+  describe(): MigrationMeta | undefined {
+    return undefined;
+  }
 
   /**
    * Makes the migration file self-executing. Call at module scope:
@@ -37,9 +48,8 @@ export abstract class Migration<TOperation = unknown> {
 
     const dryRun = args.includes('--dry-run');
     const migrationDir = dirname(metaFilename);
-    const outputPath = join(migrationDir, 'ops.json');
 
-    executeMigration(importMetaUrl, outputPath, dryRun).catch((err) => {
+    executeMigration(importMetaUrl, migrationDir, dryRun).catch((err) => {
       process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
       process.exitCode = 1;
     });
@@ -52,16 +62,27 @@ function printHelp(): void {
       'Usage: node <migration-file> [options]',
       '',
       'Options:',
-      '  --dry-run  Print operations to stdout without writing ops.json',
+      '  --dry-run  Print operations to stdout without writing files',
       '  --help     Show this help message',
       '',
     ].join('\n'),
   );
 }
 
+function buildManifest(meta: MigrationMeta): Record<string, unknown> {
+  return {
+    migrationId: null,
+    from: meta.from,
+    to: meta.to,
+    kind: meta.kind ?? 'regular',
+    labels: meta.labels ?? [],
+    createdAt: new Date().toISOString(),
+  };
+}
+
 async function executeMigration(
   fileUrl: string,
-  outputPath: string,
+  migrationDir: string,
   dryRun: boolean,
 ): Promise<void> {
   const mod = await import(fileUrl);
@@ -83,12 +104,22 @@ async function executeMigration(
     throw new Error('plan() must return an array of operations');
   }
 
-  const serialized = JSON.stringify(ops, null, 2);
+  const serializedOps = JSON.stringify(ops, null, 2);
+  const meta: MigrationMeta | undefined =
+    typeof instance.describe === 'function' ? instance.describe() : undefined;
+  const manifest = meta ? buildManifest(meta) : undefined;
 
   if (dryRun) {
-    process.stdout.write(`${serialized}\n`);
+    if (manifest) {
+      process.stdout.write(`--- migration.json ---\n${JSON.stringify(manifest, null, 2)}\n`);
+      process.stdout.write('--- ops.json ---\n');
+    }
+    process.stdout.write(`${serializedOps}\n`);
     return;
   }
 
-  writeFileSync(outputPath, serialized);
+  writeFileSync(join(migrationDir, 'ops.json'), serializedOps);
+  if (manifest) {
+    writeFileSync(join(migrationDir, 'migration.json'), JSON.stringify(manifest, null, 2));
+  }
 }

@@ -24,6 +24,33 @@ describe('Migration', () => {
       expect(ops).toEqual([{ id: 'op1' }, { id: 'op2' }]);
     });
   });
+
+  describe('describe() contract', () => {
+    it('returns undefined by default', () => {
+      class TestMigration extends Migration {
+        plan() {
+          return [];
+        }
+      }
+
+      const m = new TestMigration();
+      expect(m.describe()).toBeUndefined();
+    });
+
+    it('can be overridden to provide migration metadata', () => {
+      class TestMigration extends Migration {
+        describe() {
+          return { from: 'abc', to: 'def', labels: ['test'] };
+        }
+        plan() {
+          return [];
+        }
+      }
+
+      const m = new TestMigration();
+      expect(m.describe()).toEqual({ from: 'abc', to: 'def', labels: ['test'] });
+    });
+  });
 });
 
 describe('Migration.run() subprocess', () => {
@@ -132,5 +159,90 @@ describe('Migration.run() subprocess', () => {
     const result = await runMigration('migration.ts');
     expect(result.exitCode).not.toBe(0);
     expect(result.stderr).toContain('plan()');
+  });
+
+  describe('migration.json output', () => {
+    function migrationWithDescribe(meta: string, planReturn: string): string {
+      return [
+        `import { Migration } from '${migrationBasePath}';`,
+        '',
+        'export default class extends Migration {',
+        '  describe() {',
+        `    return ${meta};`,
+        '  }',
+        '  plan() {',
+        `    return ${planReturn};`,
+        '  }',
+        '}',
+        '',
+        'Migration.run(import.meta.url);',
+      ].join('\n');
+    }
+
+    it('writes migration.json when describe() is implemented', async () => {
+      const script = migrationWithDescribe(
+        '{ from: "abc123", to: "def456", labels: ["add-users"] }',
+        '[{ id: "op1" }]',
+      );
+      await writeFile(join(tmpDir, 'migration.ts'), script);
+
+      const result = await runMigration('migration.ts');
+      expect(result.exitCode).toBe(0);
+
+      const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
+      expect(manifest.from).toBe('abc123');
+      expect(manifest.to).toBe('def456');
+      expect(manifest.labels).toEqual(['add-users']);
+      expect(manifest.migrationId).toBeNull();
+      expect(manifest.kind).toBe('regular');
+      expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    });
+
+    it('does not write migration.json when describe() is absent', async () => {
+      const script = migrationScript('[{ id: "op1" }]');
+      await writeFile(join(tmpDir, 'migration.ts'), script);
+
+      const result = await runMigration('migration.ts');
+      expect(result.exitCode).toBe(0);
+
+      expect(await readFile(join(tmpDir, 'ops.json'), 'utf-8')).toBeTruthy();
+      const manifestExists = await readFile(join(tmpDir, 'migration.json'), 'utf-8').catch(
+        () => null,
+      );
+      expect(manifestExists).toBeNull();
+    });
+
+    it('defaults kind to regular and labels to empty', async () => {
+      const script = migrationWithDescribe('{ from: "abc", to: "def" }', '[]');
+      await writeFile(join(tmpDir, 'migration.ts'), script);
+
+      const result = await runMigration('migration.ts');
+      expect(result.exitCode).toBe(0);
+
+      const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
+      expect(manifest.kind).toBe('regular');
+      expect(manifest.labels).toEqual([]);
+    });
+
+    it('includes migration.json content in --dry-run output', async () => {
+      const script = migrationWithDescribe(
+        '{ from: "abc", to: "def", labels: ["test"] }',
+        '[{ id: "op1" }]',
+      );
+      await writeFile(join(tmpDir, 'migration.ts'), script);
+
+      const result = await runMigration('migration.ts', ['--dry-run']);
+      expect(result.exitCode).toBe(0);
+
+      const output = result.stdout;
+      expect(output).toContain('"from"');
+      expect(output).toContain('"to"');
+      expect(output).toContain('"op1"');
+
+      const manifestExists = await readFile(join(tmpDir, 'migration.json'), 'utf-8').catch(
+        () => null,
+      );
+      expect(manifestExists).toBeNull();
+    });
   });
 });
