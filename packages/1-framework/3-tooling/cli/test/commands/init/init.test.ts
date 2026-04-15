@@ -83,7 +83,7 @@ describe('runInit', () => {
 
     const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
     expect(config).toContain("from '@prisma-next/postgres/config'");
-    expect(config).toContain("contract: './prisma/contract.prisma'");
+    expect(config).toContain('contract: "./prisma/contract.prisma"');
     const imports = config.split('\n').filter((l) => l.includes("from '@prisma-next/"));
     expect(imports).toHaveLength(1);
   });
@@ -119,7 +119,7 @@ describe('runInit', () => {
     expect(schema).toContain("from '@prisma-next/sql-contract-ts/contract-builder'");
 
     const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
-    expect(config).toContain("contract: './prisma/contract.ts'");
+    expect(config).toContain('contract: "./prisma/contract.ts"');
   });
 
   it('prompts once to re-initialize when prisma-next.config.ts exists', async () => {
@@ -181,7 +181,7 @@ describe('runInit', () => {
     await runInit(tmpDir, { noInstall: true });
 
     const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
-    expect(config).toContain("contract: './prisma/contract.prisma'");
+    expect(config).toContain('contract: "./prisma/contract.prisma"');
     expect(config).not.toContain('.//');
   });
 

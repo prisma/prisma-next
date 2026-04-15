@@ -141,7 +141,7 @@ export function configFile(target: TargetId, contractPath: string): string {
 import { defineConfig } from '${pkg}/config';
 
 export default defineConfig({
-  contract: '${contractPath}',
+  contract: ${JSON.stringify(contractPath)},
   db: {
     connection: process.env['DATABASE_URL']!,
   },

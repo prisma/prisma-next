@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import mongoAdapter from '@prisma-next/adapter-mongo/control';
 import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
@@ -15,6 +16,9 @@ export interface MongoConfigOptions {
 
 function deriveOutputPath(contractPath: string): string {
   const ext = extname(contractPath);
+  if (ext.length === 0) {
+    return `${contractPath}.json`;
+  }
   return `${contractPath.slice(0, -ext.length)}.json`;
 }
 
@@ -33,7 +37,7 @@ export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mon
             const { typescriptContract } = await import(
               '@prisma-next/mongo-contract-ts/config-types'
             );
-            const mod = await import(absoluteContractPath);
+            const mod = await import(pathToFileURL(absoluteContractPath).href);
             const contract = mod.default ?? mod.contract;
             return typescriptContract(contract, output).source({
               composedExtensionPacks: [],
