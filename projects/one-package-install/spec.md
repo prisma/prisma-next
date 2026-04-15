@@ -249,7 +249,7 @@ The emit still succeeds — the warning is informational, not blocking. This act
 - F4: Init detects the user's package manager from lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lockb`) or project configuration.
 - F5: Init installs the target facade package as a dependency and `@prisma-next/cli` as a dev dependency using the detected package manager.
 - F6: Init runs `prisma-next contract emit` after installation to produce `contract.json` and `contract.d.ts`.
-- F7: Init does not overwrite existing files without confirmation.
+- F7: Init detects prior initialization (e.g. `prisma-next.config.ts` exists) and offers a single "Re-initialize? This will overwrite all generated files." prompt. If the user accepts, all scaffolded files are overwritten with the new choices. If the user declines, init exits. Init does not prompt per-file.
 - F8: `--no-install` skips dependency installation and contract emission, and prints the manual commands instead.
 - F9: Init prints a summary of created files and next steps on completion.
 
@@ -290,7 +290,7 @@ The emit still succeeds — the warning is informational, not blocking. This act
 - [ ] The facade `defineConfig` with `contract: './prisma/contract.ts'` uses the TypeScript contract provider instead of the PSL provider.
 - [ ] Init detects pnpm, npm, yarn, and bun from their respective lockfiles.
 - [ ] Init with `--no-install` produces the three scaffolded files but not `contract.json`/`contract.d.ts`, and prints install + emit commands.
-- [ ] Init does not overwrite existing files without prompting.
+- [ ] Running init in a directory where `prisma-next.config.ts` already exists prompts "Re-initialize?" once. Accepting overwrites all scaffolded files; declining exits without changes.
 - [ ] Emitting a contract when `@prisma-next/adapter-postgres` is not installed prints a warning naming the missing package and the install command.
 - [ ] Emitting a contract when all packages are installed prints no warning.
 
@@ -355,9 +355,11 @@ export default defineConfig({
 }
 ```
 
-## File overwrite protection
+## Re-initialization detection
 
-Before writing each file, check if it already exists. If it does, prompt for confirmation using `clack.confirm()`. If the user declines, skip that file and continue with the rest. This matches the Prisma ORM approach where `Init.ts` exits if `schema.prisma` or a `prisma/` folder already exists — but we prefer prompting over hard-failing, since the user may want to keep some files and regenerate others.
+Before prompting for target/schema, check whether `prisma-next.config.ts` exists in the working directory. If it does, init has already been run. Present a single `clack.confirm()`: "This project is already initialized. Re-initialize? This will overwrite all generated files." If the user declines, exit. If they accept, proceed with the normal flow and overwrite all scaffolded files without further per-file prompts.
+
+This avoids per-file overwrite prompts, which are tedious (5 prompts on re-run) and risk leaving the project in an incoherent half-old/half-new state (e.g. new config pointing at old schema, or switched target with stale `db.ts`).
 
 ## Testing approach
 
