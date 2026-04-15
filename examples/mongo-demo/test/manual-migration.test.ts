@@ -52,8 +52,8 @@ describe(
       const instance = new AddPostsAuthorIndex();
       const ops = instance.plan();
       expect(ops).toHaveLength(2);
-      expect(ops[0].id).toBe('index.posts.create(authorId:1)');
-      expect(ops[1].id).toBe('index.posts.create(createdAt:-1,authorId:1)');
+      expect(ops[0]!.id).toBe('index.posts.create(authorId:1)');
+      expect(ops[1]!.id).toBe('index.posts.create(createdAt:-1,authorId:1)');
     });
 
     it('migration.json has expected structure', () => {
