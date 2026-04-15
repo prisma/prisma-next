@@ -128,7 +128,7 @@ describe('templates', () => {
 
   describe('quickReferenceMd', () => {
     it('contains file locations for postgres', () => {
-      const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
+      const md = quickReferenceMd('postgres', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('prisma/contract.prisma');
       expect(md).toContain('prisma/contract.json');
@@ -137,7 +137,7 @@ describe('templates', () => {
     });
 
     it('contains postgres-specific content', () => {
-      const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
+      const md = quickReferenceMd('postgres', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('PostgreSQL');
       expect(md).toContain('@prisma-next/postgres');
@@ -146,7 +146,7 @@ describe('templates', () => {
     });
 
     it('contains ORM query example for postgres', () => {
-      const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
+      const md = quickReferenceMd('postgres', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('db.orm.User');
       expect(md).toContain('.where(');
@@ -154,14 +154,14 @@ describe('templates', () => {
     });
 
     it('contains common commands', () => {
-      const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
+      const md = quickReferenceMd('postgres', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('contract emit');
       expect(md).toContain('db init');
     });
 
     it('contains mongo-specific content', () => {
-      const md = quickReferenceMd('mongo', 'prisma/contract.prisma');
+      const md = quickReferenceMd('mongo', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('MongoDB');
       expect(md).toContain('@prisma-next/mongo');
@@ -170,7 +170,7 @@ describe('templates', () => {
     });
 
     it('contains ORM query example for mongo', () => {
-      const md = quickReferenceMd('mongo', 'prisma/contract.prisma');
+      const md = quickReferenceMd('mongo', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('db.connect(');
       expect(md).toContain('client.orm.User');
@@ -179,7 +179,7 @@ describe('templates', () => {
 
   describe('agentSkillMd', () => {
     it('contains file locations for postgres', () => {
-      const md = agentSkillMd('postgres', 'prisma/contract.prisma');
+      const md = agentSkillMd('postgres', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('prisma/contract.prisma');
       expect(md).toContain('prisma/db.ts');
@@ -187,7 +187,7 @@ describe('templates', () => {
     });
 
     it('uses ORM query pattern for postgres', () => {
-      const md = agentSkillMd('postgres', 'prisma/contract.prisma');
+      const md = agentSkillMd('postgres', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('PostgreSQL');
       expect(md).toContain('@prisma-next/postgres');
@@ -197,7 +197,7 @@ describe('templates', () => {
     });
 
     it('contains commands including migration operations', () => {
-      const md = agentSkillMd('postgres', 'prisma/contract.prisma');
+      const md = agentSkillMd('postgres', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('contract emit');
       expect(md).toContain('db init');
@@ -208,7 +208,7 @@ describe('templates', () => {
     });
 
     it('contains rules and workflow guidance', () => {
-      const md = agentSkillMd('postgres', 'prisma/contract.prisma');
+      const md = agentSkillMd('postgres', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('Never hand-edit');
       expect(md).toContain('Use `db.orm` for queries');
@@ -216,7 +216,7 @@ describe('templates', () => {
     });
 
     it('uses ORM query pattern for mongo', () => {
-      const md = agentSkillMd('mongo', 'prisma/contract.prisma');
+      const md = agentSkillMd('mongo', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('MongoDB');
       expect(md).toContain('@prisma-next/mongo');

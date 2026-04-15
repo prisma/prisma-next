@@ -38,7 +38,7 @@ Your contract has two companion files in the same directory:
 - **`contract.json`** — this tells your application what models exist, just like `package-lock.json` tells your package manager what dependencies your project has
 - **`contract.d.ts`** — this powers autocomplete and type checking in your editor
 
-Commit both files to git. When you change your contract, run `pnpm prisma-next contract emit` to update them.
+Commit both files to git. When you change your contract, run `{{pkgRun}} contract emit` to update them.
 
 If you use a framework like Next.js or Vite, the Prisma Next plugin will do this for you automatically.
 
@@ -71,9 +71,9 @@ You can customize how your environment variables are loaded by changing or remov
 ### Commands
 
 ```bash
-pnpm prisma-next contract emit       # Update contract.json and contract.d.ts
-pnpm prisma-next db init             # Create collections in the database
-pnpm prisma-next migration status    # Show migration status
+{{pkgRun}} contract emit       # Update contract.json and contract.d.ts
+{{pkgRun}} db init             # Create collections in the database
+{{pkgRun}} migration status    # Show migration status
 ```
 
 ### Files
@@ -89,5 +89,5 @@ pnpm prisma-next migration status    # Show migration status
 ### Workflow
 
 1. Edit [`{{schemaPath}}`]({{schemaPath}}) to add or change models.
-2. Run `pnpm prisma-next contract emit` to regenerate the contract.
+2. Run `{{pkgRun}} contract emit` to regenerate the contract.
 3. Query your models — your IDE will autocomplete everything.
