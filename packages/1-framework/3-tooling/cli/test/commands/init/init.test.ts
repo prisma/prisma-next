@@ -228,4 +228,34 @@ describe('runInit', () => {
     const outroCall = vi.mocked(clack.outro).mock.calls[0]?.[0] as string | undefined;
     expect(outroCall).toContain('prisma-next.md');
   });
+
+  it('exits with guidance when no package.json exists', async () => {
+    rmSync(join(tmpDir, 'package.json'));
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit');
+    });
+
+    await expect(runInit(tmpDir, { noInstall: true })).rejects.toThrow('process.exit');
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(clack.select).not.toHaveBeenCalled();
+
+    exitSpy.mockRestore();
+  });
+
+  it('does not write any files when no package.json exists', async () => {
+    rmSync(join(tmpDir, 'package.json'));
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit');
+    });
+
+    await expect(runInit(tmpDir, { noInstall: true })).rejects.toThrow('process.exit');
+
+    expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma'))).toBe(false);
+
+    exitSpy.mockRestore();
+  });
 });

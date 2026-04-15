@@ -32,6 +32,13 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
 
   clack.intro('prisma-next init', { output: process.stderr });
 
+  if (!existsSync(join(baseDir, 'package.json'))) {
+    ui.error('No package.json found. Initialize your project first, then re-run prisma-next init.');
+    process.exit(1);
+  }
+
+  const pm = await detectPackageManager(baseDir);
+
   if (existsSync(join(baseDir, 'prisma-next.config.ts'))) {
     const reinit = await clack.confirm({
       message:
@@ -111,7 +118,6 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
     writeFileSync(tsconfigPath, defaultTsConfig(), 'utf-8');
   }
 
-  const pm = await detectPackageManager(baseDir);
   const emitCommand = formatRunCommand(pm, 'prisma-next', 'contract emit');
 
   if (options.noInstall) {
@@ -129,8 +135,6 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
       'Manual steps',
     );
   } else {
-    ui.log(`Detected package manager: ${pm}`);
-
     const pkg = targetPackageName(target);
     const spinner = ui.spinner();
     let installSucceeded = false;
