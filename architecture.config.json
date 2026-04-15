@@ -211,6 +211,12 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/3-extensions/mongo/src/runtime/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/3-extensions/mongo/src/exports/runtime.ts",
       "domain": "extensions",
       "layer": "adapters",

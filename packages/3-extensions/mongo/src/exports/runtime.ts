@@ -1,2 +1,2 @@
-export type { MongoRuntime, MongoRuntimeOptions } from '@prisma-next/mongo-runtime';
-export { createMongoRuntime } from '@prisma-next/mongo-runtime';
+export type { ConnectedMongoClient, MongoClient, MongoOptions } from '../runtime/mongo';
+export { default } from '../runtime/mongo';

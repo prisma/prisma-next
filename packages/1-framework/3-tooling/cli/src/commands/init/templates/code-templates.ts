@@ -71,8 +71,10 @@ export const db = postgres<Contract>({ contractJson });
 `;
   }
 
-  return `import { createMongoRuntime } from '@prisma-next/mongo/runtime';
+  return `import mongo from '@prisma-next/mongo/runtime';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
 
-export { createMongoRuntime };
+export const db = mongo<Contract>({ contractJson });
 `;
 }
