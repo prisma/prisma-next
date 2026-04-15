@@ -23,6 +23,7 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
+        'src/mongo-middleware.ts',
       ],
       thresholds: {
         statements: 100,

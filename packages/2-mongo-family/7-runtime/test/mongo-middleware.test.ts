@@ -147,6 +147,69 @@ describe('MongoRuntime middleware lifecycle', () => {
     expect(afterResult).toEqual({ completed: false, rowCount: 0 });
   });
 
+  it('handles error path with middleware that has no afterExecute', async () => {
+    const failingDriver = {
+      execute: vi.fn(async function* () {
+        yield* [];
+        throw new Error('driver failure');
+      }),
+      close: vi.fn(async () => {}),
+    } as unknown as MongoDriver;
+
+    const beforeCalled = vi.fn();
+    const middleware: RuntimeMiddleware = {
+      name: 'no-afterExecute',
+      async beforeExecute() {
+        beforeCalled();
+      },
+    };
+
+    const runtime = createMongoRuntime({
+      adapter: createMockAdapter(),
+      driver: failingDriver,
+      contract: {},
+      middlewares: [middleware],
+    });
+
+    await expect(async () => {
+      for await (const _row of runtime.execute(createPlan())) {
+        void _row;
+      }
+    }).rejects.toThrow('driver failure');
+
+    expect(beforeCalled).toHaveBeenCalledOnce();
+  });
+
+  it('swallows afterExecute errors during error handling and rethrows the original', async () => {
+    const failingDriver = {
+      execute: vi.fn(async function* () {
+        yield* [];
+        throw new Error('driver failure');
+      }),
+      close: vi.fn(async () => {}),
+    } as unknown as MongoDriver;
+
+    const middleware: RuntimeMiddleware = {
+      name: 'failing-afterExecute',
+      async afterExecute() {
+        throw new Error('afterExecute also fails');
+      },
+    };
+
+    const runtime = createMongoRuntime({
+      adapter: createMockAdapter(),
+      driver: failingDriver,
+      contract: {},
+      middlewares: [middleware],
+    });
+
+    await expect(async () => {
+      for await (const _row of runtime.execute(createPlan())) {
+        void _row;
+      }
+    }).rejects.toThrow('driver failure');
+  });
+
   it('reports correct rowCount and completed: true on success', async () => {
     let afterResult: { completed: boolean; rowCount: number } | undefined;
     const middleware: RuntimeMiddleware = {
@@ -168,6 +231,57 @@ describe('MongoRuntime middleware lifecycle', () => {
     }
 
     expect(afterResult).toEqual({ completed: true, rowCount: 3 });
+  });
+
+  it('passes mode through to middleware context', async () => {
+    let receivedMode: string | undefined;
+    const middleware: RuntimeMiddleware = {
+      name: 'mode-inspector',
+      async beforeExecute(_plan, ctx) {
+        receivedMode = ctx.mode;
+      },
+    };
+
+    const runtime = createMongoRuntime({
+      adapter: createMockAdapter(),
+      driver: createMockDriver([]),
+      contract: {},
+      middlewares: [middleware],
+      mode: 'permissive',
+    });
+
+    for await (const _row of runtime.execute(createPlan())) {
+      void _row;
+    }
+
+    expect(receivedMode).toBe('permissive');
+  });
+
+  it('provides working log and now on the middleware context', async () => {
+    let logWorks = false;
+    const middleware: RuntimeMiddleware = {
+      name: 'ctx-tester',
+      async beforeExecute(_plan, ctx) {
+        ctx.log.info('test');
+        ctx.log.warn('test');
+        ctx.log.error('test');
+        ctx.now();
+        logWorks = true;
+      },
+    };
+
+    const runtime = createMongoRuntime({
+      adapter: createMockAdapter(),
+      driver: createMockDriver([]),
+      contract: {},
+      middlewares: [middleware],
+    });
+
+    for await (const _row of runtime.execute(createPlan())) {
+      void _row;
+    }
+
+    expect(logWorks).toBe(true);
   });
 });
 
