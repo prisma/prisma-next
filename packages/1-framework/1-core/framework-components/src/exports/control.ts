@@ -74,3 +74,18 @@ export {
   extractOperationTypeImports,
   extractQueryOperationTypeImports,
 } from '../control-stack';
+export type {
+  ControlMutationDefaultEntry,
+  ControlMutationDefaultRegistry,
+  ControlMutationDefaults,
+  DefaultFunctionLoweringContext,
+  DefaultFunctionLoweringHandler,
+  DefaultFunctionRegistry,
+  DefaultFunctionRegistryEntry,
+  LoweredDefaultResult,
+  LoweredDefaultValue,
+  MutationDefaultGeneratorDescriptor,
+  ParsedDefaultFunctionCall,
+  SourceDiagnostic,
+  SourceSpan,
+} from '../mutation-default-types';
