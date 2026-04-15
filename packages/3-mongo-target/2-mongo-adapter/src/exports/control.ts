@@ -24,6 +24,14 @@ const mongoAdapterDescriptor: ControlAdapterDescriptor<'mongo', 'mongo'> = {
   familyId: 'mongo',
   targetId: 'mongo',
   version: '0.0.1',
+  pslScalarTypeDescriptors: new Map([
+    ['String', 'mongo/string@1'],
+    ['Int', 'mongo/int32@1'],
+    ['Boolean', 'mongo/bool@1'],
+    ['DateTime', 'mongo/date@1'],
+    ['ObjectId', 'mongo/objectId@1'],
+    ['Float', 'mongo/double@1'],
+  ]),
   types: {
     codecTypes: {
       codecInstances: [
