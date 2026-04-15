@@ -168,7 +168,7 @@ describe('migration file E2E', () => {
 
       const commandKinds = ops.map((op: Record<string, unknown[]>) =>
         (op['execute'] as Record<string, unknown>[]).map(
-          (s) => (s as Record<string, Record<string, string>>)['command']['kind'],
+          (s: Record<string, unknown>) => (s['command'] as Record<string, string>)['kind'],
         ),
       );
       expect(commandKinds).toEqual([
