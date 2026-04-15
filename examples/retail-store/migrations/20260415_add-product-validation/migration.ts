@@ -1,7 +1,7 @@
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex, setValidation } from '@prisma-next/target-mongo/migration';
 
-export default class extends Migration {
+class AddProductValidation extends Migration {
   override describe() {
     return {
       from: 'sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d',
@@ -33,4 +33,5 @@ export default class extends Migration {
   }
 }
 
-Migration.run(import.meta.url);
+export default AddProductValidation;
+Migration.run(import.meta.url, AddProductValidation);
