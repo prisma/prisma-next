@@ -62,12 +62,14 @@ describe('runInit', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('scaffolds three files for postgres target', async () => {
+  it('scaffolds five files for postgres target', async () => {
     await runInit(tmpDir, { noInstall: true });
 
     expect(existsSync(join(tmpDir, 'prisma/contract.prisma'))).toBe(true);
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
     expect(existsSync(join(tmpDir, 'prisma/db.ts'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'prisma-next.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.agents/skills/prisma-next/SKILL.md'))).toBe(true);
   });
 
   it('generates config with single facade import and contract as string path', async () => {

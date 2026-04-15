@@ -4,7 +4,15 @@ import * as clack from '@clack/prompts';
 import { dirname, join } from 'pathe';
 import { TerminalUI } from '../../utils/terminal-ui';
 import { detectPackageManager } from './detect-package-manager';
-import { configFile, dbFile, starterSchema, type TargetId, targetPackageName } from './templates';
+import {
+  agentSkillMd,
+  configFile,
+  dbFile,
+  quickReferenceMd,
+  starterSchema,
+  type TargetId,
+  targetPackageName,
+} from './templates';
 
 export interface InitOptions {
   readonly noInstall?: boolean;
@@ -52,6 +60,8 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
     { path: schemaPath, content: starterSchema() },
     { path: 'prisma-next.config.ts', content: configFile(target, configPath) },
     { path: join(schemaDir, 'db.ts'), content: dbFile(target) },
+    { path: 'prisma-next.md', content: quickReferenceMd(target, schemaPath) },
+    { path: '.agents/skills/prisma-next/SKILL.md', content: agentSkillMd(target, schemaPath) },
   ];
 
   for (const file of files) {
