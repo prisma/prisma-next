@@ -82,7 +82,7 @@ describe('templates', () => {
 
       expect(config).toContain("import 'dotenv/config'");
       expect(config).toContain("from '@prisma-next/postgres/config'");
-      expect(config).toContain("contract: './prisma/contract.prisma'");
+      expect(config).toContain('contract: "./prisma/contract.prisma"');
       const importLines = config.split('\n').filter((l) => l.includes("from '@prisma-next/"));
       expect(importLines).toHaveLength(1);
     });

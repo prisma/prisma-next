@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
@@ -24,6 +25,9 @@ export interface PostgresConfigOptions {
 
 function deriveOutputPath(contractPath: string): string {
   const ext = extname(contractPath);
+  if (ext.length === 0) {
+    return `${contractPath}.json`;
+  }
   return `${contractPath.slice(0, -ext.length)}.json`;
 }
 
@@ -54,7 +58,7 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
             const { typescriptContract } = await import(
               '@prisma-next/sql-contract-ts/config-types'
             );
-            const mod = await import(absoluteContractPath);
+            const mod = await import(pathToFileURL(absoluteContractPath).href);
             const contract = mod.default ?? mod.contract;
             return typescriptContract(contract, output).source({
               composedExtensionPacks: extensions.map((e) => e.id),
