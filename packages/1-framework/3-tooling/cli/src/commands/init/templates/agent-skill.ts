@@ -1,3 +1,4 @@
+import { dirname } from 'pathe';
 import type { TargetId } from './code-templates';
 import { renderTemplate } from './render';
 
@@ -6,7 +7,7 @@ export const variables = ['schemaPath', 'schemaDir', 'dbImportPath'] as const;
 type TemplateVars = Record<(typeof variables)[number], string>;
 
 export function agentSkillMd(target: TargetId, schemaPath: string): string {
-  const schemaDir = schemaPath.replace(/\/[^/]+$/, '');
+  const schemaDir = dirname(schemaPath);
   const vars: TemplateVars = {
     schemaPath,
     schemaDir,

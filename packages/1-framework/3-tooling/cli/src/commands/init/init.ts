@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import * as clack from '@clack/prompts';
-import { dirname, join } from 'pathe';
+import { dirname, isAbsolute, join } from 'pathe';
 import { TerminalUI } from '../../utils/terminal-ui';
-import { detectPackageManager } from './detect-package-manager';
+import { detectPackageManager, formatRunCommand } from './detect-package-manager';
 import { agentSkillMd } from './templates/agent-skill';
 import {
   configFile,
@@ -68,7 +68,7 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
 
   const schemaDir = dirname(schemaPath);
   const configPath =
-    schemaPath.startsWith('./') || schemaPath.startsWith('/') ? schemaPath : `./${schemaPath}`;
+    schemaPath.startsWith('./') || isAbsolute(schemaPath) ? schemaPath : `./${schemaPath}`;
 
   const files: FileEntry[] = [
     { path: schemaPath, content: starterSchema(target) },
@@ -87,6 +87,8 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
   const pm = await detectPackageManager(baseDir);
   let emitSucceeded = false;
 
+  const emitCommand = formatRunCommand(pm, 'prisma-next', 'contract emit');
+
   if (options.noInstall) {
     const pkg = targetPackageName(target);
     ui.note(
@@ -97,7 +99,7 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
         `     ${pm} add ${pkg} dotenv && ${pm} add -D @prisma-next/cli`,
         '',
         '  2. Emit the contract:',
-        `     ${pm} prisma-next contract emit`,
+        `     ${emitCommand}`,
       ].join('\n'),
       'Manual steps',
     );
@@ -106,12 +108,14 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
 
     const pkg = targetPackageName(target);
     const spinner = ui.spinner();
+    let installSucceeded = false;
 
     spinner.start(`Installing ${pkg}, dotenv, and @prisma-next/cli...`);
     try {
       execFileSync(pm, ['add', pkg, 'dotenv'], { cwd: baseDir, stdio: 'pipe' });
       execFileSync(pm, ['add', '-D', '@prisma-next/cli'], { cwd: baseDir, stdio: 'pipe' });
       spinner.stop(`Installed ${pkg}, dotenv, and @prisma-next/cli`);
+      installSucceeded = true;
     } catch {
       spinner.stop('Installation failed');
       ui.warn(
@@ -123,21 +127,20 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
       );
     }
 
-    spinner.start('Emitting contract...');
-    try {
-      const { executeContractEmit } = await import('../../control-api/operations/contract-emit');
-      const configFilePath = join(baseDir, 'prisma-next.config.ts');
-      await executeContractEmit({ configPath: configFilePath });
-      spinner.stop('Contract emitted');
-      emitSucceeded = true;
-    } catch {
-      spinner.stop('Contract emission failed');
-      ui.warn(
-        [
-          'Could not emit contract automatically. Run manually:',
-          `  ${pm} prisma-next contract emit`,
-        ].join('\n'),
-      );
+    if (installSucceeded) {
+      spinner.start('Emitting contract...');
+      try {
+        const { executeContractEmit } = await import('../../control-api/operations/contract-emit');
+        const configFilePath = join(baseDir, 'prisma-next.config.ts');
+        await executeContractEmit({ configPath: configFilePath });
+        spinner.stop('Contract emitted');
+        emitSucceeded = true;
+      } catch {
+        spinner.stop('Contract emission failed');
+        ui.warn(
+          ['Could not emit contract automatically. Run manually:', `  ${emitCommand}`].join('\n'),
+        );
+      }
     }
   }
 
@@ -155,7 +158,7 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
       '',
       'Next steps:',
       `  1. Edit ${schemaPath} with your models`,
-      `  2. Run: ${pm} prisma-next contract emit`,
+      `  2. Run: ${emitCommand}`,
       `  3. Import db from ./${dirname(schemaPath)}/db in your app`,
     ].join('\n'),
     { output: process.stderr },

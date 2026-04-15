@@ -11,3 +11,10 @@ export async function detectPackageManager(cwd: string): Promise<PackageManager>
   }
   return 'npm';
 }
+
+export function formatRunCommand(pm: PackageManager, bin: string, args: string): string {
+  if (pm === 'npm') {
+    return `npx ${bin} ${args}`;
+  }
+  return `${pm} ${bin} ${args}`;
+}

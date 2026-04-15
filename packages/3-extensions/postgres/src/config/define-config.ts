@@ -9,7 +9,7 @@ import sql, {
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
-import { extname } from 'pathe';
+import { extname, isAbsolute, resolve } from 'pathe';
 
 export interface PostgresConfigOptions {
   readonly contract: string;
@@ -43,6 +43,10 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
     ...extensions,
   ]);
 
+  const absoluteContractPath = isAbsolute(options.contract)
+    ? options.contract
+    : resolve(process.cwd(), options.contract);
+
   const contractConfig =
     ext === '.ts'
       ? {
@@ -50,7 +54,7 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
             const { typescriptContract } = await import(
               '@prisma-next/sql-contract-ts/config-types'
             );
-            const mod = await import(options.contract);
+            const mod = await import(absoluteContractPath);
             const contract = mod.default ?? mod.contract;
             return typescriptContract(contract, output).source({
               composedExtensionPacks: extensions.map((e) => e.id),
