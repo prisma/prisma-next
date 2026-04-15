@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   type AuthoringId,
@@ -93,7 +94,7 @@ async function typecheck(testDir: string): Promise<void> {
   }
 }
 
-const TYPECHECK_TIMEOUT = 30_000;
+const TYPECHECK_TIMEOUT = timeouts.typeScriptCompilation;
 
 describe('init generates a typecheckable project', () => {
   let testDir: string;
