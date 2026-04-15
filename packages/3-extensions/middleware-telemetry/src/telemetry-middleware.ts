@@ -3,7 +3,7 @@ import type {
   AfterExecuteResult,
   RuntimeMiddleware,
   RuntimeMiddlewareContext,
-} from './runtime-middleware';
+} from '@prisma-next/framework-components/runtime';
 
 export interface TelemetryEvent {
   readonly phase: 'beforeExecute' | 'afterExecute';

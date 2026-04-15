@@ -1,8 +1,5 @@
 import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
-import {
-  createTelemetryMiddleware,
-  type TelemetryEvent,
-} from '@prisma-next/framework-components/runtime';
+import { createTelemetryMiddleware, type TelemetryEvent } from '@prisma-next/middleware-telemetry';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import {
