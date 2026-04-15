@@ -1,3 +1,4 @@
+import type { CartItemInput } from '../contract';
 import type { Db } from '../db';
 
 export function getCartByUserId(db: Db, userId: string) {
@@ -30,18 +31,7 @@ export function clearCart(db: Db, userId: string) {
   return db.orm.carts.where({ userId }).update({ items: [] });
 }
 
-export function addToCart(
-  db: Db,
-  userId: string,
-  item: {
-    productId: string;
-    name: string;
-    brand: string;
-    amount: number;
-    price: { amount: number; currency: string };
-    image: { url: string };
-  },
-) {
+export function addToCart(db: Db, userId: string, item: CartItemInput) {
   return db.orm.carts.where({ userId }).upsert({
     create: { userId, items: [item] },
     update: (u) => [u.items.push(item)],
