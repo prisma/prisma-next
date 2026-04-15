@@ -13,13 +13,13 @@ This project uses **Prisma Next** with **PostgreSQL** via `@prisma-next/postgres
 
 ## Commands
 
-- `pnpm prisma-next contract emit` — regenerate `contract.json` and `contract.d.ts` after changing the contract
-- `pnpm prisma-next db init` — bootstrap a database to match the contract (creates tables, indexes, constraints). Additive only — won't drop existing structures.
-- `pnpm prisma-next db update` — update the database to match the current contract. Prompts for confirmation on destructive changes. Use `--dry-run` to preview.
-- `pnpm prisma-next migration plan` — create a new migration from contract changes (offline, no database needed). Use `--name <slug>` to name it.
-- `pnpm prisma-next migration apply` — apply pending migrations to the database
-- `pnpm prisma-next migration status` — show which migrations are applied and which are pending
-- `pnpm prisma-next migration show <name>` — show details of a specific migration
+- `{{pkgRun}} contract emit` — regenerate `contract.json` and `contract.d.ts` after changing the contract
+- `{{pkgRun}} db init` — bootstrap a database to match the contract (creates tables, indexes, constraints). Additive only — won't drop existing structures.
+- `{{pkgRun}} db update` — update the database to match the current contract. Prompts for confirmation on destructive changes. Use `--dry-run` to preview.
+- `{{pkgRun}} migration plan` — create a new migration from contract changes (offline, no database needed). Use `--name <slug>` to name it.
+- `{{pkgRun}} migration apply` — apply pending migrations to the database
+- `{{pkgRun}} migration status` — show which migrations are applied and which are pending
+- `{{pkgRun}} migration show <name>` — show details of a specific migration
 
 ## How to write queries
 
@@ -73,7 +73,7 @@ const usersWithPosts = await db.orm.User
 ## Rules
 
 - **Never hand-edit** `contract.json` or `contract.d.ts`. Always regenerate them with `contract emit`.
-- **Always emit after contract changes.** When you modify `{{schemaPath}}`, run `pnpm prisma-next contract emit` before writing any code that depends on the new or changed models.
+- **Always emit after contract changes.** When you modify `{{schemaPath}}`, run `{{pkgRun}} contract emit` before writing any code that depends on the new or changed models.
 - **Don't restructure `db.ts`.** It's scaffolded by init and works as-is.
 - **Use `db.orm` for queries**, not `db.sql`. The ORM is the primary query surface.
 - **Connection string** is `DATABASE_URL` in `.env`. If the user reports connection errors, check this value and the `.env` file.
@@ -82,7 +82,7 @@ const usersWithPosts = await db.orm.User
 
 **User wants to add a new model or field:**
 1. Edit `{{schemaPath}}`
-2. Run `pnpm prisma-next contract emit`
+2. Run `{{pkgRun}} contract emit`
 3. Write query code using `db.orm.ModelName`
 
 **User wants to query data:**
@@ -94,13 +94,13 @@ const usersWithPosts = await db.orm.User
 2. The config file (`prisma-next.config.ts`) reads it automatically via `dotenv/config`
 
 **User wants to set up the database for the first time:**
-1. Run `pnpm prisma-next db init`
+1. Run `{{pkgRun}} db init`
 
 **User wants to update the database after changing the contract:**
-1. Quick path: `pnpm prisma-next db update` — compares the database to the contract and applies changes directly
+1. Quick path: `{{pkgRun}} db update` — compares the database to the contract and applies changes directly
 2. Migration path (for production workflows):
-   - `pnpm prisma-next migration plan --name describe-the-change` — creates a migration
-   - `pnpm prisma-next migration apply` — applies pending migrations
+   - `{{pkgRun}} migration plan --name describe-the-change` — creates a migration
+   - `{{pkgRun}} migration apply` — applies pending migrations
 
 **User wants to check what migrations need to be applied:**
-1. Run `pnpm prisma-next migration status`
+1. Run `{{pkgRun}} migration status`

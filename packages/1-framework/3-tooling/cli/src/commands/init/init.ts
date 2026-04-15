@@ -46,6 +46,7 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
   }
 
   const pm = await detectPackageManager(baseDir);
+  const pkgRun = formatRunCommand(pm, 'prisma-next', '').trimEnd();
 
   if (existsSync(join(baseDir, 'prisma-next.config.ts'))) {
     const reinit = await clack.confirm({
@@ -107,8 +108,11 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
     { path: schemaPath, content: starterSchema(target, authoring) },
     { path: 'prisma-next.config.ts', content: configFile(target, configPath) },
     { path: join(schemaDir, 'db.ts'), content: dbFile(target) },
-    { path: 'prisma-next.md', content: quickReferenceMd(target, schemaPath) },
-    { path: '.agents/skills/prisma-next/SKILL.md', content: agentSkillMd(target, schemaPath) },
+    { path: 'prisma-next.md', content: quickReferenceMd(target, schemaPath, pkgRun) },
+    {
+      path: '.agents/skills/prisma-next/SKILL.md',
+      content: agentSkillMd(target, schemaPath, pkgRun),
+    },
   ];
 
   for (const file of files) {
