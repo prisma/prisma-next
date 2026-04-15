@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { deserializeMongoOps, MongoMigrationRunner } from '@prisma-next/adapter-mongo/control';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
-import { Migration } from '@prisma-next/family-mongo/migration';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import AddPostsAuthorIndex from '../migrations/20260415_add-posts-author-index/migration';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -48,22 +48,23 @@ describe(
       }
     }, timeouts.spinUpMongoMemoryServer);
 
-    it('migration.ts can be imported and plan() called directly', async () => {
-      const mod = await import('../migrations/20260415_add-posts-author-index/migration.ts');
-      const MigrationClass = mod.default;
-      const instance = new MigrationClass();
-
+    it('migration class can be imported and plan() called directly', () => {
+      const instance = new AddPostsAuthorIndex();
       const ops = instance.plan();
       expect(ops).toHaveLength(2);
       expect(ops[0].id).toBe('index.posts.create(authorId:1)');
       expect(ops[1].id).toBe('index.posts.create(createdAt:-1,authorId:1)');
     });
 
-    it('migration.ts describe() returns correct metadata', async () => {
-      const mod = await import('../migrations/20260415_add-posts-author-index/migration.ts');
-      const instance = new mod.default();
-      const meta = instance.describe();
-      expect(meta.labels).toEqual(['add-posts-author-index']);
+    it('migration.json has expected structure', () => {
+      const manifest = JSON.parse(readFileSync(resolve(migrationDir, 'migration.json'), 'utf-8'));
+
+      expect(manifest.migrationId).toBeNull();
+      expect(manifest.kind).toBe('regular');
+      expect(manifest.labels).toEqual(['add-posts-author-index']);
+      expect(manifest.from).toMatch(/^sha256:/);
+      expect(manifest.to).toMatch(/^sha256:/);
+      expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
 
     it('ops.json deserializes and applies against real MongoDB', async () => {
@@ -115,18 +116,6 @@ describe(
       } finally {
         await controlDriver.close();
       }
-    });
-
-    it('migration.json exists and has expected structure', () => {
-      const manifestJson = readFileSync(resolve(migrationDir, 'migration.json'), 'utf-8');
-      const manifest = JSON.parse(manifestJson);
-
-      expect(manifest.migrationId).toBeNull();
-      expect(manifest.kind).toBe('regular');
-      expect(manifest.labels).toEqual(['add-posts-author-index']);
-      expect(manifest.from).toMatch(/^sha256:/);
-      expect(manifest.to).toMatch(/^sha256:/);
-      expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
   },
 );

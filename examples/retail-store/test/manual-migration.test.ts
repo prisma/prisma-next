@@ -6,6 +6,7 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import AddProductValidation from '../migrations/20260415_add-product-validation/migration';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -47,21 +48,23 @@ describe(
       }
     }, timeouts.spinUpMongoMemoryServer);
 
-    it('migration.ts can be imported and plan() called directly', async () => {
-      const mod = await import('../migrations/20260415_add-product-validation/migration.ts');
-      const instance = new mod.default();
-
+    it('migration class can be imported and plan() called directly', () => {
+      const instance = new AddProductValidation();
       const ops = instance.plan();
       expect(ops).toHaveLength(2);
       expect(ops[0].id).toBe('collection.products.setValidation');
       expect(ops[1].id).toContain('index.products.create');
     });
 
-    it('migration.ts describe() returns correct metadata', async () => {
-      const mod = await import('../migrations/20260415_add-product-validation/migration.ts');
-      const instance = new mod.default();
-      const meta = instance.describe();
-      expect(meta.labels).toEqual(['add-product-validation']);
+    it('migration.json has expected structure', () => {
+      const manifest = JSON.parse(readFileSync(resolve(migrationDir, 'migration.json'), 'utf-8'));
+
+      expect(manifest.migrationId).toBeNull();
+      expect(manifest.kind).toBe('regular');
+      expect(manifest.labels).toEqual(['add-product-validation']);
+      expect(manifest.from).toMatch(/^sha256:/);
+      expect(manifest.to).toMatch(/^sha256:/);
+      expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
 
     it('ops.json deserializes and applies against real MongoDB', async () => {
@@ -108,18 +111,6 @@ describe(
       } finally {
         await controlDriver.close();
       }
-    });
-
-    it('migration.json exists and has expected structure', () => {
-      const manifestJson = readFileSync(resolve(migrationDir, 'migration.json'), 'utf-8');
-      const manifest = JSON.parse(manifestJson);
-
-      expect(manifest.migrationId).toBeNull();
-      expect(manifest.kind).toBe('regular');
-      expect(manifest.labels).toEqual(['add-product-validation']);
-      expect(manifest.from).toMatch(/^sha256:/);
-      expect(manifest.to).toMatch(/^sha256:/);
-      expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
   },
 );
