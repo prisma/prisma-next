@@ -56,7 +56,10 @@ describe('runInit', () => {
     writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
     vi.clearAllMocks();
     vi.mocked(clack.isCancel).mockReturnValue(false);
-    vi.mocked(clack.select).mockResolvedValue('postgres');
+    vi.mocked(clack.select)
+      .mockReset()
+      .mockResolvedValueOnce('postgres')
+      .mockResolvedValueOnce('psl');
     vi.mocked(clack.text).mockResolvedValue('prisma/contract.prisma');
     vi.mocked(clack.confirm).mockResolvedValue(true);
   });
@@ -94,12 +97,29 @@ describe('runInit', () => {
     expect(prismaNextImports[0]).toContain('@prisma-next/postgres/runtime');
   });
 
-  it('generates starter schema with User and Post models', async () => {
+  it('generates PSL starter schema with User and Post models', async () => {
     await runInit(tmpDir, { noInstall: true });
 
     const schema = readFileSync(join(tmpDir, 'prisma/contract.prisma'), 'utf-8');
     expect(schema).toContain('model User');
     expect(schema).toContain('model Post');
+  });
+
+  it('scaffolds TypeScript contract when typescript authoring is selected', async () => {
+    vi.mocked(clack.select)
+      .mockReset()
+      .mockResolvedValueOnce('postgres')
+      .mockResolvedValueOnce('typescript');
+    vi.mocked(clack.text).mockResolvedValue('prisma/contract.ts');
+
+    await runInit(tmpDir, { noInstall: true });
+
+    const schema = readFileSync(join(tmpDir, 'prisma/contract.ts'), 'utf-8');
+    expect(schema).toContain('defineContract');
+    expect(schema).toContain("from '@prisma-next/sql-contract-ts/contract-builder'");
+
+    const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
+    expect(config).toContain("contract: './prisma/contract.ts'");
   });
 
   it('prompts once to re-initialize when prisma-next.config.ts exists', async () => {
