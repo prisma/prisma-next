@@ -12,7 +12,7 @@ import type {
 import type { MongoIndexKeyDirection, MongoStorageIndex } from '@prisma-next/mongo-contract';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { deriveJsonSchema } from './derive-json-schema';
+import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
   getAttribute,
   getMapName,
@@ -778,15 +778,6 @@ export function interpretPslDocumentToMongoContract(
     valueObjects[compositeType.name] = { fields };
   }
 
-  for (const [, modelEntry] of Object.entries(models)) {
-    const collectionName = modelEntry.storage.collection;
-    const coll = collections[collectionName];
-    if (coll) {
-      const validator = deriveJsonSchema(modelEntry.fields, valueObjects);
-      coll['validator'] = validator;
-    }
-  }
-
   const fkRelationsByPair = new Map<string, FkRelation[]>();
   for (const fk of allFkRelations) {
     const key = fkRelationPairKey(fk.declaringModel, fk.targetModel);
@@ -861,9 +852,37 @@ export function interpretPslDocumentToMongoContract(
     });
   }
 
+  const resolvedModels = polyResult.models;
+  const resolvedCollections = polyResult.collections;
+
+  for (const [, modelEntry] of Object.entries(resolvedModels)) {
+    if (modelEntry.base) continue;
+
+    const collectionName = modelEntry.storage.collection;
+    const coll = resolvedCollections[collectionName];
+    if (!coll) continue;
+
+    if (modelEntry.discriminator && modelEntry.variants) {
+      const variantEntries = Object.entries(modelEntry.variants).map(
+        ([variantName, { value }]) => ({
+          discriminatorValue: value,
+          fields: resolvedModels[variantName]?.fields ?? {},
+        }),
+      );
+      coll['validator'] = derivePolymorphicJsonSchema(
+        modelEntry.fields,
+        modelEntry.discriminator.field,
+        variantEntries,
+        valueObjects,
+      );
+    } else {
+      coll['validator'] = deriveJsonSchema(modelEntry.fields, valueObjects);
+    }
+  }
+
   const target = 'mongo';
   const targetFamily = 'mongo';
-  const storageWithoutHash = { collections: polyResult.collections };
+  const storageWithoutHash = { collections: resolvedCollections };
   const storageHash = computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
   const capabilities: Record<string, Record<string, boolean>> = {};
 

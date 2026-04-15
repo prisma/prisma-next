@@ -81,3 +81,70 @@ export function deriveJsonSchema(
     validationAction: 'error',
   };
 }
+
+export interface PolymorphicVariant {
+  readonly discriminatorValue: string;
+  readonly fields: Record<string, ContractField>;
+}
+
+export function derivePolymorphicJsonSchema(
+  baseFields: Record<string, ContractField>,
+  discriminatorField: string,
+  variants: readonly PolymorphicVariant[],
+  valueObjects?: Record<string, ContractValueObject>,
+): MongoStorageValidator {
+  const baseSchema = deriveObjectSchema(baseFields, valueObjects);
+
+  const oneOf: Record<string, unknown>[] = [];
+  for (const variant of variants) {
+    const variantOnlyFields: Record<string, ContractField> = {};
+    for (const [name, field] of Object.entries(variant.fields)) {
+      if (!(name in baseFields)) {
+        variantOnlyFields[name] = field;
+      }
+    }
+
+    if (Object.keys(variantOnlyFields).length === 0 && variants.length <= 1) continue;
+
+    const entry: Record<string, unknown> = {
+      properties: {
+        [discriminatorField]: { enum: [variant.discriminatorValue] },
+      },
+    };
+
+    const variantProperties: Record<string, unknown> = {};
+    const variantRequired: string[] = [];
+    for (const [name, field] of Object.entries(variantOnlyFields)) {
+      const schema = fieldToBsonSchema(field, valueObjects);
+      if (schema) {
+        variantProperties[name] = schema;
+        if (!field.nullable) {
+          variantRequired.push(name);
+        }
+      }
+    }
+
+    if (Object.keys(variantProperties).length > 0) {
+      (entry['properties'] as Record<string, unknown>) = {
+        ...(entry['properties'] as Record<string, unknown>),
+        ...variantProperties,
+      };
+    }
+    if (variantRequired.length > 0) {
+      entry['required'] = variantRequired.sort();
+    }
+
+    oneOf.push(entry);
+  }
+
+  const jsonSchema = { ...baseSchema };
+  if (oneOf.length > 0) {
+    jsonSchema['oneOf'] = oneOf;
+  }
+
+  return {
+    jsonSchema,
+    validationLevel: 'strict',
+    validationAction: 'error',
+  };
+}
