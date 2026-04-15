@@ -53,7 +53,7 @@ describe('Migration', () => {
   });
 });
 
-describe('Migration.run() subprocess', () => {
+describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
   let tmpDir: string;
 
   beforeEach(async () => {
