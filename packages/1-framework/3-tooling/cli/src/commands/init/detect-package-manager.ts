@@ -1,16 +1,19 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'pathe';
+import { dirname, join } from 'pathe';
 
 export type PackageManager = 'pnpm' | 'npm' | 'yarn' | 'bun';
 
-export function detectPackageManager(baseDir: string): PackageManager {
-  if (existsSync(join(baseDir, 'pnpm-lock.yaml'))) return 'pnpm';
-  if (existsSync(join(baseDir, 'yarn.lock'))) return 'yarn';
-  if (existsSync(join(baseDir, 'bun.lock')) || existsSync(join(baseDir, 'bun.lockb'))) return 'bun';
-  if (existsSync(join(baseDir, 'package-lock.json'))) return 'npm';
+function detectFromLockfile(dir: string): PackageManager | undefined {
+  if (existsSync(join(dir, 'pnpm-lock.yaml'))) return 'pnpm';
+  if (existsSync(join(dir, 'yarn.lock'))) return 'yarn';
+  if (existsSync(join(dir, 'bun.lock')) || existsSync(join(dir, 'bun.lockb'))) return 'bun';
+  if (existsSync(join(dir, 'package-lock.json'))) return 'npm';
+  return undefined;
+}
 
+function detectFromPackageJson(dir: string): PackageManager | undefined {
   try {
-    const pkgJson = JSON.parse(readFileSync(join(baseDir, 'package.json'), 'utf-8'));
+    const pkgJson = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf-8'));
     const pm = pkgJson.packageManager;
     if (typeof pm === 'string') {
       if (pm.startsWith('pnpm')) return 'pnpm';
@@ -19,6 +22,22 @@ export function detectPackageManager(baseDir: string): PackageManager {
     }
   } catch {
     // no package.json or invalid json
+  }
+  return undefined;
+}
+
+export function detectPackageManager(baseDir: string): PackageManager {
+  let dir = baseDir;
+  while (true) {
+    const fromLock = detectFromLockfile(dir);
+    if (fromLock) return fromLock;
+
+    const fromPkg = detectFromPackageJson(dir);
+    if (fromPkg) return fromPkg;
+
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
 
   return 'npm';
