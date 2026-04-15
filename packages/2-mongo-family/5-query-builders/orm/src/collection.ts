@@ -203,7 +203,7 @@ class MongoCollectionImpl<
   where(
     filter: MongoWhereFilter<TContract, ModelName> | MongoFilterExpr,
   ): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
-    if (this.#isFilterExpr(filter)) {
+    if (isMongoFilterExpr(filter)) {
       return this.#clone({ filters: [...this.#state.filters, filter] });
     }
     const compiled = this.#compileWhereObject(filter as Record<string, unknown>);
@@ -549,10 +549,6 @@ class MongoCollectionImpl<
   #modelFields(): Record<string, ContractField> {
     const model = this.#contract.models[this.#modelName] as MongoModelDefinition | undefined;
     return model?.fields ?? {};
-  }
-
-  #isFilterExpr(filter: unknown): filter is MongoFilterExpr {
-    return isMongoFilterExpr(filter);
   }
 
   #compileWhereObject(data: Record<string, unknown>): MongoFilterExpr[] {
