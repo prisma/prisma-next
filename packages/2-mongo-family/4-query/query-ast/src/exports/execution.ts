@@ -28,13 +28,13 @@ export {
 } from '../commands';
 export type { MongoFilterExpr } from '../filter-expressions';
 export {
+  isMongoFilterExpr,
   MongoAndExpr,
   MongoExistsExpr,
   MongoExprFilter,
   MongoFieldFilter,
   MongoNotExpr,
   MongoOrExpr,
-  mongoFilterBrand,
 } from '../filter-expressions';
 export type { MongoQueryPlan } from '../query-plan';
 export type { RawMongoCommand } from '../raw-commands';

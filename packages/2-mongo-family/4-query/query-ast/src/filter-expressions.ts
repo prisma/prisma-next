@@ -4,7 +4,10 @@ import { MongoAstNode } from './ast-node';
 import type { MongoFilterRewriter, MongoFilterVisitor } from './visitors';
 
 const FILTER_EXPR_BRAND = '__prismaNextMongoFilter__';
-export { FILTER_EXPR_BRAND as mongoFilterBrand };
+
+export function isMongoFilterExpr(value: unknown): value is MongoFilterExpr {
+  return typeof value === 'object' && value !== null && FILTER_EXPR_BRAND in value;
+}
 
 abstract class MongoFilterExpression extends MongoAstNode {
   abstract accept<R>(visitor: MongoFilterVisitor<R>): R;
