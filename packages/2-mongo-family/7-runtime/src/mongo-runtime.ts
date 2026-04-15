@@ -18,6 +18,7 @@ export interface MongoRuntimeOptions {
   readonly adapter: MongoAdapter;
   readonly driver: MongoDriver;
   readonly contract: unknown;
+  readonly targetId: string;
   readonly middleware?: readonly RuntimeMiddleware[];
   readonly mode?: 'strict' | 'permissive';
 }
@@ -40,7 +41,7 @@ class MongoRuntimeImpl implements MongoRuntime {
 
     if (options.middleware) {
       for (const mw of options.middleware) {
-        checkMiddlewareCompatibility(mw, 'mongo');
+        checkMiddlewareCompatibility(mw, 'mongo', options.targetId);
       }
     }
 

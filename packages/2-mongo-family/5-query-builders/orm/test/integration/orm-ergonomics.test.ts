@@ -42,7 +42,7 @@ describe(
 
       const adapter = createMongoAdapter();
       const driver = await createMongoDriver(replSet.getUri(), dbName);
-      runtime = createMongoRuntime({ adapter, driver, contract: {} });
+      runtime = createMongoRuntime({ adapter, driver, contract: {}, targetId: 'mongo' });
     }, timeouts.spinUpMongoMemoryServer);
 
     beforeEach(async () => {

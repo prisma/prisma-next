@@ -112,9 +112,8 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.codecRegistryValidated = false;
 
     if (middleware) {
-      const targetId = (context.contract as { target?: string }).target;
       for (const mw of middleware) {
-        checkMiddlewareCompatibility(mw, 'sql', targetId);
+        checkMiddlewareCompatibility(mw, 'sql', context.contract.target);
       }
     }
 

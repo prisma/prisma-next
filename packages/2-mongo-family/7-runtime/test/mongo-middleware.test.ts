@@ -62,6 +62,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([{ _id: '1', name: 'Alice' }]),
       contract: {},
+      targetId: 'mongo',
       middleware: [middleware],
     });
 
@@ -78,6 +79,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([{ _id: '1' }]),
       contract: {},
+      targetId: 'mongo',
     });
 
     const results: unknown[] = [];
@@ -101,6 +103,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([]),
       contract: {},
+      targetId: 'mongo',
       middleware: [middleware],
     });
 
@@ -135,6 +138,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: failingDriver,
       contract: {},
+      targetId: 'mongo',
       middleware: [middleware],
     });
 
@@ -168,6 +172,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: failingDriver,
       contract: {},
+      targetId: 'mongo',
       middleware: [middleware],
     });
 
@@ -200,6 +205,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: failingDriver,
       contract: {},
+      targetId: 'mongo',
       middleware: [middleware],
     });
 
@@ -223,6 +229,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([{ _id: '1' }, { _id: '2' }, { _id: '3' }]),
       contract: {},
+      targetId: 'mongo',
       middleware: [middleware],
     });
 
@@ -246,6 +253,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([]),
       contract: {},
+      targetId: 'mongo',
       middleware: [middleware],
       mode: 'permissive',
     });
@@ -274,6 +282,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([]),
       contract: {},
+      targetId: 'mongo',
       middleware: [middleware],
     });
 
@@ -293,6 +302,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
         adapter: createMockAdapter(),
         driver: createMockDriver(),
         contract: {},
+        targetId: 'mongo',
         middleware: [middleware],
       }),
     ).not.toThrow();
@@ -305,6 +315,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
         adapter: createMockAdapter(),
         driver: createMockDriver(),
         contract: {},
+        targetId: 'mongo',
         middleware: [middleware],
       }),
     ).not.toThrow();
@@ -317,6 +328,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
         adapter: createMockAdapter(),
         driver: createMockDriver(),
         contract: {},
+        targetId: 'mongo',
         middleware: [middleware],
       }),
     ).toThrow(

@@ -1,4 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { Middleware, MiddlewareContext } from '@prisma-next/runtime-executor';
 import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
 import {
@@ -25,25 +26,6 @@ export interface LintFinding {
   readonly severity: 'error' | 'warn';
   readonly message: string;
   readonly details?: Record<string, unknown>;
-}
-
-function lintError(code: string, message: string, details?: Record<string, unknown>) {
-  const error = new Error(message) as Error & {
-    code: string;
-    category: 'LINT';
-    severity: 'error';
-    details?: Record<string, unknown>;
-  };
-  Object.defineProperty(error, 'name', {
-    value: 'RuntimeError',
-    configurable: true,
-  });
-  return Object.assign(error, {
-    code,
-    category: 'LINT' as const,
-    severity: 'error' as const,
-    details,
-  });
 }
 
 function getFromSourceTableDetail(source: AnyFromSource): string | undefined {
@@ -172,7 +154,7 @@ export function lints<TContract = unknown>(options?: LintsOptions): Middleware<T
           const effectiveSeverity = configuredSeverity ?? lint.severity;
 
           if (effectiveSeverity === 'error') {
-            throw lintError(lint.code, lint.message, lint.details);
+            throw runtimeError(lint.code, lint.message, lint.details);
           }
           if (effectiveSeverity === 'warn') {
             ctx.log.warn({
@@ -195,7 +177,7 @@ export function lints<TContract = unknown>(options?: LintsOptions): Middleware<T
         const effectiveSeverity = configuredSeverity ?? lint.severity;
 
         if (effectiveSeverity === 'error') {
-          throw lintError(lint.code, lint.message, lint.details);
+          throw runtimeError(lint.code, lint.message, lint.details);
         }
         if (effectiveSeverity === 'warn') {
           ctx.log.warn({

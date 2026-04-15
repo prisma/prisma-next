@@ -1,5 +1,6 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from './async-iterable-result';
+import { runtimeError } from './runtime-error';
 
 export interface RuntimeLog {
   info(event: unknown): void;
@@ -53,27 +54,29 @@ export interface RuntimeExecutor<TPlan extends { readonly meta: PlanMeta }> {
 export function checkMiddlewareCompatibility(
   middleware: RuntimeMiddleware,
   runtimeFamilyId: string,
-  runtimeTargetId?: string,
+  runtimeTargetId: string,
 ): void {
   if (middleware.targetId !== undefined && middleware.familyId === undefined) {
-    throw new Error(
+    throw runtimeError(
+      'RUNTIME.MIDDLEWARE_INCOMPATIBLE',
       `Middleware '${middleware.name}' specifies targetId '${middleware.targetId}' without familyId`,
+      { middleware: middleware.name, targetId: middleware.targetId },
     );
   }
 
   if (middleware.familyId !== undefined && middleware.familyId !== runtimeFamilyId) {
-    throw new Error(
+    throw runtimeError(
+      'RUNTIME.MIDDLEWARE_FAMILY_MISMATCH',
       `Middleware '${middleware.name}' requires family '${middleware.familyId}' but the runtime is configured for family '${runtimeFamilyId}'`,
+      { middleware: middleware.name, middlewareFamilyId: middleware.familyId, runtimeFamilyId },
     );
   }
 
-  if (
-    middleware.targetId !== undefined &&
-    runtimeTargetId !== undefined &&
-    middleware.targetId !== runtimeTargetId
-  ) {
-    throw new Error(
+  if (middleware.targetId !== undefined && middleware.targetId !== runtimeTargetId) {
+    throw runtimeError(
+      'RUNTIME.MIDDLEWARE_TARGET_MISMATCH',
       `Middleware '${middleware.name}' requires target '${middleware.targetId}' but the runtime is configured for target '${runtimeTargetId}'`,
+      { middleware: middleware.name, middlewareTargetId: middleware.targetId, runtimeTargetId },
     );
   }
 }
