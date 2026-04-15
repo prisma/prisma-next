@@ -27,3 +27,9 @@ test('tx.sql has the same type as db.sql', () => {
   type TxSql = PostgresTransactionContext<TestContract>['sql'];
   expectTypeOf<TxSql>().toEqualTypeOf<DbSql>();
 });
+
+test('tx.orm has the same type as db.orm', () => {
+  type DbOrm = PostgresClient<TestContract>['orm'];
+  type TxOrm = PostgresTransactionContext<TestContract>['orm'];
+  expectTypeOf<TxOrm>().toEqualTypeOf<DbOrm>();
+});

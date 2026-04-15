@@ -532,7 +532,16 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
         };
       };
-      readonly relations: Record<string, never>;
+      readonly relations: {
+        readonly post: {
+          readonly to: 'Post';
+          readonly cardinality: 'N:1';
+          readonly on: {
+            readonly localFields: readonly ['postId'];
+            readonly targetFields: readonly ['id'];
+          };
+        };
+      };
       readonly storage: {
         readonly table: 'comment';
         readonly fields: {
@@ -798,7 +807,24 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/json@1' };
         };
       };
-      readonly relations: Record<string, never>;
+      readonly relations: {
+        readonly author: {
+          readonly to: 'User';
+          readonly cardinality: 'N:1';
+          readonly on: {
+            readonly localFields: readonly ['userId'];
+            readonly targetFields: readonly ['id'];
+          };
+        };
+        readonly comments: {
+          readonly to: 'Comment';
+          readonly cardinality: '1:N';
+          readonly on: {
+            readonly localFields: readonly ['id'];
+            readonly targetFields: readonly ['postId'];
+          };
+        };
+      };
       readonly storage: {
         readonly table: 'post';
         readonly fields: {
@@ -839,7 +865,16 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
         };
       };
-      readonly relations: Record<string, never>;
+      readonly relations: {
+        readonly posts: {
+          readonly to: 'Post';
+          readonly cardinality: '1:N';
+          readonly on: {
+            readonly localFields: readonly ['id'];
+            readonly targetFields: readonly ['userId'];
+          };
+        };
+      };
       readonly storage: {
         readonly table: 'user';
         readonly fields: {

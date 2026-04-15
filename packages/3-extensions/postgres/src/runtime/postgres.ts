@@ -38,6 +38,7 @@ type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBu
 export interface PostgresTransactionContext<TContract extends Contract<SqlStorage>>
   extends TransactionContext {
   readonly sql: Db<TContract>;
+  readonly orm: OrmClient<TContract>;
 }
 
 export interface PostgresClient<TContract extends Contract<SqlStorage>> {
@@ -251,9 +252,18 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {
       return withTransaction(getRuntime(), (txCtx) => {
         const txSql: Db<TContract> = sqlBuilder<TContract>({ context });
+        const txOrm: OrmClient<TContract> = ormBuilder({
+          runtime: {
+            execute(plan) {
+              return txCtx.execute(plan);
+            },
+          },
+          context,
+        });
         const tx: PostgresTransactionContext<TContract> = {
           ...txCtx,
           sql: txSql,
+          orm: txOrm,
         };
         return fn(tx);
       });

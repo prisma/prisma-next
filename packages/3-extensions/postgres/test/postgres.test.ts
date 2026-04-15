@@ -441,6 +441,31 @@ describe('postgres', () => {
     expect(mocks.sqlBuilder).toHaveBeenCalledTimes(2);
   });
 
+  it('transaction() provides orm on the transaction context', async () => {
+    const { orm: ormMock } = await import('@prisma-next/sql-orm-client');
+    const txOrmProxy = { lane: 'tx-orm' };
+    let ormCallCount = 0;
+    vi.mocked(ormMock).mockImplementation(() => {
+      ormCallCount++;
+      if (ormCallCount === 1) return { lane: 'orm' } as ReturnType<typeof ormMock>;
+      return txOrmProxy as ReturnType<typeof ormMock>;
+    });
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    let receivedTx: { orm?: unknown } | undefined;
+    await db.transaction(async (tx) => {
+      receivedTx = tx;
+    });
+
+    expect(receivedTx).toBeDefined();
+    expect(receivedTx!.orm).toBe(txOrmProxy);
+    expect(ormCallCount).toBe(2);
+  });
+
   it('transaction() lazily creates runtime before connect()', async () => {
     const db = postgres({
       contract,

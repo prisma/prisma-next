@@ -2746,6 +2746,9 @@ importers:
       '@prisma-next/integration-tests':
         specifier: workspace:*
         version: link:../../integration
+      '@prisma-next/postgres':
+        specifier: workspace:*
+        version: link:../../../packages/3-extensions/postgres
       '@prisma-next/sql-builder':
         specifier: workspace:*
         version: link:../../../packages/2-sql/4-lanes/sql-builder
