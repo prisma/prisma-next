@@ -386,6 +386,14 @@ test('FieldAccessor has FieldExpression for array fields', () => {
   expectTypeOf<Accessor['tags']>().toExtend<FieldExpression<string[]>>();
 });
 
+test('FieldAccessor resolves value-object field to concrete type, not unknown', () => {
+  type Accessor = FieldAccessor<Contract, 'User'>;
+  type HomeAddressExpr = Accessor['homeAddress'];
+
+  // @ts-expect-error set() rejects a number when field type is value-object
+  void ({} as HomeAddressExpr).set(42);
+});
+
 test('DotPath resolves value object dot-paths', () => {
   type Paths = DotPath<Contract, 'User'>;
   expectTypeOf<'homeAddress.city'>().toExtend<Paths>();
