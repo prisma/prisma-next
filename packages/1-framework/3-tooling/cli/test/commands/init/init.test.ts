@@ -170,14 +170,12 @@ describe('runInit', () => {
     expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
   });
 
-  it('with --no-install uses detected package manager in summary', async () => {
+  it('with --no-install completes without installing or emitting', async () => {
     writeFileSync(join(tmpDir, 'yarn.lock'), '');
 
     await runInit(tmpDir, { noInstall: true });
 
-    const outroCall = vi.mocked(clack.outro).mock.calls[0]?.[0] as string | undefined;
-    expect(outroCall).toBeDefined();
-    expect(outroCall).toContain('yarn prisma-next contract emit');
+    expect(execFileSync).not.toHaveBeenCalled();
   });
 
   it('detects pnpm and installs dependencies', async () => {
@@ -197,29 +195,12 @@ describe('runInit', () => {
     );
   });
 
-  it('omits emitted files from summary when emit fails', async () => {
-    const { executeContractEmit } = await import(
-      '../../../src/control-api/operations/contract-emit'
-    );
-    vi.mocked(executeContractEmit).mockRejectedValueOnce(new Error('emit failed'));
+  it('shows prisma-next.md in outro', async () => {
     writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
 
     await runInit(tmpDir, { noInstall: false });
 
     const outroCall = vi.mocked(clack.outro).mock.calls[0]?.[0] as string | undefined;
-    expect(outroCall).toBeDefined();
-    expect(outroCall).not.toContain('contract.json');
-    expect(outroCall).not.toContain('contract.d.ts');
-  });
-
-  it('includes emitted files in summary when emit succeeds', async () => {
-    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
-
-    await runInit(tmpDir, { noInstall: false });
-
-    const outroCall = vi.mocked(clack.outro).mock.calls[0]?.[0] as string | undefined;
-    expect(outroCall).toBeDefined();
-    expect(outroCall).toContain('contract.json');
-    expect(outroCall).toContain('contract.d.ts');
+    expect(outroCall).toContain('prisma-next.md');
   });
 });

@@ -85,8 +85,6 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
   }
 
   const pm = await detectPackageManager(baseDir);
-  let emitSucceeded = false;
-
   const emitCommand = formatRunCommand(pm, 'prisma-next', 'contract emit');
 
   if (options.noInstall) {
@@ -134,7 +132,6 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
         const configFilePath = join(baseDir, 'prisma-next.config.ts');
         await executeContractEmit({ configPath: configFilePath });
         spinner.stop('Contract emitted');
-        emitSucceeded = true;
       } catch {
         spinner.stop('Contract emission failed');
         ui.warn(
@@ -144,23 +141,5 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
     }
   }
 
-  const createdFiles = files.map((f) => `  ${f.path}`);
-  if (!options.noInstall && emitSucceeded) {
-    createdFiles.push(`  ${join(schemaDir, 'contract.json')}`);
-    createdFiles.push(`  ${join(schemaDir, 'contract.d.ts')}`);
-  }
-
-  clack.outro(
-    [
-      'Done! Created:',
-      '',
-      ...createdFiles,
-      '',
-      'Next steps:',
-      `  1. Edit ${schemaPath} with your models`,
-      `  2. Run: ${emitCommand}`,
-      `  3. Import db from ./${dirname(schemaPath)}/db in your app`,
-    ].join('\n'),
-    { output: process.stderr },
-  );
+  clack.outro('Done! Open prisma-next.md to get started.', { output: process.stderr });
 }
