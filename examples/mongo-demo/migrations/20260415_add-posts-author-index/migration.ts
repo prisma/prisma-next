@@ -1,7 +1,7 @@
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex } from '@prisma-next/target-mongo/migration';
 
-export default class extends Migration {
+class AddPostsAuthorIndex extends Migration {
   override describe() {
     return {
       from: 'sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe',
@@ -21,4 +21,5 @@ export default class extends Migration {
   }
 }
 
-Migration.run(import.meta.url);
+export default AddPostsAuthorIndex;
+Migration.run(import.meta.url, AddPostsAuthorIndex);

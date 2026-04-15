@@ -45,7 +45,7 @@ describe('migration file E2E', () => {
       `import { Migration } from '${migrationExport}';`,
       `import { createIndex, createCollection } from '${factoryExport}';`,
       '',
-      'export default class extends Migration {',
+      'class M extends Migration {',
       '  plan() {',
       '    return [',
       '      createCollection("users", {',
@@ -56,8 +56,9 @@ describe('migration file E2E', () => {
       '    ];',
       '  }',
       '}',
+      'export default M;',
       '',
-      'Migration.run(import.meta.url);',
+      'Migration.run(import.meta.url, M);',
     ].join('\n');
 
     it('produces ops.json with correct structure', async () => {
@@ -99,7 +100,7 @@ describe('migration file E2E', () => {
       `import { Migration } from '${migrationExport}';`,
       `import { validatedCollection } from '${factoryExport}';`,
       '',
-      'export default class extends Migration {',
+      'class M extends Migration {',
       '  plan() {',
       '    return validatedCollection(',
       '      "users",',
@@ -108,8 +109,9 @@ describe('migration file E2E', () => {
       '    );',
       '  }',
       '}',
+      'export default M;',
       '',
-      'Migration.run(import.meta.url);',
+      'Migration.run(import.meta.url, M);',
     ].join('\n');
 
     it('produces ops.json from strategy composition', async () => {
@@ -140,7 +142,7 @@ describe('migration file E2E', () => {
         `import { Migration } from '${migrationExport}';`,
         `import { createIndex, dropIndex, createCollection, dropCollection, setValidation } from '${factoryExport}';`,
         '',
-        'export default class extends Migration {',
+        'class M extends Migration {',
         '  plan() {',
         '    return [',
         '      createCollection("users"),',
@@ -151,8 +153,9 @@ describe('migration file E2E', () => {
         '    ];',
         '  }',
         '}',
+        'export default M;',
         '',
-        'Migration.run(import.meta.url);',
+        'Migration.run(import.meta.url, M);',
       ].join('\n');
 
       await writeFile(join(tmpDir, 'migration.ts'), migration);

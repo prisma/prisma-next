@@ -70,13 +70,14 @@ describe('Migration.run() subprocess', () => {
     return [
       `import { Migration } from '${migrationBasePath}';`,
       '',
-      'export default class extends Migration {',
+      'class M extends Migration {',
       '  plan() {',
       `    return ${planReturn};`,
       '  }',
       '}',
+      'export default M;',
       '',
-      'Migration.run(import.meta.url);',
+      'Migration.run(import.meta.url, M);',
     ].join('\n');
   }
 
@@ -136,8 +137,8 @@ describe('Migration.run() subprocess', () => {
     await writeFile(join(tmpDir, 'migration.ts'), migrationFile);
 
     const importerScript = [
-      `import Migration from '${join(tmpDir, 'migration.ts').replace(/\\/g, '/')}';`,
-      'const m = new Migration();',
+      `import M from '${join(tmpDir, 'migration.ts').replace(/\\/g, '/')}';`,
+      'const m = new M();',
       'const ops = m.plan();',
       'console.log(JSON.stringify(ops));',
     ].join('\n');
@@ -167,7 +168,7 @@ describe('Migration.run() subprocess', () => {
       return [
         `import { Migration } from '${migrationBasePath}';`,
         '',
-        'export default class extends Migration {',
+        'class M extends Migration {',
         '  describe() {',
         `    return ${meta};`,
         '  }',
@@ -175,8 +176,9 @@ describe('Migration.run() subprocess', () => {
         `    return ${planReturn};`,
         '  }',
         '}',
+        'export default M;',
         '',
-        'Migration.run(import.meta.url);',
+        'Migration.run(import.meta.url, M);',
       ].join('\n');
     }
 

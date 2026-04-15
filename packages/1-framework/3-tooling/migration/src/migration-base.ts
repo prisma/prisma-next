@@ -33,9 +33,11 @@ export abstract class Migration<TOperation = unknown> {
    *
    * Usage (at module scope, after the class definition):
    *
-   *     Migration.run(import.meta.url)
+   *     class MyMigration extends Migration { ... }
+   *     export default MyMigration;
+   *     Migration.run(import.meta.url, MyMigration);
    */
-  static run(importMetaUrl: string): void {
+  static run(importMetaUrl: string, MigrationClass: new () => Migration): void {
     if (!importMetaUrl) return;
 
     const metaFilename = fileURLToPath(importMetaUrl);
@@ -60,10 +62,12 @@ export abstract class Migration<TOperation = unknown> {
     const dryRun = args.includes('--dry-run');
     const migrationDir = dirname(metaFilename);
 
-    serializeMigration(importMetaUrl, migrationDir, dryRun).catch((err) => {
+    try {
+      serializeMigration(MigrationClass, migrationDir, dryRun);
+    } catch (err) {
       process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
       process.exitCode = 1;
-    });
+    }
   }
 }
 
@@ -91,23 +95,12 @@ function buildManifest(meta: MigrationMeta): Record<string, unknown> {
   };
 }
 
-async function serializeMigration(
-  fileUrl: string,
+function serializeMigration(
+  MigrationClass: new () => Migration,
   migrationDir: string,
   dryRun: boolean,
-): Promise<void> {
-  const mod = await import(fileUrl);
-  const MigrationClass = mod.default;
-
-  if (!MigrationClass || typeof MigrationClass !== 'function') {
-    throw new Error('Migration file must have a default export class');
-  }
-
+): void {
   const instance = new MigrationClass();
-
-  if (typeof instance.plan !== 'function') {
-    throw new Error('Migration class must implement plan()');
-  }
 
   const ops = instance.plan();
 
