@@ -41,7 +41,7 @@ An installable package that adds features to Prisma Next — new data types, dat
 
 A function that runs around every query, similar to middleware in Express or Koa. Middleware can inspect queries, enforce limits, collect metrics, or block unsafe operations — without changing how queries are built or executed. Examples: `budgets()` (cost limits), `lints()` (query checks).
 
-> **Divergence:** Currently named "plugin" / `plugins` in code and runtime options. The desired user-facing term is "middleware". **Status: pending refactor.**
+At the framework level, middleware is defined by the `RuntimeMiddleware` interface in `@prisma-next/framework-components`. A middleware can be family-agnostic (runs in any runtime) or scoped to a specific family (`familyId: 'sql'`) and/or target (`targetId: 'postgres'`). Family-specific interfaces (`SqlMiddleware`, `MongoMiddleware`) narrow the plan and context types.
 
 ### Plan
 
@@ -215,6 +215,6 @@ Planned refactors to bring internal naming in line with user-facing terminology:
 | User-facing term          | Current internal term               | Scope                                                             | Status  |
 | ------------------------- | ----------------------------------- | ----------------------------------------------------------------- | ------- |
 | extension / `extensions`  | extension pack / `extensionPacks`   | Config property, types, docs, CLI output, error messages          | Pending |
-| middleware / `middleware` | plugin / `plugins`                  | Runtime options, types, docs                                      | Pending |
+| middleware / `middlewares` | plugin / `plugins`                  | Runtime options, types, docs                                      | **Done** |
 | query builder             | query lane / lane                   | Architecture docs, package names, internal naming                 | Pending |
 
