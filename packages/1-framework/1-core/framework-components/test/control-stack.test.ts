@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { CreateControlStackInput } from '../src/control-stack';
 import {
   assembleAuthoringContributions,
+  assembleControlMutationDefaults,
+  assemblePslScalarTypeDescriptors,
   createControlStack,
   extractCodecLookup,
   extractCodecTypeImports,
@@ -222,6 +224,126 @@ describe('extractCodecLookup', () => {
         { id: 'desc-2', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
       ]),
     ).toThrow(/Duplicate codec instance for codecId "a@1"/);
+  });
+});
+
+describe('assemblePslScalarTypeDescriptors', () => {
+  it('returns empty map when no descriptors contribute', () => {
+    const result = assemblePslScalarTypeDescriptors([createDescriptor()]);
+    expect(result.size).toBe(0);
+  });
+
+  it('merges scalar type descriptors from multiple descriptors', () => {
+    const result = assemblePslScalarTypeDescriptors([
+      createDescriptor({
+        id: 'target',
+        pslScalarTypeDescriptors: new Map([
+          ['String', 'pg/text@1'],
+          ['Int', 'pg/int4@1'],
+        ]),
+      }),
+      createDescriptor({
+        id: 'extension',
+        pslScalarTypeDescriptors: new Map([['Vector', 'pgvector/vector@1']]),
+      }),
+    ]);
+    expect(result.size).toBe(3);
+    expect(result.get('String')).toBe('pg/text@1');
+    expect(result.get('Int')).toBe('pg/int4@1');
+    expect(result.get('Vector')).toBe('pgvector/vector@1');
+  });
+
+  it('throws on duplicate PSL type name from different descriptors', () => {
+    expect(() =>
+      assemblePslScalarTypeDescriptors([
+        createDescriptor({
+          id: 'desc-a',
+          pslScalarTypeDescriptors: new Map([['String', 'a/text@1']]),
+        }),
+        createDescriptor({
+          id: 'desc-b',
+          pslScalarTypeDescriptors: new Map([['String', 'b/text@1']]),
+        }),
+      ]),
+    ).toThrow(/Duplicate PSL scalar type descriptor "String".*"desc-b".*"desc-a"/);
+  });
+});
+
+describe('assembleControlMutationDefaults', () => {
+  const stubLower = () => ({
+    ok: true as const,
+    value: { kind: 'storage' as const, defaultValue: { kind: 'literal' as const, value: 0 } },
+  });
+
+  it('returns empty registry and generators when no descriptors contribute', () => {
+    const result = assembleControlMutationDefaults([createDescriptor()]);
+    expect(result.defaultFunctionRegistry.size).toBe(0);
+    expect(result.generatorDescriptors).toEqual([]);
+  });
+
+  it('merges function registries from multiple descriptors', () => {
+    const result = assembleControlMutationDefaults([
+      createDescriptor({
+        id: 'desc-a',
+        controlMutationDefaults: {
+          defaultFunctionRegistry: new Map([['now', { lower: stubLower }]]),
+          generatorDescriptors: [],
+        },
+      }),
+      createDescriptor({
+        id: 'desc-b',
+        controlMutationDefaults: {
+          defaultFunctionRegistry: new Map([['uuid', { lower: stubLower }]]),
+          generatorDescriptors: [{ id: 'uuidv4', applicableCodecIds: ['pg/text@1'] }],
+        },
+      }),
+    ]);
+    expect(result.defaultFunctionRegistry.size).toBe(2);
+    expect(result.defaultFunctionRegistry.has('now')).toBe(true);
+    expect(result.defaultFunctionRegistry.has('uuid')).toBe(true);
+    expect(result.generatorDescriptors).toHaveLength(1);
+  });
+
+  it('throws on duplicate function name', () => {
+    expect(() =>
+      assembleControlMutationDefaults([
+        createDescriptor({
+          id: 'desc-a',
+          controlMutationDefaults: {
+            defaultFunctionRegistry: new Map([['now', { lower: stubLower }]]),
+            generatorDescriptors: [],
+          },
+        }),
+        createDescriptor({
+          id: 'desc-b',
+          controlMutationDefaults: {
+            defaultFunctionRegistry: new Map([['now', { lower: stubLower }]]),
+            generatorDescriptors: [],
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate mutation default function "now".*"desc-b".*"desc-a"/);
+  });
+
+  it('throws on duplicate generator id', () => {
+    expect(() =>
+      assembleControlMutationDefaults([
+        createDescriptor({
+          id: 'desc-a',
+          controlMutationDefaults: {
+            defaultFunctionRegistry: new Map(),
+            generatorDescriptors: [{ id: 'uuidv4', applicableCodecIds: ['a@1'] }],
+          },
+        }),
+        createDescriptor({
+          id: 'desc-b',
+          controlMutationDefaults: {
+            defaultFunctionRegistry: new Map(),
+            generatorDescriptors: [{ id: 'uuidv4', applicableCodecIds: ['b@1'] }],
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate mutation default generator id "uuidv4".*"desc-b".*"desc-a"/);
   });
 });
 

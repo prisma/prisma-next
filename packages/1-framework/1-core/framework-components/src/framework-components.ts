@@ -1,5 +1,6 @@
 import type { Codec } from './codec-types';
 import type { AuthoringContributions } from './framework-authoring';
+import type { ControlMutationDefaults } from './mutation-default-types';
 import type { TypesImportSpec } from './types-import-spec';
 
 /**
@@ -65,6 +66,18 @@ export interface ComponentMetadata {
    * project them into concrete helper functions for TS-first workflows.
    */
   readonly authoring?: AuthoringContributions;
+
+  /**
+   * PSL scalar type name to codec ID mapping contributed by this component.
+   * Assembled by `createControlStack` with duplicate detection.
+   */
+  readonly pslScalarTypeDescriptors?: ReadonlyMap<string, string>;
+
+  /**
+   * Mutation default function handlers and generator descriptors contributed
+   * by this component. Assembled by `createControlStack` with duplicate detection.
+   */
+  readonly controlMutationDefaults?: ControlMutationDefaults;
 }
 
 /**

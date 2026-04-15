@@ -66,6 +66,8 @@ export type {
 } from '../control-stack';
 export {
   assembleAuthoringContributions,
+  assembleControlMutationDefaults,
+  assemblePslScalarTypeDescriptors,
   assertUniqueCodecOwner,
   createControlStack,
   extractCodecLookup,
