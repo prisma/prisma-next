@@ -1,6 +1,6 @@
 # Prisma Next — project skill
 
-This project uses **Prisma Next** with **{{targetLabel}}** via the `{{pkg}}` package.
+This project uses **Prisma Next** with **PostgreSQL** via the `@prisma-next/postgres` package.
 
 ## File locations
 
