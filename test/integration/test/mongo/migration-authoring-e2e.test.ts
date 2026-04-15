@@ -6,11 +6,11 @@ import {
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
-  collMod,
   createCollection,
   createIndex,
   dropCollection,
   dropIndex,
+  setValidation,
   validatedCollection,
 } from '@prisma-next/target-mongo/migration';
 import { timeouts } from '@prisma-next/test-utils';
@@ -167,14 +167,11 @@ describe(
       });
     });
 
-    describe('collMod', () => {
+    describe('setValidation', () => {
       it('modifies collection validation', async () => {
         await db.createCollection('users');
         const ops = [
-          collMod('users', {
-            validator: { $jsonSchema: { required: ['email', 'name'] } },
-            validationLevel: 'strict',
-          }),
+          setValidation('users', { required: ['email', 'name'] }, { validationLevel: 'strict' }),
         ];
         const result = await runOps(ops);
         expect(result.operationsExecuted).toBe(1);
@@ -196,7 +193,7 @@ describe(
           }),
           createIndex('users', [{ field: 'email', direction: 1 as const }], { unique: true }),
           dropIndex('users', [{ field: 'email', direction: 1 as const }]),
-          collMod('users', { validator: { $jsonSchema: { required: ['email', 'name'] } } }),
+          setValidation('users', { required: ['email', 'name'] }),
           dropCollection('users'),
         ];
 
@@ -235,7 +232,7 @@ describe(
       });
     });
 
-    describe('validatedCollection strategy', () => {
+    describe('validatedCollection', () => {
       it('creates collection with schema validation and indexes', async () => {
         const ops = validatedCollection('users', { required: ['email', 'name'] }, [
           { keys: [{ field: 'email', direction: 1 }], unique: true },
@@ -297,11 +294,7 @@ describe(
           true,
         );
 
-        const step2 = [
-          collMod('users', {
-            validator: { $jsonSchema: { required: ['email', 'name'] } },
-          }),
-        ];
+        const step2 = [setValidation('users', { required: ['email', 'name'] })];
 
         const serialized2 = JSON.parse(serializeMongoOps(step2));
         const controlDriver2 = await mongoControlDriver.create(replSet.getUri(dbName));

@@ -1,5 +1,5 @@
 import { Migration } from '@prisma-next/family-mongo/migration';
-import { collMod, createIndex } from '@prisma-next/target-mongo/migration';
+import { createIndex, setValidation } from '@prisma-next/target-mongo/migration';
 
 export default class extends Migration {
   override describe() {
@@ -12,21 +12,19 @@ export default class extends Migration {
 
   override plan() {
     return [
-      collMod('products', {
-        validator: {
-          $jsonSchema: {
-            bsonType: 'object',
-            required: ['name', 'price', 'category'],
-            properties: {
-              name: { bsonType: 'string' },
-              price: { bsonType: 'number', minimum: 0 },
-              category: { bsonType: 'string' },
-            },
+      setValidation(
+        'products',
+        {
+          bsonType: 'object',
+          required: ['name', 'price', 'category'],
+          properties: {
+            name: { bsonType: 'string' },
+            price: { bsonType: 'number', minimum: 0 },
+            category: { bsonType: 'string' },
           },
         },
-        validationLevel: 'moderate',
-        validationAction: 'warn',
-      }),
+        { validationLevel: 'moderate', validationAction: 'warn' },
+      ),
       createIndex('products', [
         { field: 'category', direction: 1 },
         { field: 'price', direction: 1 },

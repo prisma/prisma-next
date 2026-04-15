@@ -53,7 +53,7 @@ describe(
 
       const ops = instance.plan();
       expect(ops).toHaveLength(2);
-      expect(ops[0].id).toBe('collMod.products');
+      expect(ops[0].id).toBe('collection.products.setValidation');
       expect(ops[1].id).toContain('index.products.create');
     });
 
