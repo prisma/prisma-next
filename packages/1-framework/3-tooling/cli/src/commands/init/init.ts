@@ -156,11 +156,16 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
       await exec(pm, formatAddDevArgs(pm, ['@prisma-next/cli']), { cwd: baseDir });
       spinner.stop(`Installed ${pkg}, dotenv, and @prisma-next/cli`);
       installSucceeded = true;
-    } catch {
+    } catch (err) {
       spinner.stop('Installation failed');
+      const stderr =
+        err instanceof Error && 'stderr' in err ? (err as { stderr: string }).stderr : '';
       ui.warn(
         [
-          'Could not install dependencies automatically. Run manually:',
+          'Could not install dependencies automatically.',
+          ...(stderr ? [`  ${stderr.trim()}`] : []),
+          '',
+          'Run manually:',
           `  ${pm} ${formatAddArgs(pm, [pkg, 'dotenv']).join(' ')}`,
           `  ${pm} ${formatAddDevArgs(pm, ['@prisma-next/cli']).join(' ')}`,
         ].join('\n'),
