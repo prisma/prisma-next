@@ -2,6 +2,20 @@ import { describe, expect, it, vi } from 'vitest';
 import * as configLoader from '../../src/config-loader';
 import { executeContractEmit } from '../../src/control-api/operations/contract-emit';
 
+const stubDescriptor = (kind: string, id: string) => ({
+  kind,
+  id,
+  version: '0.0.1',
+});
+
+function mockConfigWithContract(contractOverrides: Record<string, unknown>) {
+  return {
+    family: stubDescriptor('family', 'test'),
+    target: stubDescriptor('target', 'test'),
+    contract: contractOverrides,
+  } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>;
+}
+
 describe('executeContractEmit', () => {
   async function withMockedConfig(
     config: Awaited<ReturnType<typeof configLoader.loadConfig>>,
@@ -30,14 +44,12 @@ describe('executeContractEmit', () => {
 
   it('preserves AbortError from contract source provider', async () => {
     await withMockedConfig(
-      {
-        contract: {
-          source: async () => {
-            throw new DOMException('Aborted by test', 'AbortError');
-          },
-          output: './src/prisma/contract.json',
+      mockConfigWithContract({
+        source: async () => {
+          throw new DOMException('Aborted by test', 'AbortError');
         },
-      } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>,
+        output: './src/prisma/contract.json',
+      }),
       async () => {
         await expect(
           executeContractEmit({ configPath: 'prisma-next.config.ts' }),
@@ -50,12 +62,10 @@ describe('executeContractEmit', () => {
 
   it('throws when contract source is not callable', async () => {
     await withMockedConfig(
-      {
-        contract: {
-          source: { invalid: true },
-          output: './src/prisma/contract.json',
-        },
-      } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>,
+      mockConfigWithContract({
+        source: { invalid: true },
+        output: './src/prisma/contract.json',
+      }),
       async () => {
         await expect(
           executeContractEmit({ configPath: 'prisma-next.config.ts' }),
@@ -72,19 +82,17 @@ describe('executeContractEmit', () => {
 
   it('throws runtime error when contract source provider returns failure result', async () => {
     await withMockedConfig(
-      {
-        contract: {
-          source: async () => ({
-            ok: false,
-            failure: {
-              summary: 'Provider parse failed',
-              diagnostics: [{ code: 'PSL_PARSE_ERROR', message: 'Unexpected token' }],
-              meta: { sourceId: 'schema.prisma' },
-            },
-          }),
-          output: './src/prisma/contract.json',
-        },
-      } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>,
+      mockConfigWithContract({
+        source: async () => ({
+          ok: false,
+          failure: {
+            summary: 'Provider parse failed',
+            diagnostics: [{ code: 'PSL_PARSE_ERROR', message: 'Unexpected token' }],
+            meta: { sourceId: 'schema.prisma' },
+          },
+        }),
+        output: './src/prisma/contract.json',
+      }),
       async () => {
         await expect(
           executeContractEmit({ configPath: 'prisma-next.config.ts' }),
@@ -103,15 +111,13 @@ describe('executeContractEmit', () => {
 
   it('throws runtime error when contract source provider returns malformed failure result', async () => {
     await withMockedConfig(
-      {
-        contract: {
-          source: async () =>
-            ({
-              ok: false,
-            }) as unknown,
-          output: './src/prisma/contract.json',
-        },
-      } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>,
+      mockConfigWithContract({
+        source: async () =>
+          ({
+            ok: false,
+          }) as unknown,
+        output: './src/prisma/contract.json',
+      }),
       async () => {
         await expect(
           executeContractEmit({ configPath: 'prisma-next.config.ts' }),
@@ -130,15 +136,13 @@ describe('executeContractEmit', () => {
 
   it('throws runtime error when contract source provider returns malformed success result', async () => {
     await withMockedConfig(
-      {
-        contract: {
-          source: async () =>
-            ({
-              ok: true,
-            }) as unknown,
-          output: './src/prisma/contract.json',
-        },
-      } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>,
+      mockConfigWithContract({
+        source: async () =>
+          ({
+            ok: true,
+          }) as unknown,
+        output: './src/prisma/contract.json',
+      }),
       async () => {
         await expect(
           executeContractEmit({ configPath: 'prisma-next.config.ts' }),
