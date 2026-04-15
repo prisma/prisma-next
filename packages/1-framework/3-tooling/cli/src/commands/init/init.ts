@@ -28,6 +28,19 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
 
   clack.intro('prisma-next init', { output: process.stderr });
 
+  if (existsSync(join(baseDir, 'prisma-next.config.ts'))) {
+    const reinit = await clack.confirm({
+      message:
+        'This project is already initialized. Re-initialize? This will overwrite all generated files.',
+      initialValue: false,
+      output: process.stderr,
+    });
+    if (clack.isCancel(reinit) || !reinit) {
+      clack.cancel('Init cancelled.', { output: process.stderr });
+      process.exit(0);
+    }
+  }
+
   const targetResult = await clack.select({
     message: 'What database are you using?',
     options: [
@@ -66,17 +79,6 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
 
   for (const file of files) {
     const fullPath = join(baseDir, file.path);
-    if (existsSync(fullPath)) {
-      const overwrite = await clack.confirm({
-        message: `${file.path} already exists. Overwrite?`,
-        initialValue: false,
-        output: process.stderr,
-      });
-      if (clack.isCancel(overwrite) || !overwrite) {
-        ui.log(`Skipping ${file.path}`);
-        continue;
-      }
-    }
     mkdirSync(dirname(fullPath), { recursive: true });
     writeFileSync(fullPath, file.content, 'utf-8');
   }
