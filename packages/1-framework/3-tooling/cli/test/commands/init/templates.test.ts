@@ -167,29 +167,43 @@ describe('templates', () => {
       expect(md).toContain('prisma-next.config.ts');
     });
 
-    it('contains postgres-specific query pattern', () => {
+    it('uses ORM query pattern for postgres', () => {
       const md = agentSkillMd('postgres', 'prisma/contract.prisma');
 
       expect(md).toContain('PostgreSQL');
       expect(md).toContain('@prisma-next/postgres');
-      expect(md).toContain('db.sql');
-      expect(md).toContain('.from(');
+      expect(md).toContain('db.orm.User');
+      expect(md).toContain('.first()');
+      expect(md).toContain('Use `db.orm` for queries');
     });
 
-    it('contains common commands', () => {
+    it('contains commands including migration operations', () => {
       const md = agentSkillMd('postgres', 'prisma/contract.prisma');
 
       expect(md).toContain('contract emit');
       expect(md).toContain('db init');
+      expect(md).toContain('db update');
+      expect(md).toContain('migration plan');
+      expect(md).toContain('migration apply');
+      expect(md).toContain('migration status');
     });
 
-    it('contains mongo-specific query pattern', () => {
+    it('contains rules and workflow guidance', () => {
+      const md = agentSkillMd('postgres', 'prisma/contract.prisma');
+
+      expect(md).toContain('Never hand-edit');
+      expect(md).toContain('Use `db.orm` for queries');
+      expect(md).toContain('Workflow for common tasks');
+    });
+
+    it('uses ORM query pattern for mongo', () => {
       const md = agentSkillMd('mongo', 'prisma/contract.prisma');
 
       expect(md).toContain('MongoDB');
       expect(md).toContain('@prisma-next/mongo');
-      expect(md).toContain('db.connect(');
-      expect(md).toContain('client.orm.User');
+      expect(md).toContain('db.orm.User');
+      expect(md).toContain('.first()');
+      expect(md).toContain('Use `db.orm` for queries');
     });
   });
 
