@@ -52,8 +52,8 @@ describe(
       const instance = new AddProductValidation();
       const ops = instance.plan();
       expect(ops).toHaveLength(2);
-      expect(ops[0].id).toBe('collection.products.setValidation');
-      expect(ops[1].id).toContain('index.products.create');
+      expect(ops[0]!.id).toBe('collection.products.setValidation');
+      expect(ops[1]!.id).toContain('index.products.create');
     });
 
     it('migration.json has expected structure', () => {
@@ -97,7 +97,7 @@ describe(
         expect(result.value.operationsExecuted).toBe(2);
 
         const info = await db.listCollections({ name: 'products' }).toArray();
-        const options = info[0]!['options'] as Record<string, unknown>;
+        const options = (info[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
         expect(options['validator']).toBeDefined();
 
         const indexes = await db.collection('products').listIndexes().toArray();
