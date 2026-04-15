@@ -21,11 +21,11 @@ import {
   FindOneAndUpdateCommand,
   InsertManyCommand,
   InsertOneCommand,
+  isMongoFilterExpr,
   MongoAndExpr,
   MongoFieldFilter,
   UpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
-import { isMongoFilterExpr } from '@prisma-next/mongo-query-ast/internal';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
