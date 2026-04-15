@@ -20,7 +20,7 @@ const TEMPLATES_DIR = join(import.meta.dirname, '../../../src/commands/init/temp
 
 function extractPlaceholders(templateFile: string): Set<string> {
   const content = readFileSync(join(TEMPLATES_DIR, templateFile), 'utf-8');
-  return new Set([...content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]));
+  return new Set([...content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1] ?? ''));
 }
 
 describe('templates', () => {

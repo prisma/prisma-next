@@ -24,7 +24,7 @@ export interface PostgresConfigOptions {
 
 function deriveOutputPath(contractPath: string): string {
   const ext = extname(contractPath);
-  return contractPath.slice(0, -ext.length) + '.json';
+  return `${contractPath.slice(0, -ext.length)}.json`;
 }
 
 export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'sql', 'postgres'> {

@@ -56,6 +56,7 @@ import { defineConfig } from '${pkg}/config';
 export default defineConfig({
   contract: '${contractPath}',
   db: {
+    // biome-ignore lint/style/noNonNullAssertion: loaded from .env
     connection: process.env['DATABASE_URL']!,
   },
 });

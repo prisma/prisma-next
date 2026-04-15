@@ -10,7 +10,11 @@ export function renderTemplate(
   const raw = readFileSync(templatePath, 'utf-8');
   let result = raw;
   for (const key of variableNames) {
-    result = result.replaceAll(`{{${key}}}`, vars[key]);
+    const value = vars[key];
+    if (value === undefined) {
+      throw new Error(`Template variable '${key}' is not defined`);
+    }
+    result = result.replaceAll(`{{${key}}}`, value);
   }
   return result;
 }
