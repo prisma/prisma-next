@@ -10,7 +10,8 @@ const packageRoot = resolve(import.meta.dirname, '..');
 const repoRoot = resolve(packageRoot, '../../..');
 const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
 
-const migrationExports = join(packageRoot, 'src/exports/migration.ts').replace(/\\/g, '/');
+const familyMongoRoot = resolve(repoRoot, 'packages/2-mongo-family/9-family');
+const migrationExports = join(familyMongoRoot, 'src/exports/migration.ts').replace(/\\/g, '/');
 
 describe('migration file E2E', () => {
   let tmpDir: string;

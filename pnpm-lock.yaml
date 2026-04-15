@@ -1389,12 +1389,18 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/migration
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../1-foundation/mongo-contract
       '@prisma-next/mongo-emitter':
         specifier: workspace:*
         version: link:../3-tooling/emitter
+      '@prisma-next/mongo-query-ast':
+        specifier: workspace:*
+        version: link:../4-query/query-ast
       '@prisma-next/mongo-schema-ir':
         specifier: workspace:*
         version: link:../3-tooling/mongo-schema-ir
@@ -2234,9 +2240,6 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
-      '@prisma-next/migration-tools':
-        specifier: workspace:*
-        version: link:../../1-framework/3-tooling/migration
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../../2-mongo-family/4-query/query-ast
