@@ -15,7 +15,7 @@ const raw = mongoRaw({ contract });
 export async function createClient(connectionUri: string, dbName: string) {
   const adapter = createMongoAdapter();
   const driver = await createMongoDriver(connectionUri, dbName);
-  const runtime = createMongoRuntime({ adapter, driver });
+  const runtime = createMongoRuntime({ adapter, driver, contract });
   const orm = mongoOrm({ contract, executor: runtime });
 
   return { orm, runtime, pipeline, raw, contract };

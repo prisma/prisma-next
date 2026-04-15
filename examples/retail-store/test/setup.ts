@@ -31,7 +31,7 @@ export function setupTestDb(dbName: string) {
 
     const adapter = createMongoAdapter();
     const driver = await createMongoDriver(replSet.getUri(), dbName);
-    runtime = createMongoRuntime({ adapter, driver });
+    runtime = createMongoRuntime({ adapter, driver, contract });
     const orm = mongoOrm({ contract, executor: runtime });
 
     db = { orm, runtime, pipeline, raw, contract };
