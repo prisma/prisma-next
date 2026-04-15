@@ -41,7 +41,7 @@ export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contrac
   readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
-  readonly middlewares?: readonly Middleware<TContract>[];
+  readonly middleware?: readonly Middleware<TContract>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -60,7 +60,7 @@ export interface CreateRuntimeOptions<
   readonly context: ExecutionContext<TContract>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
-  readonly middlewares?: readonly Middleware<TContract>[];
+  readonly middleware?: readonly Middleware<TContract>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -104,16 +104,16 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
-    const { context, adapter, driver, verify, middlewares, mode, log } = options;
+    const { context, adapter, driver, verify, middleware, mode, log } = options;
     this.contract = context.contract;
     this.adapter = adapter;
     this.codecRegistry = context.codecs;
     this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.codecRegistryValidated = false;
 
-    if (middlewares) {
+    if (middleware) {
       const targetId = (context.contract as { target?: string }).target;
-      for (const mw of middlewares) {
+      for (const mw of middleware) {
         checkMiddlewareCompatibility(mw, 'sql', targetId);
       }
     }
@@ -124,7 +124,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       familyAdapter,
       driver,
       verify,
-      ...ifDefined('middlewares', middlewares),
+      ...ifDefined('middleware', middleware),
       ...ifDefined('mode', mode),
       ...ifDefined('log', log),
     };
@@ -228,14 +228,14 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 export function createRuntime<TContract extends Contract<SqlStorage>, TTargetId extends string>(
   options: CreateRuntimeOptions<TContract, TTargetId>,
 ): Runtime {
-  const { stackInstance, context, driver, verify, middlewares, mode, log } = options;
+  const { stackInstance, context, driver, verify, middleware, mode, log } = options;
 
   return new SqlRuntimeImpl({
     context,
     adapter: stackInstance.adapter,
     driver,
     verify,
-    ...ifDefined('middlewares', middlewares),
+    ...ifDefined('middleware', middleware),
     ...ifDefined('mode', mode),
     ...ifDefined('log', log),
   });

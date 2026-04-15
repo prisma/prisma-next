@@ -6,7 +6,7 @@ A generic, family-agnostic telemetry middleware for Prisma Next runtimes.
 
 This package is a **proof-of-concept** demonstrating that the `RuntimeMiddleware` SPI works across both SQL and Mongo runtimes. It validates the cross-family middleware contract by implementing a single middleware that operates identically in both families without any family-specific code.
 
-It is **not** intended as a production observability solution. Because framework-level middlewares can only access `PlanMeta` (lane, target, storageHash, refs), they cannot inspect query content (SQL strings, Mongo commands, ASTs). Production telemetry will typically use family-specific middleware interfaces (`SqlMiddleware`, `MongoMiddleware`) that expose the full plan type.
+It is **not** intended as a production observability solution. Because framework-level middleware can only access `PlanMeta` (lane, target, storageHash, refs), they cannot inspect query content (SQL strings, Mongo commands, ASTs). Production telemetry will typically use family-specific middleware interfaces (`SqlMiddleware`, `MongoMiddleware`) that expose the full plan type.
 
 ## Usage
 

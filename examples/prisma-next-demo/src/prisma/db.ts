@@ -8,7 +8,7 @@ import contractJson from './contract.json' with { type: 'json' };
 export const db = postgres<Contract>({
   contractJson,
   extensions: [pgvector],
-  middlewares: [
+  middleware: [
     createTelemetryMiddleware(),
     lints(),
     budgets({

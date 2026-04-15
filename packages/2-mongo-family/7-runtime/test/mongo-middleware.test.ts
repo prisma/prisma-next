@@ -62,7 +62,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([{ _id: '1', name: 'Alice' }]),
       contract: {},
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     const plan = createPlan();
@@ -73,7 +73,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     expect(callOrder).toEqual(['beforeExecute', 'onRow', 'afterExecute']);
   });
 
-  it('works with no middlewares', async () => {
+  it('works with no middleware', async () => {
     const runtime = createMongoRuntime({
       adapter: createMockAdapter(),
       driver: createMockDriver([{ _id: '1' }]),
@@ -101,7 +101,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([]),
       contract: {},
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     const plan = createPlan();
@@ -135,7 +135,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: failingDriver,
       contract: {},
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     await expect(async () => {
@@ -168,7 +168,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: failingDriver,
       contract: {},
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     await expect(async () => {
@@ -200,7 +200,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: failingDriver,
       contract: {},
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     await expect(async () => {
@@ -223,7 +223,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([{ _id: '1' }, { _id: '2' }, { _id: '3' }]),
       contract: {},
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     for await (const _row of runtime.execute(createPlan())) {
@@ -246,7 +246,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([]),
       contract: {},
-      middlewares: [middleware],
+      middleware: [middleware],
       mode: 'permissive',
     });
 
@@ -274,7 +274,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       adapter: createMockAdapter(),
       driver: createMockDriver([]),
       contract: {},
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     for await (const _row of runtime.execute(createPlan())) {
@@ -293,7 +293,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
         adapter: createMockAdapter(),
         driver: createMockDriver(),
         contract: {},
-        middlewares: [middleware],
+        middleware: [middleware],
       }),
     ).not.toThrow();
   });
@@ -305,7 +305,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
         adapter: createMockAdapter(),
         driver: createMockDriver(),
         contract: {},
-        middlewares: [middleware],
+        middleware: [middleware],
       }),
     ).not.toThrow();
   });
@@ -317,7 +317,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
         adapter: createMockAdapter(),
         driver: createMockDriver(),
         contract: {},
-        middlewares: [middleware],
+        middleware: [middleware],
       }),
     ).toThrow(
       "Middleware 'sql-lints' requires family 'sql' but the runtime is configured for family 'mongo'",

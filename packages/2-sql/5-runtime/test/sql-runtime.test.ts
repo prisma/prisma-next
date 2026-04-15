@@ -332,7 +332,7 @@ describe('createRuntime', () => {
         context,
         driver,
         verify: { mode: 'onFirstUse', requireMarker: false },
-        middlewares: [{ name: 'generic' }],
+        middleware: [{ name: 'generic' }],
       }),
     ).not.toThrow();
   });
@@ -345,7 +345,7 @@ describe('createRuntime', () => {
         context,
         driver,
         verify: { mode: 'onFirstUse', requireMarker: false },
-        middlewares: [{ name: 'sql-lints', familyId: 'sql' }],
+        middleware: [{ name: 'sql-lints', familyId: 'sql' }],
       }),
     ).not.toThrow();
   });
@@ -358,7 +358,7 @@ describe('createRuntime', () => {
         context,
         driver,
         verify: { mode: 'onFirstUse', requireMarker: false },
-        middlewares: [{ name: 'mongo-mw', familyId: 'mongo' }],
+        middleware: [{ name: 'mongo-mw', familyId: 'mongo' }],
       }),
     ).toThrow(
       "Middleware 'mongo-mw' requires family 'mongo' but the runtime is configured for family 'sql'",

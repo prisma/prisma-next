@@ -39,7 +39,7 @@ export interface SqliteClient<TContract extends Contract<SqlStorage>> {
 
 export interface SqliteOptionsBase<TContract extends Contract<SqlStorage>> {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<SqliteTargetId>[];
-  readonly middlewares?: readonly Middleware<TContract>[];
+  readonly middleware?: readonly Middleware<TContract>[];
   readonly verify?: RuntimeVerifyOptions;
 }
 
@@ -144,7 +144,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       context,
       driver,
       verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-      ...(options.middlewares ? { middlewares: options.middlewares } : {}),
+      ...(options.middleware ? { middleware: options.middleware } : {}),
     });
 
     return runtimeInstance;

@@ -25,7 +25,7 @@ export interface RuntimeCoreOptions<TContract = unknown, TDriver = unknown> {
   readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   readonly driver: TDriver;
   readonly verify: RuntimeVerifyOptions;
-  readonly middlewares?: readonly Middleware<TContract>[];
+  readonly middleware?: readonly Middleware<TContract>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -102,7 +102,7 @@ class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
   private readonly contract: TContract;
   private readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   private readonly driver: TDriver;
-  private readonly middlewares: readonly Middleware<TContract>[];
+  private readonly middleware: readonly Middleware<TContract>[];
   private readonly mode: 'strict' | 'permissive';
   private readonly verify: RuntimeVerifyOptions;
   private readonly middlewareContext: MiddlewareContext<TContract>;
@@ -116,7 +116,7 @@ class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
     this.contract = familyAdapter.contract;
     this.familyAdapter = familyAdapter;
     this.driver = driver;
-    this.middlewares = options.middlewares ?? [];
+    this.middleware = options.middleware ?? [];
     this.mode = options.mode ?? 'strict';
     this.verify = options.verify;
     this.verified = options.verify.mode === 'startup' ? false : options.verify.mode === 'always';
@@ -288,7 +288,7 @@ class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
           await self.verifyPlanIfNeeded(plan);
         }
 
-        for (const mw of self.middlewares) {
+        for (const mw of self.middleware) {
           if (mw.beforeExecute) {
             await mw.beforeExecute(plan, self.middlewareContext);
           }
@@ -300,7 +300,7 @@ class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
           sql: plan.sql,
           params: encodedParams,
         })) {
-          for (const mw of self.middlewares) {
+          for (const mw of self.middleware) {
             if (mw.onRow) {
               await mw.onRow(row, plan, self.middlewareContext);
             }
@@ -317,7 +317,7 @@ class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
         }
 
         const latencyMs = Date.now() - startedAt;
-        for (const mw of self.middlewares) {
+        for (const mw of self.middleware) {
           if (mw.afterExecute) {
             try {
               await mw.afterExecute(
@@ -335,7 +335,7 @@ class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
       }
 
       const latencyMs = Date.now() - startedAt;
-      for (const mw of self.middlewares) {
+      for (const mw of self.middleware) {
         if (mw.afterExecute) {
           await mw.afterExecute(plan, { rowCount, latencyMs, completed }, self.middlewareContext);
         }
