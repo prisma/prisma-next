@@ -21,6 +21,7 @@ describe('aggregation pipelines', { timeout: timeouts.spinUpMongoMemoryServer },
         productId: `prod-${i}`,
         subCategory: 'Topwear',
         brand: 'TestBrand',
+        exitMethod: null,
       });
     }
     for (let i = 0; i < 2; i++) {

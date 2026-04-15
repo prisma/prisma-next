@@ -366,6 +366,7 @@ export async function seed(db: Db) {
     productId: p0._id,
     subCategory: 'Topwear',
     brand: 'Heritage',
+    exitMethod: null,
   });
 
   await createAddToCartEvent(db, {

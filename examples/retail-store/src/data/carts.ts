@@ -9,18 +9,7 @@ export function getCartWithUser(db: Db, userId: string) {
   return db.orm.carts.include('user').where({ userId }).first();
 }
 
-export function upsertCart(
-  db: Db,
-  userId: string,
-  items: ReadonlyArray<{
-    productId: string;
-    name: string;
-    brand: string;
-    amount: number;
-    price: { amount: number; currency: string };
-    image: { url: string };
-  }>,
-) {
+export function upsertCart(db: Db, userId: string, items: ReadonlyArray<CartItemInput>) {
   return db.orm.carts.where({ userId }).upsert({
     create: { userId, items: [...items] },
     update: { items: [...items] },

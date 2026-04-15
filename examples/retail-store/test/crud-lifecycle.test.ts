@@ -243,6 +243,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       productId: 'prod-1',
       subCategory: 'Topwear',
       brand: 'TestBrand',
+      exitMethod: null,
     });
 
     const events = await findEventsByUser(ctx.db, 'user-1');
