@@ -59,7 +59,7 @@ export function createIndex(
         description: `create index on ${collection}`,
         command: new CreateIndexCommand(collection, keys, {
           ...options,
-          unique: options?.unique || undefined,
+          unique: options?.unique ?? undefined,
           name,
         }),
       },
