@@ -175,10 +175,9 @@ describe('runInit', () => {
 
     await runInit(tmpDir, { noInstall: true });
 
-    const outroCall = vi.mocked(clack.outro).mock.calls[0];
+    const outroCall = vi.mocked(clack.outro).mock.calls[0]?.[0] as string | undefined;
     expect(outroCall).toBeDefined();
-    const outroContent = outroCall[0] as string;
-    expect(outroContent).toContain('yarn prisma-next contract emit');
+    expect(outroCall).toContain('yarn prisma-next contract emit');
   });
 
   it('detects pnpm and installs dependencies', async () => {
@@ -207,11 +206,10 @@ describe('runInit', () => {
 
     await runInit(tmpDir, { noInstall: false });
 
-    const outroCall = vi.mocked(clack.outro).mock.calls[0];
+    const outroCall = vi.mocked(clack.outro).mock.calls[0]?.[0] as string | undefined;
     expect(outroCall).toBeDefined();
-    const outroContent = outroCall[0] as string;
-    expect(outroContent).not.toContain('contract.json');
-    expect(outroContent).not.toContain('contract.d.ts');
+    expect(outroCall).not.toContain('contract.json');
+    expect(outroCall).not.toContain('contract.d.ts');
   });
 
   it('includes emitted files in summary when emit succeeds', async () => {
@@ -219,10 +217,9 @@ describe('runInit', () => {
 
     await runInit(tmpDir, { noInstall: false });
 
-    const outroCall = vi.mocked(clack.outro).mock.calls[0];
+    const outroCall = vi.mocked(clack.outro).mock.calls[0]?.[0] as string | undefined;
     expect(outroCall).toBeDefined();
-    const outroContent = outroCall[0] as string;
-    expect(outroContent).toContain('contract.json');
-    expect(outroContent).toContain('contract.d.ts');
+    expect(outroCall).toContain('contract.json');
+    expect(outroCall).toContain('contract.d.ts');
   });
 });
