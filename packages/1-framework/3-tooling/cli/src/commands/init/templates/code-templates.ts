@@ -8,7 +8,27 @@ export function targetLabel(target: TargetId): string {
   return target === 'postgres' ? 'PostgreSQL' : 'MongoDB';
 }
 
-export function starterSchema(): string {
+export function starterSchema(target: TargetId): string {
+  if (target === 'mongo') {
+    return `model User {
+  id    ObjectId @id @map("_id")
+  email String   @unique
+  name  String?
+  posts Post[]
+  @@map("users")
+}
+
+model Post {
+  id       ObjectId @id @map("_id")
+  title    String
+  content  String?
+  author   User     @relation(fields: [authorId], references: [id])
+  authorId ObjectId
+  @@map("posts")
+}
+`;
+  }
+
   return `model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique

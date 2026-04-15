@@ -68,11 +68,13 @@ describe('defineConfig facade', () => {
     expect(config.contract?.output).toBe('./foo/bar.json');
   });
 
-  it('selects TypeScript contract provider for .ts files', () => {
-    const config = defineConfig({ contract: './prisma/contract.ts' });
+  it('selects TypeScript contract provider for .ts files (distinct from PSL provider)', () => {
+    const tsConfig = defineConfig({ contract: './prisma/contract.ts' });
+    const pslConfig = defineConfig({ contract: './prisma/contract.prisma' });
 
-    expect(typeof config.contract?.source).toBe('function');
-    expect(config.contract?.output).toBe('./prisma/contract.json');
+    expect(typeof tsConfig.contract?.source).toBe('function');
+    expect(tsConfig.contract?.output).toBe('./prisma/contract.json');
+    expect(tsConfig.contract?.source).not.toBe(pslConfig.contract?.source);
   });
 
   it('passes db config through', () => {

@@ -25,18 +25,35 @@ function extractPlaceholders(templateFile: string): Set<string> {
 
 describe('templates', () => {
   describe('starterSchema', () => {
-    it('contains User and Post models', () => {
-      const schema = starterSchema();
+    it('contains User and Post models for postgres', () => {
+      const schema = starterSchema('postgres');
 
       expect(schema).toContain('model User');
       expect(schema).toContain('model Post');
+      expect(schema).toContain('@default(autoincrement())');
     });
 
-    it('includes a relation between User and Post', () => {
-      const schema = starterSchema();
+    it('includes a relation between User and Post for postgres', () => {
+      const schema = starterSchema('postgres');
 
       expect(schema).toContain('posts     Post[]');
       expect(schema).toContain('author    User');
+    });
+
+    it('uses ObjectId ids for mongo', () => {
+      const schema = starterSchema('mongo');
+
+      expect(schema).toContain('model User');
+      expect(schema).toContain('model Post');
+      expect(schema).toContain('ObjectId @id @map("_id")');
+      expect(schema).not.toContain('autoincrement');
+    });
+
+    it('includes @@map collection names for mongo', () => {
+      const schema = starterSchema('mongo');
+
+      expect(schema).toContain('@@map("users")');
+      expect(schema).toContain('@@map("posts")');
     });
   });
 

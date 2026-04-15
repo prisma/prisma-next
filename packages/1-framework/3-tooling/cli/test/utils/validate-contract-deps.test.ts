@@ -31,6 +31,15 @@ import type { B } from '@prisma-next/contract/hashing';`;
 
     expect(extractPackageSpecifiers(dts)).toEqual(['@prisma-next/contract']);
   });
+
+  it('extracts from double-quoted import specifiers', () => {
+    const dts = `import type { Foo } from "@prisma-next/adapter-postgres/codec-types";
+import type { Bar } from "@prisma-next/sql-contract/types";`;
+
+    const result = extractPackageSpecifiers(dts);
+
+    expect(result).toEqual(['@prisma-next/adapter-postgres', '@prisma-next/sql-contract']);
+  });
 });
 
 describe('validateContractDeps', () => {
@@ -50,7 +59,7 @@ describe('validateContractDeps', () => {
     expect(result.missing).toEqual(['@nonexistent-scope/fake-package']);
   });
 
-  it('formats a warning message with install command', () => {
+  it('formats a warning message listing missing packages', () => {
     const dts = `import type { Foo } from '@nonexistent-scope/pkg-a/types';
 import type { Bar } from '@nonexistent-scope/pkg-b/types';`;
 
@@ -60,7 +69,8 @@ import type { Bar } from '@nonexistent-scope/pkg-b/types';`;
     expect(result.missing).toContain('@nonexistent-scope/pkg-b');
     expect(result.warning).toContain('@nonexistent-scope/pkg-a');
     expect(result.warning).toContain('@nonexistent-scope/pkg-b');
-    expect(result.warning).toContain('pnpm add');
+    expect(result.warning).toContain('Install them with your package manager');
+    expect(result.warning).not.toContain('pnpm add');
   });
 
   it('returns no warning when all packages resolve', () => {
