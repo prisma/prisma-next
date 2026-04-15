@@ -7,8 +7,10 @@ import { TerminalUI } from '../../utils/terminal-ui';
 import { detectPackageManager, formatRunCommand } from './detect-package-manager';
 import { agentSkillMd } from './templates/agent-skill';
 import {
+  type AuthoringId,
   configFile,
   dbFile,
+  defaultSchemaPath,
   starterSchema,
   type TargetId,
   targetPackageName,
@@ -56,9 +58,23 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
   }
   const target = targetResult as TargetId;
 
+  const authoringResult = await clack.select({
+    message: 'How do you want to write your schema?',
+    options: [
+      { value: 'psl' as AuthoringId, label: 'Prisma Schema Language (.prisma)' },
+      { value: 'typescript' as AuthoringId, label: 'TypeScript (.ts)' },
+    ],
+    output: process.stderr,
+  });
+  if (clack.isCancel(authoringResult)) {
+    clack.cancel('Init cancelled.', { output: process.stderr });
+    process.exit(0);
+  }
+  const authoring = authoringResult as AuthoringId;
+
   const schemaPathResult = await clack.text({
     message: 'Where should the schema file go?',
-    initialValue: 'prisma/contract.prisma',
+    initialValue: defaultSchemaPath(authoring),
     output: process.stderr,
   });
   if (clack.isCancel(schemaPathResult)) {
@@ -72,7 +88,7 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
     schemaPath.startsWith('./') || isAbsolute(schemaPath) ? schemaPath : `./${schemaPath}`;
 
   const files: FileEntry[] = [
-    { path: schemaPath, content: starterSchema(target) },
+    { path: schemaPath, content: starterSchema(target, authoring) },
     { path: 'prisma-next.config.ts', content: configFile(target, configPath) },
     { path: join(schemaDir, 'db.ts'), content: dbFile(target) },
     { path: 'prisma-next.md', content: quickReferenceMd(target, schemaPath) },
