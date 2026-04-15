@@ -48,12 +48,10 @@ describe(
     });
 
     afterAll(async () => {
-      try {
-        await client?.close();
-        await replSet?.stop();
-      } catch {
-        // ignore cleanup errors
-      }
+      await Promise.allSettled([
+        client?.close() ?? Promise.resolve(),
+        replSet?.stop() ?? Promise.resolve(),
+      ]);
     }, timeouts.spinUpMongoMemoryServer);
 
     async function runOps(ops: readonly MongoMigrationPlanOperation[]): Promise<{
