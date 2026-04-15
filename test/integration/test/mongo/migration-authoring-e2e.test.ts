@@ -75,7 +75,7 @@ describe(
           policy: ALL_POLICY,
           frameworkComponents: [],
         });
-        if (!result.ok) throw new Error(`Runner failed: ${result.error.summary}`);
+        if (!result.ok) throw new Error(`Runner failed: ${result.failure.summary}`);
         return result.value;
       } finally {
         await controlDriver.close();
@@ -103,7 +103,7 @@ describe(
         await runOps(ops);
 
         const info = await db.listCollections({ name: 'users' }).toArray();
-        const options = info[0]!['options'] as Record<string, unknown>;
+        const options = (info[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
         expect(options['validator']).toEqual({ $jsonSchema: { required: ['email'] } });
       });
     });
@@ -177,7 +177,7 @@ describe(
         expect(result.operationsExecuted).toBe(1);
 
         const info = await db.listCollections({ name: 'users' }).toArray();
-        const options = info[0]!['options'] as Record<string, unknown>;
+        const options = (info[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
         expect(options['validator']).toEqual({
           $jsonSchema: { required: ['email', 'name'] },
         });
@@ -243,7 +243,7 @@ describe(
 
         const info = await db.listCollections({ name: 'users' }).toArray();
         expect(info).toHaveLength(1);
-        const options = info[0]!['options'] as Record<string, unknown>;
+        const options = (info[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
         expect(options['validator']).toEqual({
           $jsonSchema: { required: ['email', 'name'] },
         });
@@ -318,7 +318,7 @@ describe(
         }
 
         const info = await db.listCollections({ name: 'users' }).toArray();
-        const options = info[0]!['options'] as Record<string, unknown>;
+        const options = (info[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
         expect(options['validator']).toEqual({
           $jsonSchema: { required: ['email', 'name'] },
         });
