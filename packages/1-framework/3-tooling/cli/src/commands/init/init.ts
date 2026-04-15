@@ -4,7 +4,13 @@ import { promisify } from 'node:util';
 import * as clack from '@clack/prompts';
 import { dirname, isAbsolute, join } from 'pathe';
 import { TerminalUI } from '../../utils/terminal-ui';
-import { detectPackageManager, formatRunCommand } from './detect-package-manager';
+import {
+  detectPackageManager,
+  formatAddArgs,
+  formatAddDevArgs,
+  formatRunCommand,
+  hasProjectManifest,
+} from './detect-package-manager';
 import { agentSkillMd } from './templates/agent-skill';
 import {
   type AuthoringId,
@@ -32,8 +38,10 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
 
   clack.intro('prisma-next init', { output: process.stderr });
 
-  if (!existsSync(join(baseDir, 'package.json'))) {
-    ui.error('No package.json found. Initialize your project first, then re-run prisma-next init.');
+  if (!hasProjectManifest(baseDir)) {
+    ui.error(
+      'No package.json or deno.json found. Initialize your project first (e.g. npm init or deno init), then re-run prisma-next init.',
+    );
     process.exit(1);
   }
 
@@ -127,7 +135,8 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
         'Run the following commands to complete setup:',
         '',
         '  1. Install dependencies:',
-        `     ${pm} add ${pkg} dotenv && ${pm} add -D @prisma-next/cli`,
+        `     ${pm} ${formatAddArgs(pm, [pkg, 'dotenv']).join(' ')}`,
+        `     ${pm} ${formatAddDevArgs(pm, ['@prisma-next/cli']).join(' ')}`,
         '',
         '  2. Emit the contract:',
         `     ${emitCommand}`,
@@ -143,8 +152,8 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
 
     spinner.start(`Installing ${pkg}, dotenv, and @prisma-next/cli...`);
     try {
-      await exec(pm, ['add', pkg, 'dotenv'], { cwd: baseDir });
-      await exec(pm, ['add', '-D', '@prisma-next/cli'], { cwd: baseDir });
+      await exec(pm, formatAddArgs(pm, [pkg, 'dotenv']), { cwd: baseDir });
+      await exec(pm, formatAddDevArgs(pm, ['@prisma-next/cli']), { cwd: baseDir });
       spinner.stop(`Installed ${pkg}, dotenv, and @prisma-next/cli`);
       installSucceeded = true;
     } catch {
@@ -152,8 +161,8 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
       ui.warn(
         [
           'Could not install dependencies automatically. Run manually:',
-          `  ${pm} add ${pkg} dotenv`,
-          `  ${pm} add -D @prisma-next/cli`,
+          `  ${pm} ${formatAddArgs(pm, [pkg, 'dotenv']).join(' ')}`,
+          `  ${pm} ${formatAddDevArgs(pm, ['@prisma-next/cli']).join(' ')}`,
         ].join('\n'),
       );
     }
