@@ -11,6 +11,10 @@ import {
   type TargetId,
   targetPackageName,
 } from '../../../packages/1-framework/3-tooling/cli/src/commands/init/templates/code-templates';
+import {
+  defaultTsConfig,
+  REQUIRED_COMPILER_OPTIONS,
+} from '../../../packages/1-framework/3-tooling/cli/src/commands/init/templates/tsconfig';
 import { createIntegrationTestDir } from './utils/cli-test-helpers';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,29 +34,6 @@ export default defineConfig({
 `;
 }
 
-function writeTsConfig(testDir: string, include: string[]): void {
-  writeFileSync(
-    join(testDir, 'tsconfig.json'),
-    JSON.stringify(
-      {
-        compilerOptions: {
-          target: 'ES2022',
-          module: 'preserve',
-          moduleResolution: 'bundler',
-          strict: true,
-          skipLibCheck: true,
-          noEmit: true,
-          resolveJsonModule: true,
-        },
-        include,
-      },
-      null,
-      2,
-    ),
-    'utf-8',
-  );
-}
-
 function writeInitFiles(
   testDir: string,
   target: TargetId,
@@ -70,6 +51,7 @@ function writeInitFiles(
   writeFileSync(configPath, configContent, 'utf-8');
 
   writeFileSync(join(testDir, schemaDir, 'db.ts'), dbFile(target), 'utf-8');
+  writeFileSync(join(testDir, 'tsconfig.json'), defaultTsConfig(), 'utf-8');
 
   return { schemaPath, configPath };
 }
@@ -86,6 +68,12 @@ async function emitContract(testDir: string, configPath: string): Promise<void> 
   } finally {
     process.chdir(originalCwd);
   }
+}
+
+function writeScopedTsConfig(testDir: string, include: string[]): void {
+  const config = JSON.parse(defaultTsConfig()) as Record<string, unknown>;
+  config['include'] = include;
+  writeFileSync(join(testDir, 'tsconfig.json'), JSON.stringify(config, null, 2), 'utf-8');
 }
 
 async function typecheck(testDir: string): Promise<void> {
@@ -107,7 +95,7 @@ async function typecheck(testDir: string): Promise<void> {
 
 const TYPECHECK_TIMEOUT = 30_000;
 
-describe('init template validity', () => {
+describe('init generates a typecheckable project', () => {
   let testDir: string;
 
   beforeEach(() => {
@@ -120,45 +108,48 @@ describe('init template validity', () => {
     }
   });
 
-  describe('TypeScript contract templates typecheck', () => {
-    it(
-      'postgres: contract.ts typechecks',
-      async () => {
-        writeInitFiles(testDir, 'postgres', 'typescript');
-        writeTsConfig(testDir, ['prisma/contract.ts']);
+  it('generated tsconfig includes all required compiler options', () => {
+    const config = JSON.parse(defaultTsConfig()) as Record<string, unknown>;
+    const opts = config['compilerOptions'] as Record<string, unknown>;
 
-        await typecheck(testDir);
-      },
-      TYPECHECK_TIMEOUT,
-    );
-
-    it(
-      'mongo: contract.ts typechecks',
-      async () => {
-        writeInitFiles(testDir, 'mongo', 'typescript');
-        writeTsConfig(testDir, ['prisma/contract.ts']);
-
-        await typecheck(testDir);
-      },
-      TYPECHECK_TIMEOUT,
-    );
+    for (const [key, value] of Object.entries(REQUIRED_COMPILER_OPTIONS)) {
+      expect(opts[key], `compilerOptions.${key}`).toBe(value);
+    }
   });
 
-  describe('full generated project typechecks after contract emit', () => {
-    it(
-      'postgres + psl: all generated files typecheck',
-      async () => {
-        const { configPath } = writeInitFiles(testDir, 'postgres', 'psl');
-        await emitContract(testDir, configPath);
+  it(
+    'postgres + typescript: contract.ts typechecks with generated tsconfig',
+    async () => {
+      writeInitFiles(testDir, 'postgres', 'typescript');
+      writeScopedTsConfig(testDir, ['prisma/contract.ts']);
 
-        expect(existsSync(join(testDir, 'prisma', 'contract.json'))).toBe(true);
-        expect(existsSync(join(testDir, 'prisma', 'contract.d.ts'))).toBe(true);
+      await typecheck(testDir);
+    },
+    TYPECHECK_TIMEOUT,
+  );
 
-        writeTsConfig(testDir, ['prisma/db.ts']);
+  it(
+    'mongo + typescript: contract.ts typechecks with generated tsconfig',
+    async () => {
+      writeInitFiles(testDir, 'mongo', 'typescript');
+      writeScopedTsConfig(testDir, ['prisma/contract.ts']);
 
-        await typecheck(testDir);
-      },
-      TYPECHECK_TIMEOUT,
-    );
-  });
+      await typecheck(testDir);
+    },
+    TYPECHECK_TIMEOUT,
+  );
+
+  it(
+    'postgres + psl: full project typechecks after emit',
+    async () => {
+      const { configPath } = writeInitFiles(testDir, 'postgres', 'psl');
+      await emitContract(testDir, configPath);
+
+      expect(existsSync(join(testDir, 'prisma', 'contract.json'))).toBe(true);
+      expect(existsSync(join(testDir, 'prisma', 'contract.d.ts'))).toBe(true);
+
+      await typecheck(testDir);
+    },
+    TYPECHECK_TIMEOUT,
+  );
 });
