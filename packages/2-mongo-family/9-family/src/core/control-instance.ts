@@ -1,10 +1,4 @@
-import {
-  contractToMongoSchemaIR,
-  initMarker,
-  introspectSchema,
-  readMarker,
-  updateMarker,
-} from '@prisma-next/adapter-mongo/control';
+import { introspectSchema } from '@prisma-next/adapter-mongo/control';
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ControlDriverInstance,
@@ -25,6 +19,12 @@ import {
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import {
+  contractToMongoSchemaIR,
+  initMarker,
+  readMarker,
+  updateMarker,
+} from '@prisma-next/target-mongo/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Db } from 'mongodb';
 import { diffMongoSchemas } from './schema-diff';

@@ -6,6 +6,8 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import type { Db, Document } from 'mongodb';
 
+export type { Db } from 'mongodb';
+
 const COLLECTION = '_prisma_migrations';
 const MARKER_ID = 'marker';
 
