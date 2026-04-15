@@ -654,6 +654,9 @@ class MongoCollectionImpl<
       if (idOp) {
         throw new Error('Mutation payloads cannot modify `_id`');
       }
+      if (ops.length === 0) {
+        return { $set: {} };
+      }
       return compileFieldOperations(ops, (field, value, operator) =>
         this.#wrapFieldOpValue(field, value, operator),
       );
@@ -676,6 +679,19 @@ class MongoCollectionImpl<
     if (value instanceof MongoParamRef && contractField.type.kind === 'scalar') {
       return new MongoParamRef(value.value, { codecId: contractField.type.codecId });
     }
+
+    if (contractField.type.kind === 'valueObject' && value instanceof MongoParamRef) {
+      const raw = value.value;
+      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        const voName = contractField.type.name;
+        const voDef = (this.#contract as { valueObjects?: Record<string, ContractValueObject> })
+          .valueObjects?.[voName];
+        if (voDef) {
+          return this.#wrapValueObject(raw as Record<string, unknown>, voDef);
+        }
+      }
+    }
+
     return value;
   }
 
@@ -697,6 +713,19 @@ class MongoCollectionImpl<
     if (currentField?.type.kind === 'scalar' && value instanceof MongoParamRef) {
       return new MongoParamRef(value.value, { codecId: currentField.type.codecId });
     }
+
+    if (currentField?.type.kind === 'valueObject' && value instanceof MongoParamRef) {
+      const raw = value.value;
+      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        const voName = currentField.type.name;
+        const voDef = (this.#contract as { valueObjects?: Record<string, ContractValueObject> })
+          .valueObjects?.[voName];
+        if (voDef) {
+          return this.#wrapValueObject(raw as Record<string, unknown>, voDef);
+        }
+      }
+    }
+
     return value;
   }
 
