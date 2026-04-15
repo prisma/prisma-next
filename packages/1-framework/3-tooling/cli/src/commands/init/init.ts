@@ -1,5 +1,6 @@
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { promisify } from 'node:util';
 import * as clack from '@clack/prompts';
 import { dirname, isAbsolute, join } from 'pathe';
 import { TerminalUI } from '../../utils/terminal-ui';
@@ -108,10 +109,12 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
     const spinner = ui.spinner();
     let installSucceeded = false;
 
+    const exec = promisify(execFile);
+
     spinner.start(`Installing ${pkg}, dotenv, and @prisma-next/cli...`);
     try {
-      execFileSync(pm, ['add', pkg, 'dotenv'], { cwd: baseDir, stdio: 'pipe' });
-      execFileSync(pm, ['add', '-D', '@prisma-next/cli'], { cwd: baseDir, stdio: 'pipe' });
+      await exec(pm, ['add', pkg, 'dotenv'], { cwd: baseDir });
+      await exec(pm, ['add', '-D', '@prisma-next/cli'], { cwd: baseDir });
       spinner.stop(`Installed ${pkg}, dotenv, and @prisma-next/cli`);
       installSucceeded = true;
     } catch {

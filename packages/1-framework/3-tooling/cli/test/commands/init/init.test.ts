@@ -30,7 +30,10 @@ vi.mock('@clack/prompts', () => ({
 }));
 
 vi.mock('node:child_process', () => ({
-  execFileSync: vi.fn(),
+  execFile: vi.fn(
+    (_cmd: string, _args: string[], _opts: Record<string, unknown>, cb: (err: null) => void) =>
+      cb(null),
+  ),
 }));
 
 vi.mock('../../../src/control-api/operations/contract-emit', () => ({
@@ -41,7 +44,7 @@ vi.mock('../../../src/control-api/operations/contract-emit', () => ({
   })),
 }));
 
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import * as clack from '@clack/prompts';
 import { runInit } from '../../../src/commands/init/init';
 
@@ -165,7 +168,7 @@ describe('runInit', () => {
   it('with --no-install skips dependency installation and emit', async () => {
     await runInit(tmpDir, { noInstall: true });
 
-    expect(execFileSync).not.toHaveBeenCalled();
+    expect(execFile).not.toHaveBeenCalled();
     expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
     expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
   });
@@ -175,7 +178,7 @@ describe('runInit', () => {
 
     await runInit(tmpDir, { noInstall: true });
 
-    expect(execFileSync).not.toHaveBeenCalled();
+    expect(execFile).not.toHaveBeenCalled();
   });
 
   it('detects pnpm and installs dependencies', async () => {
@@ -183,15 +186,17 @@ describe('runInit', () => {
 
     await runInit(tmpDir, { noInstall: false });
 
-    expect(execFileSync).toHaveBeenCalledWith(
+    expect(execFile).toHaveBeenCalledWith(
       'pnpm',
       ['add', '@prisma-next/postgres', 'dotenv'],
       expect.anything(),
+      expect.any(Function),
     );
-    expect(execFileSync).toHaveBeenCalledWith(
+    expect(execFile).toHaveBeenCalledWith(
       'pnpm',
       ['add', '-D', '@prisma-next/cli'],
       expect.anything(),
+      expect.any(Function),
     );
   });
 
