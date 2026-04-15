@@ -2953,6 +2953,12 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/framework-components
+      '@prisma-next/middleware-telemetry':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/middleware-telemetry
+      '@prisma-next/runtime-executor':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/4-runtime/runtime-executor
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../utils

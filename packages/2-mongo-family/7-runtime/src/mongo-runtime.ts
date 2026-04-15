@@ -37,13 +37,12 @@ class MongoRuntimeImpl implements MongoRuntime {
   constructor(options: MongoRuntimeOptions) {
     this.#adapter = options.adapter;
     this.#driver = options.driver;
-    this.#middleware = options.middleware ?? [];
 
-    if (options.middleware) {
-      for (const mw of options.middleware) {
-        checkMiddlewareCompatibility(mw, 'mongo', options.targetId);
-      }
+    const middleware = options.middleware ? [...options.middleware] : [];
+    for (const mw of middleware) {
+      checkMiddlewareCompatibility(mw, 'mongo', options.targetId);
     }
+    this.#middleware = middleware;
 
     this.#middlewareContext = {
       contract: options.contract,
@@ -60,9 +59,10 @@ class MongoRuntimeImpl implements MongoRuntime {
     const ctx = this.#middlewareContext;
 
     const iterator = async function* (): AsyncGenerator<Row, void, unknown> {
-      const startedAt = Date.now();
+      const startedAt = ctx.now();
       let rowCount = 0;
       let completed = false;
+      let failed = false;
 
       try {
         for (const mw of middleware) {
@@ -85,22 +85,22 @@ class MongoRuntimeImpl implements MongoRuntime {
 
         completed = true;
       } catch (error) {
-        const latencyMs = Date.now() - startedAt;
+        failed = true;
+        throw error;
+      } finally {
+        const latencyMs = ctx.now() - startedAt;
         for (const mw of middleware) {
-          if (mw.afterExecute) {
+          if (!mw.afterExecute) continue;
+
+          if (failed) {
             try {
               await mw.afterExecute(plan, { rowCount, latencyMs, completed }, ctx);
             } catch {
               // Ignore errors from afterExecute during error handling
             }
+            continue;
           }
-        }
-        throw error;
-      }
 
-      const latencyMs = Date.now() - startedAt;
-      for (const mw of middleware) {
-        if (mw.afterExecute) {
           await mw.afterExecute(plan, { rowCount, latencyMs, completed }, ctx);
         }
       }

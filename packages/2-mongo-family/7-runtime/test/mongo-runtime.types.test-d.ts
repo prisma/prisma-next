@@ -12,7 +12,7 @@ test('MongoRuntime satisfies RuntimeExecutor<MongoQueryPlan> structurally', () =
   // on MongoQueryPlan prevents nominal extends but structural compatibility holds.
   expectTypeOf(runtime.execute).toBeFunction();
   expectTypeOf(runtime.close).toBeFunction();
-  expectTypeOf<MongoRuntime['close']>().toMatchTypeOf<MongoExecutor['close']>();
+  expectTypeOf<MongoRuntime['close']>().toExtend<MongoExecutor['close']>();
 });
 
 test('MongoMiddleware has familyId: mongo', () => {

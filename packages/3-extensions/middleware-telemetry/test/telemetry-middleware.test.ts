@@ -80,4 +80,23 @@ describe('telemetry middleware', () => {
       storageHash: 'sha256:test',
     });
   });
+
+  it('swallows onEvent errors and logs a warning instead', async () => {
+    const onEvent = vi.fn(() => {
+      throw new Error('sink failure');
+    });
+    const middleware = createTelemetryMiddleware({ onEvent });
+    const warn = vi.fn();
+    const ctx = {
+      contract: {},
+      mode: 'strict' as const,
+      now: Date.now,
+      log: { info: vi.fn(), warn, error: vi.fn() },
+    };
+
+    await expect(middleware.beforeExecute!(plan, ctx)).resolves.toBeUndefined();
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]![0]).toMatchObject({ message: 'telemetry sink error' });
+  });
 });

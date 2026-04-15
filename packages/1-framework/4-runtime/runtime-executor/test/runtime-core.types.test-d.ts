@@ -4,15 +4,15 @@ import { expectTypeOf, test } from 'vitest';
 import type { RuntimeCore } from '../src/runtime-core';
 
 test('RuntimeCore nominally extends RuntimeExecutor<ExecutionPlan>', () => {
-  expectTypeOf<RuntimeCore>().toMatchTypeOf<RuntimeExecutor<ExecutionPlan>>();
+  expectTypeOf<RuntimeCore>().toExtend<RuntimeExecutor<ExecutionPlan>>();
 });
 
 test('RuntimeCore.execute is assignable to RuntimeExecutor.execute', () => {
   type CoreExecute = RuntimeCore['execute'];
   type ExecutorExecute = RuntimeExecutor<ExecutionPlan>['execute'];
-  expectTypeOf<CoreExecute>().toMatchTypeOf<ExecutorExecute>();
+  expectTypeOf<CoreExecute>().toExtend<ExecutorExecute>();
 });
 
 test('RuntimeCore.close is assignable to RuntimeExecutor.close', () => {
-  expectTypeOf<RuntimeCore['close']>().toMatchTypeOf<RuntimeExecutor<ExecutionPlan>['close']>();
+  expectTypeOf<RuntimeCore['close']>().toExtend<RuntimeExecutor<ExecutionPlan>['close']>();
 });
