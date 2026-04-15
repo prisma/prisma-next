@@ -105,23 +105,6 @@ async function typecheck(testDir: string): Promise<void> {
   }
 }
 
-/**
- * Writes a .ts file that imports the emitted Contract type and exercises it,
- * so tsc can verify the emitted contract.d.ts is well-formed and importable.
- */
-function writeTypecheckHarness(testDir: string): void {
-  writeFileSync(
-    join(testDir, 'prisma', '_typecheck.ts'),
-    `import type { Contract } from './contract.d';
-
-type _HasTarget = Contract extends { target: string } ? true : never;
-const _t: _HasTarget = true;
-void _t;
-`,
-    'utf-8',
-  );
-}
-
 const TYPECHECK_TIMEOUT = 30_000;
 
 describe('init template validity', () => {
@@ -161,9 +144,9 @@ describe('init template validity', () => {
     );
   });
 
-  describe('emitted contract types are valid after PSL emit', () => {
+  describe('full generated project typechecks after contract emit', () => {
     it(
-      'postgres: emitted contract.d.ts is importable and well-formed',
+      'postgres + psl: all generated files typecheck',
       async () => {
         const { configPath } = writeInitFiles(testDir, 'postgres', 'psl');
         await emitContract(testDir, configPath);
@@ -171,8 +154,7 @@ describe('init template validity', () => {
         expect(existsSync(join(testDir, 'prisma', 'contract.json'))).toBe(true);
         expect(existsSync(join(testDir, 'prisma', 'contract.d.ts'))).toBe(true);
 
-        writeTypecheckHarness(testDir);
-        writeTsConfig(testDir, ['prisma/_typecheck.ts']);
+        writeTsConfig(testDir, ['prisma/db.ts']);
 
         await typecheck(testDir);
       },
