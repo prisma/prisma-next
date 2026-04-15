@@ -161,7 +161,23 @@ Evaluate changes against:
 - Correctness & edge cases (boundary conditions, failure modes, concurrency/reentrancy where relevant)
 - Documentation (public API docs, READMEs, breaking changes, usage examples when appropriate)
 - Tests as evidence of behavior (call out gaps and mismatches with expectations)
-- Spec traceability (map key requirements → implementation touchpoints + tests)
+- Spec traceability (see 4.1.1 — systematic AC-by-AC audit)
+
+### 4.1.1) Spec traceability — AC-by-AC audit (required)
+
+Before writing findings, walk every acceptance criterion (and every functional requirement if ACs are absent) and verify:
+
+1. **Deliverable exists**: Does the implementation the spec asks for actually exist? A test fixture that exercises an interface is not the same as a production deliverable. If the spec says "implement a middleware," there must be a shippable middleware — not just a test helper that proves the interface works.
+
+2. **Deliverable matches spec intent**: Compare what the spec describes (e.g., "a telemetry middleware," "a CLI command," "a config option") against what was actually built. Check the deliverable's location, export status, and whether it's reachable by consumers.
+
+3. **AC is honestly checked**: If an AC is marked `[x]` (done), verify the claim. An AC checked but not satisfied is a finding.
+
+4. **Evidence exists**: Tests or type tests that verify the behavior. If tests exist but only prove a weaker claim than the AC states, call it out.
+
+Common failure mode: conflating "a test proves the interface works" with "the requirement is delivered." Tests are evidence, not deliverables. When a spec says "implement X," look for X in production code — not in a test file.
+
+Record the results in the **Acceptance-criteria traceability** section (4.2).
 
 ### 4.2) Output structure (required)
 
