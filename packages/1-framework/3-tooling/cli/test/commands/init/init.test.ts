@@ -188,7 +188,7 @@ describe('runInit', () => {
 
     expect(execFileSync).toHaveBeenCalledWith(
       'pnpm',
-      ['add', '@prisma-next/postgres'],
+      ['add', '@prisma-next/postgres', 'dotenv'],
       expect.anything(),
     );
     expect(execFileSync).toHaveBeenCalledWith(

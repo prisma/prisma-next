@@ -58,18 +58,20 @@ describe('templates', () => {
   });
 
   describe('configFile', () => {
-    it('generates postgres config with single import from facade', () => {
+    it('generates postgres config with dotenv and single import from facade', () => {
       const config = configFile('postgres', './prisma/contract.prisma');
 
+      expect(config).toContain("import 'dotenv/config'");
       expect(config).toContain("from '@prisma-next/postgres/config'");
       expect(config).toContain("contract: './prisma/contract.prisma'");
       const importLines = config.split('\n').filter((l) => l.includes("from '@prisma-next/"));
       expect(importLines).toHaveLength(1);
     });
 
-    it('generates mongo config with single import from facade', () => {
+    it('generates mongo config with dotenv and single import from facade', () => {
       const config = configFile('mongo', './prisma/contract.prisma');
 
+      expect(config).toContain("import 'dotenv/config'");
       expect(config).toContain("from '@prisma-next/mongo/config'");
       const importLines = config.split('\n').filter((l) => l.includes("from '@prisma-next/"));
       expect(importLines).toHaveLength(1);

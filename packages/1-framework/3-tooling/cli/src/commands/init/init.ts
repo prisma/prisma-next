@@ -94,7 +94,7 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
         'Run the following commands to complete setup:',
         '',
         '  1. Install dependencies:',
-        `     ${pm} add ${pkg} && ${pm} add -D @prisma-next/cli`,
+        `     ${pm} add ${pkg} dotenv && ${pm} add -D @prisma-next/cli`,
         '',
         '  2. Emit the contract:',
         `     ${pm} prisma-next contract emit`,
@@ -107,17 +107,17 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
     const pkg = targetPackageName(target);
     const spinner = ui.spinner();
 
-    spinner.start(`Installing ${pkg} and @prisma-next/cli...`);
+    spinner.start(`Installing ${pkg}, dotenv, and @prisma-next/cli...`);
     try {
-      execFileSync(pm, ['add', pkg], { cwd: baseDir, stdio: 'pipe' });
+      execFileSync(pm, ['add', pkg, 'dotenv'], { cwd: baseDir, stdio: 'pipe' });
       execFileSync(pm, ['add', '-D', '@prisma-next/cli'], { cwd: baseDir, stdio: 'pipe' });
-      spinner.stop(`Installed ${pkg} and @prisma-next/cli`);
+      spinner.stop(`Installed ${pkg}, dotenv, and @prisma-next/cli`);
     } catch {
       spinner.stop('Installation failed');
       ui.warn(
         [
           'Could not install dependencies automatically. Run manually:',
-          `  ${pm} add ${pkg}`,
+          `  ${pm} add ${pkg} dotenv`,
           `  ${pm} add -D @prisma-next/cli`,
         ].join('\n'),
       );

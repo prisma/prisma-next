@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { defineConfig } from '@prisma-next/postgres/config';
 
 export default defineConfig({
