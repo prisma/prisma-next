@@ -716,6 +716,33 @@ describe('MongoCollection write methods', () => {
         expect(update['$set']!['homeAddress.city']!.codecId).toBe('mongo/string@1');
       }
     });
+
+    it('normalizes empty callback to { $set: {} }', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update(() => []);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        expect(command.update).toEqual({ $set: {} });
+      }
+    });
+
+    it('wraps value-object payload through codec in set()', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col
+        .where(MongoFieldFilter.eq('_id', 'id-1'))
+        .update((u) => [u.homeAddress.set({ city: 'NYC', country: 'US' })]);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, unknown>>;
+        const setDoc = update['$set']!['homeAddress'] as Record<string, MongoParamRef>;
+        expect(setDoc['city']).toBeInstanceOf(MongoParamRef);
+        expect(setDoc['city']!.codecId).toBe('mongo/string@1');
+        expect(setDoc['country']).toBeInstanceOf(MongoParamRef);
+        expect(setDoc['country']!.codecId).toBe('mongo/string@1');
+      }
+    });
   });
 
   describe('updateAll() with callback', () => {
