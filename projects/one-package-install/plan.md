@@ -60,9 +60,9 @@ The user-facing entry point — `prisma-next init` scaffolds files, installs dep
   - `agentSkill(target, paths)` → `.agents/skills/prisma-next/SKILL.md` agent skill with equivalent content framed for AI agents.
   - Equivalent `mongo*` templates for the Mongo target.
 - [ ] **3.3 Implement the init command flow** — Create `init.ts` with the main flow:
-  1. Prompt for target (Postgres/Mongo) using `clack.select()`.
-  2. Prompt for schema location using `clack.text()` with default `prisma/contract.prisma`.
-  3. Check for existing files; prompt for overwrite confirmation with `clack.confirm()` if any exist.
+  1. Check for prior init (`prisma-next.config.ts` exists). If found, prompt once: "This project is already initialized. Re-initialize?" If declined, exit. If accepted, proceed and overwrite all scaffolded files without further per-file prompts.
+  2. Prompt for target (Postgres/Mongo) using `clack.select()`.
+  3. Prompt for schema location using `clack.text()` with default `prisma/contract.prisma`.
   4. Write the five scaffolded files (schema, config, db.ts, prisma-next.md, agent skill).
   5. Detect package manager.
   6. Install dependencies (`@prisma-next/postgres` as dep, `@prisma-next/cli` as devDep) with a spinner.
@@ -76,7 +76,7 @@ The user-facing entry point — `prisma-next init` scaffolds files, installs dep
   - Generated `db.ts` has single `@prisma-next` import from facade `/runtime` (AC3).
   - Package manager detection from each lockfile type: pnpm, npm, yarn, bun (AC9).
   - `--no-install` produces five scaffolded files but no emitted files, prints manual commands (AC10).
-  - Existing files trigger overwrite confirmation prompt (AC11).
+  - Re-init detection: running init when `prisma-next.config.ts` exists prompts once to re-initialize; accepting overwrites all scaffolded files; declining exits cleanly (AC11).
   - Mock `execFileSync` for install and `executeContractEmit` for emit.
 
 ### Milestone 4: End-to-end verification and close-out
@@ -106,7 +106,7 @@ Full integration validation and project wrap-up.
 | AC8: .ts extension → TS provider | Unit | 1.4 | Provider selection logic |
 | AC9: PM detection (pnpm/npm/yarn/bun) | Unit | 3.5 | Lockfile fixtures |
 | AC10: --no-install skips install+emit | Unit | 3.5 | Assert files + printed commands |
-| AC11: Existing files prompt overwrite | Unit | 3.5 | Mock confirm prompt |
+| AC11: Re-init detection + single prompt | Unit | 3.5 | Mock confirm prompt |
 | AC12: Missing package → warning | Unit | 2.3 | Mock resolution failure |
 | AC13: All packages present → no warning | Unit | 2.3 | Mock resolution success |
 
