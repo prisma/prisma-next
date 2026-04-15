@@ -10,21 +10,21 @@ import type {
   MigrationRunnerResult,
 } from '@prisma-next/framework-components/control';
 import type {
+  MongoDdlCommandVisitor,
+  MongoInspectionCommandVisitor,
   MongoMigrationCheck,
   MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
-import {
-  initMarker,
-  readMarker,
-  updateMarker,
-  writeLedgerEntry,
-} from '@prisma-next/target-mongo/control';
 import { notOk, ok } from '@prisma-next/utils/result';
-import type { Db } from 'mongodb';
-import { MongoCommandExecutor, MongoInspectionExecutor } from './command-executor';
 import { FilterEvaluator } from './filter-evaluator';
-import type { MongoControlDriverInstance } from './mongo-control-driver';
+import type { Db } from './marker-ledger';
+import { initMarker, readMarker, updateMarker, writeLedgerEntry } from './marker-ledger';
 import { deserializeMongoOps } from './mongo-ops-serializer';
+
+export type MongoExecutorFactory = (db: Db) => {
+  commandExecutor: MongoDdlCommandVisitor<Promise<void>>;
+  inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>;
+};
 
 function runnerFailure(
   code: string,
@@ -40,7 +40,7 @@ function runnerFailure(
 
 function isMongoControlDriverInstance(
   driver: ControlDriverInstance<'mongo', 'mongo'>,
-): driver is MongoControlDriverInstance {
+): driver is ControlDriverInstance<'mongo', 'mongo'> & { db: Db } {
   return 'db' in driver && driver.db != null;
 }
 
@@ -55,6 +55,8 @@ function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
 }
 
 export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
+  constructor(private readonly executorFactory: MongoExecutorFactory) {}
+
   async execute(options: {
     readonly plan: MigrationPlan;
     readonly driver: ControlDriverInstance<'mongo', 'mongo'>;
@@ -83,8 +85,7 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
     const runPostchecks = checks?.postchecks !== false;
     const runIdempotency = checks?.idempotencyChecks !== false;
 
-    const commandExecutor = new MongoCommandExecutor(db);
-    const inspectionExecutor = new MongoInspectionExecutor(db);
+    const { commandExecutor, inspectionExecutor } = this.executorFactory(db);
     const filterEvaluator = new FilterEvaluator();
 
     let operationsExecuted = 0;
@@ -189,7 +190,7 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
 
   private async evaluateChecks(
     checks: readonly MongoMigrationCheck[],
-    inspectionExecutor: MongoInspectionExecutor,
+    inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>,
     filterEvaluator: FilterEvaluator,
   ): Promise<boolean> {
     for (const check of checks) {
@@ -205,7 +206,7 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
 
   private async allChecksSatisfied(
     checks: readonly MongoMigrationCheck[],
-    inspectionExecutor: MongoInspectionExecutor,
+    inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>,
     filterEvaluator: FilterEvaluator,
   ): Promise<boolean> {
     if (checks.length === 0) return false;

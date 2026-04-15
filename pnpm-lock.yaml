@@ -2334,9 +2334,24 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/mongo-contract':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/1-foundation/mongo-contract
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../../2-mongo-family/4-query/query-ast
+      '@prisma-next/mongo-schema-ir':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/3-tooling/mongo-schema-ir
+      '@prisma-next/mongo-value':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/1-foundation/mongo-value
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/utils
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0

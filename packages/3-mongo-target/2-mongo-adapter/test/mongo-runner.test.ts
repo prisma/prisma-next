@@ -8,15 +8,18 @@ import {
   MongoSchemaIndex,
   MongoSchemaIR,
 } from '@prisma-next/mongo-schema-ir';
-import * as markerLedger from '@prisma-next/target-mongo/control';
-import { initMarker, readMarker } from '@prisma-next/target-mongo/control';
+import {
+  initMarker,
+  MongoMigrationPlanner,
+  MongoMigrationRunner,
+  readMarker,
+  serializeMongoOps,
+} from '@prisma-next/target-mongo/control';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { MongoCommandExecutor, MongoInspectionExecutor } from '../src/core/command-executor';
 import { createMongoControlDriver } from '../src/core/mongo-control-driver';
-import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
-import { MongoMigrationPlanner } from '../src/core/mongo-planner';
-import { MongoMigrationRunner } from '../src/core/mongo-runner';
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -95,6 +98,13 @@ function makeDriver() {
   return createMongoControlDriver(db, client);
 }
 
+function makeRunner() {
+  return new MongoMigrationRunner((dbInstance) => ({
+    commandExecutor: new MongoCommandExecutor(dbInstance),
+    inspectionExecutor: new MongoInspectionExecutor(dbInstance),
+  }));
+}
+
 describe('MongoMigrationRunner', () => {
   it('creates an index on a real MongoDB instance', async () => {
     const contract = makeContract({
@@ -103,7 +113,7 @@ describe('MongoMigrationRunner', () => {
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
       driver: makeDriver(),
@@ -141,7 +151,7 @@ describe('MongoMigrationRunner', () => {
     const plan = planForContract(contract, originIR);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
       driver: makeDriver(),
@@ -167,7 +177,7 @@ describe('MongoMigrationRunner', () => {
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
       driver: makeDriver(),
@@ -192,7 +202,7 @@ describe('MongoMigrationRunner', () => {
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
       driver: makeDriver(),
@@ -217,7 +227,7 @@ describe('MongoMigrationRunner', () => {
     const serialized = serializePlan(plan);
 
     const executedOps: string[] = [];
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
       driver: makeDriver(),
@@ -256,7 +266,7 @@ describe('MongoMigrationRunner', () => {
       origin: { storageHash: 'sha256:expected' },
     });
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
       driver: makeDriver(),
@@ -280,7 +290,7 @@ describe('MongoMigrationRunner', () => {
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
       driver: makeDriver(),
@@ -305,7 +315,7 @@ describe('MongoMigrationRunner', () => {
       origin: { storageHash: 'sha256:something' },
     });
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
       driver: makeDriver(),
@@ -320,7 +330,7 @@ describe('MongoMigrationRunner', () => {
     }
   });
 
-  it('returns MARKER_CAS_FAILURE when marker update loses compare-and-swap', async () => {
+  it('returns MARKER_CAS_FAILURE when concurrent marker change causes CAS miss', async () => {
     await initMarker(db, { storageHash: 'sha256:origin', profileHash: 'sha256:profile' });
 
     const contract = makeContract({
@@ -332,23 +342,28 @@ describe('MongoMigrationRunner', () => {
       origin: { storageHash: 'sha256:origin' },
     });
 
-    const updateSpy = vi.spyOn(markerLedger, 'updateMarker').mockResolvedValue(false);
-    try {
-      const runner = new MongoMigrationRunner();
-      const result = await runner.execute({
-        plan: serialized,
-        driver: makeDriver(),
-        destinationContract: contract,
-        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
-        frameworkComponents: [],
-      });
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan: serialized,
+      driver: makeDriver(),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      callbacks: {
+        async onOperationComplete() {
+          await db
+            .collection('_prisma_migrations')
+            .updateOne(
+              { _id: 'marker' as never },
+              { $set: { storageHash: 'sha256:tampered-by-other-process' } },
+            );
+        },
+      },
+      frameworkComponents: [],
+    });
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.failure.code).toBe('MARKER_CAS_FAILURE');
-      }
-    } finally {
-      updateSpy.mockRestore();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('MARKER_CAS_FAILURE');
     }
   });
 
@@ -359,7 +374,7 @@ describe('MongoMigrationRunner', () => {
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
       driver: makeDriver(),
@@ -381,7 +396,7 @@ describe('MongoMigrationRunner', () => {
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     await runner.execute({
       plan: serialized,
       driver: makeDriver(),
