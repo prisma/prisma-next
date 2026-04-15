@@ -11,16 +11,6 @@ import type {
 
 type Simplify<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
-export type SimplifyDeep<T> = T extends readonly (infer E)[]
-  ? SimplifyDeep<E>[]
-  : T extends Date | RegExp | ((...args: never[]) => unknown)
-    ? T
-    : T extends object
-      ? T extends unknown
-        ? { [K in keyof T]: SimplifyDeep<T[K]> }
-        : never
-      : T;
-
 type ModelRelations<
   TContract extends MongoContract,
   ModelName extends string & keyof TContract['models'],

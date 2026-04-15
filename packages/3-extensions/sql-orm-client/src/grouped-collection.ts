@@ -8,6 +8,7 @@ import {
   ColumnRef,
   LiteralExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { getFieldToColumnMap } from './collection-contract';
 import { mapStorageRowToModelFields } from './collection-runtime';
@@ -21,7 +22,6 @@ import type {
   DefaultModelRow,
   HavingBuilder,
   HavingComparisonMethods,
-  SimplifyDeep,
 } from './types';
 import { combineWhereExprs } from './where-utils';
 

@@ -10,6 +10,7 @@ import {
   type ToWhereExpr,
   type WhereArg,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import { mapCursorValuesToColumns, mapFieldsToColumns } from './collection-column-mapping';
@@ -107,7 +108,6 @@ import {
   type RelationNames,
   type ResolvedCreateInput,
   type ShorthandWhereFilter,
-  type SimplifyDeep,
   type UniqueConstraintCriterion,
   type VariantModelRow,
   type VariantNames,
