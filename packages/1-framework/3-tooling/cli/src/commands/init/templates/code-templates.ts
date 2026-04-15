@@ -50,7 +50,8 @@ model Post {
 
 export function configFile(target: TargetId, contractPath: string): string {
   const pkg = targetPackageName(target);
-  return `import { defineConfig } from '${pkg}/config';
+  return `import 'dotenv/config';
+import { defineConfig } from '${pkg}/config';
 
 export default defineConfig({
   contract: '${contractPath}',
