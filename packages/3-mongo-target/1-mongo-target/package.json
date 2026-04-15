@@ -36,6 +36,7 @@
   "exports": {
     "./codec-types": "./dist/codec-types.mjs",
     "./control": "./dist/control.mjs",
+    "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
     "./package.json": "./package.json"
   },
