@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  agentSkillMd,
   configFile,
   dbFile,
+  quickReferenceMd,
   starterSchema,
   targetPackageName,
 } from '../../../src/commands/init/templates';
@@ -65,6 +67,70 @@ describe('templates', () => {
 
     it('returns mongo package name', () => {
       expect(targetPackageName('mongo')).toBe('@prisma-next/mongo');
+    });
+  });
+
+  describe('quickReferenceMd', () => {
+    it('contains file locations for postgres', () => {
+      const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
+
+      expect(md).toContain('prisma/contract.prisma');
+      expect(md).toContain('prisma/contract.json');
+      expect(md).toContain('prisma/db.ts');
+      expect(md).toContain('prisma-next.config.ts');
+    });
+
+    it('contains common commands', () => {
+      const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
+
+      expect(md).toContain('contract emit');
+      expect(md).toContain('db init');
+    });
+
+    it('contains a query example', () => {
+      const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
+
+      expect(md).toContain('db.sql');
+      expect(md).toContain('.from(');
+      expect(md).toContain('.select(');
+    });
+
+    it('references the correct package for mongo', () => {
+      const md = quickReferenceMd('mongo', 'prisma/contract.prisma');
+
+      expect(md).toContain('@prisma-next/mongo');
+      expect(md).toContain('MongoDB');
+    });
+  });
+
+  describe('agentSkillMd', () => {
+    it('contains file locations for postgres', () => {
+      const md = agentSkillMd('postgres', 'prisma/contract.prisma');
+
+      expect(md).toContain('prisma/contract.prisma');
+      expect(md).toContain('prisma/db.ts');
+      expect(md).toContain('prisma-next.config.ts');
+    });
+
+    it('contains common commands', () => {
+      const md = agentSkillMd('postgres', 'prisma/contract.prisma');
+
+      expect(md).toContain('contract emit');
+      expect(md).toContain('db init');
+    });
+
+    it('contains a query pattern', () => {
+      const md = agentSkillMd('postgres', 'prisma/contract.prisma');
+
+      expect(md).toContain('db.sql');
+      expect(md).toContain('.from(');
+    });
+
+    it('references the correct package for mongo', () => {
+      const md = agentSkillMd('mongo', 'prisma/contract.prisma');
+
+      expect(md).toContain('@prisma-next/mongo');
+      expect(md).toContain('MongoDB');
     });
   });
 });
