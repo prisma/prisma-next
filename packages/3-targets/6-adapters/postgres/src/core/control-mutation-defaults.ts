@@ -1,20 +1,15 @@
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
-  ControlMutationDefaultFunctionEntry,
-  ControlMutationDefaultGeneratorDescriptor,
-  PslScalarTypeDescriptor,
-} from '@prisma-next/family-sql/control';
+  ControlMutationDefaultEntry,
+  DefaultFunctionLoweringContext,
+  LoweredDefaultResult,
+  MutationDefaultGeneratorDescriptor,
+  ParsedDefaultFunctionCall,
+} from '@prisma-next/framework-components/control';
 import {
   builtinGeneratorRegistryMetadata,
   resolveBuiltinGeneratedColumnDescriptor,
 } from '@prisma-next/ids';
-import type {
-  DefaultFunctionLoweringContext,
-  DefaultFunctionLoweringHandler,
-} from '@prisma-next/sql-contract-psl';
-
-type LoweredDefaultResult = ReturnType<DefaultFunctionLoweringHandler>;
-type ParsedDefaultFunctionCall = Parameters<DefaultFunctionLoweringHandler>[0]['call'];
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
@@ -284,28 +279,28 @@ const postgresDefaultFunctionRegistryEntries = [
   ['ulid', { lower: lowerUlid, usageSignatures: ['ulid()'] }],
   ['nanoid', { lower: lowerNanoid, usageSignatures: ['nanoid()', 'nanoid(<2-255>)'] }],
   ['dbgenerated', { lower: lowerDbgenerated, usageSignatures: ['dbgenerated("...")'] }],
-] satisfies ReadonlyArray<readonly [string, ControlMutationDefaultFunctionEntry]>;
+] satisfies ReadonlyArray<readonly [string, ControlMutationDefaultEntry]>;
 
-const postgresPslScalarTypeDescriptors = new Map<string, PslScalarTypeDescriptor>([
-  ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
-  ['Boolean', { codecId: 'pg/bool@1', nativeType: 'bool' }],
-  ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
-  ['BigInt', { codecId: 'pg/int8@1', nativeType: 'int8' }],
-  ['Float', { codecId: 'pg/float8@1', nativeType: 'float8' }],
-  ['Decimal', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
-  ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
-  ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
-  ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
+const postgresPslScalarTypeDescriptors = new Map<string, string>([
+  ['String', 'pg/text@1'],
+  ['Boolean', 'pg/bool@1'],
+  ['Int', 'pg/int4@1'],
+  ['BigInt', 'pg/int8@1'],
+  ['Float', 'pg/float8@1'],
+  ['Decimal', 'pg/numeric@1'],
+  ['DateTime', 'pg/timestamptz@1'],
+  ['Json', 'pg/jsonb@1'],
+  ['Bytes', 'pg/bytea@1'],
 ]);
 
 export function createPostgresDefaultFunctionRegistry(): ReadonlyMap<
   string,
-  ControlMutationDefaultFunctionEntry
+  ControlMutationDefaultEntry
 > {
   return new Map(postgresDefaultFunctionRegistryEntries);
 }
 
-export function createPostgresMutationDefaultGeneratorDescriptors(): readonly ControlMutationDefaultGeneratorDescriptor[] {
+export function createPostgresMutationDefaultGeneratorDescriptors(): readonly MutationDefaultGeneratorDescriptor[] {
   return builtinGeneratorRegistryMetadata.map(({ id, applicableCodecIds }) => ({
     id,
     applicableCodecIds,
@@ -327,9 +322,6 @@ export function createPostgresMutationDefaultGeneratorDescriptors(): readonly Co
   }));
 }
 
-export function createPostgresPslScalarTypeDescriptors(): ReadonlyMap<
-  string,
-  PslScalarTypeDescriptor
-> {
+export function createPostgresPslScalarTypeDescriptors(): ReadonlyMap<string, string> {
   return new Map(postgresPslScalarTypeDescriptors);
 }

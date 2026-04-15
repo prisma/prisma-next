@@ -11,13 +11,11 @@ import { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError } from '../
 
 const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
   ...postgresAdapterDescriptorMeta,
-  pslTypeDescriptors: () => ({
-    scalarTypeDescriptors: createPostgresPslScalarTypeDescriptors(),
-  }),
-  controlMutationDefaults: () => ({
+  pslScalarTypeDescriptors: createPostgresPslScalarTypeDescriptors(),
+  controlMutationDefaults: {
     defaultFunctionRegistry: createPostgresDefaultFunctionRegistry(),
     generatorDescriptors: createPostgresMutationDefaultGeneratorDescriptors(),
-  }),
+  },
   create(): SqlControlAdapter<'postgres'> {
     return new PostgresControlAdapter();
   },
