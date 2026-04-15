@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -60,5 +60,30 @@ describe('detectPackageManager', () => {
     writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ packageManager: 'pnpm@9.0.0' }));
 
     expect(detectPackageManager(tmpDir)).toBe('yarn');
+  });
+
+  it('detects lockfile in ancestor directory', () => {
+    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+    const child = join(tmpDir, 'packages', 'my-app');
+    mkdirSync(child, { recursive: true });
+
+    expect(detectPackageManager(child)).toBe('pnpm');
+  });
+
+  it('detects packageManager field in ancestor package.json', () => {
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ packageManager: 'yarn@4.0.0' }));
+    const child = join(tmpDir, 'apps', 'web');
+    mkdirSync(child, { recursive: true });
+
+    expect(detectPackageManager(child)).toBe('yarn');
+  });
+
+  it('prefers closer lockfile over ancestor lockfile', () => {
+    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+    const child = join(tmpDir, 'packages', 'my-app');
+    mkdirSync(child, { recursive: true });
+    writeFileSync(join(child, 'yarn.lock'), '');
+
+    expect(detectPackageManager(child)).toBe('yarn');
   });
 });
