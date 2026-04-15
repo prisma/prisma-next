@@ -9,12 +9,11 @@ import { createMongoScalarTypeDescriptors } from './scalar-type-descriptors';
 
 export interface MongoContractOptions {
   readonly output?: string;
-  readonly scalarTypeDescriptors?: ReadonlyMap<string, string>;
 }
 
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
   return {
-    source: async (_context: ContractSourceContext) => {
+    source: async (context: ContractSourceContext) => {
       const absoluteSchemaPath = resolve(schemaPath);
       let schema: string;
       try {
@@ -39,9 +38,15 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         sourceId: schemaPath,
       });
 
+      const scalarTypeDescriptors =
+        context.pslScalarTypeDescriptors.size > 0
+          ? context.pslScalarTypeDescriptors
+          : createMongoScalarTypeDescriptors();
+
       const interpreted = interpretPslDocumentToMongoContract({
         document,
-        scalarTypeDescriptors: options?.scalarTypeDescriptors ?? createMongoScalarTypeDescriptors(),
+        scalarTypeDescriptors,
+        codecLookup: context.codecLookup,
       });
       if (!interpreted.ok) {
         return interpreted;
