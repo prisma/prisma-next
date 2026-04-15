@@ -224,4 +224,18 @@ describe('deriveJsonSchema', () => {
       },
     });
   });
+
+  it('maps Float (mongo/double@1) to bsonType "double"', () => {
+    const result = deriveJsonSchema({
+      price: scalarField('mongo/double@1'),
+    });
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      required: ['price'],
+      properties: {
+        price: { bsonType: 'double' },
+      },
+    });
+  });
 });

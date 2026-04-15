@@ -312,4 +312,143 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       );
     });
   });
+
+  describe('FL-09: variant collection suppression', () => {
+    it('does not create separate storage collection entries for variant models', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+        }
+
+        model Feature {
+          id       ObjectId @id @map("_id")
+          priority Int
+
+          @@base(Task, "feature")
+        }
+      `);
+
+      const storage = ir.storage as { collections: Record<string, unknown> };
+      expect(Object.keys(storage.collections)).toEqual(['tasks']);
+    });
+
+    it('merges variant indexes into base collection', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+          @@index([title])
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+          @@index([severity])
+        }
+      `);
+
+      const storage = ir.storage as {
+        collections: Record<
+          string,
+          { indexes?: Array<{ keys: Array<{ field: string; direction: number }> }> }
+        >;
+      };
+      const tasksColl = storage.collections['tasks'];
+      expect(tasksColl?.indexes).toBeDefined();
+      const indexFields = (tasksColl?.indexes ?? []).map((idx) => idx.keys.map((k) => k.field));
+      expect(indexFields).toEqual(
+        expect.arrayContaining([
+          expect.arrayContaining(['title']),
+          expect.arrayContaining(['severity']),
+        ]),
+      );
+    });
+  });
+
+  describe('FL-10: polymorphic validators', () => {
+    it('generates validator with oneOf for variant-specific fields', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+        }
+
+        model Feature {
+          id       ObjectId @id @map("_id")
+          priority Int
+
+          @@base(Task, "feature")
+        }
+      `);
+
+      const storage = ir.storage as {
+        collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
+      };
+      const validator = storage.collections['tasks']?.validator;
+      expect(validator).toBeDefined();
+      const schema = validator?.jsonSchema;
+      expect(schema).toHaveProperty('properties._id');
+      expect(schema).toHaveProperty('properties.title');
+      expect(schema).toHaveProperty('properties.type');
+      expect(schema).toHaveProperty('oneOf');
+      const oneOf = schema?.['oneOf'] as Array<Record<string, unknown>>;
+      expect(oneOf).toHaveLength(2);
+    });
+
+    it('omits oneOf when no variant has extra fields', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id    ObjectId @id @map("_id")
+
+          @@base(Task, "bug")
+        }
+      `);
+
+      const storage = ir.storage as {
+        collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
+      };
+      const validator = storage.collections['tasks']?.validator;
+      expect(validator).toBeDefined();
+      const schema = validator?.jsonSchema;
+      expect(schema).not.toHaveProperty('oneOf');
+    });
+  });
 });

@@ -146,6 +146,7 @@ function collectPolymorphismDeclarations(
 function resolvePolymorphism(input: {
   models: Record<string, MongoModelEntry>;
   roots: Record<string, string>;
+  collections: Record<string, Record<string, unknown>>;
   document: ParsePslDocumentResult;
   discriminatorDeclarations: Map<string, DiscriminatorDeclaration>;
   baseDeclarations: Map<string, BaseDeclaration>;
@@ -154,11 +155,13 @@ function resolvePolymorphism(input: {
 }): {
   models: Record<string, MongoModelEntry>;
   roots: Record<string, string>;
+  collections: Record<string, Record<string, unknown>>;
   diagnostics: ContractSourceDiagnostic[];
 } {
   const { discriminatorDeclarations, baseDeclarations, modelNames, sourceId, document } = input;
   let patched = input.models;
   let roots = input.roots;
+  let collections = input.collections;
   const diagnostics: ContractSourceDiagnostic[] = [];
 
   for (const [modelName, decl] of discriminatorDeclarations) {
@@ -270,9 +273,24 @@ function resolvePolymorphism(input: {
         );
       }
     }
+
+    if (variantCollectionName !== baseCollection) {
+      const variantColl = collections[variantCollectionName];
+      const variantIndexes = (variantColl?.['indexes'] ?? []) as MongoStorageIndex[];
+      if (variantIndexes.length > 0) {
+        const baseColl = collections[baseCollection];
+        if (baseColl) {
+          const baseIndexes = (baseColl['indexes'] ?? []) as MongoStorageIndex[];
+          baseColl['indexes'] = [...baseIndexes, ...variantIndexes];
+        }
+      }
+      collections = Object.fromEntries(
+        Object.entries(collections).filter(([key]) => key !== variantCollectionName),
+      );
+    }
   }
 
-  return { models: patched, roots, diagnostics };
+  return { models: patched, roots, collections, diagnostics };
 }
 
 function parseIndexDirection(raw: string | undefined): MongoIndexKeyDirection {
@@ -828,6 +846,7 @@ export function interpretPslDocumentToMongoContract(
   const polyResult = resolvePolymorphism({
     models,
     roots,
+    collections,
     document,
     discriminatorDeclarations,
     baseDeclarations,
@@ -844,7 +863,7 @@ export function interpretPslDocumentToMongoContract(
 
   const target = 'mongo';
   const targetFamily = 'mongo';
-  const storageWithoutHash = { collections };
+  const storageWithoutHash = { collections: polyResult.collections };
   const storageHash = computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
   const capabilities: Record<string, Record<string, boolean>> = {};
 
