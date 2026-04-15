@@ -234,7 +234,7 @@ importers:
         specifier: ^2.1.29
         version: 2.1.29
       dotenv:
-        specifier: ^16.6.1
+        specifier: ^16.4.5
         version: 16.6.1
       pg:
         specifier: 'catalog:'
