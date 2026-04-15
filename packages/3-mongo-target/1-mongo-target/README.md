@@ -7,13 +7,13 @@ MongoDB target pack for Prisma Next.
 - **Target pack assembly**: Exports the MongoDB target pack for authoring and family composition
 - **Target metadata**: Defines the stable Mongo target identity (`kind`, `familyId`, `targetId`, `version`, `capabilities`)
 - **Codec type surface**: Exposes the base Mongo codec type map used by authoring-time type composition
-- **Migration authoring**: Factory functions and strategies for hand-authored MongoDB migrations
+- **Migration factories and strategies**: Atomic factory functions and compound strategies for MongoDB migration operations
 
 ## Entrypoints
 
 - `./pack`: pure target pack ref used by `@prisma-next/family-mongo` and `@prisma-next/mongo-contract-ts`
 - `./codec-types`: base Mongo codec type map
-- `./migration`: migration authoring — `Migration` base class, factory functions, strategies
+- `./migration`: factory functions and strategies (the `Migration` base class is in `@prisma-next/family-mongo/migration`)
 
 ## Usage
 
@@ -32,9 +32,11 @@ const contract = defineContract({
 
 ### Migration authoring
 
+Import from `@prisma-next/family-mongo/migration` for the full authoring experience (Migration class + factories + strategies):
+
 ```typescript
 import { Migration, createIndex, createCollection }
-  from "@prisma-next/target-mongo/migration"
+  from "@prisma-next/family-mongo/migration"
 
 export default class extends Migration {
   plan() {
@@ -51,7 +53,7 @@ export default class extends Migration {
 Migration.run(import.meta.url)
 ```
 
-Run `node migration.ts` to produce `ops.json`. Use `--dry-run` to preview without writing.
+Run `node migration.ts` to produce `ops.json` and `migration.json` (when `describe()` is implemented). Use `--dry-run` to preview without writing.
 
 ### Available factories
 
