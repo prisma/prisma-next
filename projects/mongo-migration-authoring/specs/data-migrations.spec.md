@@ -33,7 +33,7 @@ export default class extends Migration {
 
       dataTransform("backfill-status", {
         check: () => agg.from('users')
-          .match({ status: { $exists: false } })
+          .match((f) => f.status.exists(false))
           .limit(1),
         run: () => raw.collection('users')
           .updateMany({ status: { $exists: false } }, { $set: { status: "active" } }),
