@@ -64,6 +64,10 @@
       "types": "./dist/exports/migration-ts.d.mts",
       "import": "./dist/exports/migration-ts.mjs"
     },
+    "./migration": {
+      "types": "./dist/exports/migration.d.mts",
+      "import": "./dist/exports/migration.mjs"
+    },
     "./package.json": "./package.json"
   },
   "repository": {
