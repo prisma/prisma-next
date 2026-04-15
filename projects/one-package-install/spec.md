@@ -47,6 +47,8 @@ The CLI prompts:
 │  prisma/contract.d.ts       — emitted contract types
 │  prisma/db.ts               — runtime client
 │  prisma-next.config.ts      — Prisma Next config
+│  prisma-next.md             — quick reference
+│  .agents/skills/prisma-next/SKILL.md — agent skill
 │
 │  Next steps:
 │  1. Edit prisma/contract.prisma with your models
@@ -65,6 +67,8 @@ prisma/
   contract.d.ts        — emitted contract types
   db.ts                — runtime client (scaffolded)
 prisma-next.config.ts  — config (scaffolded)
+prisma-next.md         — quick-reference for humans (scaffolded)
+.agents/skills/prisma-next/SKILL.md — agent skill (scaffolded)
 ```
 
 ### `prisma/contract.prisma`
@@ -116,6 +120,16 @@ export const db = postgres<Contract>({ contractJson });
 ### `prisma/contract.json` and `prisma/contract.d.ts`
 
 These are emitted by `prisma-next contract emit` (which init runs automatically). The `.d.ts` file imports types from packages like `@prisma-next/adapter-postgres/codec-types`, `@prisma-next/sql-contract/types`, and `@prisma-next/contract/types`. Because these are all transitive dependencies of `@prisma-next/postgres`, the imports resolve without the user installing anything extra.
+
+### `prisma-next.md`
+
+A quick-reference file at the project root for human developers. Contains: file locations, common commands (`contract emit`, `db init`), and a minimal query example. Serves as orientation for anyone new to the project. The init command generates this from the same information it already has (target, paths, package name).
+
+### `.agents/skills/prisma-next/SKILL.md`
+
+An agent skill file that gives AI coding agents context about the project's Prisma Next setup. Similar content to `prisma-next.md` — file locations, commands, query patterns — but framed as a skill that agents can discover and follow. This ensures that when a developer uses an AI agent in the project, the agent knows how Prisma Next is configured and can help effectively.
+
+The exact content of both files will evolve as the framework develops. For v1, the focus is on getting the user (and their agents) started and pointed at the right commands for organic discovery.
 
 ## Step 3: Use it
 
@@ -231,7 +245,7 @@ The emit still succeeds — the warning is informational, not blocking. This act
 
 - F1: The CLI exposes `prisma-next init`, usable via `pnpm dlx` / `npx` / `bunx` / `yarn dlx` without prior installation.
 - F2: Init prompts for target (Postgres or Mongo) and schema location (default: `prisma/contract.prisma`). The contract output location is derived automatically (same directory, `.json` extension).
-- F3: Init scaffolds three files as shown in the "Generated files" section above.
+- F3: Init scaffolds five files: the three core files shown in the "Generated files" section (`contract.prisma`, `prisma-next.config.ts`, `db.ts`), plus `prisma-next.md` (human quick-reference) and `.agents/skills/prisma-next/SKILL.md` (agent skill).
 - F4: Init detects the user's package manager from lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lockb`) or project configuration.
 - F5: Init installs the target facade package as a dependency and `@prisma-next/cli` as a dev dependency using the detected package manager.
 - F6: Init runs `prisma-next contract emit` after installation to produce `contract.json` and `contract.d.ts`.

@@ -56,12 +56,14 @@ The user-facing entry point — `prisma-next init` scaffolds files, installs dep
   - `postgresSchema()` → starter `contract.prisma` with `User` and `Post` models.
   - `postgresConfig(contractPath: string)` → `prisma-next.config.ts` with single import from `@prisma-next/postgres/config`.
   - `postgresDb()` → `db.ts` with imports from `@prisma-next/postgres/runtime`, `./contract.d`, and `./contract.json`.
+  - `prismaNextMd(target, paths)` → `prisma-next.md` quick-reference for human developers (file locations, common commands, query example).
+  - `agentSkill(target, paths)` → `.agents/skills/prisma-next/SKILL.md` agent skill with equivalent content framed for AI agents.
   - Equivalent `mongo*` templates for the Mongo target.
 - [ ] **3.3 Implement the init command flow** — Create `init.ts` with the main flow:
   1. Prompt for target (Postgres/Mongo) using `clack.select()`.
   2. Prompt for schema location using `clack.text()` with default `prisma/contract.prisma`.
   3. Check for existing files; prompt for overwrite confirmation with `clack.confirm()` if any exist.
-  4. Write the three scaffolded files (schema, config, db.ts).
+  4. Write the five scaffolded files (schema, config, db.ts, prisma-next.md, agent skill).
   5. Detect package manager.
   6. Install dependencies (`@prisma-next/postgres` as dep, `@prisma-next/cli` as devDep) with a spinner.
   7. Run contract emit programmatically via `executeContractEmit`.
@@ -69,11 +71,11 @@ The user-facing entry point — `prisma-next init` scaffolds files, installs dep
   Handle `--no-install` flag: skip steps 5-7, print manual commands instead.
 - [ ] **3.4 Register the init command** — Create `src/commands/init/index.ts` with commander registration. Register in the CLI's main command setup alongside existing commands. Ensure it works via `pnpm dlx @prisma-next/cli init`.
 - [ ] **3.5 Write init command tests** — Test in `packages/1-framework/3-tooling/cli/test/commands/init/`:
-  - Happy path: empty directory with `package.json`, selecting Postgres → all five files created (AC1).
+  - Happy path: empty directory with `package.json`, selecting Postgres → all seven files created (5 scaffolded + 2 emitted) (AC1).
   - Generated config has single import from facade `/config` and passes `contract` as string (AC2).
   - Generated `db.ts` has single `@prisma-next` import from facade `/runtime` (AC3).
   - Package manager detection from each lockfile type: pnpm, npm, yarn, bun (AC9).
-  - `--no-install` produces three scaffolded files but no emitted files, prints manual commands (AC10).
+  - `--no-install` produces five scaffolded files but no emitted files, prints manual commands (AC10).
   - Existing files trigger overwrite confirmation prompt (AC11).
   - Mock `execFileSync` for install and `executeContractEmit` for emit.
 
