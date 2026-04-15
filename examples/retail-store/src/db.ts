@@ -1,6 +1,6 @@
 import { createMongoAdapter } from '@prisma-next/adapter-mongo';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import { createTelemetryMiddleware } from '@prisma-next/framework-components/runtime';
+import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm, mongoRaw } from '@prisma-next/mongo-orm';
 import { mongoPipeline } from '@prisma-next/mongo-pipeline-builder';

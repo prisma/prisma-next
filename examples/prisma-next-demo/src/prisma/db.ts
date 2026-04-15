@@ -1,5 +1,5 @@
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { createTelemetryMiddleware } from '@prisma-next/framework-components/runtime';
+import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
 import postgres from '@prisma-next/postgres/runtime';
 import { budgets, lints } from '@prisma-next/sql-runtime';
 import type { Contract } from './contract.d';

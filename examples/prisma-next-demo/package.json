@@ -29,6 +29,7 @@
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/ids": "workspace:*",
+    "@prisma-next/middleware-telemetry": "workspace:*",
     "@prisma-next/postgres": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-psl": "workspace:*",
