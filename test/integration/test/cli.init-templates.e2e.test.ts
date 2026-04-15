@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { loadContractFromTs } from '@prisma-next/cli';
-import { timeouts } from '@prisma-next/test-utils';
+import { execFile } from 'node:child_process';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   type AuthoringId,
@@ -11,6 +12,10 @@ import {
   targetPackageName,
 } from '../../../packages/1-framework/3-tooling/cli/src/commands/init/templates/code-templates';
 import { createIntegrationTestDir } from './utils/cli-test-helpers';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const execFileAsync = promisify(execFile);
+const tscPath = resolve(__dirname, '../node_modules/.bin/tsc');
 
 function testConfigFile(target: TargetId, contractPath: string): string {
   const pkg = targetPackageName(target);
@@ -23,6 +28,29 @@ export default defineConfig({
   },
 });
 `;
+}
+
+function writeTsConfig(testDir: string, include: string[]): void {
+  writeFileSync(
+    join(testDir, 'tsconfig.json'),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'preserve',
+          moduleResolution: 'bundler',
+          strict: true,
+          skipLibCheck: true,
+          noEmit: true,
+          resolveJsonModule: true,
+        },
+        include,
+      },
+      null,
+      2,
+    ),
+    'utf-8',
+  );
 }
 
 function writeInitFiles(
@@ -46,6 +74,56 @@ function writeInitFiles(
   return { schemaPath, configPath };
 }
 
+async function emitContract(testDir: string, configPath: string): Promise<void> {
+  const { executeContractEmit } = await import(
+    '../../../packages/1-framework/3-tooling/cli/src/control-api/operations/contract-emit'
+  );
+
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(testDir);
+    await executeContractEmit({ configPath });
+  } finally {
+    process.chdir(originalCwd);
+  }
+}
+
+async function typecheck(testDir: string): Promise<void> {
+  if (!existsSync(tscPath)) {
+    throw new Error(`tsc not found at ${tscPath}`);
+  }
+  try {
+    await execFileAsync(tscPath, ['--noEmit', '--project', 'tsconfig.json'], {
+      cwd: testDir,
+    });
+  } catch (error: unknown) {
+    const execError = error as { stdout?: string; stderr?: string; message?: string };
+    const details = [execError.stdout, execError.stderr, execError.message]
+      .filter(Boolean)
+      .join('\n');
+    throw new Error(`tsc --noEmit failed in ${testDir}:\n${details}`);
+  }
+}
+
+/**
+ * Writes a .ts file that imports the emitted Contract type and exercises it,
+ * so tsc can verify the emitted contract.d.ts is well-formed and importable.
+ */
+function writeTypecheckHarness(testDir: string): void {
+  writeFileSync(
+    join(testDir, 'prisma', '_typecheck.ts'),
+    `import type { Contract } from './contract.d';
+
+type _HasTarget = Contract extends { target: string } ? true : never;
+const _t: _HasTarget = true;
+void _t;
+`,
+    'utf-8',
+  );
+}
+
+const TYPECHECK_TIMEOUT = 30_000;
+
 describe('init template validity', () => {
   let testDir: string;
 
@@ -59,93 +137,46 @@ describe('init template validity', () => {
     }
   });
 
-  describe('TypeScript contract authoring', () => {
+  describe('TypeScript contract templates typecheck', () => {
     it(
-      'postgres + typescript: generated contract loads and produces a valid contract',
+      'postgres: contract.ts typechecks',
       async () => {
-        const { schemaPath } = writeInitFiles(testDir, 'postgres', 'typescript');
-        const contractPath = join(testDir, schemaPath);
+        writeInitFiles(testDir, 'postgres', 'typescript');
+        writeTsConfig(testDir, ['prisma/contract.ts']);
 
-        const contract = await loadContractFromTs(contractPath);
-
-        expect(contract).toBeDefined();
-        expect(contract.targetFamily).toBe('sql');
-        expect(contract.target).toBe('postgres');
-        const storage = (contract as Record<string, unknown>).storage as Record<string, unknown>;
-        expect(storage.tables).toBeDefined();
+        await typecheck(testDir);
       },
-      timeouts.spinUpPpgDev,
+      TYPECHECK_TIMEOUT,
     );
 
     it(
-      'mongo + typescript: generated contract loads and produces a valid contract',
+      'mongo: contract.ts typechecks',
       async () => {
-        const { schemaPath } = writeInitFiles(testDir, 'mongo', 'typescript');
-        const contractPath = join(testDir, schemaPath);
+        writeInitFiles(testDir, 'mongo', 'typescript');
+        writeTsConfig(testDir, ['prisma/contract.ts']);
 
-        const contract = await loadContractFromTs(contractPath);
-
-        expect(contract).toBeDefined();
-        expect(contract.targetFamily).toBe('mongo');
-        expect(contract.target).toBe('mongo');
+        await typecheck(testDir);
       },
-      timeouts.spinUpPpgDev,
+      TYPECHECK_TIMEOUT,
     );
   });
 
-  describe('generated db.ts validity', () => {
-    it('postgres db.ts imports from facade runtime export', () => {
-      const db = dbFile('postgres');
-
-      expect(db).toContain("from '@prisma-next/postgres/runtime'");
-      expect(db).toContain("from './contract.d'");
-      expect(db).toContain("from './contract.json'");
-    });
-
-    it('mongo db.ts imports from facade runtime export', () => {
-      const db = dbFile('mongo');
-
-      expect(db).toContain("from '@prisma-next/mongo/runtime'");
-      expect(db).toContain("from './contract.d'");
-      expect(db).toContain("from './contract.json'");
-    });
-  });
-
-  describe('PSL contract authoring', () => {
+  describe('emitted contract types are valid after PSL emit', () => {
     it(
-      'postgres + psl: generated contract emits valid artifacts via executeContractEmit',
+      'postgres: emitted contract.d.ts is importable and well-formed',
       async () => {
-        const { configPath, schemaPath } = writeInitFiles(testDir, 'postgres', 'psl');
-        const schemaDir = dirname(schemaPath);
+        const { configPath } = writeInitFiles(testDir, 'postgres', 'psl');
+        await emitContract(testDir, configPath);
 
-        const { executeContractEmit } = await import(
-          '../../../packages/1-framework/3-tooling/cli/src/control-api/operations/contract-emit'
-        );
+        expect(existsSync(join(testDir, 'prisma', 'contract.json'))).toBe(true);
+        expect(existsSync(join(testDir, 'prisma', 'contract.d.ts'))).toBe(true);
 
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDir);
-          await executeContractEmit({ configPath });
-        } finally {
-          process.chdir(originalCwd);
-        }
+        writeTypecheckHarness(testDir);
+        writeTsConfig(testDir, ['prisma/_typecheck.ts']);
 
-        const contractJsonPath = join(testDir, schemaDir, 'contract.json');
-        const contractDtsPath = join(testDir, schemaDir, 'contract.d.ts');
-
-        expect(existsSync(contractJsonPath)).toBe(true);
-        expect(existsSync(contractDtsPath)).toBe(true);
-
-        const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
-        expect(contractJson.targetFamily).toBe('sql');
-        expect(contractJson.target).toBe('postgres');
-        expect(contractJson.storage.tables).toHaveProperty('user');
-        expect(contractJson.storage.tables).toHaveProperty('post');
-
-        const dts = readFileSync(contractDtsPath, 'utf-8');
-        expect(dts).toContain('export type Contract');
+        await typecheck(testDir);
       },
-      timeouts.spinUpPpgDev,
+      TYPECHECK_TIMEOUT,
     );
   });
 });

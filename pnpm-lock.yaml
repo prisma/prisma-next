@@ -234,7 +234,7 @@ importers:
         specifier: ^2.1.29
         version: 2.1.29
       dotenv:
-        specifier: ^16.4.5
+        specifier: ^16.6.1
         version: 16.6.1
       pg:
         specifier: 'catalog:'
@@ -3110,6 +3110,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../../../../../packages/1-framework/3-tooling/cli
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../../../../../packages/1-framework/0-foundation/contract
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../../../../../packages/3-targets/7-drivers/postgres
@@ -3128,6 +3131,9 @@ importers:
       '@prisma-next/mongo-contract-ts':
         specifier: workspace:*
         version: link:../../../../../../packages/2-mongo-family/2-authoring/contract-ts
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../../../../../packages/2-sql/1-core/contract
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../../../../packages/2-sql/2-authoring/contract-ts
