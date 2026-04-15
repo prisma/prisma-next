@@ -1,3 +1,4 @@
+import type { InvoiceLineItemInput } from '../contract';
 import type { Db } from '../db';
 
 export function findInvoiceById(db: Db, id: string) {
@@ -12,12 +13,7 @@ export function createInvoice(
   db: Db,
   invoice: {
     orderId: string;
-    items: ReadonlyArray<{
-      name: string;
-      amount: number;
-      unitPrice: number;
-      lineTotal: number;
-    }>;
+    items: ReadonlyArray<InvoiceLineItemInput>;
     subtotal: number;
     tax: number;
     total: number;

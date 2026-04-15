@@ -1,19 +1,14 @@
 import { acc } from '@prisma-next/mongo-pipeline-builder';
 import { MongoFieldFilter } from '@prisma-next/mongo-query-ast/execution';
+import type { FieldInputTypes } from '../contract';
 import type { Db } from '../db';
 import { collectResults } from './execute-raw';
 
+type EventBase = Omit<FieldInputTypes['Event'], '_id' | 'type'>;
+
 export function createViewProductEvent(
   db: Db,
-  event: {
-    userId: string;
-    sessionId: string;
-    timestamp: Date;
-    productId: string;
-    subCategory: string;
-    brand: string;
-    exitMethod?: string | null;
-  },
+  event: EventBase & FieldInputTypes['ViewProductEvent'],
 ) {
   return db.orm.events.variant('ViewProductEvent').create({
     userId: event.userId,
@@ -22,19 +17,11 @@ export function createViewProductEvent(
     productId: event.productId,
     subCategory: event.subCategory,
     brand: event.brand,
-    exitMethod: event.exitMethod ?? null,
+    exitMethod: event.exitMethod,
   });
 }
 
-export function createSearchEvent(
-  db: Db,
-  event: {
-    userId: string;
-    sessionId: string;
-    timestamp: Date;
-    query: string;
-  },
-) {
+export function createSearchEvent(db: Db, event: EventBase & FieldInputTypes['SearchEvent']) {
   return db.orm.events.variant('SearchEvent').create({
     userId: event.userId,
     sessionId: event.sessionId,
@@ -43,16 +30,7 @@ export function createSearchEvent(
   });
 }
 
-export function createAddToCartEvent(
-  db: Db,
-  event: {
-    userId: string;
-    sessionId: string;
-    timestamp: Date;
-    productId: string;
-    brand: string;
-  },
-) {
+export function createAddToCartEvent(db: Db, event: EventBase & FieldInputTypes['AddToCartEvent']) {
   return db.orm.events.variant('AddToCartEvent').create({
     userId: event.userId,
     sessionId: event.sessionId,
