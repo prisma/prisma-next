@@ -21,10 +21,14 @@ export interface TelemetryMiddlewareOptions {
 
 export function createTelemetryMiddleware(options?: TelemetryMiddlewareOptions): RuntimeMiddleware {
   const emit = (event: TelemetryEvent, ctx: RuntimeMiddlewareContext) => {
-    if (options?.onEvent) {
-      options.onEvent(event);
-    } else {
-      ctx.log.info(event);
+    try {
+      if (options?.onEvent) {
+        options.onEvent(event);
+      } else {
+        ctx.log.info(event);
+      }
+    } catch (error) {
+      ctx.log.warn({ message: 'telemetry sink error', error, event });
     }
   };
 

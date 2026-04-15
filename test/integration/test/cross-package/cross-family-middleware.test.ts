@@ -2,6 +2,7 @@ import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
 import { createTelemetryMiddleware, type TelemetryEvent } from '@prisma-next/middleware-telemetry';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { createMongoRuntime } from '@prisma-next/mongo-runtime';
 import {
   createRuntimeCore,
   type MarkerReader,
@@ -9,7 +10,6 @@ import {
   type RuntimeFamilyAdapter,
 } from '@prisma-next/runtime-executor';
 import { describe, expect, it, vi } from 'vitest';
-import { createMongoRuntime } from '../src/mongo-runtime';
 
 function collectingTelemetry() {
   const events: TelemetryEvent[] = [];
@@ -93,7 +93,6 @@ const mongoMeta: PlanMeta = {
 };
 
 function createMongoPlan(meta: PlanMeta = mongoMeta): MongoQueryPlan {
-  // MongoQueryPlan has a complex command union; safe to bypass for test mocks
   return {
     collection: 'users',
     command: { kind: 'find', filter: {} },
