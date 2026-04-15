@@ -283,6 +283,18 @@ describe('mongoFilterBrand', () => {
     const impersonator = { kind: 'field', field: 'x', op: '$eq', value: 1 };
     expect(mongoFilterBrand in impersonator).toBe(false);
   });
+
+  it('brand property is non-enumerable', () => {
+    const field = MongoFieldFilter.eq('x', 1);
+    expect(Object.keys(field)).not.toContain(String(mongoFilterBrand));
+    expect(JSON.parse(JSON.stringify(field))).not.toHaveProperty(String(mongoFilterBrand));
+  });
+
+  it('survives dual-package scenario (string-based lookup)', () => {
+    const field = MongoFieldFilter.eq('x', 1);
+    const brandKey = '__prismaNextMongoFilter__';
+    expect(brandKey in field).toBe(true);
+  });
 });
 
 describe('composite nesting', () => {
