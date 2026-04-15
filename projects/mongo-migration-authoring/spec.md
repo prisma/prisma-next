@@ -11,7 +11,15 @@ import { Migration, createIndex, createCollection }
   from "@prisma-next/target-mongo/migration"
 
 export default class extends Migration {
-  plan() {
+  override describe() {
+    return {
+      from: 'sha256:abc123...',
+      to: 'sha256:def456...',
+      labels: ['add-user-email-index'],
+    }
+  }
+
+  override plan() {
     return [
       createCollection("users", {
         validator: { $jsonSchema: { required: ["email"] } },
@@ -22,17 +30,17 @@ export default class extends Migration {
   }
 }
 
-Migration.run(import.meta)
+Migration.run(import.meta.url)
 ```
 
-`node migration.ts` produces `ops.json`. The existing `MongoMigrationRunner` consumes it unchanged. That's the entire authoring workflow.
+`node migration.ts` produces `ops.json` and (if `describe()` is implemented) `migration.json`. The existing `MongoMigrationRunner` consumes `ops.json` unchanged. That's the entire authoring workflow.
 
 ## How it works
 
 The file has two parts:
 
-1. **The class** — exports a `Migration` subclass with a `plan()` method. `plan()` returns an array of `MongoMigrationPlanOperation` objects built by factory functions.
-2. **The run line** — `Migration.run(import.meta)` makes the file self-executing. When run directly (`node migration.ts`), it calls `plan()`, serializes the result, and writes `ops.json`. When imported by the CLI or a test, it's a no-op.
+1. **The class** — exports a `Migration` subclass with a `plan()` method that returns an array of `MongoMigrationPlanOperation` objects built by factory functions. Optionally overrides `describe()` to provide migration metadata (origin/destination hashes, labels).
+2. **The run line** — `Migration.run(import.meta.url)` makes the file self-executing. When run directly (`node migration.ts`), it calls `plan()`, serializes the result, and writes `ops.json`. If `describe()` returns metadata, it also writes `migration.json`. When imported by the CLI or a test, it's a no-op.
 
 ## Operation factories
 
@@ -42,7 +50,7 @@ Each factory function produces a single `MongoMigrationPlanOperation` — a plai
 - `dropIndex(collection, keys)` — removes an index with a precheck that it exists
 - `createCollection(collection, options?)` — creates a collection with optional validator, collation, capped settings, etc.
 - `dropCollection(collection)` — drops a collection
-- `collMod(collection, options)` — modifies collection options (validator, changeStreamPreAndPostImages, etc.)
+- `collMod(collection, options, overrides?)` — modifies collection options (validator, changeStreamPreAndPostImages, etc.). Accepts an optional `overrides` parameter with `operationClass` to classify the operation as `widening` or `destructive` (defaults to `destructive`).
 
 The factories produce the same output as the existing `MongoMigrationPlanner`. The runner cannot distinguish between planner-generated and hand-authored operations.
 
@@ -104,7 +112,8 @@ The pattern is designed to generalize to SQL migrations, where factory functions
 - Factory functions for each Mongo DDL operation (`createIndex`, `dropIndex`, `createCollection`, `dropCollection`, `collMod`) that produce `MongoMigrationPlanOperation` objects with correct prechecks, commands, and postchecks. Factory functions and planner are co-located in `packages/3-mongo-target/1-mongo-target`, exported from `@prisma-next/target-mongo/migration`.
 - A `Migration` base class with:
   - An abstract `plan()` method returning `MongoMigrationPlanOperation[]`
-  - A static `Migration.run(import.meta)` method that handles self-execution (entrypoint detection, serialization, file writing)
+  - An optional `describe()` method returning `MigrationMeta` (origin/destination hashes, kind, labels) for `migration.json` generation
+  - A static `Migration.run(import.meta.url)` method that handles self-execution (entrypoint detection, serialization, file writing)
   - `--dry-run` flag support (print operations without writing)
   - `--help` flag support
 - At least one compound strategy function demonstrating composition of multiple factories
@@ -134,7 +143,7 @@ The pattern is designed to generalize to SQL migrations, where factory functions
 
 ## Importing a migration
 
-- [ ] When imported (not run directly), `Migration.run(import.meta)` is a no-op
+- [ ] When imported (not run directly), `Migration.run(import.meta.url)` is a no-op
 - [ ] The default export class can be instantiated and `plan()` called directly (for CLI and test use)
 
 ## Operation correctness
