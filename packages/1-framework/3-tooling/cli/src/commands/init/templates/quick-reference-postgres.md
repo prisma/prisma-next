@@ -58,7 +58,7 @@ export default defineConfig({
 
 Notice the `DATABASE_URL` above? It's defined in your [`.env`](./.env) file:
 
-```
+```env
 DATABASE_URL="postgresql://user:password@localhost:5432/mydb"
 ```
 
