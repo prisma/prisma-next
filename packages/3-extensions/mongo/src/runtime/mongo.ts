@@ -43,7 +43,7 @@ export default function mongo<
     async connect(uri: string, dbName: string): Promise<ConnectedMongoClient<TContract>> {
       const adapter = createMongoAdapter();
       const driver = await createMongoDriver(uri, dbName);
-      const runtime = createMongoRuntime({ adapter, driver });
+      const runtime = createMongoRuntime({ adapter, driver, contract, targetId: 'mongo' });
       const orm = mongoOrm<TContract>({ contract, executor: runtime });
 
       return {
