@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 
-const IMPORT_PATTERN = /import\s+type\s+.*?\s+from\s+'(@[^/]+\/[^/']+)/g;
+const IMPORT_PATTERN = /import\s+type\s+.*?\s+from\s+['"](@[^/]+\/[^/'"]+)/g;
 
 export function extractPackageSpecifiers(dtsContent: string): string[] {
   const packages = new Set<string>();
@@ -37,13 +37,12 @@ export function validateContractDeps(
   }
 
   const list = missing.map((p) => `  - ${p}`).join('\n');
-  const installCmd = `pnpm add ${missing.join(' ')}`;
   const warning = [
     'contract.d.ts imports types from packages that are not installed:',
     list,
     '',
-    '  Install them:',
-    `    ${installCmd}`,
+    'Install them with your package manager:',
+    ...missing.map((p) => `  ${p}`),
   ].join('\n');
 
   return { missing, warning };

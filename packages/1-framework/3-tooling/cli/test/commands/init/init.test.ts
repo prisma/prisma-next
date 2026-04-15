@@ -152,10 +152,35 @@ describe('runInit', () => {
     expect(clack.confirm).not.toHaveBeenCalled();
   });
 
+  it('normalizes configPath when schema path starts with ./', async () => {
+    vi.mocked(clack.text).mockResolvedValue('./prisma/contract.prisma');
+
+    await runInit(tmpDir, { noInstall: true });
+
+    const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
+    expect(config).toContain("contract: './prisma/contract.prisma'");
+    expect(config).not.toContain('.//');
+  });
+
   it('with --no-install skips dependency installation and emit', async () => {
     await runInit(tmpDir, { noInstall: true });
 
     expect(execFileSync).not.toHaveBeenCalled();
+    expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
+  });
+
+  it('with --no-install prints manual commands using detected package manager', async () => {
+    writeFileSync(join(tmpDir, 'yarn.lock'), '');
+
+    await runInit(tmpDir, { noInstall: true });
+
+    const noteCall = vi.mocked(clack.note).mock.calls[0];
+    expect(noteCall).toBeDefined();
+    const noteContent = noteCall[0] as string;
+    expect(noteContent).toContain('yarn add @prisma-next/postgres');
+    expect(noteContent).toContain('yarn prisma-next contract emit');
+    expect(noteContent).not.toContain('pnpm');
   });
 
   it('detects pnpm and installs dependencies', async () => {
@@ -173,5 +198,33 @@ describe('runInit', () => {
       ['add', '-D', '@prisma-next/cli'],
       expect.anything(),
     );
+  });
+
+  it('omits emitted files from summary when emit fails', async () => {
+    const { executeContractEmit } = await import(
+      '../../../src/control-api/operations/contract-emit'
+    );
+    vi.mocked(executeContractEmit).mockRejectedValueOnce(new Error('emit failed'));
+    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+
+    await runInit(tmpDir, { noInstall: false });
+
+    const outroCall = vi.mocked(clack.outro).mock.calls[0];
+    expect(outroCall).toBeDefined();
+    const outroContent = outroCall[0] as string;
+    expect(outroContent).not.toContain('contract.json');
+    expect(outroContent).not.toContain('contract.d.ts');
+  });
+
+  it('includes emitted files in summary when emit succeeds', async () => {
+    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+
+    await runInit(tmpDir, { noInstall: false });
+
+    const outroCall = vi.mocked(clack.outro).mock.calls[0];
+    expect(outroCall).toBeDefined();
+    const outroContent = outroCall[0] as string;
+    expect(outroContent).toContain('contract.json');
+    expect(outroContent).toContain('contract.d.ts');
   });
 });

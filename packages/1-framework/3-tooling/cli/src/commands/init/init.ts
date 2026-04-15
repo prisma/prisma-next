@@ -67,10 +67,11 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
   const schemaPath = schemaPathResult as string;
 
   const schemaDir = dirname(schemaPath);
-  const configPath = `./${schemaPath}`;
+  const configPath =
+    schemaPath.startsWith('./') || schemaPath.startsWith('/') ? schemaPath : `./${schemaPath}`;
 
   const files: FileEntry[] = [
-    { path: schemaPath, content: starterSchema() },
+    { path: schemaPath, content: starterSchema(target) },
     { path: 'prisma-next.config.ts', content: configFile(target, configPath) },
     { path: join(schemaDir, 'db.ts'), content: dbFile(target) },
     { path: 'prisma-next.md', content: quickReferenceMd(target, schemaPath) },
@@ -83,6 +84,9 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
     writeFileSync(fullPath, file.content, 'utf-8');
   }
 
+  const pm = detectPackageManager(baseDir);
+  let emitSucceeded = false;
+
   if (options.noInstall) {
     const pkg = targetPackageName(target);
     ui.note(
@@ -90,15 +94,14 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
         'Run the following commands to complete setup:',
         '',
         '  1. Install dependencies:',
-        `     pnpm add ${pkg} && pnpm add -D @prisma-next/cli`,
+        `     ${pm} add ${pkg} && ${pm} add -D @prisma-next/cli`,
         '',
         '  2. Emit the contract:',
-        '     pnpm prisma-next contract emit',
+        `     ${pm} prisma-next contract emit`,
       ].join('\n'),
       'Manual steps',
     );
   } else {
-    const pm = detectPackageManager(baseDir);
     ui.log(`Detected package manager: ${pm}`);
 
     const pkg = targetPackageName(target);
@@ -126,22 +129,22 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
       const configFilePath = join(baseDir, 'prisma-next.config.ts');
       await executeContractEmit({ configPath: configFilePath });
       spinner.stop('Contract emitted');
+      emitSucceeded = true;
     } catch {
       spinner.stop('Contract emission failed');
       ui.warn(
         [
           'Could not emit contract automatically. Run manually:',
-          '  pnpm prisma-next contract emit',
+          `  ${pm} prisma-next contract emit`,
         ].join('\n'),
       );
     }
   }
 
   const createdFiles = files.map((f) => `  ${f.path}`);
-  if (!options.noInstall) {
-    const schemaDir2 = dirname(schemaPath);
-    createdFiles.push(`  ${join(schemaDir2, 'contract.json')}`);
-    createdFiles.push(`  ${join(schemaDir2, 'contract.d.ts')}`);
+  if (!options.noInstall && emitSucceeded) {
+    createdFiles.push(`  ${join(schemaDir, 'contract.json')}`);
+    createdFiles.push(`  ${join(schemaDir, 'contract.d.ts')}`);
   }
 
   clack.outro(
@@ -152,7 +155,7 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
       '',
       'Next steps:',
       `  1. Edit ${schemaPath} with your models`,
-      '  2. Run: pnpm prisma-next contract emit',
+      `  2. Run: ${pm} prisma-next contract emit`,
       `  3. Import db from ./${dirname(schemaPath)}/db in your app`,
     ].join('\n'),
     { output: process.stderr },
