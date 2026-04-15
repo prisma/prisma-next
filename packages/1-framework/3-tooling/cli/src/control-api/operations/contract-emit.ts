@@ -94,8 +94,14 @@ export async function executeContractEmit(
   // Colocate .d.ts with .json (contract.json → contract.d.ts)
   const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 
+  const stack = createControlStack(config);
+
   const sourceContext = {
-    composedExtensionPacks: (config.extensionPacks ?? []).map((p) => p.id),
+    composedExtensionPacks: stack.extensionIds,
+    pslScalarTypeDescriptors: stack.pslScalarTypeDescriptors,
+    authoringContributions: stack.authoringContributions,
+    codecLookup: stack.codecLookup,
+    controlMutationDefaults: stack.controlMutationDefaults,
   };
 
   let providerResult: Awaited<ReturnType<typeof contractConfig.source>>;
@@ -143,7 +149,6 @@ export async function executeContractEmit(
     });
   }
 
-  const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
 
   const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
