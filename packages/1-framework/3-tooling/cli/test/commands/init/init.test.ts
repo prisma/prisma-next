@@ -99,25 +99,57 @@ describe('runInit', () => {
     expect(schema).toContain('model Post');
   });
 
-  it('prompts for overwrite when files exist', async () => {
-    mkdirSync(join(tmpDir, 'prisma'), { recursive: true });
-    writeFileSync(join(tmpDir, 'prisma/contract.prisma'), 'existing');
+  it('prompts once to re-initialize when prisma-next.config.ts exists', async () => {
+    writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'existing config');
 
     await runInit(tmpDir, { noInstall: true });
 
-    expect(clack.confirm).toHaveBeenCalled();
+    expect(clack.confirm).toHaveBeenCalledTimes(1);
+    expect(clack.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('Re-initialize') }),
+    );
   });
 
-  it('skips file when overwrite is declined', async () => {
+  it('overwrites all files when re-init is accepted', async () => {
     mkdirSync(join(tmpDir, 'prisma'), { recursive: true });
-    writeFileSync(join(tmpDir, 'prisma/contract.prisma'), 'existing content');
+    writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'old config');
+    writeFileSync(join(tmpDir, 'prisma/contract.prisma'), 'old schema');
+
+    vi.mocked(clack.confirm).mockResolvedValue(true);
+
+    await runInit(tmpDir, { noInstall: true });
+
+    const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
+    expect(config).not.toBe('old config');
+    expect(config).toContain("from '@prisma-next/postgres/config'");
+
+    const schema = readFileSync(join(tmpDir, 'prisma/contract.prisma'), 'utf-8');
+    expect(schema).not.toBe('old schema');
+    expect(schema).toContain('model User');
+  });
+
+  it('exits without changes when re-init is declined', async () => {
+    writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'existing config');
 
     vi.mocked(clack.confirm).mockResolvedValue(false);
 
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit');
+    });
+
+    await expect(runInit(tmpDir, { noInstall: true })).rejects.toThrow('process.exit');
+
+    expect(exitSpy).toHaveBeenCalledWith(0);
+    const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
+    expect(config).toBe('existing config');
+
+    exitSpy.mockRestore();
+  });
+
+  it('does not prompt when prisma-next.config.ts does not exist', async () => {
     await runInit(tmpDir, { noInstall: true });
 
-    const content = readFileSync(join(tmpDir, 'prisma/contract.prisma'), 'utf-8');
-    expect(content).toBe('existing content');
+    expect(clack.confirm).not.toHaveBeenCalled();
   });
 
   it('with --no-install skips dependency installation and emit', async () => {
