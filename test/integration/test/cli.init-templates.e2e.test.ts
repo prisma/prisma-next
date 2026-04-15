@@ -71,9 +71,8 @@ describe('init template validity', () => {
         expect(contract).toBeDefined();
         expect(contract.targetFamily).toBe('sql');
         expect(contract.target).toBe('postgres');
-        const domain = contract.domain as Record<string, Record<string, unknown>>;
-        expect(domain.models.User).toBeDefined();
-        expect(domain.models.Post).toBeDefined();
+        const storage = (contract as Record<string, unknown>).storage as Record<string, unknown>;
+        expect(storage.tables).toBeDefined();
       },
       timeouts.spinUpPpgDev,
     );

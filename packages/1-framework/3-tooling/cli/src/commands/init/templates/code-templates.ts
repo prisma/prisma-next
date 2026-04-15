@@ -65,37 +65,38 @@ model Post {
 
 function starterSchemaTsPostgres(): string {
   return `import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-const User = model('User', {
-  fields: {
-    id: field.id.autoincrement(),
-    email: field.text().unique(),
-    name: field.text().optional(),
-    createdAt: field.createdAt(),
-  },
-}).relations({
-  posts: rel.hasMany('Post', { by: 'authorId' }),
-});
+export const contract = defineContract(
+  { family: sqlFamily, target: postgresPack },
+  ({ field, model, rel }) => ({
+    models: {
+      User: model('User', {
+        fields: {
+          id: field.id.uuidv7(),
+          email: field.text().unique(),
+          name: field.text().optional(),
+          createdAt: field.createdAt(),
+        },
+      }).relations({
+        posts: rel.hasMany('Post', { by: 'authorId' }),
+      }),
 
-const Post = model('Post', {
-  fields: {
-    id: field.id.autoincrement(),
-    title: field.text(),
-    content: field.text().optional(),
-    authorId: field.int(),
-    createdAt: field.createdAt(),
-  },
-}).relations({
-  author: rel.belongsTo(User, { from: 'authorId', to: 'id' }),
-});
-
-export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
-  models: { User, Post },
-});
+      Post: model('Post', {
+        fields: {
+          id: field.id.uuidv7(),
+          title: field.text(),
+          content: field.text().optional(),
+          authorId: field.text(),
+          createdAt: field.createdAt(),
+        },
+      }).relations({
+        author: rel.belongsTo('User', { from: 'authorId', to: 'id' }),
+      }),
+    },
+  }),
+);
 `;
 }
 
