@@ -1,13 +1,37 @@
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToMongoContract } from '../src/interpreter';
 import { createMongoScalarTypeDescriptors } from '../src/scalar-type-descriptors';
+
+const mongoCodecLookup: CodecLookup = {
+  get(id: string) {
+    const types: Record<string, readonly string[]> = {
+      'mongo/string@1': ['string'],
+      'mongo/int32@1': ['int'],
+      'mongo/bool@1': ['bool'],
+      'mongo/date@1': ['date'],
+      'mongo/objectId@1': ['objectId'],
+      'mongo/double@1': ['double'],
+    };
+    const targetTypes = types[id];
+    if (!targetTypes) return undefined;
+    return {
+      id,
+      targetTypes,
+      decode: (w: unknown) => w,
+      encodeJson: (v: unknown) => v,
+      decodeJson: (j: unknown) => j,
+    } as ReturnType<CodecLookup['get']>;
+  },
+};
 
 function interpret(schema: string) {
   const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
   return interpretPslDocumentToMongoContract({
     document,
     scalarTypeDescriptors: createMongoScalarTypeDescriptors(),
+    codecLookup: mongoCodecLookup,
   });
 }
 

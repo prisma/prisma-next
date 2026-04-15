@@ -1,6 +1,28 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
 import { deriveJsonSchema } from '../src/derive-json-schema';
+
+const mongoCodecLookup: CodecLookup = {
+  get(id: string) {
+    const codecs: Record<string, { id: string; targetTypes: readonly string[] }> = {
+      'mongo/string@1': { id: 'mongo/string@1', targetTypes: ['string'] },
+      'mongo/int32@1': { id: 'mongo/int32@1', targetTypes: ['int'] },
+      'mongo/bool@1': { id: 'mongo/bool@1', targetTypes: ['bool'] },
+      'mongo/date@1': { id: 'mongo/date@1', targetTypes: ['date'] },
+      'mongo/objectId@1': { id: 'mongo/objectId@1', targetTypes: ['objectId'] },
+      'mongo/double@1': { id: 'mongo/double@1', targetTypes: ['double'] },
+    };
+    const entry = codecs[id];
+    if (!entry) return undefined;
+    return {
+      ...entry,
+      decode: (w: unknown) => w,
+      encodeJson: (v: unknown) => v,
+      decodeJson: (j: unknown) => j,
+    } as ReturnType<CodecLookup['get']>;
+  },
+};
 
 function scalarField(codecId: string, nullable = false): ContractField {
   return { type: { kind: 'scalar', codecId }, nullable };
@@ -20,13 +42,17 @@ function voArrayField(name: string, nullable = false): ContractField {
 
 describe('deriveJsonSchema', () => {
   it('maps String, Int, Boolean, DateTime, ObjectId to correct BSON types', () => {
-    const result = deriveJsonSchema({
-      name: scalarField('mongo/string@1'),
-      age: scalarField('mongo/int32@1'),
-      active: scalarField('mongo/bool@1'),
-      created: scalarField('mongo/date@1'),
-      _id: scalarField('mongo/objectId@1'),
-    });
+    const result = deriveJsonSchema(
+      {
+        name: scalarField('mongo/string@1'),
+        age: scalarField('mongo/int32@1'),
+        active: scalarField('mongo/bool@1'),
+        created: scalarField('mongo/date@1'),
+        _id: scalarField('mongo/objectId@1'),
+      },
+      undefined,
+      mongoCodecLookup,
+    );
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
@@ -44,9 +70,11 @@ describe('deriveJsonSchema', () => {
   });
 
   it('handles nullable field with bsonType array including null', () => {
-    const result = deriveJsonSchema({
-      email: scalarField('mongo/string@1', true),
-    });
+    const result = deriveJsonSchema(
+      { email: scalarField('mongo/string@1', true) },
+      undefined,
+      mongoCodecLookup,
+    );
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
@@ -57,9 +85,11 @@ describe('deriveJsonSchema', () => {
   });
 
   it('handles array field (many: true)', () => {
-    const result = deriveJsonSchema({
-      tags: arrayField('mongo/string@1'),
-    });
+    const result = deriveJsonSchema(
+      { tags: arrayField('mongo/string@1') },
+      undefined,
+      mongoCodecLookup,
+    );
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
@@ -71,9 +101,11 @@ describe('deriveJsonSchema', () => {
   });
 
   it('handles nullable array field', () => {
-    const result = deriveJsonSchema({
-      tags: arrayField('mongo/string@1', true),
-    });
+    const result = deriveJsonSchema(
+      { tags: arrayField('mongo/string@1', true) },
+      undefined,
+      mongoCodecLookup,
+    );
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
@@ -94,7 +126,11 @@ describe('deriveJsonSchema', () => {
       },
     };
 
-    const result = deriveJsonSchema({ address: voField('Address') }, valueObjects);
+    const result = deriveJsonSchema(
+      { address: voField('Address') },
+      valueObjects,
+      mongoCodecLookup,
+    );
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
@@ -122,7 +158,7 @@ describe('deriveJsonSchema', () => {
       },
     };
 
-    const result = deriveJsonSchema({ tags: voArrayField('Tag') }, valueObjects);
+    const result = deriveJsonSchema({ tags: voArrayField('Tag') }, valueObjects, mongoCodecLookup);
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
@@ -143,7 +179,7 @@ describe('deriveJsonSchema', () => {
   });
 
   it('derives minimal schema from empty model', () => {
-    const result = deriveJsonSchema({});
+    const result = deriveJsonSchema({}, undefined, mongoCodecLookup);
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
@@ -152,11 +188,15 @@ describe('deriveJsonSchema', () => {
   });
 
   it('handles mixed nullable and non-nullable fields', () => {
-    const result = deriveJsonSchema({
-      name: scalarField('mongo/string@1'),
-      bio: scalarField('mongo/string@1', true),
-      age: scalarField('mongo/int32@1'),
-    });
+    const result = deriveJsonSchema(
+      {
+        name: scalarField('mongo/string@1'),
+        bio: scalarField('mongo/string@1', true),
+        age: scalarField('mongo/int32@1'),
+      },
+      undefined,
+      mongoCodecLookup,
+    );
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
@@ -170,10 +210,14 @@ describe('deriveJsonSchema', () => {
   });
 
   it('skips fields with unknown codec IDs', () => {
-    const result = deriveJsonSchema({
-      name: scalarField('mongo/string@1'),
-      custom: scalarField('custom/unknown@1'),
-    });
+    const result = deriveJsonSchema(
+      {
+        name: scalarField('mongo/string@1'),
+        custom: scalarField('custom/unknown@1'),
+      },
+      undefined,
+      mongoCodecLookup,
+    );
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
@@ -200,7 +244,11 @@ describe('deriveJsonSchema', () => {
       },
     };
 
-    const result = deriveJsonSchema({ address: voField('Address') }, valueObjects);
+    const result = deriveJsonSchema(
+      { address: voField('Address') },
+      valueObjects,
+      mongoCodecLookup,
+    );
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
@@ -226,9 +274,11 @@ describe('deriveJsonSchema', () => {
   });
 
   it('maps Float (mongo/double@1) to bsonType "double"', () => {
-    const result = deriveJsonSchema({
-      price: scalarField('mongo/double@1'),
-    });
+    const result = deriveJsonSchema(
+      { price: scalarField('mongo/double@1') },
+      undefined,
+      mongoCodecLookup,
+    );
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',

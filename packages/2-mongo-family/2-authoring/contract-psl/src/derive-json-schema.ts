@@ -1,20 +1,22 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { MongoStorageValidator } from '@prisma-next/mongo-contract';
 
-const CODEC_TO_BSON_TYPE: Record<string, string> = {
-  'mongo/string@1': 'string',
-  'mongo/int32@1': 'int',
-  'mongo/bool@1': 'bool',
-  'mongo/date@1': 'date',
-  'mongo/objectId@1': 'objectId',
-};
+function resolveBsonType(
+  codecId: string,
+  codecLookup: CodecLookup | undefined,
+): string | undefined {
+  const codec = codecLookup?.get(codecId);
+  return codec?.targetTypes[0];
+}
 
 function fieldToBsonSchema(
   field: ContractField,
   valueObjects: Record<string, ContractValueObject> | undefined,
+  codecLookup: CodecLookup | undefined,
 ): Record<string, unknown> | undefined {
   if (field.type.kind === 'scalar') {
-    const bsonType = CODEC_TO_BSON_TYPE[field.type.codecId];
+    const bsonType = resolveBsonType(field.type.codecId, codecLookup);
     if (!bsonType) return undefined;
 
     if ('many' in field && field.many) {
@@ -31,7 +33,7 @@ function fieldToBsonSchema(
   if (field.type.kind === 'valueObject') {
     const vo = valueObjects?.[field.type.name];
     if (!vo) return undefined;
-    const voSchema = deriveObjectSchema(vo.fields, valueObjects);
+    const voSchema = deriveObjectSchema(vo.fields, valueObjects, codecLookup);
     if ('many' in field && field.many) {
       return { bsonType: 'array', items: voSchema };
     }
@@ -47,12 +49,13 @@ function fieldToBsonSchema(
 function deriveObjectSchema(
   fields: Record<string, ContractField>,
   valueObjects: Record<string, ContractValueObject> | undefined,
+  codecLookup: CodecLookup | undefined,
 ): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
 
   for (const [fieldName, field] of Object.entries(fields)) {
-    const schema = fieldToBsonSchema(field, valueObjects);
+    const schema = fieldToBsonSchema(field, valueObjects, codecLookup);
     if (schema) {
       properties[fieldName] = schema;
       if (!field.nullable) {
@@ -74,9 +77,10 @@ function deriveObjectSchema(
 export function deriveJsonSchema(
   fields: Record<string, ContractField>,
   valueObjects?: Record<string, ContractValueObject>,
+  codecLookup?: CodecLookup,
 ): MongoStorageValidator {
   return {
-    jsonSchema: deriveObjectSchema(fields, valueObjects),
+    jsonSchema: deriveObjectSchema(fields, valueObjects, codecLookup),
     validationLevel: 'strict',
     validationAction: 'error',
   };
@@ -92,8 +96,9 @@ export function derivePolymorphicJsonSchema(
   discriminatorField: string,
   variants: readonly PolymorphicVariant[],
   valueObjects?: Record<string, ContractValueObject>,
+  codecLookup?: CodecLookup,
 ): MongoStorageValidator {
-  const baseSchema = deriveObjectSchema(baseFields, valueObjects);
+  const baseSchema = deriveObjectSchema(baseFields, valueObjects, codecLookup);
 
   const oneOf: Record<string, unknown>[] = [];
   for (const variant of variants) {
@@ -115,7 +120,7 @@ export function derivePolymorphicJsonSchema(
     const variantProperties: Record<string, unknown> = {};
     const variantRequired: string[] = [];
     for (const [name, field] of Object.entries(variantOnlyFields)) {
-      const schema = fieldToBsonSchema(field, valueObjects);
+      const schema = fieldToBsonSchema(field, valueObjects, codecLookup);
       if (schema) {
         variantProperties[name] = schema;
         if (!field.nullable) {

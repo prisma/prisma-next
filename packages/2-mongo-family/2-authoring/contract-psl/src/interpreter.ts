@@ -9,6 +9,7 @@ import type {
   ContractReferenceRelation,
   ContractValueObject,
 } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { MongoIndexKeyDirection, MongoStorageIndex } from '@prisma-next/mongo-contract';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -27,6 +28,7 @@ import {
 export interface InterpretPslDocumentToMongoContractInput {
   readonly document: ParsePslDocumentResult;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
+  readonly codecLookup?: CodecLookup;
 }
 
 interface FieldMappings {
@@ -654,7 +656,7 @@ function resolveNonRelationField(
 export function interpretPslDocumentToMongoContract(
   input: InterpretPslDocumentToMongoContractInput,
 ): Result<Contract, ContractSourceDiagnostics> {
-  const { document, scalarTypeDescriptors } = input;
+  const { document, scalarTypeDescriptors, codecLookup } = input;
   const sourceId = document.ast.sourceId;
   const diagnostics: ContractSourceDiagnostic[] = [];
   const modelNames = new Set(document.ast.models.map((m) => m.name));
@@ -874,9 +876,10 @@ export function interpretPslDocumentToMongoContract(
         modelEntry.discriminator.field,
         variantEntries,
         valueObjects,
+        codecLookup,
       );
     } else {
-      coll['validator'] = deriveJsonSchema(modelEntry.fields, valueObjects);
+      coll['validator'] = deriveJsonSchema(modelEntry.fields, valueObjects, codecLookup);
     }
   }
 
