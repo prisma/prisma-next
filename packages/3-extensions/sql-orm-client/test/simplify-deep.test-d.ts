@@ -90,6 +90,41 @@ describe('Collection result types are simplified', () => {
     }>();
   });
 
+  test('chained include() produces a plain object', () => {
+    const users = new Collection({ runtime, context }, 'User');
+    const withPostsAndInviter = users.include('posts').include('invitedBy');
+    type Row = Awaited<ReturnType<typeof withPostsAndInviter.first>>;
+    expectTypeOf<NonNullable<Row>>().toEqualTypeOf<{
+      id: number;
+      name: string;
+      email: string;
+      invitedById: number | null;
+      address: {
+        readonly street: string;
+        readonly city: string;
+        readonly zip: string | null;
+      } | null;
+      posts: {
+        id: number;
+        title: string;
+        userId: number;
+        views: number;
+        embedding: number[] | null;
+      }[];
+      invitedBy: {
+        id: number;
+        name: string;
+        email: string;
+        invitedById: number | null;
+        address: {
+          readonly street: string;
+          readonly city: string;
+          readonly zip: string | null;
+        } | null;
+      } | null;
+    }>();
+  });
+
   test('include() with count refinement', () => {
     const users = new Collection({ runtime, context }, 'User');
     const withPostCount = users.include('posts', (posts) => posts.count());
