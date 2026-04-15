@@ -14,7 +14,7 @@ describe('Migration', () => {
   describe('plan() contract', () => {
     it('can be subclassed and plan() called directly', () => {
       class TestMigration extends Migration<{ id: string }> {
-        plan() {
+        override plan() {
           return [{ id: 'op1' }, { id: 'op2' }];
         }
       }
@@ -28,7 +28,7 @@ describe('Migration', () => {
   describe('describe() contract', () => {
     it('returns undefined by default', () => {
       class TestMigration extends Migration {
-        plan() {
+        override plan() {
           return [];
         }
       }
@@ -39,10 +39,10 @@ describe('Migration', () => {
 
     it('can be overridden to provide migration metadata', () => {
       class TestMigration extends Migration {
-        describe() {
+        override describe() {
           return { from: 'abc', to: 'def', labels: ['test'] };
         }
-        plan() {
+        override plan() {
           return [];
         }
       }

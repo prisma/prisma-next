@@ -1,7 +1,7 @@
 import { collMod, createIndex, Migration } from '@prisma-next/family-mongo/migration';
 
 export default class extends Migration {
-  describe() {
+  override describe() {
     return {
       from: 'sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d',
       to: 'sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d',
@@ -9,7 +9,7 @@ export default class extends Migration {
     };
   }
 
-  plan() {
+  override plan() {
     return [
       collMod('products', {
         validator: {
