@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { MongoAggFieldRef, MongoAggOperator } from '../src/aggregation-expressions';
 import type { MongoFilterExpr } from '../src/filter-expressions';
 import {
+  isMongoFilterExpr,
   MongoAndExpr,
   MongoExistsExpr,
   MongoExprFilter,
   MongoFieldFilter,
   MongoNotExpr,
   MongoOrExpr,
-  mongoFilterBrand,
 } from '../src/filter-expressions';
 import type { MongoFilterRewriter, MongoFilterVisitor } from '../src/visitors';
 
@@ -265,8 +265,8 @@ describe('MongoFilterRewriter', () => {
   });
 });
 
-describe('mongoFilterBrand', () => {
-  it('is present on all filter expression types', () => {
+describe('isMongoFilterExpr', () => {
+  it('returns true for all filter expression types', () => {
     const field = MongoFieldFilter.eq('x', 1);
     const and = MongoAndExpr.of([field]);
     const or = MongoOrExpr.of([field]);
@@ -275,19 +275,26 @@ describe('mongoFilterBrand', () => {
     const expr = MongoExprFilter.of(MongoAggFieldRef.of('x'));
 
     for (const node of [field, and, or, not, exists, expr]) {
-      expect(mongoFilterBrand in node).toBe(true);
+      expect(isMongoFilterExpr(node)).toBe(true);
     }
   });
 
-  it('is absent on plain objects with a kind property', () => {
+  it('returns false for plain objects with a kind property', () => {
     const impersonator = { kind: 'field', field: 'x', op: '$eq', value: 1 };
-    expect(mongoFilterBrand in impersonator).toBe(false);
+    expect(isMongoFilterExpr(impersonator)).toBe(false);
+  });
+
+  it('returns false for null and primitives', () => {
+    expect(isMongoFilterExpr(null)).toBe(false);
+    expect(isMongoFilterExpr(undefined)).toBe(false);
+    expect(isMongoFilterExpr(42)).toBe(false);
   });
 
   it('brand property is non-enumerable', () => {
     const field = MongoFieldFilter.eq('x', 1);
-    expect(Object.keys(field)).not.toContain(String(mongoFilterBrand));
-    expect(JSON.parse(JSON.stringify(field))).not.toHaveProperty(String(mongoFilterBrand));
+    const brandKey = '__prismaNextMongoFilter__';
+    expect(Object.keys(field)).not.toContain(brandKey);
+    expect(JSON.parse(JSON.stringify(field))).not.toHaveProperty(brandKey);
   });
 
   it('survives dual-package scenario (string-based lookup)', () => {
