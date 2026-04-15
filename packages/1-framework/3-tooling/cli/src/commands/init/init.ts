@@ -84,7 +84,7 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
     writeFileSync(fullPath, file.content, 'utf-8');
   }
 
-  const pm = detectPackageManager(baseDir);
+  const pm = await detectPackageManager(baseDir);
   let emitSucceeded = false;
 
   if (options.noInstall) {
