@@ -226,6 +226,16 @@ describe('Migration.run() subprocess', () => {
       expect(manifest.labels).toEqual([]);
     });
 
+    it('rejects invalid describe() return with clear error', async () => {
+      const script = migrationWithDescribe('{ bad: true }', '[{ id: "op1" }]');
+      await writeFile(join(tmpDir, 'migration.ts'), script);
+
+      const result = await runMigration('migration.ts');
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('describe()');
+      expect(result.stderr).toContain('invalid');
+    });
+
     it('includes migration.json content in --dry-run output', async () => {
       const script = migrationWithDescribe(
         '{ from: "abc", to: "def", labels: ["test"] }',

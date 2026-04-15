@@ -1,5 +1,6 @@
 import { realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { type } from 'arktype';
 import { dirname, join } from 'pathe';
 
 export interface MigrationMeta {
@@ -9,6 +10,13 @@ export interface MigrationMeta {
   readonly labels?: readonly string[];
 }
 
+const MigrationMetaSchema = type({
+  from: 'string',
+  to: 'string',
+  'kind?': "'regular' | 'baseline'",
+  'labels?': 'string[]',
+});
+
 export abstract class Migration<TOperation = unknown> {
   abstract plan(): TOperation[];
 
@@ -17,12 +25,15 @@ export abstract class Migration<TOperation = unknown> {
   }
 
   /**
-   * Makes the migration file self-executing. Call at module scope:
+   * Entrypoint guard for migration files. When called at module scope,
+   * detects whether the file is being run directly (e.g. `tsx migration.ts`)
+   * and if so, serializes the migration plan to `ops.json` (and optionally
+   * `migration.json`) in the same directory. When the file is imported by
+   * another module, this is a no-op.
+   *
+   * Usage (at module scope, after the class definition):
    *
    *     Migration.run(import.meta.url)
-   *
-   * When the file is the entrypoint, calls plan(), serializes, and writes ops.json.
-   * When imported by another module, this is a no-op.
    */
   static run(importMetaUrl: string): void {
     if (!importMetaUrl) return;
@@ -49,7 +60,7 @@ export abstract class Migration<TOperation = unknown> {
     const dryRun = args.includes('--dry-run');
     const migrationDir = dirname(metaFilename);
 
-    executeMigration(importMetaUrl, migrationDir, dryRun).catch((err) => {
+    serializeMigration(importMetaUrl, migrationDir, dryRun).catch((err) => {
       process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
       process.exitCode = 1;
     });
@@ -59,7 +70,7 @@ export abstract class Migration<TOperation = unknown> {
 function printHelp(): void {
   process.stdout.write(
     [
-      'Usage: node <migration-file> [options]',
+      'Usage: tsx <migration-file> [options]',
       '',
       'Options:',
       '  --dry-run  Print operations to stdout without writing files',
@@ -80,7 +91,7 @@ function buildManifest(meta: MigrationMeta): Record<string, unknown> {
   };
 }
 
-async function executeMigration(
+async function serializeMigration(
   fileUrl: string,
   migrationDir: string,
   dryRun: boolean,
@@ -105,9 +116,18 @@ async function executeMigration(
   }
 
   const serializedOps = JSON.stringify(ops, null, 2);
-  const meta: MigrationMeta | undefined =
-    typeof instance.describe === 'function' ? instance.describe() : undefined;
-  const manifest = meta ? buildManifest(meta) : undefined;
+
+  let manifest: Record<string, unknown> | undefined;
+  if (typeof instance.describe === 'function') {
+    const rawMeta: unknown = instance.describe();
+    if (rawMeta !== undefined) {
+      const parsed = MigrationMetaSchema(rawMeta);
+      if (parsed instanceof type.errors) {
+        throw new Error(`describe() returned invalid metadata: ${parsed.summary}`);
+      }
+      manifest = buildManifest(parsed);
+    }
+  }
 
   if (dryRun) {
     if (manifest) {
