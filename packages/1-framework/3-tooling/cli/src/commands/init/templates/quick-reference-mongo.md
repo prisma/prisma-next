@@ -2,7 +2,7 @@
 
 Prisma Next lets you query your database in simple, easy to read TypeScript. Define what your data looks like, and Prisma Next gives you a fully typed client — with autocomplete for every collection, field, and relation.
 
-This project is set up for MongoDB. Prisma Next also supports [other databases](https://github.com/prisma/prisma-next).
+This project is set up for MongoDB. Prisma Next also supports other databases.
 
 ## Your data contract
 
@@ -40,7 +40,7 @@ Your contract has two companion files in the same directory:
 
 Commit both files to git. When you change your contract, run `pnpm prisma-next contract emit` to update them.
 
-If you use a framework like [Next.js](https://github.com/prisma/prisma-next) or [Vite](https://github.com/prisma/prisma-next), the Prisma Next plugin will do this for you automatically.
+If you use a framework like Next.js or Vite, the Prisma Next plugin will do this for you automatically.
 
 ## Configuration
 
