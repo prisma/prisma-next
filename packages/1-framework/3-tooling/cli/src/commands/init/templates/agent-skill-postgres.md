@@ -7,7 +7,18 @@ This project uses **Prisma Next** with **PostgreSQL** via the `@prisma-next/post
 - Schema: `{{schemaPath}}` — edit models here, then re-emit
 - Config: `prisma-next.config.ts`
 - Runtime client: `{{schemaDir}}/db.ts` — import `db` from `{{dbImportPath}}`
-- Emitted contract: `{{schemaDir}}/contract.json` + `{{schemaDir}}/contract.d.ts` (generated, do not edit)
+- Emitted contract: `{{schemaDir}}/contract.json` + `{{schemaDir}}/contract.d.ts` (generated)
+
+## Important: generated files
+
+**NEVER** modify these files by hand — they are generated and will be overwritten:
+
+- `prisma-next.config.ts`
+- `{{schemaDir}}/db.ts`
+- `{{schemaDir}}/contract.json`
+- `{{schemaDir}}/contract.d.ts`
+
+To change the contract, edit `{{schemaPath}}` and re-run `pnpm prisma-next contract emit`.
 
 ## Key commands
 
