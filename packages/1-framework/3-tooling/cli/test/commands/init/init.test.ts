@@ -220,6 +220,27 @@ describe('runInit', () => {
     );
   });
 
+  it('detects deno and installs with npm: prefix', async () => {
+    rmSync(join(tmpDir, 'package.json'));
+    writeFileSync(join(tmpDir, 'deno.json'), '{}');
+    writeFileSync(join(tmpDir, 'deno.lock'), '{}');
+
+    await runInit(tmpDir, { noInstall: false });
+
+    expect(execFile).toHaveBeenCalledWith(
+      'deno',
+      ['add', 'npm:@prisma-next/postgres', 'npm:dotenv'],
+      expect.anything(),
+      expect.any(Function),
+    );
+    expect(execFile).toHaveBeenCalledWith(
+      'deno',
+      ['add', '--dev', 'npm:@prisma-next/cli'],
+      expect.anything(),
+      expect.any(Function),
+    );
+  });
+
   it('shows prisma-next.md in outro', async () => {
     writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
 
@@ -257,5 +278,24 @@ describe('runInit', () => {
     expect(existsSync(join(tmpDir, 'prisma'))).toBe(false);
 
     exitSpy.mockRestore();
+  });
+
+  it('accepts deno.json as project manifest', async () => {
+    rmSync(join(tmpDir, 'package.json'));
+    writeFileSync(join(tmpDir, 'deno.json'), '{}');
+    writeFileSync(join(tmpDir, 'deno.lock'), '{}');
+
+    await runInit(tmpDir, { noInstall: true });
+
+    expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
+  });
+
+  it('accepts deno.jsonc as project manifest', async () => {
+    rmSync(join(tmpDir, 'package.json'));
+    writeFileSync(join(tmpDir, 'deno.jsonc'), '{}');
+
+    await runInit(tmpDir, { noInstall: true });
+
+    expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
   });
 });
