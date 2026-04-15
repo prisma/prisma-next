@@ -41,6 +41,10 @@
       "types": "./dist/exports/control.d.mts",
       "import": "./dist/exports/control.mjs"
     },
+    "./internal": {
+      "types": "./dist/exports/internal.d.mts",
+      "import": "./dist/exports/internal.mjs"
+    },
     "./package.json": "./package.json"
   },
   "repository": {
