@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
@@ -11,7 +11,8 @@ const repoRoot = resolve(packageRoot, '../../..');
 const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
 
 const familyMongoRoot = resolve(repoRoot, 'packages/2-mongo-family/9-family');
-const migrationExports = join(familyMongoRoot, 'src/exports/migration.ts').replace(/\\/g, '/');
+const migrationExport = join(familyMongoRoot, 'src/exports/migration.ts').replace(/\\/g, '/');
+const factoryExport = join(packageRoot, 'src/exports/migration.ts').replace(/\\/g, '/');
 
 describe('migration file E2E', () => {
   let tmpDir: string;
@@ -41,7 +42,8 @@ describe('migration file E2E', () => {
 
   describe('factory-based migration', () => {
     const factoryMigration = [
-      `import { Migration, createIndex, createCollection } from '${migrationExports}';`,
+      `import { Migration } from '${migrationExport}';`,
+      `import { createIndex, createCollection } from '${factoryExport}';`,
       '',
       'export default class extends Migration {',
       '  plan() {',
@@ -94,7 +96,8 @@ describe('migration file E2E', () => {
 
   describe('strategy-based migration', () => {
     const strategyMigration = [
-      `import { Migration, validatedCollection } from '${migrationExports}';`,
+      `import { Migration } from '${migrationExport}';`,
+      `import { validatedCollection } from '${factoryExport}';`,
       '',
       'export default class extends Migration {',
       '  plan() {',
@@ -134,7 +137,8 @@ describe('migration file E2E', () => {
   describe('serialization format', () => {
     it('produces JSON that the runner can consume (correct kind discriminants)', async () => {
       const migration = [
-        `import { Migration, createIndex, dropIndex, createCollection, dropCollection, collMod } from '${migrationExports}';`,
+        `import { Migration } from '${migrationExport}';`,
+        `import { createIndex, dropIndex, createCollection, dropCollection, collMod } from '${factoryExport}';`,
         '',
         'export default class extends Migration {',
         '  plan() {',

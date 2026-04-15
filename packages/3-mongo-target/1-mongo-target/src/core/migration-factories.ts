@@ -1,3 +1,4 @@
+import type { MigrationOperationClass } from '@prisma-next/framework-components/control';
 import type { MongoIndexKey } from '@prisma-next/mongo-query-ast/control';
 import {
   buildIndexOpId,
@@ -26,7 +27,7 @@ function isTextIndex(keys: ReadonlyArray<MongoIndexKey>): boolean {
   return keys.some((k) => k.direction === 'text');
 }
 
-function keyFilter(collection: string, keys: ReadonlyArray<MongoIndexKey>) {
+function keyFilter(keys: ReadonlyArray<MongoIndexKey>) {
   return isTextIndex(keys)
     ? MongoFieldFilter.eq('key._fts', 'text')
     : MongoFieldFilter.eq('key', keysToKeySpec(keys));
@@ -38,7 +39,7 @@ export function createIndex(
   options?: CreateIndexOptions,
 ): MongoMigrationPlanOperation {
   const name = defaultMongoIndexName(keys);
-  const filter = keyFilter(collection, keys);
+  const filter = keyFilter(keys);
   const fullFilter = options?.unique
     ? MongoAndExpr.of([filter, MongoFieldFilter.eq('unique', true)])
     : filter;
@@ -81,7 +82,7 @@ export function dropIndex(
   keys: ReadonlyArray<MongoIndexKey>,
 ): MongoMigrationPlanOperation {
   const indexName = defaultMongoIndexName(keys);
-  const filter = keyFilter(collection, keys);
+  const filter = keyFilter(keys);
 
   return {
     id: buildIndexOpId('drop', collection, keys),
@@ -154,11 +155,15 @@ export function dropCollection(collection: string): MongoMigrationPlanOperation 
   };
 }
 
-export function collMod(collection: string, options: CollModOptions): MongoMigrationPlanOperation {
+export function collMod(
+  collection: string,
+  options: CollModOptions,
+  overrides?: { operationClass?: MigrationOperationClass },
+): MongoMigrationPlanOperation {
   return {
     id: `collMod.${collection}`,
     label: `Modify collection ${collection}`,
-    operationClass: 'destructive',
+    operationClass: overrides?.operationClass ?? 'destructive',
     precheck: [],
     execute: [
       {

@@ -25,6 +25,7 @@
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "mongodb-memory-server": "catalog:",
+    "pathe": "^2.0.3",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
