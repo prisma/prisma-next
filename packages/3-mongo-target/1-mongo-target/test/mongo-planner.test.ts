@@ -1311,4 +1311,52 @@ describe('MongoMigrationPlanner', () => {
       expect(calls).toHaveLength(0);
     });
   });
+
+  describe('polymorphic collections (FL-09)', () => {
+    it('does not createCollection for variant names when contract has only the base collection', () => {
+      const contract = makeContract({
+        tasks: {
+          indexes: [{ keys: [{ field: 'title', direction: 1 }] }],
+          validator: {
+            jsonSchema: {
+              bsonType: 'object',
+              required: ['_id', 'title', 'type'],
+              properties: {
+                _id: { bsonType: 'objectId' },
+                title: { bsonType: 'string' },
+                type: { bsonType: 'string' },
+              },
+              oneOf: [
+                {
+                  properties: {
+                    type: { enum: ['bug'] },
+                    severity: { bsonType: 'string' },
+                  },
+                  required: ['severity'],
+                },
+                {
+                  properties: {
+                    type: { enum: ['feature'] },
+                    priority: { bsonType: 'int' },
+                  },
+                  required: ['priority'],
+                },
+              ],
+            },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+
+      const plan = planSuccess(planner, contract, emptyIR());
+      const collectionNames = (plan.operations as MongoMigrationPlanOperation[])
+        .filter((op) => op.execute[0]?.command.kind === 'createCollection')
+        .map((op) => (op.execute[0]!.command as CreateCollectionCommand).collection);
+
+      expect(collectionNames).toEqual(['tasks']);
+      expect(collectionNames).not.toContain('bug');
+      expect(collectionNames).not.toContain('feature');
+    });
+  });
 });
