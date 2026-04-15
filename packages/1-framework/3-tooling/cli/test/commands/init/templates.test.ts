@@ -117,6 +117,23 @@ describe('templates', () => {
       expect(md).toContain('prisma-next.config.ts');
     });
 
+    it('contains postgres-specific content', () => {
+      const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
+
+      expect(md).toContain('PostgreSQL');
+      expect(md).toContain('@prisma-next/postgres');
+      expect(md).toContain('autoincrement()');
+      expect(md).toContain('postgresql://');
+    });
+
+    it('contains ORM query example for postgres', () => {
+      const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
+
+      expect(md).toContain('db.orm.User');
+      expect(md).toContain('.where(');
+      expect(md).toContain('.first()');
+    });
+
     it('contains common commands', () => {
       const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
 
@@ -124,19 +141,20 @@ describe('templates', () => {
       expect(md).toContain('db init');
     });
 
-    it('contains a query example', () => {
-      const md = quickReferenceMd('postgres', 'prisma/contract.prisma');
-
-      expect(md).toContain('db.sql');
-      expect(md).toContain('.from(');
-      expect(md).toContain('.select(');
-    });
-
-    it('references the correct package for mongo', () => {
+    it('contains mongo-specific content', () => {
       const md = quickReferenceMd('mongo', 'prisma/contract.prisma');
 
-      expect(md).toContain('@prisma-next/mongo');
       expect(md).toContain('MongoDB');
+      expect(md).toContain('@prisma-next/mongo');
+      expect(md).toContain('ObjectId');
+      expect(md).toContain('mongodb://');
+    });
+
+    it('contains ORM query example for mongo', () => {
+      const md = quickReferenceMd('mongo', 'prisma/contract.prisma');
+
+      expect(md).toContain('db.connect(');
+      expect(md).toContain('client.orm.User');
     });
   });
 
@@ -149,6 +167,15 @@ describe('templates', () => {
       expect(md).toContain('prisma-next.config.ts');
     });
 
+    it('contains postgres-specific query pattern', () => {
+      const md = agentSkillMd('postgres', 'prisma/contract.prisma');
+
+      expect(md).toContain('PostgreSQL');
+      expect(md).toContain('@prisma-next/postgres');
+      expect(md).toContain('db.sql');
+      expect(md).toContain('.from(');
+    });
+
     it('contains common commands', () => {
       const md = agentSkillMd('postgres', 'prisma/contract.prisma');
 
@@ -156,29 +183,34 @@ describe('templates', () => {
       expect(md).toContain('db init');
     });
 
-    it('contains a query pattern', () => {
-      const md = agentSkillMd('postgres', 'prisma/contract.prisma');
-
-      expect(md).toContain('db.sql');
-      expect(md).toContain('.from(');
-    });
-
-    it('references the correct package for mongo', () => {
+    it('contains mongo-specific query pattern', () => {
       const md = agentSkillMd('mongo', 'prisma/contract.prisma');
 
-      expect(md).toContain('@prisma-next/mongo');
       expect(md).toContain('MongoDB');
+      expect(md).toContain('@prisma-next/mongo');
+      expect(md).toContain('db.connect(');
+      expect(md).toContain('client.orm.User');
     });
   });
 
   describe('template variable consistency', () => {
-    it('quick-reference.md placeholders match declared variables', () => {
-      const mdVars = extractPlaceholders('quick-reference.md');
+    it('quick-reference-postgres.md placeholders match declared variables', () => {
+      const mdVars = extractPlaceholders('quick-reference-postgres.md');
       expect(mdVars).toEqual(new Set(quickRefVars));
     });
 
-    it('agent-skill.md placeholders match declared variables', () => {
-      const mdVars = extractPlaceholders('agent-skill.md');
+    it('quick-reference-mongo.md placeholders match declared variables', () => {
+      const mdVars = extractPlaceholders('quick-reference-mongo.md');
+      expect(mdVars).toEqual(new Set(quickRefVars));
+    });
+
+    it('agent-skill-postgres.md placeholders match declared variables', () => {
+      const mdVars = extractPlaceholders('agent-skill-postgres.md');
+      expect(mdVars).toEqual(new Set(agentSkillVars));
+    });
+
+    it('agent-skill-mongo.md placeholders match declared variables', () => {
+      const mdVars = extractPlaceholders('agent-skill-mongo.md');
       expect(mdVars).toEqual(new Set(agentSkillVars));
     });
   });
