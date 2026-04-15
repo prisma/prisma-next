@@ -169,7 +169,7 @@ describe('runtime-core with mock family', () => {
     }).rejects.toThrow('Plan target other does not match contract target mock');
   });
 
-  it('supports middlewares', async () => {
+  it('supports middleware', async () => {
     const contract: MockContract = {
       target: 'mock',
       targetFamily: 'mock',
@@ -208,7 +208,7 @@ describe('runtime-core with mock family', () => {
       familyAdapter,
       driver,
       verify: { mode: 'onFirstUse', requireMarker: false },
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     const plan: ExecutionPlan = {

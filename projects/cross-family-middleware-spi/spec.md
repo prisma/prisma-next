@@ -1,6 +1,6 @@
 # Summary
 
-Extract family-agnostic runtime and middleware SPIs at the framework level. The runtime SPI defines what a family runtime looks like to consumers (execute a plan, get rows back). The middleware SPI defines the query execution lifecycle hooks that middlewares observe. Family-specific interfaces extend both SPIs with narrowed types. Wire the middleware lifecycle into `MongoRuntime` and prove it works with a single generic middleware running in both SQL and Mongo runtimes.
+Extract family-agnostic runtime and middleware SPIs at the framework level. The runtime SPI defines what a family runtime looks like to consumers (execute a plan, get rows back). The middleware SPI defines the query execution lifecycle hooks that middleware observe. Family-specific interfaces extend both SPIs with narrowed types. Wire the middleware lifecycle into `MongoRuntime` and prove it works with a single generic middleware running in both SQL and Mongo runtimes.
 
 # Description
 
@@ -18,11 +18,11 @@ The solution follows the same pattern used for other framework components (adapt
 
 **Middleware layers:**
 
-1. **Framework-level `RuntimeMiddleware` SPI** — the interface the framework sees. The plan is opaque (using the existing `ExecutionPlan` base interface, which both SQL and Mongo plans satisfy via `meta: PlanMeta`). The framework passes plans through without inspecting their contents. Generic middlewares (telemetry, rate limiting, caching) are written against this interface.
+1. **Framework-level `RuntimeMiddleware` SPI** — the interface the framework sees. The plan is opaque (using the existing `ExecutionPlan` base interface, which both SQL and Mongo plans satisfy via `meta: PlanMeta`). The framework passes plans through without inspecting their contents. Generic middleware (telemetry, rate limiting, caching) are written against this interface.
 
 2. **Family-specific middleware interfaces** — `SqlMiddleware` extends `RuntimeMiddleware` with narrowed types: `ExecutionPlan` with `sql: string` and SQL AST, SQL-specific context. `MongoMiddleware` extends it with `MongoQueryPlan` and Mongo-specific context. These are what family-specific middleware authors use (e.g. SQL `lints` and `budgets`).
 
-3. **Compatibility validation** — when constructing a runtime, validate that provided middlewares are compatible with the runtime's `familyId`/`targetId`. A generic middleware (no `familyId`) works everywhere. A SQL middleware (`familyId: 'sql'`) fails with a clear error if provided to a Mongo runtime. This follows the `TargetBoundComponentDescriptor` / `checkContractComponentRequirements` pattern.
+3. **Compatibility validation** — when constructing a runtime, validate that provided middleware are compatible with the runtime's `familyId`/`targetId`. A generic middleware (no `familyId`) works everywhere. A SQL middleware (`familyId: 'sql'`) fails with a clear error if provided to a Mongo runtime. This follows the `TargetBoundComponentDescriptor` / `checkContractComponentRequirements` pattern.
 
 # Requirements
 
@@ -60,13 +60,13 @@ The solution follows the same pattern used for other framework components (adapt
 
    This interface lives in `@prisma-next/framework-components` alongside `RuntimeExecutor`.
 
-4. **Define `RuntimeMiddlewareContext` at the framework level.** The context available to all middlewares regardless of family:
+4. **Define `RuntimeMiddlewareContext` at the framework level.** The context available to all middleware regardless of family:
    - `contract: unknown` — the contract (opaque at framework level; narrowed by family interfaces)
    - `mode: 'strict' | 'permissive'`
    - `log: Log`
    - `now: () => number`
 
-   Family-specific context types (`SqlMiddlewareContext`, `MongoMiddlewareContext`) extend this base interface. Middleware contexts do not expose `adapter` or `driver` — middlewares interact with the runtime exclusively through the structured lifecycle hooks, not by bypassing the runtime's query orchestration.
+   Family-specific context types (`SqlMiddlewareContext`, `MongoMiddlewareContext`) extend this base interface. Middleware contexts do not expose `adapter` or `driver` — middleware interact with the runtime exclusively through the structured lifecycle hooks, not by bypassing the runtime's query orchestration.
 
    This interface lives in `@prisma-next/framework-components` alongside `RuntimeMiddleware`.
 
@@ -84,7 +84,7 @@ The solution follows the same pattern used for other framework components (adapt
 
 ### Compatibility validation
 
-7. **Validate middleware compatibility at runtime construction.** When a runtime is constructed with a list of middlewares, check each middleware's `familyId` and `targetId` against the runtime's family and target:
+7. **Validate middleware compatibility at runtime construction.** When a runtime is constructed with a list of middleware, check each middleware's `familyId` and `targetId` against the runtime's family and target:
    - No `familyId` → compatible with any family
    - `familyId` matches → compatible
    - `familyId` mismatches → error: "Middleware '{name}' requires family '{middlewareFamilyId}' but the runtime is configured for family '{runtimeFamilyId}'"
@@ -96,7 +96,7 @@ The solution follows the same pattern used for other framework components (adapt
 
 ### Mongo runtime middleware lifecycle
 
-8. **Add middleware lifecycle to `MongoRuntime`.** `MongoRuntimeOptions` gains an optional `middlewares` parameter. The middleware lifecycle wraps the existing execution path (`adapter.lower(plan)` → `driver.execute(wireCommand)`):
+8. **Add middleware lifecycle to `MongoRuntime`.** `MongoRuntimeOptions` gains an optional `middleware` parameter. The middleware lifecycle wraps the existing execution path (`adapter.lower(plan)` → `driver.execute(wireCommand)`):
    - Call `beforeExecute` on each middleware before lowering
    - Call `onRow` on each middleware per result row
    - Call `afterExecute` on each middleware after execution completes
@@ -108,9 +108,9 @@ The solution follows the same pattern used for other framework components (adapt
 
 9. **Rename `Plugin` to `RuntimeMiddleware` across the codebase.** The existing `Plugin` interface in `@prisma-next/runtime-executor` is renamed to `RuntimeMiddleware`. The existing `PluginContext` is renamed to `RuntimeMiddlewareContext`. All production code references (`plugins` options, type annotations, imports) are updated to the new names. This includes the framework layer, SQL runtime, Mongo runtime, and facade packages.
 
-10. **Migrate existing SQL middlewares.** The existing `budgets` and `lints` middlewares in `@prisma-next/sql-runtime` are updated to implement `SqlMiddleware`. They already use SQL-specific plan fields (`plan.sql`, `plan.ast`), so they naturally belong to the `SqlMiddleware` type with `familyId: 'sql'`.
+10. **Migrate existing SQL middleware.** The existing `budgets` and `lints` middleware in `@prisma-next/sql-runtime` are updated to implement `SqlMiddleware`. They already use SQL-specific plan fields (`plan.sql`, `plan.ast`), so they naturally belong to the `SqlMiddleware` type with `familyId: 'sql'`.
 
-11. **Migrate `RuntimeCoreImpl` to accept `RuntimeMiddleware[]`.** The existing `RuntimeCoreImpl` continues to orchestrate the middleware lifecycle, but now accepts `RuntimeMiddleware[]` and validates compatibility (all provided middlewares must be family-agnostic or have `familyId: 'sql'`).
+11. **Migrate `RuntimeCoreImpl` to accept `RuntimeMiddleware[]`.** The existing `RuntimeCoreImpl` continues to orchestrate the middleware lifecycle, but now accepts `RuntimeMiddleware[]` and validates compatibility (all provided middleware must be family-agnostic or have `familyId: 'sql'`).
 
 ### Cross-family proof
 
@@ -138,7 +138,7 @@ The solution follows the same pattern used for other framework components (adapt
 - **Middleware interception / short-circuiting / result injection.** This is WS3 VP4 (Alexey's workstream). This project normalizes the SPI so that whatever interception model VP4 establishes can be adopted by both families. We do not implement interception ourselves.
 - **Middleware for connections or transactions.** The middleware lifecycle wraps individual query executions. Connection-level and transaction-level hooks are deferred.
 - **Middleware ordering or composition model.** Middlewares execute in registration order. Advanced composition (priority, dependency resolution) is deferred.
-- **Renaming "plugin" everywhere.** Rename `Plugin` → `RuntimeMiddleware`, `PluginContext` → `RuntimeMiddlewareContext`, and `plugins` → `middlewares` across the entire codebase — production code AND test code. Half a rename is worse than none. All code uses the canonical "middleware" terminology.
+- **Renaming "plugin" everywhere.** Rename `Plugin` → `RuntimeMiddleware`, `PluginContext` → `RuntimeMiddlewareContext`, and `plugins` → `middleware` across the entire codebase — production code AND test code. Half a rename is worse than none. All code uses the canonical "middleware" terminology.
 
 # Acceptance Criteria
 
@@ -162,18 +162,18 @@ The solution follows the same pattern used for other framework components (adapt
 ### Compatibility validation
 - [x] Runtime construction validates middleware `familyId`/`targetId` compatibility
 - [x] Mismatched `familyId` produces a clear error message naming the middleware and the mismatch
-- [x] Generic middlewares (no `familyId`) pass validation for any runtime
+- [x] Generic middleware (no `familyId`) pass validation for any runtime
 
 ### Mongo middleware lifecycle
-- [x] `MongoRuntime` accepts an optional `middlewares` parameter
+- [x] `MongoRuntime` accepts an optional `middleware` parameter
 - [x] `MongoRuntime` calls `beforeExecute`, `onRow`, `afterExecute` around query execution
 - [x] Middleware lifecycle in Mongo handles errors (calls `afterExecute` with `completed: false`, then rethrows)
 
 ### Rename and migration
 - [x] `Plugin` renamed to `RuntimeMiddleware` across all production code
 - [x] `PluginContext` renamed to `RuntimeMiddlewareContext` across all production code
-- [x] `plugins` option renamed to `middlewares` across all production code
-- [x] Existing `budgets` and `lints` middlewares work without API changes to their consumers
+- [x] `plugins` option renamed to `middleware` across all production code
+- [x] Existing `budgets` and `lints` middleware work without API changes to their consumers
 
 ### Cross-family proof
 - [x] A generic middleware (no `familyId`) runs in both SQL and Mongo runtimes
@@ -204,7 +204,7 @@ The solution follows the same pattern used for other framework components (adapt
 - Current `RuntimeCore`/`RuntimeQueryable` interfaces: `packages/1-framework/4-runtime/runtime-executor/src/runtime-core.ts`
 - `AsyncIterableResult`: `packages/1-framework/4-runtime/runtime-executor/src/async-iterable-result.ts`
 - SQL runtime: `packages/2-sql/5-runtime/src/sql-runtime.ts` — `createRuntime`, middleware wiring
-- SQL middlewares: `packages/2-sql/5-runtime/src/middleware/budgets.ts`, `packages/2-sql/5-runtime/src/middleware/lints.ts`
+- SQL middleware: `packages/2-sql/5-runtime/src/middleware/budgets.ts`, `packages/2-sql/5-runtime/src/middleware/lints.ts`
 - Mongo runtime: `packages/2-mongo-family/7-runtime/src/mongo-runtime.ts` — `MongoRuntime`, no middleware support
 - Mongo query plan: `packages/2-mongo-family/4-query/query-ast/src/query-plan.ts` — `MongoQueryPlan`
 - Mongo executor: `packages/2-mongo-family/5-query-builders/orm/src/executor.ts` — `MongoQueryExecutor`
@@ -220,7 +220,7 @@ None — all design decisions were resolved during shaping conversation. Key dec
 - **SPI location:** `RuntimeExecutor`, `RuntimeMiddleware`, and `RuntimeMiddlewareContext` live in `@prisma-next/framework-components` (layer 1-core), alongside the other cross-family SPIs. This is the natural home for interfaces that both SQL and Mongo runtimes implement.
 - **SPI over concretions:** The framework defines interfaces, not shared base classes. Each family runtime implements the middleware lifecycle independently.
 - **Plan base type is structural:** The framework-level constraint is `{ readonly meta: PlanMeta }`. Both `ExecutionPlan` and `MongoQueryPlan` satisfy this structurally. The framework middleware sees only `meta`, not `sql` or `collection`.
-- **Middleware contexts exclude adapter/driver:** `RuntimeMiddlewareContext` has `contract`, `mode`, `log`, `now` only. Family-specific context types extend this base but do not add `adapter` or `driver` — middlewares must interact with the runtime through lifecycle hooks only, not bypass query orchestration.
-- **"Middleware" naming — complete rename:** "Middleware" is the canonical term. ALL code (production AND tests) is renamed from `Plugin`/`PluginContext`/`plugins` to `RuntimeMiddleware`/`RuntimeMiddlewareContext`/`middlewares`. Half a rename is worse than none.
+- **Middleware contexts exclude adapter/driver:** `RuntimeMiddlewareContext` has `contract`, `mode`, `log`, `now` only. Family-specific context types extend this base but do not add `adapter` or `driver` — middleware must interact with the runtime through lifecycle hooks only, not bypass query orchestration.
+- **"Middleware" naming — complete rename:** "Middleware" is the canonical term. ALL code (production AND tests) is renamed from `Plugin`/`PluginContext`/`plugins` to `RuntimeMiddleware`/`RuntimeMiddlewareContext`/`middleware`. Half a rename is worse than none.
 - **Simple compatibility validation:** `checkMiddlewareCompatibility` is a simple function that throws on incompatibility. It does not use the `TargetBoundComponentDescriptor` pattern.
 - **Scope excludes interception:** Middleware interception/short-circuiting is WS3 VP4's responsibility. This project normalizes the SPI so VP4's model can be adopted by both families.

@@ -6,7 +6,7 @@ import { context, stack } from './context';
 
 export async function getRuntime(
   databaseUrl: string,
-  middlewares: Middleware<typeof context.contract>[] = [
+  middleware: Middleware<typeof context.contract>[] = [
     createTelemetryMiddleware(),
     budgets({
       maxRows: 10_000,
@@ -38,6 +38,6 @@ export async function getRuntime(
       mode: 'onFirstUse',
       requireMarker: false,
     },
-    middlewares,
+    middleware,
   });
 }

@@ -115,7 +115,7 @@ describe('cross-family middleware proof', () => {
       familyAdapter: new MockFamilyAdapter(sqlContract),
       driver: new MockSqlDriver([{ id: 1, name: 'Alice' }]),
       verify: { mode: 'onFirstUse', requireMarker: false },
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     const sqlPlan: ExecutionPlan = {
@@ -159,7 +159,7 @@ describe('cross-family middleware proof', () => {
         { _id: '2', name: 'Carol' },
       ]),
       contract: {},
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     const plan = createMongoPlan(mongoMeta);
@@ -195,14 +195,14 @@ describe('cross-family middleware proof', () => {
       familyAdapter: new MockFamilyAdapter(sqlContract),
       driver: new MockSqlDriver([{ id: 1 }]),
       verify: { mode: 'onFirstUse', requireMarker: false },
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     const mongoRuntime = createMongoRuntime({
       adapter: createMockMongoAdapter(),
       driver: createMockMongoDriver([{ _id: '1' }]),
       contract: {},
-      middlewares: [middleware],
+      middleware: [middleware],
     });
 
     for await (const _row of sqlRuntime.execute({

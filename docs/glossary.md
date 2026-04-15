@@ -215,6 +215,6 @@ Planned refactors to bring internal naming in line with user-facing terminology:
 | User-facing term          | Current internal term               | Scope                                                             | Status  |
 | ------------------------- | ----------------------------------- | ----------------------------------------------------------------- | ------- |
 | extension / `extensions`  | extension pack / `extensionPacks`   | Config property, types, docs, CLI output, error messages          | Pending |
-| middleware / `middlewares` | plugin / `plugins`                  | Runtime options, types, docs                                      | **Done** |
+| middleware / `middleware` | plugin / `plugins`                  | Runtime options, types, docs                                      | **Done** |
 | query builder             | query lane / lane                   | Architecture docs, package names, internal naming                 | Pending |
 

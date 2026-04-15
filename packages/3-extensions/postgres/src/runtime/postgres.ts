@@ -44,7 +44,7 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>> {
 
 export interface PostgresOptionsBase<TContract extends Contract<SqlStorage>> {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
-  readonly middlewares?: readonly Middleware<TContract>[];
+  readonly middleware?: readonly Middleware<TContract>[];
   readonly verify?: RuntimeVerifyOptions;
   readonly poolOptions?: {
     readonly connectionTimeoutMillis?: number;
@@ -190,7 +190,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       context,
       driver,
       verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-      ...(options.middlewares ? { middlewares: options.middlewares } : {}),
+      ...(options.middleware ? { middleware: options.middleware } : {}),
     });
 
     return runtimeInstance;

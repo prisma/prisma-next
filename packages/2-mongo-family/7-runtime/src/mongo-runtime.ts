@@ -18,7 +18,7 @@ export interface MongoRuntimeOptions {
   readonly adapter: MongoAdapter;
   readonly driver: MongoDriver;
   readonly contract: unknown;
-  readonly middlewares?: readonly RuntimeMiddleware[];
+  readonly middleware?: readonly RuntimeMiddleware[];
   readonly mode?: 'strict' | 'permissive';
 }
 
@@ -30,16 +30,16 @@ export interface MongoRuntime {
 class MongoRuntimeImpl implements MongoRuntime {
   readonly #adapter: MongoAdapter;
   readonly #driver: MongoDriver;
-  readonly #middlewares: readonly RuntimeMiddleware[];
+  readonly #middleware: readonly RuntimeMiddleware[];
   readonly #middlewareContext: RuntimeMiddlewareContext;
 
   constructor(options: MongoRuntimeOptions) {
     this.#adapter = options.adapter;
     this.#driver = options.driver;
-    this.#middlewares = options.middlewares ?? [];
+    this.#middleware = options.middleware ?? [];
 
-    if (options.middlewares) {
-      for (const mw of options.middlewares) {
+    if (options.middleware) {
+      for (const mw of options.middleware) {
         checkMiddlewareCompatibility(mw, 'mongo');
       }
     }
@@ -55,7 +55,7 @@ class MongoRuntimeImpl implements MongoRuntime {
   execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {
     const adapter = this.#adapter;
     const driver = this.#driver;
-    const middlewares = this.#middlewares;
+    const middleware = this.#middleware;
     const ctx = this.#middlewareContext;
 
     const iterator = async function* (): AsyncGenerator<Row, void, unknown> {
@@ -64,7 +64,7 @@ class MongoRuntimeImpl implements MongoRuntime {
       let completed = false;
 
       try {
-        for (const mw of middlewares) {
+        for (const mw of middleware) {
           if (mw.beforeExecute) {
             await mw.beforeExecute(plan, ctx);
           }
@@ -73,7 +73,7 @@ class MongoRuntimeImpl implements MongoRuntime {
         const wireCommand = adapter.lower(plan);
 
         for await (const row of driver.execute<Row>(wireCommand)) {
-          for (const mw of middlewares) {
+          for (const mw of middleware) {
             if (mw.onRow) {
               await mw.onRow(row as Record<string, unknown>, plan, ctx);
             }
@@ -85,7 +85,7 @@ class MongoRuntimeImpl implements MongoRuntime {
         completed = true;
       } catch (error) {
         const latencyMs = Date.now() - startedAt;
-        for (const mw of middlewares) {
+        for (const mw of middleware) {
           if (mw.afterExecute) {
             try {
               await mw.afterExecute(plan, { rowCount, latencyMs, completed }, ctx);
@@ -98,7 +98,7 @@ class MongoRuntimeImpl implements MongoRuntime {
       }
 
       const latencyMs = Date.now() - startedAt;
-      for (const mw of middlewares) {
+      for (const mw of middleware) {
         if (mw.afterExecute) {
           await mw.afterExecute(plan, { rowCount, latencyMs, completed }, ctx);
         }

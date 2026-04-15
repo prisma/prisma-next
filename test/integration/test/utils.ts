@@ -28,7 +28,7 @@ export interface CreateTestRuntimeOptions {
     requireMarker?: boolean;
   };
   readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<'postgres'>[];
-  readonly middlewares?: readonly Middleware[];
+  readonly middleware?: readonly Middleware[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -98,7 +98,7 @@ export async function createTestRuntime(
     context,
     driver,
     verify,
-    ...(options?.middlewares ? { middlewares: options.middlewares } : {}),
+    ...(options?.middleware ? { middleware: options.middleware } : {}),
     ...(options?.mode ? { mode: options.mode } : {}),
     ...(options?.log ? { log: options.log } : {}),
   });
