@@ -85,10 +85,13 @@ describe('templates', () => {
       expect(prismaNextImports).toHaveLength(1);
     });
 
-    it('generates mongo db.ts', () => {
+    it('generates mongo db.ts with single @prisma-next import', () => {
       const db = dbFile('mongo');
 
       expect(db).toContain("from '@prisma-next/mongo/runtime'");
+      expect(db).toContain('mongo<Contract>({ contractJson })');
+      const prismaNextImports = db.split('\n').filter((l) => l.includes("from '@prisma-next/"));
+      expect(prismaNextImports).toHaveLength(1);
     });
   });
 

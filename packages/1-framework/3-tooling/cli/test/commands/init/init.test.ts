@@ -170,17 +170,15 @@ describe('runInit', () => {
     expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
   });
 
-  it('with --no-install prints manual commands using detected package manager', async () => {
+  it('with --no-install uses detected package manager in summary', async () => {
     writeFileSync(join(tmpDir, 'yarn.lock'), '');
 
     await runInit(tmpDir, { noInstall: true });
 
-    const noteCall = vi.mocked(clack.note).mock.calls[0];
-    expect(noteCall).toBeDefined();
-    const noteContent = noteCall[0] as string;
-    expect(noteContent).toContain('yarn add @prisma-next/postgres');
-    expect(noteContent).toContain('yarn prisma-next contract emit');
-    expect(noteContent).not.toContain('pnpm');
+    const outroCall = vi.mocked(clack.outro).mock.calls[0];
+    expect(outroCall).toBeDefined();
+    const outroContent = outroCall[0] as string;
+    expect(outroContent).toContain('yarn prisma-next contract emit');
   });
 
   it('detects pnpm and installs dependencies', async () => {

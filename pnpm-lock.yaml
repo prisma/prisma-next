@@ -1980,6 +1980,12 @@ importers:
       '@prisma-next/mongo-contract-ts':
         specifier: workspace:*
         version: link:../../2-mongo-family/2-authoring/contract-ts
+      '@prisma-next/mongo-orm':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/5-query-builders/orm
+      '@prisma-next/mongo-pipeline-builder':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/5-query-builders/pipeline-builder
       '@prisma-next/mongo-runtime':
         specifier: workspace:*
         version: link:../../2-mongo-family/7-runtime
