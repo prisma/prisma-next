@@ -1,12 +1,27 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
 import {
   agentSkillMd,
+  variables as agentSkillVars,
+} from '../../../src/commands/init/templates/agent-skill';
+import {
   configFile,
   dbFile,
-  quickReferenceMd,
   starterSchema,
   targetPackageName,
-} from '../../../src/commands/init/templates';
+} from '../../../src/commands/init/templates/code-templates';
+import {
+  quickReferenceMd,
+  variables as quickRefVars,
+} from '../../../src/commands/init/templates/quick-reference';
+
+const TEMPLATES_DIR = join(import.meta.dirname, '../../../src/commands/init/templates');
+
+function extractPlaceholders(templateFile: string): Set<string> {
+  const content = readFileSync(join(TEMPLATES_DIR, templateFile), 'utf-8');
+  return new Set([...content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]));
+}
 
 describe('templates', () => {
   describe('starterSchema', () => {
@@ -131,6 +146,18 @@ describe('templates', () => {
 
       expect(md).toContain('@prisma-next/mongo');
       expect(md).toContain('MongoDB');
+    });
+  });
+
+  describe('template variable consistency', () => {
+    it('quick-reference.md placeholders match declared variables', () => {
+      const mdVars = extractPlaceholders('quick-reference.md');
+      expect(mdVars).toEqual(new Set(quickRefVars));
+    });
+
+    it('agent-skill.md placeholders match declared variables', () => {
+      const mdVars = extractPlaceholders('agent-skill.md');
+      expect(mdVars).toEqual(new Set(agentSkillVars));
     });
   });
 });

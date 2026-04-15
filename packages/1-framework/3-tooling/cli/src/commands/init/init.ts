@@ -4,15 +4,15 @@ import * as clack from '@clack/prompts';
 import { dirname, join } from 'pathe';
 import { TerminalUI } from '../../utils/terminal-ui';
 import { detectPackageManager } from './detect-package-manager';
+import { agentSkillMd } from './templates/agent-skill';
 import {
-  agentSkillMd,
   configFile,
   dbFile,
-  quickReferenceMd,
   starterSchema,
   type TargetId,
   targetPackageName,
-} from './templates';
+} from './templates/code-templates';
+import { quickReferenceMd } from './templates/quick-reference';
 
 export interface InitOptions {
   readonly noInstall?: boolean;
