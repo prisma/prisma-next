@@ -203,7 +203,7 @@ async function executeContractEmitCommand(
 
     // Validate that contract.d.ts type imports are resolvable
     const { validateContractDeps } = await import('../utils/validate-contract-deps');
-    const depsValidation = validateContractDeps(result.value.contractDts, configDir);
+    const depsValidation = validateContractDeps(result.value.contractDts, dirname(outputDtsPath));
     if (depsValidation.warning) {
       ui.warn(depsValidation.warning);
     }

@@ -95,7 +95,7 @@ describe('defineConfig facade', () => {
     expect(config.migrations?.dir).toBe('custom-migrations');
   });
 
-  it('passes extensions through to config and contributions', () => {
+  it('passes extensions through to config', () => {
     const mockExtension = {
       kind: 'extension' as const,
       familyId: 'sql' as const,
