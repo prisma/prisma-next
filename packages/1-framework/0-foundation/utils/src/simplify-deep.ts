@@ -1,5 +1,7 @@
 export type SimplifyDeep<T> = T extends readonly (infer Element)[]
-  ? SimplifyDeep<Element>[]
+  ? T extends unknown[]
+    ? SimplifyDeep<Element>[]
+    : readonly SimplifyDeep<Element>[]
   : T extends
         | string
         | number

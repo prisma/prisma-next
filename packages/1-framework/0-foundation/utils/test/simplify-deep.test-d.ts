@@ -36,9 +36,15 @@ describe('SimplifyDeep', () => {
     expectTypeOf<SimplifyDeep<Input>>().toEqualTypeOf<Expected>();
   });
 
-  test('arrays recurse', () => {
+  test('mutable arrays recurse', () => {
     type Input = ({ a: number } & { b: string })[];
     type Expected = { a: number; b: string }[];
+    expectTypeOf<SimplifyDeep<Input>>().toEqualTypeOf<Expected>();
+  });
+
+  test('readonly arrays preserve readonly', () => {
+    type Input = readonly ({ a: number } & { b: string })[];
+    type Expected = readonly { a: number; b: string }[];
     expectTypeOf<SimplifyDeep<Input>>().toEqualTypeOf<Expected>();
   });
 
