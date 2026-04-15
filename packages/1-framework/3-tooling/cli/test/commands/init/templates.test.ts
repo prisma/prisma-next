@@ -25,23 +25,23 @@ function extractPlaceholders(templateFile: string): Set<string> {
 
 describe('templates', () => {
   describe('starterSchema', () => {
-    it('contains User and Post models for postgres', () => {
-      const schema = starterSchema('postgres');
+    it('contains User and Post models for postgres PSL', () => {
+      const schema = starterSchema('postgres', 'psl');
 
       expect(schema).toContain('model User');
       expect(schema).toContain('model Post');
       expect(schema).toContain('@default(autoincrement())');
     });
 
-    it('includes a relation between User and Post for postgres', () => {
-      const schema = starterSchema('postgres');
+    it('includes a relation between User and Post for postgres PSL', () => {
+      const schema = starterSchema('postgres', 'psl');
 
       expect(schema).toContain('posts     Post[]');
       expect(schema).toContain('author    User');
     });
 
-    it('uses ObjectId ids for mongo', () => {
-      const schema = starterSchema('mongo');
+    it('uses ObjectId ids for mongo PSL', () => {
+      const schema = starterSchema('mongo', 'psl');
 
       expect(schema).toContain('model User');
       expect(schema).toContain('model Post');
@@ -49,11 +49,25 @@ describe('templates', () => {
       expect(schema).not.toContain('autoincrement');
     });
 
-    it('includes @@map collection names for mongo', () => {
-      const schema = starterSchema('mongo');
+    it('includes @@map collection names for mongo PSL', () => {
+      const schema = starterSchema('mongo', 'psl');
 
       expect(schema).toContain('@@map("users")');
       expect(schema).toContain('@@map("posts")');
+    });
+
+    it('uses defineContract for postgres TypeScript', () => {
+      const schema = starterSchema('postgres', 'typescript');
+
+      expect(schema).toContain('defineContract');
+      expect(schema).toContain("from '@prisma-next/sql-contract-ts/contract-builder'");
+    });
+
+    it('uses defineContract for mongo TypeScript', () => {
+      const schema = starterSchema('mongo', 'typescript');
+
+      expect(schema).toContain('defineContract');
+      expect(schema).toContain("from '@prisma-next/mongo-contract-ts/contract-builder'");
     });
   });
 
