@@ -16,6 +16,7 @@
   "dependencies": {
     "@prisma-next/config": "workspace:*",
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/psl-parser": "workspace:*",
     "@prisma-next/utils": "workspace:*",

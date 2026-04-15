@@ -28,7 +28,7 @@ export const mongoStringCodec = mongoCodec({
 
 export const mongoDoubleCodec = mongoCodec({
   typeId: MONGO_DOUBLE_CODEC_ID,
-  targetTypes: ['float'],
+  targetTypes: ['double'],
   traits: ['equality', 'order', 'numeric'],
   decode: (wire: number) => wire,
   encode: (value: number) => value,

@@ -1031,6 +1031,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../1-foundation/mongo-contract
