@@ -289,9 +289,6 @@ describe('createPostgresPslScalarTypeDescriptors', () => {
   });
 
   it('maps String to pg/text@1', () => {
-    expect(descriptors.get('String')).toEqual({
-      codecId: 'pg/text@1',
-      nativeType: 'text',
-    });
+    expect(descriptors.get('String')).toBe('pg/text@1');
   });
 });
