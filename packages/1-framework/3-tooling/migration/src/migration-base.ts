@@ -122,4 +122,7 @@ async function executeMigration(
   if (manifest) {
     writeFileSync(join(migrationDir, 'migration.json'), JSON.stringify(manifest, null, 2));
   }
+
+  const files = manifest ? 'ops.json + migration.json' : 'ops.json';
+  process.stdout.write(`Wrote ${files} to ${migrationDir}\n`);
 }

@@ -101,6 +101,7 @@ describe('Migration.run() subprocess', () => {
 
     const result = await runMigration('migration.ts');
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('Wrote ops.json');
 
     const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
     const ops = JSON.parse(opsJson);
@@ -188,6 +189,7 @@ describe('Migration.run() subprocess', () => {
 
       const result = await runMigration('migration.ts');
       expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('ops.json + migration.json');
 
       const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
       expect(manifest.from).toBe('abc123');
