@@ -7,7 +7,12 @@ import type {
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { Log, Plugin, Runtime, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
+import type {
+  Log,
+  Middleware,
+  Runtime,
+  SqlRuntimeExtensionDescriptor,
+} from '@prisma-next/sql-runtime';
 import {
   createExecutionContext,
   createRuntime,
@@ -23,7 +28,7 @@ export interface CreateTestRuntimeOptions {
     requireMarker?: boolean;
   };
   readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<'postgres'>[];
-  readonly plugins?: readonly Plugin[];
+  readonly middleware?: readonly Middleware[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -93,7 +98,7 @@ export async function createTestRuntime(
     context,
     driver,
     verify,
-    ...(options?.plugins ? { plugins: options.plugins } : {}),
+    ...(options?.middleware ? { middleware: options.middleware } : {}),
     ...(options?.mode ? { mode: options.mode } : {}),
     ...(options?.log ? { log: options.log } : {}),
   });

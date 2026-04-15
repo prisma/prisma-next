@@ -203,7 +203,7 @@ Stop condition: The PoC either works or we've identified the specific concurrenc
 
 **VP4: Middleware supports request rewriting**
 
-Currently middlewares are observers only. A caching middleware forces the architecture to support interception, short-circuiting, and result injection — validating that the middleware interface can support the full range of use cases (rate limiting, access control, query rewriting), not just observability.
+Currently middleware are observers only. A caching middleware forces the architecture to support interception, short-circuiting, and result injection — validating that the middleware interface can support the full range of use cases (rate limiting, access control, query rewriting), not just observability.
 
 User story: I add a caching middleware that computes a cache key from the query AST. On a cache hit, it short-circuits execution and serves the cached result without hitting the database. On a miss, it lets the query through and caches the result.
 

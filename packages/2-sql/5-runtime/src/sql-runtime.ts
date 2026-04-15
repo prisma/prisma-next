@@ -3,9 +3,10 @@ import type {
   ExecutionStackInstance,
   RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
+import { checkMiddlewareCompatibility } from '@prisma-next/framework-components/runtime';
 import type {
   Log,
-  Plugin,
+  Middleware,
   RuntimeCore,
   RuntimeCoreOptions,
   RuntimeTelemetryEvent,
@@ -19,7 +20,6 @@ import type {
   AnyQueryAst,
   CodecRegistry,
   LoweredStatement,
-  SelectAst,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -41,11 +41,7 @@ export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contrac
   readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
-  readonly plugins?: readonly Plugin<
-    TContract,
-    Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
-    SqlDriver<unknown>
-  >[];
+  readonly middleware?: readonly Middleware<TContract>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -64,11 +60,7 @@ export interface CreateRuntimeOptions<
   readonly context: ExecutionContext<TContract>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
-  readonly plugins?: readonly Plugin<
-    TContract,
-    Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
-    SqlDriver<unknown>
-  >[];
+  readonly middleware?: readonly Middleware<TContract>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -104,11 +96,7 @@ export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
 class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   implements Runtime
 {
-  private readonly core: RuntimeCore<
-    TContract,
-    Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
-    SqlDriver<unknown>
-  >;
+  private readonly core: RuntimeCore<TContract, SqlDriver<unknown>>;
   private readonly contract: TContract;
   private readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   private readonly codecRegistry: CodecRegistry;
@@ -116,28 +104,26 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
-    const { context, adapter, driver, verify, plugins, mode, log } = options;
+    const { context, adapter, driver, verify, middleware, mode, log } = options;
     this.contract = context.contract;
     this.adapter = adapter;
     this.codecRegistry = context.codecs;
     this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.codecRegistryValidated = false;
 
+    if (middleware) {
+      for (const mw of middleware) {
+        checkMiddlewareCompatibility(mw, 'sql', context.contract.target);
+      }
+    }
+
     const familyAdapter = new SqlFamilyAdapter(context.contract, adapter.profile);
 
-    const coreOptions: RuntimeCoreOptions<
-      TContract,
-      Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
-      SqlDriver<unknown>
-    > = {
+    const coreOptions: RuntimeCoreOptions<TContract, SqlDriver<unknown>> = {
       familyAdapter,
       driver,
       verify,
-      plugins: plugins as readonly Plugin<
-        TContract,
-        Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
-        SqlDriver<unknown>
-      >[],
+      ...ifDefined('middleware', middleware),
       ...ifDefined('mode', mode),
       ...ifDefined('log', log),
     };
@@ -241,14 +227,14 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 export function createRuntime<TContract extends Contract<SqlStorage>, TTargetId extends string>(
   options: CreateRuntimeOptions<TContract, TTargetId>,
 ): Runtime {
-  const { stackInstance, context, driver, verify, plugins, mode, log } = options;
+  const { stackInstance, context, driver, verify, middleware, mode, log } = options;
 
   return new SqlRuntimeImpl({
     context,
     adapter: stackInstance.adapter,
     driver,
     verify,
-    ...ifDefined('plugins', plugins),
+    ...ifDefined('middleware', middleware),
     ...ifDefined('mode', mode),
     ...ifDefined('log', log),
   });

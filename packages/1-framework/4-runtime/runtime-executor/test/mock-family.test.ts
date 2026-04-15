@@ -1,6 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import type { Plugin } from '../src/plugins/types';
+import type { Middleware } from '../src/middleware/types';
 import { createRuntimeCore } from '../src/runtime-core';
 import type { MarkerReader, MarkerStatement, RuntimeFamilyAdapter } from '../src/runtime-spi';
 
@@ -169,7 +169,7 @@ describe('runtime-core with mock family', () => {
     }).rejects.toThrow('Plan target other does not match contract target mock');
   });
 
-  it('supports plugins', async () => {
+  it('supports middleware', async () => {
     const contract: MockContract = {
       target: 'mock',
       targetFamily: 'mock',
@@ -183,8 +183,8 @@ describe('runtime-core with mock family', () => {
     let onRowCalled = false;
     let afterExecuteCalled = false;
 
-    const plugin: Plugin<MockContract, unknown, MockDriver> = {
-      name: 'test-plugin',
+    const middleware: Middleware<MockContract> = {
+      name: 'test-middleware',
       async beforeExecute(plan, ctx) {
         void plan;
         void ctx;
@@ -208,7 +208,7 @@ describe('runtime-core with mock family', () => {
       familyAdapter,
       driver,
       verify: { mode: 'onFirstUse', requireMarker: false },
-      plugins: [plugin],
+      middleware: [middleware],
     });
 
     const plan: ExecutionPlan = {

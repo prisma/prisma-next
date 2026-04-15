@@ -1,5 +1,5 @@
 import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
-import type { PluginContext } from '@prisma-next/runtime-executor';
+import type { MiddlewareContext } from '@prisma-next/runtime-executor';
 import {
   BinaryExpr,
   ColumnRef,
@@ -13,13 +13,11 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { lints } from '../src/plugins/lints';
+import { lints } from '../src/middleware/lints';
 
-function createPluginContext(): PluginContext<unknown, unknown, unknown> {
+function createMiddlewareContext(): MiddlewareContext<unknown> {
   return {
     contract: {},
-    adapter: {},
-    driver: {},
     mode: 'strict' as const,
     now: () => Date.now(),
     log: {
@@ -52,15 +50,15 @@ function createPlan(overrides: PlanOverrides): ExecutionPlan {
 const userTable = TableSource.named('user');
 const idCol = ColumnRef.of('user', 'id');
 
-describe('lints plugin', () => {
+describe('lints middleware', () => {
   it(
     'blocks delete without where',
     async () => {
       const plan = createPlan({ ast: DeleteAst.from(userTable) });
-      const plugin = lints();
-      const ctx = createPluginContext();
+      const mw = lints();
+      const ctx = createMiddlewareContext();
 
-      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+      await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'LINT.DELETE_WITHOUT_WHERE',
         details: { table: 'user' },
       });
@@ -76,10 +74,10 @@ describe('lints plugin', () => {
           email: ParamRef.of('new@example.com', { name: 'email', codecId: 'pg/text@1' }),
         }),
       });
-      const plugin = lints();
-      const ctx = createPluginContext();
+      const mw = lints();
+      const ctx = createMiddlewareContext();
 
-      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+      await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'LINT.UPDATE_WITHOUT_WHERE',
         details: { table: 'user' },
       });
@@ -94,10 +92,10 @@ describe('lints plugin', () => {
         .withProjection([ProjectionItem.of('id', idCol)])
         .withSelectAllIntent({ table: 'user' });
       const plan = createPlan({ ast });
-      const plugin = lints();
-      const ctx = createPluginContext();
+      const mw = lints();
+      const ctx = createMiddlewareContext();
 
-      await plugin.beforeExecute?.(plan, ctx);
+      await mw.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({ code: 'LINT.NO_LIMIT', details: { table: 'user' } }),
       );
@@ -119,10 +117,10 @@ describe('lints plugin', () => {
         ProjectionItem.of('id', ColumnRef.of('user_ids', 'id')),
       ]);
       const plan = createPlan({ ast });
-      const plugin = lints();
-      const ctx = createPluginContext();
+      const mw = lints();
+      const ctx = createMiddlewareContext();
 
-      await plugin.beforeExecute?.(plan, ctx);
+      await mw.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'LINT.NO_LIMIT',
@@ -149,11 +147,11 @@ describe('lints plugin', () => {
           })
           .withWhere(BinaryExpr.eq(idCol, ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }))),
       });
-      const plugin = lints();
-      const ctx = createPluginContext();
+      const mw = lints();
+      const ctx = createMiddlewareContext();
 
-      await plugin.beforeExecute?.(selectPlan, ctx);
-      await plugin.beforeExecute?.(updatePlan, ctx);
+      await mw.beforeExecute?.(selectPlan, ctx);
+      await mw.beforeExecute?.(updatePlan, ctx);
       expect(ctx.log.warn).not.toHaveBeenCalled();
     },
     timeouts.default,

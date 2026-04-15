@@ -1,5 +1,10 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type { AfterExecuteResult, Plugin, PluginContext } from '@prisma-next/runtime-executor';
+import { type RuntimeErrorEnvelope, runtimeError } from '@prisma-next/framework-components/runtime';
+import type {
+  AfterExecuteResult,
+  Middleware,
+  MiddlewareContext,
+} from '@prisma-next/runtime-executor';
 import { isQueryAst, type SelectAst } from '@prisma-next/sql-relational-core/ast';
 
 export interface BudgetsOptions {
@@ -11,108 +16,6 @@ export interface BudgetsOptions {
     readonly rowCount?: 'warn' | 'error';
     readonly latency?: 'warn' | 'error';
   };
-  readonly explain?: {
-    readonly enabled?: boolean;
-  };
-}
-
-interface DriverWithExplain {
-  explain?(request: {
-    sql: string;
-    params: readonly unknown[];
-  }): Promise<{ rows: ReadonlyArray<Record<string, unknown>> }>;
-}
-
-async function computeEstimatedRows(
-  plan: ExecutionPlan,
-  driver: DriverWithExplain,
-): Promise<number | undefined> {
-  if (typeof driver.explain !== 'function') {
-    return undefined;
-  }
-
-  try {
-    const result = await driver.explain({ sql: plan.sql, params: plan.params });
-    return extractEstimatedRows(result.rows);
-  } catch {
-    return undefined;
-  }
-}
-
-function extractEstimatedRows(rows: ReadonlyArray<Record<string, unknown>>): number | undefined {
-  for (const row of rows) {
-    const estimate = findPlanRows(row);
-    if (estimate !== undefined) {
-      return estimate;
-    }
-  }
-
-  return undefined;
-}
-
-type ExplainNode = {
-  Plan?: unknown;
-  Plans?: unknown[];
-  'Plan Rows'?: number;
-  [key: string]: unknown;
-};
-
-function findPlanRows(node: unknown): number | undefined {
-  if (!node || typeof node !== 'object') {
-    return undefined;
-  }
-
-  const explainNode = node as ExplainNode;
-  const planRows = explainNode['Plan Rows'];
-  if (typeof planRows === 'number') {
-    return planRows;
-  }
-
-  if ('Plan' in explainNode && explainNode.Plan !== undefined) {
-    const nested = findPlanRows(explainNode.Plan);
-    if (nested !== undefined) {
-      return nested;
-    }
-  }
-
-  if (Array.isArray(explainNode.Plans)) {
-    for (const child of explainNode.Plans) {
-      const nested = findPlanRows(child);
-      if (nested !== undefined) {
-        return nested;
-      }
-    }
-  }
-
-  for (const value of Object.values(node as Record<string, unknown>)) {
-    if (typeof value === 'object' && value !== null) {
-      const nested = findPlanRows(value);
-      if (nested !== undefined) {
-        return nested;
-      }
-    }
-  }
-
-  return undefined;
-}
-
-function budgetError(code: string, message: string, details?: Record<string, unknown>) {
-  const error = new Error(message) as Error & {
-    code: string;
-    category: 'BUDGET';
-    severity: 'error';
-    details?: Record<string, unknown>;
-  };
-  Object.defineProperty(error, 'name', {
-    value: 'RuntimeError',
-    configurable: true,
-  });
-  return Object.assign(error, {
-    code,
-    category: 'BUDGET' as const,
-    severity: 'error' as const,
-    details,
-  });
 }
 
 function hasAggregateWithoutGroupBy(ast: SelectAst): boolean {
@@ -172,9 +75,9 @@ function hasDetectableLimitFromHeuristics(plan: ExecutionPlan): boolean {
 }
 
 function emitBudgetViolation(
-  error: ReturnType<typeof budgetError>,
+  error: RuntimeErrorEnvelope,
   shouldBlock: boolean,
-  ctx: PluginContext<unknown, unknown, unknown>,
+  ctx: MiddlewareContext<unknown>,
 ): void {
   if (shouldBlock) {
     throw error;
@@ -186,9 +89,7 @@ function emitBudgetViolation(
   });
 }
 
-export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unknown>(
-  options?: BudgetsOptions,
-): Plugin<TContract, TAdapter, TDriver> {
+export function budgets<TContract = unknown>(options?: BudgetsOptions): Middleware<TContract> {
   const maxRows = options?.maxRows ?? 10_000;
   const defaultTableRows = options?.defaultTableRows ?? 10_000;
   const tableRows = options?.tableRows ?? {};
@@ -199,8 +100,9 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
 
   return Object.freeze({
     name: 'budgets',
+    familyId: 'sql' as const,
 
-    async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
+    async beforeExecute(plan: ExecutionPlan, ctx: MiddlewareContext<TContract>) {
       observedRowsByPlan.set(plan, { count: 0 });
 
       if (isQueryAst(plan.ast)) {
@@ -216,13 +118,13 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     async onRow(
       _row: Record<string, unknown>,
       plan: ExecutionPlan,
-      _ctx: PluginContext<TContract, TAdapter, TDriver>,
+      _ctx: MiddlewareContext<TContract>,
     ) {
       const state = observedRowsByPlan.get(plan);
       if (!state) return;
       state.count += 1;
       if (state.count > maxRows) {
-        throw budgetError('BUDGET.ROWS_EXCEEDED', 'Observed row count exceeds budget', {
+        throw runtimeError('BUDGET.ROWS_EXCEEDED', 'Observed row count exceeds budget', {
           source: 'observed',
           observedRows: state.count,
           maxRows,
@@ -233,18 +135,18 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     async afterExecute(
       _plan: ExecutionPlan,
       result: AfterExecuteResult,
-      ctx: PluginContext<TContract, TAdapter, TDriver>,
+      ctx: MiddlewareContext<TContract>,
     ) {
       const latencyMs = result.latencyMs;
       if (latencyMs > maxLatencyMs) {
         const shouldBlock = ctx.mode === 'strict';
         emitBudgetViolation(
-          budgetError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
+          runtimeError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
             latencyMs,
             maxLatencyMs,
           }),
           shouldBlock,
-          ctx as PluginContext<unknown, unknown, unknown>,
+          ctx as MiddlewareContext<unknown>,
         );
       }
     },
@@ -253,7 +155,7 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
   function evaluateSelectAst(
     plan: ExecutionPlan,
     ast: SelectAst,
-    ctx: PluginContext<TContract, TAdapter, TDriver>,
+    ctx: MiddlewareContext<TContract>,
   ) {
     const hasAggNoGroup = hasAggregateWithoutGroupBy(ast);
     const estimated = estimateRowsFromAst(
@@ -269,45 +171,42 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     if (isUnbounded) {
       if (estimated !== null && estimated >= maxRows) {
         emitBudgetViolation(
-          budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+          runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
             source: 'ast',
             estimatedRows: estimated,
             maxRows,
           }),
           shouldBlock,
-          ctx as PluginContext<unknown, unknown, unknown>,
+          ctx as MiddlewareContext<unknown>,
         );
         return;
       }
 
       emitBudgetViolation(
-        budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+        runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
           source: 'ast',
           maxRows,
         }),
         shouldBlock,
-        ctx as PluginContext<unknown, unknown, unknown>,
+        ctx as MiddlewareContext<unknown>,
       );
       return;
     }
 
     if (estimated !== null && estimated > maxRows) {
       emitBudgetViolation(
-        budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
+        runtimeError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
           source: 'ast',
           estimatedRows: estimated,
           maxRows,
         }),
         shouldBlock,
-        ctx as PluginContext<unknown, unknown, unknown>,
+        ctx as MiddlewareContext<unknown>,
       );
     }
   }
 
-  async function evaluateWithHeuristics(
-    plan: ExecutionPlan,
-    ctx: PluginContext<TContract, TAdapter, TDriver>,
-  ) {
+  async function evaluateWithHeuristics(plan: ExecutionPlan, ctx: MiddlewareContext<TContract>) {
     const estimated = estimateRowsFromHeuristics(plan, tableRows, defaultTableRows);
     const isUnbounded = !hasDetectableLimitFromHeuristics(plan);
     const sqlUpper = plan.sql.trimStart().toUpperCase();
@@ -317,24 +216,24 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     if (isSelect && isUnbounded) {
       if (estimated !== null && estimated >= maxRows) {
         emitBudgetViolation(
-          budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+          runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
             source: 'heuristic',
             estimatedRows: estimated,
             maxRows,
           }),
           shouldBlock,
-          ctx as PluginContext<unknown, unknown, unknown>,
+          ctx as MiddlewareContext<unknown>,
         );
         return;
       }
 
       emitBudgetViolation(
-        budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+        runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
           source: 'heuristic',
           maxRows,
         }),
         shouldBlock,
-        ctx as PluginContext<unknown, unknown, unknown>,
+        ctx as MiddlewareContext<unknown>,
       );
       return;
     }
@@ -342,34 +241,16 @@ export function budgets<TContract = unknown, TAdapter = unknown, TDriver = unkno
     if (estimated !== null) {
       if (estimated > maxRows) {
         emitBudgetViolation(
-          budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
+          runtimeError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
             source: 'heuristic',
             estimatedRows: estimated,
             maxRows,
           }),
           shouldBlock,
-          ctx as PluginContext<unknown, unknown, unknown>,
+          ctx as MiddlewareContext<unknown>,
         );
       }
       return;
-    }
-
-    const explainEnabled = options?.explain?.enabled === true;
-    if (explainEnabled && isSelect && typeof ctx.driver === 'object' && ctx.driver !== null) {
-      const estimatedRows = await computeEstimatedRows(plan, ctx.driver as DriverWithExplain);
-      if (estimatedRows !== undefined) {
-        if (estimatedRows > maxRows) {
-          emitBudgetViolation(
-            budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
-              source: 'explain',
-              estimatedRows,
-              maxRows,
-            }),
-            shouldBlock,
-            ctx as PluginContext<unknown, unknown, unknown>,
-          );
-        }
-      }
     }
   }
 }

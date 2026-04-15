@@ -35,7 +35,7 @@ export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Pro
 
   const adapter = createMongoAdapter();
   const driver = await createMongoDriver(connectionUri, dbName);
-  const runtime = createMongoRuntime({ adapter, driver });
+  const runtime = createMongoRuntime({ adapter, driver, contract: {}, targetId: 'mongo' });
 
   const ctx: MongodContext = {
     connectionUri,

@@ -1,9 +1,5 @@
-import { runtimeError } from './errors';
+import { runtimeError } from './runtime-error';
 
-/**
- * Custom async iterable result that extends AsyncIterable with a toArray() method.
- * This provides a convenient way to collect all results from an async iterator.
- */
 export class AsyncIterableResult<Row> implements AsyncIterable<Row>, PromiseLike<Row[]> {
   private readonly generator: AsyncGenerator<Row, void, unknown>;
   private consumed = false;
@@ -33,10 +29,6 @@ export class AsyncIterableResult<Row> implements AsyncIterable<Row>, PromiseLike
     return this.generator;
   }
 
-  /**
-   * Collects all values from the async iterator into an array.
-   * Once called, the iterator is consumed and cannot be reused.
-   */
   toArray(): Promise<Row[]> {
     if (this.consumedBy === 'iterator') {
       return Promise.reject(
@@ -68,17 +60,11 @@ export class AsyncIterableResult<Row> implements AsyncIterable<Row>, PromiseLike
     return this.bufferedArrayPromise;
   }
 
-  /**
-   * Returns the first row, or null if the result set is empty.
-   */
   async first(): Promise<Row | null> {
     const rows = await this.toArray();
     return rows[0] ?? null;
   }
 
-  /**
-   * Returns the first row, or throws if the result set is empty.
-   */
   async firstOrThrow(): Promise<Row> {
     const row = await this.first();
     if (row === null)

@@ -1,8 +1,8 @@
 export type {
   AfterExecuteResult,
   Log,
-  Plugin,
-  PluginContext,
+  Middleware,
+  MiddlewareContext,
 } from '@prisma-next/runtime-executor';
 export {
   extractCodecIds,
@@ -10,10 +10,11 @@ export {
   validateContractCodecMappings,
 } from '../codecs/validation';
 export { lowerSqlPlan } from '../lower-sql-plan';
-export type { BudgetsOptions } from '../plugins/budgets';
-export { budgets } from '../plugins/budgets';
-export type { LintsOptions } from '../plugins/lints';
-export { lints } from '../plugins/lints';
+export type { BudgetsOptions } from '../middleware/budgets';
+export { budgets } from '../middleware/budgets';
+export type { LintsOptions } from '../middleware/lints';
+export { lints } from '../middleware/lints';
+export type { SqlMiddleware, SqlMiddlewareContext } from '../middleware/sql-middleware';
 export type {
   ExecutionContext,
   RuntimeMutationDefaultGenerator,

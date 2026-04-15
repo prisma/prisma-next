@@ -1,4 +1,4 @@
-import { runtimeError } from '@prisma-next/runtime-executor';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type {
   JsonSchemaValidationError,
   JsonSchemaValidatorRegistry,

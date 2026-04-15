@@ -1,6 +1,5 @@
-export { AsyncIterableResult } from '../async-iterable-result';
-export type { RuntimeErrorEnvelope } from '../errors';
-export { runtimeError } from '../errors';
+export type { RuntimeErrorEnvelope } from '@prisma-next/framework-components/runtime';
+export { AsyncIterableResult, runtimeError } from '@prisma-next/framework-components/runtime';
 export { computeSqlFingerprint } from '../fingerprint';
 export type { BudgetFinding, LintFinding, RawGuardrailResult } from '../guardrails/raw';
 export { evaluateRawGuardrails } from '../guardrails/raw';
@@ -8,10 +7,10 @@ export { parseContractMarkerRow } from '../marker';
 export type {
   AfterExecuteResult,
   Log,
-  Plugin,
-  PluginContext,
+  Middleware,
+  MiddlewareContext,
   Severity,
-} from '../plugins/types';
+} from '../middleware/types';
 export type {
   RuntimeConnection,
   RuntimeCore,

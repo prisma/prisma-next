@@ -1,9 +1,9 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import { AsyncIterableResult } from './async-iterable-result';
-import { runtimeError } from './errors';
+import type { RuntimeExecutor } from '@prisma-next/framework-components/runtime';
+import { AsyncIterableResult, runtimeError } from '@prisma-next/framework-components/runtime';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow } from './marker';
-import type { Log, Plugin, PluginContext } from './plugins/types';
+import type { Log, Middleware, MiddlewareContext } from './middleware/types';
 import type { RuntimeFamilyAdapter } from './runtime-spi';
 
 export interface RuntimeVerifyOptions {
@@ -21,20 +21,19 @@ export interface RuntimeTelemetryEvent {
   readonly durationMs?: number;
 }
 
-export interface RuntimeCoreOptions<TContract = unknown, TAdapter = unknown, TDriver = unknown> {
+export interface RuntimeCoreOptions<TContract = unknown, TDriver = unknown> {
   readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   readonly driver: TDriver;
   readonly verify: RuntimeVerifyOptions;
-  readonly plugins?: readonly Plugin<TContract, TAdapter, TDriver>[];
+  readonly middleware?: readonly Middleware<TContract>[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
 
-export interface RuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = unknown>
-  extends RuntimeQueryable {
-  // Type parameters are used in the implementation for type safety
+export interface RuntimeCore<TContract = unknown, TDriver = unknown>
+  extends RuntimeQueryable,
+    RuntimeExecutor<ExecutionPlan> {
   readonly _typeContract?: TContract;
-  readonly _typeAdapter?: TAdapter;
   readonly _typeDriver?: TDriver;
   connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
@@ -51,8 +50,19 @@ export interface RuntimeTransaction extends RuntimeQueryable {
   rollback(): Promise<void>;
 }
 
+/**
+ * Shared query execution trait for anything that can run an ExecutionPlan:
+ * RuntimeCore, RuntimeConnection, and RuntimeTransaction. This is a
+ * SQL-domain internal mixin — it is NOT the cross-family SPI.
+ *
+ * For the cross-family SPI, see RuntimeExecutor in framework-components.
+ * RuntimeCore nominally extends both this interface and RuntimeExecutor.
+ *
+ * The execute signature uses the same `_row` phantom intersection as
+ * RuntimeExecutor so that RuntimeCore can extend both without conflicts.
+ */
 export interface RuntimeQueryable {
-  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row>;
+  execute<Row>(plan: ExecutionPlan & { readonly _row?: Row }): AsyncIterableResult<Row>;
 }
 
 interface DriverWithQuery<_TDriver> {
@@ -84,52 +94,43 @@ interface DriverWithClose<_TDriver> {
   close(): Promise<void>;
 }
 
-class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown>
-  implements RuntimeCore<TContract, TAdapter, TDriver>
+class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
+  implements RuntimeCore<TContract, TDriver>
 {
   readonly _typeContract?: TContract;
-  readonly _typeAdapter?: TAdapter;
   readonly _typeDriver?: TDriver;
   private readonly contract: TContract;
   private readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   private readonly driver: TDriver;
-  private readonly plugins: readonly Plugin<TContract, TAdapter, TDriver>[];
+  private readonly middleware: readonly Middleware<TContract>[];
   private readonly mode: 'strict' | 'permissive';
   private readonly verify: RuntimeVerifyOptions;
-  private readonly pluginContext: PluginContext<TContract, TAdapter, TDriver>;
+  private readonly middlewareContext: MiddlewareContext<TContract>;
 
   private verified: boolean;
   private startupVerified: boolean;
   private _telemetry: RuntimeTelemetryEvent | null;
 
-  constructor(options: RuntimeCoreOptions<TContract, TAdapter, TDriver>) {
+  constructor(options: RuntimeCoreOptions<TContract, TDriver>) {
     const { familyAdapter, driver } = options;
     this.contract = familyAdapter.contract;
     this.familyAdapter = familyAdapter;
     this.driver = driver;
-    this.plugins = options.plugins ?? [];
+    this.middleware = options.middleware ?? [];
     this.mode = options.mode ?? 'strict';
     this.verify = options.verify;
     this.verified = options.verify.mode === 'startup' ? false : options.verify.mode === 'always';
     this.startupVerified = false;
     this._telemetry = null;
 
-    this.pluginContext = {
+    this.middlewareContext = {
       contract: this.contract,
-      adapter: options.familyAdapter as unknown as TAdapter,
-      driver: this.driver,
       mode: this.mode,
       now: () => Date.now(),
       log: options.log ?? {
-        info: () => {
-          // No-op in MVP - diagnostics stay out of runtime core
-        },
-        warn: () => {
-          // No-op in MVP - diagnostics stay out of runtime core
-        },
-        error: () => {
-          // No-op in MVP - diagnostics stay out of runtime core
-        },
+        info: () => {},
+        warn: () => {},
+        error: () => {},
       },
     };
   }
@@ -268,7 +269,7 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
     this._telemetry = null;
 
     const iterator = async function* (
-      self: RuntimeCoreImpl<TContract, TAdapter, TDriver>,
+      self: RuntimeCoreImpl<TContract, TDriver>,
     ): AsyncGenerator<Row, void, unknown> {
       const startedAt = Date.now();
       let rowCount = 0;
@@ -287,9 +288,9 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
           await self.verifyPlanIfNeeded(plan);
         }
 
-        for (const plugin of self.plugins) {
-          if (plugin.beforeExecute) {
-            await plugin.beforeExecute(plan, self.pluginContext);
+        for (const mw of self.middleware) {
+          if (mw.beforeExecute) {
+            await mw.beforeExecute(plan, self.middlewareContext);
           }
         }
 
@@ -299,9 +300,9 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
           sql: plan.sql,
           params: encodedParams,
         })) {
-          for (const plugin of self.plugins) {
-            if (plugin.onRow) {
-              await plugin.onRow(row, plan, self.pluginContext);
+          for (const mw of self.middleware) {
+            if (mw.onRow) {
+              await mw.onRow(row, plan, self.middlewareContext);
             }
           }
           rowCount++;
@@ -316,13 +317,13 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
         }
 
         const latencyMs = Date.now() - startedAt;
-        for (const plugin of self.plugins) {
-          if (plugin.afterExecute) {
+        for (const mw of self.middleware) {
+          if (mw.afterExecute) {
             try {
-              await plugin.afterExecute(
+              await mw.afterExecute(
                 plan,
                 { rowCount, latencyMs, completed },
-                self.pluginContext,
+                self.middlewareContext,
               );
             } catch {
               // Ignore errors from afterExecute hooks
@@ -334,9 +335,9 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
       }
 
       const latencyMs = Date.now() - startedAt;
-      for (const plugin of self.plugins) {
-        if (plugin.afterExecute) {
-          await plugin.afterExecute(plan, { rowCount, latencyMs, completed }, self.pluginContext);
+      for (const mw of self.middleware) {
+        if (mw.afterExecute) {
+          await mw.afterExecute(plan, { rowCount, latencyMs, completed }, self.middlewareContext);
         }
       }
     };
@@ -345,8 +346,8 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
   }
 }
 
-export function createRuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = unknown>(
-  options: RuntimeCoreOptions<TContract, TAdapter, TDriver>,
-): RuntimeCore<TContract, TAdapter, TDriver> {
+export function createRuntimeCore<TContract = unknown, TDriver = unknown>(
+  options: RuntimeCoreOptions<TContract, TDriver>,
+): RuntimeCore<TContract, TDriver> {
   return new RuntimeCoreImpl(options);
 }

@@ -1,11 +1,13 @@
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { budgets, createRuntime, type Plugin, type Runtime } from '@prisma-next/sql-runtime';
+import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
+import { budgets, createRuntime, type Middleware, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
 import { context, stack } from './context';
 
 export async function getRuntime(
   databaseUrl: string,
-  plugins: Plugin<typeof context.contract>[] = [
+  middleware: Middleware<typeof context.contract>[] = [
+    createTelemetryMiddleware(),
     budgets({
       maxRows: 10_000,
       defaultTableRows: 10_000,
@@ -36,6 +38,6 @@ export async function getRuntime(
       mode: 'onFirstUse',
       requireMarker: false,
     },
-    plugins,
+    middleware,
   });
 }

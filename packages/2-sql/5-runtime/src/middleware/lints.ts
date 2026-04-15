@@ -1,5 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type { Plugin, PluginContext } from '@prisma-next/runtime-executor';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
+import type { Middleware, MiddlewareContext } from '@prisma-next/runtime-executor';
 import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
 import {
   type AnyFromSource,
@@ -25,25 +26,6 @@ export interface LintFinding {
   readonly severity: 'error' | 'warn';
   readonly message: string;
   readonly details?: Record<string, unknown>;
-}
-
-function lintError(code: string, message: string, details?: Record<string, unknown>) {
-  const error = new Error(message) as Error & {
-    code: string;
-    category: 'LINT';
-    severity: 'error';
-    details?: Record<string, unknown>;
-  };
-  Object.defineProperty(error, 'name', {
-    value: 'RuntimeError',
-    configurable: true,
-  });
-  return Object.assign(error, {
-    code,
-    category: 'LINT' as const,
-    severity: 'error' as const,
-    details,
-  });
 }
 
 function getFromSourceTableDetail(source: AnyFromSource): string | undefined {
@@ -143,7 +125,7 @@ function getConfiguredSeverity(code: string, options?: LintsOptions): 'warn' | '
 }
 
 /**
- * AST-first lint plugin for SQL plans. When `plan.ast` is a SQL QueryAst, inspects
+ * AST-first lint middleware for SQL plans. When `plan.ast` is a SQL QueryAst, inspects
  * the AST structurally. When `plan.ast` is missing, falls back to raw heuristic
  * guardrails or skips linting depending on `fallbackWhenAstMissing`.
  *
@@ -156,15 +138,14 @@ function getConfiguredSeverity(code: string, options?: LintsOptions): 'warn' | '
  * Fallback: When ast is missing, `fallbackWhenAstMissing: 'raw'` uses heuristic
  * SQL parsing; `'skip'` skips all lints. Default is `'raw'`.
  */
-export function lints<TContract = unknown, TAdapter = unknown, TDriver = unknown>(
-  options?: LintsOptions,
-): Plugin<TContract, TAdapter, TDriver> {
+export function lints<TContract = unknown>(options?: LintsOptions): Middleware<TContract> {
   const fallback = options?.fallbackWhenAstMissing ?? 'raw';
 
   return Object.freeze({
     name: 'lints',
+    familyId: 'sql' as const,
 
-    async beforeExecute(plan: ExecutionPlan, ctx: PluginContext<TContract, TAdapter, TDriver>) {
+    async beforeExecute(plan: ExecutionPlan, ctx: MiddlewareContext<TContract>) {
       if (isQueryAst(plan.ast)) {
         const findings = evaluateAstLints(plan.ast);
 
@@ -173,7 +154,7 @@ export function lints<TContract = unknown, TAdapter = unknown, TDriver = unknown
           const effectiveSeverity = configuredSeverity ?? lint.severity;
 
           if (effectiveSeverity === 'error') {
-            throw lintError(lint.code, lint.message, lint.details);
+            throw runtimeError(lint.code, lint.message, lint.details);
           }
           if (effectiveSeverity === 'warn') {
             ctx.log.warn({
@@ -196,7 +177,7 @@ export function lints<TContract = unknown, TAdapter = unknown, TDriver = unknown
         const effectiveSeverity = configuredSeverity ?? lint.severity;
 
         if (effectiveSeverity === 'error') {
-          throw lintError(lint.code, lint.message, lint.details);
+          throw runtimeError(lint.code, lint.message, lint.details);
         }
         if (effectiveSeverity === 'warn') {
           ctx.log.warn({
