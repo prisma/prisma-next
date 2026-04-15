@@ -15,6 +15,11 @@ import {
   quickReferenceMd,
   variables as quickRefVars,
 } from '../../../src/commands/init/templates/quick-reference';
+import {
+  defaultTsConfig,
+  mergeTsConfig,
+  REQUIRED_COMPILER_OPTIONS,
+} from '../../../src/commands/init/templates/tsconfig';
 
 const TEMPLATES_DIR = join(import.meta.dirname, '../../../src/commands/init/templates');
 
@@ -218,6 +223,115 @@ describe('templates', () => {
       expect(md).toContain('db.orm.User');
       expect(md).toContain('.first()');
       expect(md).toContain('Use `db.orm` for queries');
+    });
+  });
+
+  describe('tsconfig', () => {
+    describe('defaultTsConfig', () => {
+      it('includes all required compiler options', () => {
+        const config = JSON.parse(defaultTsConfig()) as Record<string, unknown>;
+        const opts = config['compilerOptions'] as Record<string, unknown>;
+
+        for (const [key, value] of Object.entries(REQUIRED_COMPILER_OPTIONS)) {
+          expect(opts[key]).toBe(value);
+        }
+      });
+
+      it('sets strict: true', () => {
+        const config = JSON.parse(defaultTsConfig()) as Record<string, unknown>;
+        const opts = config['compilerOptions'] as Record<string, unknown>;
+
+        expect(opts['strict']).toBe(true);
+      });
+
+      it('sets skipLibCheck: true', () => {
+        const config = JSON.parse(defaultTsConfig()) as Record<string, unknown>;
+        const opts = config['compilerOptions'] as Record<string, unknown>;
+
+        expect(opts['skipLibCheck']).toBe(true);
+      });
+
+      it('produces valid JSON', () => {
+        expect(() => JSON.parse(defaultTsConfig())).not.toThrow();
+      });
+    });
+
+    describe('mergeTsConfig', () => {
+      it('adds required options to an empty compilerOptions', () => {
+        const existing = JSON.stringify({ compilerOptions: {} }, null, 2);
+        const merged = JSON.parse(mergeTsConfig(existing)) as Record<string, unknown>;
+        const opts = merged['compilerOptions'] as Record<string, unknown>;
+
+        for (const [key, value] of Object.entries(REQUIRED_COMPILER_OPTIONS)) {
+          expect(opts[key]).toBe(value);
+        }
+      });
+
+      it('preserves existing non-conflicting options', () => {
+        const existing = JSON.stringify(
+          { compilerOptions: { outDir: './dist', strict: true, declaration: true } },
+          null,
+          2,
+        );
+        const merged = JSON.parse(mergeTsConfig(existing)) as Record<string, unknown>;
+        const opts = merged['compilerOptions'] as Record<string, unknown>;
+
+        expect(opts['outDir']).toBe('./dist');
+        expect(opts['strict']).toBe(true);
+        expect(opts['declaration']).toBe(true);
+      });
+
+      it('overrides conflicting options with required values', () => {
+        const existing = JSON.stringify(
+          {
+            compilerOptions: {
+              module: 'commonjs',
+              moduleResolution: 'node',
+              resolveJsonModule: false,
+            },
+          },
+          null,
+          2,
+        );
+        const merged = JSON.parse(mergeTsConfig(existing)) as Record<string, unknown>;
+        const opts = merged['compilerOptions'] as Record<string, unknown>;
+
+        expect(opts['module']).toBe('preserve');
+        expect(opts['moduleResolution']).toBe('bundler');
+        expect(opts['resolveJsonModule']).toBe(true);
+      });
+
+      it('preserves non-compilerOptions fields', () => {
+        const existing = JSON.stringify(
+          {
+            compilerOptions: { strict: true },
+            include: ['src/**/*.ts'],
+            exclude: ['node_modules'],
+          },
+          null,
+          2,
+        );
+        const merged = JSON.parse(mergeTsConfig(existing)) as Record<string, unknown>;
+
+        expect(merged['include']).toEqual(['src/**/*.ts']);
+        expect(merged['exclude']).toEqual(['node_modules']);
+      });
+
+      it('creates compilerOptions if missing', () => {
+        const existing = JSON.stringify({ include: ['src'] }, null, 2);
+        const merged = JSON.parse(mergeTsConfig(existing)) as Record<string, unknown>;
+        const opts = merged['compilerOptions'] as Record<string, unknown>;
+
+        for (const [key, value] of Object.entries(REQUIRED_COMPILER_OPTIONS)) {
+          expect(opts[key]).toBe(value);
+        }
+        expect(merged['include']).toEqual(['src']);
+      });
+
+      it('produces valid JSON', () => {
+        const existing = JSON.stringify({ compilerOptions: { target: 'ES2020' } }, null, 2);
+        expect(() => JSON.parse(mergeTsConfig(existing))).not.toThrow();
+      });
     });
   });
 

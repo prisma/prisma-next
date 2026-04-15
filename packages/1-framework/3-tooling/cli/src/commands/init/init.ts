@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import * as clack from '@clack/prompts';
 import { dirname, isAbsolute, join } from 'pathe';
@@ -16,6 +16,7 @@ import {
   targetPackageName,
 } from './templates/code-templates';
 import { quickReferenceMd } from './templates/quick-reference';
+import { defaultTsConfig, mergeTsConfig } from './templates/tsconfig';
 
 export interface InitOptions {
   readonly noInstall?: boolean;
@@ -99,6 +100,15 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
     const fullPath = join(baseDir, file.path);
     mkdirSync(dirname(fullPath), { recursive: true });
     writeFileSync(fullPath, file.content, 'utf-8');
+  }
+
+  const tsconfigPath = join(baseDir, 'tsconfig.json');
+  if (existsSync(tsconfigPath)) {
+    const existing = readFileSync(tsconfigPath, 'utf-8');
+    writeFileSync(tsconfigPath, mergeTsConfig(existing), 'utf-8');
+    ui.log('Updated tsconfig.json with required compiler options.');
+  } else {
+    writeFileSync(tsconfigPath, defaultTsConfig(), 'utf-8');
   }
 
   const pm = await detectPackageManager(baseDir);
