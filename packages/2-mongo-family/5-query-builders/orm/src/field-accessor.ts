@@ -1,6 +1,8 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
 import type {
   ExtractMongoCodecTypes,
+  ExtractMongoFieldOutputTypes,
+  InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
@@ -52,27 +54,24 @@ type ValueObjectFieldKeys<
     : never;
 }[keyof TContract['models'][ModelName]['fields'] & string];
 
+type ResolvedModelRow<
+  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  ModelName extends string & keyof TContract['models'],
+> = string extends keyof ExtractMongoFieldOutputTypes<TContract>
+  ? InferModelRow<TContract, ModelName>
+  : ModelName extends keyof ExtractMongoFieldOutputTypes<TContract>
+    ? {
+        -readonly [K in keyof ExtractMongoFieldOutputTypes<TContract>[ModelName]]: ExtractMongoFieldOutputTypes<TContract>[ModelName][K];
+      }
+    : InferModelRow<TContract, ModelName>;
+
 type ResolveFieldType<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
   K extends keyof TContract['models'][ModelName]['fields'] & string,
-  TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
-> = TContract['models'][ModelName]['fields'][K] extends {
-  readonly type: {
-    readonly kind: 'scalar';
-    readonly codecId: infer CId extends string & keyof TCodecTypes;
-  };
-  readonly many: true;
-}
-  ? TCodecTypes[CId]['output'][]
-  : TContract['models'][ModelName]['fields'][K] extends {
-        readonly type: {
-          readonly kind: 'scalar';
-          readonly codecId: infer CId extends string & keyof TCodecTypes;
-        };
-      }
-    ? TCodecTypes[CId]['output']
-    : unknown;
+> = K extends keyof ResolvedModelRow<TContract, ModelName>
+  ? ResolvedModelRow<TContract, ModelName>[K]
+  : unknown;
 
 type NumericOps = {
   inc(value: number): FieldOperation;
