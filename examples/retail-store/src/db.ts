@@ -20,6 +20,7 @@ export async function createClient(connectionUri: string, dbName: string) {
     adapter,
     driver,
     contract,
+    targetId: 'mongo',
     middleware: [createTelemetryMiddleware()],
   });
   const orm = mongoOrm({ contract, executor: runtime });

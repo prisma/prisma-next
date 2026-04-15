@@ -159,6 +159,7 @@ describe('cross-family middleware proof', () => {
         { _id: '2', name: 'Carol' },
       ]),
       contract: {},
+      targetId: 'mongo',
       middleware: [middleware],
     });
 
@@ -202,6 +203,7 @@ describe('cross-family middleware proof', () => {
       adapter: createMockMongoAdapter(),
       driver: createMockMongoDriver([{ _id: '1' }]),
       contract: {},
+      targetId: 'mongo',
       middleware: [middleware],
     });
 

@@ -4,20 +4,24 @@ import { checkMiddlewareCompatibility, type RuntimeMiddleware } from '../src/run
 describe('checkMiddlewareCompatibility', () => {
   it('accepts a generic middleware (no familyId) for any runtime', () => {
     const middleware: RuntimeMiddleware = { name: 'telemetry' };
-    expect(() => checkMiddlewareCompatibility(middleware, 'sql')).not.toThrow();
-    expect(() => checkMiddlewareCompatibility(middleware, 'mongo')).not.toThrow();
     expect(() => checkMiddlewareCompatibility(middleware, 'sql', 'postgres')).not.toThrow();
+    expect(() => checkMiddlewareCompatibility(middleware, 'mongo', 'mongo')).not.toThrow();
   });
 
   it('accepts a family-matched middleware', () => {
     const middleware: RuntimeMiddleware = { name: 'sql-lints', familyId: 'sql' };
-    expect(() => checkMiddlewareCompatibility(middleware, 'sql')).not.toThrow();
+    expect(() => checkMiddlewareCompatibility(middleware, 'sql', 'postgres')).not.toThrow();
   });
 
-  it('rejects a family-mismatched middleware with a clear error', () => {
+  it('throws RUNTIME.MIDDLEWARE_FAMILY_MISMATCH for a family-mismatched middleware', () => {
     const middleware: RuntimeMiddleware = { name: 'sql-lints', familyId: 'sql' };
-    expect(() => checkMiddlewareCompatibility(middleware, 'mongo')).toThrow(
-      "Middleware 'sql-lints' requires family 'sql' but the runtime is configured for family 'mongo'",
+    expect(() => checkMiddlewareCompatibility(middleware, 'mongo', 'mongo')).toThrow(
+      expect.objectContaining({
+        name: 'RuntimeError',
+        code: 'RUNTIME.MIDDLEWARE_FAMILY_MISMATCH',
+        message:
+          "Middleware 'sql-lints' requires family 'sql' but the runtime is configured for family 'mongo'",
+      }),
     );
   });
 
@@ -30,33 +34,33 @@ describe('checkMiddlewareCompatibility', () => {
     expect(() => checkMiddlewareCompatibility(middleware, 'sql', 'postgres')).not.toThrow();
   });
 
-  it('rejects a target-mismatched middleware with a clear error', () => {
+  it('throws RUNTIME.MIDDLEWARE_TARGET_MISMATCH for a target-mismatched middleware', () => {
     const middleware: RuntimeMiddleware = {
       name: 'pg-specific',
       familyId: 'sql',
       targetId: 'postgres',
     };
     expect(() => checkMiddlewareCompatibility(middleware, 'sql', 'mysql')).toThrow(
-      "Middleware 'pg-specific' requires target 'postgres' but the runtime is configured for target 'mysql'",
+      expect.objectContaining({
+        name: 'RuntimeError',
+        code: 'RUNTIME.MIDDLEWARE_TARGET_MISMATCH',
+        message:
+          "Middleware 'pg-specific' requires target 'postgres' but the runtime is configured for target 'mysql'",
+      }),
     );
   });
 
-  it('rejects targetId without familyId', () => {
+  it('throws RUNTIME.MIDDLEWARE_INCOMPATIBLE for targetId without familyId', () => {
     const middleware: RuntimeMiddleware = {
       name: 'bad',
       targetId: 'postgres',
     };
     expect(() => checkMiddlewareCompatibility(middleware, 'sql', 'postgres')).toThrow(
-      "Middleware 'bad' specifies targetId 'postgres' without familyId",
+      expect.objectContaining({
+        name: 'RuntimeError',
+        code: 'RUNTIME.MIDDLEWARE_INCOMPATIBLE',
+        message: "Middleware 'bad' specifies targetId 'postgres' without familyId",
+      }),
     );
-  });
-
-  it('accepts a target-bound middleware when runtime has no targetId', () => {
-    const middleware: RuntimeMiddleware = {
-      name: 'pg-specific',
-      familyId: 'sql',
-      targetId: 'postgres',
-    };
-    expect(() => checkMiddlewareCompatibility(middleware, 'sql')).not.toThrow();
   });
 });

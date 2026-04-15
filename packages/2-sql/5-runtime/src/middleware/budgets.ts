@@ -1,4 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import { type RuntimeErrorEnvelope, runtimeError } from '@prisma-next/framework-components/runtime';
 import type {
   AfterExecuteResult,
   Middleware,
@@ -15,25 +16,6 @@ export interface BudgetsOptions {
     readonly rowCount?: 'warn' | 'error';
     readonly latency?: 'warn' | 'error';
   };
-}
-
-function budgetError(code: string, message: string, details?: Record<string, unknown>) {
-  const error = new Error(message) as Error & {
-    code: string;
-    category: 'BUDGET';
-    severity: 'error';
-    details?: Record<string, unknown>;
-  };
-  Object.defineProperty(error, 'name', {
-    value: 'RuntimeError',
-    configurable: true,
-  });
-  return Object.assign(error, {
-    code,
-    category: 'BUDGET' as const,
-    severity: 'error' as const,
-    details,
-  });
 }
 
 function hasAggregateWithoutGroupBy(ast: SelectAst): boolean {
@@ -93,7 +75,7 @@ function hasDetectableLimitFromHeuristics(plan: ExecutionPlan): boolean {
 }
 
 function emitBudgetViolation(
-  error: ReturnType<typeof budgetError>,
+  error: RuntimeErrorEnvelope,
   shouldBlock: boolean,
   ctx: MiddlewareContext<unknown>,
 ): void {
@@ -142,7 +124,7 @@ export function budgets<TContract = unknown>(options?: BudgetsOptions): Middlewa
       if (!state) return;
       state.count += 1;
       if (state.count > maxRows) {
-        throw budgetError('BUDGET.ROWS_EXCEEDED', 'Observed row count exceeds budget', {
+        throw runtimeError('BUDGET.ROWS_EXCEEDED', 'Observed row count exceeds budget', {
           source: 'observed',
           observedRows: state.count,
           maxRows,
@@ -159,7 +141,7 @@ export function budgets<TContract = unknown>(options?: BudgetsOptions): Middlewa
       if (latencyMs > maxLatencyMs) {
         const shouldBlock = ctx.mode === 'strict';
         emitBudgetViolation(
-          budgetError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
+          runtimeError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
             latencyMs,
             maxLatencyMs,
           }),
@@ -189,7 +171,7 @@ export function budgets<TContract = unknown>(options?: BudgetsOptions): Middlewa
     if (isUnbounded) {
       if (estimated !== null && estimated >= maxRows) {
         emitBudgetViolation(
-          budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+          runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
             source: 'ast',
             estimatedRows: estimated,
             maxRows,
@@ -201,7 +183,7 @@ export function budgets<TContract = unknown>(options?: BudgetsOptions): Middlewa
       }
 
       emitBudgetViolation(
-        budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+        runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
           source: 'ast',
           maxRows,
         }),
@@ -213,7 +195,7 @@ export function budgets<TContract = unknown>(options?: BudgetsOptions): Middlewa
 
     if (estimated !== null && estimated > maxRows) {
       emitBudgetViolation(
-        budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
+        runtimeError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
           source: 'ast',
           estimatedRows: estimated,
           maxRows,
@@ -234,7 +216,7 @@ export function budgets<TContract = unknown>(options?: BudgetsOptions): Middlewa
     if (isSelect && isUnbounded) {
       if (estimated !== null && estimated >= maxRows) {
         emitBudgetViolation(
-          budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+          runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
             source: 'heuristic',
             estimatedRows: estimated,
             maxRows,
@@ -246,7 +228,7 @@ export function budgets<TContract = unknown>(options?: BudgetsOptions): Middlewa
       }
 
       emitBudgetViolation(
-        budgetError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+        runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
           source: 'heuristic',
           maxRows,
         }),
@@ -259,7 +241,7 @@ export function budgets<TContract = unknown>(options?: BudgetsOptions): Middlewa
     if (estimated !== null) {
       if (estimated > maxRows) {
         emitBudgetViolation(
-          budgetError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
+          runtimeError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
             source: 'heuristic',
             estimatedRows: estimated,
             maxRows,
