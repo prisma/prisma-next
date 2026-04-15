@@ -2956,6 +2956,9 @@ importers:
       '@prisma-next/middleware-telemetry':
         specifier: workspace:*
         version: link:../../packages/3-extensions/middleware-telemetry
+      '@prisma-next/mongo-lowering':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/6-transport/mongo-lowering
       '@prisma-next/runtime-executor':
         specifier: workspace:*
         version: link:../../packages/1-framework/4-runtime/runtime-executor
