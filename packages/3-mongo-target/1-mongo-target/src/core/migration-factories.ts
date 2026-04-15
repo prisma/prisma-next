@@ -156,7 +156,7 @@ export function dropCollection(collection: string): MongoMigrationPlanOperation 
 export function setValidation(
   collection: string,
   schema: Record<string, unknown>,
-  options?: { validationLevel?: string; validationAction?: string },
+  options?: { validationLevel?: 'strict' | 'moderate'; validationAction?: 'error' | 'warn' },
 ): MongoMigrationPlanOperation {
   return {
     id: `collection.${collection}.setValidation`,
