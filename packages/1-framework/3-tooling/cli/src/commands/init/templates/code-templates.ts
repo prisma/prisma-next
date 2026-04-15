@@ -88,7 +88,7 @@ export const contract = defineContract(
           id: field.id.uuidv7(),
           title: field.text(),
           content: field.text().optional(),
-          authorId: field.text(),
+          authorId: field.uuid(),
           createdAt: field.createdAt(),
         },
       }).relations({
