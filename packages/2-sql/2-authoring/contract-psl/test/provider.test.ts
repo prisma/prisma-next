@@ -1,26 +1,20 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
 import {
-  createBuiltinLikeControlMutationDefaults,
+  createPostgresTestContext,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
-  postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
-
-const emptyContext: ContractSourceContext = { composedExtensionPacks: [] };
 
 describe('prismaContract provider helper', () => {
   const originalCwd = process.cwd();
   const tempDirs: string[] = [];
   const baseOptions = {
     target: postgresTarget,
-    scalarTypeDescriptors: postgresScalarTypeDescriptors,
-    controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   } as const;
 
   afterEach(async () => {
@@ -53,7 +47,7 @@ describe('prismaContract provider helper', () => {
       });
 
       expect(contract.output).toBe('output/contract.json');
-      const result = await contract.source(emptyContext);
+      const result = await contract.source(createPostgresTestContext());
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
@@ -90,7 +84,7 @@ model Post {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', baseOptions);
-      const result = await contract.source(emptyContext);
+      const result = await contract.source(createPostgresTestContext());
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
@@ -133,7 +127,7 @@ model Post {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', baseOptions);
-      const result = await contract.source(emptyContext);
+      const result = await contract.source(createPostgresTestContext());
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -175,7 +169,7 @@ model Post {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', baseOptions);
-      const result = await contract.source(emptyContext);
+      const result = await contract.source(createPostgresTestContext());
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -213,7 +207,7 @@ model Post {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', baseOptions);
-      const result = await contract.source(emptyContext);
+      const result = await contract.source(createPostgresTestContext());
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -249,11 +243,14 @@ model Post {
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', {
         ...baseOptions,
-        composedExtensionPacks: ['pgvector'],
         composedExtensionPackRefs: [pgvectorExtensionPack],
-        authoringContributions: pgvectorAuthoringContributions,
       });
-      const result = await contract.source({ composedExtensionPacks: [] });
+      const result = await contract.source(
+        createPostgresTestContext({
+          composedExtensionPacks: ['pgvector'],
+          authoringContributions: pgvectorAuthoringContributions,
+        }),
+      );
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -314,11 +311,14 @@ model Document {
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', {
         ...baseOptions,
-        composedExtensionPacks: ['pgvector'],
         composedExtensionPackRefs: [pgvectorExtensionPack],
-        authoringContributions: pgvectorAuthoringContributions,
       });
-      const result = await contract.source({ composedExtensionPacks: [] });
+      const result = await contract.source(
+        createPostgresTestContext({
+          composedExtensionPacks: ['pgvector'],
+          authoringContributions: pgvectorAuthoringContributions,
+        }),
+      );
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -355,10 +355,8 @@ model Document {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma', {
-        ...baseOptions,
-      });
-      const result = await contract.source(emptyContext);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source(createPostgresTestContext());
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -414,10 +412,8 @@ model Document {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma', {
-        ...baseOptions,
-      });
-      const result = await contract.source(emptyContext);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source(createPostgresTestContext());
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -439,7 +435,7 @@ model Document {
   });
 
   describe('given provider inputs without assembled mutation defaults', () => {
-    it('does not assemble mutation default handlers internally', async () => {
+    it('reports unknown default function when context has no mutation defaults', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
       const schemaPath = join(tempDir, 'schema.prisma');
@@ -454,11 +450,15 @@ model Document {
       );
 
       process.chdir(tempDir);
-      const contract = prismaContract('./schema.prisma', {
-        target: postgresTarget,
-        scalarTypeDescriptors: postgresScalarTypeDescriptors,
-      });
-      const result = await contract.source(emptyContext);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source(
+        createPostgresTestContext({
+          controlMutationDefaults: {
+            defaultFunctionRegistry: new Map(),
+            generatorDescriptors: [],
+          },
+        }),
+      );
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -480,7 +480,7 @@ model Document {
 
       process.chdir(tempDir);
       const contract = prismaContract('./missing.prisma', baseOptions);
-      const result = await contract.source(emptyContext);
+      const result = await contract.source(createPostgresTestContext());
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
