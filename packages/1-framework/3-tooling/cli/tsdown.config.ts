@@ -22,7 +22,7 @@ export default defineConfig({
     'src/config-loader.ts',
     'src/exports/control-api.ts',
   ],
-  copy: [{ from: 'src/commands/init/templates/*.md', flatten: false }],
+  copy: [{ from: 'src/commands/init/templates/*.md' }],
   // Keep manual exports to preserve stable CLI public subpaths.
   exports: { enabled: false },
   outputOptions: (opts) => ({
