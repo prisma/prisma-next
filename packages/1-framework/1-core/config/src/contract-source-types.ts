@@ -1,4 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type {
+  AssembledAuthoringContributions,
+  ControlMutationDefaults,
+} from '@prisma-next/framework-components/control';
 import type { Result } from '@prisma-next/utils/result';
 
 export interface ContractSourceDiagnosticPosition {
@@ -33,6 +38,10 @@ export interface ContractSourceDiagnostics {
 
 export interface ContractSourceContext {
   readonly composedExtensionPacks: readonly string[];
+  readonly pslScalarTypeDescriptors: ReadonlyMap<string, string>;
+  readonly authoringContributions: AssembledAuthoringContributions;
+  readonly codecLookup: CodecLookup;
+  readonly controlMutationDefaults: ControlMutationDefaults;
 }
 
 export type ContractSourceProvider = (
