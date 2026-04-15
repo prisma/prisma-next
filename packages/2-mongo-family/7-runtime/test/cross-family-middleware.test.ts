@@ -1,7 +1,7 @@
 import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
-import type {
-  AfterExecuteResult,
-  RuntimeMiddleware,
+import {
+  createTelemetryMiddleware,
+  type TelemetryEvent,
 } from '@prisma-next/framework-components/runtime';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
@@ -14,43 +14,10 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 import { createMongoRuntime } from '../src/mongo-runtime';
 
-interface TelemetryRecord {
-  readonly phase: 'before' | 'after';
-  readonly lane: string;
-  readonly target: string;
-  readonly storageHash: string;
-  readonly rowCount?: number;
-  readonly latencyMs?: number;
-  readonly completed?: boolean;
-}
-
-function createTelemetryMiddleware(): RuntimeMiddleware & {
-  records: TelemetryRecord[];
-} {
-  const records: TelemetryRecord[] = [];
-  return {
-    name: 'cross-family-telemetry',
-    records,
-    async beforeExecute(plan: { readonly meta: PlanMeta }) {
-      records.push({
-        phase: 'before',
-        lane: plan.meta.lane,
-        target: plan.meta.target,
-        storageHash: plan.meta.storageHash,
-      });
-    },
-    async afterExecute(plan: { readonly meta: PlanMeta }, result: AfterExecuteResult) {
-      records.push({
-        phase: 'after',
-        lane: plan.meta.lane,
-        target: plan.meta.target,
-        storageHash: plan.meta.storageHash,
-        rowCount: result.rowCount,
-        latencyMs: result.latencyMs,
-        completed: result.completed,
-      });
-    },
-  };
+function collectingTelemetry() {
+  const events: TelemetryEvent[] = [];
+  const middleware = createTelemetryMiddleware({ onEvent: (e) => events.push(e) });
+  return { middleware, events };
 }
 
 class MockMarkerReader implements MarkerReader {
@@ -139,7 +106,7 @@ function createMongoPlan(meta: PlanMeta = mongoMeta): MongoQueryPlan {
 
 describe('cross-family middleware proof', () => {
   it('same middleware observes queries from an SQL runtime', async () => {
-    const telemetry = createTelemetryMiddleware();
+    const { middleware, events } = collectingTelemetry();
 
     const sqlContract: MockSqlContract = {
       target: 'postgres',
@@ -151,7 +118,7 @@ describe('cross-family middleware proof', () => {
       familyAdapter: new MockFamilyAdapter(sqlContract),
       driver: new MockSqlDriver([{ id: 1, name: 'Alice' }]),
       verify: { mode: 'onFirstUse', requireMarker: false },
-      middlewares: [telemetry],
+      middlewares: [middleware],
     });
 
     const sqlPlan: ExecutionPlan = {
@@ -169,15 +136,15 @@ describe('cross-family middleware proof', () => {
       void _row;
     }
 
-    expect(telemetry.records).toHaveLength(2);
-    expect(telemetry.records[0]).toMatchObject({
-      phase: 'before',
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      phase: 'beforeExecute',
       lane: 'sql',
       target: 'postgres',
       storageHash: 'sha256:sql-test',
     });
-    expect(telemetry.records[1]).toMatchObject({
-      phase: 'after',
+    expect(events[1]).toMatchObject({
+      phase: 'afterExecute',
       lane: 'sql',
       target: 'postgres',
       rowCount: 1,
@@ -186,7 +153,7 @@ describe('cross-family middleware proof', () => {
   });
 
   it('same middleware observes queries from a Mongo runtime', async () => {
-    const telemetry = createTelemetryMiddleware();
+    const { middleware, events } = collectingTelemetry();
 
     const mongoRuntime = createMongoRuntime({
       adapter: createMockMongoAdapter(),
@@ -195,7 +162,7 @@ describe('cross-family middleware proof', () => {
         { _id: '2', name: 'Carol' },
       ]),
       contract: {},
-      middlewares: [telemetry],
+      middlewares: [middleware],
     });
 
     const plan = createMongoPlan(mongoMeta);
@@ -204,22 +171,22 @@ describe('cross-family middleware proof', () => {
       void _row;
     }
 
-    expect(telemetry.records).toHaveLength(2);
-    expect(telemetry.records[0]).toMatchObject({
-      phase: 'before',
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      phase: 'beforeExecute',
       lane: 'orm',
       target: 'mongo',
       storageHash: 'sha256:mongo-test',
     });
-    expect(telemetry.records[1]).toMatchObject({
-      phase: 'after',
+    expect(events[1]).toMatchObject({
+      phase: 'afterExecute',
       rowCount: 2,
       completed: true,
     });
   });
 
   it('same middleware instance works across SQL and Mongo runtimes', async () => {
-    const telemetry = createTelemetryMiddleware();
+    const { middleware, events } = collectingTelemetry();
 
     const sqlContract: MockSqlContract = {
       target: 'postgres',
@@ -231,14 +198,14 @@ describe('cross-family middleware proof', () => {
       familyAdapter: new MockFamilyAdapter(sqlContract),
       driver: new MockSqlDriver([{ id: 1 }]),
       verify: { mode: 'onFirstUse', requireMarker: false },
-      middlewares: [telemetry],
+      middlewares: [middleware],
     });
 
     const mongoRuntime = createMongoRuntime({
       adapter: createMockMongoAdapter(),
       driver: createMockMongoDriver([{ _id: '1' }]),
       contract: {},
-      middlewares: [telemetry],
+      middlewares: [middleware],
     });
 
     for await (const _row of sqlRuntime.execute({
@@ -266,10 +233,10 @@ describe('cross-family middleware proof', () => {
       void _row;
     }
 
-    expect(telemetry.records).toHaveLength(4);
-    expect(telemetry.records[0]).toMatchObject({ target: 'postgres', lane: 'sql' });
-    expect(telemetry.records[1]).toMatchObject({ target: 'postgres', completed: true });
-    expect(telemetry.records[2]).toMatchObject({ target: 'mongo', lane: 'orm' });
-    expect(telemetry.records[3]).toMatchObject({ target: 'mongo', completed: true });
+    expect(events).toHaveLength(4);
+    expect(events[0]).toMatchObject({ target: 'postgres', lane: 'sql' });
+    expect(events[1]).toMatchObject({ target: 'postgres', completed: true });
+    expect(events[2]).toMatchObject({ target: 'mongo', lane: 'orm' });
+    expect(events[3]).toMatchObject({ target: 'mongo', completed: true });
   });
 });
