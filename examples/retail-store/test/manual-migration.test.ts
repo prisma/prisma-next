@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { deserializeMongoOps, MongoMigrationRunner } from '@prisma-next/adapter-mongo/control';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { resolve } from 'pathe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const ALL_POLICY = {

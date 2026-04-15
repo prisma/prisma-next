@@ -1,4 +1,5 @@
-import { createIndex, Migration } from '@prisma-next/family-mongo/migration';
+import { Migration } from '@prisma-next/family-mongo/migration';
+import { createIndex } from '@prisma-next/target-mongo/migration';
 
 export default class extends Migration {
   override describe() {

@@ -309,6 +309,16 @@ describe('collMod', () => {
     expect(op.precheck).toHaveLength(0);
     expect(op.postcheck).toHaveLength(0);
   });
+
+  it('defaults operationClass to destructive', () => {
+    const op = collMod('users', { validator: {} });
+    expect(op.operationClass).toBe('destructive');
+  });
+
+  it('accepts operationClass override', () => {
+    const op = collMod('users', { validator: {} }, { operationClass: 'widening' });
+    expect(op.operationClass).toBe('widening');
+  });
 });
 
 describe('serialization round-trip', () => {
