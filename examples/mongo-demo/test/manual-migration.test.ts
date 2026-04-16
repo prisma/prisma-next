@@ -87,7 +87,7 @@ describe(
             },
             operations: JSON.parse(opsJson),
           },
-          driver: controlDriver,
+
           destinationContract: {},
           policy: ALL_POLICY,
           frameworkComponents: [],

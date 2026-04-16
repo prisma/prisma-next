@@ -94,10 +94,6 @@ function serializePlan(plan: MigrationPlan): MigrationPlan {
   return { ...plan, operations: serialized };
 }
 
-function makeDriver() {
-  return createMongoControlDriver(db, client);
-}
-
 function makeRunner() {
   return new MongoMigrationRunner(createMongoRunnerDeps(createMongoControlDriver(db, client)));
 }
@@ -113,7 +109,6 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -151,7 +146,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -177,7 +172,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -202,7 +197,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       executionChecks: { idempotencyChecks: false },
@@ -227,7 +222,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       callbacks: {
@@ -266,7 +261,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -290,7 +285,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -315,7 +310,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -342,7 +337,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       callbacks: {
@@ -374,7 +369,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['destructive'] },
       frameworkComponents: [],
@@ -396,7 +391,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
