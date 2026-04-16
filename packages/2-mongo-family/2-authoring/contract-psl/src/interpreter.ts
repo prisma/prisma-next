@@ -279,16 +279,19 @@ function resolvePolymorphism(input: {
     if (variantCollectionName !== baseCollection) {
       const variantColl = collections[variantCollectionName];
       const variantIndexes = (variantColl?.['indexes'] ?? []) as MongoStorageIndex[];
-      if (variantIndexes.length > 0) {
-        const baseColl = collections[baseCollection];
-        if (baseColl) {
-          const baseIndexes = (baseColl['indexes'] ?? []) as MongoStorageIndex[];
-          baseColl['indexes'] = [...baseIndexes, ...variantIndexes];
-        }
-      }
-      collections = Object.fromEntries(
+      const baseColl = collections[baseCollection];
+      const filtered = Object.fromEntries(
         Object.entries(collections).filter(([key]) => key !== variantCollectionName),
       );
+      if (variantIndexes.length > 0 && baseColl) {
+        const baseIndexes = (baseColl['indexes'] ?? []) as MongoStorageIndex[];
+        collections = {
+          ...filtered,
+          [baseCollection]: { ...baseColl, indexes: [...baseIndexes, ...variantIndexes] },
+        };
+      } else {
+        collections = filtered;
+      }
     }
   }
 
