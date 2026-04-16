@@ -1,8 +1,4 @@
-import type {
-  ColumnDefault,
-  Contract,
-  ExecutionMutationDefaultValue,
-} from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlAdapterDescriptor,
@@ -28,101 +24,6 @@ import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../control-instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
-
-type ControlMutationDefaultSpan = {
-  readonly start: {
-    readonly offset: number;
-    readonly line: number;
-    readonly column: number;
-  };
-  readonly end: {
-    readonly offset: number;
-    readonly line: number;
-    readonly column: number;
-  };
-};
-
-type ControlMutationDefaultFunctionCall = {
-  readonly name: string;
-  readonly raw: string;
-  readonly args: readonly {
-    readonly raw: string;
-    readonly span: ControlMutationDefaultSpan;
-  }[];
-  readonly span: ControlMutationDefaultSpan;
-};
-
-type ControlMutationDefaultLoweringContext = {
-  readonly sourceId: string;
-  readonly modelName: string;
-  readonly fieldName: string;
-  readonly columnCodecId?: string;
-};
-
-export type ControlMutationDefaultFunctionResult =
-  | {
-      readonly ok: true;
-      readonly value:
-        | { readonly kind: 'storage'; readonly defaultValue: ColumnDefault }
-        | { readonly kind: 'execution'; readonly generated: ExecutionMutationDefaultValue };
-    }
-  | {
-      readonly ok: false;
-      readonly diagnostic: {
-        readonly code: string;
-        readonly message: string;
-        readonly sourceId?: string;
-        readonly span?: ControlMutationDefaultSpan;
-      };
-    };
-
-export type ControlMutationDefaultFunctionHandler = (input: {
-  readonly call: ControlMutationDefaultFunctionCall;
-  readonly context: ControlMutationDefaultLoweringContext;
-}) => ControlMutationDefaultFunctionResult;
-
-export interface ControlMutationDefaultFunctionEntry {
-  readonly lower: ControlMutationDefaultFunctionHandler;
-  readonly usageSignatures?: readonly string[];
-}
-
-export interface ControlMutationDefaultGeneratorDescriptor {
-  readonly id: string;
-  readonly applicableCodecIds: readonly string[];
-  readonly resolveGeneratedColumnDescriptor?: (input: {
-    readonly generated: {
-      readonly kind: string;
-      readonly id: string;
-      readonly params?: Record<string, unknown>;
-    };
-  }) =>
-    | {
-        readonly codecId: string;
-        readonly nativeType: string;
-        readonly typeRef?: string;
-        readonly typeParams?: Record<string, unknown>;
-      }
-    | undefined;
-}
-
-export interface PslScalarTypeDescriptor {
-  readonly codecId: string;
-  readonly nativeType: string;
-  readonly typeRef?: string;
-  readonly typeParams?: Record<string, unknown>;
-}
-
-export interface SqlControlStaticContributions {
-  readonly controlMutationDefaults?: () => {
-    readonly defaultFunctionRegistry: ReadonlyMap<string, ControlMutationDefaultFunctionEntry>;
-    readonly generatorDescriptors: ReadonlyArray<ControlMutationDefaultGeneratorDescriptor>;
-  };
-  readonly pslTypeDescriptors?: () => {
-    readonly scalarTypeDescriptors: ReadonlyMap<string, PslScalarTypeDescriptor>;
-  };
-  /** Query operation descriptors for the migration DSL client. Same static data as runtime descriptors. */
-  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
-}
 
 export interface ComponentDatabaseDependency<TTargetDetails> {
   readonly id: string;
@@ -224,14 +125,15 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
 }
 
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
-  extends ControlExtensionDescriptor<'sql', TTargetId>,
-    SqlControlStaticContributions {
+  extends ControlExtensionDescriptor<'sql', TTargetId> {
   readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
+  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
 }
 
 export interface SqlControlAdapterDescriptor<TTargetId extends string>
-  extends ControlAdapterDescriptor<'sql', TTargetId>,
-    SqlControlStaticContributions {}
+  extends ControlAdapterDescriptor<'sql', TTargetId> {
+  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+}
 
 export interface SqlMigrationPlanOperationStep {
   readonly description: string;
@@ -389,8 +291,8 @@ export interface SqlMigrationRunner<TTargetDetails> {
 }
 
 export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDetails>
-  extends MigratableTargetDescriptor<'sql', TTargetId, SqlControlFamilyInstance>,
-    SqlControlStaticContributions {
+  extends MigratableTargetDescriptor<'sql', TTargetId, SqlControlFamilyInstance> {
+  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
   createPlanner(family: SqlControlFamilyInstance): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }
