@@ -17,6 +17,7 @@ import {
 } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
 import { MongoMigrationPlanner } from '../src/core/mongo-planner';
+import type { OpFactoryCall } from '../src/core/op-factory-call';
 
 const ALL_CLASSES_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
@@ -1037,6 +1038,171 @@ describe('MongoMigrationPlanner', () => {
       const contract = makeContract({ users: {} });
       const plan = planSuccess(planner, contract, emptyIR());
       expect(plan.destination).not.toHaveProperty('profileHash');
+    });
+  });
+
+  describe('planCalls', () => {
+    function planCallsSuccess(
+      p: MongoMigrationPlanner,
+      contract: MongoContract,
+      schema: MongoSchemaIR,
+      policy = ALL_CLASSES_POLICY,
+    ) {
+      const result = p.planCalls({ contract, schema, policy, frameworkComponents: [] });
+      expect(result.kind).toBe('success');
+      if (result.kind !== 'success') throw new Error('Expected success');
+      return result.calls;
+    }
+
+    it('returns OpFactoryCall[] for index creation', () => {
+      const contract = makeContract({
+        users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
+      });
+      const calls = planCallsSuccess(planner, contract, emptyIR());
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.factory).toBe('createIndex');
+      const call = calls[0] as OpFactoryCall & { factory: 'createIndex' };
+      expect(call.collection).toBe('users');
+      expect(call.keys).toEqual([{ field: 'email', direction: 1 }]);
+    });
+
+    it('returns OpFactoryCall[] for index drop', () => {
+      const contract = makeContract({ users: {} });
+      const origin = irWithCollection('users', [ascIndex('email')]);
+      const calls = planCallsSuccess(planner, contract, origin);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.factory).toBe('dropIndex');
+    });
+
+    it('returns failure with conflicts for immutable option changes', () => {
+      const contract = makeContract({
+        users: { options: { capped: { size: 2048 } } },
+      });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'users',
+          indexes: [],
+          options: new MongoSchemaCollectionOptions({ capped: { size: 1024 } }),
+        }),
+      ]);
+
+      const result = planner.planCalls({
+        contract,
+        schema: origin,
+        policy: ALL_CLASSES_POLICY,
+        frameworkComponents: [],
+      });
+
+      expect(result.kind).toBe('failure');
+      if (result.kind !== 'failure') throw new Error('Expected failure');
+      expect(result.conflicts[0]!.summary).toContain('capped');
+    });
+
+    it('returns failure when policy rejects operation class', () => {
+      const contract = makeContract({
+        users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
+      });
+
+      const result = planner.planCalls({
+        contract,
+        schema: emptyIR(),
+        policy: { allowedOperationClasses: ['destructive'] },
+        frameworkComponents: [],
+      });
+
+      expect(result.kind).toBe('failure');
+      if (result.kind !== 'failure') throw new Error('Expected failure');
+      expect(result.conflicts[0]!.summary).toContain('additive');
+    });
+
+    it('produces collMod calls with meta for validator diff', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { required: ['email', 'name'] },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'users',
+          indexes: [],
+          validator: new MongoSchemaValidator({
+            jsonSchema: { required: ['email'] },
+            validationLevel: 'moderate',
+            validationAction: 'warn',
+          }),
+        }),
+      ]);
+
+      const calls = planCallsSuccess(planner, contract, origin);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.factory).toBe('collMod');
+      const call = calls[0] as OpFactoryCall & { factory: 'collMod' };
+      expect(call.meta?.id).toBe('validator.users.update');
+      expect(call.meta?.label).toBe('Update validator on users');
+      expect(call.meta?.operationClass).toBe('destructive');
+    });
+
+    it('produces collMod call with widening operationClass for relaxation', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: { required: ['email'] },
+            validationLevel: 'moderate',
+            validationAction: 'warn',
+          },
+        },
+      });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'users',
+          indexes: [],
+          validator: new MongoSchemaValidator({
+            jsonSchema: { required: ['email'] },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          }),
+        }),
+      ]);
+
+      const calls = planCallsSuccess(planner, contract, origin);
+
+      expect(calls).toHaveLength(1);
+      const call = calls[0] as OpFactoryCall & { factory: 'collMod' };
+      expect(call.meta?.operationClass).toBe('widening');
+    });
+
+    it('produces collMod call for mutable options diff', () => {
+      const contract = makeContract({
+        events: {
+          options: { changeStreamPreAndPostImages: { enabled: true } },
+        },
+      });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({ name: 'events', indexes: [] }),
+      ]);
+
+      const calls = planCallsSuccess(planner, contract, origin);
+
+      const collModCalls = calls.filter((c) => c.factory === 'collMod');
+      expect(collModCalls).toHaveLength(1);
+      expect(collModCalls[0]!.meta?.id).toBe('options.events.update');
+    });
+
+    it('returns empty calls when schemas are identical', () => {
+      const contract = makeContract({
+        users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
+      });
+      const origin = irWithCollection('users', [ascIndex('email')]);
+      const calls = planCallsSuccess(planner, contract, origin);
+
+      expect(calls).toHaveLength(0);
     });
   });
 });

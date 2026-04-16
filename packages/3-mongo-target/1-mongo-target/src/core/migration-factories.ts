@@ -2,6 +2,7 @@ import type { MongoIndexKey } from '@prisma-next/mongo-query-ast/control';
 import {
   buildIndexOpId,
   CollModCommand,
+  type CollModOptions,
   CreateCollectionCommand,
   type CreateCollectionOptions,
   CreateIndexCommand,
@@ -16,6 +17,7 @@ import {
   MongoFieldFilter,
   type MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
+import type { CollModMeta } from './op-factory-call';
 
 function formatKeys(keys: ReadonlyArray<MongoIndexKey>): string {
   return keys.map((k) => `${k.field}:${k.direction}`).join(', ');
@@ -174,6 +176,55 @@ export function setValidation(
       },
     ],
     postcheck: [],
+  };
+}
+
+export function collMod(
+  collection: string,
+  options: CollModOptions,
+  meta?: CollModMeta,
+): MongoMigrationPlanOperation {
+  const hasValidator = options.validator != null && Object.keys(options.validator).length > 0;
+
+  return {
+    id: meta?.id ?? `collection.${collection}.collMod`,
+    label: meta?.label ?? `Modify collection ${collection}`,
+    operationClass: meta?.operationClass ?? 'destructive',
+    precheck:
+      options.validator != null
+        ? [
+            {
+              description: `collection ${collection} exists`,
+              source: new ListCollectionsCommand(),
+              filter: MongoFieldFilter.eq('name', collection),
+              expect: 'exists' as const,
+            },
+          ]
+        : [],
+    execute: [
+      {
+        description: `modify ${collection}`,
+        command: new CollModCommand(collection, options),
+      },
+    ],
+    postcheck: hasValidator
+      ? [
+          {
+            description: `validator applied on ${collection}`,
+            source: new ListCollectionsCommand(),
+            filter: MongoAndExpr.of([
+              MongoFieldFilter.eq('name', collection),
+              ...(options.validationLevel
+                ? [MongoFieldFilter.eq('options.validationLevel', options.validationLevel)]
+                : []),
+              ...(options.validationAction
+                ? [MongoFieldFilter.eq('options.validationAction', options.validationAction)]
+                : []),
+            ]),
+            expect: 'exists' as const,
+          },
+        ]
+      : [],
   };
 }
 

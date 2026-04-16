@@ -1,4 +1,5 @@
 export {
+  collMod,
   createCollection,
   createIndex,
   dropCollection,
