@@ -349,12 +349,30 @@ export function extractCodecLookup(
   return { get: (id) => byId.get(id) };
 }
 
+export function validatePslScalarTypeCodecIds(
+  pslScalarTypeDescriptors: ReadonlyMap<string, string>,
+  codecLookup: CodecLookup,
+): string[] {
+  const errors: string[] = [];
+  for (const [typeName, codecId] of pslScalarTypeDescriptors) {
+    if (!codecLookup.get(codecId)) {
+      errors.push(
+        `PSL scalar type "${typeName}" references codec "${codecId}" which is not registered by any component.`,
+      );
+    }
+  }
+  return errors;
+}
+
 export function createControlStack<TFamilyId extends string, TTargetId extends string>(
   input: CreateControlStackInput<TFamilyId, TTargetId>,
 ): ControlStack<TFamilyId, TTargetId> {
   const { family, target, adapter, driver, extensionPacks = [] } = input;
 
   const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...extensionPacks];
+
+  const codecLookup = extractCodecLookup(allDescriptors);
+  const pslScalarTypeDescriptors = assemblePslScalarTypeDescriptors(allDescriptors);
 
   return {
     family,
@@ -367,9 +385,9 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     operationTypeImports: extractOperationTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
     extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
-    codecLookup: extractCodecLookup(allDescriptors),
+    codecLookup,
     authoringContributions: assembleAuthoringContributions(allDescriptors),
-    pslScalarTypeDescriptors: assemblePslScalarTypeDescriptors(allDescriptors),
+    pslScalarTypeDescriptors,
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
   };
 }
