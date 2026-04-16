@@ -260,10 +260,10 @@ export function assemblePslScalarTypeDescriptors(
   const owners = new Map<string, string>();
 
   for (const descriptor of descriptors) {
-    const descriptors_map = descriptor.pslScalarTypeDescriptors;
-    if (!descriptors_map) continue;
+    const descriptorMap = descriptor.pslScalarTypeDescriptors;
+    if (!descriptorMap) continue;
     const descriptorId = descriptor.id ?? '<unknown>';
-    for (const [typeName, codecId] of descriptors_map) {
+    for (const [typeName, codecId] of descriptorMap) {
       const existingOwner = owners.get(typeName);
       if (existingOwner !== undefined) {
         throw new Error(
