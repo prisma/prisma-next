@@ -143,7 +143,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
         const runResult = await runner.execute({
           plan: {
             targetId: 'mongo',
@@ -186,7 +186,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
         await runner.execute({
           plan: {
             targetId: 'mongo',
@@ -223,7 +223,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
         await runner.execute({
           plan: {
             targetId: 'mongo',
@@ -253,7 +253,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
         const planner = new MongoMigrationPlanner();
-        const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
 
         // Step 1: Apply create index
         const createSchema = contractToMongoSchemaIR(null);
@@ -344,7 +344,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
         const planner = new MongoMigrationPlanner();
-        const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
 
         // First apply
         const schema = contractToMongoSchemaIR(null);
@@ -405,7 +405,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         expect(controlDriver.db.databaseName).toBe(dbName);
 
         const planner = new MongoMigrationPlanner();
-        const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
         const schema = contractToMongoSchemaIR(null);
         const result = planner.plan({
           contract: indexedContract,

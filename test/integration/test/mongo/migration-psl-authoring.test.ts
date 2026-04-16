@@ -56,7 +56,7 @@ async function planAndApply(
   const serialized = JSON.parse(serializeMongoOps(ops));
   const controlDriver = await mongoControlDriver.create(replSetUri);
   try {
-    const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+    const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
     const runResult = await runner.execute({
       plan: {
         targetId: 'mongo',
