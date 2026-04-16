@@ -36,7 +36,7 @@ const contract = defineContract({
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex, createCollection } from '@prisma-next/target-mongo/migration';
 
-export default class extends Migration {
+class UsersMigration extends Migration {
   plan() {
     return [
       createCollection("users", {
@@ -48,7 +48,8 @@ export default class extends Migration {
   }
 }
 
-Migration.run(import.meta.url)
+export default UsersMigration;
+Migration.run(import.meta.url, UsersMigration)
 ```
 
 Run `tsx migration.ts` to produce `ops.json` and `migration.json` (when `describe()` is implemented). Use `--dry-run` to preview without writing.
