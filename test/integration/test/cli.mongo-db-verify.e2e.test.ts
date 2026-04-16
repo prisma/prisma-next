@@ -1,9 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { initMarker } from '@prisma-next/adapter-mongo/control';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MongoContract } from '@prisma-next/mongo-contract';
+import { initMarker } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';

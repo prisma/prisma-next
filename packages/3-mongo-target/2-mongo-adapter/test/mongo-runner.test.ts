@@ -18,8 +18,8 @@ import {
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { MongoCommandExecutor, MongoInspectionExecutor } from '../src/core/command-executor';
 import { createMongoControlDriver } from '../src/core/mongo-control-driver';
+import { createMongoRunnerDeps } from '../src/core/runner-deps';
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -99,10 +99,7 @@ function makeDriver() {
 }
 
 function makeRunner() {
-  return new MongoMigrationRunner((dbInstance) => ({
-    commandExecutor: new MongoCommandExecutor(dbInstance),
-    inspectionExecutor: new MongoInspectionExecutor(dbInstance),
-  }));
+  return new MongoMigrationRunner(createMongoRunnerDeps);
 }
 
 describe('MongoMigrationRunner', () => {

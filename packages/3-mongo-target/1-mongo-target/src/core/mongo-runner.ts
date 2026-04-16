@@ -1,3 +1,4 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
@@ -17,14 +18,34 @@ import type {
 } from '@prisma-next/mongo-query-ast/control';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { FilterEvaluator } from './filter-evaluator';
-import type { Db } from './marker-ledger';
-import { initMarker, readMarker, updateMarker, writeLedgerEntry } from './marker-ledger';
 import { deserializeMongoOps } from './mongo-ops-serializer';
 
-export type MongoExecutorFactory = (db: Db) => {
-  commandExecutor: MongoDdlCommandVisitor<Promise<void>>;
-  inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>;
-};
+export interface MarkerOperations {
+  readMarker(): Promise<ContractMarkerRecord | null>;
+  initMarker(destination: {
+    readonly storageHash: string;
+    readonly profileHash: string;
+  }): Promise<void>;
+  updateMarker(
+    expectedFrom: string,
+    destination: { readonly storageHash: string; readonly profileHash: string },
+  ): Promise<boolean>;
+  writeLedgerEntry(entry: {
+    readonly edgeId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<void>;
+}
+
+export interface MongoRunnerDependencies {
+  readonly commandExecutor: MongoDdlCommandVisitor<Promise<void>>;
+  readonly inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>;
+  readonly markerOps: MarkerOperations;
+}
+
+export type MongoRunnerDependenciesFactory = (
+  driver: ControlDriverInstance<'mongo', 'mongo'>,
+) => MongoRunnerDependencies;
 
 function runnerFailure(
   code: string,
@@ -38,24 +59,8 @@ function runnerFailure(
   });
 }
 
-function isMongoControlDriverInstance(
-  driver: ControlDriverInstance<'mongo', 'mongo'>,
-): driver is ControlDriverInstance<'mongo', 'mongo'> & { db: Db } {
-  return 'db' in driver && driver.db != null;
-}
-
-function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
-  if (!isMongoControlDriverInstance(driver)) {
-    throw new Error(
-      'Mongo control driver does not expose a db property. ' +
-        'Use mongoControlDriver.create() from `@prisma-next/driver-mongo/control`.',
-    );
-  }
-  return driver.db;
-}
-
 export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
-  constructor(private readonly executorFactory: MongoExecutorFactory) {}
+  constructor(private readonly createDeps: MongoRunnerDependenciesFactory) {}
 
   async execute(options: {
     readonly plan: MigrationPlan;
@@ -69,13 +74,13 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
     readonly executionChecks?: MigrationRunnerExecutionChecks;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
   }): Promise<MigrationRunnerResult> {
-    const db = extractDb(options.driver);
+    const { commandExecutor, inspectionExecutor, markerOps } = this.createDeps(options.driver);
     const operations = deserializeMongoOps(options.plan.operations as readonly unknown[]);
 
     const policyCheck = this.enforcePolicyCompatibility(options.policy, operations);
     if (policyCheck) return policyCheck;
 
-    const existingMarker = await readMarker(db);
+    const existingMarker = await markerOps.readMarker();
 
     const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
     if (markerCheck) return markerCheck;
@@ -85,7 +90,6 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
     const runPostchecks = checks?.postchecks !== false;
     const runIdempotency = checks?.idempotencyChecks !== false;
 
-    const { commandExecutor, inspectionExecutor } = this.executorFactory(db);
     const filterEvaluator = new FilterEvaluator();
 
     let operationsExecuted = 0;
@@ -155,7 +159,7 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
     }
 
     if (existingMarker) {
-      const updated = await updateMarker(db, existingMarker.storageHash, {
+      const updated = await markerOps.updateMarker(existingMarker.storageHash, {
         storageHash: destination.storageHash,
         profileHash,
       });
@@ -172,14 +176,14 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
         );
       }
     } else {
-      await initMarker(db, {
+      await markerOps.initMarker({
         storageHash: destination.storageHash,
         profileHash,
       });
     }
 
     const originHash = existingMarker?.storageHash ?? '';
-    await writeLedgerEntry(db, {
+    await markerOps.writeLedgerEntry({
       edgeId: `${originHash}->${destination.storageHash}`,
       from: originHash,
       to: destination.storageHash,
@@ -237,7 +241,7 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
   }
 
   private ensureMarkerCompatibility(
-    marker: Awaited<ReturnType<typeof readMarker>>,
+    marker: ContractMarkerRecord | null,
     plan: MigrationPlan,
   ): MigrationRunnerResult | undefined {
     const origin = plan.origin ?? null;

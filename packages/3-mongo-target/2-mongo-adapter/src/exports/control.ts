@@ -1,25 +1,12 @@
 import type { ControlAdapterDescriptor } from '@prisma-next/framework-components/control';
 
-export type { MongoExecutorFactory } from '@prisma-next/target-mongo/control';
-export {
-  contractToMongoSchemaIR,
-  deserializeMongoOps,
-  FilterEvaluator,
-  formatMongoOperations,
-  initMarker,
-  MongoMigrationPlanner,
-  MongoMigrationRunner,
-  readMarker,
-  serializeMongoOps,
-  updateMarker,
-  writeLedgerEntry,
-} from '@prisma-next/target-mongo/control';
 export { MongoCommandExecutor, MongoInspectionExecutor } from '../core/command-executor';
 export { introspectSchema } from '../core/introspect-schema';
 export {
   createMongoControlDriver,
   type MongoControlDriverInstance,
 } from '../core/mongo-control-driver';
+export { createMongoRunnerDeps } from '../core/runner-deps';
 
 import {
   mongoBooleanCodec,

@@ -1,4 +1,4 @@
-import { MongoCommandExecutor, MongoInspectionExecutor } from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigratableTargetDescriptor } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -21,10 +21,7 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
       return new MongoMigrationPlanner();
     },
     createRunner(_family: MongoControlFamilyInstance) {
-      return new MongoMigrationRunner((db) => ({
-        commandExecutor: new MongoCommandExecutor(db),
-        inspectionExecutor: new MongoInspectionExecutor(db),
-      }));
+      return new MongoMigrationRunner(createMongoRunnerDeps);
     },
     contractToSchema(contract: Contract | null) {
       return contractToMongoSchemaIR(contract as MongoContract | null);
