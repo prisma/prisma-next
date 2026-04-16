@@ -6,7 +6,7 @@ import type {
   MigrationPlannerConflict,
   MigrationPlannerResult,
 } from '@prisma-next/framework-components/control';
-import type { MongoContract, MongoIndexKey } from '@prisma-next/mongo-contract';
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type {
   MongoSchemaCollection,
   MongoSchemaCollectionOptions,
@@ -16,7 +16,7 @@ import type {
 } from '@prisma-next/mongo-schema-ir';
 import { canonicalize, deepEqual } from '@prisma-next/mongo-schema-ir';
 import { contractToMongoSchemaIR } from './contract-to-schema';
-import type { OpFactoryCall, OpFactoryCallVisitor } from './op-factory-call';
+import type { OpFactoryCall } from './op-factory-call';
 import {
   CollModCall,
   CreateCollectionCall,
@@ -95,49 +95,6 @@ function hasImmutableOptionChange(
 function collectionHasOptions(coll: MongoSchemaCollection): boolean {
   return !!(coll.options || coll.validator);
 }
-
-function formatKeys(keys: ReadonlyArray<MongoIndexKey>): string {
-  return keys.map((k) => `${k.field}:${k.direction}`).join(', ');
-}
-
-const operationClassVisitor: OpFactoryCallVisitor<MigrationOperationClass> = {
-  createIndex() {
-    return 'additive';
-  },
-  createCollection() {
-    return 'additive';
-  },
-  dropIndex() {
-    return 'destructive';
-  },
-  dropCollection() {
-    return 'destructive';
-  },
-  /* v8 ignore next 3 -- planner always provides meta with operationClass */
-  collMod(call) {
-    return call.meta?.operationClass ?? 'destructive';
-  },
-};
-
-/* v8 ignore start -- labelVisitor is only called for policy violations; not all paths exercised */
-const labelVisitor: OpFactoryCallVisitor<string> = {
-  createIndex(call) {
-    return `Create index on ${call.collection} (${formatKeys(call.keys)})`;
-  },
-  dropIndex(call) {
-    return `Drop index on ${call.collection} (${formatKeys(call.keys)})`;
-  },
-  createCollection(call) {
-    return `Create collection ${call.collection}`;
-  },
-  dropCollection(call) {
-    return `Drop collection ${call.collection}`;
-  },
-  collMod(call) {
-    return call.meta?.label ?? `Modify collection ${call.collection}`;
-  },
-};
-/* v8 ignore stop */
 
 export type PlanCallsResult =
   | { readonly kind: 'success'; readonly calls: OpFactoryCall[] }
@@ -246,12 +203,11 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
     ];
 
     for (const call of allCalls) {
-      const opClass = call.accept(operationClassVisitor);
-      if (!options.policy.allowedOperationClasses.includes(opClass)) {
+      if (!options.policy.allowedOperationClasses.includes(call.operationClass)) {
         conflicts.push({
           kind: 'policy-violation',
-          summary: `${opClass} operation disallowed: ${call.accept(labelVisitor)}`,
-          why: `Policy does not allow '${opClass}' operations`,
+          summary: `${call.operationClass} operation disallowed: ${call.label}`,
+          why: `Policy does not allow '${call.operationClass}' operations`,
         });
       }
     }
