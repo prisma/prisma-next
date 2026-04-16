@@ -28,6 +28,8 @@ export interface OpFactoryCallVisitor<R> {
 
 abstract class OpFactoryCallNode {
   abstract readonly factory: string;
+  abstract readonly operationClass: MigrationOperationClass;
+  abstract readonly label: string;
   abstract accept<R>(visitor: OpFactoryCallVisitor<R>): R;
 
   protected freeze(): void {
@@ -35,11 +37,17 @@ abstract class OpFactoryCallNode {
   }
 }
 
+function formatKeys(keys: ReadonlyArray<MongoIndexKey>): string {
+  return keys.map((k) => `${k.field}:${k.direction}`).join(', ');
+}
+
 export class CreateIndexCall extends OpFactoryCallNode {
   readonly factory = 'createIndex' as const;
+  readonly operationClass = 'additive' as const;
   readonly collection: string;
   readonly keys: ReadonlyArray<MongoIndexKey>;
   readonly options: CreateIndexOptions | undefined;
+  readonly label: string;
 
   constructor(
     collection: string,
@@ -50,6 +58,7 @@ export class CreateIndexCall extends OpFactoryCallNode {
     this.collection = collection;
     this.keys = keys;
     this.options = options;
+    this.label = `Create index on ${collection} (${formatKeys(keys)})`;
     this.freeze();
   }
 
@@ -60,13 +69,16 @@ export class CreateIndexCall extends OpFactoryCallNode {
 
 export class DropIndexCall extends OpFactoryCallNode {
   readonly factory = 'dropIndex' as const;
+  readonly operationClass = 'destructive' as const;
   readonly collection: string;
   readonly keys: ReadonlyArray<MongoIndexKey>;
+  readonly label: string;
 
   constructor(collection: string, keys: ReadonlyArray<MongoIndexKey>) {
     super();
     this.collection = collection;
     this.keys = keys;
+    this.label = `Drop index on ${collection} (${formatKeys(keys)})`;
     this.freeze();
   }
 
@@ -77,13 +89,16 @@ export class DropIndexCall extends OpFactoryCallNode {
 
 export class CreateCollectionCall extends OpFactoryCallNode {
   readonly factory = 'createCollection' as const;
+  readonly operationClass = 'additive' as const;
   readonly collection: string;
   readonly options: CreateCollectionOptions | undefined;
+  readonly label: string;
 
   constructor(collection: string, options?: CreateCollectionOptions) {
     super();
     this.collection = collection;
     this.options = options;
+    this.label = `Create collection ${collection}`;
     this.freeze();
   }
 
@@ -94,11 +109,14 @@ export class CreateCollectionCall extends OpFactoryCallNode {
 
 export class DropCollectionCall extends OpFactoryCallNode {
   readonly factory = 'dropCollection' as const;
+  readonly operationClass = 'destructive' as const;
   readonly collection: string;
+  readonly label: string;
 
   constructor(collection: string) {
     super();
     this.collection = collection;
+    this.label = `Drop collection ${collection}`;
     this.freeze();
   }
 
@@ -112,12 +130,16 @@ export class CollModCall extends OpFactoryCallNode {
   readonly collection: string;
   readonly options: CollModOptions;
   readonly meta: CollModMeta | undefined;
+  readonly operationClass: MigrationOperationClass;
+  readonly label: string;
 
   constructor(collection: string, options: CollModOptions, meta?: CollModMeta) {
     super();
     this.collection = collection;
     this.options = options;
     this.meta = meta;
+    this.operationClass = meta?.operationClass ?? 'destructive';
+    this.label = meta?.label ?? `Modify collection ${collection}`;
     this.freeze();
   }
 
