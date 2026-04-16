@@ -109,8 +109,6 @@ export function derivePolymorphicJsonSchema(
       }
     }
 
-    if (Object.keys(variantOnlyFields).length === 0 && variants.length <= 1) continue;
-
     const entry: Record<string, unknown> = {
       properties: {
         [discriminatorField]: { enum: [variant.discriminatorValue] },
@@ -118,7 +116,7 @@ export function derivePolymorphicJsonSchema(
     };
 
     const variantProperties: Record<string, unknown> = {};
-    const variantRequired: string[] = [];
+    const variantRequired: string[] = [discriminatorField];
     for (const [name, field] of Object.entries(variantOnlyFields)) {
       const schema = fieldToBsonSchema(field, valueObjects, codecLookup);
       if (schema) {
@@ -135,9 +133,7 @@ export function derivePolymorphicJsonSchema(
         ...variantProperties,
       };
     }
-    if (variantRequired.length > 0) {
-      entry['required'] = variantRequired.sort();
-    }
+    entry['required'] = variantRequired.sort();
 
     oneOf.push(entry);
   }
