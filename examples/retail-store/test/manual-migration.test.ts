@@ -77,7 +77,7 @@ describe(
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
         const result = await runner.execute({
           plan: {
             targetId: 'mongo',

@@ -62,7 +62,7 @@ describe(
       const serialized = JSON.parse(serializeMongoOps(ops));
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
         const result = await runner.execute({
           plan: {
             targetId: 'mongo',
@@ -298,7 +298,7 @@ describe(
         const serialized2 = JSON.parse(serializeMongoOps(step2));
         const controlDriver2 = await mongoControlDriver.create(replSet.getUri(dbName));
         try {
-          const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+          const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver2));
           const result2 = await runner.execute({
             plan: {
               targetId: 'mongo',
@@ -330,7 +330,7 @@ describe(
         const serialized3 = JSON.parse(serializeMongoOps(step3));
         const controlDriver3 = await mongoControlDriver.create(replSet.getUri(dbName));
         try {
-          const runner = new MongoMigrationRunner(createMongoRunnerDeps);
+          const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver3));
           const result3 = await runner.execute({
             plan: {
               targetId: 'mongo',
