@@ -122,7 +122,9 @@ function validate<T>(schema: { assert: (data: unknown) => T }, data: unknown, co
   try {
     return schema.assert(data);
   } catch (error) {
+    /* v8 ignore start -- assertion libraries always throw Error instances */
     const message = error instanceof Error ? error.message : String(error);
+    /* v8 ignore stop */
     throw new Error(`Invalid ${context}: ${message}`);
   }
 }

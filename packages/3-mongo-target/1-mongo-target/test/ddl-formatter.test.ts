@@ -335,4 +335,52 @@ describe('formatMongoOperations', () => {
     expect(result[0]).toContain('changeStreamPreAndPostImages:');
     expect(result[0]).toContain('"enabled":true');
   });
+
+  it('formats createCollection with max, timeseries, collation, and clusteredIndex', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'additive',
+      precheck: [],
+      execute: [
+        {
+          description: 'create collection',
+          command: new CreateCollectionCommand('events', {
+            capped: true,
+            size: 1048576,
+            max: 5000,
+            timeseries: { timeField: 'ts', metaField: 'meta', granularity: 'seconds' },
+            collation: { locale: 'en', strength: 2 },
+            clusteredIndex: { key: { _id: 1 }, unique: true },
+          }),
+        },
+      ],
+      postcheck: [],
+    };
+    const result = formatMongoOperations([op]);
+    expect(result[0]).toContain('max: 5000');
+    expect(result[0]).toContain('timeseries:');
+    expect(result[0]).toContain('collation:');
+    expect(result[0]).toContain('clusteredIndex:');
+  });
+
+  it('skips execute steps without a command', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'test',
+      label: 'test',
+      operationClass: 'additive',
+      precheck: [],
+      execute: [
+        { description: 'no-op step' } as never,
+        {
+          description: 'create index',
+          command: new CreateIndexCommand('users', [{ field: 'email', direction: 1 }]),
+        },
+      ],
+      postcheck: [],
+    };
+    const result = formatMongoOperations([op]);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain('createIndex');
+  });
 });
