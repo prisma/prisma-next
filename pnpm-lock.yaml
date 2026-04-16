@@ -2334,6 +2334,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/migration
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../2-mongo-family/1-foundation/mongo-contract
