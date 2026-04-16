@@ -99,7 +99,7 @@ function makeDriver() {
 }
 
 function makeRunner() {
-  return new MongoMigrationRunner(createMongoRunnerDeps);
+  return new MongoMigrationRunner(createMongoRunnerDeps(createMongoControlDriver(db, client)));
 }
 
 describe('MongoMigrationRunner', () => {

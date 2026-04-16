@@ -43,10 +43,6 @@ export interface MongoRunnerDependencies {
   readonly markerOps: MarkerOperations;
 }
 
-export type MongoRunnerDependenciesFactory = (
-  driver: ControlDriverInstance<'mongo', 'mongo'>,
-) => MongoRunnerDependencies;
-
 function runnerFailure(
   code: string,
   summary: string,
@@ -60,7 +56,7 @@ function runnerFailure(
 }
 
 export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
-  constructor(private readonly createDeps: MongoRunnerDependenciesFactory) {}
+  constructor(private readonly deps: MongoRunnerDependencies) {}
 
   async execute(options: {
     readonly plan: MigrationPlan;
@@ -74,7 +70,7 @@ export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
     readonly executionChecks?: MigrationRunnerExecutionChecks;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
   }): Promise<MigrationRunnerResult> {
-    const { commandExecutor, inspectionExecutor, markerOps } = this.createDeps(options.driver);
+    const { commandExecutor, inspectionExecutor, markerOps } = this.deps;
     const operations = deserializeMongoOps(options.plan.operations as readonly unknown[]);
 
     const policyCheck = this.enforcePolicyCompatibility(options.policy, operations);
