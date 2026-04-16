@@ -7,7 +7,7 @@ import { enrichContract } from '@prisma-next/cli/control-api';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/emitter';
 import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
-import sql, { assemblePslInterpretationContributions } from '@prisma-next/family-sql/control';
+import sql from '@prisma-next/family-sql/control';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -24,8 +24,33 @@ import { describe, expect, it } from 'vitest';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtureRootDir = join(__dirname, 'side-by-side');
 const shouldUpdateExpected = process.env['UPDATE_SIDE_BY_SIDE_CONTRACTS'] === '1';
-const sourceContext: ContractSourceContext = {
+
+const sqlStack = createControlStack({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+});
+
+const mongoStack = createControlStack({
+  family: mongoFamilyDescriptor,
+  target: mongoTargetDescriptor,
+  adapter: mongoAdapter,
+});
+
+const sqlSourceContext: ContractSourceContext = {
   composedExtensionPacks: [],
+  pslScalarTypeDescriptors: sqlStack.pslScalarTypeDescriptors,
+  authoringContributions: sqlStack.authoringContributions,
+  codecLookup: sqlStack.codecLookup,
+  controlMutationDefaults: sqlStack.controlMutationDefaults,
+};
+
+const mongoSourceContext: ContractSourceContext = {
+  composedExtensionPacks: [],
+  pslScalarTypeDescriptors: mongoStack.pslScalarTypeDescriptors,
+  authoringContributions: mongoStack.authoringContributions,
+  codecLookup: mongoStack.codecLookup,
+  controlMutationDefaults: mongoStack.controlMutationDefaults,
 };
 
 type FixtureName = 'postgres' | 'mongo';
@@ -41,11 +66,6 @@ interface FixtureCase {
 interface LoadedFixture {
   readonly tsContract: Contract;
 }
-
-const sqlPslInterpretationContributions = assemblePslInterpretationContributions([
-  postgres,
-  postgresAdapter,
-]);
 
 const fixtureNames = ['postgres', 'mongo'] as const satisfies readonly FixtureName[];
 
@@ -123,25 +143,15 @@ describe('side-by-side contract examples', () => {
       const fixture = await loadFixture(fixtureCase);
       const provider = prismaContract(fixtureCase.contractPslPath, {
         target: postgres,
-        scalarTypeDescriptors: sqlPslInterpretationContributions.scalarTypeDescriptors,
-        controlMutationDefaults: {
-          defaultFunctionRegistry: sqlPslInterpretationContributions.defaultFunctionRegistry,
-          generatorDescriptors: sqlPslInterpretationContributions.generatorDescriptors,
-        },
       });
 
-      const providerResult = await provider.source(sourceContext);
+      const providerResult = await provider.source(sqlSourceContext);
       expect(providerResult.ok).toBe(true);
       if (!providerResult.ok) {
         throw new Error(providerResult.failure.summary);
       }
 
-      const stack = createControlStack({
-        family: sql,
-        target: postgres,
-        adapter: postgresAdapter,
-      });
-      const familyInstance = sql.create(stack);
+      const familyInstance = sql.create(sqlStack);
       const frameworkComponents = [postgres, postgresAdapter];
 
       const normalizedTs = familyInstance.validateContract(
@@ -153,8 +163,8 @@ describe('side-by-side contract examples', () => {
 
       expect(normalizedTs).toEqual(normalizedPsl);
 
-      const emittedTs = await emit(normalizedTs, stack, sql.emission);
-      const emittedPsl = await emit(normalizedPsl, stack, sql.emission);
+      const emittedTs = await emit(normalizedTs, sqlStack, sql.emission);
+      const emittedPsl = await emit(normalizedPsl, sqlStack, sql.emission);
 
       expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
 
@@ -197,18 +207,13 @@ describe('side-by-side contract examples', () => {
 
       const fixture = await loadFixture(fixtureCase);
       const provider = mongoContract(fixtureCase.contractPslPath);
-      const providerResult = await provider.source(sourceContext);
+      const providerResult = await provider.source(mongoSourceContext);
       expect(providerResult.ok).toBe(true);
       if (!providerResult.ok) {
         throw new Error(providerResult.failure.summary);
       }
 
-      const stack = createControlStack({
-        family: mongoFamilyDescriptor,
-        target: mongoTargetDescriptor,
-        adapter: mongoAdapter,
-      });
-      const familyInstance = mongoFamilyDescriptor.create(stack);
+      const familyInstance = mongoFamilyDescriptor.create(mongoStack);
       const frameworkComponents = [mongoTargetDescriptor, mongoAdapter];
 
       const normalizedTs = familyInstance.validateContract(
@@ -218,9 +223,6 @@ describe('side-by-side contract examples', () => {
         enrichContract(providerResult.value, frameworkComponents),
       );
 
-      // PSL auto-derives validators from model schemas; TS builder doesn't yet.
-      // Compare everything except storage.collections[].validator and storageHash
-      // (which changes because the validator is part of the hashed storage).
       const stripValidatorFields = (contract: typeof normalizedTs) => {
         const storage = contract.storage as unknown as Record<string, unknown>;
         const collections = storage['collections'] as Record<string, Record<string, unknown>>;
@@ -234,11 +236,9 @@ describe('side-by-side contract examples', () => {
       };
       expect(stripValidatorFields(normalizedTs)).toEqual(stripValidatorFields(normalizedPsl));
 
-      const emittedTs = await emit(normalizedTs, stack, mongoFamilyDescriptor.emission);
-      const emittedPsl = await emit(normalizedPsl, stack, mongoFamilyDescriptor.emission);
+      const emittedTs = await emit(normalizedTs, mongoStack, mongoFamilyDescriptor.emission);
+      const emittedPsl = await emit(normalizedPsl, mongoStack, mongoFamilyDescriptor.emission);
 
-      // Emitted JSON differs because PSL adds validators + different storageHash.
-      // Compare structurally without validators and storageHash.
       const stripForComparison = (json: string) => {
         const parsed = JSON.parse(json) as Record<string, unknown>;
         const storage = parsed['storage'] as Record<string, unknown>;

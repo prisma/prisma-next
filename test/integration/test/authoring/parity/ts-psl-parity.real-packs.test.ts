@@ -1,11 +1,9 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import pgvectorControl from '@prisma-next/extension-pgvector/control';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
-import sqlFamilyControl, {
-  assembleAuthoringContributions,
-  assemblePslInterpretationContributions,
-} from '@prisma-next/family-sql/control';
+import sqlFamilyControl from '@prisma-next/family-sql/control';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -18,26 +16,30 @@ const int4Column = {
   nativeType: 'int4',
 } as const;
 
-const REAL_PACK_CONTROLS = [
-  sqlFamilyControl,
-  postgresControl,
-  postgresAdapter,
-  pgvectorControl,
-] as const;
+const stack = createControlStack({
+  family: sqlFamilyControl,
+  target: postgresControl,
+  adapter: postgresAdapter,
+  extensionPacks: [pgvectorControl],
+});
 
-const realPackAuthoringContributions = assembleAuthoringContributions([...REAL_PACK_CONTROLS]);
-const realPackPslInputs = assemblePslInterpretationContributions([...REAL_PACK_CONTROLS]);
+function buildColumnDescriptorMap() {
+  const result = new Map<string, { codecId: string; nativeType: string }>();
+  for (const [typeName, codecId] of stack.pslScalarTypeDescriptors) {
+    const codec = stack.codecLookup.get(codecId);
+    const nativeType = codec?.targetTypes[0] ?? codecId;
+    result.set(typeName, { codecId, nativeType });
+  }
+  return result;
+}
 
 function interpretWithRealPacks(schema: string) {
   return interpretPslDocumentToSqlContract({
     document: parsePslDocument({ schema, sourceId: 'schema.prisma' }),
     target: postgresPack,
-    scalarTypeDescriptors: realPackPslInputs.scalarTypeDescriptors,
-    controlMutationDefaults: {
-      defaultFunctionRegistry: realPackPslInputs.defaultFunctionRegistry,
-      generatorDescriptors: realPackPslInputs.generatorDescriptors,
-    },
-    authoringContributions: realPackAuthoringContributions,
+    scalarTypeDescriptors: buildColumnDescriptorMap(),
+    controlMutationDefaults: stack.controlMutationDefaults,
+    authoringContributions: stack.authoringContributions,
     composedExtensionPacks: [pgvectorControl.id],
     composedExtensionPackRefs: [pgvectorPack],
   });

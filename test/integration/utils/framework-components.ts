@@ -4,7 +4,6 @@ import pgvectorExtension from '@prisma-next/extension-pgvector/control';
 import pgvectorExtensionRuntime from '@prisma-next/extension-pgvector/runtime';
 import type {
   SqlControlAdapterDescriptor,
-  SqlControlDescriptorWithContributions,
   SqlControlExtensionDescriptor,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
@@ -19,23 +18,16 @@ export interface SqlDescriptorBundle {
   readonly target: SqlControlTargetDescriptor<'postgres', unknown>;
   readonly adapter: SqlControlAdapterDescriptor<'postgres'>;
   readonly extensions: ReadonlyArray<SqlControlExtensionDescriptor<'postgres'>>;
-  readonly descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>;
 }
 
 export function getSqlDescriptorBundle(options?: {
   readonly extensions?: ReadonlyArray<SqlControlExtensionDescriptor<'postgres'>>;
 }): SqlDescriptorBundle {
   const extensions = options?.extensions ?? [];
-  const descriptors: SqlControlDescriptorWithContributions[] = [
-    targetDescriptor,
-    adapterDescriptor,
-    ...extensions,
-  ];
   return {
     target: targetDescriptor,
     adapter: adapterDescriptor,
     extensions,
-    descriptors,
   };
 }
 
