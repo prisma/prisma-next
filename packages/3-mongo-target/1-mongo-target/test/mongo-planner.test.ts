@@ -17,7 +17,7 @@ import {
 } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
 import { MongoMigrationPlanner } from '../src/core/mongo-planner';
-import type { OpFactoryCall } from '../src/core/op-factory-call';
+import { CollModCall, CreateIndexCall } from '../src/core/op-factory-call';
 
 const ALL_CLASSES_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
@@ -1061,8 +1061,8 @@ describe('MongoMigrationPlanner', () => {
       const calls = planCallsSuccess(planner, contract, emptyIR());
 
       expect(calls).toHaveLength(1);
-      expect(calls[0]!.factory).toBe('createIndex');
-      const call = calls[0] as OpFactoryCall & { factory: 'createIndex' };
+      expect(calls[0]).toBeInstanceOf(CreateIndexCall);
+      const call = calls[0] as CreateIndexCall;
       expect(call.collection).toBe('users');
       expect(call.keys).toEqual([{ field: 'email', direction: 1 }]);
     });
@@ -1142,8 +1142,8 @@ describe('MongoMigrationPlanner', () => {
       const calls = planCallsSuccess(planner, contract, origin);
 
       expect(calls).toHaveLength(1);
-      expect(calls[0]!.factory).toBe('collMod');
-      const call = calls[0] as OpFactoryCall & { factory: 'collMod' };
+      expect(calls[0]).toBeInstanceOf(CollModCall);
+      const call = calls[0] as CollModCall;
       expect(call.meta?.id).toBe('validator.users.update');
       expect(call.meta?.label).toBe('Update validator on users');
       expect(call.meta?.operationClass).toBe('destructive');
@@ -1174,7 +1174,7 @@ describe('MongoMigrationPlanner', () => {
       const calls = planCallsSuccess(planner, contract, origin);
 
       expect(calls).toHaveLength(1);
-      const call = calls[0] as OpFactoryCall & { factory: 'collMod' };
+      const call = calls[0] as CollModCall;
       expect(call.meta?.operationClass).toBe('widening');
     });
 
@@ -1190,7 +1190,7 @@ describe('MongoMigrationPlanner', () => {
 
       const calls = planCallsSuccess(planner, contract, origin);
 
-      const collModCalls = calls.filter((c) => c.factory === 'collMod');
+      const collModCalls = calls.filter((c): c is CollModCall => c instanceof CollModCall);
       expect(collModCalls).toHaveLength(1);
       expect(collModCalls[0]!.meta?.id).toBe('options.events.update');
     });

@@ -18,30 +18,120 @@ export interface CollModMeta {
   readonly operationClass?: MigrationOperationClass;
 }
 
+export interface OpFactoryCallVisitor<R> {
+  createIndex(call: CreateIndexCall): R;
+  dropIndex(call: DropIndexCall): R;
+  createCollection(call: CreateCollectionCall): R;
+  dropCollection(call: DropCollectionCall): R;
+  collMod(call: CollModCall): R;
+}
+
+abstract class OpFactoryCallNode {
+  abstract readonly factory: string;
+  abstract accept<R>(visitor: OpFactoryCallVisitor<R>): R;
+
+  protected freeze(): void {
+    Object.freeze(this);
+  }
+}
+
+export class CreateIndexCall extends OpFactoryCallNode {
+  readonly factory = 'createIndex' as const;
+  readonly collection: string;
+  readonly keys: ReadonlyArray<MongoIndexKey>;
+  readonly options: CreateIndexOptions | undefined;
+
+  constructor(
+    collection: string,
+    keys: ReadonlyArray<MongoIndexKey>,
+    options?: CreateIndexOptions,
+  ) {
+    super();
+    this.collection = collection;
+    this.keys = keys;
+    this.options = options;
+    this.freeze();
+  }
+
+  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
+    return visitor.createIndex(this);
+  }
+}
+
+export class DropIndexCall extends OpFactoryCallNode {
+  readonly factory = 'dropIndex' as const;
+  readonly collection: string;
+  readonly keys: ReadonlyArray<MongoIndexKey>;
+
+  constructor(collection: string, keys: ReadonlyArray<MongoIndexKey>) {
+    super();
+    this.collection = collection;
+    this.keys = keys;
+    this.freeze();
+  }
+
+  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
+    return visitor.dropIndex(this);
+  }
+}
+
+export class CreateCollectionCall extends OpFactoryCallNode {
+  readonly factory = 'createCollection' as const;
+  readonly collection: string;
+  readonly options: CreateCollectionOptions | undefined;
+
+  constructor(collection: string, options?: CreateCollectionOptions) {
+    super();
+    this.collection = collection;
+    this.options = options;
+    this.freeze();
+  }
+
+  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
+    return visitor.createCollection(this);
+  }
+}
+
+export class DropCollectionCall extends OpFactoryCallNode {
+  readonly factory = 'dropCollection' as const;
+  readonly collection: string;
+
+  constructor(collection: string) {
+    super();
+    this.collection = collection;
+    this.freeze();
+  }
+
+  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
+    return visitor.dropCollection(this);
+  }
+}
+
+export class CollModCall extends OpFactoryCallNode {
+  readonly factory = 'collMod' as const;
+  readonly collection: string;
+  readonly options: CollModOptions;
+  readonly meta: CollModMeta | undefined;
+
+  constructor(collection: string, options: CollModOptions, meta?: CollModMeta) {
+    super();
+    this.collection = collection;
+    this.options = options;
+    this.meta = meta;
+    this.freeze();
+  }
+
+  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
+    return visitor.collMod(this);
+  }
+}
+
 export type OpFactoryCall =
-  | {
-      readonly factory: 'createIndex';
-      readonly collection: string;
-      readonly keys: ReadonlyArray<MongoIndexKey>;
-      readonly options?: CreateIndexOptions;
-    }
-  | {
-      readonly factory: 'dropIndex';
-      readonly collection: string;
-      readonly keys: ReadonlyArray<MongoIndexKey>;
-    }
-  | {
-      readonly factory: 'createCollection';
-      readonly collection: string;
-      readonly options?: CreateCollectionOptions;
-    }
-  | { readonly factory: 'dropCollection'; readonly collection: string }
-  | {
-      readonly factory: 'collMod';
-      readonly collection: string;
-      readonly options: CollModOptions;
-      readonly meta?: CollModMeta;
-    };
+  | CreateIndexCall
+  | DropIndexCall
+  | CreateCollectionCall
+  | DropCollectionCall
+  | CollModCall;
 
 export function schemaIndexToCreateIndexOptions(index: MongoSchemaIndex): CreateIndexOptions {
   return {

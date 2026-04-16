@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { OpFactoryCall } from '../src/core/op-factory-call';
+import {
+  CollModCall,
+  CreateCollectionCall,
+  CreateIndexCall,
+  DropCollectionCall,
+  DropIndexCall,
+} from '../src/core/op-factory-call';
 import { renderTypeScript } from '../src/core/render-typescript';
 
 describe('renderTypeScript', () => {
   it('generates valid TypeScript with correct imports', () => {
-    const calls: OpFactoryCall[] = [
-      {
-        factory: 'createIndex',
-        collection: 'users',
-        keys: [{ field: 'email', direction: 1 }],
-        options: { unique: true },
-      },
+    const calls = [
+      new CreateIndexCall('users', [{ field: 'email', direction: 1 }], { unique: true }),
     ];
 
     const output = renderTypeScript(calls);
@@ -24,9 +25,9 @@ describe('renderTypeScript', () => {
   });
 
   it('only imports used factory functions', () => {
-    const calls: OpFactoryCall[] = [
-      { factory: 'createIndex', collection: 'users', keys: [{ field: 'email', direction: 1 }] },
-      { factory: 'dropCollection', collection: 'legacy' },
+    const calls = [
+      new CreateIndexCall('users', [{ field: 'email', direction: 1 }]),
+      new DropCollectionCall('legacy'),
     ];
 
     const output = renderTypeScript(calls);
@@ -39,7 +40,7 @@ describe('renderTypeScript', () => {
   });
 
   it('includes describe() method when meta is provided', () => {
-    const calls: OpFactoryCall[] = [{ factory: 'dropCollection', collection: 'users' }];
+    const calls = [new DropCollectionCall('users')];
 
     const output = renderTypeScript(calls, {
       from: 'sha256:abc',
@@ -54,7 +55,7 @@ describe('renderTypeScript', () => {
   });
 
   it('omits describe() method when meta is undefined', () => {
-    const calls: OpFactoryCall[] = [{ factory: 'dropCollection', collection: 'users' }];
+    const calls = [new DropCollectionCall('users')];
 
     const output = renderTypeScript(calls);
 
@@ -62,13 +63,11 @@ describe('renderTypeScript', () => {
   });
 
   it('renders createIndex with options', () => {
-    const calls: OpFactoryCall[] = [
-      {
-        factory: 'createIndex',
-        collection: 'users',
-        keys: [{ field: 'email', direction: 1 }],
-        options: { unique: true, sparse: true },
-      },
+    const calls = [
+      new CreateIndexCall('users', [{ field: 'email', direction: 1 }], {
+        unique: true,
+        sparse: true,
+      }),
     ];
 
     const output = renderTypeScript(calls);
@@ -79,13 +78,7 @@ describe('renderTypeScript', () => {
   });
 
   it('renders createIndex without options when absent', () => {
-    const calls: OpFactoryCall[] = [
-      {
-        factory: 'createIndex',
-        collection: 'users',
-        keys: [{ field: 'email', direction: 1 }],
-      },
-    ];
+    const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
 
     const output = renderTypeScript(calls);
 
@@ -93,13 +86,7 @@ describe('renderTypeScript', () => {
   });
 
   it('renders dropIndex', () => {
-    const calls: OpFactoryCall[] = [
-      {
-        factory: 'dropIndex',
-        collection: 'users',
-        keys: [{ field: 'email', direction: 1 }],
-      },
-    ];
+    const calls = [new DropIndexCall('users', [{ field: 'email', direction: 1 }])];
 
     const output = renderTypeScript(calls);
 
@@ -107,7 +94,7 @@ describe('renderTypeScript', () => {
   });
 
   it('renders createCollection without options', () => {
-    const calls: OpFactoryCall[] = [{ factory: 'createCollection', collection: 'users' }];
+    const calls = [new CreateCollectionCall('users')];
 
     const output = renderTypeScript(calls);
 
@@ -115,15 +102,11 @@ describe('renderTypeScript', () => {
   });
 
   it('renders createCollection with options', () => {
-    const calls: OpFactoryCall[] = [
-      {
-        factory: 'createCollection',
-        collection: 'users',
-        options: {
-          validator: { $jsonSchema: { required: ['email'] } },
-          validationLevel: 'strict',
-        },
-      },
+    const calls = [
+      new CreateCollectionCall('users', {
+        validator: { $jsonSchema: { required: ['email'] } },
+        validationLevel: 'strict',
+      }),
     ];
 
     const output = renderTypeScript(calls);
@@ -134,7 +117,7 @@ describe('renderTypeScript', () => {
   });
 
   it('renders dropCollection', () => {
-    const calls: OpFactoryCall[] = [{ factory: 'dropCollection', collection: 'users' }];
+    const calls = [new DropCollectionCall('users')];
 
     const output = renderTypeScript(calls);
 
@@ -142,16 +125,12 @@ describe('renderTypeScript', () => {
   });
 
   it('renders collMod without meta', () => {
-    const calls: OpFactoryCall[] = [
-      {
-        factory: 'collMod',
-        collection: 'users',
-        options: {
-          validator: { $jsonSchema: { required: ['email'] } },
-          validationLevel: 'strict',
-          validationAction: 'error',
-        },
-      },
+    const calls = [
+      new CollModCall('users', {
+        validator: { $jsonSchema: { required: ['email'] } },
+        validationLevel: 'strict',
+        validationAction: 'error',
+      }),
     ];
 
     const output = renderTypeScript(calls);
@@ -161,19 +140,18 @@ describe('renderTypeScript', () => {
   });
 
   it('renders collMod with meta', () => {
-    const calls: OpFactoryCall[] = [
-      {
-        factory: 'collMod',
-        collection: 'users',
-        options: {
+    const calls = [
+      new CollModCall(
+        'users',
+        {
           validator: { $jsonSchema: { required: ['email'] } },
         },
-        meta: {
+        {
           id: 'validator.users.add',
           label: 'Add validator on users',
           operationClass: 'destructive',
         },
-      },
+      ),
     ];
 
     const output = renderTypeScript(calls);
@@ -185,30 +163,17 @@ describe('renderTypeScript', () => {
   });
 
   it('renders multiple calls', () => {
-    const calls: OpFactoryCall[] = [
-      {
-        factory: 'createCollection',
-        collection: 'users',
-        options: {
-          validator: { $jsonSchema: { required: ['email'] } },
-          validationLevel: 'strict',
-          validationAction: 'error',
-        },
-      },
-      {
-        factory: 'createIndex',
-        collection: 'users',
-        keys: [{ field: 'email', direction: 1 }],
-        options: { unique: true },
-      },
-      {
-        factory: 'createIndex',
-        collection: 'users',
-        keys: [
-          { field: 'name', direction: 1 },
-          { field: 'age', direction: -1 },
-        ],
-      },
+    const calls = [
+      new CreateCollectionCall('users', {
+        validator: { $jsonSchema: { required: ['email'] } },
+        validationLevel: 'strict',
+        validationAction: 'error',
+      }),
+      new CreateIndexCall('users', [{ field: 'email', direction: 1 }], { unique: true }),
+      new CreateIndexCall('users', [
+        { field: 'name', direction: 1 },
+        { field: 'age', direction: -1 },
+      ]),
     ];
 
     const output = renderTypeScript(calls);
@@ -223,7 +188,7 @@ describe('renderTypeScript', () => {
   });
 
   it('includes kind in describe when specified', () => {
-    const calls: OpFactoryCall[] = [{ factory: 'dropCollection', collection: 'users' }];
+    const calls = [new DropCollectionCall('users')];
 
     const output = renderTypeScript(calls, {
       from: 'sha256:abc',

@@ -15,7 +15,13 @@ import {
   dropIndex,
 } from '../src/core/migration-factories';
 import { MongoMigrationPlanner } from '../src/core/mongo-planner';
-import type { OpFactoryCall } from '../src/core/op-factory-call';
+import {
+  CollModCall,
+  CreateCollectionCall,
+  CreateIndexCall,
+  DropCollectionCall,
+  DropIndexCall,
+} from '../src/core/op-factory-call';
 import { renderOps } from '../src/core/render-ops';
 
 const ALL_CLASSES_POLICY: MigrationOperationPolicy = {
@@ -47,12 +53,7 @@ describe('renderOps', () => {
   describe('individual call rendering', () => {
     it('renders createIndex call', () => {
       const keys = [{ field: 'email', direction: 1 as const }];
-      const call: OpFactoryCall = {
-        factory: 'createIndex',
-        collection: 'users',
-        keys,
-        options: { unique: true },
-      };
+      const call = new CreateIndexCall('users', keys, { unique: true });
 
       const ops = renderOps([call]);
 
@@ -62,11 +63,7 @@ describe('renderOps', () => {
 
     it('renders dropIndex call', () => {
       const keys = [{ field: 'email', direction: 1 as const }];
-      const call: OpFactoryCall = {
-        factory: 'dropIndex',
-        collection: 'users',
-        keys,
-      };
+      const call = new DropIndexCall('users', keys);
 
       const ops = renderOps([call]);
 
@@ -75,14 +72,10 @@ describe('renderOps', () => {
     });
 
     it('renders createCollection call', () => {
-      const call: OpFactoryCall = {
-        factory: 'createCollection',
-        collection: 'users',
-        options: {
-          validator: { $jsonSchema: { required: ['email'] } },
-          validationLevel: 'strict',
-        },
-      };
+      const call = new CreateCollectionCall('users', {
+        validator: { $jsonSchema: { required: ['email'] } },
+        validationLevel: 'strict',
+      });
 
       const ops = renderOps([call]);
 
@@ -96,7 +89,7 @@ describe('renderOps', () => {
     });
 
     it('renders dropCollection call', () => {
-      const call: OpFactoryCall = { factory: 'dropCollection', collection: 'users' };
+      const call = new DropCollectionCall('users');
 
       const ops = renderOps([call]);
 
@@ -105,20 +98,19 @@ describe('renderOps', () => {
     });
 
     it('renders collMod call with meta', () => {
-      const call: OpFactoryCall = {
-        factory: 'collMod',
-        collection: 'users',
-        options: {
+      const call = new CollModCall(
+        'users',
+        {
           validator: { $jsonSchema: { required: ['email'] } },
           validationLevel: 'strict',
           validationAction: 'error',
         },
-        meta: {
+        {
           id: 'validator.users.add',
           label: 'Add validator on users',
           operationClass: 'destructive',
         },
-      };
+      );
 
       const ops = renderOps([call]);
 

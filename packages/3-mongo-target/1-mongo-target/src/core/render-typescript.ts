@@ -1,5 +1,13 @@
 import type { MigrationMeta } from '@prisma-next/migration-tools/migration';
-import type { OpFactoryCall } from './op-factory-call';
+import type {
+  CollModCall,
+  CreateCollectionCall,
+  CreateIndexCall,
+  DropCollectionCall,
+  DropIndexCall,
+  OpFactoryCall,
+  OpFactoryCallVisitor,
+} from './op-factory-call';
 
 export function renderTypeScript(
   calls: ReadonlyArray<OpFactoryCall>,
@@ -7,7 +15,7 @@ export function renderTypeScript(
 ): string {
   const factoryNames = collectFactoryNames(calls);
   const imports = buildImports(factoryNames);
-  const planBody = calls.map((c) => renderCall(c)).join(',\n');
+  const planBody = calls.map((c) => c.accept(renderCallVisitor)).join(',\n');
   const describeMethod = meta ? buildDescribeMethod(meta) : '';
 
   return [
@@ -62,26 +70,29 @@ function buildDescribeMethod(meta: MigrationMeta): string {
   return lines.join('\n');
 }
 
-function renderCall(call: OpFactoryCall): string {
-  switch (call.factory) {
-    case 'createIndex':
-      return call.options
-        ? `createIndex(${renderLiteral(call.collection)}, ${renderLiteral(call.keys)}, ${renderLiteral(call.options)})`
-        : `createIndex(${renderLiteral(call.collection)}, ${renderLiteral(call.keys)})`;
-    case 'dropIndex':
-      return `dropIndex(${renderLiteral(call.collection)}, ${renderLiteral(call.keys)})`;
-    case 'createCollection':
-      return call.options
-        ? `createCollection(${renderLiteral(call.collection)}, ${renderLiteral(call.options)})`
-        : `createCollection(${renderLiteral(call.collection)})`;
-    case 'dropCollection':
-      return `dropCollection(${renderLiteral(call.collection)})`;
-    case 'collMod':
-      return call.meta
-        ? `collMod(${renderLiteral(call.collection)}, ${renderLiteral(call.options)}, ${renderLiteral(call.meta)})`
-        : `collMod(${renderLiteral(call.collection)}, ${renderLiteral(call.options)})`;
-  }
-}
+const renderCallVisitor: OpFactoryCallVisitor<string> = {
+  createIndex(call: CreateIndexCall) {
+    return call.options
+      ? `createIndex(${renderLiteral(call.collection)}, ${renderLiteral(call.keys)}, ${renderLiteral(call.options)})`
+      : `createIndex(${renderLiteral(call.collection)}, ${renderLiteral(call.keys)})`;
+  },
+  dropIndex(call: DropIndexCall) {
+    return `dropIndex(${renderLiteral(call.collection)}, ${renderLiteral(call.keys)})`;
+  },
+  createCollection(call: CreateCollectionCall) {
+    return call.options
+      ? `createCollection(${renderLiteral(call.collection)}, ${renderLiteral(call.options)})`
+      : `createCollection(${renderLiteral(call.collection)})`;
+  },
+  dropCollection(call: DropCollectionCall) {
+    return `dropCollection(${renderLiteral(call.collection)})`;
+  },
+  collMod(call: CollModCall) {
+    return call.meta
+      ? `collMod(${renderLiteral(call.collection)}, ${renderLiteral(call.options)}, ${renderLiteral(call.meta)})`
+      : `collMod(${renderLiteral(call.collection)}, ${renderLiteral(call.options)})`;
+  },
+};
 
 function renderLiteral(value: unknown): string {
   if (value === undefined) return 'undefined';

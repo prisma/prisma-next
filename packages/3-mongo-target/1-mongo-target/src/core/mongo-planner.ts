@@ -15,8 +15,13 @@ import type {
 } from '@prisma-next/mongo-schema-ir';
 import { canonicalize, deepEqual } from '@prisma-next/mongo-schema-ir';
 import { contractToMongoSchemaIR } from './contract-to-schema';
-import type { OpFactoryCall } from './op-factory-call';
+import type { OpFactoryCall, OpFactoryCallVisitor } from './op-factory-call';
 import {
+  CollModCall,
+  CreateCollectionCall,
+  CreateIndexCall,
+  DropCollectionCall,
+  DropIndexCall,
   schemaCollectionToCreateCollectionOptions,
   schemaIndexToCreateIndexOptions,
 } from './op-factory-call';
@@ -90,22 +95,45 @@ function collectionHasOptions(coll: MongoSchemaCollection): boolean {
   return !!(coll.options || coll.validator);
 }
 
-function operationClassForFactory(call: OpFactoryCall): MigrationOperationClass {
-  switch (call.factory) {
-    case 'createIndex':
-    case 'createCollection':
-      return 'additive';
-    case 'dropIndex':
-    case 'dropCollection':
-      return 'destructive';
-    case 'collMod':
-      return call.meta?.operationClass ?? 'destructive';
-  }
-}
-
 function formatKeys(keys: ReadonlyArray<MongoIndexKey>): string {
   return keys.map((k) => `${k.field}:${k.direction}`).join(', ');
 }
+
+const operationClassVisitor: OpFactoryCallVisitor<MigrationOperationClass> = {
+  createIndex() {
+    return 'additive';
+  },
+  createCollection() {
+    return 'additive';
+  },
+  dropIndex() {
+    return 'destructive';
+  },
+  dropCollection() {
+    return 'destructive';
+  },
+  collMod(call) {
+    return call.meta?.operationClass ?? 'destructive';
+  },
+};
+
+const labelVisitor: OpFactoryCallVisitor<string> = {
+  createIndex(call) {
+    return `Create index on ${call.collection} (${formatKeys(call.keys)})`;
+  },
+  dropIndex(call) {
+    return `Drop index on ${call.collection} (${formatKeys(call.keys)})`;
+  },
+  createCollection(call) {
+    return `Create collection ${call.collection}`;
+  },
+  dropCollection(call) {
+    return `Drop collection ${call.collection}`;
+  },
+  collMod(call) {
+    return call.meta?.label ?? `Modify collection ${call.collection}`;
+  },
+};
 
 export type PlanCallsResult =
   | { readonly kind: 'success'; readonly calls: OpFactoryCall[] }
@@ -142,14 +170,10 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
       if (!originColl && destColl) {
         if (collectionHasOptions(destColl)) {
           const opts = schemaCollectionToCreateCollectionOptions(destColl);
-          collCreates.push({
-            factory: 'createCollection',
-            collection: collName,
-            options: opts,
-          });
+          collCreates.push(new CreateCollectionCall(collName, opts));
         }
       } else if (originColl && !destColl) {
-        collDrops.push({ factory: 'dropCollection', collection: collName });
+        collDrops.push(new DropCollectionCall(collName));
       } else if (originColl && destColl) {
         const immutableChange = hasImmutableOptionChange(originColl.options, destColl.options);
         if (immutableChange) {
@@ -191,22 +215,15 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
 
       for (const [lookupKey, idx] of originLookup) {
         if (!destLookup.has(lookupKey)) {
-          drops.push({
-            factory: 'dropIndex',
-            collection: collName,
-            keys: idx.keys,
-          });
+          drops.push(new DropIndexCall(collName, idx.keys));
         }
       }
 
       for (const [lookupKey, idx] of destLookup) {
         if (!originLookup.has(lookupKey)) {
-          creates.push({
-            factory: 'createIndex',
-            collection: collName,
-            keys: idx.keys,
-            options: schemaIndexToCreateIndexOptions(idx),
-          });
+          creates.push(
+            new CreateIndexCall(collName, idx.keys, schemaIndexToCreateIndexOptions(idx)),
+          );
         }
       }
     }
@@ -225,11 +242,11 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
     ];
 
     for (const call of allCalls) {
-      const opClass = operationClassForFactory(call);
+      const opClass = call.accept(operationClassVisitor);
       if (!options.policy.allowedOperationClasses.includes(opClass)) {
         conflicts.push({
           kind: 'policy-violation',
-          summary: `${opClass} operation disallowed: ${labelForCall(call)}`,
+          summary: `${opClass} operation disallowed: ${call.accept(labelVisitor)}`,
           why: `Policy does not allow '${opClass}' operations`,
         });
       }
@@ -264,21 +281,6 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
   }
 }
 
-function labelForCall(call: OpFactoryCall): string {
-  switch (call.factory) {
-    case 'createIndex':
-      return `Create index on ${call.collection} (${formatKeys(call.keys)})`;
-    case 'dropIndex':
-      return `Drop index on ${call.collection} (${formatKeys(call.keys)})`;
-    case 'createCollection':
-      return `Create collection ${call.collection}`;
-    case 'dropCollection':
-      return `Drop collection ${call.collection}`;
-    case 'collMod':
-      return call.meta?.label ?? `Modify collection ${call.collection}`;
-  }
-}
-
 function planValidatorDiffCall(
   collName: string,
   originValidator: MongoSchemaValidator | undefined,
@@ -290,36 +292,34 @@ function planValidatorDiffCall(
     const operationClass: MigrationOperationClass = originValidator
       ? classifyValidatorUpdate(originValidator, destValidator)
       : 'destructive';
-    return {
-      factory: 'collMod',
-      collection: collName,
-      options: {
+    return new CollModCall(
+      collName,
+      {
         validator: { $jsonSchema: destValidator.jsonSchema },
         validationLevel: destValidator.validationLevel,
         validationAction: destValidator.validationAction,
       },
-      meta: {
+      {
         id: `validator.${collName}.${originValidator ? 'update' : 'add'}`,
         label: `${originValidator ? 'Update' : 'Add'} validator on ${collName}`,
         operationClass,
       },
-    };
+    );
   }
 
-  return {
-    factory: 'collMod',
-    collection: collName,
-    options: {
+  return new CollModCall(
+    collName,
+    {
       validator: {},
       validationLevel: 'strict',
       validationAction: 'error',
     },
-    meta: {
+    {
       id: `validator.${collName}.remove`,
       label: `Remove validator on ${collName}`,
       operationClass: 'widening',
     },
-  };
+  );
 }
 
 function planMutableOptionsDiffCall(
@@ -331,16 +331,15 @@ function planMutableOptionsDiffCall(
   const destCSPPI = dest?.changeStreamPreAndPostImages;
   if (deepEqual(originCSPPI, destCSPPI)) return undefined;
 
-  return {
-    factory: 'collMod',
-    collection: collName,
-    options: {
+  return new CollModCall(
+    collName,
+    {
       changeStreamPreAndPostImages: destCSPPI,
     },
-    meta: {
+    {
       id: `options.${collName}.update`,
       label: `Update mutable options on ${collName}`,
       operationClass: destCSPPI?.enabled ? 'widening' : 'destructive',
     },
-  };
+  );
 }

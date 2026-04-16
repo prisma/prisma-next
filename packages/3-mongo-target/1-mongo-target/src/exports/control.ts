@@ -15,8 +15,13 @@ export type {
   MongoRunnerDependenciesFactory,
 } from '../core/mongo-runner';
 export { MongoMigrationRunner } from '../core/mongo-runner';
-export type { CollModMeta, OpFactoryCall } from '../core/op-factory-call';
+export type { CollModMeta, OpFactoryCall, OpFactoryCallVisitor } from '../core/op-factory-call';
 export {
+  CollModCall,
+  CreateCollectionCall,
+  CreateIndexCall,
+  DropCollectionCall,
+  DropIndexCall,
   schemaCollectionToCreateCollectionOptions,
   schemaIndexToCreateIndexOptions,
 } from '../core/op-factory-call';
