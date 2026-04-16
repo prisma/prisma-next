@@ -22,12 +22,7 @@ function buildColumnDescriptorMap(
   const result = new Map<string, ColumnDescriptor>();
   for (const [typeName, codecId] of scalarTypeDescriptors) {
     const codec = codecLookup.get(codecId);
-    if (!codec) {
-      throw new Error(
-        `Codec "${codecId}" for PSL type "${typeName}" not found in codecLookup. ` +
-          'Ensure the control stack includes a component that registers this codec.',
-      );
-    }
+    if (!codec) continue;
     result.set(typeName, { codecId, nativeType: codec.targetTypes[0] });
   }
   return result;

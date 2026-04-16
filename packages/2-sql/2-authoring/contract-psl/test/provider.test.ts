@@ -474,21 +474,34 @@ model Document {
   });
 
   describe('given a broken codec configuration', () => {
-    it('throws when a scalar type descriptor references an unresolvable codec', async () => {
+    it('returns diagnostics when a field uses a type with no codec', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
       const schemaPath = join(tempDir, 'schema.prisma');
-      await writeFile(schemaPath, 'model User {\n  id Int @id\n}\n', 'utf-8');
+      await writeFile(schemaPath, 'model User {\n  id Int @id\n  data Bytes\n}\n', 'utf-8');
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', baseOptions);
       const brokenContext = createPostgresTestContext({
-        pslScalarTypeDescriptors: new Map([['Int', 'bogus/missing@1']]),
-        codecLookup: { get: () => undefined },
+        pslScalarTypeDescriptors: new Map([
+          ['Int', 'pg/int4@1'],
+          ['Bytes', 'bogus/missing@1'],
+        ]),
+        codecLookup: {
+          get: (id: string) =>
+            id === 'pg/int4@1' ? createPostgresTestContext().codecLookup.get(id) : undefined,
+        },
       });
 
-      await expect(contract.source(brokenContext)).rejects.toThrow(
-        /Codec "bogus\/missing@1" for PSL type "Int" not found/,
+      const result = await contract.source(brokenContext);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+          }),
+        ]),
       );
     });
   });
