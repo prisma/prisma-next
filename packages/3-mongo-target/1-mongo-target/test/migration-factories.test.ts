@@ -13,6 +13,7 @@ import {
   MongoFieldFilter,
   type MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
+import { MongoSchemaCollection, MongoSchemaCollectionOptions } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
 import {
   collMod,
@@ -23,6 +24,7 @@ import {
   setValidation,
   validatedCollection,
 } from '../src/core/migration-factories';
+import { schemaCollectionToCreateCollectionOptions } from '../src/core/op-factory-call';
 
 describe('createIndex', () => {
   const keys = [{ field: 'email', direction: 1 as const }];
@@ -552,5 +554,43 @@ describe('serialization round-trip', () => {
     };
 
     expect(JSON.stringify(factoryOp)).toBe(JSON.stringify(plannerOp));
+  });
+});
+
+describe('schemaCollectionToCreateCollectionOptions', () => {
+  it('returns undefined for collection with no options and no validator', () => {
+    const coll = new MongoSchemaCollection({ name: 'bare' });
+    expect(schemaCollectionToCreateCollectionOptions(coll)).toBeUndefined();
+  });
+
+  it('maps clusteredIndex option with name', () => {
+    const coll = new MongoSchemaCollection({
+      name: 'clustered',
+      options: new MongoSchemaCollectionOptions({
+        clusteredIndex: { name: 'my_cluster' },
+      }),
+    });
+    const result = schemaCollectionToCreateCollectionOptions(coll);
+    expect(result).toBeDefined();
+    expect(result!.clusteredIndex).toEqual({
+      key: { _id: 1 },
+      unique: true,
+      name: 'my_cluster',
+    });
+  });
+
+  it('maps clusteredIndex without explicit name', () => {
+    const coll = new MongoSchemaCollection({
+      name: 'clustered',
+      options: new MongoSchemaCollectionOptions({
+        clusteredIndex: {},
+      }),
+    });
+    const result = schemaCollectionToCreateCollectionOptions(coll);
+    expect(result).toBeDefined();
+    expect(result!.clusteredIndex).toEqual({
+      key: { _id: 1 },
+      unique: true,
+    });
   });
 });

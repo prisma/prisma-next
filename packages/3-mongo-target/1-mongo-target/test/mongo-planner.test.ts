@@ -127,6 +127,15 @@ describe('MongoMigrationPlanner', () => {
       expect(plan.operations).toHaveLength(0);
     });
 
+    it('includes sparse flag in index lookup key', () => {
+      const contract = makeContract({
+        users: { indexes: [{ keys: [{ field: 'email', direction: 1 }], sparse: true }] },
+      });
+      const origin = irWithCollection('users', [ascIndex('email', { sparse: true })]);
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(0);
+    });
+
     it('treats indexes with same keys but different options as different', () => {
       const contract = makeContract({
         users: { indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }] },
@@ -940,6 +949,81 @@ describe('MongoMigrationPlanner', () => {
       expect(result.kind).toBe('failure');
       if (result.kind !== 'failure') throw new Error('Expected failure');
       expect(result.conflicts.some((c) => c.summary.includes('immutable'))).toBe(true);
+    });
+
+    it('reports conflict when clusteredIndex changes', () => {
+      const contract = makeContract({
+        events: {
+          options: { clusteredIndex: { name: 'newName' } },
+        },
+      });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'events',
+          options: new MongoSchemaCollectionOptions({
+            clusteredIndex: {},
+          }),
+        }),
+      ]);
+      const result = planner.plan({
+        contract,
+        schema: origin,
+        policy: ALL_CLASSES_POLICY,
+        frameworkComponents: [],
+      });
+      expect(result.kind).toBe('failure');
+      if (result.kind !== 'failure') throw new Error('Expected failure');
+      expect(result.conflicts.some((c) => c.summary.includes('clusteredIndex'))).toBe(true);
+    });
+
+    it('reports conflict when timeseries changes', () => {
+      const contract = makeContract({
+        events: {
+          options: {
+            timeseries: { timeField: 'ts', metaField: 'newMeta', granularity: 'seconds' },
+          },
+        },
+      });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'events',
+          options: new MongoSchemaCollectionOptions({
+            timeseries: { timeField: 'ts', metaField: 'meta', granularity: 'seconds' },
+          }),
+        }),
+      ]);
+      const result = planner.plan({
+        contract,
+        schema: origin,
+        policy: ALL_CLASSES_POLICY,
+        frameworkComponents: [],
+      });
+      expect(result.kind).toBe('failure');
+      if (result.kind !== 'failure') throw new Error('Expected failure');
+      expect(result.conflicts.some((c) => c.summary.includes('timeseries'))).toBe(true);
+    });
+
+    it('reports policy violations with createCollection and createIndex labels', () => {
+      const contract = makeContract({
+        newColl: {
+          options: { capped: { size: 1024 } },
+          indexes: [{ keys: [{ field: 'ts', direction: 1 }] }],
+        },
+      });
+      const result = planner.plan({
+        contract,
+        schema: emptyIR(),
+        policy: { allowedOperationClasses: [] },
+        frameworkComponents: [],
+      });
+      expect(result.kind).toBe('failure');
+      if (result.kind !== 'failure') throw new Error('Expected failure');
+      expect(result.conflicts.some((c) => c.summary.includes('Create collection newColl'))).toBe(
+        true,
+      );
+      expect(result.conflicts.some((c) => c.summary.includes('Create index on newColl'))).toBe(
+        true,
+      );
     });
 
     it('treats reordered collation keys as equivalent (no conflict)', () => {

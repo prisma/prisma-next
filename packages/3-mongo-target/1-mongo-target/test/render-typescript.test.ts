@@ -1,3 +1,4 @@
+import type { CollModOptions } from '@prisma-next/mongo-query-ast/control';
 import { describe, expect, it } from 'vitest';
 import {
   CollModCall,
@@ -206,5 +207,103 @@ describe('renderTypeScript', () => {
     expect(output).not.toContain('@prisma-next/target-mongo/migration');
     expect(output).toContain('return [');
     expect(output).toContain('];');
+  });
+
+  it('wraps long arrays onto multiple lines', () => {
+    const calls = [
+      new CreateIndexCall('users', [
+        { field: 'first_name', direction: 1 },
+        { field: 'last_name', direction: 1 },
+        { field: 'email_address', direction: 1 },
+        { field: 'phone_number', direction: 1 },
+      ]),
+    ];
+    const output = renderTypeScript(calls);
+    expect(output).toContain('[\n');
+  });
+
+  it('quotes __proto__ key in rendered object literals', () => {
+    const opts = Object.create(null) as Record<string, unknown>;
+    opts['__proto__'] = 'poisoned';
+    const calls = [
+      new CollModCall('test', opts as CollModOptions, {
+        id: 'test',
+        label: 'test',
+        operationClass: 'destructive',
+      }),
+    ];
+    const output = renderTypeScript(calls);
+    expect(output).toContain('"__proto__"');
+  });
+
+  it('falls back to String() for non-standard value types', () => {
+    const calls = [
+      new CollModCall('test', { validator: BigInt(42) } as unknown as CollModOptions, {
+        id: 'test',
+        label: 'test',
+        operationClass: 'destructive',
+      }),
+    ];
+    const output = renderTypeScript(calls);
+    expect(output).toContain('42');
+  });
+
+  it('renders null values', () => {
+    const calls = [
+      new CollModCall('test', { validator: null } as unknown as CollModOptions, {
+        id: 'test',
+        label: 'test',
+        operationClass: 'destructive',
+      }),
+    ];
+    const output = renderTypeScript(calls);
+    expect(output).toContain('null');
+  });
+
+  it('renders empty arrays as []', () => {
+    const calls = [
+      new CreateCollectionCall('test', {
+        validator: { $jsonSchema: { required: [] } },
+      }),
+    ];
+    const output = renderTypeScript(calls);
+    expect(output).toContain('[]');
+  });
+
+  it('renders empty objects as {}', () => {
+    const calls = [
+      new CollModCall('test', { validator: {} } as CollModOptions, {
+        id: 'test',
+        label: 'test',
+        operationClass: 'destructive',
+      }),
+    ];
+    const output = renderTypeScript(calls);
+    expect(output).toContain('{}');
+  });
+
+  it('quotes keys with special characters', () => {
+    const calls = [
+      new CollModCall('test', { 'some-key': true } as unknown as CollModOptions, {
+        id: 'test',
+        label: 'test',
+        operationClass: 'destructive',
+      }),
+    ];
+    const output = renderTypeScript(calls);
+    expect(output).toContain('"some-key"');
+  });
+
+  it('renders undefined values in arrays', () => {
+    const calls = [
+      new CollModCall('test', { validator: [undefined, 'a'] } as unknown as CollModOptions, {
+        id: 'test',
+        label: 'test',
+        operationClass: 'destructive',
+      }),
+    ];
+    const output = renderTypeScript(calls);
+    expect(output).toContain('undefined');
+    expect(output).toContain('"a"');
   });
 });

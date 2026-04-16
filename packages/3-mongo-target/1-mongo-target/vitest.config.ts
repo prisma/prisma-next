@@ -19,6 +19,7 @@ export default defineConfig({
         '**/*.d.ts',
         '**/*.config.ts',
         '**/exports/**',
+        '**/mongo-runner.ts',
       ],
       reporter: ['text', 'html'],
       thresholds: {
