@@ -371,7 +371,7 @@ describe('formatMongoOperations', () => {
       operationClass: 'additive',
       precheck: [],
       execute: [
-        { description: 'no-op step' } as never,
+        { description: 'no-op step' } as unknown as (typeof op.execute)[number],
         {
           description: 'create index',
           command: new CreateIndexCommand('users', [{ field: 'email', direction: 1 }]),

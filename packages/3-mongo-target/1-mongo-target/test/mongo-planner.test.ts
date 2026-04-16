@@ -1088,6 +1088,26 @@ describe('MongoMigrationPlanner', () => {
       expect(collModOps[0]!.operationClass).toBe('destructive');
     });
 
+    it('emits { enabled: false } when destination removes changeStreamPreAndPostImages', () => {
+      const contract = makeContract({ events: {} });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'events',
+          options: new MongoSchemaCollectionOptions({
+            changeStreamPreAndPostImages: { enabled: true },
+          }),
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('destructive');
+      const cmd = collModOps[0]!.execute[0]!.command as CollModCommand;
+      expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: false });
+    });
+
     it('orders creates before indexes, drops after', () => {
       const contract = makeContract({
         events: {
@@ -1146,9 +1166,10 @@ describe('MongoMigrationPlanner', () => {
 
       expect(calls).toHaveLength(1);
       expect(calls[0]).toBeInstanceOf(CreateIndexCall);
-      const call = calls[0] as CreateIndexCall;
-      expect(call.collection).toBe('users');
-      expect(call.keys).toEqual([{ field: 'email', direction: 1 }]);
+      expect(calls[0]).toMatchObject({
+        collection: 'users',
+        keys: [{ field: 'email', direction: 1 }],
+      });
     });
 
     it('returns OpFactoryCall[] for index drop', () => {
@@ -1227,10 +1248,11 @@ describe('MongoMigrationPlanner', () => {
 
       expect(calls).toHaveLength(1);
       expect(calls[0]).toBeInstanceOf(CollModCall);
-      const call = calls[0] as CollModCall;
-      expect(call.meta?.id).toBe('validator.users.update');
-      expect(call.meta?.label).toBe('Update validator on users');
-      expect(call.meta?.operationClass).toBe('destructive');
+      expect((calls[0] as CollModCall).meta).toMatchObject({
+        id: 'validator.users.update',
+        label: 'Update validator on users',
+        operationClass: 'destructive',
+      });
     });
 
     it('produces collMod call with widening operationClass for relaxation', () => {

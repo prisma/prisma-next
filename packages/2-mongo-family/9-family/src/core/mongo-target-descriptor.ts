@@ -22,6 +22,8 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
       return new MongoMigrationPlanner();
     },
     createRunner(_family: MongoControlFamilyInstance) {
+      // Deps are bound to the first driver passed to execute() and cached for
+      // subsequent calls. Callers must not change the driver between calls.
       let cachedDeps: MongoRunnerDependencies | undefined;
       return {
         async execute(options) {

@@ -335,15 +335,16 @@ function planMutableOptionsDiffCall(
   const destCSPPI = dest?.changeStreamPreAndPostImages;
   if (deepEqual(originCSPPI, destCSPPI)) return undefined;
 
+  const desiredCSPPI = destCSPPI ?? { enabled: false };
   return new CollModCall(
     collName,
     {
-      changeStreamPreAndPostImages: destCSPPI,
+      changeStreamPreAndPostImages: desiredCSPPI,
     },
     {
       id: `options.${collName}.update`,
       label: `Update mutable options on ${collName}`,
-      operationClass: destCSPPI?.enabled ? 'widening' : 'destructive',
+      operationClass: desiredCSPPI.enabled ? 'widening' : 'destructive',
     },
   );
 }
