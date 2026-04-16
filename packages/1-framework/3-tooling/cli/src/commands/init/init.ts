@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import * as clack from '@clack/prompts';
-import { dirname, isAbsolute, join } from 'pathe';
+import { dirname, extname, isAbsolute, join, normalize } from 'pathe';
 import { TerminalUI } from '../../utils/terminal-ui';
 import {
   detectPackageManager,
@@ -92,17 +92,24 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
   const schemaPathResult = await clack.text({
     message: 'Where should the schema file go?',
     initialValue: defaultSchemaPath(authoring),
+    validate(value = '') {
+      const trimmed = value.trim();
+      if (trimmed.length === 0) return 'Path cannot be empty';
+      if (trimmed.endsWith('/') || trimmed.endsWith('\\'))
+        return 'Path must be a file, not a directory';
+      if (!extname(trimmed)) return 'Path must include a file extension (e.g. .prisma or .ts)';
+      return undefined;
+    },
     output: process.stderr,
   });
   if (clack.isCancel(schemaPathResult)) {
     clack.cancel('Init cancelled.', { output: process.stderr });
     process.exit(0);
   }
-  const schemaPath = schemaPathResult as string;
+  const schemaPath = normalize((schemaPathResult as string).trim());
 
   const schemaDir = dirname(schemaPath);
-  const configPath =
-    schemaPath.startsWith('./') || isAbsolute(schemaPath) ? schemaPath : `./${schemaPath}`;
+  const configPath = isAbsolute(schemaPath) ? schemaPath : `./${schemaPath}`;
 
   const files: FileEntry[] = [
     { path: schemaPath, content: starterSchema(target, authoring) },
