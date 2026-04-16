@@ -1,4 +1,3 @@
-import type { MigrationMeta } from '@prisma-next/migration-tools/migration';
 import type {
   CollModCall,
   CreateCollectionCall,
@@ -9,9 +8,16 @@ import type {
   OpFactoryCallVisitor,
 } from './op-factory-call';
 
+export interface RenderMigrationMeta {
+  readonly from: string;
+  readonly to: string;
+  readonly kind?: string;
+  readonly labels?: readonly string[];
+}
+
 export function renderTypeScript(
   calls: ReadonlyArray<OpFactoryCall>,
-  meta?: MigrationMeta,
+  meta?: RenderMigrationMeta,
 ): string {
   const factoryNames = collectFactoryNames(calls);
   const imports = buildImports(factoryNames);
@@ -52,7 +58,7 @@ function buildImports(factoryNames: string[]): string {
   return lines.join('\n');
 }
 
-function buildDescribeMethod(meta: MigrationMeta): string {
+function buildDescribeMethod(meta: RenderMigrationMeta): string {
   const lines: string[] = [];
   lines.push('  override describe() {');
   lines.push('    return {');
@@ -118,6 +124,7 @@ function renderLiteral(value: unknown): string {
 }
 
 function renderKey(key: string): string {
+  if (key === '__proto__') return JSON.stringify(key);
   return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
 }
 
