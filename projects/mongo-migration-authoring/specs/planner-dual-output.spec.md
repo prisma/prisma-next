@@ -14,18 +14,24 @@ The goal is to make the planner produce a higher-level representation — an arr
 
 ## `OpFactoryCall` type
 
-A discriminated union where each variant corresponds to one factory function:
+A discriminated union of frozen AST classes following the codebase's established class/visitor pattern (see `MongoAstNode`). Each concrete class extends an abstract `OpFactoryCallNode` base, carries a `factory` discriminant as a literal type, and implements `accept(visitor)` for exhaustive dispatch:
 
 ```typescript
-type OpFactoryCall =
-  | { readonly factory: 'createIndex'; readonly collection: string; readonly keys: ReadonlyArray<MongoIndexKey>; readonly options?: CreateIndexOptions }
-  | { readonly factory: 'dropIndex'; readonly collection: string; readonly keys: ReadonlyArray<MongoIndexKey> }
-  | { readonly factory: 'createCollection'; readonly collection: string; readonly options?: CreateCollectionOptions }
-  | { readonly factory: 'dropCollection'; readonly collection: string }
-  | { readonly factory: 'collMod'; readonly collection: string; readonly options: CollModOptions };
+abstract class OpFactoryCallNode {
+  abstract readonly factory: string;
+  abstract accept<R>(visitor: OpFactoryCallVisitor<R>): R;
+}
+
+class CreateIndexCall extends OpFactoryCallNode { readonly factory = 'createIndex' as const; /* ... */ }
+class DropIndexCall extends OpFactoryCallNode { readonly factory = 'dropIndex' as const; /* ... */ }
+class CreateCollectionCall extends OpFactoryCallNode { readonly factory = 'createCollection' as const; /* ... */ }
+class DropCollectionCall extends OpFactoryCallNode { readonly factory = 'dropCollection' as const; /* ... */ }
+class CollModCall extends OpFactoryCallNode { readonly factory = 'collMod' as const; /* ... */ }
+
+type OpFactoryCall = CreateIndexCall | DropIndexCall | CreateCollectionCall | DropCollectionCall | CollModCall;
 ```
 
-Each variant captures exactly the arguments of the corresponding factory function. The planner produces these instead of fully-expanded operations.
+Each class captures exactly the arguments of the corresponding factory function. Instances are frozen at construction time to ensure immutability. The `OpFactoryCallVisitor<R>` interface provides compile-time exhaustiveness: adding a new variant forces all visitor implementations to handle it.
 
 ## Factory alignment
 
@@ -56,7 +62,7 @@ The planner's conflict detection logic (immutable option changes, policy violati
 
 - The `plan()` method's external behavior is unchanged — consumers (CLI, target descriptor, tests) see the same `MigrationPlannerResult`
 - The TypeScript renderer produces readable, idiomatic code (proper formatting, minimal boilerplate)
-- The `OpFactoryCall` type is serializable (no class instances, only plain data)
+- `OpFactoryCall` uses frozen AST classes with a visitor interface, consistent with the codebase's `MongoAstNode` pattern, providing compile-time exhaustiveness for all dispatch sites
 
 ## Non-goals
 
@@ -131,7 +137,7 @@ Not applicable.
 
 # Decisions
 
-1. **`OpFactoryCall` is plain data, not class instances.** This makes it serializable and testable without constructing AST nodes. The factory functions handle AST construction.
+1. **`OpFactoryCall` uses frozen AST classes with a visitor interface.** This matches the codebase's established `MongoAstNode` pattern and provides compile-time exhaustiveness: adding a new variant forces all dispatch sites (renderers, planner helpers) to handle it. The trade-off versus plain data is that tests must import and construct class instances, and serialized values lose their visitor capability — but exhaustiveness is more valuable here since dispatch sites are spread across multiple modules (`renderOps`, `renderTypeScript`, planner label/operationClass derivation).
 
 2. **`operationClass` is not part of `OpFactoryCall`.** It's a derived property that the operation renderer computes. This keeps the intermediate representation simple and avoids duplicating classification logic.
 
