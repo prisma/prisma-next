@@ -97,7 +97,7 @@ export async function executeContractEmit(
   const stack = createControlStack(config);
 
   const sourceContext = {
-    composedExtensionPacks: stack.extensionIds,
+    composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
     pslScalarTypeDescriptors: stack.pslScalarTypeDescriptors,
     authoringContributions: stack.authoringContributions,
     codecLookup: stack.codecLookup,

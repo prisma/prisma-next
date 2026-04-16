@@ -577,7 +577,7 @@ describe('emit command', () => {
             extensionPacks: providerConfig.extensionPacks ?? [],
           });
           sourceResult = await contractConfig!.source({
-            composedExtensionPacks: stack.extensionIds.slice(),
+            composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
             pslScalarTypeDescriptors: stack.pslScalarTypeDescriptors,
             authoringContributions: stack.authoringContributions,
             codecLookup: stack.codecLookup,
