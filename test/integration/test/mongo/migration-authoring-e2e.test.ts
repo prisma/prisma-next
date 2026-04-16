@@ -69,7 +69,7 @@ describe(
             destination: { storageHash: 'authoring-test' },
             operations: serialized,
           },
-          driver: controlDriver,
+
           destinationContract: {},
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -306,7 +306,7 @@ describe(
               destination: { storageHash: 'authoring-test-v2' },
               operations: serialized2,
             },
-            driver: controlDriver2,
+
             destinationContract: {},
             policy: ALL_POLICY,
             frameworkComponents: [],
@@ -338,7 +338,7 @@ describe(
               destination: { storageHash: 'authoring-test-v3' },
               operations: serialized3,
             },
-            driver: controlDriver3,
+
             destinationContract: {},
             policy: ALL_POLICY,
             frameworkComponents: [],

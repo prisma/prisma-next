@@ -84,7 +84,7 @@ async function planAndApply(
         destination: { storageHash: destination.storage.storageHash },
         operations: serialized,
       },
-      driver: controlDriver,
+
       destinationContract: destination,
       policy: ALL_POLICY,
       frameworkComponents: [],

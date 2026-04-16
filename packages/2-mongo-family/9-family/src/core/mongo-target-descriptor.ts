@@ -26,8 +26,9 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
       return {
         async execute(options) {
           cachedDeps ??= createMongoRunnerDeps(options.driver);
+          const { driver: _, ...runnerOptions } = options;
           const runner = new MongoMigrationRunner(cachedDeps);
-          return runner.execute(options);
+          return runner.execute(runnerOptions);
         },
       };
     },

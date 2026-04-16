@@ -1,11 +1,9 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
-  ControlDriverInstance,
   MigrationOperationPolicy,
   MigrationPlan,
   MigrationPlanOperation,
-  MigrationRunner,
   MigrationRunnerExecutionChecks,
   MigrationRunnerFailure,
   MigrationRunnerResult,
@@ -55,12 +53,11 @@ function runnerFailure(
   });
 }
 
-export class MongoMigrationRunner implements MigrationRunner<'mongo', 'mongo'> {
+export class MongoMigrationRunner {
   constructor(private readonly deps: MongoRunnerDependencies) {}
 
   async execute(options: {
     readonly plan: MigrationPlan;
-    readonly driver: ControlDriverInstance<'mongo', 'mongo'>;
     readonly destinationContract: unknown;
     readonly policy: MigrationOperationPolicy;
     readonly callbacks?: {
