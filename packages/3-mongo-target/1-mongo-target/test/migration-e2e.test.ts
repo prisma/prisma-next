@@ -139,21 +139,13 @@ describe('migration file E2E', () => {
   describe('renderTypeScript round-trip', () => {
     it('produces ops.json identical to direct factory invocation', async () => {
       const { renderTypeScript } = await import('../src/core/render-typescript');
+      const { CreateCollectionCall, CreateIndexCall } = await import('../src/core/op-factory-call');
       const calls = [
-        {
-          factory: 'createCollection' as const,
-          collection: 'users',
-          options: {
-            validator: { $jsonSchema: { required: ['email'] } },
-            validationLevel: 'strict' as const,
-          },
-        },
-        {
-          factory: 'createIndex' as const,
-          collection: 'users',
-          keys: [{ field: 'email', direction: 1 as const }],
-          options: { unique: true },
-        },
+        new CreateCollectionCall('users', {
+          validator: { $jsonSchema: { required: ['email'] } },
+          validationLevel: 'strict',
+        }),
+        new CreateIndexCall('users', [{ field: 'email', direction: 1 as const }], { unique: true }),
       ];
 
       const tsSource = renderTypeScript(calls);
@@ -181,21 +173,21 @@ describe('migration file E2E', () => {
 
     it('round-trips collMod with meta through TypeScript execution', async () => {
       const { renderTypeScript } = await import('../src/core/render-typescript');
+      const { CollModCall } = await import('../src/core/op-factory-call');
       const calls = [
-        {
-          factory: 'collMod' as const,
-          collection: 'users',
-          options: {
+        new CollModCall(
+          'users',
+          {
             validator: { $jsonSchema: { required: ['email'] } },
-            validationLevel: 'strict' as const,
-            validationAction: 'error' as const,
+            validationLevel: 'strict',
+            validationAction: 'error',
           },
-          meta: {
+          {
             id: 'validator.users.add',
             label: 'Add validator on users',
-            operationClass: 'destructive' as const,
+            operationClass: 'destructive',
           },
-        },
+        ),
       ];
 
       const tsSource = renderTypeScript(calls);
@@ -219,7 +211,8 @@ describe('migration file E2E', () => {
 
     it('round-trips describe() meta through TypeScript execution', async () => {
       const { renderTypeScript } = await import('../src/core/render-typescript');
-      const calls = [{ factory: 'dropCollection' as const, collection: 'legacy' }];
+      const { DropCollectionCall } = await import('../src/core/op-factory-call');
+      const calls = [new DropCollectionCall('legacy')];
 
       const tsSource = renderTypeScript(calls, {
         from: 'sha256:aaa',

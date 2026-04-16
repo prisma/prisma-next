@@ -6,23 +6,34 @@ import {
   dropCollection,
   dropIndex,
 } from './migration-factories';
-import type { OpFactoryCall } from './op-factory-call';
+import type {
+  CollModCall,
+  CreateCollectionCall,
+  CreateIndexCall,
+  DropCollectionCall,
+  DropIndexCall,
+  OpFactoryCall,
+  OpFactoryCallVisitor,
+} from './op-factory-call';
 
-function renderOne(call: OpFactoryCall): MongoMigrationPlanOperation {
-  switch (call.factory) {
-    case 'createIndex':
-      return createIndex(call.collection, call.keys, call.options);
-    case 'dropIndex':
-      return dropIndex(call.collection, call.keys);
-    case 'createCollection':
-      return createCollection(call.collection, call.options);
-    case 'dropCollection':
-      return dropCollection(call.collection);
-    case 'collMod':
-      return collMod(call.collection, call.options, call.meta);
-  }
-}
+const renderVisitor: OpFactoryCallVisitor<MongoMigrationPlanOperation> = {
+  createIndex(call: CreateIndexCall) {
+    return createIndex(call.collection, call.keys, call.options);
+  },
+  dropIndex(call: DropIndexCall) {
+    return dropIndex(call.collection, call.keys);
+  },
+  createCollection(call: CreateCollectionCall) {
+    return createCollection(call.collection, call.options);
+  },
+  dropCollection(call: DropCollectionCall) {
+    return dropCollection(call.collection);
+  },
+  collMod(call: CollModCall) {
+    return collMod(call.collection, call.options, call.meta);
+  },
+};
 
 export function renderOps(calls: ReadonlyArray<OpFactoryCall>): MongoMigrationPlanOperation[] {
-  return calls.map(renderOne);
+  return calls.map((call) => call.accept(renderVisitor));
 }
