@@ -1,10 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import sql, {
-  assembleAuthoringContributions,
-  assemblePslInterpretationContributions,
-} from '@prisma-next/family-sql/control';
+import sql from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 import { describe, expect, it } from 'vitest';
@@ -17,16 +14,6 @@ describe('defineConfig facade', () => {
     const facadeConfig = defineConfig({ contract: contractPath });
 
     const extensionPacks: [] = [];
-    const authoringContributions = assembleAuthoringContributions([
-      postgres,
-      postgresAdapter,
-      ...extensionPacks,
-    ]);
-    const pslContributions = assemblePslInterpretationContributions([
-      postgres,
-      postgresAdapter,
-      ...extensionPacks,
-    ]);
 
     const manualConfig = coreDefineConfig({
       family: sql,
@@ -37,13 +24,6 @@ describe('defineConfig facade', () => {
       contract: prismaContract(contractPath, {
         output: './prisma/contract.json',
         target: postgres,
-        authoringContributions,
-        scalarTypeDescriptors: pslContributions.scalarTypeDescriptors,
-        controlMutationDefaults: {
-          defaultFunctionRegistry: pslContributions.defaultFunctionRegistry,
-          generatorDescriptors: pslContributions.generatorDescriptors,
-        },
-        composedExtensionPacks: [],
       }),
     });
 

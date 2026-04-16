@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import mongoAdapter from '@prisma-next/adapter-mongo/control';
-import type { PrismaNextConfig } from '@prisma-next/config/config-types';
+import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/config/config-types';
 import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
 import mongoDriver from '@prisma-next/driver-mongo/control';
 import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
@@ -33,15 +33,13 @@ export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mon
   const contractConfig =
     ext === '.ts'
       ? {
-          source: async () => {
+          source: async (context: ContractSourceContext) => {
             const { typescriptContract } = await import(
               '@prisma-next/mongo-contract-ts/config-types'
             );
             const mod = await import(pathToFileURL(absoluteContractPath).href);
             const contract = mod.default ?? mod.contract;
-            return typescriptContract(contract, output).source({
-              composedExtensionPacks: [],
-            });
+            return typescriptContract(contract, output).source(context);
           },
           output,
         }
