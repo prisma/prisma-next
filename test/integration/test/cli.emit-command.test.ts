@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { loadConfig } from '@prisma-next/cli/config-loader';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -569,12 +570,19 @@ describe('emit command', () => {
         >;
         try {
           process.chdir(testDirPsl);
-          const sourceContext = {
-            composedExtensionPacks: (providerConfig.extensionPacks ?? []).map(
-              (p: { id: string }) => p.id,
-            ),
-          };
-          sourceResult = await contractConfig!.source(sourceContext);
+          const stack = createControlStack({
+            family: providerConfig.family,
+            target: providerConfig.target,
+            adapter: providerConfig.adapter,
+            extensionPacks: providerConfig.extensionPacks ?? [],
+          });
+          sourceResult = await contractConfig!.source({
+            composedExtensionPacks: stack.extensionIds.slice(),
+            pslScalarTypeDescriptors: stack.pslScalarTypeDescriptors,
+            authoringContributions: stack.authoringContributions,
+            codecLookup: stack.codecLookup,
+            controlMutationDefaults: stack.controlMutationDefaults,
+          });
         } finally {
           process.chdir(originalCwd);
         }
