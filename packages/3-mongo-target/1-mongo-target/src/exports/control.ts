@@ -9,11 +9,7 @@ export {
 } from '../core/mongo-ops-serializer';
 export type { PlanCallsResult } from '../core/mongo-planner';
 export { MongoMigrationPlanner } from '../core/mongo-planner';
-export type {
-  MarkerOperations,
-  MongoRunnerDependencies,
-  MongoRunnerDependenciesFactory,
-} from '../core/mongo-runner';
+export type { MarkerOperations, MongoRunnerDependencies } from '../core/mongo-runner';
 export { MongoMigrationRunner } from '../core/mongo-runner';
 export type { CollModMeta, OpFactoryCall, OpFactoryCallVisitor } from '../core/op-factory-call';
 export {

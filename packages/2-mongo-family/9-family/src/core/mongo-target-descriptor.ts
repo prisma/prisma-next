@@ -6,6 +6,7 @@ import {
   contractToMongoSchemaIR,
   MongoMigrationPlanner,
   MongoMigrationRunner,
+  type MongoRunnerDependencies,
 } from '@prisma-next/target-mongo/control';
 import mongoTargetDescriptorMeta from '@prisma-next/target-mongo/pack';
 import type { MongoControlFamilyInstance } from './control-instance';
@@ -21,7 +22,14 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
       return new MongoMigrationPlanner();
     },
     createRunner(_family: MongoControlFamilyInstance) {
-      return new MongoMigrationRunner(createMongoRunnerDeps);
+      let cachedDeps: MongoRunnerDependencies | undefined;
+      return {
+        async execute(options) {
+          cachedDeps ??= createMongoRunnerDeps(options.driver);
+          const runner = new MongoMigrationRunner(cachedDeps);
+          return runner.execute(options);
+        },
+      };
     },
     contractToSchema(contract: Contract | null) {
       return contractToMongoSchemaIR(contract as MongoContract | null);
