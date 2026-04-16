@@ -16,6 +16,11 @@ import type {
 import { instantiateAuthoringTypeConstructor } from '@prisma-next/framework-components/authoring';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
+  ControlMutationDefaultRegistry,
+  ControlMutationDefaults,
+  MutationDefaultGeneratorDescriptor,
+} from '@prisma-next/framework-components/control';
+import type {
   ParsePslDocumentResult,
   PslAttribute,
   PslCompositeType,
@@ -34,11 +39,6 @@ import {
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import type {
-  ControlMutationDefaultRegistry,
-  ControlMutationDefaults,
-  MutationDefaultGeneratorDescriptor,
-} from './default-function-registry';
 import {
   getAttribute,
   getPositionalArgument,
