@@ -276,10 +276,11 @@ function resolvePolymorphism(input: {
       }
     }
 
+    const variantColl = collections[variantCollectionName];
+    const variantIndexes = (variantColl?.['indexes'] ?? []) as MongoStorageIndex[];
+    const baseColl = collections[baseCollection];
+
     if (variantCollectionName !== baseCollection) {
-      const variantColl = collections[variantCollectionName];
-      const variantIndexes = (variantColl?.['indexes'] ?? []) as MongoStorageIndex[];
-      const baseColl = collections[baseCollection];
       const filtered = Object.fromEntries(
         Object.entries(collections).filter(([key]) => key !== variantCollectionName),
       );
@@ -291,6 +292,23 @@ function resolvePolymorphism(input: {
         };
       } else {
         collections = filtered;
+      }
+    } else if (variantIndexes.length > 0 && baseColl) {
+      const baseIndexes = (baseColl['indexes'] ?? []) as MongoStorageIndex[];
+      const mergedIndexes = [...baseIndexes];
+      for (const idx of variantIndexes) {
+        const isDuplicate = baseIndexes.some(
+          (existing) => JSON.stringify(existing) === JSON.stringify(idx),
+        );
+        if (!isDuplicate) {
+          mergedIndexes.push(idx);
+        }
+      }
+      if (mergedIndexes.length > baseIndexes.length) {
+        collections = {
+          ...collections,
+          [baseCollection]: { ...baseColl, indexes: mergedIndexes },
+        };
       }
     }
   }
@@ -761,7 +779,13 @@ export function interpretPslDocumentToMongoContract(
 
     models[pslModel.name] = { fields, relations, storage: { collection: collectionName } };
     const modelIndexes = collectIndexes(pslModel, fieldMappings, modelNames, sourceId, diagnostics);
-    collections[collectionName] = modelIndexes.length > 0 ? { indexes: modelIndexes } : {};
+    const existingColl = collections[collectionName];
+    if (existingColl && modelIndexes.length > 0) {
+      const existingIndexes = (existingColl['indexes'] ?? []) as MongoStorageIndex[];
+      collections[collectionName] = { indexes: [...existingIndexes, ...modelIndexes] };
+    } else if (!existingColl) {
+      collections[collectionName] = modelIndexes.length > 0 ? { indexes: modelIndexes } : {};
+    }
     roots[collectionName] = pslModel.name;
   }
 

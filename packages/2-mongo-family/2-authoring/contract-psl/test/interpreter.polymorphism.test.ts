@@ -413,6 +413,45 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         ]),
       );
     });
+
+    it('merges variant indexes when variant maps to same collection as base', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+          @@index([title])
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+          @@map("tasks")
+          @@index([severity])
+        }
+      `);
+
+      const storage = ir.storage as unknown as {
+        collections: Record<
+          string,
+          { indexes?: Array<{ keys: Array<{ field: string; direction: number }> }> }
+        >;
+      };
+      const tasksColl = storage.collections['tasks'];
+      expect(tasksColl?.indexes).toBeDefined();
+      const indexFields = (tasksColl?.indexes ?? []).map((idx) => idx.keys.map((k) => k.field));
+      expect(indexFields).toEqual(
+        expect.arrayContaining([
+          expect.arrayContaining(['title']),
+          expect.arrayContaining(['severity']),
+        ]),
+      );
+    });
   });
 
   describe('FL-10: polymorphic validators', () => {
