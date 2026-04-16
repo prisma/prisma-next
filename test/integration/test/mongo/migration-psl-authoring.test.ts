@@ -1,5 +1,7 @@
 import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
+import type { JsonValue } from '@prisma-next/contract/types';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
@@ -19,6 +21,29 @@ const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 };
 
+const bsonTypesByCodecId: Record<string, string> = {
+  'mongo/string@1': 'string',
+  'mongo/int32@1': 'int',
+  'mongo/bool@1': 'bool',
+  'mongo/date@1': 'date',
+  'mongo/objectId@1': 'objectId',
+  'mongo/double@1': 'double',
+};
+
+const mongoCodecLookup: CodecLookup = {
+  get(id: string) {
+    const bsonType = bsonTypesByCodecId[id];
+    if (!bsonType) return undefined;
+    return {
+      id,
+      targetTypes: [bsonType],
+      decode: (v: unknown) => v,
+      encodeJson: (v: unknown) => v as JsonValue,
+      decodeJson: (v: JsonValue) => v,
+    };
+  },
+};
+
 function pslToContract(schema: string): MongoContract {
   const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
   const result = interpretPslDocumentToMongoContract({
@@ -31,6 +56,7 @@ function pslToContract(schema: string): MongoContract {
       ['ObjectId', 'mongo/objectId@1'],
       ['Float', 'mongo/double@1'],
     ]),
+    codecLookup: mongoCodecLookup,
   });
   if (!result.ok) {
     throw new Error(`PSL interpretation failed: ${JSON.stringify(result)}`);

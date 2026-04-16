@@ -493,7 +493,7 @@
       "limit": true,
       "orderBy": true,
       "partialIndex": true,
-      "pgvector/cosine": true,
+      "pgvector.cosine": true,
       "returning": true,
       "savepoints": true,
       "transactionalDDL": true
@@ -511,7 +511,7 @@
     "pgvector": {
       "capabilities": {
         "postgres": {
-          "pgvector/cosine": true
+          "pgvector.cosine": true
         }
       },
       "familyId": "sql",

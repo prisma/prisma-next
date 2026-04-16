@@ -70,11 +70,41 @@ export type FieldOutputTypes = {
     readonly invitedById: CodecTypes['pg/int4@1']['output'] | null;
   };
 };
+export type FieldInputTypes = {
+  readonly Article: {
+    readonly id: CodecTypes['sql/char@1']['input'];
+    readonly title: CodecTypes['pg/text@1']['input'];
+  };
+  readonly Comment: {
+    readonly id: CodecTypes['pg/int4@1']['input'];
+    readonly body: CodecTypes['pg/text@1']['input'];
+    readonly postId: CodecTypes['pg/int4@1']['input'];
+  };
+  readonly Post: {
+    readonly id: CodecTypes['pg/int4@1']['input'];
+    readonly title: CodecTypes['pg/text@1']['input'];
+    readonly userId: CodecTypes['pg/int4@1']['input'];
+    readonly views: CodecTypes['pg/int4@1']['input'];
+    readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
+  };
+  readonly Profile: {
+    readonly id: CodecTypes['pg/int4@1']['input'];
+    readonly userId: CodecTypes['pg/int4@1']['input'];
+    readonly bio: CodecTypes['pg/text@1']['input'];
+  };
+  readonly User: {
+    readonly id: CodecTypes['pg/int4@1']['input'];
+    readonly name: CodecTypes['pg/text@1']['input'];
+    readonly email: CodecTypes['pg/text@1']['input'];
+    readonly invitedById: CodecTypes['pg/int4@1']['input'] | null;
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   OperationTypes,
   QueryOperationTypes,
-  FieldOutputTypes
+  FieldOutputTypes,
+  FieldInputTypes
 >;
 
 type ContractBase = ContractType<
@@ -421,7 +451,7 @@ type ContractBase = ContractType<
       readonly limit: true;
       readonly orderBy: true;
       readonly partialIndex: true;
-      readonly 'pgvector/cosine': true;
+      readonly 'pgvector.cosine': true;
       readonly returning: true;
       readonly savepoints: true;
       readonly transactionalDDL: true;
@@ -438,7 +468,7 @@ type ContractBase = ContractType<
   };
   readonly extensionPacks: {
     readonly pgvector: {
-      readonly capabilities: { readonly postgres: { readonly 'pgvector/cosine': true } };
+      readonly capabilities: { readonly postgres: { readonly 'pgvector.cosine': true } };
       readonly familyId: 'sql';
       readonly id: 'pgvector';
       readonly kind: 'extension';
