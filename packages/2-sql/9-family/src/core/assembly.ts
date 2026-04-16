@@ -1,38 +1,6 @@
-import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import type { Codec } from '@prisma-next/framework-components/codec';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { assertUniqueCodecOwner } from '@prisma-next/framework-components/control';
-import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
-import type {
-  CodecControlHooks,
-  ControlMutationDefaultFunctionEntry,
-  ControlMutationDefaultGeneratorDescriptor,
-  PslScalarTypeDescriptor,
-  SqlControlStaticContributions,
-} from './migrations/types';
-
-export interface SqlControlDescriptorWithContributions extends SqlControlStaticContributions {
-  readonly id: string;
-  readonly authoring?: AuthoringContributions;
-  readonly types?: {
-    readonly codecTypes?: {
-      readonly import?: TypesImportSpec;
-      readonly codecInstances?: ReadonlyArray<Codec>;
-      readonly typeImports?: ReadonlyArray<TypesImportSpec>;
-    };
-    readonly operationTypes?: { readonly import: TypesImportSpec };
-  };
-}
-
-export interface AssembledControlMutationDefaultContributions {
-  readonly defaultFunctionRegistry: ReadonlyMap<string, ControlMutationDefaultFunctionEntry>;
-  readonly generatorDescriptors: readonly ControlMutationDefaultGeneratorDescriptor[];
-}
-
-export interface AssembledPslInterpretationContributions
-  extends AssembledControlMutationDefaultContributions {
-  readonly scalarTypeDescriptors: ReadonlyMap<string, PslScalarTypeDescriptor>;
-}
+import type { CodecControlHooks } from './migrations/types';
 
 type CodecControlHooksMap = Record<string, CodecControlHooks>;
 
@@ -80,78 +48,4 @@ export function extractCodecControlHooks(
   }
 
   return hooks;
-}
-
-export function assembleControlMutationDefaultContributions(
-  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
-): AssembledControlMutationDefaultContributions {
-  const defaultFunctionRegistry = new Map<string, ControlMutationDefaultFunctionEntry>();
-  const functionOwners = new Map<string, string>();
-  const generatorMap = new Map<string, ControlMutationDefaultGeneratorDescriptor>();
-  const generatorOwners = new Map<string, string>();
-
-  for (const descriptor of descriptors) {
-    const contributions = descriptor.controlMutationDefaults?.();
-    if (!contributions) {
-      continue;
-    }
-
-    for (const generatorDescriptor of contributions.generatorDescriptors) {
-      const owner = generatorOwners.get(generatorDescriptor.id);
-      if (owner) {
-        throw new Error(
-          `Duplicate mutation default generator id "${generatorDescriptor.id}". Descriptor "${descriptor.id}" conflicts with "${owner}".`,
-        );
-      }
-      generatorMap.set(generatorDescriptor.id, generatorDescriptor);
-      generatorOwners.set(generatorDescriptor.id, descriptor.id);
-    }
-
-    for (const [functionName, handler] of contributions.defaultFunctionRegistry) {
-      const owner = functionOwners.get(functionName);
-      if (owner) {
-        throw new Error(
-          `Duplicate mutation default function "${functionName}". Descriptor "${descriptor.id}" conflicts with "${owner}".`,
-        );
-      }
-      defaultFunctionRegistry.set(functionName, handler);
-      functionOwners.set(functionName, descriptor.id);
-    }
-  }
-
-  return {
-    defaultFunctionRegistry,
-    generatorDescriptors: Array.from(generatorMap.values()),
-  };
-}
-
-export function assemblePslInterpretationContributions(
-  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
-): AssembledPslInterpretationContributions {
-  const mutationDefaults = assembleControlMutationDefaultContributions(descriptors);
-  const scalarTypeDescriptors = new Map<string, PslScalarTypeDescriptor>();
-  const scalarOwners = new Map<string, string>();
-
-  for (const descriptor of descriptors) {
-    const pslTypeContributions = descriptor.pslTypeDescriptors?.();
-    if (!pslTypeContributions) {
-      continue;
-    }
-
-    for (const [typeName, scalarDescriptor] of pslTypeContributions.scalarTypeDescriptors) {
-      const owner = scalarOwners.get(typeName);
-      if (owner) {
-        throw new Error(
-          `Duplicate PSL scalar type descriptor "${typeName}". Descriptor "${descriptor.id}" conflicts with "${owner}".`,
-        );
-      }
-      scalarTypeDescriptors.set(typeName, scalarDescriptor);
-      scalarOwners.set(typeName, descriptor.id);
-    }
-  }
-
-  return {
-    ...mutationDefaults,
-    scalarTypeDescriptors,
-  };
 }
