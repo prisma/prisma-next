@@ -6,20 +6,6 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { PslSpan } from '@prisma-next/psl-parser';
 
-export type {
-  ControlMutationDefaultEntry,
-  ControlMutationDefaultRegistry,
-  ControlMutationDefaults,
-  DefaultFunctionLoweringContext,
-  DefaultFunctionLoweringHandler,
-  DefaultFunctionRegistry,
-  DefaultFunctionRegistryEntry,
-  LoweredDefaultResult,
-  LoweredDefaultValue,
-  MutationDefaultGeneratorDescriptor,
-  ParsedDefaultFunctionCall,
-} from '@prisma-next/framework-components/control';
-
 interface DefaultFunctionArgument {
   readonly raw: string;
   readonly span: PslSpan;

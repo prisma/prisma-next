@@ -6,7 +6,7 @@ import type {
   ControlMutationDefaults,
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
-} from '../src/default-function-registry';
+} from '@prisma-next/framework-components/control';
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;

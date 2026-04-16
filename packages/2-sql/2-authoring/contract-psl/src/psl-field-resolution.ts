@@ -1,12 +1,12 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import type { PslAttribute, PslField, PslModel } from '@prisma-next/psl-parser';
-import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
-} from './default-function-registry';
+} from '@prisma-next/framework-components/control';
+import type { PslAttribute, PslField, PslModel } from '@prisma-next/psl-parser';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   getAttribute,
   lowerFirst,

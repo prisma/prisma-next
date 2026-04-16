@@ -10,15 +10,15 @@ import {
   validateAuthoringHelperArguments,
 } from '@prisma-next/framework-components/authoring';
 import type {
+  ControlMutationDefaultRegistry,
+  MutationDefaultGeneratorDescriptor,
+} from '@prisma-next/framework-components/control';
+import type {
   PslAttribute,
   PslField,
   PslSpan,
   PslTypeConstructorCall,
 } from '@prisma-next/psl-parser';
-import type {
-  ControlMutationDefaultRegistry,
-  MutationDefaultGeneratorDescriptor,
-} from './default-function-registry';
 import {
   lowerDefaultFunctionWithRegistry,
   parseDefaultFunctionCall,

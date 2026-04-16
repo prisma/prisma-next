@@ -1,9 +1,9 @@
-import { parsePslDocument } from '@prisma-next/psl-parser';
-import { describe, expect, it } from 'vitest';
 import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
-} from '../src/default-function-registry';
+} from '@prisma-next/framework-components/control';
+import { parsePslDocument } from '@prisma-next/psl-parser';
+import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
