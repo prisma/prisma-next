@@ -473,6 +473,26 @@ model Document {
     });
   });
 
+  describe('given a broken codec configuration', () => {
+    it('throws when a scalar type descriptor references an unresolvable codec', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(schemaPath, 'model User {\n  id Int @id\n}\n', 'utf-8');
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const brokenContext = createPostgresTestContext({
+        pslScalarTypeDescriptors: new Map([['Int', 'bogus/missing@1']]),
+        codecLookup: { get: () => undefined },
+      });
+
+      await expect(contract.source(brokenContext)).rejects.toThrow(
+        /Codec "bogus\/missing@1" for PSL type "Int" not found/,
+      );
+    });
+  });
+
   describe('given a missing schema file', () => {
     it('returns PSL_SCHEMA_READ_FAILED diagnostics when schema file is missing', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
