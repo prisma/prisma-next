@@ -1,6 +1,6 @@
 # Welcome to Prisma Next!
 
-Prisma Next lets you query your database in simple, easy to read TypeScript. Define what your data looks like, and Prisma Next gives you a fully typed client — with autocomplete for every table, column, and relation.
+Prisma Next lets you query your database in simple, easy-to-read TypeScript. Define what your data looks like, and Prisma Next gives you a fully typed client — with autocomplete for every table, column, and relation.
 
 This project is set up for PostgreSQL. Prisma Next also supports other databases.
 
