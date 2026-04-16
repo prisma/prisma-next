@@ -2,7 +2,15 @@ import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToMongoContract } from '../src/interpreter';
-import { createMongoScalarTypeDescriptors } from '../src/scalar-type-descriptors';
+
+const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
+  ['String', 'mongo/string@1'],
+  ['Int', 'mongo/int32@1'],
+  ['Boolean', 'mongo/bool@1'],
+  ['DateTime', 'mongo/date@1'],
+  ['ObjectId', 'mongo/objectId@1'],
+  ['Float', 'mongo/double@1'],
+]);
 
 const mongoCodecLookup: CodecLookup = {
   get(id: string) {
@@ -30,7 +38,7 @@ function interpret(schema: string) {
   const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
   return interpretPslDocumentToMongoContract({
     document,
-    scalarTypeDescriptors: createMongoScalarTypeDescriptors(),
+    scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
   });
 }

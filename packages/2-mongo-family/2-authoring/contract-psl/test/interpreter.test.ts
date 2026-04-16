@@ -6,7 +6,15 @@ import {
   type InterpretPslDocumentToMongoContractInput,
   interpretPslDocumentToMongoContract,
 } from '../src/interpreter';
-import { createMongoScalarTypeDescriptors } from '../src/scalar-type-descriptors';
+
+const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
+  ['String', 'mongo/string@1'],
+  ['Int', 'mongo/int32@1'],
+  ['Boolean', 'mongo/bool@1'],
+  ['DateTime', 'mongo/date@1'],
+  ['ObjectId', 'mongo/objectId@1'],
+  ['Float', 'mongo/double@1'],
+]);
 
 const mongoCodecLookup: CodecLookup = {
   get(id: string) {
@@ -47,7 +55,7 @@ function interpret(
   const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
   return interpretPslDocumentToMongoContract({
     document,
-    scalarTypeDescriptors: createMongoScalarTypeDescriptors(),
+    scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
     ...overrides,
   });
@@ -106,23 +114,18 @@ describe('interpretPslDocumentToMongoContract', () => {
         model Item {
           id    ObjectId @id @map("_id")
           big   BigInt
-          score Float
           data  Bytes
         }
       `);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
-      expect(result.failure.diagnostics).toHaveLength(3);
+      expect(result.failure.diagnostics).toHaveLength(2);
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             code: 'PSL_UNSUPPORTED_FIELD_TYPE',
             message: expect.stringContaining('BigInt'),
-          }),
-          expect.objectContaining({
-            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
-            message: expect.stringContaining('Float'),
           }),
           expect.objectContaining({
             code: 'PSL_UNSUPPORTED_FIELD_TYPE',
@@ -673,10 +676,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `,
         {
-          scalarTypeDescriptors: new Map([
-            ...createMongoScalarTypeDescriptors(),
-            ['Float', 'mongo/double@1'],
-          ]),
+          scalarTypeDescriptors: mongoScalarTypeDescriptors,
         },
       );
 
