@@ -1,36 +1,26 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  MigrationOperationClass,
   MigrationOperationPolicy,
   MigrationPlanner,
   MigrationPlannerConflict,
   MigrationPlannerResult,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract, MongoIndexKey } from '@prisma-next/mongo-contract';
-import {
-  buildIndexOpId,
-  CollModCommand,
-  CreateCollectionCommand,
-  CreateIndexCommand,
-  DropCollectionCommand,
-  DropIndexCommand,
-  defaultMongoIndexName,
-  keysToKeySpec,
-  ListCollectionsCommand,
-  ListIndexesCommand,
-  MongoAndExpr,
-  MongoFieldFilter,
-  type MongoMigrationPlanOperation,
-} from '@prisma-next/mongo-query-ast/control';
-import {
-  canonicalize,
-  deepEqual,
-  type MongoSchemaCollection,
-  type MongoSchemaCollectionOptions,
-  type MongoSchemaIndex,
-  type MongoSchemaIR,
-  type MongoSchemaValidator,
+import type {
+  MongoSchemaCollection,
+  MongoSchemaCollectionOptions,
+  MongoSchemaIndex,
+  MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
+import { canonicalize, deepEqual } from '@prisma-next/mongo-schema-ir';
 import { contractToMongoSchemaIR } from './contract-to-schema';
+import type { OpFactoryCall } from './op-factory-call';
+import {
+  schemaCollectionToCreateCollectionOptions,
+  schemaIndexToCreateIndexOptions,
+} from './op-factory-call';
+import { renderOps } from './render-ops';
 
 function buildIndexLookupKey(index: MongoSchemaIndex): string {
   const keys = index.keys.map((k) => `${k.field}:${k.direction}`).join(',');
@@ -48,103 +38,6 @@ function buildIndexLookupKey(index: MongoSchemaIndex): string {
     .filter(Boolean)
     .join(';');
   return opts ? `${keys}|${opts}` : keys;
-}
-
-function formatKeys(keys: ReadonlyArray<MongoIndexKey>): string {
-  return keys.map((k) => `${k.field}:${k.direction}`).join(', ');
-}
-
-function isTextIndex(keys: ReadonlyArray<MongoIndexKey>): boolean {
-  return keys.some((k) => k.direction === 'text');
-}
-
-function planCreateIndex(collection: string, index: MongoSchemaIndex): MongoMigrationPlanOperation {
-  const { keys } = index;
-  const name = defaultMongoIndexName(keys);
-
-  const textIndex = isTextIndex(keys);
-  const keyFilter = textIndex
-    ? MongoFieldFilter.eq('key._fts', 'text')
-    : MongoFieldFilter.eq('key', keysToKeySpec(keys));
-  const fullFilter = index.unique
-    ? MongoAndExpr.of([keyFilter, MongoFieldFilter.eq('unique', true)])
-    : keyFilter;
-
-  return {
-    id: buildIndexOpId('create', collection, keys),
-    label: `Create index on ${collection} (${formatKeys(keys)})`,
-    operationClass: 'additive',
-    precheck: [
-      {
-        description: `index does not already exist on ${collection}`,
-        source: new ListIndexesCommand(collection),
-        filter: keyFilter,
-        expect: 'notExists',
-      },
-    ],
-    execute: [
-      {
-        description: `create index on ${collection}`,
-        command: new CreateIndexCommand(collection, keys, {
-          unique: index.unique || undefined,
-          sparse: index.sparse,
-          expireAfterSeconds: index.expireAfterSeconds,
-          partialFilterExpression: index.partialFilterExpression,
-          wildcardProjection: index.wildcardProjection,
-          collation: index.collation,
-          weights: index.weights,
-          default_language: index.default_language,
-          language_override: index.language_override,
-          name,
-        }),
-      },
-    ],
-    postcheck: [
-      {
-        description: `index exists on ${collection}`,
-        source: new ListIndexesCommand(collection),
-        filter: fullFilter,
-        expect: 'exists',
-      },
-    ],
-  };
-}
-
-function planDropIndex(collection: string, index: MongoSchemaIndex): MongoMigrationPlanOperation {
-  const { keys } = index;
-  const indexName = defaultMongoIndexName(keys);
-  const textIndex = isTextIndex(keys);
-  const keyFilter = textIndex
-    ? MongoFieldFilter.eq('key._fts', 'text')
-    : MongoFieldFilter.eq('key', keysToKeySpec(keys));
-
-  return {
-    id: buildIndexOpId('drop', collection, keys),
-    label: `Drop index on ${collection} (${formatKeys(keys)})`,
-    operationClass: 'destructive',
-    precheck: [
-      {
-        description: `index exists on ${collection}`,
-        source: new ListIndexesCommand(collection),
-        filter: keyFilter,
-        expect: 'exists',
-      },
-    ],
-    execute: [
-      {
-        description: `drop index on ${collection}`,
-        command: new DropIndexCommand(collection, indexName),
-      },
-    ],
-    postcheck: [
-      {
-        description: `index no longer exists on ${collection}`,
-        source: new ListIndexesCommand(collection),
-        filter: keyFilter,
-        expect: 'notExists',
-      },
-    ],
-  };
 }
 
 function validatorsEqual(
@@ -181,73 +74,6 @@ function classifyValidatorUpdate(
   return hasDestructive ? 'destructive' : 'widening';
 }
 
-function planValidatorDiff(
-  collName: string,
-  originValidator: MongoSchemaValidator | undefined,
-  destValidator: MongoSchemaValidator | undefined,
-): MongoMigrationPlanOperation | undefined {
-  if (validatorsEqual(originValidator, destValidator)) return undefined;
-
-  const collExistsPrecheck = {
-    description: `collection ${collName} exists`,
-    source: new ListCollectionsCommand(),
-    filter: MongoFieldFilter.eq('name', collName),
-    expect: 'exists' as const,
-  };
-
-  if (destValidator) {
-    const operationClass = originValidator
-      ? classifyValidatorUpdate(originValidator, destValidator)
-      : 'destructive';
-    return {
-      id: `validator.${collName}.${originValidator ? 'update' : 'add'}`,
-      label: `${originValidator ? 'Update' : 'Add'} validator on ${collName}`,
-      operationClass,
-      precheck: [collExistsPrecheck],
-      execute: [
-        {
-          description: `set validator on ${collName}`,
-          command: new CollModCommand(collName, {
-            validator: { $jsonSchema: destValidator.jsonSchema },
-            validationLevel: destValidator.validationLevel,
-            validationAction: destValidator.validationAction,
-          }),
-        },
-      ],
-      postcheck: [
-        {
-          description: `validator applied on ${collName}`,
-          source: new ListCollectionsCommand(),
-          filter: MongoAndExpr.of([
-            MongoFieldFilter.eq('name', collName),
-            MongoFieldFilter.eq('options.validationLevel', destValidator.validationLevel),
-            MongoFieldFilter.eq('options.validationAction', destValidator.validationAction),
-          ]),
-          expect: 'exists' as const,
-        },
-      ],
-    };
-  }
-
-  return {
-    id: `validator.${collName}.remove`,
-    label: `Remove validator on ${collName}`,
-    operationClass: 'widening',
-    precheck: [collExistsPrecheck],
-    execute: [
-      {
-        description: `remove validator on ${collName}`,
-        command: new CollModCommand(collName, {
-          validator: {},
-          validationLevel: 'strict',
-          validationAction: 'error',
-        }),
-      },
-    ],
-    postcheck: [],
-  };
-}
-
 function hasImmutableOptionChange(
   origin: MongoSchemaCollectionOptions | undefined,
   dest: MongoSchemaCollectionOptions | undefined,
@@ -260,114 +86,48 @@ function hasImmutableOptionChange(
   return undefined;
 }
 
-function planCreateCollection(
-  collName: string,
-  dest: MongoSchemaCollection,
-): MongoMigrationPlanOperation {
-  const opts = dest.options;
-  const validator = dest.validator;
-  return {
-    id: `collection.${collName}.create`,
-    label: `Create collection ${collName}`,
-    operationClass: 'additive',
-    precheck: [
-      {
-        description: `collection ${collName} does not exist`,
-        source: new ListCollectionsCommand(),
-        filter: MongoFieldFilter.eq('name', collName),
-        expect: 'notExists',
-      },
-    ],
-    execute: [
-      {
-        description: `create collection ${collName}`,
-        command: new CreateCollectionCommand(collName, {
-          capped: opts?.capped ? true : undefined,
-          size: opts?.capped?.size,
-          max: opts?.capped?.max,
-          timeseries: opts?.timeseries,
-          collation: opts?.collation,
-          clusteredIndex: opts?.clusteredIndex
-            ? {
-                key: { _id: 1 } as Record<string, number>,
-                unique: true as boolean,
-                ...(opts.clusteredIndex.name != null ? { name: opts.clusteredIndex.name } : {}),
-              }
-            : undefined,
-          validator: validator ? { $jsonSchema: validator.jsonSchema } : undefined,
-          validationLevel: validator?.validationLevel,
-          validationAction: validator?.validationAction,
-          changeStreamPreAndPostImages: opts?.changeStreamPreAndPostImages,
-        }),
-      },
-    ],
-    postcheck: [],
-  };
-}
-
-function planDropCollection(collName: string): MongoMigrationPlanOperation {
-  return {
-    id: `collection.${collName}.drop`,
-    label: `Drop collection ${collName}`,
-    operationClass: 'destructive',
-    precheck: [],
-    execute: [
-      {
-        description: `drop collection ${collName}`,
-        command: new DropCollectionCommand(collName),
-      },
-    ],
-    postcheck: [],
-  };
-}
-
-function planMutableOptionsDiff(
-  collName: string,
-  origin: MongoSchemaCollectionOptions | undefined,
-  dest: MongoSchemaCollectionOptions | undefined,
-): MongoMigrationPlanOperation | undefined {
-  const originCSPPI = origin?.changeStreamPreAndPostImages;
-  const destCSPPI = dest?.changeStreamPreAndPostImages;
-  if (deepEqual(originCSPPI, destCSPPI)) return undefined;
-
-  return {
-    id: `options.${collName}.update`,
-    label: `Update mutable options on ${collName}`,
-    operationClass: destCSPPI?.enabled ? 'widening' : 'destructive',
-    precheck: [],
-    execute: [
-      {
-        description: `update options on ${collName}`,
-        command: new CollModCommand(collName, {
-          changeStreamPreAndPostImages: destCSPPI,
-        }),
-      },
-    ],
-    postcheck: [],
-  };
-}
-
 function collectionHasOptions(coll: MongoSchemaCollection): boolean {
   return !!(coll.options || coll.validator);
 }
 
+function operationClassForFactory(call: OpFactoryCall): MigrationOperationClass {
+  switch (call.factory) {
+    case 'createIndex':
+    case 'createCollection':
+      return 'additive';
+    case 'dropIndex':
+    case 'dropCollection':
+      return 'destructive';
+    case 'collMod':
+      return call.meta?.operationClass ?? 'destructive';
+  }
+}
+
+function formatKeys(keys: ReadonlyArray<MongoIndexKey>): string {
+  return keys.map((k) => `${k.field}:${k.direction}`).join(', ');
+}
+
+export type PlanCallsResult =
+  | { readonly kind: 'success'; readonly calls: OpFactoryCall[] }
+  | { readonly kind: 'failure'; readonly conflicts: MigrationPlannerConflict[] };
+
 export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'> {
-  plan(options: {
+  planCalls(options: {
     readonly contract: unknown;
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
-  }): MigrationPlannerResult {
+  }): PlanCallsResult {
     const contract = options.contract as MongoContract;
     const originIR = options.schema as MongoSchemaIR;
     const destinationIR = contractToMongoSchemaIR(contract);
 
-    const collCreates: MongoMigrationPlanOperation[] = [];
-    const drops: MongoMigrationPlanOperation[] = [];
-    const creates: MongoMigrationPlanOperation[] = [];
-    const validatorOps: MongoMigrationPlanOperation[] = [];
-    const mutableOptionOps: MongoMigrationPlanOperation[] = [];
-    const collDrops: MongoMigrationPlanOperation[] = [];
+    const collCreates: OpFactoryCall[] = [];
+    const drops: OpFactoryCall[] = [];
+    const creates: OpFactoryCall[] = [];
+    const validatorOps: OpFactoryCall[] = [];
+    const mutableOptionOps: OpFactoryCall[] = [];
+    const collDrops: OpFactoryCall[] = [];
     const conflicts: MigrationPlannerConflict[] = [];
 
     const allCollectionNames = new Set([
@@ -381,10 +141,15 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
 
       if (!originColl && destColl) {
         if (collectionHasOptions(destColl)) {
-          collCreates.push(planCreateCollection(collName, destColl));
+          const opts = schemaCollectionToCreateCollectionOptions(destColl);
+          collCreates.push({
+            factory: 'createCollection',
+            collection: collName,
+            options: opts,
+          });
         }
       } else if (originColl && !destColl) {
-        collDrops.push(planDropCollection(collName));
+        collDrops.push({ factory: 'dropCollection', collection: collName });
       } else if (originColl && destColl) {
         const immutableChange = hasImmutableOptionChange(originColl.options, destColl.options);
         if (immutableChange) {
@@ -395,11 +160,19 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
           });
         }
 
-        const mutableOp = planMutableOptionsDiff(collName, originColl.options, destColl.options);
-        if (mutableOp) mutableOptionOps.push(mutableOp);
+        const mutableCall = planMutableOptionsDiffCall(
+          collName,
+          originColl.options,
+          destColl.options,
+        );
+        if (mutableCall) mutableOptionOps.push(mutableCall);
 
-        const validatorOp = planValidatorDiff(collName, originColl.validator, destColl.validator);
-        if (validatorOp) validatorOps.push(validatorOp);
+        const validatorCall = planValidatorDiffCall(
+          collName,
+          originColl.validator,
+          destColl.validator,
+        );
+        if (validatorCall) validatorOps.push(validatorCall);
       }
 
       const originLookup = new Map<string, MongoSchemaIndex>();
@@ -418,13 +191,22 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
 
       for (const [lookupKey, idx] of originLookup) {
         if (!destLookup.has(lookupKey)) {
-          drops.push(planDropIndex(collName, idx));
+          drops.push({
+            factory: 'dropIndex',
+            collection: collName,
+            keys: idx.keys,
+          });
         }
       }
 
       for (const [lookupKey, idx] of destLookup) {
         if (!originLookup.has(lookupKey)) {
-          creates.push(planCreateIndex(collName, idx));
+          creates.push({
+            factory: 'createIndex',
+            collection: collName,
+            keys: idx.keys,
+            options: schemaIndexToCreateIndexOptions(idx),
+          });
         }
       }
     }
@@ -433,7 +215,7 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
       return { kind: 'failure', conflicts };
     }
 
-    const allOps = [
+    const allCalls = [
       ...collCreates,
       ...drops,
       ...creates,
@@ -442,12 +224,13 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
       ...collDrops,
     ];
 
-    for (const op of allOps) {
-      if (!options.policy.allowedOperationClasses.includes(op.operationClass)) {
+    for (const call of allCalls) {
+      const opClass = operationClassForFactory(call);
+      if (!options.policy.allowedOperationClasses.includes(opClass)) {
         conflicts.push({
           kind: 'policy-violation',
-          summary: `${op.operationClass} operation disallowed: ${op.label}`,
-          why: `Policy does not allow '${op.operationClass}' operations`,
+          summary: `${opClass} operation disallowed: ${labelForCall(call)}`,
+          why: `Policy does not allow '${opClass}' operations`,
         });
       }
     }
@@ -456,6 +239,18 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
       return { kind: 'failure', conflicts };
     }
 
+    return { kind: 'success', calls: allCalls };
+  }
+
+  plan(options: {
+    readonly contract: unknown;
+    readonly schema: unknown;
+    readonly policy: MigrationOperationPolicy;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
+  }): MigrationPlannerResult {
+    const contract = options.contract as MongoContract;
+    const result = this.planCalls(options);
+    if (result.kind === 'failure') return result;
     return {
       kind: 'success',
       plan: {
@@ -463,8 +258,89 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
         destination: {
           storageHash: contract.storage.storageHash,
         },
-        operations: allOps,
+        operations: renderOps(result.calls),
       },
     };
   }
+}
+
+function labelForCall(call: OpFactoryCall): string {
+  switch (call.factory) {
+    case 'createIndex':
+      return `Create index on ${call.collection} (${formatKeys(call.keys)})`;
+    case 'dropIndex':
+      return `Drop index on ${call.collection} (${formatKeys(call.keys)})`;
+    case 'createCollection':
+      return `Create collection ${call.collection}`;
+    case 'dropCollection':
+      return `Drop collection ${call.collection}`;
+    case 'collMod':
+      return call.meta?.label ?? `Modify collection ${call.collection}`;
+  }
+}
+
+function planValidatorDiffCall(
+  collName: string,
+  originValidator: MongoSchemaValidator | undefined,
+  destValidator: MongoSchemaValidator | undefined,
+): OpFactoryCall | undefined {
+  if (validatorsEqual(originValidator, destValidator)) return undefined;
+
+  if (destValidator) {
+    const operationClass: MigrationOperationClass = originValidator
+      ? classifyValidatorUpdate(originValidator, destValidator)
+      : 'destructive';
+    return {
+      factory: 'collMod',
+      collection: collName,
+      options: {
+        validator: { $jsonSchema: destValidator.jsonSchema },
+        validationLevel: destValidator.validationLevel,
+        validationAction: destValidator.validationAction,
+      },
+      meta: {
+        id: `validator.${collName}.${originValidator ? 'update' : 'add'}`,
+        label: `${originValidator ? 'Update' : 'Add'} validator on ${collName}`,
+        operationClass,
+      },
+    };
+  }
+
+  return {
+    factory: 'collMod',
+    collection: collName,
+    options: {
+      validator: {},
+      validationLevel: 'strict',
+      validationAction: 'error',
+    },
+    meta: {
+      id: `validator.${collName}.remove`,
+      label: `Remove validator on ${collName}`,
+      operationClass: 'widening',
+    },
+  };
+}
+
+function planMutableOptionsDiffCall(
+  collName: string,
+  origin: MongoSchemaCollectionOptions | undefined,
+  dest: MongoSchemaCollectionOptions | undefined,
+): OpFactoryCall | undefined {
+  const originCSPPI = origin?.changeStreamPreAndPostImages;
+  const destCSPPI = dest?.changeStreamPreAndPostImages;
+  if (deepEqual(originCSPPI, destCSPPI)) return undefined;
+
+  return {
+    factory: 'collMod',
+    collection: collName,
+    options: {
+      changeStreamPreAndPostImages: destCSPPI,
+    },
+    meta: {
+      id: `options.${collName}.update`,
+      label: `Update mutable options on ${collName}`,
+      operationClass: destCSPPI?.enabled ? 'widening' : 'destructive',
+    },
+  };
 }

@@ -15,6 +15,7 @@ import {
 } from '@prisma-next/mongo-query-ast/control';
 import { describe, expect, it } from 'vitest';
 import {
+  collMod,
   createCollection,
   createIndex,
   dropCollection,
@@ -362,6 +363,113 @@ describe('validatedCollection', () => {
 
     expect(Array.isArray(ops)).toBe(true);
     expect(ops.every((op) => 'id' in op && 'execute' in op)).toBe(true);
+  });
+});
+
+describe('collMod', () => {
+  it('produces correct default operation structure', () => {
+    const op = collMod('users', {
+      validator: { $jsonSchema: { required: ['email'] } },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+
+    expect(op.id).toBe('collection.users.collMod');
+    expect(op.label).toBe('Modify collection users');
+    expect(op.operationClass).toBe('destructive');
+  });
+
+  it('applies meta overrides for id, label, and operationClass', () => {
+    const op = collMod(
+      'users',
+      { validator: { $jsonSchema: { required: ['email'] } } },
+      {
+        id: 'validator.users.add',
+        label: 'Add validator on users',
+        operationClass: 'widening',
+      },
+    );
+
+    expect(op.id).toBe('validator.users.add');
+    expect(op.label).toBe('Add validator on users');
+    expect(op.operationClass).toBe('widening');
+  });
+
+  it('includes collection-exists precheck when validator is present', () => {
+    const op = collMod('users', {
+      validator: { $jsonSchema: { required: ['email'] } },
+    });
+
+    expect(op.precheck).toHaveLength(1);
+    expect(op.precheck[0]!.expect).toBe('exists');
+    expect(op.precheck[0]!.source).toBeInstanceOf(ListCollectionsCommand);
+    const filter = op.precheck[0]!.filter as MongoFieldFilter;
+    expect(filter.field).toBe('name');
+    expect(filter.value).toBe('users');
+  });
+
+  it('includes collection-exists precheck when validator is empty (removal)', () => {
+    const op = collMod('users', {
+      validator: {},
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+
+    expect(op.precheck).toHaveLength(1);
+    expect(op.precheck[0]!.expect).toBe('exists');
+  });
+
+  it('has no precheck when only changeStreamPreAndPostImages is set', () => {
+    const op = collMod('users', {
+      changeStreamPreAndPostImages: { enabled: true },
+    });
+
+    expect(op.precheck).toHaveLength(0);
+  });
+
+  it('includes postcheck when validator has content', () => {
+    const op = collMod('users', {
+      validator: { $jsonSchema: { required: ['email'] } },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+
+    expect(op.postcheck).toHaveLength(1);
+    expect(op.postcheck[0]!.expect).toBe('exists');
+  });
+
+  it('has no postcheck when validator is empty (removal)', () => {
+    const op = collMod('users', {
+      validator: {},
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+
+    expect(op.postcheck).toHaveLength(0);
+  });
+
+  it('has no postcheck when only changeStreamPreAndPostImages is set', () => {
+    const op = collMod('users', {
+      changeStreamPreAndPostImages: { enabled: true },
+    });
+
+    expect(op.postcheck).toHaveLength(0);
+  });
+
+  it('uses CollModCommand in execute', () => {
+    const op = collMod('users', {
+      validator: { $jsonSchema: { required: ['email'] } },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+
+    expect(op.execute).toHaveLength(1);
+    const cmd = op.execute[0]!.command as CollModCommand;
+    expect(cmd).toBeInstanceOf(CollModCommand);
+    expect(cmd.collection).toBe('users');
+    expect(cmd.validator).toEqual({ $jsonSchema: { required: ['email'] } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
   });
 });
 

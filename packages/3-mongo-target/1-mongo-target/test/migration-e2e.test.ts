@@ -136,6 +136,117 @@ describe('migration file E2E', () => {
     });
   });
 
+  describe('renderTypeScript round-trip', () => {
+    it('produces ops.json identical to direct factory invocation', async () => {
+      const { renderTypeScript } = await import('../src/core/render-typescript');
+      const calls = [
+        {
+          factory: 'createCollection' as const,
+          collection: 'users',
+          options: {
+            validator: { $jsonSchema: { required: ['email'] } },
+            validationLevel: 'strict' as const,
+          },
+        },
+        {
+          factory: 'createIndex' as const,
+          collection: 'users',
+          keys: [{ field: 'email', direction: 1 as const }],
+          options: { unique: true },
+        },
+      ];
+
+      const tsSource = renderTypeScript(calls);
+      const resolvedSource = tsSource
+        .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
+        .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`);
+      await writeFile(join(tmpDir, 'migration.ts'), resolvedSource);
+
+      const result = await runFile('migration.ts');
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+
+      const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
+
+      expect(ops).toHaveLength(2);
+      expect(ops[0].id).toBe('collection.users.create');
+      expect(ops[0].operationClass).toBe('additive');
+      expect(ops[0].execute[0].command.kind).toBe('createCollection');
+      expect(ops[0].execute[0].command.validator).toEqual({ $jsonSchema: { required: ['email'] } });
+
+      expect(ops[1].id).toContain('index.users.create');
+      expect(ops[1].execute[0].command.kind).toBe('createIndex');
+      expect(ops[1].execute[0].command.unique).toBe(true);
+    });
+
+    it('round-trips collMod with meta through TypeScript execution', async () => {
+      const { renderTypeScript } = await import('../src/core/render-typescript');
+      const calls = [
+        {
+          factory: 'collMod' as const,
+          collection: 'users',
+          options: {
+            validator: { $jsonSchema: { required: ['email'] } },
+            validationLevel: 'strict' as const,
+            validationAction: 'error' as const,
+          },
+          meta: {
+            id: 'validator.users.add',
+            label: 'Add validator on users',
+            operationClass: 'destructive' as const,
+          },
+        },
+      ];
+
+      const tsSource = renderTypeScript(calls);
+      const resolvedSource = tsSource
+        .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
+        .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`);
+      await writeFile(join(tmpDir, 'migration.ts'), resolvedSource);
+
+      const result = await runFile('migration.ts');
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+
+      const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
+
+      expect(ops).toHaveLength(1);
+      expect(ops[0].id).toBe('validator.users.add');
+      expect(ops[0].label).toBe('Add validator on users');
+      expect(ops[0].operationClass).toBe('destructive');
+      expect(ops[0].execute[0].command.kind).toBe('collMod');
+    });
+
+    it('round-trips describe() meta through TypeScript execution', async () => {
+      const { renderTypeScript } = await import('../src/core/render-typescript');
+      const calls = [{ factory: 'dropCollection' as const, collection: 'legacy' }];
+
+      const tsSource = renderTypeScript(calls, {
+        from: 'sha256:aaa',
+        to: 'sha256:bbb',
+        labels: ['cleanup'],
+      });
+      const resolvedSource = tsSource
+        .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
+        .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`);
+      await writeFile(join(tmpDir, 'migration.ts'), resolvedSource);
+
+      const result = await runFile('migration.ts');
+      expect(result.exitCode).toBe(0);
+
+      const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
+      const ops = JSON.parse(opsJson);
+      expect(ops).toHaveLength(1);
+      expect(ops[0].id).toBe('collection.legacy.drop');
+
+      const manifestJson = await readFile(join(tmpDir, 'migration.json'), 'utf-8');
+      const manifest = JSON.parse(manifestJson);
+      expect(manifest.from).toBe('sha256:aaa');
+      expect(manifest.to).toBe('sha256:bbb');
+      expect(manifest.labels).toEqual(['cleanup']);
+    });
+  });
+
   describe('serialization format', () => {
     it('produces JSON that the runner can consume (correct kind discriminants)', async () => {
       const migration = [
