@@ -372,7 +372,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as { collections: Record<string, unknown> };
+      const storage = ir.storage as unknown as { collections: Record<string, unknown> };
       expect(Object.keys(storage.collections)).toEqual(['tasks']);
     });
 
@@ -397,7 +397,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as {
+      const storage = ir.storage as unknown as {
         collections: Record<
           string,
           { indexes?: Array<{ keys: Array<{ field: string; direction: number }> }> }
@@ -442,7 +442,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as {
+      const storage = ir.storage as unknown as {
         collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
       };
       const validator = storage.collections['tasks']?.validator;
@@ -474,7 +474,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as {
+      const storage = ir.storage as unknown as {
         collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
       };
       const validator = storage.collections['tasks']?.validator;
