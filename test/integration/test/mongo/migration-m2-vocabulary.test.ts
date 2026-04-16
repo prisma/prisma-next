@@ -1,13 +1,14 @@
+import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
+import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
   contractToMongoSchemaIR,
   MongoMigrationPlanner,
   MongoMigrationRunner,
   serializeMongoOps,
-} from '@prisma-next/adapter-mongo/control';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
-import mongoControlDriver from '@prisma-next/driver-mongo/control';
-import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
-import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
+} from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -75,7 +76,7 @@ async function planAndApply(
   const serialized = JSON.parse(serializeMongoOps(ops));
   const controlDriver = await mongoControlDriver.create(replSetUri);
   try {
-    const runner = new MongoMigrationRunner();
+    const runner = new MongoMigrationRunner(createMongoRunnerDeps);
     const runResult = await runner.execute({
       plan: {
         targetId: 'mongo',

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { deserializeMongoOps, MongoMigrationRunner } from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import { deserializeMongoOps, MongoMigrationRunner } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -76,7 +77,7 @@ describe(
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner();
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps);
         const result = await runner.execute({
           plan: {
             targetId: 'mongo',
