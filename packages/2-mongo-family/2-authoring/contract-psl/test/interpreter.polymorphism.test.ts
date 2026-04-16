@@ -456,7 +456,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       expect(oneOf).toHaveLength(2);
     });
 
-    it('omits oneOf when no variant has extra fields', () => {
+    it('emits oneOf with discriminator constraint even when no variant has extra fields', () => {
       const ir = interpretOk(`
         model Task {
           id    ObjectId @id @map("_id")
@@ -480,7 +480,13 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       const validator = storage.collections['tasks']?.validator;
       expect(validator).toBeDefined();
       const schema = validator?.jsonSchema;
-      expect(schema).not.toHaveProperty('oneOf');
+      expect(schema).toHaveProperty('oneOf');
+      const oneOf = schema?.['oneOf'] as Array<Record<string, unknown>>;
+      expect(oneOf).toHaveLength(1);
+      expect(oneOf[0]).toMatchObject({
+        properties: { type: { enum: ['bug'] } },
+        required: ['type'],
+      });
     });
   });
 });

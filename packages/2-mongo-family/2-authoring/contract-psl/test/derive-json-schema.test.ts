@@ -1,7 +1,7 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
-import { deriveJsonSchema } from '../src/derive-json-schema';
+import { deriveJsonSchema, derivePolymorphicJsonSchema } from '../src/derive-json-schema';
 
 const mongoCodecLookup: CodecLookup = {
   get(id: string) {
@@ -286,6 +286,44 @@ describe('deriveJsonSchema', () => {
       properties: {
         price: { bsonType: 'double' },
       },
+    });
+  });
+});
+
+describe('derivePolymorphicJsonSchema', () => {
+  it('includes discriminatorField in required for each oneOf branch', () => {
+    const result = derivePolymorphicJsonSchema(
+      { _id: scalarField('mongo/objectId@1'), name: scalarField('mongo/string@1') },
+      '_type',
+      [
+        { discriminatorValue: 'Dog', fields: { breed: scalarField('mongo/string@1') } },
+        { discriminatorValue: 'Cat', fields: { indoor: scalarField('mongo/bool@1') } },
+      ],
+      undefined,
+      mongoCodecLookup,
+    );
+
+    const oneOf = result.jsonSchema['oneOf'] as Record<string, unknown>[];
+    expect(oneOf).toHaveLength(2);
+    for (const branch of oneOf) {
+      expect(branch['required']).toContain('_type');
+    }
+  });
+
+  it('emits oneOf branch even for single variant with no extra fields', () => {
+    const result = derivePolymorphicJsonSchema(
+      { _id: scalarField('mongo/objectId@1'), name: scalarField('mongo/string@1') },
+      '_type',
+      [{ discriminatorValue: 'OnlyVariant', fields: {} }],
+      undefined,
+      mongoCodecLookup,
+    );
+
+    const oneOf = result.jsonSchema['oneOf'] as Record<string, unknown>[];
+    expect(oneOf).toHaveLength(1);
+    expect(oneOf[0]).toMatchObject({
+      properties: { _type: { enum: ['OnlyVariant'] } },
+      required: ['_type'],
     });
   });
 });
