@@ -10,6 +10,7 @@ import {
   extractComponentIds,
   extractOperationTypeImports,
   extractQueryOperationTypeImports,
+  validatePslScalarTypeCodecIds,
 } from '../src/control-stack';
 import type { ComponentDescriptor } from '../src/framework-components';
 
@@ -447,5 +448,33 @@ describe('createControlStack', () => {
     expect(state.queryOperationTypeImports).toEqual([]);
     expect(state.extensionIds).toEqual(['fam', 'tgt']);
     expect(state.authoringContributions).toEqual({ field: {}, type: {} });
+  });
+});
+
+describe('validatePslScalarTypeCodecIds', () => {
+  it('returns errors for unregistered codec IDs', () => {
+    const descriptors = new Map([['String', 'missing/codec@1']]);
+    const lookup = { get: () => undefined };
+    const errors = validatePslScalarTypeCodecIds(descriptors, lookup);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/PSL scalar type "String" references codec "missing\/codec@1"/);
+  });
+
+  it('returns empty array when all codec IDs are registered', () => {
+    const descriptors = new Map([['String', 'test/text@1']]);
+    const lookup = {
+      get: (id: string) =>
+        id === 'test/text@1'
+          ? ({
+              id,
+              targetTypes: ['text'],
+              decode: (v: unknown) => v,
+              encodeJson: (v: unknown) => v,
+              decodeJson: (v: unknown) => v,
+            } as ReturnType<typeof lookup.get>)
+          : undefined,
+    };
+    const errors = validatePslScalarTypeCodecIds(descriptors, lookup);
+    expect(errors).toEqual([]);
   });
 });
