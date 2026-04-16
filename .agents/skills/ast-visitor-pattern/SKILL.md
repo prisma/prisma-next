@@ -42,6 +42,17 @@ export class BarNode extends FooNode {
   accept<R>(visitor: FooVisitor<R>): R { return visitor.bar(this); }
 }
 
+export class BazNode extends FooNode {
+  readonly kind = 'baz' as const;
+  readonly count: number;
+  constructor(count: number) {
+    super();
+    this.count = count;
+    this.freeze();
+  }
+  accept<R>(visitor: FooVisitor<R>): R { return visitor.baz(this); }
+}
+
 // 4. Union type
 export type Foo = BarNode | BazNode;
 ```
