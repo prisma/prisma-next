@@ -115,49 +115,49 @@ The fix: enrich `ContractSourceContext` with all of these, assembled by the CLI 
 
 ## FL-09: Variant collection suppression
 
-- [ ] Running the interpreter on a PSL schema with `@@discriminator` / `@@base` produces a contract where `storage.collections` has no entry for the variant's default collection name (only the base's collection).
-- [ ] `MongoMigrationPlanner.plan()` on such a contract (from empty origin) emits no `createCollection` for variant collection names.
-- [ ] Variant-level `@@index` declarations are merged into the base collection's index list in the contract.
+- [x] Running the interpreter on a PSL schema with `@@discriminator` / `@@base` produces a contract where `storage.collections` has no entry for the variant's default collection name (only the base's collection).
+- [x] `MongoMigrationPlanner.plan()` on such a contract (from empty origin) emits no `createCollection` for variant collection names.
+- [x] Variant-level `@@index` declarations are merged into the base collection's index list in the contract.
 
 ## FL-10: Polymorphic validators
 
-- [ ] The base collection's `$jsonSchema` validator includes all base model fields in `properties` and `required`.
-- [ ] The validator includes a `oneOf` array with one entry per variant, each scoped to the discriminator value and listing variant-specific properties/required.
-- [ ] A base model with no variant-specific fields (all fields are on the base) produces a simple validator with no `oneOf`.
+- [x] The base collection's `$jsonSchema` validator includes all base model fields in `properties` and `required`.
+- [x] The validator includes a `oneOf` array with one entry per variant, each scoped to the discriminator value and listing variant-specific properties/required.
+- [x] A base model with no variant-specific fields (all fields are on the base) produces a simple validator with no `oneOf`.
 
 ## FL-11: Float type support
 
-- [ ] A PSL field `price Float` produces `{ bsonType: "double" }` in the collection's `$jsonSchema` validator.
-- [ ] The `Float` codec ID (`mongo/double@1`) comes from the Mongo target/adapter descriptor's `pslScalarTypeDescriptors`, not from a hardcoded map in the authoring layer.
+- [x] A PSL field `price Float` produces `{ bsonType: "double" }` in the collection's `$jsonSchema` validator.
+- [x] The `Float` codec ID (`mongo/double@1`) comes from the Mongo target/adapter descriptor's `pslScalarTypeDescriptors`, not from a hardcoded map in the authoring layer.
 
 ## Enriched `ContractSourceContext`
 
-- [ ] `ContractSourceContext` carries `pslScalarTypeDescriptors`, `authoringContributions`, `codecLookup`, `controlMutationDefaults`, and `composedExtensionPacks`.
-- [ ] The CLI's `executeContractEmit` builds the `ControlStack` and assembles all contributions *before* calling the contract source provider.
-- [ ] The contract source provider receives the fully assembled context.
+- [x] `ContractSourceContext` carries `pslScalarTypeDescriptors`, `authoringContributions`, `codecLookup`, `controlMutationDefaults`, and `composedExtensionPacks`.
+- [x] The CLI's `executeContractEmit` builds the `ControlStack` and assembles all contributions *before* calling the contract source provider.
+- [x] The contract source provider receives the fully assembled context.
 
 ## Framework-level PSL contribution assembly
 
-- [ ] `ComponentMetadata` has optional `pslScalarTypeDescriptors` and `controlMutationDefaults` fields.
-- [ ] `createControlStack` assembles scalar type descriptors and mutation defaults from all component descriptors with duplicate detection.
-- [ ] The Mongo adapter declares `pslScalarTypeDescriptors` including `Float` → `mongo/double@1`.
-- [ ] The Postgres adapter declares `pslScalarTypeDescriptors` and `controlMutationDefaults` using the new framework-level fields instead of the SQL-specific `SqlControlStaticContributions` hooks.
-- [ ] Mutation default types (`DefaultFunctionRegistryEntry`, `MutationDefaultGeneratorDescriptor`) live at the framework level.
+- [x] `ComponentMetadata` has optional `pslScalarTypeDescriptors` and `controlMutationDefaults` fields.
+- [x] `createControlStack` assembles scalar type descriptors and mutation defaults from all component descriptors with duplicate detection.
+- [x] The Mongo adapter declares `pslScalarTypeDescriptors` including `Float` → `mongo/double@1`.
+- [x] The Postgres adapter declares `pslScalarTypeDescriptors` and `controlMutationDefaults` using the new framework-level fields instead of the SQL-specific `SqlControlStaticContributions` hooks.
+- [x] Mutation default types (`DefaultFunctionRegistryEntry`, `MutationDefaultGeneratorDescriptor`) live at the framework level.
 
 ## Elimination of duplicated/hardcoded contributions
 
-- [ ] `createMongoScalarTypeDescriptors()` in `scalar-type-descriptors.ts` is deleted.
-- [ ] `CODEC_TO_BSON_TYPE` in `derive-json-schema.ts` is deleted. `deriveJsonSchema` derives BSON types from the codec lookup.
-- [ ] SQL's `PslScalarTypeDescriptor` type (carrying `nativeType`) is eliminated. Native type is derived from the codec.
-- [ ] `SqlControlStaticContributions` interface is eliminated.
-- [ ] `assemblePslInterpretationContributions()` and `assembleControlMutationDefaultContributions()` are replaced by framework-level assembly.
+- [x] `createMongoScalarTypeDescriptors()` in `scalar-type-descriptors.ts` is deleted.
+- [x] `CODEC_TO_BSON_TYPE` in `derive-json-schema.ts` is deleted. `deriveJsonSchema` derives BSON types from the codec lookup.
+- [x] SQL's `PslScalarTypeDescriptor` type (carrying `nativeType`) is eliminated. Native type is derived from the codec.
+- [x] `SqlControlStaticContributions` interface is eliminated.
+- [x] `assemblePslInterpretationContributions()` and `assembleControlMutationDefaultContributions()` are replaced by framework-level assembly.
 
 ## Provider and config simplification
 
-- [ ] `prismaContract()` reads all contributions from `ContractSourceContext`. Options for `scalarTypeDescriptors`, `authoringContributions`, and `controlMutationDefaults` are removed.
-- [ ] `mongoContract()` reads scalar type descriptors from `ContractSourceContext`. The `scalarTypeDescriptors` option is removed.
-- [ ] `examples/prisma-next-demo/prisma-next.config.ts` does not call assembly functions or pass contributions to the contract source.
-- [ ] `examples/retail-store/prisma-next.config.ts` does not manually extend scalar type descriptors.
+- [x] `prismaContract()` reads all contributions from `ContractSourceContext`. Options for `scalarTypeDescriptors`, `authoringContributions`, and `controlMutationDefaults` are removed.
+- [x] `mongoContract()` reads scalar type descriptors from `ContractSourceContext`. The `scalarTypeDescriptors` option is removed.
+- [x] `examples/prisma-next-demo/prisma-next.config.ts` does not call assembly functions or pass contributions to the contract source.
+- [x] `examples/retail-store/prisma-next.config.ts` does not manually extend scalar type descriptors.
 
 # Other Considerations
 
