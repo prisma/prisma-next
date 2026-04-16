@@ -92,6 +92,7 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
  *  Real-pack parity is covered by
  *  `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`. */
 export const pgvectorAuthoringContributions = {
+  field: {},
   type: {
     pgvector: {
       Vector: {

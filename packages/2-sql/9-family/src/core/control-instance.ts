@@ -32,7 +32,6 @@ import {
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { SqlControlDescriptorWithContributions } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
 import type {
   SqlControlAdapterDescriptor,
@@ -279,7 +278,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   }
 
   const target = stack.target as unknown as TargetDescriptor<'sql', TTargetId> &
-    SqlControlDescriptorWithContributions &
     DescriptorWithStorageTypes;
   const adapter = stack.adapter as unknown as SqlControlAdapterDescriptor<TTargetId> &
     DescriptorWithStorageTypes;

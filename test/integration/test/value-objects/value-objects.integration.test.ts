@@ -1,9 +1,6 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
-import {
-  createMongoScalarTypeDescriptors,
-  interpretPslDocumentToMongoContract,
-} from '@prisma-next/mongo-contract-psl';
+import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
@@ -61,7 +58,14 @@ function interpretMongoPsl(schema: string) {
   const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
   return interpretPslDocumentToMongoContract({
     document,
-    scalarTypeDescriptors: createMongoScalarTypeDescriptors(),
+    scalarTypeDescriptors: new Map([
+      ['String', 'mongo/string@1'],
+      ['Int', 'mongo/int32@1'],
+      ['Boolean', 'mongo/bool@1'],
+      ['DateTime', 'mongo/date@1'],
+      ['ObjectId', 'mongo/objectId@1'],
+      ['Float', 'mongo/double@1'],
+    ]),
   });
 }
 

@@ -489,8 +489,13 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
+      const stack = this.stack!;
       const sourceContext = {
-        composedExtensionPacks: (this.options.extensionPacks ?? []).map((p) => p.id),
+        composedExtensionPacks: stack.extensionIds,
+        pslScalarTypeDescriptors: stack.pslScalarTypeDescriptors,
+        authoringContributions: stack.authoringContributions,
+        codecLookup: stack.codecLookup,
+        controlMutationDefaults: stack.controlMutationDefaults,
       };
       const providerResult = await contractConfig.sourceProvider(sourceContext);
       if (!providerResult.ok) {

@@ -1,10 +1,7 @@
 import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
-import {
-  createMongoScalarTypeDescriptors,
-  interpretPslDocumentToMongoContract,
-} from '@prisma-next/mongo-contract-psl';
+import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import {
@@ -26,7 +23,14 @@ function pslToContract(schema: string): MongoContract {
   const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
   const result = interpretPslDocumentToMongoContract({
     document,
-    scalarTypeDescriptors: createMongoScalarTypeDescriptors(),
+    scalarTypeDescriptors: new Map([
+      ['String', 'mongo/string@1'],
+      ['Int', 'mongo/int32@1'],
+      ['Boolean', 'mongo/bool@1'],
+      ['DateTime', 'mongo/date@1'],
+      ['ObjectId', 'mongo/objectId@1'],
+      ['Float', 'mongo/double@1'],
+    ]),
   });
   if (!result.ok) {
     throw new Error(`PSL interpretation failed: ${JSON.stringify(result)}`);

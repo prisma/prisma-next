@@ -35,7 +35,8 @@ describe('emit command functionality', () => {
   });
 
   const buildEmitterArtifacts = () => {
-    const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+    const { adapter, target, extensions } = getSqlDescriptorBundle();
+    const descriptors = [target, adapter, ...extensions];
     return {
       codecTypeImports: extractCodecTypeImports(descriptors),
       operationTypeImports: extractOperationTypeImports(descriptors),

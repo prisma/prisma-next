@@ -14,11 +14,11 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('extracts codec type imports from descriptors', () => {
-    const { descriptors } = getSqlDescriptorBundle({
+    const { target, adapter, extensions } = getSqlDescriptorBundle({
       extensions: [pgvectorExtensionDescriptor],
     });
 
-    const codecTypeImports = extractCodecTypeImports(descriptors);
+    const codecTypeImports = extractCodecTypeImports([target, adapter, ...extensions]);
     expect(codecTypeImports.length).toBe(14);
     // Adapter codec types come first
     expect(codecTypeImports[0]).toEqual({
@@ -39,11 +39,11 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('extracts operation type imports from descriptors', () => {
-    const { descriptors } = getSqlDescriptorBundle({
+    const { target, adapter, extensions } = getSqlDescriptorBundle({
       extensions: [pgvectorExtensionDescriptor],
     });
 
-    const operationTypeImports = extractOperationTypeImports(descriptors);
+    const operationTypeImports = extractOperationTypeImports([target, adapter, ...extensions]);
     expect(operationTypeImports.length).toBe(1);
     expect(operationTypeImports[0]).toEqual({
       package: '@prisma-next/extension-pgvector/operation-types',
