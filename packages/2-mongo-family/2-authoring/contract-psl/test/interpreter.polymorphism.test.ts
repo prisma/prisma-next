@@ -527,5 +527,40 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         required: ['type'],
       });
     });
+
+    it('uses storage-mapped discriminator field name in validator', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String   @map("_type")
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+        }
+      `);
+
+      const storage = ir.storage as unknown as {
+        collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
+      };
+      const validator = storage.collections['tasks']?.validator;
+      expect(validator).toBeDefined();
+      const schema = validator?.jsonSchema;
+      expect(schema).toHaveProperty('properties._type');
+      expect(schema).not.toHaveProperty('properties.type');
+      expect(schema).toHaveProperty('oneOf');
+      const oneOf = schema?.['oneOf'] as Array<Record<string, unknown>>;
+      expect(oneOf[0]).toMatchObject({
+        properties: { _type: { enum: ['bug'] } },
+      });
+      expect(oneOf[0]['required']).toContain('_type');
+    });
   });
 });

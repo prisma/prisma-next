@@ -180,7 +180,12 @@ function resolvePolymorphism(input: {
     const model = patched[modelName];
     if (!model) continue;
 
-    if (!Object.hasOwn(model.fields, decl.fieldName)) {
+    const pslModel = document.ast.models.find((m) => m.name === modelName);
+    const mappedDiscriminatorField = pslModel
+      ? (resolveFieldMappings(pslModel).pslNameToMapped.get(decl.fieldName) ?? decl.fieldName)
+      : decl.fieldName;
+
+    if (!Object.hasOwn(model.fields, mappedDiscriminatorField)) {
       diagnostics.push({
         code: 'PSL_DISCRIMINATOR_FIELD_NOT_FOUND',
         message: `Discriminator field "${decl.fieldName}" is not a field on model "${modelName}"`,
@@ -208,7 +213,7 @@ function resolvePolymorphism(input: {
 
     patched = {
       ...patched,
-      [modelName]: { ...model, discriminator: { field: decl.fieldName }, variants },
+      [modelName]: { ...model, discriminator: { field: mappedDiscriminatorField }, variants },
     };
   }
 
