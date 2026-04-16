@@ -24,7 +24,7 @@ function buildControlStack(config: Awaited<ReturnType<typeof loadConfig>>) {
 
 function buildSourceContext(stack: ControlStack): ContractSourceContext {
   return {
-    composedExtensionPacks: stack.extensionIds.slice(),
+    composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
     pslScalarTypeDescriptors: stack.pslScalarTypeDescriptors,
     authoringContributions: stack.authoringContributions,
     codecLookup: stack.codecLookup,
