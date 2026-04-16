@@ -11,6 +11,7 @@ import type {
   MongoSchemaCollection,
   MongoSchemaCollectionOptions,
   MongoSchemaIndex,
+  MongoSchemaIR,
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import { canonicalize, deepEqual } from '@prisma-next/mongo-schema-ir';
