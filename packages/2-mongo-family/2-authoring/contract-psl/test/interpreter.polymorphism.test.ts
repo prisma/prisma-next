@@ -556,11 +556,12 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       expect(schema).toHaveProperty('properties._type');
       expect(schema).not.toHaveProperty('properties.type');
       expect(schema).toHaveProperty('oneOf');
-      const oneOf = schema?.['oneOf'] as Array<Record<string, unknown>>;
-      expect(oneOf[0]).toMatchObject({
+      const oneOf = schema?.['oneOf'] as Array<Record<string, unknown>> | undefined;
+      expect(oneOf).toBeDefined();
+      expect(oneOf![0]).toMatchObject({
         properties: { _type: { enum: ['bug'] } },
       });
-      expect(oneOf[0]['required']).toContain('_type');
+      expect(oneOf![0]!['required']).toContain('_type');
     });
   });
 });
