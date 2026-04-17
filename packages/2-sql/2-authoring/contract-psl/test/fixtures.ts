@@ -168,7 +168,7 @@ export function createPostgresTestContext(
 ): ContractSourceContext {
   return {
     composedExtensionPacks: [],
-    pslScalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
+    scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
     authoringContributions: { field: {}, type: {} },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),

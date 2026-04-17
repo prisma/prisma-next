@@ -5,7 +5,7 @@ import { typescriptContract } from '../src/config-types';
 
 const stubContext: ContractSourceContext = {
   composedExtensionPacks: [],
-  pslScalarTypeDescriptors: new Map(),
+  scalarTypeDescriptors: new Map(),
   authoringContributions: { field: {}, type: {} },
   codecLookup: { get: () => undefined },
   controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },

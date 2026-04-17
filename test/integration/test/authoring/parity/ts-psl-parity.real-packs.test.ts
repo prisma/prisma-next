@@ -25,7 +25,7 @@ const stack = createControlStack({
 
 function buildColumnDescriptorMap() {
   const result = new Map<string, { codecId: string; nativeType: string }>();
-  for (const [typeName, codecId] of stack.pslScalarTypeDescriptors) {
+  for (const [typeName, codecId] of stack.scalarTypeDescriptors) {
     const codec = stack.codecLookup.get(codecId);
     const nativeType = codec?.targetTypes[0] ?? codecId;
     result.set(typeName, { codecId, nativeType });

@@ -67,7 +67,7 @@ export type {
 export {
   assembleAuthoringContributions,
   assembleControlMutationDefaults,
-  assemblePslScalarTypeDescriptors,
+  assembleScalarTypeDescriptors,
   assertUniqueCodecOwner,
   createControlStack,
   extractCodecLookup,

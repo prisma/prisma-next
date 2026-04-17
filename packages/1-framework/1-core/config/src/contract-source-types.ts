@@ -38,7 +38,7 @@ export interface ContractSourceDiagnostics {
 
 export interface ContractSourceContext {
   readonly composedExtensionPacks: readonly string[];
-  readonly pslScalarTypeDescriptors: ReadonlyMap<string, string>;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly authoringContributions: AssembledAuthoringContributions;
   readonly codecLookup: CodecLookup;
   readonly controlMutationDefaults: ControlMutationDefaults;

@@ -483,7 +483,7 @@ model Document {
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', baseOptions);
       const brokenContext = createPostgresTestContext({
-        pslScalarTypeDescriptors: new Map([
+        scalarTypeDescriptors: new Map([
           ['Int', 'pg/int4@1'],
           ['Bytes', 'bogus/missing@1'],
         ]),

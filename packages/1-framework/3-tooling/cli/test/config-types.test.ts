@@ -187,7 +187,7 @@ describe('defineConfig', () => {
     const config = typescriptContract(contract, 'output/contract.json');
     const result = await config.source({
       composedExtensionPacks: [],
-      pslScalarTypeDescriptors: new Map(),
+      scalarTypeDescriptors: new Map(),
       authoringContributions: { field: {}, type: {} },
       codecLookup: { get: () => undefined },
       controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },

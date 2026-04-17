@@ -56,7 +56,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
       });
 
       const scalarTypeDescriptors = buildColumnDescriptorMap(
-        context.pslScalarTypeDescriptors,
+        context.scalarTypeDescriptors,
         context.codecLookup,
       );
 
