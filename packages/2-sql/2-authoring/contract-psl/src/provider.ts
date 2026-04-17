@@ -23,7 +23,9 @@ function buildColumnDescriptorMap(
   for (const [typeName, codecId] of scalarTypeDescriptors) {
     const codec = codecLookup.get(codecId);
     if (!codec) continue;
-    result.set(typeName, { codecId, nativeType: codec.targetTypes[0] });
+    const nativeType = codec.targetTypes[0];
+    if (nativeType === undefined) continue;
+    result.set(typeName, { codecId, nativeType });
   }
   return result;
 }
