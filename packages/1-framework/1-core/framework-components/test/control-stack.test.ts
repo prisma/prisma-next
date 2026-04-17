@@ -1,16 +1,18 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
+import type { CodecLookup } from '../src/codec-types';
 import type { CreateControlStackInput } from '../src/control-stack';
 import {
   assembleAuthoringContributions,
   assembleControlMutationDefaults,
-  assemblePslScalarTypeDescriptors,
+  assembleScalarTypeDescriptors,
   createControlStack,
   extractCodecLookup,
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,
   extractQueryOperationTypeImports,
-  validatePslScalarTypeCodecIds,
+  validateScalarTypeCodecIds,
 } from '../src/control-stack';
 import type { ComponentDescriptor } from '../src/framework-components';
 
@@ -228,24 +230,24 @@ describe('extractCodecLookup', () => {
   });
 });
 
-describe('assemblePslScalarTypeDescriptors', () => {
+describe('assembleScalarTypeDescriptors', () => {
   it('returns empty map when no descriptors contribute', () => {
-    const result = assemblePslScalarTypeDescriptors([createDescriptor()]);
+    const result = assembleScalarTypeDescriptors([createDescriptor()]);
     expect(result.size).toBe(0);
   });
 
   it('merges scalar type descriptors from multiple descriptors', () => {
-    const result = assemblePslScalarTypeDescriptors([
+    const result = assembleScalarTypeDescriptors([
       createDescriptor({
         id: 'target',
-        pslScalarTypeDescriptors: new Map([
+        scalarTypeDescriptors: new Map([
           ['String', 'pg/text@1'],
           ['Int', 'pg/int4@1'],
         ]),
       }),
       createDescriptor({
         id: 'extension',
-        pslScalarTypeDescriptors: new Map([['Vector', 'pgvector/vector@1']]),
+        scalarTypeDescriptors: new Map([['Vector', 'pgvector/vector@1']]),
       }),
     ]);
     expect(result.size).toBe(3);
@@ -254,19 +256,19 @@ describe('assemblePslScalarTypeDescriptors', () => {
     expect(result.get('Vector')).toBe('pgvector/vector@1');
   });
 
-  it('throws on duplicate PSL type name from different descriptors', () => {
+  it('throws on duplicate type name from different descriptors', () => {
     expect(() =>
-      assemblePslScalarTypeDescriptors([
+      assembleScalarTypeDescriptors([
         createDescriptor({
           id: 'desc-a',
-          pslScalarTypeDescriptors: new Map([['String', 'a/text@1']]),
+          scalarTypeDescriptors: new Map([['String', 'a/text@1']]),
         }),
         createDescriptor({
           id: 'desc-b',
-          pslScalarTypeDescriptors: new Map([['String', 'b/text@1']]),
+          scalarTypeDescriptors: new Map([['String', 'b/text@1']]),
         }),
       ]),
-    ).toThrow(/Duplicate PSL scalar type descriptor "String".*"desc-b".*"desc-a"/);
+    ).toThrow(/Duplicate scalar type descriptor "String".*"desc-b".*"desc-a"/);
   });
 });
 
@@ -451,30 +453,30 @@ describe('createControlStack', () => {
   });
 });
 
-describe('validatePslScalarTypeCodecIds', () => {
+describe('validateScalarTypeCodecIds', () => {
   it('returns errors for unregistered codec IDs', () => {
     const descriptors = new Map([['String', 'missing/codec@1']]);
     const lookup = { get: () => undefined };
-    const errors = validatePslScalarTypeCodecIds(descriptors, lookup);
+    const errors = validateScalarTypeCodecIds(descriptors, lookup);
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatch(/PSL scalar type "String" references codec "missing\/codec@1"/);
+    expect(errors[0]).toMatch(/Scalar type "String" references codec "missing\/codec@1"/);
   });
 
   it('returns empty array when all codec IDs are registered', () => {
     const descriptors = new Map([['String', 'test/text@1']]);
-    const lookup = {
+    const lookup: CodecLookup = {
       get: (id: string) =>
         id === 'test/text@1'
-          ? ({
+          ? {
               id,
               targetTypes: ['text'],
               decode: (v: unknown) => v,
-              encodeJson: (v: unknown) => v,
-              decodeJson: (v: unknown) => v,
-            } as ReturnType<typeof lookup.get>)
+              encodeJson: (v: unknown) => v as JsonValue,
+              decodeJson: (v: JsonValue) => v,
+            }
           : undefined,
     };
-    const errors = validatePslScalarTypeCodecIds(descriptors, lookup);
+    const errors = validateScalarTypeCodecIds(descriptors, lookup);
     expect(errors).toEqual([]);
   });
 });

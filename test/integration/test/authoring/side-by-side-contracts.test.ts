@@ -39,7 +39,7 @@ const mongoStack = createControlStack({
 
 const sqlSourceContext: ContractSourceContext = {
   composedExtensionPacks: [],
-  pslScalarTypeDescriptors: sqlStack.pslScalarTypeDescriptors,
+  scalarTypeDescriptors: sqlStack.scalarTypeDescriptors,
   authoringContributions: sqlStack.authoringContributions,
   codecLookup: sqlStack.codecLookup,
   controlMutationDefaults: sqlStack.controlMutationDefaults,
@@ -47,7 +47,7 @@ const sqlSourceContext: ContractSourceContext = {
 
 const mongoSourceContext: ContractSourceContext = {
   composedExtensionPacks: [],
-  pslScalarTypeDescriptors: mongoStack.pslScalarTypeDescriptors,
+  scalarTypeDescriptors: mongoStack.scalarTypeDescriptors,
   authoringContributions: mongoStack.authoringContributions,
   codecLookup: mongoStack.codecLookup,
   controlMutationDefaults: mongoStack.controlMutationDefaults,

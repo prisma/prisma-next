@@ -24,7 +24,7 @@ const mongoAdapterDescriptor: ControlAdapterDescriptor<'mongo', 'mongo'> = {
   familyId: 'mongo',
   targetId: 'mongo',
   version: '0.0.1',
-  pslScalarTypeDescriptors: new Map([
+  scalarTypeDescriptors: new Map([
     ['String', 'mongo/string@1'],
     ['Int', 'mongo/int32@1'],
     ['Boolean', 'mongo/bool@1'],

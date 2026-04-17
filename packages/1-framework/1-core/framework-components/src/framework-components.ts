@@ -68,10 +68,10 @@ export interface ComponentMetadata {
   readonly authoring?: AuthoringContributions;
 
   /**
-   * PSL scalar type name to codec ID mapping contributed by this component.
+   * Scalar type name to codec ID mapping contributed by this component.
    * Assembled by `createControlStack` with duplicate detection.
    */
-  readonly pslScalarTypeDescriptors?: ReadonlyMap<string, string>;
+  readonly scalarTypeDescriptors?: ReadonlyMap<string, string>;
 
   /**
    * Mutation default function handlers and generator descriptors contributed

@@ -39,7 +39,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
 
       const interpreted = interpretPslDocumentToMongoContract({
         document,
-        scalarTypeDescriptors: context.pslScalarTypeDescriptors,
+        scalarTypeDescriptors: context.scalarTypeDescriptors,
         codecLookup: context.codecLookup,
       });
       if (!interpreted.ok) {

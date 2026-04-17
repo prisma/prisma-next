@@ -281,7 +281,7 @@ const postgresDefaultFunctionRegistryEntries = [
   ['dbgenerated', { lower: lowerDbgenerated, usageSignatures: ['dbgenerated("...")'] }],
 ] satisfies ReadonlyArray<readonly [string, ControlMutationDefaultEntry]>;
 
-const postgresPslScalarTypeDescriptors = new Map<string, string>([
+const postgresScalarTypeDescriptors = new Map<string, string>([
   ['String', 'pg/text@1'],
   ['Boolean', 'pg/bool@1'],
   ['Int', 'pg/int4@1'],
@@ -322,6 +322,6 @@ export function createPostgresMutationDefaultGeneratorDescriptors(): readonly Mu
   }));
 }
 
-export function createPostgresPslScalarTypeDescriptors(): ReadonlyMap<string, string> {
-  return new Map(postgresPslScalarTypeDescriptors);
+export function createPostgresScalarTypeDescriptors(): ReadonlyMap<string, string> {
+  return new Map(postgresScalarTypeDescriptors);
 }

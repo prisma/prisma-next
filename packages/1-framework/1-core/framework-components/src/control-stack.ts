@@ -42,7 +42,7 @@ export interface ControlStack<
   readonly extensionIds: ReadonlyArray<string>;
   readonly codecLookup: CodecLookup;
   readonly authoringContributions: AssembledAuthoringContributions;
-  readonly pslScalarTypeDescriptors: ReadonlyMap<string, string>;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
 }
 
@@ -251,23 +251,23 @@ export function assembleAuthoringContributions(
   };
 }
 
-export function assemblePslScalarTypeDescriptors(
+export function assembleScalarTypeDescriptors(
   descriptors: ReadonlyArray<
-    Pick<ComponentMetadata, 'pslScalarTypeDescriptors'> & { readonly id?: string }
+    Pick<ComponentMetadata, 'scalarTypeDescriptors'> & { readonly id?: string }
   >,
 ): ReadonlyMap<string, string> {
   const result = new Map<string, string>();
   const owners = new Map<string, string>();
 
   for (const descriptor of descriptors) {
-    const descriptorMap = descriptor.pslScalarTypeDescriptors;
+    const descriptorMap = descriptor.scalarTypeDescriptors;
     if (!descriptorMap) continue;
     const descriptorId = descriptor.id ?? '<unknown>';
     for (const [typeName, codecId] of descriptorMap) {
       const existingOwner = owners.get(typeName);
       if (existingOwner !== undefined) {
         throw new Error(
-          `Duplicate PSL scalar type descriptor "${typeName}". ` +
+          `Duplicate scalar type descriptor "${typeName}". ` +
             `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
         );
       }
@@ -349,15 +349,15 @@ export function extractCodecLookup(
   return { get: (id) => byId.get(id) };
 }
 
-export function validatePslScalarTypeCodecIds(
-  pslScalarTypeDescriptors: ReadonlyMap<string, string>,
+export function validateScalarTypeCodecIds(
+  scalarTypeDescriptors: ReadonlyMap<string, string>,
   codecLookup: CodecLookup,
 ): string[] {
   const errors: string[] = [];
-  for (const [typeName, codecId] of pslScalarTypeDescriptors) {
+  for (const [typeName, codecId] of scalarTypeDescriptors) {
     if (!codecLookup.get(codecId)) {
       errors.push(
-        `PSL scalar type "${typeName}" references codec "${codecId}" which is not registered by any component.`,
+        `Scalar type "${typeName}" references codec "${codecId}" which is not registered by any component.`,
       );
     }
   }
@@ -372,7 +372,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
   const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...extensionPacks];
 
   const codecLookup = extractCodecLookup(allDescriptors);
-  const pslScalarTypeDescriptors = assemblePslScalarTypeDescriptors(allDescriptors);
+  const scalarTypeDescriptors = assembleScalarTypeDescriptors(allDescriptors);
 
   return {
     family,
@@ -387,7 +387,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
     codecLookup,
     authoringContributions: assembleAuthoringContributions(allDescriptors),
-    pslScalarTypeDescriptors,
+    scalarTypeDescriptors,
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
   };
 }

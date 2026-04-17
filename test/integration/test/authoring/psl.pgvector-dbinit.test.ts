@@ -50,7 +50,7 @@ describe(
 
       const pslResult = await contractConfig.source({
         composedExtensionPacks: [pgvector.id],
-        pslScalarTypeDescriptors: stack.pslScalarTypeDescriptors,
+        scalarTypeDescriptors: stack.scalarTypeDescriptors,
         authoringContributions: stack.authoringContributions,
         codecLookup: stack.codecLookup,
         controlMutationDefaults: stack.controlMutationDefaults,
