@@ -1,16 +1,18 @@
 # Summary
 
-Publish the `@prisma-next/cli` package under the unscoped NPM name `prisma-next` by introducing a thin shim package (`packages/prisma-next`) whose build copies the CLI's `dist/` into its own, giving us a curated public package name and README without touching internal imports.
+Publish the `@prisma-next/cli` package under the unscoped NPM name `prisma-next` by introducing a thin **bin-only** shim package (`packages/1-framework/3-tooling/prisma-next/`) whose build copies the CLI's `dist/` into its own, giving us a curated public package name and README. The shim exposes only the `prisma-next` binary — no library exports — so nothing can ever `import` from it.
 
 # Description
 
 Today the CLI is named `@prisma-next/cli` internally and is imported under that name from ~21 packages and several example apps. We want the **public-facing** NPM package to be called `prisma-next` for brand and ergonomics (`npm i -D prisma-next`, `npx prisma-next …`), but we do **not** want the churn of renaming internal imports or the dilution of the `@prisma-next/*` scope convention for internal packages.
 
-The chosen approach is a thin **shim package** at `packages/1-framework/3-tooling/prisma-next/` whose sole responsibility is to:
+The chosen approach is a thin **bin-only shim package** at `packages/1-framework/3-tooling/prisma-next/` whose sole responsibility is to:
 
-1. Re-expose `@prisma-next/cli`'s public subpath exports and `bin` under the name `prisma-next`.
+1. Ship the `prisma-next` binary, backed by a verbatim copy of `@prisma-next/cli/dist/` so that at runtime there is **zero module/process indirection** between `npx prisma-next` and the real CLI entry point.
 2. Own a curated, user-facing README and package description (independent of the internal CLI README, which remains as architecture/internal documentation).
-3. At build time, produce its own populated `dist/` (a verbatim copy of `@prisma-next/cli/dist/`) so that at runtime there is **zero module/process indirection** between `npx prisma-next` and the real CLI entry point.
+3. Expose **no** library exports: no `main`, no `types`, no `exports` map. The shim is a CLI distribution vehicle, not an import target. Consumers who need the programmatic API, low-level `defineConfig`, or other CLI subpaths (`config-types`, `control-api`, `commands/*`, `config-loader`) import them from `@prisma-next/cli` directly and accept that package's stability contract.
+
+This shape matches how CLI-first packages are conventionally distributed on npm (`eslint`, `prettier`, the `typescript` binary, `prisma` itself): the user-facing package provides the command, and companion scoped packages provide library APIs.
 
 This design was chosen over two alternatives:
 
@@ -38,24 +40,24 @@ The work also establishes a forward path: if we later want to inline the CLI's i
 - **F8**: `pnpm -F prisma-next clean` removes the shim's `dist/`.
 - **F9**: The build script is implemented as a Node ESM script (`scripts/build.mjs` or equivalent), using `node:fs/promises` and `pathe`. It does not shell out to `cp`.
 
-### Public surface mirroring
+### Public surface — bin only
 
-- **F10**: The shim's `package.json` `exports` map mirrors `@prisma-next/cli`'s `exports` map exactly, including the `.`, `./config-types`, `./control-api`, `./config-loader`, and all `./commands/*` subpaths. All paths resolve within the shim's own copied `dist/`.
+- **F10**: The shim's `package.json` declares **no** `exports` map, **no** `main`, and **no** `types`. Any `import '…' from 'prisma-next'` (or any subpath) must fail with a Node module-resolution error. This is a hard invariant: the shim is a CLI distribution vehicle, never an import target.
 - **F11**: The shim's `package.json` `bin` field is `{ "prisma-next": "./dist/cli.js" }` — structurally identical to the CLI's, pointing at the shim's own copied compat shim.
-- **F12**: The shim's `package.json` `dependencies` mirror `@prisma-next/cli`'s `dependencies` exactly (all third-party packages and all `@prisma-next/*` runtime deps), so that Node resolves external imports in the copied `dist/` from the shim's own `node_modules` at install time.
+- **F12**: The shim's `package.json` `dependencies` mirror `@prisma-next/cli`'s `dependencies` exactly (all third-party packages and all `@prisma-next/*` runtime deps), so that Node resolves external imports in the copied `dist/` from the shim's own `node_modules` when the CLI binary runs.
 - **F13**: The shim's `package.json` does **not** include the CLI's `devDependencies`; only runtime deps and the devDep on `@prisma-next/cli` itself are needed.
 - **F14**: The shim's `files` field publishes only `["dist"]`. It does not publish `src`, `scripts`, or test fixtures.
 - **F15**: The shim's `package.json` includes `"type": "module"`, `"sideEffects": false`, and a `repository` field consistent with the rest of the workspace.
 
 ### Drift lint
 
-- **F16**: A lint script at `packages/prisma-next/scripts/lint-sync.mjs` (or equivalent) compares the shim's `package.json` against the CLI's `package.json` and fails with a clear error when any of the following drift:
-  - `exports` map (keys and values must be identical, modulo the shim pointing at its own `./dist/` paths which are the same relative paths as the CLI's)
+- **F16**: A lint script at `packages/1-framework/3-tooling/prisma-next/scripts/lint-sync.mjs` compares the shim's `package.json` against the CLI's `package.json` and fails with a clear error when any of the following drift:
   - `dependencies` map (keys and values must be identical)
   - `bin` map (keys and values must be identical)
   - `version` (must be identical)
-- **F17**: The lint script is wired into the shim's `package.json` `scripts` (e.g. `"lint": "node scripts/lint-sync.mjs"`) and runs as part of the workspace-wide lint flow (`pnpm -r lint` or the project's existing lint orchestrator).
-- **F18**: When drift is detected, the lint script prints the specific fields that diverge and an actionable fix message (e.g. "update `packages/prisma-next/package.json` to match these fields in `@prisma-next/cli`: …").
+  The lint also fails if the shim's `package.json` declares `exports`, `main`, or `types` at all — these fields violate F10 and must not be present.
+- **F17**: The lint script is wired into the shim's `package.json` `scripts` (`"lint": "node scripts/lint-sync.mjs"`) and runs as part of the workspace-wide lint flow (`pnpm -r lint` or the project's existing lint orchestrator).
+- **F18**: When drift is detected, the lint script prints the specific fields that diverge and an actionable fix message (e.g. "update `packages/1-framework/3-tooling/prisma-next/package.json` to match these fields in `@prisma-next/cli`: …").
 
 ### Internal-package labeling (forward compatibility)
 
@@ -68,7 +70,7 @@ The work also establishes a forward path: if we later want to inline the CLI's i
   - `@prisma-next/errors`
   - `@prisma-next/framework-components`
   - `@prisma-next/psl-printer`
-- **F20**: The CLI's own package (`@prisma-next/cli`) gains a similar notice directing users to install `prisma-next` instead. The CLI package continues to be published (its existence is required by internal workspace consumers and the shim's devDependency graph) but is not advertised as a user-facing package.
+- **F20**: The CLI's own package (`@prisma-next/cli`) gains a notice that reframes its role under the bin-only shim model: **for the CLI command, install `prisma-next`**; this package's subpath APIs (`@prisma-next/cli/config-types`, `@prisma-next/cli/control-api`, `@prisma-next/cli/commands/*`, `@prisma-next/cli/config-loader`) are the documented import target for authors of build integrations, extension packs, and advanced config wiring, but they are less stable than the facade packages (`@prisma-next/postgres/config`, `@prisma-next/mongo/config`). The CLI package continues to be published because both internal workspace consumers and external advanced users rely on it.
 
 ### Publish configuration
 
@@ -90,8 +92,8 @@ The work also establishes a forward path: if we later want to inline the CLI's i
   - All user-facing install/run commands reference `prisma-next` instead of `@prisma-next/cli` (e.g., `pnpm dlx prisma-next init`, `npx prisma-next init`, etc.).
   - Generated-file examples (the `package.json` snippet on line 162 and the install spinner lines) reflect `prisma-next` as the installed devDep.
   - Functional requirements and acceptance criteria that name `@prisma-next/cli` as the installed devDep now name `prisma-next`.
-  - References to internal implementation packages (e.g., "the low-level config API (`defineConfig` from `@prisma-next/cli/config-types`)") are updated to `prisma-next/config-types` since `prisma-next` is the public name for that same subpath export.
   - Shell snippets in Implementation Guidance that show `pnpm add -D @prisma-next/cli` are updated to `pnpm add -D prisma-next`.
+  - References to the low-level programmatic API (e.g., `defineConfig` from `@prisma-next/cli/config-types`) **stay** as `@prisma-next/cli/config-types`: `prisma-next` has no library exports (F10), so advanced users who need the low-level `defineConfig` import it from `@prisma-next/cli` directly. This is a deliberate asymmetry — the CLI command is distributed under the ergonomic `prisma-next` name; programmatic APIs keep the `@prisma-next/cli` address that signals their stability contract.
 - **F27**: `projects/one-package-install/plan.md` is updated so task descriptions and command examples reference `prisma-next` instead of `@prisma-next/cli`.
 - **F28**: `projects/one-package-install/user-journey.md` is updated so the roadblock narrative reflects the public package name `prisma-next` rather than `@prisma-next/cli`.
 
@@ -106,11 +108,13 @@ The work also establishes a forward path: if we later want to inline the CLI's i
 ## Non-goals
 
 - Renaming `@prisma-next/cli` internally, either in its `package.json#name` field or in the ~21 packages/examples that import it.
+- Giving `prisma-next` any library exports. The shim is intentionally bin-only. Any subpath or root import from `prisma-next` must fail. Programmatic APIs keep the `@prisma-next/cli` import address.
+- Trimming the shim's copied `dist/` to remove non-bin entry points. The copy is verbatim for simplicity. Tarball bloat from unreachable subpath files is acceptable in the short term and is trackable as a later optimization.
 - Switching to the "Flavor 2" model where internal `@prisma-next/*` dependencies are bundled into the shim's `dist/` and no longer need to be published. This is an explicit follow-up deferred until the internal/public boundary stabilizes.
-- Deprecating `@prisma-next/cli` on NPM. The CLI package continues to be published because internal workspace consumers and the shim's build depend on it.
+- Deprecating `@prisma-next/cli` on NPM. The CLI package continues to be published because internal workspace consumers — and external advanced users importing programmatic APIs — depend on it.
 - Automated changelog or release tooling (changesets, semantic-release). Version bumps remain manual and lockstep; automation is out of scope and tracked separately.
 - Publishing any package to NPM as part of this ticket. The ticket covers the build, lint, and packaging machinery only; the first actual `pnpm publish` is a separate action gated on coordination.
-- Rewriting the CLI's existing README. The shim gets a new, curated README. The CLI's README stays as-is (internal/architecture documentation).
+- Rewriting the CLI's existing README. The shim gets a new, curated README. The CLI's README stays as-is (internal/architecture documentation), with a short reframing notice for the bin-only model.
 - Changing the CLI's `bin` name. The `bin` remains `prisma-next` as today; this ticket only aligns the NPM package name with the bin name.
 
 # Acceptance Criteria
@@ -120,17 +124,17 @@ The work also establishes a forward path: if we later want to inline the CLI's i
 - [ ] `packages/1-framework/3-tooling/prisma-next/dist/cli.js` and `packages/1-framework/3-tooling/prisma-next/dist/cli.mjs` are executable (`stat -f %Lp` on macOS or `stat -c %a` on Linux reports `755`) after the build.
 - [ ] Running `node packages/1-framework/3-tooling/prisma-next/dist/cli.js --version` from the workspace root prints the CLI version and exits 0.
 - [ ] Running `node packages/1-framework/3-tooling/prisma-next/dist/cli.js --help` from the workspace root prints the standard Prisma Next CLI help output.
-- [ ] The shim's `package.json` `exports` map has exactly the same set of keys as `@prisma-next/cli`'s `package.json` `exports` map, with identical `types` and `import` path values (within each key's object).
+- [ ] The shim's `package.json` does **not** declare `exports`, `main`, or `types`. Attempting `import 'prisma-next'` or `import 'prisma-next/anything'` from a Node script with the shim installed raises `ERR_PACKAGE_PATH_NOT_EXPORTED` (or the equivalent resolution failure).
 - [ ] The shim's `package.json` `dependencies` map has exactly the same keys and version ranges as `@prisma-next/cli`'s `dependencies` map.
 - [ ] The shim's `package.json` `bin` map equals `{ "prisma-next": "./dist/cli.js" }`.
 - [ ] The shim's `package.json` `files` array equals `["dist"]`.
 - [ ] The shim's `package.json` `version` equals `@prisma-next/cli`'s `package.json` `version`.
 - [ ] Running the sync-lint script with the shim and CLI `package.json`s in sync exits 0.
-- [ ] Artificially introducing drift in any one of `exports`, `dependencies`, `bin`, or `version` causes the sync-lint script to exit non-zero with a message that names the drifted field.
+- [ ] Artificially introducing drift in any one of `dependencies`, `bin`, or `version`, or adding an `exports` / `main` / `types` field to the shim's `package.json`, causes the sync-lint script to exit non-zero with a message that names the offending field.
 - [ ] `pnpm -r lint` runs the shim's sync-lint as part of workspace-wide linting.
 - [ ] The shim has its own `README.md` at `packages/1-framework/3-tooling/prisma-next/README.md` intended for NPM users (short, user-focused: install, quickstart, command index, link to internal docs).
 - [ ] Each internal-package README in the F19 target set contains a short notice that identifies the package as an internal implementation detail of `prisma-next`.
-- [ ] `@prisma-next/cli`'s README contains a notice directing users to install `prisma-next` instead.
+- [ ] `@prisma-next/cli`'s README contains a notice that directs users to install `prisma-next` for the CLI and explains that `@prisma-next/cli` is the programmatic-API import target for advanced users.
 - [ ] `pnpm -F prisma-next publish --dry-run` succeeds and the published tarball's file list includes only files under `dist/`, `README.md`, `package.json`, and (where applicable) `LICENSE`.
 - [ ] `pnpm -F prisma-next clean` removes `packages/1-framework/3-tooling/prisma-next/dist/`.
 - [ ] Re-running `pnpm -F prisma-next build` after a clean produces byte-identical `dist/` contents across two runs.
@@ -170,7 +174,7 @@ Not applicable.
 
 ```
 packages/1-framework/3-tooling/prisma-next/
-  package.json           # name, bin, exports, dependencies mirrored from CLI
+  package.json           # name, bin, dependencies mirrored from CLI; NO exports/main/types
   README.md              # user-facing NPM README (curated)
   scripts/
     build.mjs            # clears dist, copies CLI dist, re-applies chmod 755
@@ -201,8 +205,9 @@ Implementation may differ in details (e.g. logging, error handling, version stam
 ## `scripts/lint-sync.mjs` sketch
 
 - Read both `package.json` files.
-- Compare `exports`, `dependencies`, `bin`, `version` as plain JSON objects (deep equality).
-- On drift, print a structured diff and exit non-zero.
+- Compare `dependencies`, `bin`, `version` as plain JSON objects (deep equality).
+- Separately assert that the shim's `package.json` has no `exports`, `main`, or `types` field (bin-only invariant from F10).
+- On drift or invariant violation, print a structured diff and exit non-zero.
 - On success, exit 0 silently (or with a minimal confirmation line).
 
 Implementation should use `node:fs/promises` and should not depend on external diff libraries; a hand-rolled deep-equal is sufficient.
@@ -221,7 +226,17 @@ A short, consistent stanza to add near the top of each target README (F19):
 > without notice. Do not depend on this package directly; install `prisma-next` instead.
 ```
 
-Apply the same stanza (with adjusted wording) to `@prisma-next/cli`'s README (F20).
+`@prisma-next/cli`'s README gets a different notice reflecting its dual role under the bin-only shim model (F20) — it is both the CLI's implementation and the documented programmatic-API import target for advanced users. Suggested wording:
+
+```markdown
+> **For the CLI, install [`prisma-next`](https://www.npmjs.com/package/prisma-next).**
+> This package (`@prisma-next/cli`) ships the CLI's implementation and exposes its programmatic
+> APIs (`@prisma-next/cli/config-types`, `@prisma-next/cli/control-api`, `@prisma-next/cli/commands/*`,
+> `@prisma-next/cli/config-loader`) for authors of build integrations, extension packs, and
+> advanced config wiring. These subpaths are less stable than the facade packages
+> (`@prisma-next/postgres/config`, `@prisma-next/mongo/config`); prefer those for
+> application-level config. This README is architecture documentation for contributors.
+```
 
 ## `init` command alignment
 
@@ -269,3 +284,4 @@ None outstanding. Decisions locked in during shaping:
 - CI gating: sync-lint blocks CI alongside other lints.
 - Internal-package README stanza: ship the draft wording in "Implementation Guidance" as-is; refine on review.
 - `one-package-install` alignment: the textual updates in `projects/one-package-install/{spec,plan,user-journey}.md` and the corresponding `init` command source + test updates are included in this ticket (F23–F28), not deferred.
+- **Shim is bin-only**: no `exports`, no `main`, no `types`. The `prisma-next` package is a CLI distribution vehicle and nothing else. Programmatic APIs keep the `@prisma-next/cli` import address. Locked in to prevent a second public import surface that would have to be stability-managed in parallel with `@prisma-next/cli`, and to keep future "Flavor 2" inlining of internal deps transparent to consumers.
