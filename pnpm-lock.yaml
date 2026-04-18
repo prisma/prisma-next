@@ -884,6 +884,76 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
 
+  packages/1-framework/3-tooling/prisma-next:
+    dependencies:
+      '@clack/prompts':
+        specifier: ^1.1.0
+        version: 1.1.0
+      '@dagrejs/dagre':
+        specifier: ^3.0.0
+        version: 3.0.0
+      '@prisma-next/config':
+        specifier: workspace:*
+        version: link:../../1-core/config
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../0-foundation/contract
+      '@prisma-next/emitter':
+        specifier: workspace:*
+        version: link:../emitter
+      '@prisma-next/errors':
+        specifier: workspace:*
+        version: link:../../1-core/errors
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../1-core/framework-components
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../migration
+      '@prisma-next/psl-printer':
+        specifier: workspace:*
+        version: link:../../2-authoring/psl-printer
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../0-foundation/utils
+      arktype:
+        specifier: ^2.0.0
+        version: 2.1.29
+      c12:
+        specifier: ^3.3.2
+        version: 3.3.2(magicast@0.5.1)
+      closest-match:
+        specifier: ^1.3.3
+        version: 1.3.3
+      colorette:
+        specifier: ^2.0.20
+        version: 2.0.20
+      commander:
+        specifier: ^12.0.0
+        version: 12.1.0
+      esbuild:
+        specifier: ^0.25.11
+        version: 0.25.11
+      package-manager-detector:
+        specifier: ^1.6.0
+        version: 1.6.0
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
+      string-width:
+        specifier: ^8.2.0
+        version: 8.2.0
+      strip-ansi:
+        specifier: ^7.1.2
+        version: 7.1.2
+      wrap-ansi:
+        specifier: ^10.0.0
+        version: 10.0.0
+    devDependencies:
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../cli
+
   packages/1-framework/3-tooling/vite-plugin-contract-emit:
     dependencies:
       '@prisma-next/cli':
@@ -6402,10 +6472,6 @@ packages:
     resolution: {integrity: sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ==}
     engines: {node: '>=18'}
 
-  string-width@8.1.0:
-    resolution: {integrity: sha512-Kxl3KJGb/gxkaUMOjRsQ8IrXiGW75O4E3RPjFIINOVH8AMl2SQ/yWdTzWwF3FevIX9LcMAjJW+GRwAlAbTSXdg==}
-    engines: {node: '>=20'}
-
   string-width@8.2.0:
     resolution: {integrity: sha512-6hJPQ8N0V0P3SNmP6h2J99RLuzrWz2gvT7VnK5tKvrNqJoyS9W4/Fb8mo31UiPvy00z7DQXkP2hnKBVav76thw==}
     engines: {node: '>=20'}
@@ -8356,7 +8422,7 @@ snapshots:
   cli-truncate@5.1.1:
     dependencies:
       slice-ansi: 7.1.2
-      string-width: 8.1.0
+      string-width: 8.2.0
 
   client-only@0.0.1: {}
 
@@ -9547,11 +9613,6 @@ snapshots:
   string-width@7.2.0:
     dependencies:
       emoji-regex: 10.6.0
-      get-east-asian-width: 1.4.0
-      strip-ansi: 7.1.2
-
-  string-width@8.1.0:
-    dependencies:
       get-east-asian-width: 1.4.0
       strip-ansi: 7.1.2
 
