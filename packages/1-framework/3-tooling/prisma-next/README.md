@@ -56,12 +56,16 @@ Run `prisma-next --help` or `prisma-next <command> --help` for full options.
 
 ## Programmatic use
 
-The package also exports subpaths for tooling integrations:
+`prisma-next` is a CLI distribution only — it has no library exports. Importing from `prisma-next` (root or any subpath) will fail.
 
-- `prisma-next/config-types` — `defineConfig` and config types
-- `prisma-next/control-api` — `createControlClient` for programmatic control-plane operations
-- `prisma-next/config-loader` — `loadConfig`
-- `prisma-next/commands/*` — individual command factories (`createContractEmitCommand`, `createDbInitCommand`, …)
+Authors of build integrations, extension packs, and advanced config wiring should install [`@prisma-next/cli`](https://www.npmjs.com/package/@prisma-next/cli) and import from its subpaths:
+
+- `@prisma-next/cli/config-types` — `defineConfig` and config types
+- `@prisma-next/cli/control-api` — `createControlClient` for programmatic control-plane operations
+- `@prisma-next/cli/config-loader` — `loadConfig`
+- `@prisma-next/cli/commands/*` — individual command factories (`createContractEmitCommand`, `createDbInitCommand`, …)
+
+These subpaths are less stable than the facade packages (`@prisma-next/postgres/config`, `@prisma-next/mongo/config`) — prefer those for application-level config.
 
 ## Links
 
