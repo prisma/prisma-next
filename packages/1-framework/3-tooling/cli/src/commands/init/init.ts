@@ -147,7 +147,7 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
         '',
         '  1. Install dependencies:',
         `     ${pm} ${formatAddArgs(pm, [pkg, 'dotenv']).join(' ')}`,
-        `     ${pm} ${formatAddDevArgs(pm, ['@prisma-next/cli']).join(' ')}`,
+        `     ${pm} ${formatAddDevArgs(pm, ['prisma-next']).join(' ')}`,
         '',
         '  2. Emit the contract:',
         `     ${emitCommand}`,
@@ -161,11 +161,11 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
 
     const exec = promisify(execFile);
 
-    spinner.start(`Installing ${pkg}, dotenv, and @prisma-next/cli...`);
+    spinner.start(`Installing ${pkg}, dotenv, and prisma-next...`);
     try {
       await exec(pm, formatAddArgs(pm, [pkg, 'dotenv']), { cwd: baseDir });
-      await exec(pm, formatAddDevArgs(pm, ['@prisma-next/cli']), { cwd: baseDir });
-      spinner.stop(`Installed ${pkg}, dotenv, and @prisma-next/cli`);
+      await exec(pm, formatAddDevArgs(pm, ['prisma-next']), { cwd: baseDir });
+      spinner.stop(`Installed ${pkg}, dotenv, and prisma-next`);
       installSucceeded = true;
     } catch (err) {
       spinner.stop('Installation failed');
@@ -178,7 +178,7 @@ export async function runInit(baseDir: string, options: InitOptions): Promise<vo
           '',
           'Run manually:',
           `  ${pm} ${formatAddArgs(pm, [pkg, 'dotenv']).join(' ')}`,
-          `  ${pm} ${formatAddDevArgs(pm, ['@prisma-next/cli']).join(' ')}`,
+          `  ${pm} ${formatAddDevArgs(pm, ['prisma-next']).join(' ')}`,
         ].join('\n'),
       );
     }

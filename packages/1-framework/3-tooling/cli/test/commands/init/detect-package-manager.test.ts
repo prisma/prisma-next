@@ -147,18 +147,10 @@ describe('formatAddArgs', () => {
 
 describe('formatAddDevArgs', () => {
   it('uses --dev for deno with npm: prefix', () => {
-    expect(formatAddDevArgs('deno', ['@prisma-next/cli'])).toEqual([
-      'add',
-      '--dev',
-      'npm:@prisma-next/cli',
-    ]);
+    expect(formatAddDevArgs('deno', ['prisma-next'])).toEqual(['add', '--dev', 'npm:prisma-next']);
   });
 
   it('uses -D for other managers', () => {
-    expect(formatAddDevArgs('npm', ['@prisma-next/cli'])).toEqual([
-      'add',
-      '-D',
-      '@prisma-next/cli',
-    ]);
+    expect(formatAddDevArgs('npm', ['prisma-next'])).toEqual(['add', '-D', 'prisma-next']);
   });
 });

@@ -214,7 +214,7 @@ describe('runInit', () => {
     );
     expect(execFile).toHaveBeenCalledWith(
       'pnpm',
-      ['add', '-D', '@prisma-next/cli'],
+      ['add', '-D', 'prisma-next'],
       expect.anything(),
       expect.any(Function),
     );
@@ -235,7 +235,7 @@ describe('runInit', () => {
     );
     expect(execFile).toHaveBeenCalledWith(
       'deno',
-      ['add', '--dev', 'npm:@prisma-next/cli'],
+      ['add', '--dev', 'npm:prisma-next'],
       expect.anything(),
       expect.any(Function),
     );
