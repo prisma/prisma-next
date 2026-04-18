@@ -1,11 +1,20 @@
 # @prisma-next/cli
 
-> **Internal package.** This package is the implementation behind [`prisma-next`](https://www.npmjs.com/package/prisma-next).
-> It is published only to support the `prisma-next` shim and internal workspace
-> consumers; its API is unstable and may change without notice. Do not depend on
-> this package directly — install [`prisma-next`](https://www.npmjs.com/package/prisma-next)
-> instead. This README stays as architecture and internal documentation for
-> contributors; the user-facing README lives in the `prisma-next` package.
+> **For the CLI command, install [`prisma-next`](https://www.npmjs.com/package/prisma-next).**
+> The public `prisma-next` package ships the `prisma-next` binary and nothing
+> else — it has no library exports.
+>
+> This package (`@prisma-next/cli`) is both the CLI's implementation and the
+> documented programmatic-API import target. Authors of build integrations,
+> extension packs, and advanced config wiring import from
+> `@prisma-next/cli/config-types`, `@prisma-next/cli/control-api`,
+> `@prisma-next/cli/commands/*`, and `@prisma-next/cli/config-loader`. These
+> subpaths are less stable than the facade packages
+> (`@prisma-next/postgres/config`, `@prisma-next/mongo/config`); prefer those
+> for application-level config.
+>
+> This README is architecture and internal documentation for contributors;
+> the user-facing README lives in the `prisma-next` package.
 
 Command-line interface for Prisma Next contract emission and management.
 
