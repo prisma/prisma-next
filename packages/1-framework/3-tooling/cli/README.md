@@ -1,5 +1,12 @@
 # @prisma-next/cli
 
+> **Internal package.** This package is the implementation behind [`prisma-next`](https://www.npmjs.com/package/prisma-next).
+> It is published only to support the `prisma-next` shim and internal workspace
+> consumers; its API is unstable and may change without notice. Do not depend on
+> this package directly — install [`prisma-next`](https://www.npmjs.com/package/prisma-next)
+> instead. This README stays as architecture and internal documentation for
+> contributors; the user-facing README lives in the `prisma-next` package.
+
 Command-line interface for Prisma Next contract emission and management.
 
 ## Overview
