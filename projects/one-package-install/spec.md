@@ -168,7 +168,7 @@ Everything else (`@prisma-next/adapter-postgres`, `@prisma-next/sql-contract`, `
 
 # The `/config` Facade API
 
-`@prisma-next/postgres` gains a new `/config` export. Its `defineConfig` function wraps the low-level config API (`defineConfig` from `prisma-next/config-types`), pre-wiring all Postgres-specific internals.
+`@prisma-next/postgres` gains a new `/config` export. Its `defineConfig` function wraps the low-level config API (`defineConfig` from `@prisma-next/cli/config-types`), pre-wiring all Postgres-specific internals. The low-level import retains the `@prisma-next/cli` address because the public `prisma-next` package is bin-only and has no library exports; the scoped name is the stability contract for programmatic consumers.
 
 ## Signature
 
