@@ -6,7 +6,8 @@ const scriptDir = import.meta.dirname;
 const shimPkgPath = resolve(scriptDir, '../package.json');
 const cliPkgPath = resolve(scriptDir, '../../cli/package.json');
 
-const SYNCED_FIELDS = ['version', 'bin', 'exports', 'dependencies'];
+const SYNCED_FIELDS = ['version', 'bin', 'dependencies'];
+const FORBIDDEN_SHIM_FIELDS = ['exports', 'main', 'types'];
 
 const [shimPkg, cliPkg] = await Promise.all([readJson(shimPkgPath), readJson(cliPkgPath)]);
 
@@ -52,6 +53,18 @@ function diffEntries(cliValue, shimValue) {
 }
 
 const drifts = [];
+
+for (const field of FORBIDDEN_SHIM_FIELDS) {
+  if (Object.hasOwn(shimPkg, field)) {
+    drifts.push({
+      field,
+      summary:
+        `  shim declares "${field}" but must not (shim is bin-only).\n` +
+        `  remove the "${field}" field from the shim's package.json.`,
+    });
+  }
+}
+
 for (const field of SYNCED_FIELDS) {
   const cliValue = cliPkg[field];
   const shimValue = shimPkg[field];
