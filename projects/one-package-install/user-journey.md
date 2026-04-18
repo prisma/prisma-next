@@ -30,7 +30,7 @@ The config file imports from several `@prisma-next/*` packages. The user needs t
 
 ### Step 4: Install the CLI
 
-The user needs to run `prisma-next contract emit`, but they don't remember the package name for the CLI (`@prisma-next/cli`). This is minor friction — they can grep the example `package.json` or guess — but it's one more thing in a chain of lookups.
+The user needs to run `prisma-next contract emit`, but they don't remember the package name for the CLI (`prisma-next`). This is minor friction — they can grep the example `package.json` or guess — but it's one more thing in a chain of lookups.
 
 ### Step 5: Emit the contract
 

@@ -21,10 +21,10 @@ This section describes what the user sees end-to-end. Everything below is the so
 The user has a Next.js app (or any Node project with a `package.json`). They run:
 
 ```bash
-pnpm dlx @prisma-next/cli init
+pnpm dlx prisma-next init
 ```
 
-(Or `npx @prisma-next/cli init`, `bunx @prisma-next/cli init`, `yarn dlx @prisma-next/cli init`.)
+(Or `npx prisma-next init`, `bunx prisma-next init`, `yarn dlx prisma-next init`.)
 
 The CLI prompts:
 
@@ -37,7 +37,7 @@ The CLI prompts:
 │  prisma/contract.prisma
 │
 ◇  Detecting package manager... pnpm
-◇  Installing @prisma-next/postgres and @prisma-next/cli...
+◇  Installing @prisma-next/postgres and prisma-next...
 ◇  Emitting contract...
 │
 ◆  Done! Created:
@@ -159,7 +159,7 @@ After init, the user's `package.json` has exactly two new entries:
     "@prisma-next/postgres": "^x.y.z"
   },
   "devDependencies": {
-    "@prisma-next/cli": "^x.y.z"
+    "prisma-next": "^x.y.z"
   }
 }
 ```
@@ -168,7 +168,7 @@ Everything else (`@prisma-next/adapter-postgres`, `@prisma-next/sql-contract`, `
 
 # The `/config` Facade API
 
-`@prisma-next/postgres` gains a new `/config` export. Its `defineConfig` function wraps the low-level config API (`defineConfig` from `@prisma-next/cli/config-types`), pre-wiring all Postgres-specific internals.
+`@prisma-next/postgres` gains a new `/config` export. Its `defineConfig` function wraps the low-level config API (`defineConfig` from `prisma-next/config-types`), pre-wiring all Postgres-specific internals.
 
 ## Signature
 
@@ -247,7 +247,7 @@ The emit still succeeds — the warning is informational, not blocking. This act
 - F2: Init prompts for target (Postgres or Mongo) and schema location (default: `prisma/contract.prisma`). The contract output location is derived automatically (same directory, `.json` extension).
 - F3: Init scaffolds five files: the three core files shown in the "Generated files" section (`contract.prisma`, `prisma-next.config.ts`, `db.ts`), plus `prisma-next.md` (human quick-reference) and `.agents/skills/prisma-next/SKILL.md` (agent skill).
 - F4: Init detects the user's package manager from lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lockb`) or project configuration.
-- F5: Init installs the target facade package as a dependency and `@prisma-next/cli` as a dev dependency using the detected package manager.
+- F5: Init installs the target facade package as a dependency and `prisma-next` as a dev dependency using the detected package manager.
 - F6: Init runs `prisma-next contract emit` after installation to produce `contract.json` and `contract.d.ts`.
 - F7: Init detects prior initialization (e.g. `prisma-next.config.ts` exists) and offers a single "Re-initialize? This will overwrite all generated files." prompt. If the user accepts, all scaffolded files are overwritten with the new choices. If the user declines, init exits. Init does not prompt per-file.
 - F8: `--no-install` skips dependency installation and contract emission, and prints the manual commands instead.
@@ -280,7 +280,7 @@ The emit still succeeds — the warning is informational, not blocking. This act
 
 # Acceptance Criteria
 
-- [ ] `pnpm dlx @prisma-next/cli init` (selecting Postgres) in a directory with only a `package.json` produces the file layout shown in "Generated files" with no errors.
+- [ ] `pnpm dlx prisma-next init` (selecting Postgres) in a directory with only a `package.json` produces the file layout shown in "Generated files" with no errors.
 - [ ] The generated `prisma-next.config.ts` has exactly one import line (from `@prisma-next/postgres/config`) and passes `contract` as a string path.
 - [ ] The generated `prisma/db.ts` has exactly one `@prisma-next` import (from `@prisma-next/postgres/runtime`).
 - [ ] After init, `tsc --noEmit` reports no type errors in `prisma/db.ts` (with `skipLibCheck: true`).
@@ -324,9 +324,9 @@ This should be a small utility function in the init command's module (e.g. `src/
 Shell out to the detected package manager to install dependencies. Use `execFileSync` (not `exec`) to avoid shell injection. Example:
 
 ```typescript
-// pnpm add @prisma-next/postgres && pnpm add -D @prisma-next/cli
+// pnpm add @prisma-next/postgres && pnpm add -D prisma-next
 execFileSync(pm, ['add', '@prisma-next/postgres'], { cwd: baseDir, stdio: 'pipe' });
-execFileSync(pm, ['add', '-D', '@prisma-next/cli'], { cwd: baseDir, stdio: 'pipe' });
+execFileSync(pm, ['add', '-D', 'prisma-next'], { cwd: baseDir, stdio: 'pipe' });
 ```
 
 Wrap with a spinner from `TerminalUI`. If installation fails, print the manual install commands and exit gracefully (don't crash).
