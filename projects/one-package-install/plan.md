@@ -65,11 +65,11 @@ The user-facing entry point — `prisma-next init` scaffolds files, installs dep
   3. Prompt for schema location using `clack.text()` with default `prisma/contract.prisma`.
   4. Write the five scaffolded files (schema, config, db.ts, prisma-next.md, agent skill).
   5. Detect package manager.
-  6. Install dependencies (`@prisma-next/postgres` as dep, `@prisma-next/cli` as devDep) with a spinner.
+  6. Install dependencies (`@prisma-next/postgres` as dep, `prisma-next` as devDep) with a spinner.
   7. Run contract emit programmatically via `executeContractEmit`.
   8. Print completion summary and next steps.
   Handle `--no-install` flag: skip steps 5-7, print manual commands instead.
-- [ ] **3.4 Register the init command** — Create `src/commands/init/index.ts` with commander registration. Register in the CLI's main command setup alongside existing commands. Ensure it works via `pnpm dlx @prisma-next/cli init`.
+- [ ] **3.4 Register the init command** — Create `src/commands/init/index.ts` with commander registration. Register in the CLI's main command setup alongside existing commands. Ensure it works via `pnpm dlx prisma-next init`.
 - [ ] **3.5 Write init command tests** — Test in `packages/1-framework/3-tooling/cli/test/commands/init/`:
   - Happy path: empty directory with `package.json`, selecting Postgres → all seven files created (5 scaffolded + 2 emitted) (AC1).
   - Generated config has single import from facade `/config` and passes `contract` as string (AC2).
