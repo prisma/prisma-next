@@ -26,10 +26,10 @@ import {
   runDbUpdate,
   runDbVerify,
   runMigrationApply,
+  runMigrationEmit,
   runMigrationPlan,
   runMigrationShow,
   runMigrationStatus,
-  runMigrationVerify,
   setupJourney,
   swapContract,
   timeouts,
@@ -44,7 +44,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'emit → plan initial → apply → swap → plan v2 → show → verify → status → apply → verify',
+      'emit → plan initial → apply → swap → plan v2 → show → emit → status → apply → verify',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -73,11 +73,11 @@ withTempDir(({ createTempDir }) => {
         const show = await runMigrationShow(ctx);
         expect(show.exitCode, 'B.03: migration show').toBe(0);
 
-        // B.04: migration verify --dir <planned-dir>
+        // B.04: migration emit --dir <planned-dir>
         const migDir = getLatestMigrationDir(ctx);
         expect(migDir, 'B.04: migration dir exists').toBeDefined();
-        const verify = await runMigrationVerify(ctx, ['--dir', `migrations/${migDir}`]);
-        expect(verify.exitCode, 'B.04: migration verify').toBe(0);
+        const emitMig = await runMigrationEmit(ctx, ['--dir', `migrations/${migDir}`]);
+        expect(emitMig.exitCode, 'B.04: migration emit').toBe(0);
 
         // B.05: migration status (pre-apply — shows pending migration)
         const statusPreApply = await runMigrationStatus(ctx);

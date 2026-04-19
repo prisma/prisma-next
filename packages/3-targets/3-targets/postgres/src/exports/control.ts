@@ -178,7 +178,6 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         return {
           ok: true as const,
           descriptors: planResult.value.descriptors,
-          needsDataMigration: planResult.value.needsDataMigration,
         };
       },
 

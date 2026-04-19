@@ -1,5 +1,5 @@
 /**
- * Data Transform Authoring Surface (Journey: migration new → verify → ops)
+ * Data Transform Authoring Surface (Journey: migration new → emit → ops)
  *
  * Tests the authoring pipeline end-to-end:
  * 1. Set up a project with a base contract, plan + apply initial migration
@@ -7,7 +7,7 @@
  * 3. Emit the new contract
  * 4. migration new → scaffolds package with migration.ts
  * 5. Fill in migration.ts with descriptors + dataTransform (raw_sql)
- * 6. migration verify → evaluates TS, resolves descriptors, writes ops.json, attests
+ * 6. migration emit → evaluates TS, resolves descriptors, writes ops.json, attests
  * 7. Inspect ops.json — verify the ops are correct
  * 8. migration apply → executes ops including data transform
  * 9. Verify data was transformed
@@ -21,9 +21,9 @@ import {
   type JourneyContext,
   runContractEmit,
   runMigrationApply,
+  runMigrationEmit,
   runMigrationNew,
   runMigrationPlan,
-  runMigrationVerify,
   setupJourney,
   sql,
   swapContract,
@@ -36,7 +36,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'migration new → fill migration.ts → verify → apply → data correct',
+      'migration new → fill migration.ts → emit → apply → data correct',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -109,28 +109,24 @@ export default () => [
 `;
         writeFileSync(migrationTsPath, migrationTs);
 
-        // Step 6: migration verify → evaluates TS, resolves, attests
-        const verify = await runMigrationVerify(ctx, [
+        // Step 6: migration emit → evaluates TS, resolves, attests
+        const emitResult = await runMigrationEmit(ctx, [
           '--dir',
           migrationDir,
           '--config',
           ctx.configPath,
         ]);
-        expect(verify.exitCode, `verify: ${verify.stdout}\n${verify.stderr}`).toBe(0);
+        expect(emitResult.exitCode, `emit: ${emitResult.stdout}\n${emitResult.stderr}`).toBe(0);
 
-        // Step 7: Inspect ops.json after verify
-        const opsAfterVerify = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'));
-        expect(opsAfterVerify.length).toBeGreaterThan(0);
+        // Step 7: Inspect ops.json after emit
+        const opsAfterEmit = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'));
+        expect(opsAfterEmit.length).toBeGreaterThan(0);
 
-        // Should have an addColumn op
-        const addColumnOp = opsAfterVerify.find(
-          (op: { id: string }) => op.id === 'column.user.name',
-        );
+        const addColumnOp = opsAfterEmit.find((op: { id: string }) => op.id === 'column.user.name');
         expect(addColumnOp, 'addColumn op exists').toBeDefined();
         expect(addColumnOp.operationClass).toBe('additive');
 
-        // Should have a data transform op
-        const dataTransformOp = opsAfterVerify.find(
+        const dataTransformOp = opsAfterEmit.find(
           (op: { id: string }) => op.id === 'data_migration.backfill-user-name',
         );
         expect(dataTransformOp, 'dataTransform op exists').toBeDefined();

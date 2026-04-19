@@ -10,6 +10,7 @@ import {
 } from '@prisma-next/target-mongo/control';
 import mongoTargetDescriptorMeta from '@prisma-next/target-mongo/pack';
 import type { MongoControlFamilyInstance } from './control-instance';
+import { mongoEmit } from './mongo-emit';
 
 export const mongoTargetDescriptor: MigratableTargetDescriptor<
   'mongo',
@@ -36,6 +37,9 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
     },
     contractToSchema(contract: Contract | null) {
       return contractToMongoSchemaIR(contract as MongoContract | null);
+    },
+    emit(options) {
+      return mongoEmit(options);
     },
   },
   create() {

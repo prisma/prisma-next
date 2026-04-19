@@ -2,7 +2,7 @@ import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import {
   formatMigrationApplyCommandOutput,
-  formatMigrationVerifyCommandOutput,
+  formatMigrationEmitCommandOutput,
 } from '../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../src/utils/global-flags';
 
@@ -61,35 +61,18 @@ describe('formatMigrationApplyCommandOutput', () => {
   });
 });
 
-describe('formatMigrationVerifyCommandOutput', () => {
-  it('formats verified status output', () => {
+describe('formatMigrationEmitCommandOutput', () => {
+  it('formats emit success output', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
-    const output = formatMigrationVerifyCommandOutput(
-      { status: 'verified', migrationId: 'sha256:edge' },
-      flags,
-    );
+    const output = formatMigrationEmitCommandOutput({ migrationId: 'sha256:edge' }, flags);
 
     const stripped = stripAnsi(output);
-    expect(stripped).toContain('Migration verified');
-    expect(stripped).toContain('migrationId: sha256:edge');
-  });
-
-  it('formats attested status output', () => {
-    const flags = parseGlobalFlags({ 'no-color': true });
-    const output = formatMigrationVerifyCommandOutput(
-      { status: 'attested', migrationId: 'sha256:edge' },
-      flags,
-    );
-
-    const stripped = stripAnsi(output);
-    expect(stripped).toContain('Draft migration attested');
+    expect(stripped).toContain('Emitted ops.json and attested migration');
     expect(stripped).toContain('migrationId: sha256:edge');
   });
 
   it('returns empty output in quiet mode', () => {
     const flags = parseGlobalFlags({ quiet: true, 'no-color': true });
-    expect(
-      formatMigrationVerifyCommandOutput({ status: 'verified', migrationId: 'sha256:edge' }, flags),
-    ).toBe('');
+    expect(formatMigrationEmitCommandOutput({ migrationId: 'sha256:edge' }, flags)).toBe('');
   });
 });

@@ -5,7 +5,7 @@
  * - evaluateMigrationTs: loads migration.ts via native Node import, returns descriptors
  *
  * Shared by migration plan (scaffold), migration new (scaffold), and
- * migration verify (evaluate).
+ * migration emit (evaluate).
  */
 
 import { stat, writeFile } from 'node:fs/promises';

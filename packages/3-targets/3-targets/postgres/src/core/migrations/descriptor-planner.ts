@@ -370,7 +370,6 @@ export interface DescriptorPlannerOptions {
 
 export interface DescriptorPlannerValue {
   readonly descriptors: readonly PostgresMigrationOpDescriptor[];
-  readonly needsDataMigration: boolean;
 }
 
 export function planDescriptors(
@@ -461,6 +460,5 @@ export function planDescriptors(
 
   return ok({
     descriptors,
-    needsDataMigration: descriptors.some((op) => op.kind === 'dataTransform'),
   });
 }

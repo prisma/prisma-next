@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { canonicalizeContract } from '@prisma-next/contract/hashing';
 import { canonicalizeJson } from './canonicalize-json';
 import { readMigrationPackage, writeMigrationManifest } from './io';
 import type { MigrationManifest, MigrationOps } from './types';
@@ -21,22 +20,14 @@ export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOp
     signature: _signature,
     fromContract: _fromContract,
     toContract: _toContract,
+    hints: _hints,
     ...strippedMeta
   } = manifest;
 
   const canonicalManifest = canonicalizeJson(strippedMeta);
   const canonicalOps = canonicalizeJson(ops);
 
-  const canonicalFromContract =
-    manifest.fromContract !== null ? canonicalizeContract(manifest.fromContract) : 'null';
-  const canonicalToContract = canonicalizeContract(manifest.toContract);
-
-  const partHashes = [
-    canonicalManifest,
-    canonicalOps,
-    canonicalFromContract,
-    canonicalToContract,
-  ].map(sha256Hex);
+  const partHashes = [canonicalManifest, canonicalOps].map(sha256Hex);
   const hash = sha256Hex(canonicalizeJson(partHashes));
 
   return `sha256:${hash}`;

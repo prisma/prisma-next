@@ -141,7 +141,6 @@ describe('additive — fresh database', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(descriptorKinds(result)).toEqual(['createTable']);
-    expect(result.needsDataMigration).toBe(false);
   });
 
   it('2: table with FK + backing index', () => {
@@ -170,7 +169,6 @@ describe('additive — fresh database', () => {
       'addForeignKey.post',
       'createIndex.post',
     ]);
-    expect(result.needsDataMigration).toBe(false);
   });
 
   it('3: table with explicit indexes and uniques', () => {
@@ -275,7 +273,6 @@ describe('additive — existing contract', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(descriptorSummary(result)).toEqual(['addColumn.user.bio']);
-    expect(result.needsDataMigration).toBe(false);
   });
 
   it('7: new NOT NULL column with default', () => {
@@ -290,7 +287,6 @@ describe('additive — existing contract', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(descriptorSummary(result)).toEqual(['addColumn.user.active']);
-    expect(result.needsDataMigration).toBe(false);
   });
 
   it('8: new NOT NULL column without default → data migration', () => {
@@ -305,7 +301,6 @@ describe('additive — existing contract', () => {
       'dataTransform',
       'setNotNull.user.name',
     ]);
-    expect(result.needsDataMigration).toBe(true);
     // addColumn should have nullable override
     const addCol = result.descriptors[0] as Record<string, unknown>;
     expect(addCol['overrides']).toEqual({ nullable: true });
@@ -320,7 +315,6 @@ describe('additive — existing contract', () => {
     if (!result.ok) return;
     const kinds = descriptorKinds(result);
     expect(kinds.filter((k) => k === 'dataTransform')).toHaveLength(2);
-    expect(result.needsDataMigration).toBe(true);
   });
 
   it('10: new table alongside existing (existing untouched)', () => {
@@ -488,7 +482,6 @@ describe('reconciliation — alters', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(descriptorSummary(result)).toEqual(['alterColumnType.user.age']);
-    expect(result.needsDataMigration).toBe(false);
   });
 
   it('18b: unsafe type change (text → int4) — dataTransform + alterColumnType', () => {
@@ -502,7 +495,6 @@ describe('reconciliation — alters', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(descriptorKinds(result)).toEqual(['dataTransform', 'alterColumnType']);
-    expect(result.needsDataMigration).toBe(true);
   });
 
   it('19: nullable → NOT NULL — dataTransform + setNotNull (existing NULLs may violate)', () => {
@@ -516,7 +508,6 @@ describe('reconciliation — alters', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(descriptorKinds(result)).toEqual(['dataTransform', 'setNotNull']);
-    expect(result.needsDataMigration).toBe(true);
     const dt = result.descriptors[0] as Record<string, unknown>;
     expect(dt['name']).toBe('handle-nulls-user-name');
   });
@@ -876,7 +867,6 @@ describe('combined / realistic', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.descriptors).toEqual([]);
-    expect(result.needsDataMigration).toBe(false);
   });
 });
 
@@ -896,7 +886,6 @@ describe('old planner parity', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(descriptorKinds(result)).toContain('dataTransform');
-    expect(result.needsDataMigration).toBe(true);
     // Should NOT contain a plain addColumn (that would apply NOT NULL directly)
     const plainAddCol = result.descriptors.find(
       (d) => d.kind === 'addColumn' && !(d as Record<string, unknown>)['overrides'],
@@ -936,7 +925,6 @@ describe('data-safety gaps', () => {
     const result = plan(from, to);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.needsDataMigration).toBe(true);
     const dt = result.descriptors.find((d) => d.kind === 'dataTransform') as
       | Record<string, unknown>
       | undefined;
@@ -954,7 +942,6 @@ describe('data-safety gaps', () => {
     const result = plan(from, to);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.needsDataMigration).toBe(true);
     expect(descriptorKinds(result)).toEqual(['dataTransform', 'alterColumnType']);
   });
 
@@ -968,7 +955,6 @@ describe('data-safety gaps', () => {
     const result = plan(from, to);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.needsDataMigration).toBe(true);
     expect(descriptorKinds(result)).toEqual(['dataTransform', 'alterColumnType']);
   });
 
@@ -985,7 +971,6 @@ describe('data-safety gaps', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     // Should detect 2 NOT NULL columns + drop of old column
-    expect(result.needsDataMigration).toBe(true);
     const kinds = descriptorKinds(result);
     expect(kinds.filter((k) => k === 'dataTransform')).toHaveLength(2);
     expect(kinds).toContain('dropColumn');
@@ -1024,7 +1009,6 @@ describe('data-safety gaps', () => {
     const result = plan(from, to);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.needsDataMigration).toBe(false);
     // Structural ops: drop columns from user, create profile with FK + index
     const summary = descriptorSummary(result);
     expect(summary).toContain('dropColumn.user.bio');
@@ -1044,7 +1028,6 @@ describe('data-safety gaps', () => {
     if (!result.ok) return;
     // Currently emits just setNotNull — but if table has NULL values, this fails at apply time
     // Should detect this as needing a data migration (user decides what to do with NULLs)
-    expect(result.needsDataMigration).toBe(true);
   });
 
   it('S14: data seeding — new table with NOT NULL FK to new lookup table', () => {
@@ -1072,7 +1055,6 @@ describe('data-safety gaps', () => {
     if (!result.ok) return;
     // countryId is NOT NULL without default on existing user table → data migration
     // Also: country table needs seed data before FK can be applied
-    expect(result.needsDataMigration).toBe(true);
   });
 
   it('S18: multi-tenant — NOT NULL FK column added to multiple existing tables', () => {
@@ -1113,7 +1095,6 @@ describe('data-safety gaps', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     // tenantId on user and order are both NOT NULL without default → 2 data transforms
-    expect(result.needsDataMigration).toBe(true);
     const kinds = descriptorKinds(result);
     expect(kinds.filter((k) => k === 'dataTransform')).toHaveLength(2);
   });

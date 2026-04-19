@@ -1,24 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
-import type { OperationDescriptor } from '@prisma-next/framework-components/control';
-import { attestMigration } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration } from '@prisma-next/migration-tools/dag';
-import {
-  formatMigrationDirName,
-  writeMigrationOps,
-  writeMigrationPackage,
-} from '@prisma-next/migration-tools/io';
-import {
-  evaluateMigrationTs,
-  scaffoldMigrationTs,
-} from '@prisma-next/migration-tools/migration-ts';
+import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
+import { scaffoldMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { type MigrationManifest, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
+import { emitMigration } from '../lib/migration-emit';
 import {
   type CliErrorConflict,
   CliStructuredError,
@@ -178,7 +170,7 @@ async function executeMigrationPlanCommand(
       return notOk(
         errorRuntime('A draft migration to this contract already exists', {
           why: `Draft migration at "${existingDraft.dirName}" already targets ${toStorageHash}`,
-          fix: `Run 'prisma-next migration verify --dir ${migrationsRelative}/${existingDraft.dirName}' to attest it, or delete it and re-plan.`,
+          fix: `Run 'prisma-next migration emit --dir ${migrationsRelative}/${existingDraft.dirName}' to attest it, or delete it and re-plan.`,
         }),
       );
     }
@@ -302,56 +294,22 @@ async function executeMigrationPlanCommand(
     };
 
     try {
-      // Always write migration.ts with the descriptors
-      // Write package with empty ops first (draft)
       await writeMigrationPackage(packageDir, manifest, []);
       await scaffoldMigrationTs(packageDir, {
         descriptors: descriptorResult.descriptors,
         contractJsonPath: contractPathAbsolute,
       });
 
-      if (descriptorResult.needsDataMigration) {
-        // Draft — user must fill in dataTransform and run verify
-        const result: MigrationPlanResult = {
-          ok: true,
-          noOp: false,
-          from: fromHash,
-          to: toStorageHash,
-          dir: relative(process.cwd(), packageDir),
-          operations: descriptorResult.descriptors.map((d) => ({
-            id: (d as { kind: string }).kind,
-            label: (d as { kind: string }).kind,
-            operationClass: 'data' as const,
-          })),
-          sql: [],
-          summary: `Planned ${descriptorResult.descriptors.length} operation(s) — data migration required. Edit migration.ts and run \`migration verify --dir ${relative(process.cwd(), packageDir)}\` to attest.`,
-          timings: { total: Date.now() - startTime },
-        };
-        return ok(result);
-      }
+      // Always run emit inline; structured errors thrown during evaluation
+      // (e.g. invalid migration.ts shape, missing file) propagate through
+      // emitMigration to the CLI envelope.
+      const { operations, migrationId } = await emitMigration(packageDir, {
+        targetId: config.target.targetId,
+        migrations,
+        frameworkComponents,
+      });
 
-      // No data migration — evaluate, resolve, write ops, attest
-      const evaluatedDescriptors = await evaluateMigrationTs(packageDir);
-
-      if (!migrations.resolveDescriptors) {
-        throw errorTargetMigrationNotSupported({
-          why: `Target "${config.target.targetId}" does not implement resolveDescriptors; cannot finalize migration plan with migration.ts`,
-        });
-      }
-
-      const resolvedOps = migrations.resolveDescriptors(
-        evaluatedDescriptors as OperationDescriptor[],
-        {
-          fromContract,
-          toContract: toContractJson,
-          frameworkComponents,
-        },
-      );
-
-      await writeMigrationOps(packageDir, resolvedOps);
-      const migrationId = await attestMigration(packageDir);
-
-      const sql = extractSqlDdl(resolvedOps);
+      const sql = extractSqlDdl(operations);
       const result: MigrationPlanResult = {
         ok: true,
         noOp: false,
@@ -359,13 +317,13 @@ async function executeMigrationPlanCommand(
         to: toStorageHash,
         migrationId,
         dir: relative(process.cwd(), packageDir),
-        operations: resolvedOps.map((op) => ({
+        operations: operations.map((op) => ({
           id: op.id,
           label: op.label,
           operationClass: op.operationClass,
         })),
         sql,
-        summary: `Planned ${resolvedOps.length} operation(s)`,
+        summary: `Planned ${operations.length} operation(s)`,
         timings: { total: Date.now() - startTime },
       };
       return ok(result);
