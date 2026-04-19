@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadConfig } from '../src/config-loader';
+import { loadConfig, loadConfigWithMetadata } from '../src/config-loader';
 
 describe('config loader', () => {
   let testDir: string;
@@ -19,7 +19,7 @@ describe('config loader', () => {
     }
   }, timeouts.typeScriptCompilation);
 
-  const createValidConfig = () => {
+  const createValidConfig = (extraProps = '') => {
     return `const mockHook = {
       id: 'sql',
       generateStorageType: () => '{}',
@@ -47,7 +47,7 @@ describe('config loader', () => {
       target: { kind: 'target', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-target', version: '0.0.1' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
       adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-adapter', version: '0.0.1' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
       driver: { kind: 'driver', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-driver', version: '0.0.1' }, create: async () => ({ targetId: 'postgres', query: async () => ({ rows: [] }), close: async () => {} }) },
-      extensionPacks: [],
+      extensionPacks: [],${extraProps}
     };`;
   };
 
@@ -61,6 +61,107 @@ describe('config loader', () => {
       expect(config).toBeDefined();
       expect(config.family).toBeDefined();
       expect(config.family.familyId).toBe('sql');
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'surfaces normalized contract watch inputs alongside config',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        createValidConfig(`
+      contract: {
+        source: async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        output: 'generated/contract.json',
+        watchInputs: ['./prisma/schema.prisma', './generated/contract.json', './generated/contract.d.ts'],
+      }`),
+        'utf-8',
+      );
+
+      const result = await loadConfigWithMetadata(configPath);
+
+      expect(result.config.contract?.output).toBe('generated/contract.json');
+      expect(result.metadata.contractWatch).toEqual({
+        inputs: [join(testDir, 'prisma', 'schema.prisma')],
+        warnings: [],
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'returns no warning when contract watch strategy is module graph',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        createValidConfig(`
+      contract: {
+        source: async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        watchStrategy: 'moduleGraph',
+      }`),
+        'utf-8',
+      );
+
+      const result = await loadConfigWithMetadata(configPath);
+
+      expect(result.metadata.contractWatch).toEqual({
+        inputs: [],
+        warnings: [],
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'filters default output artifact paths from watch inputs when output is omitted',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        createValidConfig(`
+      contract: {
+        source: async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        watchInputs: ['./prisma/schema.prisma', './src/prisma/contract.json', './src/prisma/contract.d.ts'],
+      }`),
+        'utf-8',
+      );
+
+      const result = await loadConfigWithMetadata(configPath);
+
+      expect(result.config.contract?.output).toBeUndefined();
+      expect(result.metadata.contractWatch).toEqual({
+        inputs: [join(testDir, 'prisma', 'schema.prisma')],
+        warnings: [],
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'falls back to config path and returns partial coverage warning when watch metadata is omitted',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        createValidConfig(`
+      contract: {
+        source: async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+      }`),
+        'utf-8',
+      );
+
+      const result = await loadConfigWithMetadata(configPath);
+
+      expect(result.metadata.contractWatch?.inputs).toEqual([configPath]);
+      expect(result.metadata.contractWatch?.warnings).toEqual([
+        expect.objectContaining({
+          code: 'CONTRACT_WATCH_INPUTS_PARTIAL',
+          message: expect.stringContaining('contract.watchInputs'),
+        }),
+      ]);
     },
     timeouts.typeScriptCompilation,
   );
