@@ -114,7 +114,7 @@ Fork `node migration.ts` as a child process, capture `ops.json` from the file sy
 
 ### Framework owns the class-flow emit pipeline
 
-Instead of delegating to the target's `emit` capability, the framework could directly import `migration.ts`, instantiate the class, and serialize operations — the same steps Mongo's `emit` does today. We chose target-owned emit because different targets may need different loading strategies (e.g. a future target might compile the file first, or validate operations against a target-specific schema before serialization). The capability interface lets each target own its pipeline while the framework owns attestation.
+Instead of delegating to the target's `emit` capability, the framework could directly import `migration.ts`, instantiate the class, and serialize operations — the same steps Mongo's `emit` does today (and the same steps the CLI's class-flow import path performs in the pseudocode above). We keep the `emit` capability seam open during the descriptor-flow bridge so the framework doesn't have to special-case class-flow vs descriptor-flow targets, even though the seam carries no substantive logic today. Once descriptor flow is removed ([ADR 193](ADR%20193%20-%20Class-flow%20as%20the%20canonical%20migration%20authoring%20strategy.md)), the `emit` capability disappears with it; this is a bridge artifact, not a future-extensibility hook.
 
 ## References
 
