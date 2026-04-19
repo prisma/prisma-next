@@ -1474,6 +1474,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/emitter
+      '@prisma-next/errors':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/errors
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
@@ -1501,6 +1504,9 @@ importers:
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
     devDependencies:
       '@prisma-next/mongo-contract-ts':
         specifier: workspace:*
