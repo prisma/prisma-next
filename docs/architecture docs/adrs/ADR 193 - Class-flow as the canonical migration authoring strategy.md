@@ -24,9 +24,9 @@ migrations/20250614T1030_add-status-index/
 ```ts
 #!/usr/bin/env node --experimental-strip-types
 import { createIndex, dataTransform, placeholder } from '@prisma-next/target-mongo/migration'
-import { MongoMigration } from '@prisma-next/family-mongo/migration'
+import { Migration } from '@prisma-next/family-mongo/migration'
 
-class M extends MongoMigration {
+class M extends Migration {
   override describe() {
     return { from: 'sha256:abc', to: 'sha256:def' }
   }
@@ -46,7 +46,7 @@ class M extends MongoMigration {
 }
 
 export default M
-MongoMigration.run(import.meta.url, M)
+Migration.run(import.meta.url, M)
 ```
 
 The `createIndex` operation is fully specified by the planner — no user intervention needed. The `dataTransform` has two `placeholder(...)` slots that the planner can't fill because only the developer knows the query. When `migration plan` ran inline emit after scaffolding, the placeholder threw `PN-MIG-2001` and the CLI reported: "Unfilled migration placeholder: `backfill-status:check.source`." The developer opens the file, replaces the placeholders with real queries using the snapshotted contract for types, and re-runs the file directly:
@@ -55,7 +55,7 @@ The `createIndex` operation is fully specified by the planner — no user interv
 ./migration.ts
 ```
 
-`MongoMigration.run(...)` detects it is the main module, instantiates `M`, reads `operations`, and writes fully-attested `ops.json` + `migration.json` with a fresh content-addressed `migrationId` ([ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md)). When happy, they run:
+`Migration.run(...)` detects it is the main module, instantiates `M`, reads `operations`, and writes fully-attested `ops.json` + `migration.json` with a fresh content-addressed `migrationId` ([ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md)). When happy, they run:
 
 ```
 prisma-next migration apply
