@@ -24,7 +24,7 @@ There are two ways this file's authored intent ends up on disk as `ops.json` + a
 
 1. **Direct execution (canonical).** The developer runs `./migration.ts` (shebang) or `node migration.ts`. `Migration.run(...)` detects it is the main module, instantiates the class, reads `operations`, computes the content-addressed `migrationId`, and writes `ops.json` + a fully attested `migration.json` — no draft, no later "verify" step required.
 
-2. **CLI import (transitional).** `migration plan` and the descriptor-flow bridge (`migration emit`) load `migration.ts` via `await import(pathToFileURL(filePath).href)`, instantiate the default-exported `Migration` subclass, read `operations`, write `ops.json`, then call `attestMigration(dir)`. `Migration.run(...)` is still in the file, but the entrypoint guard doesn't fire because the file isn't the main module.
+2. **CLI import (transitional).** `migration plan` and the descriptor-flow bridge (`migration emit`) load `migration.ts` via `await import(pathToFileURL(filePath).href)` and dispatch on the default export's shape: if it is a `Migration` subclass, instantiate it and call `plan()`; if it is a factory function, call it, validate the result has a `plan()` method, then call `plan()`. In both cases the resulting operations are written to `ops.json` and the package is attested via `attestMigration(dir)`. `Migration.run(...)` is still in the file, but the entrypoint guard doesn't fire because the file isn't the main module.
 
 Both paths produce **byte-identical** `ops.json` and an attested `migration.json` carrying the same `migrationId`. They are two ways of driving the same self-contained authoring surface.
 
@@ -39,21 +39,34 @@ A `migration.ts` run via shebang yields the same artifacts the CLI would produce
 
 When a `migration.json` is already present in the directory (the common case after `migration plan` scaffolding), `Migration.run` preserves the contract bookends, hints, labels, and `createdAt` set there — those fields are owned by the CLI scaffolder, not the authored class. The author's `describe()` and `operations` drive what may legitimately change between runs; everything else is read back from disk and re-attested.
 
-The CLI's `migration plan` and `migration emit` commands implement the same emit contract via dynamic import:
+The CLI's `migration plan` and `migration emit` commands implement the same emit contract via dynamic import. Two authoring shapes are accepted — a `Migration` subclass (canonical) or a factory function returning an object with a `plan()` method:
 
 ```ts
 const fileUrl = pathToFileURL(filePath).href;
 const mod = (await import(fileUrl)) as { default?: unknown };
 
-const MigrationClass = mod.default;
-const instance = new (MigrationClass as new () => Migration)();
-const operations = instance.operations;
+const MigrationExport = mod.default;
+
+// Shape 1: class subclass
+//   export default class M extends Migration { override plan() { ... } }
+// Shape 2: factory function returning { plan() }
+//   export default () => ({ plan() { return [...] } })
+
+let migration: { plan(): unknown };
+if (MigrationExport.prototype instanceof Migration) {
+  migration = new (MigrationExport as new () => Migration)();
+} else {
+  const factoryResult = await (MigrationExport as () => unknown)();
+  // validate factoryResult has plan()...
+  migration = factoryResult as { plan(): unknown };
+}
+const operations = migration.plan();
 
 await writeMigrationOps(dir, operations);
 const migrationId = await attestMigration(dir);
 ```
 
-The guards in this pipeline throw structured errors: `PN-MIG-2002` if `migration.ts` is missing, `PN-MIG-2003` if the default export is not a `Migration` subclass, and `PN-MIG-2004` if `instance.operations` is not an array (see [ADR 027](ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md)).
+Both shapes funnel through `plan()` — the class path instantiates and calls `plan()`, the factory path calls the function, validates the result has `plan()`, then calls it. The guards in this pipeline throw structured errors: `PN-MIG-2002` if `migration.ts` is missing, `PN-MIG-2003` if the default export is not a valid migration shape, and `PN-MIG-2004` if `plan()` returns a non-array (see [ADR 027](ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md)).
 
 This is transitional infrastructure: it bridges the CLI to the descriptor flow (where evaluating `migration.ts` produces a descriptor list rather than a self-emitting class) and gives `migration plan` a single in-process dispatch path it can use against either flow. Once the descriptor flow is removed, `migration emit` disappears entirely ([ADR 193](ADR%20193%20-%20Class-flow%20as%20the%20canonical%20migration%20authoring%20strategy.md)) and shebang execution becomes the only emit path that matters for class-flow targets.
 

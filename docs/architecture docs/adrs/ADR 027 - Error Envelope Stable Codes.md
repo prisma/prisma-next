@@ -125,8 +125,8 @@ The migration authoring subsystem uses a separate error construction (`CliStruct
 
 - **PN-MIG-2001**: unfilled placeholder thrown at emit time when scaffolded `placeholder(slot)` was not replaced (see [ADR 200](ADR%20200%20-%20Placeholder%20utility%20for%20scaffolded%20migration%20slots.md))
 - **PN-MIG-2002**: `migration.ts` not found in the migration package directory (see [ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md))
-- **PN-MIG-2003**: invalid default export — `migration.ts` does not default-export a `Migration` subclass (see [ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md))
-- **PN-MIG-2004**: `Migration.operations` returned a non-array value (see [ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md))
+- **PN-MIG-2003**: invalid default export — `migration.ts` does not default-export a `Migration` subclass or a factory function returning `{ plan() }` (see [ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md))
+- **PN-MIG-2004**: `plan()` returned a non-array value (see [ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md))
 - **PN-MIG-2010**: plan does not support TypeScript authoring surface (see [ADR 194](ADR%20194%20-%20Plans%20carry%20their%20own%20authoring%20surface.md))
 - **PN-MIG-2011**: target registers a migrations capability but implements neither `resolveDescriptors` nor `emit` (see [ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md))
 
