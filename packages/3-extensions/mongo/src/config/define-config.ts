@@ -43,7 +43,7 @@ export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mon
           },
           output,
           watchInputs: [options.contract],
-          watchStrategy: 'moduleGraph',
+          watchStrategy: 'moduleGraph' as const,
         }
       : mongoContract(options.contract, { output });
 
