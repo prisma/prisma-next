@@ -20,12 +20,12 @@ import {
 import { describe, expect, it } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
 import { fn } from '../src/expression-helpers';
-import { mongoPipeline } from '../src/pipeline';
+import { mongoQuery } from '../src/query';
 import type { TContract } from './fixtures/test-contract';
 import { testContractJson } from './fixtures/test-contract';
 
 function createOrdersBuilder() {
-  return mongoPipeline<TContract>({ contractJson: testContractJson }).from('orders');
+  return mongoQuery<TContract>({ contractJson: testContractJson }).from('orders');
 }
 
 describe('PipelineBuilder', () => {
@@ -276,16 +276,16 @@ describe('PipelineBuilder', () => {
   });
 });
 
-describe('mongoPipeline()', () => {
+describe('mongoQuery()', () => {
   it('from() creates builder for known root', () => {
-    const p = mongoPipeline<TContract>({ contractJson: testContractJson });
+    const p = mongoQuery<TContract>({ contractJson: testContractJson });
     const builder = p.from('orders');
     const plan = builder.build();
     expect(plan.collection).toBe('orders');
   });
 
   it('from() throws for unknown root', () => {
-    const p = mongoPipeline<TContract>({ contractJson: testContractJson });
+    const p = mongoQuery<TContract>({ contractJson: testContractJson });
     expect(() => p.from('nonexistent' as 'orders')).toThrow('Unknown root');
   });
 });

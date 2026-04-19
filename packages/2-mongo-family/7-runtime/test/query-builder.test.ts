@@ -5,8 +5,8 @@ import type {
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import { defineContract, field, model, rel } from '@prisma-next/mongo-contract-ts/contract-builder';
-import { acc, fn, mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { acc, fn, mongoQuery } from '@prisma-next/mongo-query-builder';
 import mongoTargetPack from '@prisma-next/target-mongo/pack';
 import { ObjectId } from 'mongodb';
 import { describe, expect, expectTypeOf, it } from 'vitest';
@@ -106,7 +106,7 @@ const contract = defineContract({
 });
 
 describe('pipeline builder integration', () => {
-  const p = mongoPipeline<TContract>({ contractJson });
+  const p = mongoQuery<TContract>({ contractJson });
 
   it('match → group → sort → limit analytics query', async () => {
     await withMongod(async (ctx) => {
@@ -277,7 +277,7 @@ describe('pipeline builder integration', () => {
         },
       ]);
 
-      const plan = mongoPipeline<typeof contract>({ contractJson: contract })
+      const plan = mongoQuery<typeof contract>({ contractJson: contract })
         .from('tasks')
         .group((f) => ({
           _id: f.type,

@@ -3,7 +3,7 @@ import { MongoAggFieldRef, MongoLimitStage } from '@prisma-next/mongo-query-ast/
 import { expectTypeOf } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
 import { fn } from '../src/expression-helpers';
-import { mongoPipeline } from '../src/pipeline';
+import { mongoQuery } from '../src/query';
 import type { TContract } from './fixtures/test-contract';
 
 const contractJson = {} as unknown;
@@ -21,7 +21,7 @@ type OrderRow = {
 
 describe('builder shape tests', () => {
   it('sort() only accepts keys from current shape', () => {
-    const p = mongoPipeline<TContract>({ contractJson });
+    const p = mongoQuery<TContract>({ contractJson });
     const builder = p.from('orders');
     builder.sort({ amount: -1 });
     builder.sort({ status: 1 });
@@ -30,7 +30,7 @@ describe('builder shape tests', () => {
   });
 
   it('group() replaces shape — previous fields inaccessible', () => {
-    const p = mongoPipeline<TContract>({ contractJson });
+    const p = mongoQuery<TContract>({ contractJson });
     const grouped = p.from('orders').group((f) => ({
       _id: f.customerId,
       total: acc.sum(f.amount),
@@ -47,7 +47,7 @@ describe('builder shape tests', () => {
   });
 
   it('addFields() extends shape', () => {
-    const p = mongoPipeline<TContract>({ contractJson });
+    const p = mongoQuery<TContract>({ contractJson });
     const extended = p.from('orders').addFields((f) => ({
       fullName: fn.concat(f.status, fn.literal(' ')),
     }));
@@ -57,7 +57,7 @@ describe('builder shape tests', () => {
   });
 
   it('project() inclusion narrows shape', () => {
-    const p = mongoPipeline<TContract>({ contractJson });
+    const p = mongoQuery<TContract>({ contractJson });
     const projected = p.from('orders').project('status', 'amount');
 
     projected.sort({ status: 1 });
@@ -68,7 +68,7 @@ describe('builder shape tests', () => {
   });
 
   it('count() replaces shape with single field', () => {
-    const p = mongoPipeline<TContract>({ contractJson });
+    const p = mongoQuery<TContract>({ contractJson });
     const counted = p.from('orders').count('total');
 
     counted.sort({ total: 1 });
@@ -77,7 +77,7 @@ describe('builder shape tests', () => {
   });
 
   it('lookup() adds array field and preserves existing fields', () => {
-    const p = mongoPipeline<TContract>({ contractJson });
+    const p = mongoQuery<TContract>({ contractJson });
     const withLookup = p.from('orders').lookup({
       from: 'users',
       localField: 'customerId',
@@ -94,7 +94,7 @@ describe('builder shape tests', () => {
   });
 
   it('replaceRoot() replaces entire shape', () => {
-    const p = mongoPipeline<TContract>({ contractJson });
+    const p = mongoQuery<TContract>({ contractJson });
     type NewShape = {
       readonly x: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
     };
@@ -109,12 +109,12 @@ describe('builder shape tests', () => {
 
 describe('resolved row types', () => {
   it('from() → build() resolves to concrete field types', () => {
-    const plan = mongoPipeline<TContract>({ contractJson }).from('orders').build();
+    const plan = mongoQuery<TContract>({ contractJson }).from('orders').build();
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
   });
 
   it('match() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .match((f) => f.status.eq('active') as MongoFilterExpr)
       .build();
@@ -122,7 +122,7 @@ describe('resolved row types', () => {
   });
 
   it('sort() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .sort({ amount: -1 })
       .build();
@@ -130,7 +130,7 @@ describe('resolved row types', () => {
   });
 
   it('limit() / skip() / sample() preserve row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .limit(10)
       .skip(5)
@@ -140,7 +140,7 @@ describe('resolved row types', () => {
   });
 
   it('addFields() extends row with new fields at correct types', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .addFields((f) => ({
         fullName: fn.concat(f.status, fn.literal(' ')),
@@ -160,7 +160,7 @@ describe('resolved row types', () => {
   });
 
   it('project() inclusion narrows to selected fields at correct types', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .project('status', 'amount')
       .build();
@@ -172,7 +172,7 @@ describe('resolved row types', () => {
   });
 
   it('project() computed includes expression fields at correct types', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .project((f) => ({
         status: 1 as const,
@@ -189,7 +189,7 @@ describe('resolved row types', () => {
   });
 
   it('group() resolves _id at grouped-by field type, accumulators at correct types', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .group((f) => ({
         _id: f.customerId,
@@ -207,17 +207,17 @@ describe('resolved row types', () => {
   });
 
   it('unwind() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson }).from('orders').unwind('tags').build();
+    const plan = mongoQuery<TContract>({ contractJson }).from('orders').unwind('tags').build();
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
   });
 
   it('count() row type is { [field]: number }', () => {
-    const plan = mongoPipeline<TContract>({ contractJson }).from('orders').count('total').build();
+    const plan = mongoQuery<TContract>({ contractJson }).from('orders').count('total').build();
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{ total: number }>();
   });
 
   it('sortByCount() row type is { _id: <field type>; count: number }', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .sortByCount((f) => f.status)
       .build();
@@ -228,7 +228,7 @@ describe('resolved row types', () => {
   });
 
   it('lookup() adds as field as unknown[], preserves existing at correct types', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .lookup({
         from: 'users',
@@ -253,7 +253,7 @@ describe('resolved row types', () => {
       readonly x: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
       readonly y: { readonly codecId: 'mongo/double@1'; readonly nullable: true };
     };
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .replaceRoot<NewShape>((f) => f.status)
       .build();
@@ -264,7 +264,7 @@ describe('resolved row types', () => {
   });
 
   it('pipe() preserves row type by default', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .pipe(new MongoLimitStage(5))
       .build();
@@ -275,7 +275,7 @@ describe('resolved row types', () => {
     type NewShape = {
       readonly a: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
     };
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .pipe<NewShape>(new MongoLimitStage(5))
       .build();
@@ -283,14 +283,14 @@ describe('resolved row types', () => {
   });
 
   it('nullable fields resolve to T | null', () => {
-    const plan = mongoPipeline<TContract>({ contractJson }).from('orders').build();
+    const plan = mongoQuery<TContract>({ contractJson }).from('orders').build();
     type Row = PlanRow<typeof plan>;
     expectTypeOf<Row['notes']>().toEqualTypeOf<string | null>();
     expectTypeOf<Row['status']>().toEqualTypeOf<string>();
   });
 
   it('chained pipeline produces correct cumulative row types', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .match((f) => f.status.eq('active') as MongoFilterExpr)
       .group((f) => ({
@@ -309,7 +309,7 @@ describe('resolved row types', () => {
   });
 
   it('execute() infers Row from build() plan type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson }).from('orders').build();
+    const plan = mongoQuery<TContract>({ contractJson }).from('orders').build();
     const execute = {} as <Row>(p: MongoQueryPlan<Row>) => Promise<Row[]>;
     const result = execute(plan);
     expectTypeOf<Awaited<typeof result>[0]>().toEqualTypeOf<OrderRow>();
@@ -318,7 +318,7 @@ describe('resolved row types', () => {
 
 describe('resolved row types — new stages', () => {
   it('redact() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .redact((f) => f.status)
       .build();
@@ -326,12 +326,12 @@ describe('resolved row types — new stages', () => {
   });
 
   it('out() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson }).from('orders').out('archive').build();
+    const plan = mongoQuery<TContract>({ contractJson }).from('orders').out('archive').build();
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
   });
 
   it('merge() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .merge({ into: 'summary' })
       .build();
@@ -339,7 +339,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('unionWith() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .unionWith('archived_orders')
       .build();
@@ -347,7 +347,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('densify() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .densify({ field: 'amount', range: { step: 10, bounds: 'full' } })
       .build();
@@ -355,7 +355,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('fill() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .fill({ sortBy: { amount: 1 }, output: { notes: { method: 'linear' } } })
       .build();
@@ -363,7 +363,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('search() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .search({ text: { query: 'test', path: 'status' } })
       .build();
@@ -371,7 +371,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('vectorSearch() preserves row type', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .vectorSearch({
         index: 'idx',
@@ -385,7 +385,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('bucket() resets to untyped row', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .bucket({ groupBy: MongoAggFieldRef.of('amount'), boundaries: [0, 100, 500] })
       .build();
@@ -393,7 +393,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('bucketAuto() resets to untyped row', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .bucketAuto({ groupBy: MongoAggFieldRef.of('amount'), buckets: 5 })
       .build();
@@ -401,7 +401,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('facet() resets to untyped row', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .facet({ counts: [], top: [] })
       .build();
@@ -409,7 +409,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('geoNear() resets to untyped row', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .geoNear({ near: [0, 0], distanceField: 'dist' })
       .build();
@@ -417,7 +417,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('graphLookup() resets to untyped row', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .graphLookup({
         from: 'categories',
@@ -431,7 +431,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('setWindowFields() resets to untyped row', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .setWindowFields({ sortBy: { amount: 1 }, output: {} })
       .build();
@@ -439,7 +439,7 @@ describe('resolved row types — new stages', () => {
   });
 
   it('searchMeta() resets to untyped row', () => {
-    const plan = mongoPipeline<TContract>({ contractJson })
+    const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .searchMeta({ facet: { operator: {} } })
       .build();

@@ -86,7 +86,7 @@ Planes are a conceptual grouping recorded in `architecture.config.json` but do n
 | `packages/2-mongo-family/3-tooling/emitter/` | `@prisma-next/mongo-emitter` |
 | `packages/2-mongo-family/4-query/query-ast/` | `@prisma-next/mongo-query-ast` |
 | `packages/2-mongo-family/5-query-builders/orm/` | `@prisma-next/mongo-orm` |
-| `packages/2-mongo-family/5-query-builders/pipeline-builder/` | `@prisma-next/mongo-pipeline-builder` |
+| `packages/2-mongo-family/5-query-builders/query-builder/` | `@prisma-next/mongo-query-builder` |
 | `packages/2-mongo-family/6-transport/mongo-lowering/` | `@prisma-next/mongo-lowering` |
 | `packages/2-mongo-family/6-transport/mongo-wire/` | `@prisma-next/mongo-wire` |
 | `packages/2-mongo-family/7-runtime/` | `@prisma-next/mongo-runtime` |

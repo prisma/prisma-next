@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add data transform support to MongoDB migrations. Users author transforms using the existing `mongoRaw` and `mongoPipeline` query builders, which produce `MongoQueryPlan` ASTs from a scaffolded contract. The plans serialize to `ops.json` as JSON (same pattern as DDL commands) and execute at apply time via `MongoAdapter` → `MongoDriver`. No TypeScript runs at apply time.
+Add data transform support to MongoDB migrations. Users author transforms using the existing `mongoRaw` and `mongoQuery` query builders, which produce `MongoQueryPlan` ASTs from a scaffolded contract. The plans serialize to `ops.json` as JSON (same pattern as DDL commands) and execute at apply time via `MongoAdapter` → `MongoDriver`. No TypeScript runs at apply time.
 
 **Spec:** `projects/mongo-migration-authoring/specs/data-migrations.spec.md`
 
@@ -121,5 +121,4 @@ Wire contract scaffolding into the migration directory and validate the full pip
 2. **Aggregation pipeline stage deserialization scope**: The pipeline builder produces ~25 stage kinds. For v1, implementing deserialization for the subset needed by `check` queries (`$match`, `$limit`, `$sort`, `$project`) plus common data transform patterns (`$addFields`, `$merge`, `$lookup`) is likely sufficient. Extend as users hit gaps.
 3. **Where the serializer lives**: The existing DDL serializer is in `mongo-ops-serializer.ts` in the adapter package. If the migration-subsystem-refactor spec is implemented first (moving the serializer to `target-mongo`), the DML serializer goes there too. Otherwise, it goes in the adapter alongside the existing serializer for now and moves later.
 4. **Runner architecture**: The runner currently only handles DDL via `MongoCommandExecutor` (visitor pattern). Data transforms need a different execution path (`MongoAdapter` + `MongoDriver`). The runner needs access to both. If the migration-subsystem-refactor spec is done first (runner accepts injected executors), the adapter/driver can be injected alongside the DDL executors. Otherwise, the runner needs to be extended to accept the adapter/driver as additional dependencies.
-5. **Filter expression serialization for typed commands**: The `mongoPipeline` builder produces typed `MongoPipelineStage` and `MongoFilterExpr` objects. The existing `mongo-ops-serializer` already handles `MongoFilterExpr` deserialization (for DDL prechecks/postchecks). Pipeline stages need new deserialization logic, but the pattern is identical.
-
+5. **Filter expression serialization for typed commands**: The `mongoQuery` builder produces typed `MongoPipelineStage` and `MongoFilterExpr` objects. The existing `mongo-ops-serializer` already handles `MongoFilterExpr` deserialization (for DDL prechecks/postchecks). Pipeline stages need new deserialization logic, but the pattern is identical.

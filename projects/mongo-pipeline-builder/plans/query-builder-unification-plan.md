@@ -32,12 +32,12 @@ Mechanical rename. No surface change. Lands first as a small standalone PR.
 
 **Tasks:**
 
-- [ ] 0.1 — Move `packages/2-mongo-family/5-query-builders/pipeline-builder/` → `packages/2-mongo-family/5-query-builders/query-builder/`. Update `package.json#name` to `@prisma-next/mongo-query-builder`. Update `tsdown.config.ts`, `tsconfig.json`, and `package.json#exports`.
-- [ ] 0.2 — Rename the `mongoPipeline` export to `mongoQuery` and the `PipelineRoot` interface to `QueryRoot` in `src/pipeline.ts`. Rename the file `src/pipeline.ts` → `src/query.ts` and update internal imports.
-- [ ] 0.3 — Update all in-repo callers (`pnpm exec rg -l 'mongoPipeline|@prisma-next/mongo-pipeline-builder'`) to the new names. Includes ORM internals, tests, examples, and project docs.
-- [ ] 0.4 — Update layering config (`pnpm lint:deps`) and any architecture-config globs that reference the old directory.
-- [ ] 0.5 — Update repo-wide doc references: `docs/architecture docs/**`, `projects/mongo-pipeline-builder/spec.md` and `plan.md` (mark as superseded-in-scope), READMEs.
-- [ ] 0.6 — Verify `pnpm typecheck && pnpm lint && pnpm test && pnpm lint:deps` pass. Open M0 PR.
+- [x] 0.1 — Move `packages/2-mongo-family/5-query-builders/pipeline-builder/` → `packages/2-mongo-family/5-query-builders/query-builder/`. Update `package.json#name` to `@prisma-next/mongo-query-builder`.
+- [x] 0.2 — Rename the `mongoPipeline` export to `mongoQuery` and the `PipelineRoot` interface to `QueryRoot`. Rename the file `src/pipeline.ts` → `src/query.ts` and update internal imports.
+- [x] 0.3 — Update all in-repo callers (runtime tests, integration tests, `@prisma-next/mongo` extension, examples, migration-authoring docs) to the new names. Renamed the extension's `pipeline:` field to `query:`.
+- [x] 0.4 — `pnpm lint:deps` passes (no architecture-config changes needed; layering rules use globs by layer index, not package name).
+- [x] 0.5 — Update repo-wide doc references: `docs/architecture docs/Package-Layering.md`, `docs/Architecture Overview.md`, `docs/reference/Package Naming Conventions.md`, READMEs. The historical `projects/mongo-pipeline-builder/{spec.md,plan.md}` are left intact; the new design lives under `projects/mongo-pipeline-builder/specs/query-builder-unification.spec.md` and the corresponding plan.
+- [x] 0.6 — Verified: `mongo-query-builder` typecheck + tests green (271 tests), `mongo-runtime` typecheck + tests green (51 tests), `lint:deps` clean, `lint` clean for touched packages.
 
 ### Milestone 1 — State split + unified accessor (read-side parity)
 

@@ -1,8 +1,8 @@
 export { acc } from '../accumulator-helpers';
 export { PipelineBuilder } from '../builder';
 export { fn } from '../expression-helpers';
-export type { PipelineRoot } from '../pipeline';
-export { mongoPipeline } from '../pipeline';
+export type { QueryRoot } from '../query';
+export { mongoQuery } from '../query';
 export type {
   ArrayField,
   BooleanField,

@@ -3,7 +3,6 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import { acc, fn, mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
 import {
   MongoAggAccumulator,
   MongoAggCond,
@@ -18,6 +17,7 @@ import {
   MongoRedactStage,
   MongoSortStage,
 } from '@prisma-next/mongo-query-ast/execution';
+import { acc, fn, mongoQuery } from '@prisma-next/mongo-query-builder';
 import { describe, expect, it } from 'vitest';
 import { describeWithMongoDB } from './setup';
 
@@ -104,7 +104,7 @@ const contractJson = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const pipeline = mongoPipeline<TContract>({ contractJson });
+const pipeline = mongoQuery<TContract>({ contractJson });
 
 function products() {
   return pipeline.from('products');
@@ -166,7 +166,7 @@ const ORDERS = [
 // Tests
 // ---------------------------------------------------------------------------
 
-describeWithMongoDB('Pipeline builder integration (mongoPipeline DSL)', (ctx) => {
+describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
   async function seed() {
     const db = ctx.client.db(ctx.dbName);
     await db.collection('products').insertMany(PRODUCTS.map((p) => ({ ...p })));
