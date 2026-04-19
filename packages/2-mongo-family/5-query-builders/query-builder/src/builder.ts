@@ -19,7 +19,10 @@ import type {
 } from '@prisma-next/mongo-query-ast/execution';
 import {
   AggregateCommand,
+  FindOneAndDeleteCommand,
+  FindOneAndUpdateCommand,
   MongoAddFieldsStage,
+  MongoAndExpr,
   MongoBucketAutoStage,
   MongoBucketStage,
   MongoCountStage,
@@ -62,6 +65,7 @@ import type {
   TypedAggExpr,
   UnwoundShape,
 } from './types';
+import { foldUpdateOps, type TypedUpdateOp } from './update-ops';
 
 interface PipelineChainState {
   readonly collection: string;
@@ -98,6 +102,9 @@ export class PipelineChain<
   U extends UpdateCompat = 'compat',
   F extends FindAndModifyCompat = 'compat',
 > {
+  declare readonly __updateCompat: U;
+  declare readonly __findAndModifyCompat: F;
+
   readonly #contract: TContract;
   readonly #state: PipelineChainState;
 
@@ -536,6 +543,68 @@ export class PipelineChain<
     return this.#withStage<NewShape, 'cleared', 'cleared'>(stage);
   }
 
+  // --- Find-and-modify terminals (marker-gated) ---
+
+  /**
+   * Find a single document matching the accumulated pipeline (which must
+   * consist solely of `$match`/`$sort`/`$skip` stages) and apply
+   * `updaterFn`. Available only when `FindAndModifyCompat` is `'compat'`
+   * — stages that clear the marker make this method invisible at the type
+   * level.
+   *
+   * The pipeline stages are deconstructed into the wire command's `filter`,
+   * `sort`, and `skip` slots. If any non-deconstructable stage is present,
+   * a runtime error is thrown as a defensive check (the type system should
+   * prevent this).
+   */
+  findOneAndUpdate(
+    this: PipelineChain<TContract, Shape, U, 'compat'>,
+    updaterFn: (fields: FieldAccessor<Shape>) => ReadonlyArray<TypedUpdateOp>,
+    opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
+  ): MongoQueryPlan<unknown> {
+    const { filter, sort, skip } = deconstructFindAndModifyChain(this.#state.stages);
+    const accessor = createFieldAccessor<Shape>();
+    const ops = updaterFn(accessor);
+    if (ops.length === 0) {
+      throw new Error(
+        'Updater returned no operations. Return at least one update from the callback (e.g. `[f.amount.set(0)]`).',
+      );
+    }
+    const update = foldUpdateOps(ops);
+    const command = new FindOneAndUpdateCommand(
+      this.#state.collection,
+      filter,
+      update,
+      opts.upsert ?? false,
+      sort,
+      skip,
+      opts.returnDocument ?? 'after',
+    );
+    const meta: PlanMeta = {
+      target: 'mongo',
+      storageHash: this.#state.storageHash,
+      lane: 'mongo-write',
+      paramDescriptors: [],
+    };
+    return { collection: this.#state.collection, command, meta };
+  }
+
+  /**
+   * Find a single document matching the accumulated pipeline and delete it.
+   * Same marker gating and deconstruction as `findOneAndUpdate`.
+   */
+  findOneAndDelete(this: PipelineChain<TContract, Shape, U, 'compat'>): MongoQueryPlan<unknown> {
+    const { filter, sort, skip } = deconstructFindAndModifyChain(this.#state.stages);
+    const command = new FindOneAndDeleteCommand(this.#state.collection, filter, sort, skip);
+    const meta: PlanMeta = {
+      target: 'mongo',
+      storageHash: this.#state.storageHash,
+      lane: 'mongo-write',
+      paramDescriptors: [],
+    };
+    return { collection: this.#state.collection, command, meta };
+  }
+
   // --- Read terminals ---
 
   /**
@@ -558,6 +627,58 @@ export class PipelineChain<
   aggregate(): MongoQueryPlan<ResolveRow<Shape, ExtractMongoCodecTypes<TContract>>> {
     return this.build();
   }
+}
+
+interface DeconstructedFindAndModify {
+  filter: MongoFilterExpr;
+  sort: Record<string, 1 | -1> | undefined;
+  skip: number | undefined;
+}
+
+/**
+ * Walk the accumulated pipeline stages and extract the `filter`, `sort`,
+ * and `skip` slots for a `findOneAndUpdate` / `findOneAndDelete` wire
+ * command. Only `$match`, `$sort`, and `$skip` stages are permitted; any
+ * other stage triggers a runtime error (the type system should make this
+ * unreachable, but the check is here as a defence-in-depth measure).
+ *
+ * Multiple `$match` stages are AND-folded. Multiple `$sort` stages fold
+ * last-writer-wins per key (matching Mongo's own pipeline semantics).
+ * The largest `$skip` value wins.
+ */
+function deconstructFindAndModifyChain(
+  stages: ReadonlyArray<MongoPipelineStage>,
+): DeconstructedFindAndModify {
+  const matchFilters: MongoFilterExpr[] = [];
+  let sort: Record<string, 1 | -1> | undefined;
+  let skip: number | undefined;
+
+  for (const stage of stages) {
+    if (stage instanceof MongoMatchStage) {
+      matchFilters.push(stage.filter);
+    } else if (stage instanceof MongoSortStage) {
+      sort = sort ? { ...sort, ...stage.sort } : { ...stage.sort };
+    } else if (stage instanceof MongoSkipStage) {
+      skip = skip != null ? Math.max(skip, stage.skip) : stage.skip;
+    } else {
+      throw new Error(
+        'findOneAndUpdate/findOneAndDelete requires a chain of $match/$sort/$skip stages only, ' +
+          `but encountered a '${stage.constructor.name}' stage. ` +
+          'This is likely a bug — the type system should have prevented this chain.',
+      );
+    }
+  }
+
+  if (matchFilters.length === 0) {
+    throw new Error('findOneAndUpdate/findOneAndDelete requires at least one .match() call.');
+  }
+  const first = matchFilters[0];
+  if (first === undefined) {
+    throw new Error('Unreachable: matchFilters.length > 0 but first is undefined');
+  }
+  const filter: MongoFilterExpr = matchFilters.length === 1 ? first : MongoAndExpr.of(matchFilters);
+
+  return { filter, sort, skip };
 }
 
 /**
