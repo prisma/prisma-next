@@ -3,19 +3,23 @@
  * `TargetMigrationsCapability`.
  *
  * The CLI's `migration emit` (and `migration plan`'s inline emit) dispatches
- * here for any target that does not implement `resolveDescriptors`. Mongo's
- * `migration.ts` is authored as an executable class:
+ * here for any target that does not implement `resolveDescriptors`. Two
+ * authoring shapes are accepted:
  *
- *     class MyMigration extends Migration { override plan() { return [...] } }
- *     export default MyMigration;
- *     Migration.run(import.meta.url, MyMigration);
+ *   1. Class subclass (canonical):
+ *        class M extends Migration { override plan() { return [...] } }
+ *        export default M;
+ *        Migration.run(import.meta.url, M);
+ *
+ *   2. Default-exported function (arrow, async, or plain) returning operations:
+ *        export default async () => [createCollection("users")];
  *
  * We dynamic-import the file (so that any structured errors thrown by
- * `placeholder(...)` propagate as real exceptions to the CLI), instantiate
- * the default-exported class, invoke `plan()`, and persist `ops.json` via the
- * framework I/O helper. `Migration.run` already guards itself against firing
- * when the file is imported rather than run as the main module, so this is
- * safe to call from inside the CLI process.
+ * `placeholder(...)` propagate as real exceptions to the CLI), dispatch on
+ * the export's shape (class subclass vs. callable function), and persist
+ * `ops.json` via the framework I/O helper. `Migration.run` already guards
+ * itself against firing when the file is imported rather than run as the
+ * main module, so this is safe to call from inside the CLI process.
  *
  * Attestation (computing and writing `migrationId` to `manifest.json`) is
  * owned by the framework's `emitMigration` helper, not this capability.
@@ -43,11 +47,13 @@ type EmitOptions = Parameters<NonNullable<TargetMigrationsCapability['emit']>>[0
 /**
  * Implementation of `TargetMigrationsCapability.emit` for Mongo.
  *
- * Loads `<dir>/migration.ts`, instantiates the default-exported `Migration`
- * subclass, calls `plan()` to produce the operations list, writes
- * `ops.json`, and returns the operations for the framework helper to render.
- * Attestation (`migrationId` in `manifest.json`) is the framework helper's
- * responsibility; this capability MUST NOT call `attestMigration` itself.
+ * Loads `<dir>/migration.ts` and dispatches on the default export's shape:
+ * if it is a `Migration` subclass, instantiates it and calls `plan()`;
+ * otherwise invokes it as a function (sync or async) and awaits the result.
+ * Writes `ops.json` and returns the operations for the framework helper to
+ * render. Attestation (`migrationId` in `manifest.json`) is the framework
+ * helper's responsibility; this capability MUST NOT call `attestMigration`
+ * itself.
  */
 export async function mongoEmit(options: EmitOptions): Promise<readonly MigrationPlanOperation[]> {
   const filePath = join(options.dir, MIGRATION_TS_FILE);
@@ -61,23 +67,31 @@ export async function mongoEmit(options: EmitOptions): Promise<readonly Migratio
   const fileUrl = pathToFileURL(filePath).href;
   const mod = (await import(fileUrl)) as { default?: unknown };
 
-  const MigrationClass = mod.default;
-  if (typeof MigrationClass !== 'function') {
+  const MigrationExport = mod.default;
+  if (typeof MigrationExport !== 'function') {
     throw errorMigrationInvalidDefaultExport(
       options.dir,
-      `default export of type ${typeof MigrationClass}`,
+      `default export of type ${typeof MigrationExport}`,
     );
   }
 
-  const instance = new (MigrationClass as new () => Migration)();
-  if (!(instance instanceof Migration)) {
-    throw errorMigrationInvalidDefaultExport(
-      options.dir,
-      'a default export that does not extend Migration (from @prisma-next/migration-tools/migration)',
-    );
+  let operations: unknown;
+  if (MigrationExport.prototype instanceof Migration) {
+    operations = new (MigrationExport as new () => Migration)().plan();
+  } else {
+    try {
+      operations = await (MigrationExport as () => unknown | Promise<unknown>)();
+    } catch (error) {
+      if (error instanceof TypeError && /cannot be invoked without 'new'/i.test(error.message)) {
+        throw errorMigrationInvalidDefaultExport(
+          options.dir,
+          'a default export that does not extend Migration (from @prisma-next/migration-tools/migration)',
+        );
+      }
+      throw error;
+    }
   }
 
-  const operations = instance.plan() as readonly MigrationPlanOperation[];
   if (!Array.isArray(operations)) {
     throw errorMigrationPlanNotArray(options.dir, describeValue(operations));
   }
@@ -89,6 +103,5 @@ export async function mongoEmit(options: EmitOptions): Promise<readonly Migratio
 
 function describeValue(value: unknown): string {
   if (value === null) return 'null';
-  if (Array.isArray(value)) return 'an array';
   return `a value of type ${typeof value}`;
 }

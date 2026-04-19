@@ -7,10 +7,12 @@
  *    re-exports the planner's descriptor list), calls the target's
  *    `resolveDescriptors` to produce display-oriented operations, and writes
  *    `ops.json` + `manifest.json`.
- *  - Class flow (Mongo): the target owns the entire emit step via its
- *    `emit` capability. The capability dynamic-imports `migration.ts`,
- *    invokes its class to produce operations, and is responsible for calling
- *    `writeMigrationOps` and `attestMigration` itself.
+ *  - Class flow (Mongo): the target owns the source-loading and ops
+ *    serialization step via its `emit` capability. The capability
+ *    dynamic-imports `migration.ts`, invokes its class to produce
+ *    operations, and calls `writeMigrationOps`. The framework helper
+ *    then attests the package (single source of truth for
+ *    `migrationId`).
  *
  * Used by `migration emit` (always) and `migration plan` (always, after
  * scaffolding `migration.ts`). Both flows run in-process so that structured
@@ -18,6 +20,7 @@
  * CLI's error envelope renders them with full structured metadata.
  */
 
+import assert from 'node:assert/strict';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationPlanOperation,
@@ -93,11 +96,10 @@ async function emitDescriptorFlow(
   migrations: TargetMigrationsCapability,
   ctx: EmitMigrationContext,
 ): Promise<EmitMigrationResult> {
-  if (!migrations.resolveDescriptors) {
-    throw errorTargetMigrationNotSupported({
-      why: `Target "${ctx.targetId}" does not implement resolveDescriptors`,
-    });
-  }
+  assert(
+    migrations.resolveDescriptors,
+    'emitDescriptorFlow requires resolveDescriptors; gated by caller',
+  );
   const pkg = await readMigrationPackage(dir);
   const descriptors = await evaluateMigrationTs(dir);
   const operations = migrations.resolveDescriptors(descriptors as OperationDescriptor[], {

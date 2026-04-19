@@ -1,8 +1,11 @@
-import { errorMigrationInvalidDefaultExport } from '@prisma-next/errors/migration';
+import {
+  errorMigrationFileMissing,
+  errorMigrationInvalidDefaultExport,
+} from '@prisma-next/errors/migration';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MigrationEmitResult } from '../../src/commands/migration-emit';
-import { errorRuntime, errorTargetMigrationNotSupported } from '../../src/utils/cli-errors';
+import { errorTargetMigrationNotSupported } from '../../src/utils/cli-errors';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
 
 type CreateMigrationEmitCommand =
@@ -140,18 +143,10 @@ describe('migration emit command', () => {
       expect(envelope.code).toBe('PN-MIG-2003');
     });
 
-    // TODO(F13): once the CLI's `emitMigration` helper uses
-    // `errorMigrationFileMissing` (PN-MIG-2002) instead of the generic
-    // `errorRuntime` for a missing `migration.ts`, tighten this assertion to
-    // check for the MIG-domain code. Until then the helper throws a RUN-domain
-    // error and we only assert that it propagates structurally.
     it('propagates a structured error when migration.ts is missing', async () => {
       mockMigrationCapableConfig();
       mocks.emitMigrationMock.mockRejectedValue(
-        errorRuntime('migration.ts not found', {
-          why: 'No migration.ts file found at "migrations/20260101_test"',
-          fix: 'Run `prisma-next migration plan` or `prisma-next migration new` to scaffold one.',
-        }),
+        errorMigrationFileMissing('migrations/20260101_test'),
       );
 
       const command = createMigrationEmitCommand();
@@ -163,9 +158,10 @@ describe('migration emit command', () => {
 
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       expect(jsonLine).toBeDefined();
-      const envelope = JSON.parse(jsonLine!) as { ok: false; code: string };
+      const envelope = JSON.parse(jsonLine!) as { ok: false; code: string; domain: string };
       expect(envelope.ok).toBe(false);
-      expect(envelope.code).toMatch(/^PN-(MIG|RUN)-/);
+      expect(envelope.domain).toBe('MIG');
+      expect(envelope.code).toBe('PN-MIG-2002');
     });
 
     it('emits a CLI-domain envelope when the configured target does not support migrations', async () => {
