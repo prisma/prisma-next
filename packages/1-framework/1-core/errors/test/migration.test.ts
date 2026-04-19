@@ -27,7 +27,7 @@ describe('Migration Errors', () => {
     expect(error).toMatchObject({
       code: '2003',
       domain: 'MIG',
-      message: 'migration.ts default export is not a Migration subclass',
+      message: 'migration.ts default export is not a valid migration',
       meta: { dir: '/tmp/pkg', actualExport: 'an exported constant "undefined"' },
     });
     expect(error.why).toContain('an exported constant "undefined"');

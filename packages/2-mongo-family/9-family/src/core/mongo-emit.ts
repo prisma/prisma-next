@@ -11,8 +11,8 @@
  *        export default M;
  *        Migration.run(import.meta.url, M);
  *
- *   2. Default-exported function (arrow, async, or plain) returning operations:
- *        export default async () => [createCollection("users")];
+ *   2. Factory function returning a Migration-satisfying object:
+ *        export default () => ({ plan() { return [createCollection("users")] } });
  *
  * We dynamic-import the file (so that any structured errors thrown by
  * `placeholder(...)` propagate as real exceptions to the CLI), dispatch on
@@ -49,7 +49,8 @@ type EmitOptions = Parameters<NonNullable<TargetMigrationsCapability['emit']>>[0
  *
  * Loads `<dir>/migration.ts` and dispatches on the default export's shape:
  * if it is a `Migration` subclass, instantiates it and calls `plan()`;
- * otherwise invokes it as a function (sync or async) and awaits the result.
+ * otherwise invokes it as a factory function, validates the returned value
+ * has a `plan()` method, and calls it.
  * Writes `ops.json` and returns the operations for the framework helper to
  * render. Attestation (`migrationId` in `manifest.json`) is the framework
  * helper's responsibility; this capability MUST NOT call `attestMigration`
@@ -75,12 +76,13 @@ export async function mongoEmit(options: EmitOptions): Promise<readonly Migratio
     );
   }
 
-  let operations: unknown;
+  let migration: { plan(): unknown };
   if (MigrationExport.prototype instanceof Migration) {
-    operations = new (MigrationExport as new () => Migration)().plan();
+    migration = new (MigrationExport as new () => Migration)();
   } else {
+    let factoryResult: unknown;
     try {
-      operations = await (MigrationExport as () => unknown | Promise<unknown>)();
+      factoryResult = await (MigrationExport as () => unknown | Promise<unknown>)();
     } catch (error) {
       if (error instanceof TypeError && /cannot be invoked without 'new'/i.test(error.message)) {
         throw errorMigrationInvalidDefaultExport(
@@ -90,7 +92,20 @@ export async function mongoEmit(options: EmitOptions): Promise<readonly Migratio
       }
       throw error;
     }
+    if (
+      typeof factoryResult !== 'object' ||
+      factoryResult === null ||
+      typeof (factoryResult as { plan?: unknown }).plan !== 'function'
+    ) {
+      throw errorMigrationInvalidDefaultExport(
+        options.dir,
+        `factory must return an object with a plan() method; got ${describeValue(factoryResult)}`,
+      );
+    }
+    migration = factoryResult as { plan(): unknown };
   }
+
+  const operations: unknown = migration.plan();
 
   if (!Array.isArray(operations)) {
     throw errorMigrationPlanNotArray(options.dir, describeValue(operations));
