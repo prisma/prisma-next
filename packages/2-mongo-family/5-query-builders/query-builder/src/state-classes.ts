@@ -1,13 +1,104 @@
+import type { PlanMeta } from '@prisma-next/contract/types';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import type { MongoFilterExpr } from '@prisma-next/mongo-query-ast/execution';
-import { MongoAndExpr, MongoMatchStage } from '@prisma-next/mongo-query-ast/execution';
+import type { MongoFilterExpr, MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import {
+  DeleteManyCommand,
+  DeleteOneCommand,
+  InsertManyCommand,
+  InsertOneCommand,
+  MongoAndExpr,
+  MongoExistsExpr,
+  MongoMatchStage,
+  UpdateManyCommand,
+  UpdateOneCommand,
+} from '@prisma-next/mongo-query-ast/execution';
+import type { MongoValue } from '@prisma-next/mongo-value';
 import { PipelineChain } from './builder';
 import { createFieldAccessor, type FieldAccessor } from './field-accessor';
 import type { ModelToDocShape } from './types';
+import { foldUpdateOps, type TypedUpdateOp } from './update-ops';
+
+/**
+ * Wire-result row types for the M2 write terminals. The runtime/driver
+ * yields a single result document per write command — these types describe
+ * its shape so callers receive a typed plan rather than `unknown`.
+ *
+ * Field optionality reflects what every supported driver guarantees vs.
+ * what may be present (e.g. `acknowledged` is universal but
+ * `upsertedId`/`upsertedCount` only appear when an upsert path was taken).
+ */
+export interface InsertOneResult {
+  readonly insertedId: unknown;
+  readonly acknowledged?: boolean;
+}
+
+export interface InsertManyResult {
+  readonly insertedIds: ReadonlyArray<unknown>;
+  readonly insertedCount: number;
+  readonly acknowledged?: boolean;
+}
+
+export interface UpdateResult {
+  readonly matchedCount: number;
+  readonly modifiedCount: number;
+  readonly upsertedCount?: number;
+  readonly upsertedId?: unknown;
+  readonly acknowledged?: boolean;
+}
+
+export interface DeleteResult {
+  readonly deletedCount: number;
+  readonly acknowledged?: boolean;
+}
+
+/**
+ * "Match-all" filter used by the unqualified-write terminals
+ * (`updateAll`/`deleteAll`). Spec Open Item #2 leaves the canonical
+ * representation TBD; for now we use `_id $exists: true`, which is
+ * trivially true on every document and avoids introducing a new AST node
+ * before the wider question is resolved. Centralised so the eventual switch
+ * to `MongoMatchAllExpr` is a one-line change.
+ */
+function matchAllFilter(): MongoFilterExpr {
+  return MongoExistsExpr.exists('_id');
+}
+
+/**
+ * Resolve an updater callback into the wire-format `Record<string, MongoValue>`
+ * consumed by `Update{One,Many}Command`. Centralised so all write terminals
+ * share the same fold semantics, including duplicate-operator detection from
+ * `foldUpdateOps`.
+ */
+function resolveUpdaterCallback<Shape extends ModelToDocShape<MongoContract, string>>(
+  updaterFn: (fields: FieldAccessor<Shape>) => ReadonlyArray<TypedUpdateOp>,
+): Record<string, MongoValue> {
+  const accessor = createFieldAccessor<Shape>();
+  const ops = updaterFn(accessor);
+  if (ops.length === 0) {
+    throw new Error(
+      'Updater returned no operations. Return at least one update from the callback (e.g. `[f.amount.set(0)]`).',
+    );
+  }
+  return foldUpdateOps(ops);
+}
+
+/**
+ * Build the `PlanMeta` envelope shared by every write terminal in this
+ * package. Lane is `mongo-write` (vs. `mongo-pipeline` for read terminals)
+ * so middleware can dispatch on intent without inspecting the command.
+ */
+function writeMeta(storageHash: string): PlanMeta {
+  return {
+    target: 'mongo',
+    storageHash,
+    lane: 'mongo-write',
+    paramDescriptors: [],
+  };
+}
 
 /**
  * Root state of the query-builder state machine. Returned from
@@ -73,6 +164,81 @@ export class CollectionHandle<
         ? filterOrFn(createFieldAccessor<ModelToDocShape<TContract, ModelName>>())
         : filterOrFn;
     return new FilteredCollection<TContract, ModelName>(this.#ctx, this.#modelName, [resolved]);
+  }
+
+  // --- Inserts ---
+
+  /**
+   * Insert a single document. Document fields are passed straight through to
+   * the wire `InsertOneCommand` — codec normalisation happens at the
+   * adapter/driver boundary, identically to the SQL builder (see Open Item
+   * #14 confirmation in the design conversation).
+   *
+   * Returns a `MongoQueryPlan<InsertOneResult>` whose row stream yields a
+   * single result document with the server-assigned `insertedId`.
+   */
+  insertOne(document: Record<string, MongoValue>): MongoQueryPlan<InsertOneResult> {
+    const command = new InsertOneCommand(this.#ctx.collection, document);
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
+  }
+
+  /**
+   * Insert a batch of documents. Order is preserved in the returned
+   * `insertedIds` array.
+   */
+  insertMany(
+    documents: ReadonlyArray<Record<string, MongoValue>>,
+  ): MongoQueryPlan<InsertManyResult> {
+    if (documents.length === 0) {
+      throw new Error('insertMany() requires at least one document.');
+    }
+    const command = new InsertManyCommand(this.#ctx.collection, documents);
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
+  }
+
+  // --- Unqualified writes ---
+
+  /**
+   * Update *every* document in the collection. Lives only on
+   * `CollectionHandle` — the corresponding method is intentionally absent
+   * from `FilteredCollection` so a caller cannot accidentally produce an
+   * unqualified write by forgetting to `.match(...)` first. Pair with
+   * `.match(...).updateMany(...)` for the filtered case.
+   */
+  updateAll(
+    updaterFn: (
+      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
+    ) => ReadonlyArray<TypedUpdateOp>,
+  ): MongoQueryPlan<UpdateResult> {
+    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const command = new UpdateManyCommand(this.#ctx.collection, matchAllFilter(), update);
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
+  }
+
+  /**
+   * Delete *every* document in the collection. See `updateAll` for the
+   * rationale around the unqualified-write surface being limited to this
+   * state class.
+   */
+  deleteAll(): MongoQueryPlan<DeleteResult> {
+    const command = new DeleteManyCommand(this.#ctx.collection, matchAllFilter());
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
   }
 }
 
@@ -167,6 +333,87 @@ export class FilteredCollection<
       ...this.#filters,
       resolved,
     ]);
+  }
+
+  // --- Filtered writes ---
+
+  /**
+   * AND-fold the accumulated filters into a single `MongoFilterExpr` for
+   * splatting into a write/find-and-modify wire command's `filter` slot.
+   * Length-1 short-circuits to avoid a redundant `$and` wrapper.
+   */
+  #foldedFilter(): MongoFilterExpr {
+    const first = this.#filters[0];
+    if (first === undefined) {
+      throw new Error('FilteredCollection: invariant violated — empty filter accumulator');
+    }
+    return this.#filters.length === 1 ? first : foldAnd(this.#filters);
+  }
+
+  /**
+   * Update every matching document. `updaterFn` receives a `FieldAccessor`
+   * and returns an array of `TypedUpdateOp` (e.g. `[f.amount.inc(1),
+   * f.status.set('done')]`). Operators are folded into the wire-format
+   * update spec by `foldUpdateOps`, which throws on operator+path
+   * collisions.
+   */
+  updateMany(
+    updaterFn: (
+      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
+    ) => ReadonlyArray<TypedUpdateOp>,
+  ): MongoQueryPlan<UpdateResult> {
+    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const command = new UpdateManyCommand(this.#ctx.collection, this.#foldedFilter(), update);
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
+  }
+
+  /**
+   * Update at most one matching document. The driver picks the document
+   * (typically the first one matched by the underlying scan); no ordering
+   * guarantee is implied — chain `.sort(...)` and use the M3
+   * `.findOneAndUpdate(...)` terminal when ordering matters.
+   */
+  updateOne(
+    updaterFn: (
+      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
+    ) => ReadonlyArray<TypedUpdateOp>,
+  ): MongoQueryPlan<UpdateResult> {
+    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const command = new UpdateOneCommand(this.#ctx.collection, this.#foldedFilter(), update);
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
+  }
+
+  /**
+   * Delete every matching document.
+   */
+  deleteMany(): MongoQueryPlan<DeleteResult> {
+    const command = new DeleteManyCommand(this.#ctx.collection, this.#foldedFilter());
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
+  }
+
+  /**
+   * Delete at most one matching document. See the `updateOne` note about
+   * driver-chosen victim selection.
+   */
+  deleteOne(): MongoQueryPlan<DeleteResult> {
+    const command = new DeleteOneCommand(this.#ctx.collection, this.#foldedFilter());
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
   }
 }
 
