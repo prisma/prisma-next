@@ -18,7 +18,7 @@ A data transform is an operation in the migration's operation chain, alongside s
 // migrations/0002_backfill-status/migration.ts
 import type { Contract } from './contract.d'
 import contractJson from './contract.json' with { type: 'json' }
-import { MongoMigration, createCollection, setValidation, dataTransform }
+import { Migration, createCollection, setValidation, dataTransform }
   from '@prisma-next/target-mongo/migration'
 import { mongoRaw } from '@prisma-next/mongo-orm'
 import { mongoPipeline } from '@prisma-next/mongo-pipeline-builder'
@@ -26,7 +26,7 @@ import { mongoPipeline } from '@prisma-next/mongo-pipeline-builder'
 const raw = mongoRaw({ contract: contractJson as Contract })
 const agg = mongoPipeline<Contract>({ contractJson })
 
-export default class extends MongoMigration {
+export default class BackfillStatus extends Migration {
   override get operations() {
     return [
       createCollection("users", {
@@ -51,7 +51,7 @@ export default class extends MongoMigration {
   }
 }
 
-MongoMigration.run(import.meta.url, exports.default)
+Migration.run(import.meta.url, BackfillStatus)
 ```
 
 The ordering matters: create the collection, backfill the data, *then* tighten the validator. The `dataTransform` sits between structural operations exactly where the data needs to be in the right shape.
