@@ -8,6 +8,8 @@ import type { MongoFilterExpr, MongoQueryPlan } from '@prisma-next/mongo-query-a
 import {
   DeleteManyCommand,
   DeleteOneCommand,
+  FindOneAndDeleteCommand,
+  FindOneAndUpdateCommand,
   InsertManyCommand,
   InsertOneCommand,
   MongoAndExpr,
@@ -240,6 +242,35 @@ export class CollectionHandle<
       meta: writeMeta(this.#ctx.storageHash),
     };
   }
+
+  // --- Upserts ---
+
+  /**
+   * Insert-or-update the document matching `filterFn`. The filter is
+   * mandatory (vs. `updateAll`'s tautological match) because an upsert
+   * without a discriminating predicate would either match every existing
+   * document or insert an indistinguishable new one.
+   *
+   * Maps to `UpdateOneCommand` with `upsert: true`. The driver inserts a
+   * new document derived from the filter equality fields plus the update
+   * spec when no match is found; otherwise updates the matched document.
+   */
+  upsertOne(
+    filterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => MongoFilterExpr,
+    updaterFn: (
+      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
+    ) => ReadonlyArray<TypedUpdateOp>,
+  ): MongoQueryPlan<UpdateResult> {
+    const accessor = createFieldAccessor<ModelToDocShape<TContract, ModelName>>();
+    const filter = filterFn(accessor);
+    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const command = new UpdateOneCommand(this.#ctx.collection, filter, update, true);
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
+  }
 }
 
 /**
@@ -409,6 +440,77 @@ export class FilteredCollection<
    */
   deleteOne(): MongoQueryPlan<DeleteResult> {
     const command = new DeleteOneCommand(this.#ctx.collection, this.#foldedFilter());
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
+  }
+
+  // --- Upserts ---
+
+  /**
+   * Insert-or-update against the accumulated filter. Maps to
+   * `UpdateOneCommand` with `upsert: true`. Equivalent to
+   * `CollectionHandle.upsertOne(f => filter, updaterFn)` but reuses the
+   * already-accumulated `.match(...)` filter chain.
+   */
+  upsertOne(
+    updaterFn: (
+      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
+    ) => ReadonlyArray<TypedUpdateOp>,
+  ): MongoQueryPlan<UpdateResult> {
+    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const command = new UpdateOneCommand(this.#ctx.collection, this.#foldedFilter(), update, true);
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
+  }
+
+  // --- Find-and-modify ---
+
+  /**
+   * Find a single matching document and apply `updaterFn` to it. The driver
+   * returns the updated document (`returnDocument: 'after'` is hardcoded —
+   * the spec defers caller-controllable `returnDocument` to a follow-up;
+   * see [TML-2267 plan §M3.2](../../../../projects/mongo-pipeline-builder/plans/query-builder-unification-plan.md)).
+   *
+   * `opts.upsert` (default `false`) toggles insert-on-miss behaviour. The
+   * upsert path inserts a new document derived from filter equality fields
+   * plus the update spec when no match is found.
+   *
+   * Returns `MongoQueryPlan<unknown>` until the contract-typed shape can be
+   * narrowed (deferred to M3 close-out — the `MongoQueryPlan` row type
+   * here is the actual document shape, not a write-result envelope).
+   */
+  findOneAndUpdate(
+    updaterFn: (
+      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
+    ) => ReadonlyArray<TypedUpdateOp>,
+    opts: { readonly upsert?: boolean } = {},
+  ): MongoQueryPlan<ModelToDocShape<TContract, ModelName>> {
+    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const command = new FindOneAndUpdateCommand(
+      this.#ctx.collection,
+      this.#foldedFilter(),
+      update,
+      opts.upsert ?? false,
+    );
+    return {
+      collection: this.#ctx.collection,
+      command,
+      meta: writeMeta(this.#ctx.storageHash),
+    };
+  }
+
+  /**
+   * Find a single matching document and delete it. Returns the deleted
+   * document via the row stream.
+   */
+  findOneAndDelete(): MongoQueryPlan<ModelToDocShape<TContract, ModelName>> {
+    const command = new FindOneAndDeleteCommand(this.#ctx.collection, this.#foldedFilter());
     return {
       collection: this.#ctx.collection,
       command,

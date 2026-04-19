@@ -79,8 +79,13 @@ export class MongoDriverImpl implements MongoDriver {
 
   async *#executeUpdateOneCommand(cmd: UpdateOneWireCommand): AsyncIterable<UpdateOneResult> {
     const collection = this.#db.collection(cmd.collection);
-    const result = await collection.updateOne(cmd.filter, cmd.update);
-    yield { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount };
+    const result = await collection.updateOne(cmd.filter, cmd.update, { upsert: cmd.upsert });
+    yield {
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount,
+      upsertedCount: result.upsertedCount,
+      upsertedId: result.upsertedId ?? undefined,
+    };
   }
 
   async *#executeInsertManyCommand(cmd: InsertManyWireCommand): AsyncIterable<InsertManyResult> {
@@ -92,8 +97,13 @@ export class MongoDriverImpl implements MongoDriver {
 
   async *#executeUpdateManyCommand(cmd: UpdateManyWireCommand): AsyncIterable<UpdateManyResult> {
     const collection = this.#db.collection(cmd.collection);
-    const result = await collection.updateMany(cmd.filter, cmd.update);
-    yield { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount };
+    const result = await collection.updateMany(cmd.filter, cmd.update, { upsert: cmd.upsert });
+    yield {
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount,
+      upsertedCount: result.upsertedCount,
+      upsertedId: result.upsertedId ?? undefined,
+    };
   }
 
   async *#executeDeleteOneCommand(cmd: DeleteOneWireCommand): AsyncIterable<DeleteOneResult> {
