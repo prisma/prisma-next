@@ -14,6 +14,13 @@ function sha256Hex(input: string): string {
   return createHash('sha256').update(input).digest('hex');
 }
 
+/**
+ * Content-addressed migration identity over (manifest envelope sans
+ * contracts/hints, ops). See ADR 199 "Storage-only migration identity"
+ * for the rationale: contracts are anchored separately by the
+ * storage-hash bookends inside the envelope; planner hints are advisory
+ * and must not affect identity.
+ */
 export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOps): string {
   const {
     migrationId: _migrationId,
@@ -33,6 +40,7 @@ export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOp
   return `sha256:${hash}`;
 }
 
+/** Compute and persist `migrationId` to `manifest.json`. */
 export async function attestMigration(dir: string): Promise<string> {
   const pkg = await readMigrationPackage(dir);
   const migrationId = computeMigrationId(pkg.manifest, pkg.ops);

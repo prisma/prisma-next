@@ -38,9 +38,7 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
     contractToSchema(contract: Contract | null) {
       return contractToMongoSchemaIR(contract as MongoContract | null);
     },
-    emit(options) {
-      return mongoEmit(options);
-    },
+    emit: mongoEmit,
   },
   create() {
     return { familyId: 'mongo' as const, targetId: 'mongo' as const };

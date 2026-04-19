@@ -122,6 +122,82 @@ describe('mongoEmit', () => {
     });
   });
 
+  describe('given a function-form migration.ts (arrow function)', () => {
+    it('writes ops.json and returns operations without attesting', async () => {
+      const migration = [
+        `import { createCollection } from '${targetMongoMigrationExport}';`,
+        '',
+        'export default () => [createCollection("users")];',
+        '',
+      ].join('\n');
+      await writeFile(join(pkgDir, 'migration.ts'), migration);
+
+      const operations = await mongoEmit({ dir: pkgDir, frameworkComponents: [] });
+
+      expect(operations).toHaveLength(1);
+      expect(operations[0]).toMatchObject({
+        id: 'collection.users.create',
+        operationClass: 'additive',
+      });
+
+      const opsJson = JSON.parse(await readFile(join(pkgDir, 'ops.json'), 'utf-8'));
+      expect(opsJson).toHaveLength(1);
+
+      const manifest = JSON.parse(
+        await readFile(join(pkgDir, 'migration.json'), 'utf-8'),
+      ) as MigrationManifest;
+      expect(manifest.migrationId).toBeNull();
+    });
+  });
+
+  describe('given a function-form migration.ts (async function)', () => {
+    it('writes ops.json and returns operations without attesting', async () => {
+      const migration = [
+        `import { createCollection } from '${targetMongoMigrationExport}';`,
+        '',
+        'export default async () => [createCollection("users")];',
+        '',
+      ].join('\n');
+      await writeFile(join(pkgDir, 'migration.ts'), migration);
+
+      const operations = await mongoEmit({ dir: pkgDir, frameworkComponents: [] });
+
+      expect(operations).toHaveLength(1);
+      expect(operations[0]).toMatchObject({
+        id: 'collection.users.create',
+        operationClass: 'additive',
+      });
+
+      const opsJson = JSON.parse(await readFile(join(pkgDir, 'ops.json'), 'utf-8'));
+      expect(opsJson).toHaveLength(1);
+
+      const manifest = JSON.parse(
+        await readFile(join(pkgDir, 'migration.json'), 'utf-8'),
+      ) as MigrationManifest;
+      expect(manifest.migrationId).toBeNull();
+    });
+  });
+
+  describe('given a function-form migration.ts that does not return an array', () => {
+    it('throws PN-MIG-2004', async () => {
+      await writeFile(join(pkgDir, 'migration.ts'), 'export default () => "not an array";\n');
+
+      let thrown: unknown;
+      try {
+        await mongoEmit({ dir: pkgDir, frameworkComponents: [] });
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(CliStructuredError.is(thrown)).toBe(true);
+      expect(thrown).toMatchObject({
+        code: '2004',
+        domain: 'MIG',
+        meta: { dir: pkgDir },
+      });
+    });
+  });
+
   describe('given a missing migration.ts', () => {
     it('throws PN-MIG-2002 with the package dir in meta', async () => {
       let thrown: unknown;
