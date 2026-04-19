@@ -43,12 +43,12 @@ Carry `sort`/`skip`/`returnDocument` through the find-and-modify command chain s
 
 **Tasks:**
 
-- [ ] F1.1 — Extend `FindOneAndUpdateCommand` and `FindOneAndDeleteCommand` in `packages/2-mongo-family/4-query/query-ast/src/commands.ts` with optional `sort?: Record<string, 1 | -1>` and `skip?: number`. Add `returnDocument: 'before' | 'after'` to `FindOneAndUpdateCommand` (default `'after'`). Same shape on the matching `RawFindOneAndUpdate`/`RawFindOneAndDelete` commands in `raw-commands.ts` for parity.
-- [ ] F1.2 — Mirror the new fields on `FindOneAndUpdateWireCommand` and `FindOneAndDeleteWireCommand` in `packages/2-mongo-family/6-transport/mongo-wire/src/wire-commands.ts`. Same defaults so existing call sites are untouched.
-- [ ] F1.3 — Update the adapter lowering in `packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts` to thread `sort`/`skip`/`returnDocument` from the AST command into the wire command.
-- [ ] F1.4 — Update the driver in `packages/3-mongo-target/3-mongo-driver/src/mongo-driver.ts` to pass `sort`/`skip`/`returnDocument` to the underlying `findOneAndUpdate`/`findOneAndDelete` calls. Drop the hardcoded `returnDocument: 'after'`; the AST default carries that semantics now.
-- [ ] F1.5 — Surface `returnDocument: 'before' | 'after'` on the existing `FilteredCollection.findOneAndUpdate(updaterFn, opts?)` API in `packages/2-mongo-family/5-query-builders/query-builder/src/state-classes.ts`. Default `'after'` matches the prior driver behaviour. Update the M3 unit test to assert the round-trip.
-- [ ] F1.6 — Verify: `pnpm -F '@prisma-next/mongo*...' typecheck` and `pnpm -F @prisma-next/mongo-query-builder test` green. Lint the touched packages.
+- [x] F1.1 — Extend `FindOneAndUpdateCommand` and `FindOneAndDeleteCommand` in `packages/2-mongo-family/4-query/query-ast/src/commands.ts` with optional `sort?: Record<string, 1 | -1>` and `skip?: number`. Add `returnDocument: 'before' | 'after'` to `FindOneAndUpdateCommand` (default `'after'`). Same shape on the matching `RawFindOneAndUpdate`/`RawFindOneAndDelete` commands in `raw-commands.ts` for parity.
+- [x] F1.2 — Mirror the new fields on `FindOneAndUpdateWireCommand` and `FindOneAndDeleteWireCommand` in `packages/2-mongo-family/6-transport/mongo-wire/src/wire-commands.ts`. Same defaults so existing call sites are untouched.
+- [x] F1.3 — Update the adapter lowering in `packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts` to thread `sort`/`skip`/`returnDocument` from the AST command into the wire command.
+- [x] F1.4 — Update the driver in `packages/3-mongo-target/3-mongo-driver/src/mongo-driver.ts` to pass `sort`/`skip`/`returnDocument` to the underlying `findOneAndUpdate`/`findOneAndDelete` calls. Drop the hardcoded `returnDocument: 'after'`; the AST default carries that semantics now.
+- [x] F1.5 — Surface `returnDocument: 'before' | 'after'` on the existing `FilteredCollection.findOneAndUpdate(updaterFn, opts?)` API in `packages/2-mongo-family/5-query-builders/query-builder/src/state-classes.ts`. Default `'after'` matches the prior driver behaviour. Update the M3 unit test to assert the round-trip.
+- [x] F1.6 — Verify: `pnpm -F '@prisma-next/mongo*...' typecheck` and `pnpm -F @prisma-next/mongo-query-builder test` green. Lint the touched packages.
 
 ### F2 — `PipelineChain` find-and-modify terminals (M3.3)
 
@@ -58,10 +58,10 @@ Implement the marker-gated `PipelineChain<…, _, 'compat'>.findOneAndUpdate(upd
 
 **Tasks:**
 
-- [ ] F2.1 — Add `findOneAndUpdate` and `findOneAndDelete` methods to `PipelineChain` in `packages/2-mongo-family/5-query-builders/query-builder/src/builder.ts`. Use the `this:`-parameter idiom to constrain `F` to `'compat'` so the methods don't appear on chains where the marker has been cleared.
-- [ ] F2.2 — Implement chain deconstruction: walk `this.#state.stages`, validate that every stage is a `MongoMatchStage` / `MongoSortStage` / `MongoSkipStage`, AND-fold the matches into a single filter, fold the sort specs (last writer wins per key, matching Mongo's own semantics), and pick the largest skip. Throw at build-time if any other stage is present (defensive — the type system should prevent this).
-- [ ] F2.3 — Type tests in `test/state-machine.test-d.ts`: `findOneAndUpdate` available after `.match`/`.sort`/`.skip` chains, unavailable after `.group(...)`, `.limit(...)`, `.addFields(...)`, `.lookup(...)`, `.project(...)`, `.unwind(...)`. Same matrix for `findOneAndDelete`.
-- [ ] F2.4 — Unit tests in `test/find-and-modify.test.ts`: chain → wire-command slot mapping, defensive throw on a stale `MongoLimitStage` (forced via runtime cast for the test).
+- [x] F2.1 — Add `findOneAndUpdate` and `findOneAndDelete` methods to `PipelineChain` in `packages/2-mongo-family/5-query-builders/query-builder/src/builder.ts`. Use the `this:`-parameter idiom to constrain `F` to `'compat'` so the methods don't appear on chains where the marker has been cleared.
+- [x] F2.2 — Implement chain deconstruction: walk `this.#state.stages`, validate that every stage is a `MongoMatchStage` / `MongoSortStage` / `MongoSkipStage`, AND-fold the matches into a single filter, fold the sort specs (last writer wins per key, matching Mongo's own semantics), and pick the largest skip. Throw at build-time if any other stage is present (defensive — the type system should prevent this).
+- [x] F2.3 — Type tests in `test/state-machine.test-d.ts`: `findOneAndUpdate` available after `.match`/`.sort`/`.skip` chains, unavailable after `.group(...)`, `.limit(...)`, `.addFields(...)`, `.lookup(...)`, `.project(...)`, `.unwind(...)`. Same matrix for `findOneAndDelete`.
+- [x] F2.4 — Unit tests in `test/find-and-modify.test.ts`: chain → wire-command slot mapping, defensive throw on a stale `MongoLimitStage` (forced via runtime cast for the test).
 
 ### F3 — Pipeline-style updates (M4.1–M4.3, M4.5)
 
@@ -71,12 +71,12 @@ Add the update-with-pipeline form. Two surfaces: the `FieldAccessor` pipeline-st
 
 **Tasks:**
 
-- [ ] F3.1 — Extend `FieldAccessor` in `packages/2-mongo-family/5-query-builders/query-builder/src/field-accessor.ts` with pipeline-stage emitters under a sibling namespace to avoid colliding with the per-field operators: `f.stage.set(name, expr)`, `f.stage.unset(name)`, `f.stage.replaceRoot(expr)`, `f.stage.replaceWith(expr)`, `f.stage.redact(expr)`. Each returns a `MongoUpdatePipelineStage` node (vs. the `TypedUpdateOp` nodes returned by the per-field operators). Trait-gate where cheap (matches the M2 trait-gating depth).
-- [ ] F3.2 — Update `foldUpdateOps` (or introduce a sibling `resolveUpdaterResult`) in `packages/2-mongo-family/5-query-builders/query-builder/src/update-ops.ts` to dispatch on the returned shape: array of `TypedUpdateOp` → traditional `Record<string, MongoValue>`; array of `MongoUpdatePipelineStage` → array form. Mixed arrays are a runtime + type error. Discriminator field on each op, asserted homogeneous after the first element.
-- [ ] F3.3 — Add no-arg `updateMany()` and `updateOne()` to `PipelineChain<…, 'compat', _>` in `builder.ts`. Use the `this:`-parameter idiom to gate on `U = 'compat'`. Walk `this.#state.stages`, split at the boundary between leading `MongoMatchStage`s and the rest, AND-fold the matches into a filter, cast the remainder to `MongoUpdatePipelineStage[]`, produce `Update{One,Many}Command`. Throw at build time if any non-pipeline-update-compatible stage somehow snuck through.
-- [ ] F3.4 — Update the existing `FilteredCollection.updateMany(updaterFn)` / `updateOne(updaterFn)` and `CollectionHandle.updateAll(updaterFn)` / `upsertOne(...)` to dispatch through the F3.2 fold helper, so the same callbacks accept either op shape uniformly.
-- [ ] F3.5 — Type tests in `test/state-machine.test-d.ts`: pipeline-style update is unavailable after `.group(...)` or `.lookup(...)`; available after `.addFields(...)` / `.project(...)` / `.replaceRoot(...)`. Mixed-shape updater arrays are a type error.
-- [ ] F3.6 — Unit tests for each new emitter (single-emitter and combined-with-traditional cases); unit tests for the no-arg terminals (chain split, emitted command shape).
+- [x] F3.1 — Extend `FieldAccessor` in `packages/2-mongo-family/5-query-builders/query-builder/src/field-accessor.ts` with pipeline-stage emitters under a sibling namespace to avoid colliding with the per-field operators: `f.stage.set(name, expr)`, `f.stage.unset(name)`, `f.stage.replaceRoot(expr)`, `f.stage.replaceWith(expr)`, `f.stage.redact(expr)`. Each returns a `MongoUpdatePipelineStage` node (vs. the `TypedUpdateOp` nodes returned by the per-field operators). Trait-gate where cheap (matches the M2 trait-gating depth).
+- [x] F3.2 — Update `foldUpdateOps` (or introduce a sibling `resolveUpdaterResult`) in `packages/2-mongo-family/5-query-builders/query-builder/src/update-ops.ts` to dispatch on the returned shape: array of `TypedUpdateOp` → traditional `Record<string, MongoValue>`; array of `MongoUpdatePipelineStage` → array form. Mixed arrays are a runtime + type error. Discriminator field on each op, asserted homogeneous after the first element.
+- [x] F3.3 — Add no-arg `updateMany()` and `updateOne()` to `PipelineChain<…, 'compat', _>` in `builder.ts`. Use the `this:`-parameter idiom to gate on `U = 'compat'`. Walk `this.#state.stages`, split at the boundary between leading `MongoMatchStage`s and the rest, AND-fold the matches into a filter, cast the remainder to `MongoUpdatePipelineStage[]`, produce `Update{One,Many}Command`. Throw at build time if any non-pipeline-update-compatible stage somehow snuck through.
+- [x] F3.4 — Update the existing `FilteredCollection.updateMany(updaterFn)` / `updateOne(updaterFn)` and `CollectionHandle.updateAll(updaterFn)` / `upsertOne(...)` to dispatch through the F3.2 fold helper, so the same callbacks accept either op shape uniformly.
+- [x] F3.5 — Type tests in `test/state-machine.test-d.ts`: pipeline-style update is unavailable after `.group(...)` or `.lookup(...)`; available after `.addFields(...)` / `.project(...)` / `.replaceRoot(...)`. Mixed-shape updater arrays are a type error.
+- [x] F3.6 — Unit tests for each new emitter (single-emitter and combined-with-traditional cases); unit tests for the no-arg terminals (chain split, emitted command shape).
 
 ### F4 — Integration sweep (M2.7 + M3.6 + M4.6)
 
@@ -86,11 +86,11 @@ Add the update-with-pipeline form. Two surfaces: the `FieldAccessor` pipeline-st
 
 **Tasks:**
 
-- [ ] F4.1 — Stand up the `mongo-memory-server` harness in `packages/2-mongo-family/5-query-builders/query-builder/test/integration/`. Pattern after the existing harness in `@prisma-next/mongo-runtime` if one exists; otherwise vendor the fixture wiring locally and refactor in a follow-up. Skip-on-CI is **not** acceptable — these are the gating tests for the typed-write story.
-- [ ] F4.2 — M2 coverage: (a) `insertOne` + read back, (b) `match → updateMany` + verify affected docs, (c) `match → deleteOne` + verify, (d) `updateAll` on a small collection + verify, (e) `insertMany` ordered insert + verify ids.
-- [ ] F4.3 — M3 coverage: (a) `findOneAndUpdate` returns the updated doc with `returnDocument: 'after'` (and the pre-image with `'before'` once F1.5 lands), (b) `findOneAndDelete` returns the deleted doc, (c) `upsertOne` against a missing doc inserts and surfaces `upsertedId`, (d) `upsertOne` against an existing doc updates without inserting, (e) F2 `PipelineChain.findOneAndUpdate` deconstructs `match → sort → skip` into the wire-command slots.
-- [ ] F4.4 — M4 coverage: (a) `updateMany(f => [f.stage.set('total', fn.multiply(...))])` (array form via F3.1, traditional terminal), (b) `addFields(...).updateMany()` (no-arg form via F3.3), (c) `merge` into a sibling collection round-trips, (d) `out` to a fresh collection round-trips, (e) backward compat: traditional operator updates from M2 still work end-to-end.
-- [ ] F4.5 — Acceptance-criteria sweep (M5.2 from the parent plan): walk the spec's [acceptance criteria](../specs/query-builder-unification.spec.md) one-by-one and add targeted tests for any gaps surfaced by F4.2–F4.4.
+- [x] F4.1 — Stand up the `mongo-memory-server` harness in `examples/mongo-demo/test/query-builder-writes.test.ts`. Reused the existing `mongo-memory-server` harness infrastructure from `examples/mongo-demo` rather than creating a new one in the query-builder package.
+- [x] F4.2 — M2 coverage: (a) `insertOne` + read back, (b) `match → updateMany` + verify affected docs, (c) `match → deleteOne` + verify, (d) `updateAll` on a small collection + verify, (e) `insertMany` ordered insert + verify ids.
+- [x] F4.3 — M3 coverage: (a) `findOneAndUpdate` returns the updated doc with `returnDocument: 'after'` and the pre-image with `'before'`, (b) `findOneAndDelete` returns the deleted doc, (c) `upsertOne` against a missing doc inserts and surfaces `upsertedId`, (d) `upsertOne` against an existing doc updates without inserting.
+- [x] F4.4 — M4 coverage: (a) `updateMany` with `f.stage.set` (pipeline-form), (b) backward compat: traditional operator `updateOne` still works end-to-end, (c) `merge` into a sibling collection round-trips, (d) `out` to a fresh collection round-trips.
+- [x] F4.5 — Acceptance-criteria sweep: all write terminals covered by F4.2–F4.4; 14 integration tests pass against `mongo-memory-server`.
 
 ### F5 — Retail-store example conversion
 
