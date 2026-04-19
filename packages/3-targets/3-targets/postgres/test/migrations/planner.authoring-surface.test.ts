@@ -1,6 +1,5 @@
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import { CliStructuredError } from '@prisma-next/errors/control';
 import {
   contractToSchemaIR as contractToSchemaIRImpl,
   extractCodecControlHooks,
@@ -69,16 +68,12 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       }
       const success = result as MigrationPlannerSuccessResult;
 
-      let caught: unknown;
-      try {
-        success.plan.renderTypeScript();
-      } catch (err) {
-        caught = err;
-      }
-
-      expect(caught).toBeInstanceOf(CliStructuredError);
-      expect((caught as CliStructuredError).code).toBe('2010');
-      expect((caught as CliStructuredError).meta).toMatchObject({ targetId: 'postgres' });
+      expect(() => success.plan.renderTypeScript()).toThrow(
+        expect.objectContaining({
+          code: '2010',
+          meta: expect.objectContaining({ targetId: 'postgres' }),
+        }),
+      );
     });
   });
 
