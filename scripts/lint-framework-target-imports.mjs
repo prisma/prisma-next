@@ -69,8 +69,18 @@ for (const file of walk(join(repoRoot, FRAMEWORK_ROOT))) {
     const line = lines[i];
     if (!line.includes(FORBIDDEN_SUBSTRING)) continue;
     const trimmed = line.trimStart();
-    // Skip JSDoc and line comments — these are documentation, not runtime behaviour.
-    if (trimmed.startsWith('*') || trimmed.startsWith('//')) continue;
+    // Skip JSDoc, line comments, and single-line block comments — these are
+    // documentation, not runtime behaviour. Order matters: check `/**` and
+    // `/*` before `*/` and `*` since the latter are prefixes of the former.
+    if (
+      trimmed.startsWith('//') ||
+      trimmed.startsWith('/**') ||
+      trimmed.startsWith('/*') ||
+      trimmed.startsWith('*/') ||
+      trimmed.startsWith('*')
+    ) {
+      continue;
+    }
     violations.push({
       file: relative(repoRoot, file),
       line: i + 1,
