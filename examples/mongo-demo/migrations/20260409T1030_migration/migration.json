@@ -1,7 +1,7 @@
 {
   "from": "sha256:empty",
   "to": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
-  "migrationId": "sha256:209db525f5dd7d822bcbcc31c90885beb5d5f31f8498cb65a05f0e8faee2a600",
+  "migrationId": "sha256:595df3677eebd59fb6d39191180d1ba425197c3ab2129324f08892df12405375",
   "kind": "regular",
   "fromContract": null,
   "toContract": {

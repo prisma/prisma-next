@@ -343,8 +343,10 @@ export interface TargetMigrationsCapability<
 
   /**
    * Plans a migration using the descriptor-based planner.
-   * Returns operation descriptors and whether data migration is needed.
-   * The caller decides whether to resolve immediately or scaffold migration.ts.
+   * Returns operation descriptors that the caller scaffolds into a
+   * `migration.ts` file. Whether the resulting migration can be emitted
+   * end-to-end is determined at emit time (via `placeholder()` errors
+   * thrown for unfilled slots), not by the planner.
    */
   planWithDescriptors?(context: {
     readonly fromContract: Contract | null;
@@ -356,7 +358,6 @@ export interface TargetMigrationsCapability<
     | {
         readonly ok: true;
         readonly descriptors: readonly OperationDescriptor[];
-        readonly needsDataMigration: boolean;
       }
     | {
         readonly ok: false;
@@ -365,7 +366,7 @@ export interface TargetMigrationsCapability<
 
   /**
    * Resolves operation descriptors into target-specific migration plan operations
-   * with SQL/DDL, prechecks, and postchecks. Called by `migration verify` to
+   * with SQL/DDL, prechecks, and postchecks. Called by `migration emit` to
    * serialize migration.ts into ops.json.
    */
   resolveDescriptors?(
@@ -379,4 +380,33 @@ export interface TargetMigrationsCapability<
       >;
     },
   ): readonly MigrationPlanOperation[];
+
+  /**
+   * Optional: in-process emit capability for class-flow migration files.
+   *
+   * Targets that author `migration.ts` as an executable class (rather than
+   * an array of descriptors) implement `emit` to produce `ops.json` from
+   * the source file directly. The framework dispatches to `emit` whenever
+   * `resolveDescriptors` is not present on the target.
+   *
+   * The capability runs in the same Node process as the CLI:
+   *  - The target dynamically imports `<dir>/migration.ts`, locates the
+   *    authored class on the module's default export, and invokes whatever
+   *    runtime machinery it needs to obtain the operations list.
+   *  - Structured errors thrown during evaluation (notably the emit-path
+   *    PN-MIG-2xxx codes) propagate as real JS exceptions so the CLI's
+   *    normal error envelope can render them with full structured
+   *    metadata. No subprocess is spawned.
+   *  - The target is responsible for calling `writeMigrationOps(dir, ops)`
+   *    so that `ops.json` ends up on disk before `emit` returns; the
+   *    framework's `emitMigration` helper owns `attestMigration`.
+   *  - The returned `MigrationPlanOperation[]` is the display-oriented
+   *    shape the CLI uses for output (id, label, operationClass).
+   */
+  emit?(options: {
+    readonly dir: string;
+    readonly frameworkComponents: ReadonlyArray<
+      TargetBoundComponentDescriptor<TFamilyId, TTargetId>
+    >;
+  }): Promise<readonly MigrationPlanOperation[]>;
 }

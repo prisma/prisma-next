@@ -15,7 +15,7 @@ Ship an official Conformance Kit and define Certification Levels L0, L1, L2 for 
 - **Lane-agnostic Plan contract compliance and hashing rules** (References ADR 011 and ADR 013)
 - **Lowering determinism and golden rendering policy** (References ADR 016 and ADR 067)
 - **Driver execution semantics and error mapping to RuntimeError** (References ADR 027 and ADR 068)
-- **Migration runner op executors and idempotency classes** (References ADR 037, ADR 038, ADR 041, ADR 044)
+- **Migration runner op executors and idempotency classes** (References ADR 037, ADR 038, ADR 041, ADR 028, ADR 188)
 - **EXPLAIN normalization for budgets** (References ADR 023 and ADR 076)
 - **Capability discovery and negotiation** (References ADR 031 and ADR 065)
 - **Privacy and redaction for diagnostics and telemetry** (References ADR 024 and ADR 085)

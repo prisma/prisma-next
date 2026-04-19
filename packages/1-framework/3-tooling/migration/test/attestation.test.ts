@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { canonicalizeContract } from '@prisma-next/contract/hashing';
+import type { Contract } from '@prisma-next/contract/types';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { attestMigration, computeMigrationId, verifyMigration } from '../src/attestation';
@@ -59,7 +59,7 @@ describe('computeMigrationId', () => {
     expect(id1).not.toBe(id2);
   });
 
-  it('changes when toContract changes', () => {
+  it('is unchanged when toContract is mutated (non-storage fields)', () => {
     const ops = createTestOps();
     const m1 = createTestManifest({
       toContract: createTestContract({ target: 'postgres' }),
@@ -67,6 +67,82 @@ describe('computeMigrationId', () => {
     const m2 = createTestManifest({
       toContract: createTestContract({ target: 'mysql' }),
     });
+    expect(computeMigrationId(m1, ops)).toBe(computeMigrationId(m2, ops));
+  });
+
+  it('is unchanged when fromContract is mutated', () => {
+    const ops = createTestOps();
+    const m1 = createTestManifest({
+      fromContract: createTestContract({ target: 'postgres' }),
+    });
+    const m2 = createTestManifest({
+      fromContract: createTestContract({ target: 'mysql' }),
+    });
+    expect(computeMigrationId(m1, ops)).toBe(computeMigrationId(m2, ops));
+  });
+
+  it('is unchanged when toContract.meta (a non-storage field) changes', () => {
+    const ops = createTestOps();
+    const baseContract = createTestContract();
+    const mutatedContract = { ...baseContract, meta: { foo: 'bar' } } as Contract;
+    const m1 = createTestManifest({ toContract: baseContract });
+    const m2 = createTestManifest({ toContract: mutatedContract });
+    expect(computeMigrationId(m1, ops)).toBe(computeMigrationId(m2, ops));
+  });
+
+  it('is unchanged when manifest.hints.plannerVersion is mutated', () => {
+    const ops = createTestOps();
+    const m1 = createTestManifest({
+      hints: {
+        used: [],
+        applied: ['additive_only'],
+        plannerVersion: '0.0.1',
+        planningStrategy: 'additive',
+      },
+    });
+    const m2 = createTestManifest({
+      hints: {
+        used: [],
+        applied: ['additive_only'],
+        plannerVersion: '9.9.9',
+        planningStrategy: 'additive',
+      },
+    });
+    expect(computeMigrationId(m1, ops)).toBe(computeMigrationId(m2, ops));
+  });
+
+  it('is unchanged when manifest.hints.planningStrategy is mutated', () => {
+    const ops = createTestOps();
+    const m1 = createTestManifest({
+      hints: {
+        used: [],
+        applied: ['additive_only'],
+        plannerVersion: '0.0.1',
+        planningStrategy: 'additive',
+      },
+    });
+    const m2 = createTestManifest({
+      hints: {
+        used: [],
+        applied: ['additive_only'],
+        plannerVersion: '0.0.1',
+        planningStrategy: 'diff',
+      },
+    });
+    expect(computeMigrationId(m1, ops)).toBe(computeMigrationId(m2, ops));
+  });
+
+  it('changes when manifest.from changes', () => {
+    const ops = createTestOps();
+    const m1 = createTestManifest({ from: 'sha256:empty' });
+    const m2 = createTestManifest({ from: 'sha256:different' });
+    expect(computeMigrationId(m1, ops)).not.toBe(computeMigrationId(m2, ops));
+  });
+
+  it('changes when manifest.to changes', () => {
+    const ops = createTestOps();
+    const m1 = createTestManifest({ to: 'sha256:abc123' });
+    const m2 = createTestManifest({ to: 'sha256:different' });
     expect(computeMigrationId(m1, ops)).not.toBe(computeMigrationId(m2, ops));
   });
 
@@ -79,15 +155,11 @@ describe('computeMigrationId', () => {
       signature: _signature,
       fromContract: _fromContract,
       toContract: _toContract,
+      hints: _hints,
       ...strippedMeta
     } = manifest;
 
-    const canonicalParts = [
-      canonicalizeJson(strippedMeta),
-      canonicalizeJson(ops),
-      manifest.fromContract !== null ? canonicalizeContract(manifest.fromContract) : 'null',
-      canonicalizeContract(manifest.toContract),
-    ];
+    const canonicalParts = [canonicalizeJson(strippedMeta), canonicalizeJson(ops)];
     const partHashes = canonicalParts.map((part) =>
       createHash('sha256').update(part).digest('hex'),
     );

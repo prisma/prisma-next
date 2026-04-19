@@ -90,7 +90,7 @@ Every operation must declare:
 }
 ```
 
-Pre/post checks use the shared vocabulary from ADR 044 and must be deterministic.
+Pre/post checks use the per-family check vocabulary ([ADR 028](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md) for SQL, [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md) for Mongo) and must be deterministic.
 
 ## What "already applied" means
 
@@ -218,5 +218,6 @@ This enables audit, replay decisions, and safe resumption.
 - ADR 028 — Migration structure & operations
 - ADR 037 — Transactional DDL fallback & compensation
 - ADR 039 — Migration graph path resolution & integrity
-- ADR 044 — Pre/post check vocabulary v1
+- ADR 028 — Migration structure & operations
+- ADR 188 — MongoDB migration operation model
 - ADR 027 — Error envelope & stable codes

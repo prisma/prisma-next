@@ -33,7 +33,7 @@ async function createTempDir(): Promise<string> {
   return dir;
 }
 
-describe('migration plan → verify end-to-end', () => {
+describe('migration plan → emit end-to-end', () => {
   it('new project: plan writes valid package, verify passes', async () => {
     const root = await createTempDir();
     const migrationsDir = join(root, 'migrations');
@@ -258,7 +258,7 @@ describe('migration plan → verify end-to-end', () => {
     expect(result1.ok).toBe(false);
     expect(result1.reason).toBe('draft');
 
-    // Attest (same as what migration verify does for drafts)
+    // Attest (same as what migration emit does for drafts)
     const migrationId = await attestMigration(packageDir);
     expect(migrationId).toMatch(/^sha256:/);
 

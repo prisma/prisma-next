@@ -35,7 +35,7 @@ export interface CliErrorConflict {
  */
 export class CliStructuredError extends Error {
   readonly code: string;
-  readonly domain: 'CLI' | 'RUN';
+  readonly domain: 'CLI' | 'RUN' | 'MIG';
   readonly severity: 'error' | 'warn' | 'info';
   readonly why: string | undefined;
   readonly fix: string | undefined;
@@ -52,7 +52,7 @@ export class CliStructuredError extends Error {
     code: string,
     summary: string,
     options?: {
-      readonly domain?: 'CLI' | 'RUN';
+      readonly domain?: 'CLI' | 'RUN' | 'MIG';
       readonly severity?: 'error' | 'warn' | 'info';
       readonly why?: string;
       readonly fix?: string;
@@ -82,7 +82,8 @@ export class CliStructuredError extends Error {
    * Converts this error to a CLI error envelope for output formatting.
    */
   toEnvelope(): CliErrorEnvelope {
-    const codePrefix = this.domain === 'CLI' ? 'PN-CLI-' : 'PN-RUN-';
+    const domainPrefixes = { CLI: 'PN-CLI-', RUN: 'PN-RUN-', MIG: 'PN-MIG-' } as const;
+    const codePrefix = domainPrefixes[this.domain];
     return {
       ok: false as const,
       code: `${codePrefix}${this.code}`,
@@ -109,7 +110,7 @@ export class CliStructuredError extends Error {
     return (
       candidate.name === 'CliStructuredError' &&
       typeof candidate.code === 'string' &&
-      (candidate.domain === 'CLI' || candidate.domain === 'RUN') &&
+      (candidate.domain === 'CLI' || candidate.domain === 'RUN' || candidate.domain === 'MIG') &&
       typeof candidate.toEnvelope === 'function'
     );
   }

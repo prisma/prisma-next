@@ -136,9 +136,8 @@ export interface MigrationApplyCommandOutputResult {
   };
 }
 
-export interface MigrationVerifyCommandOutputResult {
-  readonly status: 'verified' | 'attested';
-  readonly migrationId?: string;
+export interface MigrationEmitCommandOutputResult {
+  readonly migrationId: string;
 }
 
 export function formatMigrationApplyCommandOutput(
@@ -183,8 +182,8 @@ export function formatMigrationApplyCommandOutput(
   return lines.join('\n');
 }
 
-export function formatMigrationVerifyCommandOutput(
-  result: MigrationVerifyCommandOutputResult,
+export function formatMigrationEmitCommandOutput(
+  result: MigrationEmitCommandOutputResult,
   flags: GlobalFlags,
 ): string {
   if (flags.quiet) {
@@ -194,23 +193,10 @@ export function formatMigrationVerifyCommandOutput(
   const lines: string[] = [];
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
-  const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  switch (result.status) {
-    case 'verified':
-      lines.push(`${formatGreen('✔')} Migration verified`);
-      if (result.migrationId) {
-        lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
-      }
-      break;
-    case 'attested':
-      lines.push(`${formatYellow('◉')} Draft migration attested`);
-      if (result.migrationId) {
-        lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
-      }
-      break;
-  }
+  lines.push(`${formatGreen('✔')} Emitted ops.json and attested migration`);
+  lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
 
   return lines.join('\n');
 }

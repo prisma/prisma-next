@@ -1,7 +1,7 @@
 /**
  * `migration new` — scaffolds a migration package with a migration.ts file
  * for manual authoring. The user writes operation descriptors and data
- * transforms; `migration verify` resolves them to ops.json.
+ * transforms; `migration emit` resolves them to ops.json.
  */
 
 import { readFileSync } from 'node:fs';
@@ -214,7 +214,7 @@ export function createMigrationNewCommand(): Command {
     'Scaffold a new migration for manual authoring',
     'Creates a migration package with a migration.ts file for manual authoring.\n' +
       'Write operation descriptors and data transforms in migration.ts, then run\n' +
-      '`migration verify` to resolve and attest the package.',
+      '`migration emit` to resolve and attest the package.',
   );
   setCommandExamples(command, [
     'prisma-next migration new --name split-name',
@@ -248,7 +248,7 @@ export function createMigrationNewCommand(): Command {
           ui.output(`  from: ${value.from}`);
           ui.output(`  to:   ${value.to}`);
           ui.output(
-            `\nEdit migration.ts, then run \`prisma-next migration verify --dir ${value.dir}\` to attest.`,
+            `\nEdit migration.ts, then run \`prisma-next migration emit --dir "${value.dir}"\` to attest.`,
           );
         }
       });

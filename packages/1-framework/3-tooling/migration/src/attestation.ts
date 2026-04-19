@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { canonicalizeContract } from '@prisma-next/contract/hashing';
 import { canonicalizeJson } from './canonicalize-json';
 import { readMigrationPackage, writeMigrationManifest } from './io';
 import type { MigrationManifest, MigrationOps } from './types';
@@ -15,33 +14,33 @@ function sha256Hex(input: string): string {
   return createHash('sha256').update(input).digest('hex');
 }
 
+/**
+ * Content-addressed migration identity over (manifest envelope sans
+ * contracts/hints, ops). See ADR 199 "Storage-only migration identity"
+ * for the rationale: contracts are anchored separately by the
+ * storage-hash bookends inside the envelope; planner hints are advisory
+ * and must not affect identity.
+ */
 export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOps): string {
   const {
     migrationId: _migrationId,
     signature: _signature,
     fromContract: _fromContract,
     toContract: _toContract,
+    hints: _hints,
     ...strippedMeta
   } = manifest;
 
   const canonicalManifest = canonicalizeJson(strippedMeta);
   const canonicalOps = canonicalizeJson(ops);
 
-  const canonicalFromContract =
-    manifest.fromContract !== null ? canonicalizeContract(manifest.fromContract) : 'null';
-  const canonicalToContract = canonicalizeContract(manifest.toContract);
-
-  const partHashes = [
-    canonicalManifest,
-    canonicalOps,
-    canonicalFromContract,
-    canonicalToContract,
-  ].map(sha256Hex);
+  const partHashes = [canonicalManifest, canonicalOps].map(sha256Hex);
   const hash = sha256Hex(canonicalizeJson(partHashes));
 
   return `sha256:${hash}`;
 }
 
+/** Compute and persist `migrationId` to `manifest.json`. */
 export async function attestMigration(dir: string): Promise<string> {
   const pkg = await readMigrationPackage(dir);
   const migrationId = computeMigrationId(pkg.manifest, pkg.ops);

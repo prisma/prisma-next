@@ -133,7 +133,8 @@ Rejected because: sequence numbers require coordination (who assigns the next nu
 - [ADR 010 — Canonicalization Rules](ADR%20010%20-%20Canonicalization%20Rules.md)
 - [ADR 028 — Migration Structure & Operations](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md)
 - [ADR 039 — Migration graph path resolution & integrity](ADR%20039%20-%20Migration%20graph%20path%20resolution%20&%20integrity.md)
-- [ADR 044 — Pre & post check vocabulary v1](ADR%20044%20-%20Pre%20&%20post%20check%20vocabulary%20v1.md)
+- [ADR 028 — Migration Structure & Operations](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md)
+- [ADR 188 — MongoDB migration operation model](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)
 - [ADR 122 — Database Initialization & Adoption](ADR%20122%20-%20Database%20Initialization%20&%20Adoption.md)
 - PR #184: feat(migrations): on-disk migration planning, serialization, and apply
 - Linear: TML-1938 — [PN] On-disk migration system

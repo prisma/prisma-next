@@ -16,7 +16,7 @@ Each test builds a from-contract (or null) and a to-contract, runs the planner, 
 
 6. **New nullable column** — plain addColumn (no pattern match)
 7. **New NOT NULL column with default** — plain addColumn (has default, no pattern match)
-8. **New NOT NULL column without default** — pattern match: addColumn(nullable) + dataTransform + setNotNull, needsDataMigration = true
+8. **New NOT NULL column without default** — pattern match: addColumn(nullable) + dataTransform + setNotNull
 9. **Multiple NOT NULL columns without defaults** — multiple dataTransform ops
 10. **New table alongside existing** — only new table gets ops, existing table untouched
 11. **New FK column on existing table** — addColumn + addForeignKey + createIndex
