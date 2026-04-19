@@ -29,6 +29,14 @@ describe('state-machine surface (negative type tests)', () => {
     h.deleteOne();
   });
 
+  it('CollectionHandle does not expose findOneAndUpdate / findOneAndDelete', () => {
+    const h = handle();
+    // @ts-expect-error — find-and-modify requires a `.match(...)` first
+    h.findOneAndUpdate((f) => [f.amount.inc(1)]);
+    // @ts-expect-error — find-and-modify requires a `.match(...)` first
+    h.findOneAndDelete();
+  });
+
   it('FilteredCollection does not expose insert / unqualified-write terminals', () => {
     const f = filtered();
     // @ts-expect-error — inserts ignore filters; not meaningful after `.match(...)`

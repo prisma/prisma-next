@@ -23,12 +23,26 @@ export class UpdateOneCommand extends MongoAstNode {
   readonly collection: string;
   readonly filter: MongoFilterExpr;
   readonly update: MongoUpdateSpec;
+  /**
+   * When true, the wire command becomes an upsert: if no document matches
+   * `filter`, a new document is inserted derived from filter equality
+   * fields plus the update spec. Defaults to false to preserve the
+   * pre-upsert constructor signature for existing call sites (see
+   * `query-builder-unification.spec.md` Open Item #1).
+   */
+  readonly upsert: boolean;
 
-  constructor(collection: string, filter: MongoFilterExpr, update: MongoUpdateSpec) {
+  constructor(
+    collection: string,
+    filter: MongoFilterExpr,
+    update: MongoUpdateSpec,
+    upsert = false,
+  ) {
     super();
     this.collection = collection;
     this.filter = filter;
     this.update = update;
+    this.upsert = upsert;
     this.freeze();
   }
 }
@@ -64,12 +78,24 @@ export class UpdateManyCommand extends MongoAstNode {
   readonly collection: string;
   readonly filter: MongoFilterExpr;
   readonly update: MongoUpdateSpec;
+  /**
+   * Upsert flag — see `UpdateOneCommand.upsert`. For `updateMany`, the
+   * wire command inserts at most one document if no match exists (Mongo's
+   * own constraint, not ours).
+   */
+  readonly upsert: boolean;
 
-  constructor(collection: string, filter: MongoFilterExpr, update: MongoUpdateSpec) {
+  constructor(
+    collection: string,
+    filter: MongoFilterExpr,
+    update: MongoUpdateSpec,
+    upsert = false,
+  ) {
     super();
     this.collection = collection;
     this.filter = filter;
     this.update = update;
+    this.upsert = upsert;
     this.freeze();
   }
 }

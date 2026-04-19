@@ -28,11 +28,18 @@ export class UpdateOneWireCommand extends MongoWireCommand {
   readonly kind = 'updateOne' as const;
   readonly filter: Document;
   readonly update: Document | ReadonlyArray<Document>;
+  readonly upsert: boolean;
 
-  constructor(collection: string, filter: Document, update: Document | ReadonlyArray<Document>) {
+  constructor(
+    collection: string,
+    filter: Document,
+    update: Document | ReadonlyArray<Document>,
+    upsert = false,
+  ) {
     super(collection);
     this.filter = filter;
     this.update = update;
+    this.upsert = upsert;
     this.freeze();
   }
 }
@@ -63,11 +70,18 @@ export class UpdateManyWireCommand extends MongoWireCommand {
   readonly kind = 'updateMany' as const;
   readonly filter: Document;
   readonly update: Document | ReadonlyArray<Document>;
+  readonly upsert: boolean;
 
-  constructor(collection: string, filter: Document, update: Document | ReadonlyArray<Document>) {
+  constructor(
+    collection: string,
+    filter: Document,
+    update: Document | ReadonlyArray<Document>,
+    upsert = false,
+  ) {
     super(collection);
     this.filter = filter;
     this.update = update;
+    this.upsert = upsert;
     this.freeze();
   }
 }

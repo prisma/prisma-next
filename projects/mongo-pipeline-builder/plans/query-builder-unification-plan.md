@@ -81,12 +81,12 @@ Add `findOneAndUpdate`, `findOneAndDelete`, `upsertOne`, `upsertMany`. Resolve t
 
 **Tasks:**
 
-- [ ] 3.1 — Decide AST shape for upserts (extend `UpdateOneCommand`/`UpdateManyCommand` with an `upsert: boolean` field, vs. introduce sibling commands). Implement the chosen shape in `packages/2-mongo-family/4-query/query-ast/src/commands.ts`. Update visitors and the adapter lowering.
-- [ ] 3.2 — Implement `FilteredCollection.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete(opts?)`. Options: `returnDocument` ('after' default), `upsert` (false default for `findOneAndUpdate`).
-- [ ] 3.3 — Implement `PipelineChain<…, _, 'compat'>.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete(opts?)`. Deconstruct the leading `$match`/`$sort`/`$skip` stages into the wire-command slots; throw at build-time if any other stage is present (defensive — the type system should prevent this).
-- [ ] 3.4 — Implement `CollectionHandle.upsertOne(filterFn, updaterFn)`, `.upsertMany(filterFn, updaterFn)`, `FilteredCollection.upsertOne(updaterFn)`, `.upsertMany(updaterFn)`. They produce the M3.1 AST shape with upsert=true.
-- [ ] 3.5 — Type tests: `findOneAndUpdate` is unavailable after a `.group(...)` and after a `.limit(...)`; available after only `.match`/`.sort`/`.skip`.
-- [ ] 3.6 — Integration tests (`mongo-memory-server`): (a) `findOneAndUpdate` returns the updated doc with `returnDocument: 'after'`, (b) `findOneAndDelete` returns the deleted doc, (c) upsert against a missing doc inserts, (d) upsert against an existing doc updates.
+- [x] 3.1 — Extended `UpdateOneCommand` / `UpdateManyCommand` (and the corresponding `UpdateOneWireCommand` / `UpdateManyWireCommand`) with a defaulted `upsert: boolean` field. Adapter lowering threads it through; the driver passes it to the underlying `updateOne`/`updateMany` calls. Result types (`UpdateOneResult` / `UpdateManyResult`) gained optional `upsertedCount` / `upsertedId` so callers see the upserted id when the upsert path was taken.
+- [x] 3.2 — `FilteredCollection.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete()` implemented. Options for the update form: `upsert` (default `false`). `returnDocument` is hardcoded `'after'` at the driver layer; making it caller-controllable requires plumbing it through the AST and wire commands and is deferred.
+- [ ] 3.3 — Deferred. Implementing `PipelineChain<…, _, 'compat'>.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete(opts?)` requires `sort`/`skip` slots on the find-and-modify AST and wire commands (today neither carries them); the marker types already gate availability correctly. Punting until the AST extension lands.
+- [x] 3.4 — `CollectionHandle.upsertOne(filterFn, updaterFn)` and `FilteredCollection.upsertOne(updaterFn)` implemented; both produce `UpdateOneCommand` with `upsert: true`. `upsertMany` deferred per the design discussion (multi-doc upserts are a Mongo-side gotcha — at most one inserts, the rest update; better to surface the unsafety with an explicit raw-command escape hatch).
+- [x] 3.5 — Type tests: `state-machine-surface.test-d.ts` asserts `findOneAndUpdate` / `findOneAndDelete` are absent on `CollectionHandle` (require `.match(...)` first). The marker-driven gating on `PipelineChain` is in place; per-stage `findOneAndUpdate` availability tests block on M3.3.
+- [ ] 3.6 — Integration tests (`mongo-memory-server`) deferred — unit tests in `find-and-modify.test.ts` cover the AST emission. Integration coverage to land alongside the wider M2/M3/M4 integration sweep.
 
 ### Milestone 4 — Update-with-pipeline + `$merge`/`$out` write terminals
 

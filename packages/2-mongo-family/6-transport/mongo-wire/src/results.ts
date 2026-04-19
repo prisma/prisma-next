@@ -10,11 +10,15 @@ export interface InsertManyResult {
 export interface UpdateOneResult {
   readonly matchedCount: number;
   readonly modifiedCount: number;
+  readonly upsertedCount?: number;
+  readonly upsertedId?: unknown;
 }
 
 export interface UpdateManyResult {
   readonly matchedCount: number;
   readonly modifiedCount: number;
+  readonly upsertedCount?: number;
+  readonly upsertedId?: unknown;
 }
 
 export interface DeleteOneResult {

@@ -62,6 +62,7 @@ class MongoAdapterImpl implements MongoAdapter {
           command.collection,
           lowerFilter(command.filter),
           this.#lowerUpdate(command.update),
+          command.upsert,
         );
       case 'insertMany':
         return new InsertManyWireCommand(
@@ -73,6 +74,7 @@ class MongoAdapterImpl implements MongoAdapter {
           command.collection,
           lowerFilter(command.filter),
           this.#lowerUpdate(command.update),
+          command.upsert,
         );
       case 'deleteOne':
         return new DeleteOneWireCommand(command.collection, lowerFilter(command.filter));
