@@ -5,11 +5,10 @@
 A Mongo migration file on disk looks like this:
 
 ```ts
-import { Migration } from '@prisma-next/migration-tools/migration';
-import { createIndex } from '@prisma-next/mongo-migration-ops';
+import { MongoMigration } from '@prisma-next/family-mongo/migration';
+import { createIndex } from '@prisma-next/target-mongo/migration';
 
-class BackfillStatus extends Migration {
-  override readonly targetId = 'mongo';
+class BackfillStatus extends MongoMigration {
   override get operations() {
     return [createIndex('users', [{ field: 'email', direction: 1 }], { unique: true })];
   }
@@ -18,27 +17,27 @@ class BackfillStatus extends Migration {
   }
 }
 export default BackfillStatus;
-Migration.run(import.meta.url, BackfillStatus);
+MongoMigration.run(import.meta.url, BackfillStatus);
 ```
 
 There are two ways this file's authored intent ends up on disk as `ops.json` + an attested `migration.json`:
 
-1. **Direct execution (canonical).** The developer runs `./migration.ts` (shebang) or `node migration.ts`. `Migration.run(...)` detects it is the main module, instantiates the class, reads `operations`, computes the content-addressed `migrationId`, and writes `ops.json` + a fully attested `migration.json` — no draft, no later "verify" step required.
+1. **Direct execution (canonical).** The developer runs `./migration.ts` (shebang) or `node migration.ts`. `MongoMigration.run(...)` detects it is the main module, instantiates the class, reads `operations`, computes the content-addressed `migrationId`, and writes `ops.json` + a fully attested `migration.json` — no draft, no later "verify" step required.
 
-2. **CLI import (transitional).** `migration plan` and the descriptor-flow bridge (`migration emit`) load `migration.ts` via `await import(pathToFileURL(filePath).href)`, instantiate the default-exported `Migration` subclass, read `operations`, write `ops.json`, then call `attestMigration(dir)`. `Migration.run(...)` is still in the file, but the entrypoint guard doesn't fire because the file isn't the main module.
+2. **CLI import (transitional).** `migration plan` and the descriptor-flow bridge (`migration emit`) load `migration.ts` via `await import(pathToFileURL(filePath).href)`, instantiate the default-exported `MongoMigration` subclass, read `operations`, write `ops.json`, then call `attestMigration(dir)`. `MongoMigration.run(...)` is still in the file, but the entrypoint guard doesn't fire because the file isn't the main module.
 
 Both paths produce **byte-identical** `ops.json` and an attested `migration.json` carrying the same `migrationId`. They are two ways of driving the same self-contained authoring surface.
 
 ## Decision
 
-`Migration.run(...)` is the **canonical self-emitting path** for class-flow migration files. When invoked as the main module, it produces the complete on-disk artifact set deterministically:
+`MongoMigration.run(...)` is the **canonical self-emitting path** for class-flow migration files. When invoked as the main module, it produces the complete on-disk artifact set deterministically:
 
 - `ops.json` — serialized `instance.operations`
 - `migration.json` — manifest with content-addressed `migrationId` computed in-process via `computeMigrationId(manifest, ops)` ([ADR 192](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md), [ADR 199](ADR%20199%20-%20Storage-only%20migration%20identity.md))
 
-A `migration.ts` that is run via shebang yields the same artifacts the CLI would produce. There is no draft state, no `migrationId: null` left for someone else to fill in, and no two-step "emit then verify" handshake. The file is a self-contained authoring surface; running it produces the contract ([ADR 192](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md)).
+A `migration.ts` run via shebang yields the same artifacts the CLI would produce. There is no draft state, no `migrationId: null` left for someone else to fill in, and no two-step "emit then verify" handshake. The file is a self-contained authoring surface; running it produces the contract ([ADR 192](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md)).
 
-When a `migration.json` is already present in the directory (the common case after `migration plan` scaffolding), `Migration.run` preserves the contract bookends, hints, labels, and `createdAt` set there — those fields are owned by the CLI scaffolder, not the authored class. The author's `describe()` and `operations` drive what may legitimately change between runs; everything else is read back from disk and re-attested.
+When a `migration.json` is already present in the directory (the common case after `migration plan` scaffolding), `MongoMigration.run` preserves the contract bookends, hints, labels, and `createdAt` set there — those fields are owned by the CLI scaffolder, not the authored class. The author's `describe()` and `operations` drive what may legitimately change between runs; everything else is read back from disk and re-attested.
 
 The CLI's `migration plan` and `migration emit` commands implement the same emit contract via dynamic import:
 
@@ -47,7 +46,7 @@ const fileUrl = pathToFileURL(filePath).href;
 const mod = (await import(fileUrl)) as { default?: unknown };
 
 const MigrationClass = mod.default;
-const instance = new (MigrationClass as new () => Migration)();
+const instance = new (MigrationClass as new () => MongoMigration)();
 const operations = instance.operations;
 
 await writeMigrationOps(dir, operations);
@@ -56,15 +55,15 @@ const migrationId = await attestMigration(dir);
 
 This is transitional infrastructure: it bridges the CLI to the descriptor flow (where evaluating `migration.ts` produces a descriptor list rather than a self-emitting class) and gives `migration plan` a single in-process dispatch path it can use against either flow. Once the descriptor flow is removed, `migration emit` disappears entirely ([ADR 193](ADR%20193%20-%20Class-flow%20as%20the%20canonical%20migration%20authoring%20strategy.md)) and shebang execution becomes the only emit path that matters for class-flow targets.
 
-### The `Migration.run(...)` guard
+### The `MongoMigration.run(...)` guard
 
 Every class-flow migration file ends with:
 
 ```ts
-Migration.run(import.meta.url, BackfillStatus);
+MongoMigration.run(import.meta.url, BackfillStatus);
 ```
 
-`Migration.run` compares `import.meta.url` against `process.argv[1]` (via `realpathSync` on both). When the file is run directly, they match — the guard fires and writes attested artifacts. When the CLI imports the file, they don't match — the guard is a no-op, and the CLI drives emit via the dynamic-import path above. The same file is safe for both modes without any conditional logic at the call site.
+`MongoMigration.run` compares `import.meta.url` against `process.argv[1]` (via `realpathSync` on both). When the file is run directly, they match — the guard fires and writes attested artifacts. When the CLI imports the file, they don't match — the guard is a no-op, and the CLI drives emit via the dynamic-import path above. The same file is safe for both modes without any conditional logic at the call site.
 
 ### Dispatch: `emit` on `TargetMigrationsCapability`
 

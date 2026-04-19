@@ -39,7 +39,7 @@ export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOp
 
 ### What stays on disk
 
-`fromContract`, `toContract`, and `hints` remain in `migration.json`. They are consumed by `migration plan` (to reconstruct the "from" schema for the next diff), `migration emit` (to regenerate ops), and `migration apply` (for display and verification). They're context for tooling, not inputs to identity.
+`fromContract`, `toContract`, and `hints` remain in `migration.json`. They are consumed by `migration plan` (to reconstruct the "from" schema for the next diff), `migration apply` (for display and verification), and the transitional `migration emit` command (to regenerate ops; see [ADR 193](ADR%20193%20-%20Class-flow%20as%20the%20canonical%20migration%20authoring%20strategy.md)). They're context for tooling, not inputs to identity.
 
 ### Why `hints` is excluded
 
