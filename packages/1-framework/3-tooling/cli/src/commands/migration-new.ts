@@ -217,7 +217,7 @@ async function executeMigrationNewCommand(
     const planner = migrations.createPlanner(familyInstance);
     const emptyPlan = planner.emptyMigration({
       packageDir,
-      contractJsonPath: contractPathAbsolute,
+      contractJsonPath: join(packageDir, 'contract.json'),
       fromHash,
       toHash: toStorageHash,
     });
