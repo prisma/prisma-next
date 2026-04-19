@@ -158,11 +158,9 @@ describe('migration emit command', () => {
       );
 
       const command = createMigrationEmitCommand();
-      try {
-        await executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']);
-      } catch {
-        /* expected non-zero exit */
-      }
+      await expect(
+        executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']),
+      ).rejects.toBeDefined();
 
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       expect(jsonLine).toBeDefined();
@@ -178,11 +176,9 @@ describe('migration emit command', () => {
       );
 
       const command = createMigrationEmitCommand();
-      try {
-        await executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']);
-      } catch {
-        /* expected non-zero exit */
-      }
+      await expect(
+        executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']),
+      ).rejects.toBeDefined();
 
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       expect(jsonLine).toBeDefined();
@@ -208,11 +204,9 @@ describe('migration emit command', () => {
       });
 
       const command = createMigrationEmitCommand();
-      try {
-        await executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']);
-      } catch {
-        /* expected non-zero exit */
-      }
+      await expect(
+        executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']),
+      ).rejects.toBeDefined();
 
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       expect(jsonLine).toBeDefined();
@@ -227,11 +221,9 @@ describe('migration emit command', () => {
       mocks.emitMigrationMock.mockRejectedValue(new Error('boom'));
 
       const command = createMigrationEmitCommand();
-      try {
-        await executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']);
-      } catch {
-        /* expected non-zero exit */
-      }
+      await expect(
+        executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']),
+      ).rejects.toBeDefined();
 
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       expect(jsonLine).toBeDefined();
