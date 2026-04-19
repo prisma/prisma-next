@@ -144,23 +144,16 @@ describe('emitMigration dispatcher', () => {
   it('throws errorTargetHasIncompleteMigrationCapabilities when neither capability is present', async () => {
     mocks.hasMigrationTs.mockResolvedValue(true);
 
-    let thrown: unknown;
-    try {
-      await emitMigration(
+    await expect(
+      emitMigration(
         DIR,
         makeCtx({ targetId: 'test-target' }) as unknown as Parameters<EmitMigration>[1],
-      );
-    } catch (error) {
-      thrown = error;
-    }
-
-    expect(thrown).toMatchObject({
+      ),
+    ).rejects.toMatchObject({
       code: '2011',
       message: 'Target migrations capability is incomplete',
+      why: expect.stringContaining('implements neither `resolveDescriptors`'),
     });
-    expect((thrown as Error & { why: string }).why).toContain(
-      'implements neither `resolveDescriptors`',
-    );
   });
 
   it('calls attestMigration exactly once after emit returns in class flow', async () => {
