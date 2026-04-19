@@ -49,6 +49,7 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
             return typescriptContract(contract, output).source(context);
           },
           output,
+          watchInputs: [options.contract],
         }
       : prismaContract(options.contract, {
           output,

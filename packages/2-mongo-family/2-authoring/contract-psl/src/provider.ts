@@ -48,6 +48,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
 
       return ok(interpreted.value);
     },
+    watchInputs: [schemaPath],
     ...ifDefined('output', options?.output),
   };
 }

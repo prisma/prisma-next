@@ -47,6 +47,7 @@ describe('prismaContract provider helper', () => {
       });
 
       expect(contract.output).toBe('output/contract.json');
+      expect(contract.watchInputs).toEqual(['./schema.prisma']);
       const result = await contract.source(createPostgresTestContext());
       expect(result.ok).toBe(true);
       if (!result.ok) return;

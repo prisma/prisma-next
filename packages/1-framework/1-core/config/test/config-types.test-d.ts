@@ -7,6 +7,7 @@ import type {
   ControlFamilyInstance,
   ControlTargetDescriptor,
 } from '@prisma-next/framework-components/control';
+import { ok } from '@prisma-next/utils/result';
 import { expectTypeOf, test } from 'vitest';
 import { defineConfig, type PrismaNextConfig } from '../src/config-types';
 
@@ -95,6 +96,23 @@ test('accepts compatible control descriptors', () => {
 
   const result = defineConfig(config);
   expectTypeOf(result).toExtend<PrismaNextConfig<'sql', 'postgres'>>();
+});
+
+test('accepts contract watch metadata', () => {
+  const config: PrismaNextConfig<'sql', 'postgres'> = {
+    family: sqlFamilyDescriptor,
+    target: postgresTargetDescriptor,
+    adapter: postgresAdapterDescriptor,
+    contract: {
+      source: async () => ok({} as never),
+      watchInputs: ['./schema.prisma'],
+      watchStrategy: 'moduleGraph',
+    },
+  };
+
+  const result = defineConfig(config);
+  expectTypeOf(result.contract?.watchInputs).toEqualTypeOf<readonly string[] | undefined>();
+  expectTypeOf(result.contract?.watchStrategy).toEqualTypeOf<'moduleGraph' | undefined>();
 });
 
 test('rejects mismatched target in target descriptor', () => {

@@ -85,6 +85,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
 
       return ok(interpreted.value);
     },
+    watchInputs: [schemaPath],
     ...ifDefined('output', options.output),
   };
 }

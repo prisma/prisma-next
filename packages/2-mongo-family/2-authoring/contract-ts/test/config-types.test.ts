@@ -28,6 +28,7 @@ describe('typescriptContract', () => {
 
     expect(result.value).toBe(contract);
     expect(config.output).toBe('output/contract.json');
+    expect(config.watchStrategy).toBe('moduleGraph');
   });
 
   it('omits output when not provided', () => {
@@ -35,5 +36,6 @@ describe('typescriptContract', () => {
     const config = typescriptContract(contract);
 
     expect(config.output).toBeUndefined();
+    expect(config.watchStrategy).toBe('moduleGraph');
   });
 });

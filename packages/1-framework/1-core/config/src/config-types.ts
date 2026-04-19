@@ -15,6 +15,8 @@ import type { ContractSourceProvider } from './contract-source-types';
  */
 export type CliDriver = ControlDriverInstance<string, string>;
 
+export type ContractWatchStrategy = 'moduleGraph';
+
 /**
  * Contract configuration specifying source and artifact locations.
  */
@@ -29,6 +31,17 @@ export interface ContractConfig {
    * The .d.ts types file will be colocated (e.g., contract.json -> contract.d.ts).
    */
   readonly output?: string;
+  /**
+   * Optional authoritative source files for development watch integrations.
+   * Use this when contract inputs are not visible through the config module graph
+   * (for example PSL schema paths passed as strings).
+   */
+  readonly watchInputs?: readonly string[];
+  /**
+   * Declares that the config module graph remains authoritative for contract
+   * invalidation. Use this for TS-first contract modules imported by the config.
+   */
+  readonly watchStrategy?: ContractWatchStrategy;
 }
 
 /**
@@ -94,6 +107,8 @@ export interface PrismaNextConfig<
 const ContractConfigSchema = type({
   source: 'unknown', // Runtime check enforces provider function shape
   'output?': 'string',
+  'watchInputs?': 'string[]',
+  'watchStrategy?': "'moduleGraph'",
 });
 
 /**
@@ -150,6 +165,12 @@ export function defineConfig<TFamilyId extends string = string, TTargetId extend
     const normalizedContract: ContractConfig = {
       source: config.contract.source,
       output,
+      ...(config.contract.watchInputs !== undefined
+        ? { watchInputs: config.contract.watchInputs }
+        : {}),
+      ...(config.contract.watchStrategy !== undefined
+        ? { watchStrategy: config.contract.watchStrategy }
+        : {}),
     };
 
     // Return normalized config

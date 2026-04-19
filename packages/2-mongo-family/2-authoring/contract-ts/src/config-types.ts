@@ -8,6 +8,7 @@ import { ok } from '@prisma-next/utils/result';
 export function typescriptContract(contract: Contract, output?: string): ContractConfig {
   return {
     source: async (_context) => ok(contract),
+    watchStrategy: 'moduleGraph',
     ...ifDefined('output', output),
   };
 }

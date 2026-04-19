@@ -128,11 +128,27 @@ describe('defineConfig', () => {
       contract: {
         source: sourceProvider,
         output: 'custom/contract.json',
+        watchInputs: ['./schema.prisma'],
       },
     };
 
     const result = defineConfig(config);
     expect(result.contract?.output).toBe('custom/contract.json');
+    expect(result.contract?.watchInputs).toEqual(['./schema.prisma']);
+  });
+
+  it('preserves contract watch strategy', () => {
+    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
+    const config: PrismaNextConfig = {
+      ...baseConfig,
+      contract: {
+        source: sourceProvider,
+        watchStrategy: 'moduleGraph',
+      },
+    };
+
+    const result = defineConfig(config);
+    expect(result.contract?.watchStrategy).toBe('moduleGraph');
   });
 
   it('validates contract source accepts provider function', () => {
@@ -194,6 +210,7 @@ describe('defineConfig', () => {
     });
 
     expect(config.output).toBe('output/contract.json');
+    expect(config.watchStrategy).toBe('moduleGraph');
     expect(result.ok).toBe(true);
     expect(result.assertOk()).toBe(contract);
   });

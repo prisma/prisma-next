@@ -235,5 +235,30 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
     if (contract['output'] !== undefined && typeof contract['output'] !== 'string') {
       throwValidation('contract.output', 'Config.contract.output must be a string when provided');
     }
+
+    if (contract['watchInputs'] !== undefined) {
+      if (!Array.isArray(contract['watchInputs'])) {
+        throwValidation(
+          'contract.watchInputs',
+          'Config.contract.watchInputs must be an array of strings when provided',
+        );
+      }
+
+      for (const input of contract['watchInputs']) {
+        if (typeof input !== 'string') {
+          throwValidation(
+            'contract.watchInputs',
+            'Config.contract.watchInputs must contain only strings',
+          );
+        }
+      }
+    }
+
+    if (contract['watchStrategy'] !== undefined && contract['watchStrategy'] !== 'moduleGraph') {
+      throwValidation(
+        'contract.watchStrategy',
+        'Config.contract.watchStrategy must be "moduleGraph" when provided',
+      );
+    }
   }
 }
