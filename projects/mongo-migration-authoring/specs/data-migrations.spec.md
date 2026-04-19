@@ -4,6 +4,8 @@ Users can express data transformations in MongoDB migrations — backfilling fie
 
 # Description
 
+> **Supersession note.** The original form of this spec described a `check: (() => query) | false | true` API for `dataTransform`. That API has been superseded by the structured check shape specified in [`data-transform-check-unification.md`](./data-transform-check-unification.md) — `check?: { source, filter?, expect?, description? }` — which aligns data-transform checks with DDL `precheck`/`postcheck` so both are evaluated by a single `FilterEvaluator` path. The Functional Requirements and Acceptance Criteria below describe the shipped structured form. The boolean `check: true | false` variants are not supported; equivalent behaviours (always-run, always-skip) are expressed through the structured form's `expect` discriminant or by omitting `check` entirely. The intent of `check` — idempotency and retry safety — is unchanged.
+
 ## The problem
 
 MongoDB migrations today can only express structural DDL: create/drop collections, create/drop indexes, set validation rules. But schema evolution often requires changing data too. Adding a required `status` field to a `users` collection means you need to backfill `"active"` into every existing document before you can enforce the validator. Today, there's no way to express that backfill as part of the migration.
@@ -32,9 +34,12 @@ export default class extends Migration {
       }),
 
       dataTransform("backfill-status", {
-        check: () => agg.from('users')
-          .match((f) => f.status.exists(false))
-          .limit(1),
+        check: {
+          source: () => agg.from('users')
+            .match(MongoExistsExpr.notExists('status'))
+            .limit(1),
+          // expect defaults to 'exists' — "if the query finds violations, the transform still needs to run"
+        },
         run: () => raw.collection('users')
           .updateMany({ status: { $exists: false } }, { $set: { status: "active" } }),
       }),
@@ -55,14 +60,14 @@ The ordering matters: create the collection, backfill the data, *then* tighten t
 
 The query builders (`mongoRaw`, `mongoPipeline`) are the existing tools for building MongoDB queries. They take a contract and produce `MongoQueryPlan` objects — static command descriptions, no database connection required.
 
-The user constructs these builders at the top of the migration file from the scaffolded contract. The `check` and `run` closures use them to describe what the migration should do:
+The user constructs these builders at the top of the migration file from the scaffolded contract. The `check` object and `run` closure use them to describe what the migration should do:
 
-- **`check`** describes a query for "violation" documents — rows that still need the transform. If the result is empty, the transform has already been applied. This gives retry safety: if a migration fails partway through and is re-run, completed transforms are skipped.
+- **`check`** is a structured object `{ source, filter?, expect?, description? }` that describes a query for "violation" documents — rows that still need the transform. `source` is a closure returning a `MongoQueryPlan` (typically an aggregation over the target collection, which can itself carry a `$match` expressing the violation condition); `filter` is an optional client-side `MongoFilterExpr` applied to the result set — useful when `source` cannot narrow server-side; `expect` (`'exists' | 'notExists'`, default `'exists'`) states whether matches before `run` mean "still needs work" (`'exists'`) or "already done" (`'notExists'`). This mirrors the DDL `MongoMigrationCheck` shape (see [`data-transform-check-unification.md`](./data-transform-check-unification.md)) so the runner evaluates DDL and data-transform checks through a single `FilterEvaluator` path. Matching `expect` gives retry safety: if a migration fails partway through and is re-run, completed transforms are skipped.
 - **`run`** describes the actual data modification — an `updateMany`, `insertMany`, `deleteMany`, or aggregation pipeline.
 
-`check` also runs *after* `run` to verify the transform worked. If violations remain, the migration fails with a diagnostic *before* the subsequent `setValidation` would produce a cryptic database error.
+`check` also runs *after* `run` to verify the transform worked. The postcheck flips `expect` (`'exists'` ↔ `'notExists'`) so the same source-plus-filter query asserts "no violations remain." If violations remain, the migration fails with a diagnostic *before* the subsequent `setValidation` would produce a cryptic database error.
 
-`check` also accepts `false` (always run — for idempotent-by-construction cases) or `true` (always skip).
+Users who want "always run" semantics omit `check` entirely (no precheck, no skip path); users who want "already idempotent by construction" semantics either omit `check` or use a `check` whose `filter` is unsatisfiable. The boolean `check: true | false` forms from the original design have been removed — see the supersession note above and [`data-transform-check-unification.md`](./data-transform-check-unification.md).
 
 ## How serialization works
 
@@ -110,11 +115,11 @@ The user creates a second set of query builders from the intermediate contract a
 
 ## Functional Requirements
 
-- A `dataTransform(name, { check, run })` factory that produces a data transform migration operation. `check` and `run` are closures returning `Buildable` or `MongoQueryPlan` objects. The resolver calls `.build()` on `Buildable` returns.
+- A `dataTransform(name, { check, run })` factory that produces a data transform migration operation. `run` is a closure (or bare value) returning a `Buildable` or `MongoQueryPlan`. `check` is an optional structured object — `{ source: () => Buildable | MongoQueryPlan, filter?: MongoFilterExpr, expect?: 'exists' | 'notExists', description?: string }` — matching the unified check shape from [`data-transform-check-unification.md`](./data-transform-check-unification.md). The resolver calls `.build()` on `Buildable` returns.
 - DML command serialization: all `RawMongoCommand` kinds and typed `AggregateCommand` serialize via `JSON.stringify` and deserialize via `kind`-based rehydration with arktype validation, following the existing DDL pattern.
-- The migration runner executes data transform operations with the check → (skip or run) → check → (fail or proceed) sequence.
-- `check` supports three modes: a closure returning a query (empty result = done), `false` (always run), `true` (always skip).
-- A `TODO` sentinel in `dataTransform` prevents attestation.
+- The migration runner executes data transform operations with the check → (skip or run) → check → (fail or proceed) sequence. The factory derives the operation's `precheck` from the supplied `check` (using `expect` as given) and the `postcheck` by flipping `expect` (`'exists'` ↔ `'notExists'`), so one check specification drives both phases through a single `FilterEvaluator` path shared with DDL operations.
+- Omitting `check` produces an operation with no precheck and no postcheck (always run). The boolean `check: true | false` variants from the original design are superseded by the structured form — see [`data-transform-check-unification.md`](./data-transform-check-unification.md).
+- A placeholder mechanism in `dataTransform` prevents attestation of scaffolded-but-unfilled migrations. The shipped mechanism is the `placeholder(slot)` utility (see [`data-transform-placeholder.md`](./data-transform-placeholder.md)) that throws a structured `PN-MIG-2001` error when invoked; it replaces the original `TODO` symbol sentinel.
 - Migration scaffolding copies `contract.json` and `contract.d.ts` into the migration directory.
 
 ## Non-Functional Requirements
@@ -134,10 +139,10 @@ The user creates a second set of query builders from the intermediate contract a
 
 ## Authoring
 
-- [ ] A migration file with `dataTransform` using `mongoRaw` for `run` and `mongoPipeline` for `check` type-checks and can be verified
-- [ ] The resolver calls `.build()` on `Buildable` returns from `check`/`run` closures
-- [ ] A `TODO` sentinel in `dataTransform` prevents attestation
-- [ ] `check: false` (always run) and `check: true` (always skip) are supported
+- [ ] A migration file with `dataTransform` using `mongoRaw` for `run` and `mongoPipeline` for `check.source` type-checks and can be emitted
+- [ ] The resolver calls `.build()` on `Buildable` returns from `check.source` and `run` closures
+- [ ] An unfilled `placeholder(slot)` call in a scaffolded `dataTransform` throws `PN-MIG-2001` at emit time, preventing attestation (per [`data-transform-placeholder.md`](./data-transform-placeholder.md))
+- [ ] `check` accepts the structured form `{ source, filter?, expect?, description? }` (per [`data-transform-check-unification.md`](./data-transform-check-unification.md)); omitting `check` yields an always-run operation with no precheck or postcheck. The original boolean `check: true | false` variants are superseded and not supported.
 
 ## Serialization
 

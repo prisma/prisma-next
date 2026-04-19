@@ -37,9 +37,9 @@ Each class captures exactly the arguments of the corresponding factory function.
 
 The existing planner helper functions and the hand-authored factory functions have slightly different signatures and behaviors in some cases (e.g., the planner's `planCreateCollection` maps `MongoSchemaCollectionOptions` to `CreateCollectionOptions`, while the factory takes `CreateCollectionOptions` directly). As part of this work, the factory signatures are aligned so the planner can produce `OpFactoryCall` values that map 1:1 to factory calls. Since the factories were just created for the migration authoring project, their signatures can be adjusted freely.
 
-The planner's `planValidatorDiff` function currently produces `collMod` operations directly. After alignment, this maps to `OpFactoryCall` with `factory: 'collMod'`, and the operation-class classification logic (`classifyValidatorUpdate`) moves to a helper that the operation renderer calls (since `OpFactoryCall` doesn't carry `operationClass`).
+The planner's `planValidatorDiff` function currently produces `collMod` operations directly. After alignment, this maps to `OpFactoryCall` with `factory: 'collMod'`, and its `operationClass` (`widening` vs `destructive`) is determined by `classifyValidatorUpdate` inside the planner — where the origin-validator context needed for that classification is available — and carried on the call IR (see shipped behaviour below).
 
-**Assumption:** `operationClass` is derived by the operation renderer, not stored in `OpFactoryCall`. The renderer has enough context (factory type + arguments) to determine the class.
+**Decision (shipped, supersedes earlier assumption):** `operationClass` (and the human-readable `label`) live on every `OpFactoryCall` instance rather than being re-derived in `renderOps`. The planner is the only site with the origin-validator context required to classify a `collMod` update correctly, so classification happens there and the result rides along with the call. See Decisions §2 and Open Questions §1 below for rationale.
 
 ## Conflict detection stays in the planner
 
@@ -55,7 +55,7 @@ The planner's conflict detection logic (immutable option changes, policy violati
 - An operation renderer function (`renderOps(calls: OpFactoryCall[]): MongoMigrationPlanOperation[]`) that calls the factory functions to produce operations
 - A TypeScript renderer function (`renderTypeScript(calls: OpFactoryCall[], meta?: MigrationMeta): string`) that produces a complete, runnable migration file
 - Factory function signatures in `migration-factories.ts` are aligned with `OpFactoryCall` argument shapes so the mapping is 1:1
-- The operation renderer assigns `operationClass` based on factory type and arguments (same classification logic the planner uses today)
+- The planner assigns `operationClass` (and `label`) to each `OpFactoryCall` instance as part of construction (using `classifyValidatorUpdate` for `collMod`, constant literals for the additive/destructive variants); `renderOps` reads `call.operationClass` without re-deriving. See Decisions §2.
 - The TypeScript renderer generates valid TypeScript that imports from `@prisma-next/target-mongo/migration` and calls the factory functions
 
 ## Non-Functional Requirements
@@ -90,7 +90,7 @@ The planner's conflict detection logic (immutable option changes, policy violati
 
 - [ ] `renderOps(calls)` produces `MongoMigrationPlanOperation[]` identical to the current planner output for the same inputs
 - [ ] Round-trip equivalence: for any schema diff, `renderOps(planner.planCalls(...))` produces the same operations as the current `planner.plan(...)` (verified by test comparing JSON output)
-- [ ] `operationClass` is correctly derived for each factory call
+- [ ] `operationClass` on each `OpFactoryCall` correctly reflects the planner's classification (constant per variant for additive/destructive factories; set via `CollModMeta` for `CollModCall`, using `classifyValidatorUpdate`)
 
 ## TypeScript renderer
 
@@ -139,13 +139,13 @@ Not applicable.
 
 1. **`OpFactoryCall` uses frozen AST classes with a visitor interface.** This matches the codebase's established `MongoAstNode` pattern and provides compile-time exhaustiveness: adding a new variant forces all dispatch sites (renderers, planner helpers) to handle it. The trade-off versus plain data is that tests must import and construct class instances, and serialized values lose their visitor capability — but exhaustiveness is more valuable here since dispatch sites are spread across multiple modules (`renderOps`, `renderTypeScript`, planner label/operationClass derivation).
 
-2. **`operationClass` is not part of `OpFactoryCall`.** It's a derived property that the operation renderer computes. This keeps the intermediate representation simple and avoids duplicating classification logic.
+2. **`operationClass` (and `label`) live on `OpFactoryCall`.** An earlier draft of this spec had them derived in `renderOps`; the shipped design stores them on every call instance instead. The planner is the only site with the context required to classify a `collMod`'s validator update as `widening` vs `destructive` — that decision runs `classifyValidatorUpdate` over the origin validator, which `renderOps` does not see. Deriving in the renderer would mean either threading origin-validator state through the scaffolding/emit pipeline to a node that otherwise only needs the call arguments, or duplicating `classifyValidatorUpdate` and its inputs on both sides. Storing `operationClass` on the call keeps each call self-describing (planner-produced semantics travel with it), keeps `renderOps` purely structural, and matches how `label` is handled. The trade-off is that the IR is no longer purely syntactic — it carries planner-derived semantics — and an "inverse" path that built calls from user-authored factory invocations would have to re-derive them somehow. That inverse path is not in scope for this spec; the additive/destructive variants (`CreateIndexCall`, `DropCollectionCall`, etc.) have constant `operationClass`es baked into the class literals, and only `CollModCall` carries a computed one via its `meta` parameter.
 
 3. **Prerequisite: migration subsystem refactor.** This spec assumes the planner and factories are co-located in `@prisma-next/target-mongo` (per the migration-subsystem-refactor spec). The planner needs to import and call the factory functions, which requires them to be in the same package or a dependency.
 
 # Open Questions
 
-1. **How should `operationClass` be derived for `collMod` calls?** Today the planner classifies validator updates as `widening` or `destructive` based on comparing origin and destination validators. The operation renderer needs access to this context (origin validator state) to make the same determination. Should the `collMod` variant of `OpFactoryCall` carry an explicit `operationClass` override, or should the renderer receive the origin schema as context? **Default assumption:** The `collMod` variant carries an optional `operationClass` field that the planner sets when it has the context to determine it; if omitted, the renderer defaults to `destructive`.
+1. **How should `operationClass` be derived for `collMod` calls?** *(Resolved — shipped design.)* The planner classifies validator updates as `widening` or `destructive` via `classifyValidatorUpdate`, which compares the origin and destination validators. Since only the planner has the origin-validator context, the classification is performed there and stored on the call: `CollModCall` accepts a `meta: CollModMeta` argument carrying an optional `operationClass` (and `label`) which the planner sets, defaulting to `'destructive'` when the planner has insufficient context. All other `OpFactoryCall` variants have a constant `operationClass` baked into the class literal (`'additive'` for create-calls, `'destructive'` for drop-calls). `renderOps` simply reads `call.operationClass` — it never re-derives. See Decisions §2 for the rationale.
 
 2. **Should `renderTypeScript` produce the `Migration.run(import.meta)` line?** The hand-authored migration pattern includes this line at the bottom. The rendered file should include it so it's immediately runnable. **Default assumption:** Yes, include it.
 
