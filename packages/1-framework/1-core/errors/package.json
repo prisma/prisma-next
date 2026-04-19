@@ -35,6 +35,7 @@
   "exports": {
     "./control": "./dist/control.mjs",
     "./execution": "./dist/execution.mjs",
+    "./migration": "./dist/migration.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
