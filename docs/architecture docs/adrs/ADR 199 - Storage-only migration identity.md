@@ -71,4 +71,4 @@ Instead of dropping contracts entirely, we could have projected each contract do
 - [ADR 004 — Storage Hash vs Profile Hash](ADR%20004%20-%20Storage%20Hash%20vs%20Profile%20Hash.md)
 - [ADR 028 — Migration Structure & Operations](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md)
 - [ADR 169 — On-disk migration persistence](ADR%20169%20-%20On-disk%20migration%20persistence.md) (§3 amended)
-- ADR 192 — ops.json is the migration contract (concurrent)
+- [ADR 192 — ops.json is the migration contract](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md) (concurrent)
