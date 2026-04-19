@@ -45,7 +45,9 @@ export interface CliErrorConflict {
  * Sub-clustering within a domain is conveyed by the numeric code range; see
  * the per-domain source files for reserved ranges.
  */
-export type CliErrorDomain = 'CLI' | 'RUN' | 'MIG' | 'CON' | 'SCHEMA';
+const CLI_ERROR_DOMAINS = ['CLI', 'RUN', 'MIG', 'CON', 'SCHEMA'] as const;
+
+export type CliErrorDomain = (typeof CLI_ERROR_DOMAINS)[number];
 
 /**
  * Structured CLI error that contains all information needed for error envelopes.
@@ -132,16 +134,10 @@ export class CliStructuredError extends Error {
   }
 }
 
-const CLI_ERROR_DOMAINS: ReadonlySet<CliErrorDomain> = new Set([
-  'CLI',
-  'RUN',
-  'MIG',
-  'CON',
-  'SCHEMA',
-]);
+const CLI_ERROR_DOMAIN_SET: ReadonlySet<CliErrorDomain> = new Set(CLI_ERROR_DOMAINS);
 
 function isCliErrorDomain(value: unknown): value is CliErrorDomain {
-  return typeof value === 'string' && CLI_ERROR_DOMAINS.has(value as CliErrorDomain);
+  return typeof value === 'string' && CLI_ERROR_DOMAIN_SET.has(value as CliErrorDomain);
 }
 
 // ============================================================================
