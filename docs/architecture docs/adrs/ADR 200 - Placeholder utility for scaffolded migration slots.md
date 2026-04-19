@@ -18,7 +18,7 @@ dataTransform('backfill-product-status', {
 
 If the author runs `migration emit` without replacing those calls, each `placeholder` throws a structured `PN-MIG-2001` error naming the exact slot:
 
-```
+```text
 PN-MIG-2001  Unfilled migration placeholder
   The migration contains a placeholder that has not been filled in: backfill-product-status:check.source
   Fix: Open migration.ts and replace the `placeholder(...)` call with your actual query.
@@ -53,6 +53,8 @@ Only by the scaffolder — each target's `renderTypeScript` implementation. The 
 This is what makes the scaffold-then-emit handoff safe: without a structured throw on unfilled slots, the CLI would need a separate "is this migration ready?" check. With `placeholder`, evaluating the scaffolded file with unfilled slots fails cleanly through the normal error path.
 
 ## What this replaces
+
+> **Status:** Planned/target-state. The sentinel→`placeholder()` switch described here is design intent for the upcoming class-flow rollout. The runtime data-transform paths in `@prisma-next/target-mongo/migration` still ship the `TodoMarker` sentinel today; the snippets below show the target API and the deletion catalog the implementation PR will execute against.
 
 The prior design used a sentinel symbol:
 
