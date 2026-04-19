@@ -146,6 +146,7 @@ describe('renderOps', () => {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       const callsResult = planner.planCalls({
@@ -177,6 +178,7 @@ describe('renderOps', () => {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       const callsResult = planner.planCalls({
@@ -212,6 +214,7 @@ describe('renderOps', () => {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       const callsResult = planner.planCalls({
@@ -243,6 +246,7 @@ describe('renderOps', () => {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       const callsResult = planner.planCalls({
@@ -287,6 +291,7 @@ describe('renderOps', () => {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       const callsResult = planner.planCalls({
@@ -341,6 +346,7 @@ describe('renderOps', () => {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       const callsResult = planner.planCalls({

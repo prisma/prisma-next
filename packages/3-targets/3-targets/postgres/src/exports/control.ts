@@ -3,6 +3,7 @@ import {
   parsePostgresDefault,
 } from '@prisma-next/adapter-postgres/control';
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
+import { errorPlanDoesNotSupportAuthoringSurface } from '@prisma-next/errors/migration';
 import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
@@ -18,7 +19,9 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type {
   ControlTargetInstance,
   MigrationPlanner,
+  MigrationPlanWithAuthoringSurface,
   MigrationRunner,
+  MigrationScaffoldContext,
   OperationDescriptor,
 } from '@prisma-next/framework-components/control';
 import { sql } from '@prisma-next/sql-builder/runtime';
@@ -33,6 +36,7 @@ import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
+import { renderDescriptorTypeScript } from '../core/migrations/scaffolding';
 
 function parseDescriptors(descriptors: readonly OperationDescriptor[]) {
   const result = MigrationDescriptorArraySchema([...descriptors]);
@@ -126,8 +130,38 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
   {
     ...postgresTargetDescriptorMeta,
     migrations: {
-      createPlanner(_family: SqlControlFamilyInstance) {
-        return createPostgresMigrationPlanner() as MigrationPlanner<'sql', 'postgres'>;
+      createPlanner(_family: SqlControlFamilyInstance): MigrationPlanner<'sql', 'postgres'> {
+        const inner = createPostgresMigrationPlanner();
+        return {
+          plan(options) {
+            // The framework's planner options omit `schemaName`; Postgres's
+            // own planner defaults to `'public'` when it's absent, so this
+            // cast is safe for the framework-facing surface.
+            const result = inner.plan(options as never);
+            if (result.kind === 'failure') {
+              return { kind: 'failure', conflicts: result.conflicts };
+            }
+            return {
+              kind: 'success',
+              plan: {
+                ...result.plan,
+                renderTypeScript(): string {
+                  throw errorPlanDoesNotSupportAuthoringSurface({ targetId: 'postgres' });
+                },
+              },
+            };
+          },
+          emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
+            return {
+              targetId: 'postgres',
+              destination: { storageHash: context.toHash },
+              operations: [],
+              renderTypeScript(): string {
+                return renderDescriptorTypeScript([], context);
+              },
+            };
+          },
+        };
       },
       createRunner(family) {
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
@@ -198,6 +232,9 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           dependencies,
           db,
         });
+      },
+      renderDescriptorTypeScript(descriptors, context) {
+        return renderDescriptorTypeScript(descriptors, context);
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {

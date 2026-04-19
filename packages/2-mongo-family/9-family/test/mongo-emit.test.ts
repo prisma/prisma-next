@@ -60,11 +60,14 @@ describe('mongoEmit', () => {
       `import { createCollection, createIndex } from '${targetMongoMigrationExport}';`,
       '',
       'class M extends Migration {',
-      '  override plan() {',
+      '  override get operations() {',
       '    return [',
       '      createCollection("users"),',
       '      createIndex("users", [{ field: "email", direction: 1 }]),',
       '    ];',
+      '  }',
+      '  override describe() {',
+      '    return { from: "sha256:aaa", to: "sha256:bbb" };',
       '  }',
       '}',
       'export default M;',
@@ -122,12 +125,53 @@ describe('mongoEmit', () => {
     });
   });
 
-  describe('given a function-form migration.ts (arrow factory)', () => {
+  describe('given a class-flow migration.ts with an unfilled placeholder', () => {
+    const placeholderMigration = [
+      `import { Migration } from '${familyMongoMigrationExport}';`,
+      `import { placeholder } from '${targetMongoMigrationExport}';`,
+      '',
+      'class M extends Migration {',
+      '  override get operations() {',
+      '    return placeholder("backfill-product-status:run");',
+      '  }',
+      '  override describe() {',
+      '    return { from: "sha256:aaa", to: "sha256:bbb" };',
+      '  }',
+      '}',
+      'export default M;',
+      'Migration.run(import.meta.url, M);',
+      '',
+    ].join('\n');
+
+    it('propagates a structured CliStructuredError with code PN-MIG-2001 and the slot in meta', async () => {
+      await writeFile(join(pkgDir, 'migration.ts'), placeholderMigration);
+
+      let thrown: unknown;
+      try {
+        await mongoEmit({ dir: pkgDir, frameworkComponents: [] });
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(CliStructuredError.is(thrown)).toBe(true);
+      expect(thrown).toMatchObject({
+        code: '2001',
+        domain: 'MIG',
+        meta: { slot: 'backfill-product-status:run' },
+      });
+    });
+  });
+
+  describe('given a function-form migration.ts (arrow factory returning MigrationPlan)', () => {
     it('writes ops.json and returns operations without attesting', async () => {
       const migration = [
         `import { createCollection } from '${targetMongoMigrationExport}';`,
         '',
-        'export default () => ({ plan() { return [createCollection("users")] } });',
+        'export default () => ({',
+        '  targetId: "mongo",',
+        '  destination: { storageHash: "sha256:bbb" },',
+        '  operations: [createCollection("users")],',
+        '});',
         '',
       ].join('\n');
       await writeFile(join(pkgDir, 'migration.ts'), migration);
@@ -150,12 +194,16 @@ describe('mongoEmit', () => {
     });
   });
 
-  describe('given a function-form migration.ts (async factory)', () => {
+  describe('given a function-form migration.ts (async factory returning MigrationPlan)', () => {
     it('writes ops.json and returns operations without attesting', async () => {
       const migration = [
         `import { createCollection } from '${targetMongoMigrationExport}';`,
         '',
-        'export default async () => ({ plan() { return [createCollection("users")] } });',
+        'export default async () => ({',
+        '  targetId: "mongo",',
+        '  destination: { storageHash: "sha256:bbb" },',
+        '  operations: [createCollection("users")],',
+        '});',
         '',
       ].join('\n');
       await writeFile(join(pkgDir, 'migration.ts'), migration);
@@ -178,11 +226,18 @@ describe('mongoEmit', () => {
     });
   });
 
-  describe('given a function-form migration.ts whose plan() does not return an array', () => {
+  describe('given a function-form migration.ts whose operations is not an array', () => {
     it('throws PN-MIG-2004', async () => {
       await writeFile(
         join(pkgDir, 'migration.ts'),
-        'export default () => ({ plan() { return "not an array" } });\n',
+        [
+          'export default () => ({',
+          '  targetId: "mongo",',
+          '  destination: { storageHash: "sha256:bbb" },',
+          '  operations: "not an array",',
+          '});',
+          '',
+        ].join('\n'),
       );
 
       let thrown: unknown;
@@ -201,7 +256,7 @@ describe('mongoEmit', () => {
     });
   });
 
-  describe('given a function-form migration.ts that does not return an object with plan()', () => {
+  describe('given a function-form migration.ts that does not return a MigrationPlan-shaped object', () => {
     it('throws PN-MIG-2003', async () => {
       await writeFile(join(pkgDir, 'migration.ts'), 'export default () => 42;\n');
 
@@ -280,14 +335,17 @@ describe('mongoEmit', () => {
     });
   });
 
-  describe('given a class-flow migration.ts whose plan() does not return an array', () => {
+  describe('given a class-flow migration.ts whose operations getter does not return an array', () => {
     it('throws PN-MIG-2004 with the package dir in meta', async () => {
       const migration = [
         `import { Migration } from '${familyMongoMigrationExport}';`,
         '',
         'class M extends Migration {',
-        '  override plan() {',
+        '  override get operations() {',
         '    return "not an array" as unknown as never;',
+        '  }',
+        '  override describe() {',
+        '    return { from: "sha256:aaa", to: "sha256:bbb" };',
         '  }',
         '}',
         'export default M;',

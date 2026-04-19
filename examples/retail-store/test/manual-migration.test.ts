@@ -49,9 +49,9 @@ describe(
       }
     }, timeouts.spinUpMongoMemoryServer);
 
-    it('migration class can be imported and plan() called directly', () => {
+    it('migration class can be imported and operations accessed directly', () => {
       const instance = new AddProductValidation();
-      const ops = instance.plan();
+      const ops = instance.operations;
       expect(ops).toHaveLength(2);
       expect(ops[0]!.id).toBe('collection.products.setValidation');
       expect(ops[1]!.id).toContain('index.products.create');

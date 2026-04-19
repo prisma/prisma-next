@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
 import {
@@ -72,6 +72,31 @@ export async function writeMigrationPackage(
 
   await writeFile(join(dir, MANIFEST_FILE), JSON.stringify(manifest, null, 2), { flag: 'wx' });
   await writeFile(join(dir, OPS_FILE), JSON.stringify(ops, null, 2), { flag: 'wx' });
+}
+
+/**
+ * Copy the destination contract artifacts (`contract.json` and the
+ * colocated `contract.d.ts`) into the migration package directory so
+ * authors of the scaffolded `migration.ts` can import the typed
+ * contract relative to the migration directory
+ * (`import type { Contract } from './contract'`).
+ *
+ * A missing `.d.ts` is tolerated (only the `.json` is required) so the
+ * helper stays usable in tests that hand-roll a bare `contract.json`.
+ * A missing `contract.json` — or any other I/O failure — throws.
+ */
+export async function copyContractToMigrationDir(
+  packageDir: string,
+  contractJsonPath: string,
+): Promise<void> {
+  await copyFile(contractJsonPath, join(packageDir, 'contract.json'));
+  const dtsPath = `${contractJsonPath.slice(0, -'.json'.length)}.d.ts`;
+  try {
+    await copyFile(dtsPath, join(packageDir, 'contract.d.ts'));
+  } catch (error) {
+    if (hasErrnoCode(error, 'ENOENT')) return;
+    throw error;
+  }
 }
 
 export async function writeMigrationManifest(

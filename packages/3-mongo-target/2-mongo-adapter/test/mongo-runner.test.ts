@@ -75,12 +75,14 @@ function makeContract(
 function planForContract(
   contract: ReturnType<typeof makeContract>,
   origin: MongoSchemaIR = new MongoSchemaIR([]),
+  fromHash = '',
 ) {
   const planner = new MongoMigrationPlanner();
   const result = planner.plan({
     contract,
     schema: origin,
     policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+    fromHash,
     frameworkComponents: [],
   });
   if (result.kind !== 'success') throw new Error('Planner failed unexpectedly');
@@ -91,7 +93,12 @@ function serializePlan(plan: MigrationPlan): MigrationPlan {
   const serialized = JSON.parse(
     serializeMongoOps(plan.operations as MongoMigrationPlanOperation[]),
   );
-  return { ...plan, operations: serialized };
+  return {
+    targetId: plan.targetId,
+    origin: plan.origin ?? null,
+    destination: plan.destination,
+    operations: serialized,
+  };
 }
 
 function makeRunner() {
@@ -252,11 +259,8 @@ describe('MongoMigrationRunner', () => {
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
-    const plan = planForContract(contract);
-    const serialized = serializePlan({
-      ...plan,
-      origin: { storageHash: 'sha256:expected' },
-    });
+    const plan = planForContract(contract, undefined, 'sha256:expected');
+    const serialized = serializePlan(plan);
 
     const runner = makeRunner();
     const result = await runner.execute({
@@ -301,11 +305,8 @@ describe('MongoMigrationRunner', () => {
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
-    const plan = planForContract(contract);
-    const serialized = serializePlan({
-      ...plan,
-      origin: { storageHash: 'sha256:something' },
-    });
+    const plan = planForContract(contract, undefined, 'sha256:something');
+    const serialized = serializePlan(plan);
 
     const runner = makeRunner();
     const result = await runner.execute({
@@ -328,11 +329,8 @@ describe('MongoMigrationRunner', () => {
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
-    const plan = planForContract(contract);
-    const serialized = serializePlan({
-      ...plan,
-      origin: { storageHash: 'sha256:origin' },
-    });
+    const plan = planForContract(contract, undefined, 'sha256:origin');
+    const serialized = serializePlan(plan);
 
     const runner = makeRunner();
     const result = await runner.execute({

@@ -75,6 +75,7 @@ async function planAndApply(
     contract: destination,
     schema,
     policy: ALL_POLICY,
+    fromHash: 'sha256:origin',
     frameworkComponents: [],
   });
   if (result.kind !== 'success') {

@@ -1,3 +1,4 @@
+import { detectScaffoldRuntime, shebangLineFor } from '@prisma-next/migration-tools/migration-ts';
 import type {
   CollModCall,
   CreateCollectionCall,
@@ -15,23 +16,32 @@ export interface RenderMigrationMeta {
   readonly labels?: readonly string[];
 }
 
-export function renderTypeScript(
+/**
+ * Render a list of Mongo `OpFactoryCall`s as a class-flow `migration.ts`
+ * source string. The result is shebanged, extends the user-facing
+ * `Migration` (i.e. `MongoMigration`) from `@prisma-next/family-mongo`, and
+ * implements the abstract `operations` and `describe` members. `meta` is
+ * always rendered — `describe()` is part of the `Migration` contract, so
+ * even an empty stub must satisfy it; callers pass empty strings for a
+ * migration-new scaffold.
+ */
+export function renderCallsToTypeScript(
   calls: ReadonlyArray<OpFactoryCall>,
-  meta?: RenderMigrationMeta,
+  meta: RenderMigrationMeta,
 ): string {
   const factoryNames = collectFactoryNames(calls);
   const imports = buildImports(factoryNames);
-  const planBody = calls.map((c) => c.accept(renderCallVisitor)).join(',\n');
-  const describeMethod = meta ? buildDescribeMethod(meta) : '';
+  const operationsBody = calls.map((c) => c.accept(renderCallVisitor)).join(',\n');
 
   return [
+    shebangLineFor(detectScaffoldRuntime()),
     imports,
     '',
     'class M extends Migration {',
-    describeMethod,
-    '  override plan() {',
+    buildDescribeMethod(meta),
+    '  override get operations() {',
     '    return [',
-    indent(planBody, 6),
+    indent(operationsBody, 6),
     '    ];',
     '  }',
     '}',

@@ -1,4 +1,5 @@
 export {
+  copyContractToMigrationDir,
   formatMigrationDirName,
   readMigrationPackage,
   readMigrationsDir,

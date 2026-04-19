@@ -49,9 +49,9 @@ describe(
       }
     }, timeouts.spinUpMongoMemoryServer);
 
-    it('migration class can be imported and plan() called directly', () => {
+    it('migration class can be imported and operations accessed directly', () => {
       const instance = new AddPostsAuthorIndex();
-      const ops = instance.plan();
+      const ops = instance.operations;
       expect(ops).toHaveLength(2);
       expect(ops[0]!.id).toBe('index.posts.create(authorId:1)');
       expect(ops[1]!.id).toBe('index.posts.create(createdAt:-1,authorId:1)');
