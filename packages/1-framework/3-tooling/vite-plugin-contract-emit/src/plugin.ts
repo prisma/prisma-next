@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { loadConfigWithMetadata } from '@prisma-next/cli/config-loader';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
 import { executeContractEmit } from '@prisma-next/cli/control-api';
 import type { Plugin, ViteDevServer } from 'vite';
@@ -7,6 +8,7 @@ import type { PrismaVitePluginOptions } from './types';
 const PLUGIN_NAME = 'prisma-vite-plugin-contract-emit';
 const DEFAULT_DEBOUNCE_MS = 150;
 const DEFAULT_CONFIG_PATH = 'prisma-next.config.ts';
+const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
 
 /**
  * Creates a Vite plugin that automatically emits Prisma Next contract artifacts.
@@ -43,6 +45,7 @@ export function prismaVitePlugin(
 
   let absoluteConfigPath: string;
   const watchedFiles = new Set<string>();
+  const ignoredOutputFiles = new Set<string>();
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let currentAbortController: AbortController | null = null;
   let server: ViteDevServer | null = null;
@@ -63,6 +66,33 @@ export function prismaVitePlugin(
     }
   }
 
+  function handleTrackedFileChange(file: string) {
+    if (ignoredOutputFiles.has(file)) {
+      log(`Ignoring emitted artifact update: ${file}`, 'debug');
+      return;
+    }
+
+    if (watchedFiles.has(file)) {
+      log(`Detected change: ${file}`, 'debug');
+      scheduleEmit();
+    }
+  }
+
+  function resolveContractOutputFiles(
+    outputPath: string | undefined,
+    resolvedConfigPath: string,
+  ): Set<string> {
+    const configDir = dirname(resolvedConfigPath);
+    const outputJsonPath = resolve(configDir, outputPath ?? DEFAULT_CONTRACT_OUTPUT);
+    const outputFiles = new Set<string>([outputJsonPath]);
+
+    if (outputJsonPath.endsWith('.json')) {
+      outputFiles.add(`${outputJsonPath.slice(0, -5)}.d.ts`);
+    }
+
+    return outputFiles;
+  }
+
   async function emitContract(): Promise<ContractEmitResult | null> {
     const requestId = ++emitRequestId;
 
@@ -74,6 +104,10 @@ export function prismaVitePlugin(
     const signal = currentAbortController.signal;
 
     try {
+      if (server) {
+        await updateWatchedFiles(server);
+      }
+
       const result = await executeContractEmit({
         configPath: absoluteConfigPath,
         signal,
@@ -89,9 +123,7 @@ export function prismaVitePlugin(
       log(`  → ${result.files.json}`, 'debug');
       log(`  → ${result.files.dts}`, 'debug');
 
-      // Update watched files to include any new transitive dependencies
       if (server) {
-        await updateWatchedFiles(server);
         server.ws.send({ type: 'full-reload' });
       }
 
@@ -175,10 +207,40 @@ export function prismaVitePlugin(
       files.add(absoluteConfigPath);
     }
 
+    try {
+      const { config, metadata } = await loadConfigWithMetadata(absoluteConfigPath);
+
+      for (const outputFile of resolveContractOutputFiles(
+        config.contract?.output,
+        metadata.resolvedConfigPath,
+      )) {
+        ignoredOutputFiles.add(outputFile);
+      }
+
+      files.add(metadata.resolvedConfigPath);
+
+      for (const warning of metadata.contractWatch?.warnings ?? []) {
+        log(warning.message, 'debug');
+      }
+
+      for (const input of metadata.contractWatch?.inputs ?? []) {
+        if (!ignoredOutputFiles.has(input)) {
+          files.add(input);
+        }
+      }
+    } catch {
+      ignoredOutputFiles.clear();
+    }
+
+    for (const ignoredFile of ignoredOutputFiles) {
+      files.delete(ignoredFile);
+    }
+
     return files;
   }
 
   async function updateWatchedFiles(viteServer: ViteDevServer): Promise<void> {
+    ignoredOutputFiles.clear();
     const newWatchedFiles = await collectWatchedFiles(viteServer);
 
     // Find files to add and remove
@@ -227,6 +289,9 @@ export function prismaVitePlugin(
 
     async configureServer(viteServer) {
       server = viteServer;
+      const onWatcherChange = (file: string) => {
+        handleTrackedFileChange(file);
+      };
 
       // Register close hook to clean up timers and abort in-flight work
       const cleanup = () => {
@@ -238,14 +303,17 @@ export function prismaVitePlugin(
           currentAbortController.abort();
           currentAbortController = null;
         }
+        viteServer.watcher.off?.('change', onWatcherChange);
         server = null;
         watchedFiles.clear();
+        ignoredOutputFiles.clear();
         log('Server closed, cleaned up resources', 'debug');
       };
 
       // Register cleanup on server close via httpServer or watcher
       viteServer.httpServer?.on('close', cleanup);
       viteServer.watcher?.on?.('close', cleanup);
+      viteServer.watcher.on('change', onWatcherChange);
 
       // Collect files to watch from the module graph
       for (const file of await collectWatchedFiles(viteServer)) {
@@ -285,11 +353,7 @@ export function prismaVitePlugin(
     },
 
     handleHotUpdate(ctx) {
-      // Check if the changed file is one we're watching
-      if (watchedFiles.has(ctx.file)) {
-        log(`Detected change: ${ctx.file}`, 'debug');
-        scheduleEmit();
-      }
+      handleTrackedFileChange(ctx.file);
     },
   };
 }
