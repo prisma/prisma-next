@@ -4,7 +4,7 @@
 
 Open a scaffolded migration directory and you see this:
 
-```
+```text
 migrations/20250612T0930_backfill-status/
 ├── migration.ts          # authoring surface (TypeScript)
 ├── migration.json        # manifest: from/to hashes, migrationId
@@ -22,9 +22,11 @@ import contractJson from './contract.json' with { type: 'json' }
 const raw = mongoRaw({ contract: contractJson as Contract })
 ```
 
-`contract.json` and `contract.d.ts` are copies — snapshots of the project's emitted contract at the moment the migration was scaffolded. The migration never reaches outside its own directory for type information.
+`contract.json` and `contract.d.ts` are copies — snapshots of the project's emitted contract when the migration was scaffolded. The migration never reaches outside its own directory for type information.
 
 ## Decision
+
+> **Status:** Planned/target-state. The snapshot-copy semantics described below are the intended behavior; today's scaffolder in `packages/1-framework/3-tooling/migration/src/migration-ts.ts` still derives the contract import differently and `copyContractToMigrationDir` is not yet present in main. The implementation PR sequenced after this ADR introduces the helper and switches scaffolding over. The code snippet below is the target API.
 
 When a migration is scaffolded (`migration plan` / `migration new`), the tooling copies the project's emitted `contract.json` and the colocated `contract.d.ts` into the migration directory. The migration is self-contained: its query builders are typed against the contract that existed when the migration was authored, and that contract travels with the migration permanently.
 
@@ -66,7 +68,7 @@ Some migrations need queries typed against a schema state that doesn't match eit
 
 For these cases, the user copies their schema authoring surface (e.g. a `.prisma` file) into the migration directory, modifies it to represent the intermediate state, and runs `contract emit` to produce a second contract:
 
-```
+```text
 migrations/20250613T1100_split-name/
 ├── migration.ts
 ├── migration.json
