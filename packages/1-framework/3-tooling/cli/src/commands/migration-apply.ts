@@ -290,7 +290,7 @@ async function executeMigrationApplyCommand(
             ? `A draft migration exists at "${matchingDraft.dirName}" but has not been attested`
             : `Current contract hash "${destinationHash}" is not present in the migration history at ${migrationsRelative}`,
           fix: matchingDraft
-            ? `Run 'prisma-next migration emit --dir ${migrationsRelative}/${matchingDraft.dirName}' to attest, then re-run apply.`
+            ? `Run 'prisma-next migration emit --dir "${migrationsRelative}/${matchingDraft.dirName}"' to attest, then re-run apply.`
             : 'Run `prisma-next migration plan` to create a migration for the current contract, then re-run apply.',
           meta: { destinationHash, knownNodes: [...migrations.graph.nodes] },
         }),

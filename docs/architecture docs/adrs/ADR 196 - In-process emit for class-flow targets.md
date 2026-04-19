@@ -9,7 +9,7 @@ import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex } from '@prisma-next/target-mongo/migration';
 
 class BackfillStatus extends Migration {
-  override get operations() {
+  override plan() {
     return [createIndex('users', [{ field: 'email', direction: 1 }], { unique: true })];
   }
   override describe() {
@@ -22,7 +22,7 @@ Migration.run(import.meta.url, BackfillStatus);
 
 There are two ways this file's authored intent ends up on disk as `ops.json` + an attested `migration.json`:
 
-1. **Direct execution (canonical).** The developer runs `./migration.ts` (shebang) or `node migration.ts`. `Migration.run(...)` detects it is the main module, instantiates the class, reads `operations`, computes the content-addressed `migrationId`, and writes `ops.json` + a fully attested `migration.json` — no draft, no later "verify" step required.
+1. **Direct execution (canonical).** The developer runs `./migration.ts` (shebang) or `node migration.ts`. `Migration.run(...)` detects it is the main module, instantiates the class, calls `plan()`, computes the content-addressed `migrationId`, and writes `ops.json` + a fully attested `migration.json` — no draft, no later "verify" step required.
 
 2. **CLI import (transitional).** `migration plan` and the descriptor-flow bridge (`migration emit`) load `migration.ts` via `await import(pathToFileURL(filePath).href)` and dispatch on the default export's shape: if it is a `Migration` subclass, instantiate it and call `plan()`; if it is a factory function, call it, validate the result has a `plan()` method, then call `plan()`. In both cases the resulting operations are written to `ops.json` and the package is attested via `attestMigration(dir)`. `Migration.run(...)` is still in the file, but the entrypoint guard doesn't fire because the file isn't the main module.
 
