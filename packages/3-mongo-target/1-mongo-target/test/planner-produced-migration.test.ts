@@ -94,5 +94,17 @@ describe('PlannerProducedMongoMigration', () => {
     expect(source).toContain('class M extends Migration');
     expect(source).toContain(META.from);
     expect(source).toContain(META.to);
+    expect(source).toContain('kind: "baseline"');
+    expect(source).toContain('labels: ["initial", "seed"]');
+  });
+
+  it('omits optional describe() metadata from renderTypeScript when not supplied', () => {
+    const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
+    const migration = new PlannerProducedMongoMigration(calls, META);
+
+    const source = migration.renderTypeScript();
+
+    expect(source).not.toContain('kind:');
+    expect(source).not.toContain('labels:');
   });
 });
