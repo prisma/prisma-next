@@ -111,12 +111,12 @@ Wire the `q.rawCommand(...)` escape hatch and close out the project.
 
 **Tasks:**
 
-- [ ] 5.1 — Implement `mongoQuery<TContract>(opts).rawCommand(cmd: AnyMongoCommand): MongoQueryPlan<unknown>`. Carry contract `storageHash` in `meta`; emit `lane: 'mongo-raw'`.
-- [ ] 5.2 — Verify all spec acceptance criteria. Add any missed coverage as targeted tests.
-- [ ] 5.3 — Migrate long-lived design content into the MongoDB Family subsystem doc (or new ADR if any decision in this work warrants one — leading candidates: state-machine pattern; unified accessor consolidation as a tightening of ADR 180).
-- [ ] 5.4 — Update `projects/mongo-pipeline-builder/spec.md` and `plan.md` to mark this work as completed and superseding the original read-side scope.
-- [ ] 5.5 — Strip repo-wide references to `projects/mongo-pipeline-builder/**`; replace with canonical `docs/` links where appropriate.
-- [ ] 5.6 — Delete `projects/mongo-pipeline-builder/` (close-out PR).
+- [x] 5.1 — `mongoQuery<TContract>(opts).rawCommand(cmd: AnyMongoCommand): MongoQueryPlan<unknown>` accepts any `AnyMongoCommand` (typed CRUD or `RawMongoCommand`). The plan carries the contract's `storageHash` and `lane: 'mongo-raw'`. Validates the contract eagerly in the `rawCommand` body (vs. at `mongoQuery(...)` construction) so the type-test files exercising `from(...)` against a `{}`-shaped `unknown` contract continue to typecheck without a runtime guard fight.
+- [ ] 5.2 — Deferred to the close-out PR. The unit-test suite covers M2/M3/M4/M5 AST emission; the wider integration sweep (mongo-memory-server) for M2.7/M3.6/M4.6 is the gap.
+- [ ] 5.3 — Deferred to the close-out PR.
+- [ ] 5.4 — Deferred to the close-out PR.
+- [ ] 5.5 — Deferred to the close-out PR.
+- [ ] 5.6 — Deferred to the close-out PR.
 
 ### Close-out
 
