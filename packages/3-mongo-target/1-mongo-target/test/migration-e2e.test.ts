@@ -267,7 +267,7 @@ describe('migration file E2E', () => {
     );
     const targetMongoDistMigration = join(packageRoot, 'dist/migration.mjs').replace(/\\/g, '/');
 
-    it('runs via ./migration.ts on POSIX (or node migration.ts on Windows) and prints operations JSON', async () => {
+    it('runs via ./migration.ts on POSIX (or node migration.ts on Windows) and prints operations JSON', async (ctx) => {
       const distsExist = await Promise.all([
         stat(familyMongoDistMigration).then(
           () => true,
@@ -279,7 +279,9 @@ describe('migration file E2E', () => {
         ),
       ]);
       if (!distsExist.every(Boolean)) {
-        return;
+        ctx.skip(
+          `dist migration entrypoints not built: ${familyMongoDistMigration}, ${targetMongoDistMigration} — run \`pnpm build\` for @prisma-next/family-mongo and @prisma-next/target-mongo`,
+        );
       }
 
       const { renderCallsToTypeScript } = await import('../src/core/render-typescript');
