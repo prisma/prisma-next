@@ -146,15 +146,7 @@ describe('mongoEmit', () => {
     it('propagates a structured CliStructuredError with code PN-MIG-2001 and the slot in meta', async () => {
       await writeFile(join(pkgDir, 'migration.ts'), placeholderMigration);
 
-      let thrown: unknown;
-      try {
-        await mongoEmit({ dir: pkgDir, frameworkComponents: [] });
-      } catch (error) {
-        thrown = error;
-      }
-
-      expect(CliStructuredError.is(thrown)).toBe(true);
-      expect(thrown).toMatchObject({
+      await expect(mongoEmit({ dir: pkgDir, frameworkComponents: [] })).rejects.toMatchObject({
         code: '2001',
         domain: 'MIG',
         meta: { slot: 'backfill-product-status:run' },
