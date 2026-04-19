@@ -29,7 +29,6 @@ This ADR complements:
 - ADR 039 Migration graph path resolution & integrity
 - ADR 037 Transactional DDL fallback & compensation
 - ADR 038 Operation idempotency classification & enforcement
-- ADR 044 Pre/post check vocabulary v1
 - ADR 101 — Advisors framework
 - ADR 102 — Squash-first policy & squash advisor
 
@@ -137,8 +136,8 @@ migrations/
     "plannerVersion": "1.0.0",
     "planningStrategy": "additive"
   },
-  "pre": [{ "check": "tableNotExists", "args": { "table": "user" } }],
-  "post": [{ "check": "tableExists", "args": { "table": "user" } }],
+  "pre": [{ "description": "ensure table \"user\" does not exist", "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM information_schema.tables\n  WHERE table_schema = 'public' AND table_name = 'user'\n)" }],
+  "post": [{ "description": "verify table \"user\" exists", "sql": "SELECT EXISTS (\n  SELECT 1 FROM information_schema.tables\n  WHERE table_schema = 'public' AND table_name = 'user'\n)" }],
   "labels": ["main"],
   "authorship": { "author": "example", "email": "dev@example.com" }
 }
@@ -193,7 +192,7 @@ All path operations reconstruct the graph from migration files by default. The o
 Ops in `ops.json` resolve to executors at apply time:
 - Core ops are executed by the target adapter and honor transactional semantics and idempotency (ADR 037, ADR 038).
 - Extension ops carry `kind: "ext.op"` and `extId`; they are validated and executed by the corresponding extension pack, with capability gates enforced (ADR 116).
-- Pre/post checks use the shared vocabulary (ADR 044). Canonicalization and deterministic naming make ops hash-stable (ADR 010, ADR 009, ADR 106).
+- Pre/post checks use `{ description, sql }` for SQL targets (this ADR §Operation envelope) and the per-family check vocabulary for other targets ([ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)). Canonicalization and deterministic naming make ops hash-stable (ADR 010, ADR 009, ADR 106).
 
 ## Lifecycle, attestation, and commands (spec overview)
 

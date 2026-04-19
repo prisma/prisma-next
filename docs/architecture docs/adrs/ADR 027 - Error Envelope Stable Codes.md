@@ -123,12 +123,12 @@ NAMESPACE.SUBCODE where NAMESPACE ∈ { PLAN, RUNTIME, ADAPTER, BUDGET, LINT, MI
 
 The migration authoring subsystem uses a separate error construction (`CliStructuredError` with `domain: 'MIG'`) and a numeric code range `2000–2999`. The envelope format is `PN-MIG-{code}` (e.g. `PN-MIG-2001`). These codes cover authoring, planning, and emit-level errors, complementing the runner-level `MIGRATION.*` codes above.
 
-- **PN-MIG-2001**: Unfilled placeholder — a scaffolded migration contains a `placeholder(slot)` call that was never replaced by the author; thrown at emit time
-- **PN-MIG-2002**: migration.ts not found — `migration.ts` was expected at the migration package directory but could not be located
-- **PN-MIG-2003**: Invalid default export — `migration.ts` does not default-export a `Migration` subclass
-- **PN-MIG-2004**: Operations not an array — `Migration.operations` getter returned a non-array value
-- **PN-MIG-2010**: Plan does not support authoring surface — a descriptor-flow plan was asked to `renderTypeScript()`; safety rail, not normally user-visible
-- **PN-MIG-2011**: Incomplete migration capabilities — target registers a migrations capability but implements neither `resolveDescriptors` nor `emit`; internal wiring error
+- **PN-MIG-2001**: unfilled placeholder thrown at emit time when scaffolded `placeholder(slot)` was not replaced (see [ADR 200](ADR%20200%20-%20Placeholder%20utility%20for%20scaffolded%20migration%20slots.md))
+- **PN-MIG-2002**: `migration.ts` not found in the migration package directory
+- **PN-MIG-2003**: invalid default export — `migration.ts` does not default-export a `Migration` subclass (see [ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md))
+- **PN-MIG-2004**: `Migration.operations` returned a non-array value (see [ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md))
+- **PN-MIG-2010**: plan does not support TypeScript authoring surface (see [ADR 194](ADR%20194%20-%20Plans%20carry%20their%20own%20authoring%20surface.md))
+- **PN-MIG-2011**: target registers a migrations capability but implements neither `resolveDescriptors` nor `emit`
 
 #### PREFLIGHT
 - **PREFLIGHT.SHADOW_FAILED**: shadow DB provision or migrate failed

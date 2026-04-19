@@ -82,7 +82,7 @@ export interface MarkerOperations {
 }
 ```
 
-The concrete implementation calls `db.collection('_prisma_migrations').findOne(...)`, `insertOne(...)`, and `findOneAndUpdate(...)` — but the runner interacts only with the interface. This was the last remaining `Db` dependency in the runner; extracting it completed the decoupling.
+The concrete implementation calls into the migration marker collection per [ADR 190](ADR%20190%20-%20CAS-based%20concurrency%20and%20migration%20state%20storage%20for%20MongoDB.md) — but the runner interacts only with the interface. This was the last remaining `Db` dependency in the runner; extracting it completed the decoupling.
 
 ### Composition site
 

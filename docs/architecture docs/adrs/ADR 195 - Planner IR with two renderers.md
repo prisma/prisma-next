@@ -126,7 +126,7 @@ Factory function signatures in `migration-factories.ts` are aligned 1:1 with `Op
 
 This alignment is what makes the TypeScript renderer possible. The rendered source code calls the same functions with the same argument shapes, so a user reading or editing `migration.ts` is working with the same API that the planner uses internally.
 
-## Cross-references
+## References
 
 - [ADR 188 — MongoDB migration operation model](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md): the three-phase envelope that `renderOps` produces.
 - [ADR 191 — Generic three-phase migration operation envelope](ADR%20191%20-%20Generic%20three-phase%20migration%20operation%20envelope.md): the framework generic that both SQL and Mongo operations implement.

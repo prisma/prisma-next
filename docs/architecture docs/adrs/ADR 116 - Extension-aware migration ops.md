@@ -63,7 +63,7 @@ Every extension op serialized in a migration edge must follow this shape:
 - `extId` ties the op to a Target Extension Pack per ADR 112
 - `op` is a stable identifier defined by the pack
 - `args` are canonicalized and deterministically named per ADR 009 and ADR 106
-- `pre` and `post` use vocabulary from ADR 044
+- `pre` and `post` use the per-family check vocabulary ([ADR 028](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md) for SQL, [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md) for Mongo)
 - `idempotency` and `requiresTx` follow ADR 038 and ADR 037
 
 ### Capability gating

@@ -5,7 +5,7 @@ Foreign keys in the contract IR declare structural relationships between tables 
 
 Without referential actions in the contract, the migration planner omits `ON DELETE` and `ON UPDATE` clauses entirely. The database falls back to the SQL standard default (`NO ACTION`), which means any delete or update that would violate the FK constraint simply fails. Users cannot express intent for CASCADE, SET NULL, or other actions through the contract.
 
-ADR 044 (Pre/post-check vocabulary) already reserves `onDelete?` and `onUpdate?` parameters in the `foreignKeyMatches` check signature, anticipating this extension.
+[ADR 028](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md) (Migration Structure & Operations) anticipates referential action parameters (`onDelete?`, `onUpdate?`) in foreign key check signatures.
 
 ## Problem
 
