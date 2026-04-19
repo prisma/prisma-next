@@ -21,6 +21,7 @@ export {
   schemaCollectionToCreateCollectionOptions,
   schemaIndexToCreateIndexOptions,
 } from '../core/op-factory-call';
+export { PlannerProducedMongoMigration } from '../core/planner-produced-migration';
 export { renderOps } from '../core/render-ops';
 export type { RenderMigrationMeta } from '../core/render-typescript';
-export { renderTypeScript } from '../core/render-typescript';
+export { renderCallsToTypeScript } from '../core/render-typescript';

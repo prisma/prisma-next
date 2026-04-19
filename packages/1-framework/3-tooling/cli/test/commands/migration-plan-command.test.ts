@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => ({
   findLatestMigration: vi.fn(),
   emitMigration: vi.fn(),
   writeMigrationPackage: vi.fn(),
-  scaffoldMigrationTs: vi.fn(),
+  copyContractToMigrationDir: vi.fn(),
+  writeMigrationTs: vi.fn(),
   assertFrameworkComponentsCompatible: vi.fn(),
   extractSqlDdl: vi.fn(),
 }));
@@ -48,11 +49,15 @@ vi.mock('@prisma-next/migration-tools/io', async () => {
   const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/io')>(
     '@prisma-next/migration-tools/io',
   );
-  return { ...actual, writeMigrationPackage: mocks.writeMigrationPackage };
+  return {
+    ...actual,
+    writeMigrationPackage: mocks.writeMigrationPackage,
+    copyContractToMigrationDir: mocks.copyContractToMigrationDir,
+  };
 });
 
 vi.mock('@prisma-next/migration-tools/migration-ts', () => ({
-  scaffoldMigrationTs: mocks.scaffoldMigrationTs,
+  writeMigrationTs: mocks.writeMigrationTs,
 }));
 
 vi.mock('../../src/lib/migration-emit', () => ({
@@ -86,6 +91,8 @@ function setupBaseConfig(): void {
           ok: true,
           descriptors: [{ kind: 'createTable', tableName: 'user' }],
         }),
+        renderDescriptorTypeScript: vi.fn().mockReturnValue('// migration.ts'),
+        resolveDescriptors: vi.fn().mockReturnValue([]),
       },
     },
     adapter: { kind: 'adapter', familyId: 'mongo', targetId: 'mongo' },
@@ -150,12 +157,12 @@ describe('migration plan command', () => {
       expect(result).not.toHaveProperty('migrationId');
       expect(result).not.toHaveProperty('dir');
       expect(mocks.emitMigration).not.toHaveBeenCalled();
-      expect(mocks.scaffoldMigrationTs).not.toHaveBeenCalled();
+      expect(mocks.writeMigrationTs).not.toHaveBeenCalled();
     });
   });
 
   describe('emit-after-scaffold ordering', () => {
-    it('calls emitMigration after scaffoldMigrationTs in non-no-op path', async () => {
+    it('calls emitMigration after writeMigrationTs in non-no-op path', async () => {
       setupBaseConfig();
       const OLD_HASH = 'sha256:old-hash';
       const NEW_HASH = 'sha256:new-hash';
@@ -172,11 +179,12 @@ describe('migration plan command', () => {
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyContractToMigrationDir.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
       const callOrder: string[] = [];
-      mocks.scaffoldMigrationTs.mockImplementation(async () => {
-        callOrder.push('scaffoldMigrationTs');
+      mocks.writeMigrationTs.mockImplementation(async () => {
+        callOrder.push('writeMigrationTs');
       });
       mocks.emitMigration.mockImplementation(async () => {
         callOrder.push('emitMigration');
@@ -192,7 +200,7 @@ describe('migration plan command', () => {
       const exitCode = await executeCommand(command, ['--json']);
 
       expect(exitCode).toBe(0);
-      expect(callOrder).toEqual(['scaffoldMigrationTs', 'emitMigration']);
+      expect(callOrder).toEqual(['writeMigrationTs', 'emitMigration']);
       expect(mocks.emitMigration).toHaveBeenCalledTimes(1);
     });
   });

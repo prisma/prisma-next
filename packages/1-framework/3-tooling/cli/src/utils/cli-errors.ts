@@ -34,4 +34,6 @@ export {
   errorMigrationFileMissing,
   errorMigrationInvalidDefaultExport,
   errorMigrationPlanNotArray,
+  errorUnfilledPlaceholder,
+  placeholder,
 } from '@prisma-next/errors/migration';

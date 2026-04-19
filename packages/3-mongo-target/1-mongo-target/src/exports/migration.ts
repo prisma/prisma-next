@@ -1,3 +1,4 @@
+export { placeholder } from '@prisma-next/errors/migration';
 export {
   collMod,
   createCollection,

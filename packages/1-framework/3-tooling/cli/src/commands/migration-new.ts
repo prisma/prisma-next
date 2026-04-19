@@ -1,33 +1,47 @@
 /**
- * `migration new` — scaffolds a migration package with a migration.ts file
- * for manual authoring. The user writes operation descriptors and data
- * transforms; `migration emit` resolves them to ops.json.
+ * `migration new` — scaffolds a migration package with a `migration.ts` file
+ * for manual authoring.
+ *
+ * Both descriptor-flow (Postgres) and class-flow (Mongo) targets go through
+ * the same path here: the planner's `emptyMigration(context)` returns a
+ * `MigrationPlanWithAuthoringSurface`, whose `renderTypeScript()` produces
+ * the target-appropriate empty stub. The CLI writes the returned source
+ * verbatim.
  */
 
 import { readFileSync } from 'node:fs';
 import type { Contract } from '@prisma-next/contract/types';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
+  copyContractToMigrationDir,
   formatMigrationDirName,
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
-import { scaffoldMigrationTs } from '@prisma-next/migration-tools/migration-ts';
+import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
-import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
+import {
+  type CliStructuredError,
+  errorRuntime,
+  errorTargetMigrationNotSupported,
+  errorUnexpected,
+} from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  getTargetMigrations,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
 import { formatStyledHeader } from '../utils/formatters/styled';
+import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { parseGlobalFlags } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
@@ -53,7 +67,6 @@ async function executeMigrationNewCommand(
   const config = await loadConfig(options.config);
   const { migrationsDir, migrationsRelative } = resolveMigrationPaths(options.config, config);
 
-  // Read the emitted contract (destination)
   const contractPath = config.contract?.output ?? 'contract.json';
   const contractPathAbsolute = resolve(
     options.config ? resolve(options.config, '..') : process.cwd(),
@@ -101,7 +114,6 @@ async function executeMigrationNewCommand(
     );
   }
 
-  // Determine "from" hash
   let fromContract: Contract | null = null;
   let fromHash: string = EMPTY_CONTRACT_HASH;
 
@@ -113,7 +125,6 @@ async function executeMigrationNewCommand(
       const graph = reconstructGraph(attested);
 
       if (options.from) {
-        // Explicit --from: find the migration with matching to hash
         const match = attested.find((p) => p.manifest.to.startsWith(options.from!));
         if (!match) {
           return notOk(
@@ -151,7 +162,6 @@ async function executeMigrationNewCommand(
     throw error;
   }
 
-  // Check for no-op
   if (fromHash === toStorageHash) {
     return notOk(
       errorRuntime('No changes detected', {
@@ -161,7 +171,6 @@ async function executeMigrationNewCommand(
     );
   }
 
-  // Build manifest and write package
   const timestamp = new Date();
   const slug = options.name ?? 'migration';
   const dirName = formatMigrationDirName(timestamp, slug);
@@ -184,12 +193,35 @@ async function executeMigrationNewCommand(
     createdAt: timestamp.toISOString(),
   };
 
-  try {
-    // Write package with empty ops (draft)
-    await writeMigrationPackage(packageDir, manifest, []);
+  const migrations = getTargetMigrations(config.target);
+  if (!migrations) {
+    return notOk(
+      errorTargetMigrationNotSupported({
+        why: `Target "${config.target.targetId}" does not support migrations`,
+      }),
+    );
+  }
 
-    // Scaffold migration.ts
-    await scaffoldMigrationTs(packageDir);
+  assertFrameworkComponentsCompatible(config.family.familyId, config.target.targetId, [
+    config.target,
+    config.adapter,
+    ...(config.extensionPacks ?? []),
+  ]);
+
+  try {
+    await writeMigrationPackage(packageDir, manifest, []);
+    await copyContractToMigrationDir(packageDir, contractPathAbsolute);
+
+    const stack = createControlStack(config);
+    const familyInstance = config.family.create(stack);
+    const planner = migrations.createPlanner(familyInstance);
+    const emptyPlan = planner.emptyMigration({
+      packageDir,
+      contractJsonPath: contractPathAbsolute,
+      fromHash,
+      toHash: toStorageHash,
+    });
+    await writeMigrationTs(packageDir, emptyPlan.renderTypeScript());
 
     return ok({
       ok: true as const,
@@ -199,6 +231,13 @@ async function executeMigrationNewCommand(
       summary: `Scaffolded migration at ${relative(process.cwd(), packageDir)}`,
     });
   } catch (error) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      typeof (error as { code?: unknown }).code === 'string'
+    ) {
+      return notOk(error as CliStructuredError);
+    }
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {
         why: `Failed to scaffold migration: ${error instanceof Error ? error.message : String(error)}`,

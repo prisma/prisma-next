@@ -4,6 +4,7 @@ import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MigrationToolsError } from '../src/errors';
 import {
+  copyContractToMigrationDir,
   formatMigrationDirName,
   readMigrationPackage,
   readMigrationsDir,
@@ -332,6 +333,63 @@ describe('readMigrationsDir', () => {
     await writeFile(join(tmpDir, '.gitkeep'), '');
     const packages = await readMigrationsDir(tmpDir);
     expect(packages).toHaveLength(0);
+  });
+});
+
+describe('copyContractToMigrationDir', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'migration-copy-contract-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('copies contract.json and the colocated contract.d.ts into the migration dir under canonical names', async () => {
+    const sourceDir = join(tmpDir, 'src/prisma');
+    await mkdir(sourceDir, { recursive: true });
+    const sourceJson = join(sourceDir, 'contract.json');
+    const sourceDts = join(sourceDir, 'contract.d.ts');
+    await writeFile(sourceJson, JSON.stringify({ storage: { storageHash: 'sha256:abc' } }));
+    await writeFile(sourceDts, 'export type StorageHash = string;');
+
+    const packageDir = join(tmpDir, 'migrations/20260225T1430_test');
+    await mkdir(packageDir, { recursive: true });
+
+    await copyContractToMigrationDir(packageDir, sourceJson);
+
+    const copiedJson = await readFile(join(packageDir, 'contract.json'), 'utf-8');
+    expect(copiedJson).toBe(JSON.stringify({ storage: { storageHash: 'sha256:abc' } }));
+    const copiedDts = await readFile(join(packageDir, 'contract.d.ts'), 'utf-8');
+    expect(copiedDts).toBe('export type StorageHash = string;');
+  });
+
+  it('does not fail when no .d.ts companion exists', async () => {
+    const sourceDir = join(tmpDir, 'src/prisma');
+    await mkdir(sourceDir, { recursive: true });
+    const sourceJson = join(sourceDir, 'contract.json');
+    await writeFile(sourceJson, '{}');
+
+    const packageDir = join(tmpDir, 'migrations/20260225T1430_no_dts');
+    await mkdir(packageDir, { recursive: true });
+
+    await copyContractToMigrationDir(packageDir, sourceJson);
+
+    expect(await readFile(join(packageDir, 'contract.json'), 'utf-8')).toBe('{}');
+    await expect(readFile(join(packageDir, 'contract.d.ts'), 'utf-8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
+  it('throws when the source contract.json is missing', async () => {
+    const packageDir = join(tmpDir, 'migrations/20260225T1430_missing');
+    await mkdir(packageDir, { recursive: true });
+
+    await expect(
+      copyContractToMigrationDir(packageDir, join(tmpDir, 'does/not/exist/contract.json')),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
 

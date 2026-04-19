@@ -2,6 +2,8 @@ import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex, setValidation } from '@prisma-next/target-mongo/migration';
 
 class AddProductValidation extends Migration {
+  override readonly targetId = 'mongo' as const;
+
   override describe() {
     return {
       from: 'sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d',
@@ -10,7 +12,7 @@ class AddProductValidation extends Migration {
     };
   }
 
-  override plan() {
+  override get operations() {
     return [
       setValidation(
         'products',

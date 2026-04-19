@@ -83,6 +83,9 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     contract,
     schema: schemaIR,
     policy,
+    // `db update` does not produce a `migration.ts`, so the from-hash on the
+    // resulting plan is never surfaced to authoring — pass empty string.
+    fromHash: '',
     frameworkComponents,
   });
   if (plannerResult.kind === 'failure') {
