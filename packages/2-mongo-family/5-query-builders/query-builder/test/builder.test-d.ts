@@ -325,17 +325,14 @@ describe('resolved row types — new stages', () => {
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
   });
 
-  it('out() preserves row type', () => {
-    const plan = mongoQuery<TContract>({ contractJson }).from('orders').out('archive').build();
-    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
+  it('out() returns a write-terminal plan with an unknown row type', () => {
+    const plan = mongoQuery<TContract>({ contractJson }).from('orders').out('archive');
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<unknown>();
   });
 
-  it('merge() preserves row type', () => {
-    const plan = mongoQuery<TContract>({ contractJson })
-      .from('orders')
-      .merge({ into: 'summary' })
-      .build();
-    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<OrderRow>();
+  it('merge() returns a write-terminal plan with an unknown row type', () => {
+    const plan = mongoQuery<TContract>({ contractJson }).from('orders').merge({ into: 'summary' });
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<unknown>();
   });
 
   it('unionWith() preserves row type', () => {

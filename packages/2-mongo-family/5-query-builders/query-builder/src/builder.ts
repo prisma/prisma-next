@@ -354,19 +354,50 @@ export class PipelineChain<
     return this.#withStage<Shape, U, 'cleared'>(new MongoRedactStage(expr.node));
   }
 
-  // --- Output stages ---
+  // --- Write terminals (output stages) ---
 
-  out(collection: string, db?: string): PipelineChain<TContract, Shape, 'cleared', 'cleared'> {
-    return this.#withStage<Shape, 'cleared', 'cleared'>(new MongoOutStage(collection, db));
+  /**
+   * `$out` write terminal. Materialises the pipeline output into
+   * `collection` (optionally in `db`), replacing any prior contents. Unlike
+   * the other pipeline-stage methods, this **terminates** the chain — it
+   * returns a `MongoQueryPlan` rather than another `PipelineChain`, since
+   * `$out` must be the final stage and there is nothing further to chain.
+   *
+   * Lane is `mongo-write` (vs. `mongo-pipeline` for read terminals) so
+   * middleware can dispatch on intent without inspecting the command.
+   *
+   * The result row stream is empty (`unknown` row type) — the data lives
+   * in the destination collection, not the response.
+   */
+  out(collection: string, db?: string): MongoQueryPlan<unknown> {
+    return this.#writeTerminal(new MongoOutStage(collection, db));
   }
 
+  /**
+   * `$merge` write terminal. Streams the pipeline output into the target
+   * collection per the supplied merge semantics (`whenMatched` /
+   * `whenNotMatched`). Like `out()`, terminates the chain — `$merge` must
+   * be the final stage.
+   */
   merge(options: {
     into: string | { db: string; coll: string };
     on?: string | ReadonlyArray<string>;
     whenMatched?: string | ReadonlyArray<MongoUpdatePipelineStage>;
     whenNotMatched?: string;
-  }): PipelineChain<TContract, Shape, 'cleared', 'cleared'> {
-    return this.#withStage<Shape, 'cleared', 'cleared'>(new MongoMergeStage(options));
+  }): MongoQueryPlan<unknown> {
+    return this.#writeTerminal(new MongoMergeStage(options));
+  }
+
+  #writeTerminal(stage: MongoPipelineStage): MongoQueryPlan<unknown> {
+    const pipeline = [...this.#state.stages, stage];
+    const command = new AggregateCommand(this.#state.collection, pipeline);
+    const meta: PlanMeta = {
+      target: 'mongo',
+      storageHash: this.#state.storageHash,
+      lane: 'mongo-write',
+      paramDescriptors: [],
+    };
+    return { collection: this.#state.collection, command, meta };
   }
 
   // --- Union stages ---

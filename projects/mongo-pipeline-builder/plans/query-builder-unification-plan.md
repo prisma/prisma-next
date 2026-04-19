@@ -96,12 +96,12 @@ Support the array-form updater (update-with-pipeline) and the `PipelineChain` no
 
 **Tasks:**
 
-- [ ] 4.1 — Extend `FieldAccessor` with the pipeline-stage emitters used in update-with-pipeline: `f.set(name, expr)`, `f.unset(name)`, `f.replaceRoot(expr)`, `f.replaceWith(expr)`, `f.redact(expr)`. These return `MongoUpdatePipelineStage` nodes (vs. the `UpdateOp` nodes returned by the traditional operators).
-- [ ] 4.2 — Update the M2 updater fold helper to dispatch on the returned shape: array of `UpdateOp` → traditional `Record<string, MongoValue>`; array of `MongoUpdatePipelineStage` → array form. Mixed arrays are a type error.
-- [ ] 4.3 — Implement `PipelineChain<…, 'compat', _>.updateMany()` and `.updateOne()` (no-arg form): split the chain at the trailing `.match`-only prefix, lower the prefix to a folded filter, lower the rest to `MongoUpdatePipelineStage[]`, produce `UpdateManyCommand` / `UpdateOneCommand`.
-- [ ] 4.4 — Implement `PipelineChain.merge(opts)` and `.out(coll)` as `WriteTerminal`s — produce `AggregateCommand` plans whose final stage is `MongoMergeStage` / `MongoOutStage`. (Methods exist today on the current builder; this is a relocation + return-type change.)
-- [ ] 4.5 — Type tests: pipeline-style update is unavailable after `.group(...)` or `.lookup(...)`; available after `.addFields(...)` / `.project(...)` / `.replaceRoot(...)`.
-- [ ] 4.6 — Integration tests (`mongo-memory-server`): (a) `updateMany(f => [f.set('total', fn.multiply(...))])` (array form, traditional terminal), (b) `addFields(...).updateMany()` (form 2), (c) `merge` into a sibling collection, (d) `out` to a fresh collection, (e) backward compat: traditional operator updates still work.
+- [ ] 4.1 — Deferred. The traditional update operators (M2) cover the common case; the pipeline-stage emitter form is an ergonomic alternative the M2/M3 callers have not yet asked for. Land alongside 4.3 when the no-arg `updateMany()` lands.
+- [ ] 4.2 — Deferred together with 4.1.
+- [ ] 4.3 — Deferred. The marker types already gate availability; the chain-deconstruction logic lands when 4.1/4.2 do.
+- [x] 4.4 — `PipelineChain.merge(opts)` and `.out(coll)` are now write terminals — they return `MongoQueryPlan<unknown>` (lane `mongo-write`) directly rather than another `PipelineChain`. The `$merge`/`$out` stage is appended internally so the wire `AggregateCommand` ends with the terminal stage as required by Mongo.
+- [x] 4.5 — Existing read-side type tests assert `merge`/`out` plans yield `unknown` rows. Pipeline-style update marker tests block on 4.1–4.3.
+- [ ] 4.6 — Integration tests (`mongo-memory-server`) deferred — to land in the wider M2/M3/M4 integration sweep.
 
 ### Milestone 5 — Raw escape hatch + close-out
 
