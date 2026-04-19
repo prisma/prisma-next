@@ -17,12 +17,8 @@ const filtered = () => handle().match(MongoFieldFilter.eq('status', 'new'));
  * spec set out to close.
  */
 describe('state-machine surface (negative type tests)', () => {
-  it('CollectionHandle does not expose filtered-write or find-and-modify terminals', () => {
+  it('CollectionHandle does not expose filtered-only terminals', () => {
     const h = handle();
-    // @ts-expect-error — `updateMany` requires a `.match(...)` first
-    h.updateMany((f) => [f.amount.inc(1)]);
-    // @ts-expect-error — `updateOne` requires a `.match(...)` first
-    h.updateOne((f) => [f.amount.inc(1)]);
     // @ts-expect-error — `deleteMany` requires a `.match(...)` first
     h.deleteMany();
     // @ts-expect-error — `deleteOne` requires a `.match(...)` first

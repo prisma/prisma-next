@@ -50,6 +50,8 @@ import {
   MongoUnionWithStage,
   MongoUnwindStage,
   MongoVectorSearchStage,
+  UpdateManyCommand,
+  UpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import { createFieldAccessor, type Expression, type FieldAccessor } from './field-accessor';
 import type { FindAndModifyCompat, UpdateCompat } from './markers';
@@ -65,7 +67,7 @@ import type {
   TypedAggExpr,
   UnwoundShape,
 } from './types';
-import { foldUpdateOps, type TypedUpdateOp } from './update-ops';
+import { resolveUpdaterResult, type UpdaterItem } from './update-ops';
 
 interface PipelineChainState {
   readonly collection: string;
@@ -122,6 +124,15 @@ export class PipelineChain<
       ...this.#state,
       stages: [...this.#state.stages, stage],
     });
+  }
+
+  #writeMeta(): PlanMeta {
+    return {
+      target: 'mongo',
+      storageHash: this.#state.storageHash,
+      lane: 'mongo-write',
+      paramDescriptors: [],
+    };
   }
 
   // --- Identity stages ---
@@ -543,6 +554,50 @@ export class PipelineChain<
     return this.#withStage<NewShape, 'cleared', 'cleared'>(stage);
   }
 
+  // --- Pipeline-style write terminals (UpdateCompat-gated) ---
+
+  /**
+   * No-arg `updateMany()`: deconstruct the chain into leading `$match`
+   * stages (folded into the filter) and remaining stages (which must all
+   * be valid pipeline-update stages). Available only when `U = 'compat'`.
+   *
+   * Overloaded to accept an optional updater callback for subclass
+   * compatibility with `FilteredCollection.updateMany(updaterFn)`.
+   */
+  updateMany(
+    this: PipelineChain<TContract, Shape, 'compat', F>,
+    updaterFn?: (fields: FieldAccessor<Shape>) => ReadonlyArray<UpdaterItem>,
+  ): MongoQueryPlan<unknown> {
+    if (updaterFn) {
+      throw new Error(
+        'PipelineChain.updateMany() with a callback should not be called directly. ' +
+          'Use FilteredCollection.updateMany(updaterFn) instead.',
+      );
+    }
+    const { filter, updatePipeline } = deconstructUpdateChain(this.#state.stages);
+    const command = new UpdateManyCommand(this.#state.collection, filter, updatePipeline);
+    return { collection: this.#state.collection, command, meta: this.#writeMeta() };
+  }
+
+  /**
+   * No-arg `updateOne()`: same as `updateMany()` but maps to a single-doc
+   * update.
+   */
+  updateOne(
+    this: PipelineChain<TContract, Shape, 'compat', F>,
+    updaterFn?: (fields: FieldAccessor<Shape>) => ReadonlyArray<UpdaterItem>,
+  ): MongoQueryPlan<unknown> {
+    if (updaterFn) {
+      throw new Error(
+        'PipelineChain.updateOne() with a callback should not be called directly. ' +
+          'Use FilteredCollection.updateOne(updaterFn) instead.',
+      );
+    }
+    const { filter, updatePipeline } = deconstructUpdateChain(this.#state.stages);
+    const command = new UpdateOneCommand(this.#state.collection, filter, updatePipeline);
+    return { collection: this.#state.collection, command, meta: this.#writeMeta() };
+  }
+
   // --- Find-and-modify terminals (marker-gated) ---
 
   /**
@@ -559,18 +614,13 @@ export class PipelineChain<
    */
   findOneAndUpdate(
     this: PipelineChain<TContract, Shape, U, 'compat'>,
-    updaterFn: (fields: FieldAccessor<Shape>) => ReadonlyArray<TypedUpdateOp>,
+    updaterFn: (fields: FieldAccessor<Shape>) => ReadonlyArray<UpdaterItem>,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
   ): MongoQueryPlan<unknown> {
     const { filter, sort, skip } = deconstructFindAndModifyChain(this.#state.stages);
     const accessor = createFieldAccessor<Shape>();
-    const ops = updaterFn(accessor);
-    if (ops.length === 0) {
-      throw new Error(
-        'Updater returned no operations. Return at least one update from the callback (e.g. `[f.amount.set(0)]`).',
-      );
-    }
-    const update = foldUpdateOps(ops);
+    const items = updaterFn(accessor);
+    const update = resolveUpdaterResult(items);
     const command = new FindOneAndUpdateCommand(
       this.#state.collection,
       filter,
@@ -679,6 +729,69 @@ function deconstructFindAndModifyChain(
   const filter: MongoFilterExpr = matchFilters.length === 1 ? first : MongoAndExpr.of(matchFilters);
 
   return { filter, sort, skip };
+}
+
+interface DeconstructedUpdate {
+  filter: MongoFilterExpr;
+  updatePipeline: ReadonlyArray<MongoUpdatePipelineStage>;
+}
+
+/**
+ * Walk the accumulated pipeline stages: leading `$match` stages become the
+ * filter, remaining stages must all be valid `MongoUpdatePipelineStage`
+ * members (currently `$addFields`, `$project`, `$replaceRoot`).
+ */
+function deconstructUpdateChain(stages: ReadonlyArray<MongoPipelineStage>): DeconstructedUpdate {
+  const matchFilters: MongoFilterExpr[] = [];
+  let boundary = 0;
+
+  for (let i = 0; i < stages.length; i++) {
+    const stage = stages[i];
+    if (stage === undefined) break;
+    if (stage instanceof MongoMatchStage) {
+      matchFilters.push(stage.filter);
+      boundary = i + 1;
+    } else {
+      break;
+    }
+  }
+
+  if (matchFilters.length === 0) {
+    throw new Error('No-arg updateMany/updateOne requires at least one .match() call.');
+  }
+
+  const remaining = stages.slice(boundary);
+  if (remaining.length === 0) {
+    throw new Error(
+      'No-arg updateMany/updateOne requires at least one pipeline-update stage ' +
+        '(e.g. .addFields(), .project(), .replaceRoot()) after the .match() stages.',
+    );
+  }
+
+  const updatePipeline: MongoUpdatePipelineStage[] = [];
+  for (const stage of remaining) {
+    if (
+      stage instanceof MongoAddFieldsStage ||
+      stage instanceof MongoProjectStage ||
+      stage instanceof MongoReplaceRootStage
+    ) {
+      updatePipeline.push(stage);
+    } else {
+      throw new Error(
+        `No-arg updateMany/updateOne: encountered non-update stage '${stage.constructor.name}' ` +
+          'after the leading $match stages. Only $addFields/$set, $project/$unset, ' +
+          'and $replaceRoot/$replaceWith stages are valid in an update pipeline.',
+      );
+    }
+  }
+
+  const first = matchFilters[0];
+  if (first === undefined) {
+    throw new Error('Unreachable: matchFilters.length > 0 but first is undefined');
+  }
+  const filter: MongoFilterExpr = matchFilters.length === 1 ? first : MongoAndExpr.of(matchFilters);
+
+  return { filter, updatePipeline };
 }
 
 /**

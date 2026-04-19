@@ -1,3 +1,4 @@
+import type { MongoUpdatePipelineStage } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 
 /**
@@ -158,4 +159,48 @@ export function foldUpdateOps(ops: ReadonlyArray<TypedUpdateOp>): Record<string,
   }
 
   return buckets as unknown as Record<string, MongoValue>;
+}
+
+export type UpdaterItem = TypedUpdateOp | MongoUpdatePipelineStage;
+
+/**
+ * Classify an array of updater items and produce a `MongoUpdateSpec`.
+ *
+ * - All `TypedUpdateOp` → fold via `foldUpdateOps` (classic `{ $set, $inc, … }`)
+ * - All `MongoUpdatePipelineStage` → return as-is (pipeline-style update)
+ * - Mixed → throw (also a type error at the call site via the union shape)
+ */
+export function resolveUpdaterResult(
+  items: ReadonlyArray<UpdaterItem>,
+): Record<string, MongoValue> | ReadonlyArray<MongoUpdatePipelineStage> {
+  if (items.length === 0) {
+    throw new Error(
+      'Updater returned no operations. Return at least one update from the callback (e.g. `[f.amount.set(0)]`).',
+    );
+  }
+
+  const isOp = (item: UpdaterItem): item is TypedUpdateOp =>
+    'op' in item && typeof (item as TypedUpdateOp).op === 'string';
+
+  const first = items[0];
+  if (first === undefined) {
+    throw new Error('Unreachable: items.length > 0 but first is undefined');
+  }
+  const firstIsOp = isOp(first);
+
+  for (let i = 1; i < items.length; i++) {
+    const item = items[i];
+    if (item === undefined) continue;
+    if (isOp(item) !== firstIsOp) {
+      throw new Error(
+        'Cannot mix TypedUpdateOp values and pipeline stages in a single updater. ' +
+          'Use either `[f.amount.set(0)]` (operator form) or `[f.stage.set({...})]` (pipeline form), not both.',
+      );
+    }
+  }
+
+  if (firstIsOp) {
+    return foldUpdateOps(items as ReadonlyArray<TypedUpdateOp>);
+  }
+  return items as ReadonlyArray<MongoUpdatePipelineStage>;
 }

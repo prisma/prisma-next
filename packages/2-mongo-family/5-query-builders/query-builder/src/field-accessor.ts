@@ -1,8 +1,15 @@
-import type { MongoFilterExpr } from '@prisma-next/mongo-query-ast/execution';
+import type {
+  MongoAggExpr,
+  MongoFilterExpr,
+  MongoUpdatePipelineStage,
+} from '@prisma-next/mongo-query-ast/execution';
 import {
+  MongoAddFieldsStage,
   MongoAggFieldRef,
   MongoExistsExpr,
   MongoFieldFilter,
+  MongoProjectStage,
+  MongoReplaceRootStage,
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import type { DocField, DocShape, TypedAggExpr } from './types';
@@ -81,6 +88,37 @@ export interface Expression<F extends DocField> extends TypedAggExpr<F> {
 }
 
 /**
+ * Emitters for MongoDB update-pipeline stages (`$addFields`/`$set`,
+ * `$project`/`$unset`, `$replaceRoot`/`$replaceWith`). These return
+ * `MongoUpdatePipelineStage` nodes that can be mixed into the updater
+ * callback alongside `TypedUpdateOp` values when the pipeline-style
+ * update form is desired.
+ *
+ * Accessible via `f.stage` on the `FieldAccessor`.
+ */
+export interface StageEmitters {
+  set(fields: Record<string, MongoAggExpr>): MongoUpdatePipelineStage;
+  unset(...paths: ReadonlyArray<string>): MongoUpdatePipelineStage;
+  replaceRoot(newRoot: MongoAggExpr): MongoUpdatePipelineStage;
+  replaceWith(newRoot: MongoAggExpr): MongoUpdatePipelineStage;
+}
+
+function buildStageEmitters(): StageEmitters {
+  return {
+    set: (fields) => new MongoAddFieldsStage(fields),
+    unset: (...paths) => {
+      const spec: Record<string, 0> = {};
+      for (const p of paths) {
+        spec[p] = 0;
+      }
+      return new MongoProjectStage(spec);
+    },
+    replaceRoot: (newRoot) => new MongoReplaceRootStage(newRoot),
+    replaceWith: (newRoot) => new MongoReplaceRootStage(newRoot),
+  };
+}
+
+/**
  * The unified `FieldAccessor` per ADR 180.
  *
  * - Property access (`f.status`) returns an `Expression<F>` whose codec comes
@@ -89,13 +127,17 @@ export interface Expression<F extends DocField> extends TypedAggExpr<F> {
  *   arbitrary dot-paths (value-object traversal). Strict path validation
  *   against `ContractValueObject` definitions is a follow-up; v1 accepts any
  *   string.
+ * - `f.stage` exposes pipeline-style update emitters (`$set`, `$unset`,
+ *   `$replaceRoot`, `$replaceWith`).
  *
  * Both forms produce compatible expressions; both can be passed to filter
  * helpers, aggregation helpers, or write terminals.
  */
 export type FieldAccessor<S extends DocShape> = {
   readonly [K in keyof S & string]: Expression<S[K]>;
-} & ((path: string) => Expression<DocField>);
+} & ((path: string) => Expression<DocField>) & {
+    readonly stage: StageEmitters;
+  };
 
 function buildExpression<F extends DocField>(path: string): Expression<F> {
   return {
@@ -145,12 +187,16 @@ function buildExpression<F extends DocField>(path: string): Expression<F> {
  * the previous `FieldProxy` / `FilterProxy` semantics.
  */
 export function createFieldAccessor<S extends DocShape>(): FieldAccessor<S> {
+  const stageInstance = buildStageEmitters();
   const callable = ((path: string) =>
     buildExpression<DocField>(path)) as unknown as FieldAccessor<S>;
   return new Proxy(callable, {
     get(target, prop, receiver) {
       if (typeof prop === 'symbol') {
         return Reflect.get(target, prop, receiver);
+      }
+      if (prop === 'stage') {
+        return stageInstance;
       }
       return buildExpression(prop);
     },

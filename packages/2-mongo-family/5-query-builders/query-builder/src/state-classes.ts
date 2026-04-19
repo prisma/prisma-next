@@ -4,7 +4,11 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import type { MongoFilterExpr, MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import type {
+  MongoFilterExpr,
+  MongoQueryPlan,
+  MongoUpdateSpec,
+} from '@prisma-next/mongo-query-ast/execution';
 import {
   DeleteManyCommand,
   DeleteOneCommand,
@@ -22,7 +26,7 @@ import type { MongoValue } from '@prisma-next/mongo-value';
 import { PipelineChain } from './builder';
 import { createFieldAccessor, type FieldAccessor } from './field-accessor';
 import type { ModelToDocShape } from './types';
-import { foldUpdateOps, type TypedUpdateOp } from './update-ops';
+import { resolveUpdaterResult, type UpdaterItem } from './update-ops';
 
 /**
  * Wire-result row types for the M2 write terminals. The runtime/driver
@@ -70,22 +74,16 @@ function matchAllFilter(): MongoFilterExpr {
 }
 
 /**
- * Resolve an updater callback into the wire-format `Record<string, MongoValue>`
- * consumed by `Update{One,Many}Command`. Centralised so all write terminals
- * share the same fold semantics, including duplicate-operator detection from
- * `foldUpdateOps`.
+ * Resolve an updater callback into a `MongoUpdateSpec` (either the folded
+ * operator object or a pipeline-stage array). Centralised so all write
+ * terminals share the same fold / dispatch semantics.
  */
 function resolveUpdaterCallback<Shape extends ModelToDocShape<MongoContract, string>>(
-  updaterFn: (fields: FieldAccessor<Shape>) => ReadonlyArray<TypedUpdateOp>,
-): Record<string, MongoValue> {
+  updaterFn: (fields: FieldAccessor<Shape>) => ReadonlyArray<UpdaterItem>,
+): MongoUpdateSpec {
   const accessor = createFieldAccessor<Shape>();
-  const ops = updaterFn(accessor);
-  if (ops.length === 0) {
-    throw new Error(
-      'Updater returned no operations. Return at least one update from the callback (e.g. `[f.amount.set(0)]`).',
-    );
-  }
-  return foldUpdateOps(ops);
+  const items = updaterFn(accessor);
+  return resolveUpdaterResult(items);
 }
 
 /**
@@ -218,7 +216,7 @@ export class CollectionHandle<
   updateAll(
     updaterFn: (
       fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<TypedUpdateOp>,
+    ) => ReadonlyArray<UpdaterItem>,
   ): MongoQueryPlan<UpdateResult> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateManyCommand(this.#ctx.collection, matchAllFilter(), update);
@@ -259,7 +257,7 @@ export class CollectionHandle<
     filterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => MongoFilterExpr,
     updaterFn: (
       fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<TypedUpdateOp>,
+    ) => ReadonlyArray<UpdaterItem>,
   ): MongoQueryPlan<UpdateResult> {
     const accessor = createFieldAccessor<ModelToDocShape<TContract, ModelName>>();
     const filter = filterFn(accessor);
@@ -388,10 +386,10 @@ export class FilteredCollection<
    * update spec by `foldUpdateOps`, which throws on operator+path
    * collisions.
    */
-  updateMany(
+  override updateMany(
     updaterFn: (
       fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<TypedUpdateOp>,
+    ) => ReadonlyArray<UpdaterItem>,
   ): MongoQueryPlan<UpdateResult> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateManyCommand(this.#ctx.collection, this.#foldedFilter(), update);
@@ -408,10 +406,10 @@ export class FilteredCollection<
    * guarantee is implied — chain `.sort(...)` and use the M3
    * `.findOneAndUpdate(...)` terminal when ordering matters.
    */
-  updateOne(
+  override updateOne(
     updaterFn: (
       fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<TypedUpdateOp>,
+    ) => ReadonlyArray<UpdaterItem>,
   ): MongoQueryPlan<UpdateResult> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateOneCommand(this.#ctx.collection, this.#foldedFilter(), update);
@@ -458,7 +456,7 @@ export class FilteredCollection<
   upsertOne(
     updaterFn: (
       fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<TypedUpdateOp>,
+    ) => ReadonlyArray<UpdaterItem>,
   ): MongoQueryPlan<UpdateResult> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateOneCommand(this.#ctx.collection, this.#foldedFilter(), update, true);
@@ -481,7 +479,7 @@ export class FilteredCollection<
   override findOneAndUpdate(
     updaterFn: (
       fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<TypedUpdateOp>,
+    ) => ReadonlyArray<UpdaterItem>,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
   ): MongoQueryPlan<ModelToDocShape<TContract, ModelName>> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
