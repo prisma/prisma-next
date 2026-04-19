@@ -3,18 +3,19 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import { PipelineBuilder } from './builder';
-import type { ModelToDocShape } from './types';
+import { type CollectionHandle, createCollectionHandle } from './state-classes';
 
+/**
+ * Public entry point of the query builder. `mongoQuery(...).from(rootName)`
+ * yields the root state of the three-state machine
+ * (`CollectionHandle` → `FilteredCollection` → `PipelineChain`).
+ */
 export interface QueryRoot<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
 > {
   from<K extends keyof TContract['roots'] & string>(
     rootName: K,
-  ): PipelineBuilder<
-    TContract,
-    ModelToDocShape<TContract, TContract['roots'][K] & string & keyof TContract['models']>
-  >;
+  ): CollectionHandle<TContract, TContract['roots'][K] & string & keyof TContract['models']>;
 }
 
 export function mongoQuery<
@@ -23,33 +24,7 @@ export function mongoQuery<
   const contract = options.contractJson as TContract;
   return {
     from<K extends keyof TContract['roots'] & string>(rootName: K) {
-      const modelName = (contract as MongoContract).roots[rootName];
-      if (!modelName) {
-        throw new Error(`Unknown root: ${rootName}`);
-      }
-      const model = (contract as MongoContract).models[modelName];
-      if (!model) {
-        throw new Error(`Unknown model: ${modelName}`);
-      }
-      const collectionName = model.storage?.collection ?? rootName;
-      const storage = (contract as MongoContract).storage;
-      if (!storage?.storageHash) {
-        throw new Error(
-          'Contract is missing storage.storageHash. Pass a validated contract to mongoQuery().',
-        );
-      }
-      const storageHash = storage.storageHash;
-
-      type ResultShape = ModelToDocShape<
-        TContract,
-        TContract['roots'][K] & string & keyof TContract['models']
-      >;
-
-      return new PipelineBuilder<TContract, ResultShape>(contract, {
-        collection: collectionName,
-        stages: [],
-        storageHash: String(storageHash),
-      });
+      return createCollectionHandle(contract, rootName);
     },
   };
 }
