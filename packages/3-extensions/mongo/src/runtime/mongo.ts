@@ -7,7 +7,7 @@ import type {
 } from '@prisma-next/mongo-contract';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm } from '@prisma-next/mongo-orm';
-import { mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
+import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import type { MongoRuntime } from '@prisma-next/mongo-runtime';
 import { createMongoRuntime } from '@prisma-next/mongo-runtime';
 
@@ -18,7 +18,7 @@ export interface MongoOptions {
 export interface MongoClient<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
 > {
-  readonly pipeline: ReturnType<typeof mongoPipeline<TContract>>;
+  readonly query: ReturnType<typeof mongoQuery<TContract>>;
   connect(uri: string, dbName: string): Promise<ConnectedMongoClient<TContract>>;
 }
 
@@ -27,7 +27,7 @@ export interface ConnectedMongoClient<
 > {
   readonly orm: ReturnType<typeof mongoOrm<TContract>>;
   readonly runtime: MongoRuntime;
-  readonly pipeline: ReturnType<typeof mongoPipeline<TContract>>;
+  readonly query: ReturnType<typeof mongoQuery<TContract>>;
   readonly contract: TContract;
   close(): Promise<void>;
 }
@@ -36,10 +36,10 @@ export default function mongo<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
 >(options: MongoOptions): MongoClient<TContract> {
   const { contract } = validateMongoContract<TContract>(options.contractJson);
-  const pipeline = mongoPipeline<TContract>({ contractJson: options.contractJson });
+  const query = mongoQuery<TContract>({ contractJson: options.contractJson });
 
   return {
-    pipeline,
+    query,
     async connect(uri: string, dbName: string): Promise<ConnectedMongoClient<TContract>> {
       const adapter = createMongoAdapter();
       const driver = await createMongoDriver(uri, dbName);
@@ -49,7 +49,7 @@ export default function mongo<
       return {
         orm,
         runtime,
-        pipeline,
+        query,
         contract,
         async close() {
           await runtime.close();

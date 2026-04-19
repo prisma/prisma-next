@@ -3,14 +3,14 @@ import { createMongoDriver } from '@prisma-next/driver-mongo';
 import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm } from '@prisma-next/mongo-orm';
-import { mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
+import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtime';
 import type { Contract } from './contract';
 import contractJson from './contract.json' with { type: 'json' };
 
 const { contract } = validateMongoContract<Contract>(contractJson);
 
-const pipeline = mongoPipeline<Contract>({ contractJson });
+const pipeline = mongoQuery<Contract>({ contractJson });
 
 export async function createClient(connectionUri: string, dbName: string) {
   const adapter = createMongoAdapter();

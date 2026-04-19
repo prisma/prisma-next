@@ -115,12 +115,12 @@ importers:
       '@prisma-next/mongo-orm':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/5-query-builders/orm
-      '@prisma-next/mongo-pipeline-builder':
-        specifier: workspace:*
-        version: link:../../packages/2-mongo-family/5-query-builders/pipeline-builder
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/4-query/query-ast
+      '@prisma-next/mongo-query-builder':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/5-query-builders/query-builder
       '@prisma-next/mongo-runtime':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/7-runtime
@@ -333,12 +333,12 @@ importers:
       '@prisma-next/mongo-orm':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/5-query-builders/orm
-      '@prisma-next/mongo-pipeline-builder':
-        specifier: workspace:*
-        version: link:../../packages/2-mongo-family/5-query-builders/pipeline-builder
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/4-query/query-ast
+      '@prisma-next/mongo-query-builder':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/5-query-builders/query-builder
       '@prisma-next/mongo-runtime':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/7-runtime
@@ -1315,7 +1315,7 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/2-mongo-family/5-query-builders/pipeline-builder:
+  packages/2-mongo-family/5-query-builders/query-builder:
     dependencies:
       '@prisma-next/contract':
         specifier: workspace:*
@@ -1426,9 +1426,9 @@ importers:
       '@prisma-next/mongo-contract-ts':
         specifier: workspace:*
         version: link:../2-authoring/contract-ts
-      '@prisma-next/mongo-pipeline-builder':
+      '@prisma-next/mongo-query-builder':
         specifier: workspace:*
-        version: link:../5-query-builders/pipeline-builder
+        version: link:../5-query-builders/query-builder
       '@prisma-next/mongo-value':
         specifier: workspace:*
         version: link:../1-foundation/mongo-value
@@ -2089,9 +2089,9 @@ importers:
       '@prisma-next/mongo-orm':
         specifier: workspace:*
         version: link:../../2-mongo-family/5-query-builders/orm
-      '@prisma-next/mongo-pipeline-builder':
+      '@prisma-next/mongo-query-builder':
         specifier: workspace:*
-        version: link:../../2-mongo-family/5-query-builders/pipeline-builder
+        version: link:../../2-mongo-family/5-query-builders/query-builder
       '@prisma-next/mongo-runtime':
         specifier: workspace:*
         version: link:../../2-mongo-family/7-runtime
@@ -3086,12 +3086,12 @@ importers:
       '@prisma-next/mongo-orm':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/5-query-builders/orm
-      '@prisma-next/mongo-pipeline-builder':
-        specifier: workspace:*
-        version: link:../../packages/2-mongo-family/5-query-builders/pipeline-builder
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/4-query/query-ast
+      '@prisma-next/mongo-query-builder':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/5-query-builders/query-builder
       '@prisma-next/mongo-runtime':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/7-runtime

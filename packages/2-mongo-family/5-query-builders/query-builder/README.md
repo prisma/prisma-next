@@ -1,6 +1,8 @@
-# @prisma-next/mongo-pipeline-builder
+# @prisma-next/mongo-query-builder
 
-Type-safe MongoDB aggregation pipeline builder with document shape tracking.
+Type-safe MongoDB query builder (reads, writes, find-and-modify, pipeline-terminal writes) with document shape tracking.
+
+> Read terminals are documented below. Write terminals (inserts, updates, deletes, upserts, find-and-modify, `$merge`/`$out`) are landing in [TML-2267](https://linear.app/prisma-company/issue/TML-2267); see [`projects/mongo-pipeline-builder/specs/query-builder-unification.spec.md`](../../../../projects/mongo-pipeline-builder/specs/query-builder-unification.spec.md) for the design.
 
 ## What it does
 
@@ -17,13 +19,13 @@ Use this package when you need to construct MongoDB aggregation pipelines with c
 ## Usage
 
 ```typescript
-import { mongoPipeline, fn, acc } from '@prisma-next/mongo-pipeline-builder';
+import { mongoQuery, fn, acc } from '@prisma-next/mongo-query-builder';
 import type { Contract, TypeMaps } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 type TContract = MongoContractWithTypeMaps<Contract, TypeMaps>;
 
-const p = mongoPipeline<TContract>({ contractJson });
+const p = mongoQuery<TContract>({ contractJson });
 
 // Analytics query: revenue by department
 const plan = p
@@ -45,7 +47,7 @@ const plan = p
 
 ### Entry point
 
-- `mongoPipeline<TContract>({ contractJson })` — returns a `PipelineRoot` with `.from(rootName)` to start building
+- `mongoQuery<TContract>({ contractJson })` — returns a `QueryRoot` with `.from(rootName)` to start building
 
 ### Stage methods
 

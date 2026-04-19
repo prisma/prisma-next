@@ -6,7 +6,7 @@ import type {
 import { PipelineBuilder } from './builder';
 import type { ModelToDocShape } from './types';
 
-export interface PipelineRoot<
+export interface QueryRoot<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
 > {
   from<K extends keyof TContract['roots'] & string>(
@@ -17,9 +17,9 @@ export interface PipelineRoot<
   >;
 }
 
-export function mongoPipeline<
+export function mongoQuery<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
->(options: { contractJson: unknown }): PipelineRoot<TContract> {
+>(options: { contractJson: unknown }): QueryRoot<TContract> {
   const contract = options.contractJson as TContract;
   return {
     from<K extends keyof TContract['roots'] & string>(rootName: K) {
@@ -35,7 +35,7 @@ export function mongoPipeline<
       const storage = (contract as MongoContract).storage;
       if (!storage?.storageHash) {
         throw new Error(
-          'Contract is missing storage.storageHash. Pass a validated contract to mongoPipeline().',
+          'Contract is missing storage.storageHash. Pass a validated contract to mongoQuery().',
         );
       }
       const storageHash = storage.storageHash;

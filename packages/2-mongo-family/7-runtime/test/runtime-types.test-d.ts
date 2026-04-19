@@ -4,8 +4,8 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import { mongoPipeline } from '@prisma-next/mongo-pipeline-builder';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import { expectTypeOf } from 'vitest';
 import type { MongoRuntime } from '../src/mongo-runtime';
 
@@ -48,7 +48,7 @@ type OrderRow = { _id: string; status: string; amount: number };
 describe('runtime type safety', () => {
   it('execute() returns AsyncIterableResult<Row> where Row matches build() row type', () => {
     const contractJson = {} as unknown;
-    const plan = mongoPipeline<TContract>({ contractJson }).from('orders').build();
+    const plan = mongoQuery<TContract>({ contractJson }).from('orders').build();
     type Row = PlanRow<typeof plan>;
     expectTypeOf<Row>().toEqualTypeOf<OrderRow>();
 
@@ -59,7 +59,7 @@ describe('runtime type safety', () => {
 
   it('execute() result awaits to Row[]', () => {
     const contractJson = {} as unknown;
-    const plan = mongoPipeline<TContract>({ contractJson }).from('orders').build();
+    const plan = mongoQuery<TContract>({ contractJson }).from('orders').build();
     type Row = PlanRow<typeof plan>;
 
     const runtime = {} as MongoRuntime;

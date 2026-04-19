@@ -24,12 +24,12 @@ import {
   MongoVectorSearchStage,
 } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
-import { mongoPipeline } from '../src/pipeline';
+import { mongoQuery } from '../src/query';
 import type { TContract } from './fixtures/test-contract';
 import { testContractJson } from './fixtures/test-contract';
 
 function createOrdersBuilder() {
-  return mongoPipeline<TContract>({ contractJson: testContractJson }).from('orders');
+  return mongoQuery<TContract>({ contractJson: testContractJson }).from('orders');
 }
 
 describe('new stage builder methods', () => {

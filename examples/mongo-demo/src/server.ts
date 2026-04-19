@@ -6,12 +6,12 @@ if (existsSync('.env')) {
   process.loadEnvFile('.env');
 }
 
-import { acc, fn } from '@prisma-next/mongo-pipeline-builder';
 import {
   MongoCountStage,
   MongoLimitStage,
   MongoSortStage,
 } from '@prisma-next/mongo-query-ast/execution';
+import { acc, fn } from '@prisma-next/mongo-query-builder';
 import type { Db } from './db';
 import { createClient } from './db';
 import { seed } from './seed';

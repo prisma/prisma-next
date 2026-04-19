@@ -115,7 +115,7 @@ The Mongo family domain (`packages/2-mongo-family/`) contains Mongo-specific pac
 |   |-- query-ast/        → @prisma-next/mongo-query-ast
 |-- 5-query-builders (runtime plane)
 |   |-- orm/              → @prisma-next/mongo-orm
-|   |-- pipeline-builder/ → @prisma-next/mongo-pipeline-builder
+|   |-- query-builder/    → @prisma-next/mongo-query-builder
 |-- 6-transport (shared plane)
 |   |-- mongo-lowering/   → @prisma-next/mongo-lowering
 |   |-- mongo-wire/       → @prisma-next/mongo-wire
@@ -342,7 +342,7 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/2-mongo-family/3-tooling/emitter/` | `@prisma-next/mongo-emitter` |
 | `packages/2-mongo-family/4-query/query-ast/` | `@prisma-next/mongo-query-ast` |
 | `packages/2-mongo-family/5-query-builders/orm/` | `@prisma-next/mongo-orm` |
-| `packages/2-mongo-family/5-query-builders/pipeline-builder/` | `@prisma-next/mongo-pipeline-builder` |
+| `packages/2-mongo-family/5-query-builders/query-builder/` | `@prisma-next/mongo-query-builder` |
 | `packages/2-mongo-family/6-transport/mongo-lowering/` | `@prisma-next/mongo-lowering` |
 | `packages/2-mongo-family/6-transport/mongo-wire/` | `@prisma-next/mongo-wire` |
 | `packages/2-mongo-family/7-runtime/` | `@prisma-next/mongo-runtime` |

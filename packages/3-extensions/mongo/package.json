@@ -25,7 +25,7 @@
     "@prisma-next/mongo-contract-psl": "workspace:*",
     "@prisma-next/mongo-contract-ts": "workspace:*",
     "@prisma-next/mongo-orm": "workspace:*",
-    "@prisma-next/mongo-pipeline-builder": "workspace:*",
+    "@prisma-next/mongo-query-builder": "workspace:*",
     "@prisma-next/mongo-runtime": "workspace:*",
     "@prisma-next/target-mongo": "workspace:*",
     "pathe": "^2.0.3"
