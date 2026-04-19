@@ -119,6 +119,62 @@ interface MongoMigrationCheck {
 
 This gives checks the same expressive power as MongoDB query filters, without inventing a separate vocabulary.
 
+### Data transform operations and unified check shape
+
+The envelope described above covers DDL operations — creating indexes, modifying collections. Data transform operations (backfills, renames, seed inserts) use the same three-phase envelope but carry different payloads.
+
+```ts
+interface MongoDataTransformOperation extends MigrationPlanOperation {
+  readonly operationClass: 'data';
+  readonly name: string;
+  readonly precheck: readonly MongoDataTransformCheck[];
+  readonly run: readonly MongoQueryPlan[];
+  readonly postcheck: readonly MongoDataTransformCheck[];
+}
+```
+
+The `operationClass` is always `'data'`. The `run` array contains `MongoQueryPlan` objects — aggregation pipelines or raw commands (`rawUpdateMany`, `rawInsertOne`, etc.) — rather than DDL commands. The `precheck` and `postcheck` arrays contain `MongoDataTransformCheck` objects instead of `MongoMigrationCheck`.
+
+`MongoDataTransformCheck` has the same four-field shape as `MongoMigrationCheck`:
+
+```ts
+interface MongoDataTransformCheck {
+  readonly description: string;
+  readonly source: MongoQueryPlan;
+  readonly filter: MongoFilterExpr;
+  readonly expect: 'exists' | 'notExists';
+}
+```
+
+The only difference is the `source` type: `MongoQueryPlan` (an aggregation or raw command) instead of `AnyMongoInspectionCommand`. Both use `MongoFilterExpr` for `filter` and `'exists' | 'notExists'` for `expect`. Both are evaluated by the same `FilterEvaluator` path in the runner — run the source query, apply the filter client-side, check against the expectation.
+
+The two types are kept concrete rather than collapsed into a generic `MigrationCheck<TSource>` because the source types need different executors — DDL checks dispatch through `MongoInspectionCommandVisitor`, data transform checks dispatch through `MongoAdapter.lower()` → `MongoDriver.execute()`. Two concrete types with a shared shape let the runner dispatch internally based on which operation type it's processing.
+
+#### One factory derives both precheck and postcheck
+
+The `dataTransform` factory takes a single `check` configuration and produces both precheck and postcheck arrays by flipping `expect`:
+
+```ts
+dataTransform('backfill-status', {
+  check: {
+    source: () => agg.from('users').match((f) => f.status.exists(false)).limit(1),
+    expect: 'exists',
+  },
+  run: () => raw.collection('users')
+    .updateMany({ status: { $exists: false } }, { $set: { status: 'active' } }),
+})
+```
+
+The factory resolves this into a precheck with `expect: 'exists'` (violations found — run the transform) and a postcheck with `expect: 'notExists'` (no violations remain — transform succeeded). This gives idempotency and verification from a single check specification. Omitting `check` entirely produces empty arrays — always run, no idempotency guard.
+
+#### DML execution
+
+Data transform `run` commands execute via `MongoAdapter.lower()` → `MongoDriver.execute()` — the same adapter+driver transport used for runtime queries. No bespoke DML executor is needed; the adapter lowers each `MongoQueryPlan` to a wire command, and the driver executes it against the database.
+
+#### Relationship to the generic envelope
+
+Both DDL and data transform operations are specializations of the generic three-phase migration operation envelope described in [ADR 191](ADR%20191%20-%20Generic%20three-phase%20migration%20operation%20envelope.md). The DDL variant fills the phases with inspection commands, DDL commands, and `MongoMigrationCheck`; the data transform variant fills them with query plans and `MongoDataTransformCheck`. The runner processes both through the same three-phase loop.
+
 ## Serialization
 
 Because all AST nodes are frozen plain-property objects, `JSON.stringify` produces the persisted format directly. For example, the precheck from the grounding example serializes as:

@@ -119,6 +119,17 @@ NAMESPACE.SUBCODE where NAMESPACE ∈ { PLAN, RUNTIME, ADAPTER, BUDGET, LINT, MI
 - **MIGRATION.SAME_SOURCE_AND_TARGET**: migration edge has from === to (graph invariant violation)
 - **MIGRATION.AMBIGUOUS_TARGET**: multiple branch tips in migration graph (diverged branches)
 
+#### PN-MIG (Migration Authoring)
+
+The migration authoring subsystem uses a separate error construction (`CliStructuredError` with `domain: 'MIG'`) and a numeric code range `2000–2999`. The envelope format is `PN-MIG-{code}` (e.g. `PN-MIG-2001`). These codes cover authoring, planning, and emit-level errors, complementing the runner-level `MIGRATION.*` codes above.
+
+- **PN-MIG-2001**: Unfilled placeholder — a scaffolded migration contains a `placeholder(slot)` call that was never replaced by the author; thrown at emit time
+- **PN-MIG-2002**: migration.ts not found — `migration.ts` was expected at the migration package directory but could not be located
+- **PN-MIG-2003**: Invalid default export — `migration.ts` does not default-export a `Migration` subclass
+- **PN-MIG-2004**: Operations not an array — `Migration.operations` getter returned a non-array value
+- **PN-MIG-2010**: Plan does not support authoring surface — a descriptor-flow plan was asked to `renderTypeScript()`; safety rail, not normally user-visible
+- **PN-MIG-2011**: Incomplete migration capabilities — target registers a migrations capability but implements neither `resolveDescriptors` nor `emit`; internal wiring error
+
 #### PREFLIGHT
 - **PREFLIGHT.SHADOW_FAILED**: shadow DB provision or migrate failed
 - **PREFLIGHT.DIAGNOSTIC_TIMEOUT**: exceeded job budget for diagnostics
