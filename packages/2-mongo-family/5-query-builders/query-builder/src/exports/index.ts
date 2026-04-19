@@ -6,6 +6,12 @@ export { createFieldAccessor } from '../field-accessor';
 export type { FindAndModifyCompat, UpdateCompat } from '../markers';
 export type { QueryRoot } from '../query';
 export { mongoQuery } from '../query';
+export type {
+  DeleteResult,
+  InsertManyResult,
+  InsertOneResult,
+  UpdateResult,
+} from '../state-classes';
 export { CollectionHandle, FilteredCollection } from '../state-classes';
 export type {
   ArrayField,
