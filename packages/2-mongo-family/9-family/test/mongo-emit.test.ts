@@ -122,12 +122,12 @@ describe('mongoEmit', () => {
     });
   });
 
-  describe('given a function-form migration.ts (arrow function)', () => {
+  describe('given a function-form migration.ts (arrow factory)', () => {
     it('writes ops.json and returns operations without attesting', async () => {
       const migration = [
         `import { createCollection } from '${targetMongoMigrationExport}';`,
         '',
-        'export default () => [createCollection("users")];',
+        'export default () => ({ plan() { return [createCollection("users")] } });',
         '',
       ].join('\n');
       await writeFile(join(pkgDir, 'migration.ts'), migration);
@@ -150,12 +150,12 @@ describe('mongoEmit', () => {
     });
   });
 
-  describe('given a function-form migration.ts (async function)', () => {
+  describe('given a function-form migration.ts (async factory)', () => {
     it('writes ops.json and returns operations without attesting', async () => {
       const migration = [
         `import { createCollection } from '${targetMongoMigrationExport}';`,
         '',
-        'export default async () => [createCollection("users")];',
+        'export default async () => ({ plan() { return [createCollection("users")] } });',
         '',
       ].join('\n');
       await writeFile(join(pkgDir, 'migration.ts'), migration);
@@ -178,9 +178,12 @@ describe('mongoEmit', () => {
     });
   });
 
-  describe('given a function-form migration.ts that does not return an array', () => {
+  describe('given a function-form migration.ts whose plan() does not return an array', () => {
     it('throws PN-MIG-2004', async () => {
-      await writeFile(join(pkgDir, 'migration.ts'), 'export default () => "not an array";\n');
+      await writeFile(
+        join(pkgDir, 'migration.ts'),
+        'export default () => ({ plan() { return "not an array" } });\n',
+      );
 
       let thrown: unknown;
       try {
@@ -192,6 +195,26 @@ describe('mongoEmit', () => {
       expect(CliStructuredError.is(thrown)).toBe(true);
       expect(thrown).toMatchObject({
         code: '2004',
+        domain: 'MIG',
+        meta: { dir: pkgDir },
+      });
+    });
+  });
+
+  describe('given a function-form migration.ts that does not return an object with plan()', () => {
+    it('throws PN-MIG-2003', async () => {
+      await writeFile(join(pkgDir, 'migration.ts'), 'export default () => 42;\n');
+
+      let thrown: unknown;
+      try {
+        await mongoEmit({ dir: pkgDir, frameworkComponents: [] });
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(CliStructuredError.is(thrown)).toBe(true);
+      expect(thrown).toMatchObject({
+        code: '2003',
         domain: 'MIG',
         meta: { dir: pkgDir },
       });

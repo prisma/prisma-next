@@ -25,21 +25,22 @@ export function errorMigrationFileMissing(dir: string): CliStructuredError {
 
 /**
  * The `migration.ts` at the given package directory does not default-export a
- * `Migration` subclass. Used by class-flow emit capabilities when the module's
- * default export is missing, is not a constructor, or does not produce an
- * instance of `Migration`.
+ * valid migration shape. Two shapes are accepted: a `Migration` subclass, or a
+ * factory function returning an object with a `plan()` method. Thrown when the
+ * default export is missing, is not a constructor/function, does not extend
+ * `Migration`, or (for factory functions) returns a value without `plan()`.
  */
 export function errorMigrationInvalidDefaultExport(
   dir: string,
   actualExportDescription?: string,
 ): CliStructuredError {
-  return new CliStructuredError('2003', 'migration.ts default export is not a Migration subclass', {
+  return new CliStructuredError('2003', 'migration.ts default export is not a valid migration', {
     domain: 'MIG',
     why:
       actualExportDescription !== undefined
-        ? `migration.ts at "${dir}" must default-export a Migration subclass; got ${actualExportDescription}`
-        : `migration.ts at "${dir}" must default-export a Migration subclass.`,
-    fix: 'Ensure your migration file uses `export default class extends Migration { ... }` and re-run the command.',
+        ? `migration.ts at "${dir}" must default-export a Migration subclass or a factory function returning { plan() }; got ${actualExportDescription}`
+        : `migration.ts at "${dir}" must default-export a Migration subclass or a factory function returning { plan() }.`,
+    fix: 'Use `export default class extends Migration { ... }` or `export default () => ({ plan() { return [...] } })`.',
     meta: {
       dir,
       ...(actualExportDescription !== undefined ? { actualExport: actualExportDescription } : {}),
