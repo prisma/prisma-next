@@ -1,4 +1,3 @@
-import { CliStructuredError } from '@prisma-next/errors/control';
 import type { TargetMigrationsCapability } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { migrationStrategy } from '../../src/lib/migration-strategy';
@@ -49,15 +48,11 @@ describe('migrationStrategy', () => {
   it('throws errorTargetHasIncompleteMigrationCapabilities when neither hook is registered', () => {
     const capability = makeCapability({});
 
-    let caught: unknown;
-    try {
-      migrationStrategy(capability, 'broken');
-    } catch (error) {
-      caught = error;
-    }
-
-    expect(caught).toBeInstanceOf(CliStructuredError);
-    expect((caught as CliStructuredError).code).toBe('2011');
-    expect((caught as CliStructuredError).meta).toMatchObject({ targetId: 'broken' });
+    expect(() => migrationStrategy(capability, 'broken')).toThrow(
+      expect.objectContaining({
+        code: '2011',
+        meta: expect.objectContaining({ targetId: 'broken' }),
+      }),
+    );
   });
 });
