@@ -82,11 +82,11 @@ Add `findOneAndUpdate`, `findOneAndDelete`, `upsertOne`, `upsertMany`. Resolve t
 **Tasks:**
 
 - [x] 3.1 — Extended `UpdateOneCommand` / `UpdateManyCommand` (and the corresponding `UpdateOneWireCommand` / `UpdateManyWireCommand`) with a defaulted `upsert: boolean` field. Adapter lowering threads it through; the driver passes it to the underlying `updateOne`/`updateMany` calls. Result types (`UpdateOneResult` / `UpdateManyResult`) gained optional `upsertedCount` / `upsertedId` so callers see the upserted id when the upsert path was taken.
-- [x] 3.2 — `FilteredCollection.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete()` implemented. Options for the update form: `upsert` (default `false`). `returnDocument` is hardcoded `'after'` at the driver layer; making it caller-controllable requires plumbing it through the AST and wire commands and is deferred.
-- [ ] 3.3 — Deferred. Implementing `PipelineChain<…, _, 'compat'>.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete(opts?)` requires `sort`/`skip` slots on the find-and-modify AST and wire commands (today neither carries them); the marker types already gate availability correctly. Punting until the AST extension lands.
+- [x] 3.2 — `FilteredCollection.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete()` implemented. Options for the update form: `upsert` (default `false`). `returnDocument` is now caller-controllable (plumbed through AST/wire in follow-up F1).
+- [x] 3.3 — Completed in follow-up F2. `PipelineChain<…, _, 'compat'>.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete()` implemented with chain deconstruction for `sort`/`skip` slots. AST/wire extensions landed in F1.
 - [x] 3.4 — `CollectionHandle.upsertOne(filterFn, updaterFn)` and `FilteredCollection.upsertOne(updaterFn)` implemented; both produce `UpdateOneCommand` with `upsert: true`. `upsertMany` deferred per the design discussion (multi-doc upserts are a Mongo-side gotcha — at most one inserts, the rest update; better to surface the unsafety with an explicit raw-command escape hatch).
 - [x] 3.5 — Type tests: `state-machine-surface.test-d.ts` asserts `findOneAndUpdate` / `findOneAndDelete` are absent on `CollectionHandle` (require `.match(...)` first). The marker-driven gating on `PipelineChain` is in place; per-stage `findOneAndUpdate` availability tests block on M3.3.
-- [ ] 3.6 — Integration tests (`mongo-memory-server`) deferred — unit tests in `find-and-modify.test.ts` cover the AST emission. Integration coverage to land alongside the wider M2/M3/M4 integration sweep.
+- [x] 3.6 — Integration tests completed in follow-up F4. 14 end-to-end tests against `mongo-memory-server` in `examples/mongo-demo/test/query-builder-writes.test.ts`.
 
 ### Milestone 4 — Update-with-pipeline + `$merge`/`$out` write terminals
 
@@ -96,12 +96,12 @@ Support the array-form updater (update-with-pipeline) and the `PipelineChain` no
 
 **Tasks:**
 
-- [ ] 4.1 — Deferred. The traditional update operators (M2) cover the common case; the pipeline-stage emitter form is an ergonomic alternative the M2/M3 callers have not yet asked for. Land alongside 4.3 when the no-arg `updateMany()` lands.
-- [ ] 4.2 — Deferred together with 4.1.
-- [ ] 4.3 — Deferred. The marker types already gate availability; the chain-deconstruction logic lands when 4.1/4.2 do.
+- [x] 4.1 — Completed in follow-up F3. `FieldAccessor` extended with `f.stage.set(...)`, `f.stage.unset(...)`, `f.stage.replaceRoot(...)`, `f.stage.replaceWith(...)` pipeline-stage emitters.
+- [x] 4.2 — Completed in follow-up F3. `resolveUpdaterResult` dispatches between `TypedUpdateOp[]` and `MongoUpdatePipelineStage[]`; mixed arrays throw.
+- [x] 4.3 — Completed in follow-up F3. No-arg `PipelineChain.updateMany()` / `.updateOne()` with chain deconstruction.
 - [x] 4.4 — `PipelineChain.merge(opts)` and `.out(coll)` are now write terminals — they return `MongoQueryPlan<unknown>` (lane `mongo-write`) directly rather than another `PipelineChain`. The `$merge`/`$out` stage is appended internally so the wire `AggregateCommand` ends with the terminal stage as required by Mongo.
 - [x] 4.5 — Existing read-side type tests assert `merge`/`out` plans yield `unknown` rows. Pipeline-style update marker tests block on 4.1–4.3.
-- [ ] 4.6 — Integration tests (`mongo-memory-server`) deferred — to land in the wider M2/M3/M4 integration sweep.
+- [x] 4.6 — Integration tests completed in follow-up F4.
 
 ### Milestone 5 — Raw escape hatch + close-out
 
