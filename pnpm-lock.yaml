@@ -2425,6 +2425,9 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../2-mongo-family/1-foundation/mongo-contract
+      '@prisma-next/mongo-lowering':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/6-transport/mongo-lowering
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../../2-mongo-family/4-query/query-ast
@@ -3213,9 +3216,21 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../../../../../packages/2-mongo-family/1-foundation/mongo-contract
+      '@prisma-next/mongo-contract-ts':
+        specifier: workspace:*
+        version: link:../../../../../../packages/2-mongo-family/2-authoring/contract-ts
+      '@prisma-next/mongo-orm':
+        specifier: workspace:*
+        version: link:../../../../../../packages/2-mongo-family/5-query-builders/orm
+      '@prisma-next/mongo-query-ast':
+        specifier: workspace:*
+        version: link:../../../../../../packages/2-mongo-family/4-query/query-ast
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../../../../packages/2-sql/2-authoring/contract-ts
+      '@prisma-next/target-mongo':
+        specifier: workspace:*
+        version: link:../../../../../../packages/3-mongo-target/1-mongo-target
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../../../../../packages/3-targets/3-targets/postgres

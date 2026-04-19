@@ -7,7 +7,9 @@ import {
   writeLedgerEntry,
 } from '@prisma-next/target-mongo/control';
 import type { Db } from 'mongodb';
+import { createMongoAdapter } from '../mongo-adapter';
 import { MongoCommandExecutor, MongoInspectionExecutor } from './command-executor';
+import { MigrationMongoDriver } from './dml-executor';
 
 function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
   const mongoDriver = driver as ControlDriverInstance<'mongo', 'mongo'> & { db?: Db };
@@ -27,6 +29,8 @@ export function createMongoRunnerDeps(
   return {
     commandExecutor: new MongoCommandExecutor(db),
     inspectionExecutor: new MongoInspectionExecutor(db),
+    adapter: createMongoAdapter(),
+    driver: new MigrationMongoDriver(db),
     markerOps: {
       readMarker: () => readMarker(db),
       initMarker: (dest) => initMarker(db, dest),

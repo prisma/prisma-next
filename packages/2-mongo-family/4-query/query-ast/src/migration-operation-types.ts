@@ -5,6 +5,7 @@ import type {
 import type { AnyMongoDdlCommand } from './ddl-commands';
 import type { MongoFilterExpr } from './filter-expressions';
 import type { AnyMongoInspectionCommand } from './inspection-commands';
+import type { MongoQueryPlan } from './query-plan';
 
 export interface MongoMigrationCheck {
   readonly description: string;
@@ -24,12 +25,21 @@ export interface MongoMigrationPlanOperation extends MigrationPlanOperation {
   readonly postcheck: readonly MongoMigrationCheck[];
 }
 
-/**
- * Union of all Mongo migration operation kinds. The class-flow scaffolding
- * (e.g. `PlannerProducedMongoMigration`) parameterises `Migration` over this
- * union so that future operation kinds can extend it without changes to the
- * spine.
- */
-export type AnyMongoMigrationOperation = MongoMigrationPlanOperation;
+export interface MongoDataTransformCheck {
+  readonly description: string;
+  readonly source: MongoQueryPlan;
+  readonly filter: MongoFilterExpr;
+  readonly expect: 'exists' | 'notExists';
+}
+
+export interface MongoDataTransformOperation extends MigrationPlanOperation {
+  readonly operationClass: 'data';
+  readonly name: string;
+  readonly precheck: readonly MongoDataTransformCheck[];
+  readonly run: readonly MongoQueryPlan[];
+  readonly postcheck: readonly MongoDataTransformCheck[];
+}
+
+export type AnyMongoMigrationOperation = MongoMigrationPlanOperation | MongoDataTransformOperation;
 
 export type { MigrationOperationClass, MigrationPlanOperation };

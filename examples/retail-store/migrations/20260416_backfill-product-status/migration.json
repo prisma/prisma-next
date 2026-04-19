@@ -1,0 +1,8 @@
+{
+  "migrationId": null,
+  "from": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d",
+  "to": "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "kind": "regular",
+  "labels": ["backfill-product-status"],
+  "createdAt": "2026-04-16T07:26:17.265Z"
+}

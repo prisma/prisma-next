@@ -1,6 +1,6 @@
 import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
-import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
+import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import {
   deserializeMongoOps,
   MongoMigrationRunner,
@@ -55,7 +55,7 @@ describe(
       ]);
     }, timeouts.spinUpMongoMemoryServer);
 
-    async function runOps(ops: readonly MongoMigrationPlanOperation[]): Promise<{
+    async function runOps(ops: readonly AnyMongoMigrationOperation[]): Promise<{
       operationsPlanned: number;
       operationsExecuted: number;
     }> {

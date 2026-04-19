@@ -8,7 +8,11 @@ import type {
   MigrationRunnerFailure,
   MigrationRunnerResult,
 } from '@prisma-next/framework-components/control';
+import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
+  AnyMongoMigrationOperation,
+  MongoDataTransformCheck,
+  MongoDataTransformOperation,
   MongoDdlCommandVisitor,
   MongoInspectionCommandVisitor,
   MongoMigrationCheck,
@@ -38,6 +42,8 @@ export interface MarkerOperations {
 export interface MongoRunnerDependencies {
   readonly commandExecutor: MongoDdlCommandVisitor<Promise<void>>;
   readonly inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>;
+  readonly adapter: MongoAdapter;
+  readonly driver: MongoDriver;
   readonly markerOps: MarkerOperations;
 }
 
@@ -67,7 +73,7 @@ export class MongoMigrationRunner {
     readonly executionChecks?: MigrationRunnerExecutionChecks;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
   }): Promise<MigrationRunnerResult> {
-    const { commandExecutor, inspectionExecutor, markerOps } = this.deps;
+    const { commandExecutor, inspectionExecutor, adapter, driver, markerOps } = this.deps;
     const operations = deserializeMongoOps(options.plan.operations as readonly unknown[]);
 
     const policyCheck = this.enforcePolicyCompatibility(options.policy, operations);
@@ -90,9 +96,26 @@ export class MongoMigrationRunner {
     for (const operation of operations) {
       options.callbacks?.onOperationStart?.(operation);
       try {
+        if (operation.operationClass === 'data') {
+          const result = await this.executeDataTransform(
+            operation as MongoDataTransformOperation,
+            adapter,
+            driver,
+            filterEvaluator,
+            runIdempotency,
+            runPrechecks,
+            runPostchecks,
+          );
+          if (result.failure) return result.failure;
+          if (result.executed) operationsExecuted += 1;
+          continue;
+        }
+
+        const ddlOp = operation as MongoMigrationPlanOperation;
+
         if (runPostchecks && runIdempotency) {
           const allSatisfied = await this.allChecksSatisfied(
-            operation.postcheck,
+            ddlOp.postcheck,
             inspectionExecutor,
             filterEvaluator,
           );
@@ -101,7 +124,7 @@ export class MongoMigrationRunner {
 
         if (runPrechecks) {
           const precheckResult = await this.evaluateChecks(
-            operation.precheck,
+            ddlOp.precheck,
             inspectionExecutor,
             filterEvaluator,
           );
@@ -114,13 +137,13 @@ export class MongoMigrationRunner {
           }
         }
 
-        for (const step of operation.execute) {
+        for (const step of ddlOp.execute) {
           await step.command.accept(commandExecutor);
         }
 
         if (runPostchecks) {
           const postcheckResult = await this.evaluateChecks(
-            operation.postcheck,
+            ddlOp.postcheck,
             inspectionExecutor,
             filterEvaluator,
           );
@@ -185,6 +208,92 @@ export class MongoMigrationRunner {
     return ok({ operationsPlanned: operations.length, operationsExecuted });
   }
 
+  private async executeDataTransform(
+    op: MongoDataTransformOperation,
+    adapter: MongoAdapter,
+    driver: MongoDriver,
+    filterEvaluator: FilterEvaluator,
+    runIdempotency: boolean,
+    runPrechecks: boolean,
+    runPostchecks: boolean,
+  ): Promise<{ executed: boolean; failure?: MigrationRunnerResult }> {
+    if (runPostchecks && runIdempotency && op.postcheck.length > 0) {
+      const allSatisfied = await this.evaluateDataTransformChecks(
+        op.postcheck,
+        adapter,
+        driver,
+        filterEvaluator,
+      );
+      if (allSatisfied) return { executed: false };
+    }
+
+    if (runPrechecks && op.precheck.length > 0) {
+      const passed = await this.evaluateDataTransformChecks(
+        op.precheck,
+        adapter,
+        driver,
+        filterEvaluator,
+      );
+      if (!passed) {
+        return {
+          executed: false,
+          failure: runnerFailure('PRECHECK_FAILED', `Operation ${op.id} failed during precheck`, {
+            meta: { operationId: op.id, name: op.name },
+          }),
+        };
+      }
+    }
+
+    for (const plan of op.run) {
+      const wireCommand = adapter.lower(plan);
+      for await (const _ of driver.execute(wireCommand)) {
+        /* consume */
+      }
+    }
+
+    if (runPostchecks && op.postcheck.length > 0) {
+      const passed = await this.evaluateDataTransformChecks(
+        op.postcheck,
+        adapter,
+        driver,
+        filterEvaluator,
+      );
+      if (!passed) {
+        return {
+          executed: false,
+          failure: runnerFailure(
+            'POSTCHECK_FAILED',
+            `Data transform "${op.name}" (${op.id}) failed post-check.`,
+            { meta: { operationId: op.id, name: op.name } },
+          ),
+        };
+      }
+    }
+
+    return { executed: true };
+  }
+
+  private async evaluateDataTransformChecks(
+    checks: readonly MongoDataTransformCheck[],
+    adapter: MongoAdapter,
+    driver: MongoDriver,
+    filterEvaluator: FilterEvaluator,
+  ): Promise<boolean> {
+    for (const check of checks) {
+      const wireCommand = adapter.lower(check.source);
+      let matchFound = false;
+      for await (const row of driver.execute<Record<string, unknown>>(wireCommand)) {
+        if (filterEvaluator.evaluate(check.filter, row)) {
+          matchFound = true;
+          break;
+        }
+      }
+      const passed = check.expect === 'exists' ? matchFound : !matchFound;
+      if (!passed) return false;
+    }
+    return true;
+  }
+
   private async evaluateChecks(
     checks: readonly MongoMigrationCheck[],
     inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>,
@@ -212,7 +321,7 @@ export class MongoMigrationRunner {
 
   private enforcePolicyCompatibility(
     policy: MigrationOperationPolicy,
-    operations: readonly MongoMigrationPlanOperation[],
+    operations: readonly AnyMongoMigrationOperation[],
   ): MigrationRunnerResult | undefined {
     const allowedClasses = new Set(policy.allowedOperationClasses);
     for (const operation of operations) {
