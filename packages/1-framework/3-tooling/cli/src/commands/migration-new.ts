@@ -28,7 +28,7 @@ import { Command } from 'commander';
 import { join, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import {
-  type CliStructuredError,
+  CliStructuredError,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
@@ -231,12 +231,8 @@ async function executeMigrationNewCommand(
       summary: `Scaffolded migration at ${relative(process.cwd(), packageDir)}`,
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      'code' in error &&
-      typeof (error as { code?: unknown }).code === 'string'
-    ) {
-      return notOk(error as CliStructuredError);
+    if (CliStructuredError.is(error)) {
+      return notOk(error);
     }
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {
