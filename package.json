@@ -23,7 +23,7 @@
     "lint:fix:unsafe": "pnpm biome check --write --unsafe .",
     "lint:packages": "turbo run lint --filter='!./examples/**'",
     "lint:examples": "turbo run lint --filter='./examples/**'",
-    "lint:deps": "depcruise --config dependency-cruiser.config.mjs packages",
+    "lint:deps": "depcruise --config dependency-cruiser.config.mjs packages && node scripts/lint-framework-target-imports.mjs",
     "lint:rules": "node scripts/validate-rules.mjs",
     "lint:rules:footprint": "node scripts/rules-footprint.mjs --check",
     "rules:footprint": "node scripts/rules-footprint.mjs",

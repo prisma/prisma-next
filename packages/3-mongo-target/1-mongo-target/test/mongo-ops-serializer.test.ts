@@ -1,4 +1,5 @@
 import {
+  type AnyMongoMigrationOperation,
   CollModCommand,
   CreateCollectionCommand,
   CreateIndexCommand,
@@ -14,6 +15,13 @@ import {
 } from '@prisma-next/mongo-query-ast/control';
 import { describe, expect, it } from 'vitest';
 import { deserializeMongoOps, serializeMongoOps } from '../src/core/mongo-ops-serializer';
+
+function asDdlOp(op: AnyMongoMigrationOperation): MongoMigrationPlanOperation {
+  if (op.operationClass === 'data') {
+    throw new Error('Expected DDL operation, got data transform');
+  }
+  return op as MongoMigrationPlanOperation;
+}
 
 function makeCreateIndexOp(): MongoMigrationPlanOperation {
   return {
@@ -88,7 +96,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     const deserialized = deserializeMongoOps(JSON.parse(serialized) as unknown[]);
 
     expect(deserialized).toHaveLength(1);
-    const op = deserialized[0]!;
+    const op = asDdlOp(deserialized[0]!);
     expect(op.id).toBe('index.users.create(email:1)');
     expect(op.label).toBe('Create index on users (email ascending)');
     expect(op.operationClass).toBe('additive');
@@ -115,7 +123,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     const deserialized = deserializeMongoOps(JSON.parse(serialized) as unknown[]);
 
     expect(deserialized).toHaveLength(1);
-    const op = deserialized[0]!;
+    const op = asDdlOp(deserialized[0]!);
     expect(op.id).toBe('index.users.drop(email:1)');
     expect(op.operationClass).toBe('destructive');
 
@@ -154,7 +162,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
       postcheck: [],
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
-    expect(deserialized[0]!.precheck[0]!.filter.kind).toBe('or');
+    expect(asDdlOp(deserialized[0]!).precheck[0]!.filter.kind).toBe('or');
   });
 
   it('round-trips $not filter expression', () => {
@@ -174,7 +182,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
       postcheck: [],
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
-    expect(deserialized[0]!.precheck[0]!.filter.kind).toBe('not');
+    expect(asDdlOp(deserialized[0]!).precheck[0]!.filter.kind).toBe('not');
   });
 
   it('round-trips $exists filter expression', () => {
@@ -194,7 +202,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
       postcheck: [],
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
-    const filter = deserialized[0]!.precheck[0]!.filter;
+    const filter = asDdlOp(deserialized[0]!).precheck[0]!.filter;
     expect(filter.kind).toBe('exists');
   });
 
@@ -466,7 +474,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
       postcheck: [],
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
-    const cmd = deserialized[0]!.execute[0]!.command as CreateIndexCommand;
+    const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as CreateIndexCommand;
     expect(cmd.unique).toBe(true);
     expect(cmd.sparse).toBe(true);
     expect(cmd.expireAfterSeconds).toBe(3600);
@@ -495,7 +503,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
       postcheck: [],
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
-    const cmd = deserialized[0]!.execute[0]!.command as CreateIndexCommand;
+    const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as CreateIndexCommand;
     expect(cmd.weights).toEqual({ bio: 10 });
     expect(cmd.default_language).toBe('english');
     expect(cmd.language_override).toBe('lang');
@@ -532,7 +540,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
       postcheck: [],
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
-    const cmd = deserialized[0]!.execute[0]!.command as CreateCollectionCommand;
+    const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as CreateCollectionCommand;
     expect(cmd.kind).toBe('createCollection');
     expect(cmd.collection).toBe('events');
     expect(cmd.capped).toBe(true);
@@ -558,7 +566,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
       postcheck: [],
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
-    const cmd = deserialized[0]!.execute[0]!.command as DropCollectionCommand;
+    const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as DropCollectionCommand;
     expect(cmd.kind).toBe('dropCollection');
     expect(cmd.collection).toBe('events');
   });
@@ -583,7 +591,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
       postcheck: [],
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
-    const cmd = deserialized[0]!.execute[0]!.command as CollModCommand;
+    const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as CollModCommand;
     expect(cmd.kind).toBe('collMod');
     expect(cmd.collection).toBe('users');
     expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
@@ -686,7 +694,7 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
       postcheck: [],
     };
     const deserialized = deserializeMongoOps(JSON.parse(serializeMongoOps([op])) as unknown[]);
-    const cmd = deserialized[0]!.execute[0]!.command as CreateCollectionCommand;
+    const cmd = asDdlOp(deserialized[0]!).execute[0]!.command as CreateCollectionCommand;
     expect(cmd.kind).toBe('createCollection');
     expect(cmd.collection).toBe('metrics');
     expect(cmd.timeseries).toEqual(timeseries);

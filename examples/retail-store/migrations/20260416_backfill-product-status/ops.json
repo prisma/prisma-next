@@ -1,0 +1,109 @@
+[
+  {
+    "id": "data_transform.backfill-product-status",
+    "label": "Data transform: backfill-product-status",
+    "operationClass": "data",
+    "name": "backfill-product-status",
+    "precheck": [
+      {
+        "description": "Check for data transform: backfill-product-status",
+        "source": {
+          "collection": "products",
+          "command": {
+            "kind": "aggregate",
+            "collection": "products",
+            "pipeline": [
+              {
+                "kind": "match",
+                "filter": {
+                  "kind": "exists",
+                  "field": "status",
+                  "exists": false
+                }
+              },
+              {
+                "kind": "limit",
+                "limit": 1
+              }
+            ]
+          },
+          "meta": {
+            "target": "mongo",
+            "storageHash": "sha256:5f5aee268e41d345787b7c5d396778443a977b10dc2ec9f14c913171fd6d1411",
+            "lane": "mongo-pipeline",
+            "paramDescriptors": []
+          }
+        },
+        "filter": {
+          "kind": "exists",
+          "field": "_id",
+          "exists": true
+        },
+        "expect": "exists"
+      }
+    ],
+    "run": [
+      {
+        "collection": "products",
+        "command": {
+          "kind": "rawUpdateMany",
+          "collection": "products",
+          "filter": {
+            "status": {
+              "$exists": false
+            }
+          },
+          "update": {
+            "$set": {
+              "status": "active"
+            }
+          }
+        },
+        "meta": {
+          "target": "mongo",
+          "storageHash": "sha256:5f5aee268e41d345787b7c5d396778443a977b10dc2ec9f14c913171fd6d1411",
+          "lane": "mongo-raw",
+          "paramDescriptors": []
+        }
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "Check for data transform: backfill-product-status",
+        "source": {
+          "collection": "products",
+          "command": {
+            "kind": "aggregate",
+            "collection": "products",
+            "pipeline": [
+              {
+                "kind": "match",
+                "filter": {
+                  "kind": "exists",
+                  "field": "status",
+                  "exists": false
+                }
+              },
+              {
+                "kind": "limit",
+                "limit": 1
+              }
+            ]
+          },
+          "meta": {
+            "target": "mongo",
+            "storageHash": "sha256:5f5aee268e41d345787b7c5d396778443a977b10dc2ec9f14c913171fd6d1411",
+            "lane": "mongo-pipeline",
+            "paramDescriptors": []
+          }
+        },
+        "filter": {
+          "kind": "exists",
+          "field": "_id",
+          "exists": true
+        },
+        "expect": "notExists"
+      }
+    ]
+  }
+]

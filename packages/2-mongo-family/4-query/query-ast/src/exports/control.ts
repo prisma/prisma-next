@@ -27,6 +27,8 @@ export { ListCollectionsCommand, ListIndexesCommand } from '../inspection-comman
 export { buildIndexOpId, defaultMongoIndexName, keysToKeySpec } from '../migration-helpers';
 export type {
   AnyMongoMigrationOperation,
+  MongoDataTransformCheck,
+  MongoDataTransformOperation,
   MongoMigrationCheck,
   MongoMigrationPlanOperation,
   MongoMigrationStep,

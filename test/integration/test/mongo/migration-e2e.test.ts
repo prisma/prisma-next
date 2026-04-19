@@ -114,7 +114,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         contract: indexedContract,
         schema,
         policy: ALL_POLICY,
-        fromHash: 'sha256:origin',
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
 
@@ -135,7 +135,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         contract: indexedContract,
         schema,
         policy: ALL_POLICY,
-        fromHash: 'sha256:origin',
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       if (result.kind !== 'success') throw new Error('Plan failed unexpectedly');
@@ -179,7 +179,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         contract: indexedContract,
         schema,
         policy: ALL_POLICY,
-        fromHash: 'sha256:origin',
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       if (result.kind !== 'success') throw new Error('Plan failed');
@@ -217,7 +217,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         contract: indexedContract,
         schema,
         policy: ALL_POLICY,
-        fromHash: 'sha256:origin',
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       if (result.kind !== 'success') throw new Error('Plan failed');
@@ -265,7 +265,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           contract: indexedContract,
           schema: createSchema,
           policy: ALL_POLICY,
-          fromHash: 'sha256:origin',
+          fromHash: 'sha256:00',
           frameworkComponents: [],
         });
         if (createResult.kind !== 'success') throw new Error('Create plan failed');
@@ -294,7 +294,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           contract: emptyContract,
           schema: dropSchema,
           policy: ALL_POLICY,
-          fromHash: 'sha256:origin',
+          fromHash: 'sha256:00',
           frameworkComponents: [],
         });
         if (dropResult.kind !== 'success') throw new Error('Drop plan failed');
@@ -358,7 +358,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           contract: indexedContract,
           schema,
           policy: ALL_POLICY,
-          fromHash: 'sha256:origin',
+          fromHash: 'sha256:00',
           frameworkComponents: [],
         });
         if (result.kind !== 'success') throw new Error('Plan failed');
@@ -418,7 +418,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           contract: indexedContract,
           schema,
           policy: ALL_POLICY,
-          fromHash: 'sha256:origin',
+          fromHash: 'sha256:00',
           frameworkComponents: [],
         });
         if (result.kind !== 'success') throw new Error('Plan failed');
