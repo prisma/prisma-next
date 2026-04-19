@@ -1,4 +1,4 @@
-import { dirname, resolve } from 'node:path';
+import { dirname, extname, resolve } from 'node:path';
 import { loadConfigWithMetadata } from '@prisma-next/cli/config-loader';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
 import { executeContractEmit } from '@prisma-next/cli/control-api';
@@ -9,6 +9,16 @@ const PLUGIN_NAME = 'prisma-vite-plugin-contract-emit';
 const DEFAULT_DEBOUNCE_MS = 150;
 const DEFAULT_CONFIG_PATH = 'prisma-next.config.ts';
 const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
+const MODULE_GRAPH_EXTENSIONS = new Set([
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.ts',
+  '.tsx',
+  '.mts',
+  '.cts',
+]);
 
 /**
  * Creates a Vite plugin that automatically emits Prisma Next contract artifacts.
@@ -93,6 +103,10 @@ export function prismaVitePlugin(
     return outputFiles;
   }
 
+  function isModuleGraphRoot(filePath: string): boolean {
+    return MODULE_GRAPH_EXTENSIONS.has(extname(filePath));
+  }
+
   async function emitContract(): Promise<ContractEmitResult | null> {
     const requestId = ++emitRequestId;
 
@@ -172,14 +186,58 @@ export function prismaVitePlugin(
 
   async function collectWatchedFiles(viteServer: ViteDevServer): Promise<Set<string>> {
     const files = new Set<string>();
+    const moduleGraphRoots = new Set<string>([absoluteConfigPath]);
 
     try {
-      // Load the config module through Vite's SSR loader to populate the module graph
-      await viteServer.ssrLoadModule(absoluteConfigPath);
+      const { config, metadata } = await loadConfigWithMetadata(absoluteConfigPath);
 
-      // Crawl the module graph starting from the config file
+      for (const outputFile of resolveContractOutputFiles(
+        config.contract?.output,
+        metadata.resolvedConfigPath,
+      )) {
+        ignoredOutputFiles.add(outputFile);
+      }
+
+      files.add(metadata.resolvedConfigPath);
+
+      for (const warning of metadata.contractWatch?.warnings ?? []) {
+        log(warning.message, 'debug');
+      }
+
+      for (const input of metadata.contractWatch?.inputs ?? []) {
+        if (!ignoredOutputFiles.has(input)) {
+          files.add(input);
+        }
+      }
+
+      if (config.contract?.watchStrategy === 'moduleGraph') {
+        for (const input of metadata.contractWatch?.inputs ?? []) {
+          if (isModuleGraphRoot(input)) {
+            moduleGraphRoots.add(input);
+          }
+        }
+      }
+    } catch {
+      ignoredOutputFiles.clear();
+    }
+
+    try {
+      // Load the config module and any declared module-graph roots through Vite's SSR loader
+      // so they appear in the module graph before we crawl their dependencies.
+      for (const root of moduleGraphRoots) {
+        try {
+          await viteServer.ssrLoadModule(root);
+        } catch (error) {
+          if (root === absoluteConfigPath) {
+            throw error;
+          }
+          log(`Skipped module-graph root after load failure: ${root}`, 'debug');
+        }
+      }
+
+      // Crawl the module graph starting from the config file and any authoritative TS roots
       const visited = new Set<string>();
-      const queue = [absoluteConfigPath];
+      const queue = [...moduleGraphRoots];
 
       while (queue.length > 0) {
         const current = queue.shift();
@@ -205,31 +263,6 @@ export function prismaVitePlugin(
       logError('Failed to collect watched files:', error);
       // At minimum, watch the config file itself
       files.add(absoluteConfigPath);
-    }
-
-    try {
-      const { config, metadata } = await loadConfigWithMetadata(absoluteConfigPath);
-
-      for (const outputFile of resolveContractOutputFiles(
-        config.contract?.output,
-        metadata.resolvedConfigPath,
-      )) {
-        ignoredOutputFiles.add(outputFile);
-      }
-
-      files.add(metadata.resolvedConfigPath);
-
-      for (const warning of metadata.contractWatch?.warnings ?? []) {
-        log(warning.message, 'debug');
-      }
-
-      for (const input of metadata.contractWatch?.inputs ?? []) {
-        if (!ignoredOutputFiles.has(input)) {
-          files.add(input);
-        }
-      }
-    } catch {
-      ignoredOutputFiles.clear();
     }
 
     for (const ignoredFile of ignoredOutputFiles) {
@@ -289,7 +322,7 @@ export function prismaVitePlugin(
 
     async configureServer(viteServer) {
       server = viteServer;
-      const onWatcherChange = (file: string) => {
+      const onTrackedWatcherEvent = (file: string) => {
         handleTrackedFileChange(file);
       };
 
@@ -303,7 +336,9 @@ export function prismaVitePlugin(
           currentAbortController.abort();
           currentAbortController = null;
         }
-        viteServer.watcher.off?.('change', onWatcherChange);
+        viteServer.watcher.off?.('change', onTrackedWatcherEvent);
+        viteServer.watcher.off?.('add', onTrackedWatcherEvent);
+        viteServer.watcher.off?.('unlink', onTrackedWatcherEvent);
         server = null;
         watchedFiles.clear();
         ignoredOutputFiles.clear();
@@ -313,7 +348,9 @@ export function prismaVitePlugin(
       // Register cleanup on server close via httpServer or watcher
       viteServer.httpServer?.on('close', cleanup);
       viteServer.watcher?.on?.('close', cleanup);
-      viteServer.watcher.on('change', onWatcherChange);
+      viteServer.watcher.on('change', onTrackedWatcherEvent);
+      viteServer.watcher.on('add', onTrackedWatcherEvent);
+      viteServer.watcher.on('unlink', onTrackedWatcherEvent);
 
       // Collect files to watch from the module graph
       for (const file of await collectWatchedFiles(viteServer)) {
