@@ -5,7 +5,7 @@
 A Mongo migration class already looks like a migration plan:
 
 ```ts
-class AddPostsAuthorIndex extends MongoMigration {
+class AddPostsAuthorIndex extends Migration {
   override get operations() {
     return [createIndex('posts', [{ field: 'authorId', direction: 1 }])];
   }
