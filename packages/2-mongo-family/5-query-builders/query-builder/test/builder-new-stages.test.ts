@@ -45,28 +45,30 @@ describe('new stage builder methods', () => {
   });
 
   describe('out()', () => {
-    it('adds MongoOutStage with collection', () => {
-      const plan = createOrdersBuilder().out('results').build();
+    it('terminates the chain into a write plan with $out as the final stage', () => {
+      const plan = createOrdersBuilder().out('results');
       const pipeline = (plan.command as AggregateCommand).pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoOutStage);
       expect((pipeline[0] as MongoOutStage).collection).toBe('results');
+      expect(plan.meta.lane).toBe('mongo-write');
     });
 
-    it('adds MongoOutStage with collection and db', () => {
-      const plan = createOrdersBuilder().out('results', 'archive').build();
+    it('threads the optional db parameter through to the stage', () => {
+      const plan = createOrdersBuilder().out('results', 'archive');
       const stage = (plan.command as AggregateCommand).pipeline[0] as MongoOutStage;
       expect(stage.db).toBe('archive');
     });
   });
 
   describe('merge()', () => {
-    it('adds MongoMergeStage', () => {
-      const plan = createOrdersBuilder().merge({ into: 'output', whenMatched: 'replace' }).build();
+    it('terminates the chain into a write plan with $merge as the final stage', () => {
+      const plan = createOrdersBuilder().merge({ into: 'output', whenMatched: 'replace' });
       const pipeline = (plan.command as AggregateCommand).pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoMergeStage);
       expect((pipeline[0] as MongoMergeStage).into).toBe('output');
+      expect(plan.meta.lane).toBe('mongo-write');
     });
   });
 
