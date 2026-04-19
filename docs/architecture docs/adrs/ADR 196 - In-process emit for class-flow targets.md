@@ -53,6 +53,8 @@ await writeMigrationOps(dir, operations);
 const migrationId = await attestMigration(dir);
 ```
 
+The guards in this pipeline throw structured errors: `PN-MIG-2002` if `migration.ts` is missing, `PN-MIG-2003` if the default export is not a `Migration` subclass, and `PN-MIG-2004` if `instance.operations` is not an array (see [ADR 027](ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md)).
+
 This is transitional infrastructure: it bridges the CLI to the descriptor flow (where evaluating `migration.ts` produces a descriptor list rather than a self-emitting class) and gives `migration plan` a single in-process dispatch path it can use against either flow. Once the descriptor flow is removed, `migration emit` disappears entirely ([ADR 193](ADR%20193%20-%20Class-flow%20as%20the%20canonical%20migration%20authoring%20strategy.md)) and shebang execution becomes the only emit path that matters for class-flow targets.
 
 ### The `MongoMigration.run(...)` guard
@@ -72,7 +74,7 @@ The framework's `emitMigration` helper doesn't know whether a target uses descri
 - **Descriptor flow** (e.g. Postgres, transitional): `resolveDescriptors` is present. The framework evaluates `migration.ts` to obtain operation descriptors, passes them to the target's resolver, writes `ops.json`, and attests.
 - **Class flow** (e.g. Mongo, canonical): `emit` is present. The target owns the load → instantiate → serialize pipeline; the framework attests after.
 
-The two are mutually exclusive in practice — a target implements one or the other. The capability dispatch and the CLI's class-flow `emit` path both exist to support the descriptor-flow bridge during the migration to class-flow as canonical ([ADR 193](ADR%20193%20-%20Class-flow%20as%20the%20canonical%20migration%20authoring%20strategy.md)).
+The two are mutually exclusive in practice — a target implements one or the other. If a target registers a migrations capability but provides neither method, the dispatch throws `PN-MIG-2011` (see [ADR 027](ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md)). The capability dispatch and the CLI's class-flow `emit` path both exist to support the descriptor-flow bridge during the migration to class-flow as canonical ([ADR 193](ADR%20193%20-%20Class-flow%20as%20the%20canonical%20migration%20authoring%20strategy.md)).
 
 ## Why not subprocess
 
