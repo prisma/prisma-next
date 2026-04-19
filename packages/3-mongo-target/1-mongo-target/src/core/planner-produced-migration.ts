@@ -1,6 +1,7 @@
 import type { MigrationPlanWithAuthoringSurface } from '@prisma-next/framework-components/control';
 import { Migration, type MigrationMeta } from '@prisma-next/migration-tools/migration';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { OpFactoryCall } from './op-factory-call';
 import { renderOps } from './render-ops';
 import { renderCallsToTypeScript } from './render-typescript';
@@ -46,8 +47,8 @@ export class PlannerProducedMongoMigration
     return renderCallsToTypeScript(this.calls, {
       from: this.meta.from,
       to: this.meta.to,
-      ...(this.meta.kind !== undefined ? { kind: this.meta.kind } : {}),
-      ...(this.meta.labels !== undefined ? { labels: this.meta.labels } : {}),
+      ...ifDefined('kind', this.meta.kind),
+      ...ifDefined('labels', this.meta.labels),
     });
   }
 }
