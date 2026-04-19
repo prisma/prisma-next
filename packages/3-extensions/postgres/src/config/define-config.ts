@@ -50,6 +50,7 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
           },
           output,
           watchInputs: [options.contract],
+          watchStrategy: 'moduleGraph',
         }
       : prismaContract(options.contract, {
           output,

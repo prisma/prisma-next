@@ -56,6 +56,7 @@ describe('defineConfig facade', () => {
     expect(typeof tsConfig.contract?.source).toBe('function');
     expect(tsConfig.contract?.output).toBe('./prisma/contract.json');
     expect(tsConfig.contract?.watchInputs).toEqual(['./prisma/contract.ts']);
+    expect(tsConfig.contract?.watchStrategy).toBe('moduleGraph');
     expect(tsConfig.contract?.source).not.toBe(pslConfig.contract?.source);
   });
 
