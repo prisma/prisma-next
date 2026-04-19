@@ -86,9 +86,17 @@ class MongoAdapterImpl implements MongoAdapter {
           lowerFilter(command.filter),
           this.#lowerUpdate(command.update),
           command.upsert,
+          command.sort,
+          command.skip,
+          command.returnDocument,
         );
       case 'findOneAndDelete':
-        return new FindOneAndDeleteWireCommand(command.collection, lowerFilter(command.filter));
+        return new FindOneAndDeleteWireCommand(
+          command.collection,
+          lowerFilter(command.filter),
+          command.sort,
+          command.skip,
+        );
       case 'aggregate':
         return new AggregateWireCommand(command.collection, lowerPipeline(command.pipeline));
       case 'rawAggregate':
@@ -111,9 +119,17 @@ class MongoAdapterImpl implements MongoAdapter {
           command.filter,
           command.update,
           command.upsert,
+          command.sort,
+          command.skip,
+          command.returnDocument,
         );
       case 'rawFindOneAndDelete':
-        return new FindOneAndDeleteWireCommand(command.collection, command.filter);
+        return new FindOneAndDeleteWireCommand(
+          command.collection,
+          command.filter,
+          command.sort,
+          command.skip,
+        );
       // v8 ignore next 4
       default: {
         const _exhaustive: never = command;

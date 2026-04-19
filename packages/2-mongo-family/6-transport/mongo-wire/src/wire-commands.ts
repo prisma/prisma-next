@@ -102,17 +102,26 @@ export class FindOneAndUpdateWireCommand extends MongoWireCommand {
   readonly filter: Document;
   readonly update: Document | ReadonlyArray<Document>;
   readonly upsert: boolean;
+  readonly sort: Record<string, 1 | -1> | undefined;
+  readonly skip: number | undefined;
+  readonly returnDocument: 'before' | 'after';
 
   constructor(
     collection: string,
     filter: Document,
     update: Document | ReadonlyArray<Document>,
-    upsert: boolean,
+    upsert = false,
+    sort?: Record<string, 1 | -1>,
+    skip?: number,
+    returnDocument: 'before' | 'after' = 'after',
   ) {
     super(collection);
     this.filter = filter;
     this.update = update;
     this.upsert = upsert;
+    this.sort = sort;
+    this.skip = skip;
+    this.returnDocument = returnDocument;
     this.freeze();
   }
 }
@@ -120,10 +129,14 @@ export class FindOneAndUpdateWireCommand extends MongoWireCommand {
 export class FindOneAndDeleteWireCommand extends MongoWireCommand {
   readonly kind = 'findOneAndDelete' as const;
   readonly filter: Document;
+  readonly sort: Record<string, 1 | -1> | undefined;
+  readonly skip: number | undefined;
 
-  constructor(collection: string, filter: Document) {
+  constructor(collection: string, filter: Document, sort?: Record<string, 1 | -1>, skip?: number) {
     super(collection);
     this.filter = filter;
+    this.sort = sort;
+    this.skip = skip;
     this.freeze();
   }
 }

@@ -32,6 +32,20 @@ describe('M3 find-and-modify and upsert terminals', () => {
       expect((plan.command as FindOneAndUpdateCommand).upsert).toBe(true);
     });
 
+    it('defaults returnDocument to after', () => {
+      const plan = orders()
+        .match((f) => f.status.eq('new'))
+        .findOneAndUpdate((f) => [f.status.set('seen')]);
+      expect((plan.command as FindOneAndUpdateCommand).returnDocument).toBe('after');
+    });
+
+    it('threads opts.returnDocument through to the wire command', () => {
+      const plan = orders()
+        .match((f) => f.status.eq('new'))
+        .findOneAndUpdate((f) => [f.status.set('seen')], { returnDocument: 'before' });
+      expect((plan.command as FindOneAndUpdateCommand).returnDocument).toBe('before');
+    });
+
     it('rejects an empty updater (caller almost certainly forgot something)', () => {
       expect(() =>
         orders()

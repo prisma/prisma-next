@@ -119,18 +119,27 @@ export class FindOneAndUpdateCommand extends MongoAstNode {
   readonly filter: MongoFilterExpr;
   readonly update: MongoUpdateSpec;
   readonly upsert: boolean;
+  readonly sort: Record<string, 1 | -1> | undefined;
+  readonly skip: number | undefined;
+  readonly returnDocument: 'before' | 'after';
 
   constructor(
     collection: string,
     filter: MongoFilterExpr,
     update: MongoUpdateSpec,
-    upsert: boolean,
+    upsert = false,
+    sort?: Record<string, 1 | -1>,
+    skip?: number,
+    returnDocument: 'before' | 'after' = 'after',
   ) {
     super();
     this.collection = collection;
     this.filter = filter;
     this.update = update;
     this.upsert = upsert;
+    this.sort = sort;
+    this.skip = skip;
+    this.returnDocument = returnDocument;
     this.freeze();
   }
 }
@@ -139,11 +148,20 @@ export class FindOneAndDeleteCommand extends MongoAstNode {
   readonly kind = 'findOneAndDelete' as const;
   readonly collection: string;
   readonly filter: MongoFilterExpr;
+  readonly sort: Record<string, 1 | -1> | undefined;
+  readonly skip: number | undefined;
 
-  constructor(collection: string, filter: MongoFilterExpr) {
+  constructor(
+    collection: string,
+    filter: MongoFilterExpr,
+    sort?: Record<string, 1 | -1>,
+    skip?: number,
+  ) {
     super();
     this.collection = collection;
     this.filter = filter;
+    this.sort = sort;
+    this.skip = skip;
     this.freeze();
   }
 }
