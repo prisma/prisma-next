@@ -202,13 +202,13 @@ async function executeMigrationNewCommand(
     );
   }
 
-  assertFrameworkComponentsCompatible(config.family.familyId, config.target.targetId, [
-    config.target,
-    config.adapter,
-    ...(config.extensionPacks ?? []),
-  ]);
-
   try {
+    assertFrameworkComponentsCompatible(config.family.familyId, config.target.targetId, [
+      config.target,
+      config.adapter,
+      ...(config.extensionPacks ?? []),
+    ]);
+
     await writeMigrationPackage(packageDir, manifest, []);
     await copyContractToMigrationDir(packageDir, contractPathAbsolute);
 
