@@ -472,24 +472,17 @@ export class FilteredCollection<
   // --- Find-and-modify ---
 
   /**
-   * Find a single matching document and apply `updaterFn` to it. The driver
-   * returns the updated document (`returnDocument: 'after'` is hardcoded —
-   * the spec defers caller-controllable `returnDocument` to a follow-up;
-   * see [TML-2267 plan §M3.2](../../../../projects/mongo-pipeline-builder/plans/query-builder-unification-plan.md)).
+   * Find a single matching document and apply `updaterFn` to it.
    *
-   * `opts.upsert` (default `false`) toggles insert-on-miss behaviour. The
-   * upsert path inserts a new document derived from filter equality fields
-   * plus the update spec when no match is found.
-   *
-   * Returns `MongoQueryPlan<unknown>` until the contract-typed shape can be
-   * narrowed (deferred to M3 close-out — the `MongoQueryPlan` row type
-   * here is the actual document shape, not a write-result envelope).
+   * `opts.upsert` (default `false`) toggles insert-on-miss behaviour.
+   * `opts.returnDocument` (default `'after'`) controls whether the row
+   * stream yields the document as it was before or after the update.
    */
   findOneAndUpdate(
     updaterFn: (
       fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
     ) => ReadonlyArray<TypedUpdateOp>,
-    opts: { readonly upsert?: boolean } = {},
+    opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
   ): MongoQueryPlan<ModelToDocShape<TContract, ModelName>> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new FindOneAndUpdateCommand(
@@ -497,6 +490,9 @@ export class FilteredCollection<
       this.#foldedFilter(),
       update,
       opts.upsert ?? false,
+      undefined,
+      undefined,
+      opts.returnDocument ?? 'after',
     );
     return {
       collection: this.#ctx.collection,

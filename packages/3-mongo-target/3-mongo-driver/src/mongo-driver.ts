@@ -123,8 +123,9 @@ export class MongoDriverImpl implements MongoDriver {
   ): AsyncIterable<Record<string, unknown>> {
     const collection = this.#db.collection(cmd.collection);
     const result = await collection.findOneAndUpdate(cmd.filter, cmd.update, {
-      returnDocument: 'after',
+      returnDocument: cmd.returnDocument,
       upsert: cmd.upsert,
+      ...(cmd.sort != null ? { sort: cmd.sort } : {}),
     });
     if (result) {
       yield result as Record<string, unknown>;
@@ -135,7 +136,9 @@ export class MongoDriverImpl implements MongoDriver {
     cmd: FindOneAndDeleteWireCommand,
   ): AsyncIterable<Record<string, unknown>> {
     const collection = this.#db.collection(cmd.collection);
-    const result = await collection.findOneAndDelete(cmd.filter);
+    const result = await collection.findOneAndDelete(cmd.filter, {
+      ...(cmd.sort != null ? { sort: cmd.sort } : {}),
+    });
     if (result) {
       yield result as Record<string, unknown>;
     }
