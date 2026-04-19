@@ -103,7 +103,7 @@ function descriptorToBuilderCall(desc: OperationDescriptor): string {
 /**
  * Scaffolds a migration.ts file in the given package directory.
  * Serializes operation descriptors as builder calls that the user can edit.
- * On verify, this file is re-evaluated to produce the final ops.
+ * On emit, this file is re-evaluated to produce the final ops.
  */
 export async function scaffoldMigrationTs(
   packageDir: string,

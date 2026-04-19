@@ -248,7 +248,7 @@ export function createMigrationNewCommand(): Command {
           ui.output(`  from: ${value.from}`);
           ui.output(`  to:   ${value.to}`);
           ui.output(
-            `\nEdit migration.ts, then run \`prisma-next migration emit --dir ${value.dir}\` to attest.`,
+            `\nEdit migration.ts, then run \`prisma-next migration emit --dir "${value.dir}"\` to attest.`,
           );
         }
       });
