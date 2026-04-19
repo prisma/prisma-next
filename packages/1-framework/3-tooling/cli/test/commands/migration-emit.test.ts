@@ -131,14 +131,10 @@ describe('migration emit command', () => {
       );
 
       const command = createMigrationEmitCommand();
-      let thrown = false;
-      try {
-        await executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']);
-      } catch {
-        thrown = true;
-      }
+      await expect(
+        executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']),
+      ).rejects.toBeDefined();
 
-      expect(thrown).toBe(true);
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       expect(jsonLine).toBeDefined();
       const envelope = JSON.parse(jsonLine!) as {
