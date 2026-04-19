@@ -421,6 +421,20 @@ describe('defineConfig', () => {
     expect(result.contract?.output).toBe('src/prisma/contract.json');
   });
 
+  it('omits watch metadata when it is not provided', () => {
+    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
+    const config = createValidConfig({
+      contract: {
+        source: sourceProvider,
+      },
+    });
+
+    const result = defineConfig(config);
+    expect(result.contract).toBeDefined();
+    expect(Object.hasOwn(result.contract ?? {}, 'watchInputs')).toBe(false);
+    expect(Object.hasOwn(result.contract ?? {}, 'watchStrategy')).toBe(false);
+  });
+
   it('preserves custom output path', () => {
     const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config = createValidConfig({
