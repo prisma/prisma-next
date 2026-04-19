@@ -29,12 +29,47 @@ describe('state-machine surface (negative type tests)', () => {
     h.deleteOne();
   });
 
-  it('CollectionHandle does not expose findOneAndUpdate / findOneAndDelete', () => {
-    const h = handle();
-    // @ts-expect-error — find-and-modify requires a `.match(...)` first
-    h.findOneAndUpdate((f) => [f.amount.inc(1)]);
-    // @ts-expect-error — find-and-modify requires a `.match(...)` first
-    h.findOneAndDelete();
+  it('findOneAndUpdate / findOneAndDelete unavailable after FindAndModifyCompat-clearing stages', () => {
+    // .group() clears both markers
+    const grouped = handle()
+      .match(MongoFieldFilter.eq('status', 'new'))
+      .group(() => ({ _id: null }));
+    // @ts-expect-error — group clears FindAndModifyCompat
+    grouped.findOneAndUpdate((f) => [f.amount.inc(1)]);
+    // @ts-expect-error — group clears FindAndModifyCompat
+    grouped.findOneAndDelete();
+
+    // .limit() clears both markers
+    const limited = handle().match(MongoFieldFilter.eq('status', 'new')).limit(1);
+    // @ts-expect-error — limit clears FindAndModifyCompat
+    limited.findOneAndUpdate((f) => [f.amount.inc(1)]);
+    // @ts-expect-error — limit clears FindAndModifyCompat
+    limited.findOneAndDelete();
+
+    // .addFields() clears FindAndModifyCompat
+    const withAddFields = handle()
+      .match(MongoFieldFilter.eq('status', 'new'))
+      .addFields(() => ({}));
+    // @ts-expect-error — addFields clears FindAndModifyCompat
+    withAddFields.findOneAndUpdate((f) => [f.amount.inc(1)]);
+    // @ts-expect-error — addFields clears FindAndModifyCompat
+    withAddFields.findOneAndDelete();
+
+    // .project() clears FindAndModifyCompat
+    const projected = handle().match(MongoFieldFilter.eq('status', 'new')).project('status');
+    // @ts-expect-error — project clears FindAndModifyCompat
+    projected.findOneAndUpdate((f) => [f.amount.inc(1)]);
+    // @ts-expect-error — project clears FindAndModifyCompat
+    projected.findOneAndDelete();
+
+    // .unwind() clears both markers
+    const unwound = handle()
+      .match(MongoFieldFilter.eq('status', 'new'))
+      .unwind('tags' as never);
+    // @ts-expect-error — unwind clears FindAndModifyCompat
+    unwound.findOneAndUpdate((f) => [f.amount.inc(1)]);
+    // @ts-expect-error — unwind clears FindAndModifyCompat
+    unwound.findOneAndDelete();
   });
 
   it('FilteredCollection does not expose insert / unqualified-write terminals', () => {

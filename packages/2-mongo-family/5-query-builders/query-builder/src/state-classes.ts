@@ -478,7 +478,7 @@ export class FilteredCollection<
    * `opts.returnDocument` (default `'after'`) controls whether the row
    * stream yields the document as it was before or after the update.
    */
-  findOneAndUpdate(
+  override findOneAndUpdate(
     updaterFn: (
       fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
     ) => ReadonlyArray<TypedUpdateOp>,
@@ -505,7 +505,7 @@ export class FilteredCollection<
    * Find a single matching document and delete it. Returns the deleted
    * document via the row stream.
    */
-  findOneAndDelete(): MongoQueryPlan<ModelToDocShape<TContract, ModelName>> {
+  override findOneAndDelete(): MongoQueryPlan<ModelToDocShape<TContract, ModelName>> {
     const command = new FindOneAndDeleteCommand(this.#ctx.collection, this.#foldedFilter());
     return {
       collection: this.#ctx.collection,

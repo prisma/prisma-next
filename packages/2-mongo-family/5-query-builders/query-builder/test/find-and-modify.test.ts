@@ -65,6 +65,61 @@ describe('M3 find-and-modify and upsert terminals', () => {
     });
   });
 
+  describe('PipelineChain.findOneAndUpdate (chain deconstruction)', () => {
+    it('deconstructs match + sort + skip into wire-command slots', () => {
+      const plan = orders()
+        .match((f) => f.status.eq('new'))
+        .sort({ amount: -1 })
+        .skip(5)
+        .findOneAndUpdate((f) => [f.status.set('processed')]);
+      expect(plan.command).toBeInstanceOf(FindOneAndUpdateCommand);
+      const cmd = plan.command as FindOneAndUpdateCommand;
+      expect(cmd.sort).toEqual({ amount: -1 });
+      expect(cmd.skip).toBe(5);
+      expect(cmd.update).toEqual({ $set: { status: 'processed' } });
+    });
+
+    it('AND-folds multiple match stages', () => {
+      const plan = orders()
+        .match((f) => f.status.eq('new'))
+        .match((f) => f.amount.gt(10))
+        .findOneAndUpdate((f) => [f.status.set('big')]);
+      const cmd = plan.command as FindOneAndUpdateCommand;
+      expect(cmd.filter.kind).toBe('and');
+    });
+
+    it('last-writer-wins per sort key across multiple sort stages', () => {
+      const plan = orders()
+        .match((f) => f.status.eq('new'))
+        .sort({ amount: 1 })
+        .sort({ amount: -1 })
+        .findOneAndUpdate((f) => [f.status.set('seen')]);
+      const cmd = plan.command as FindOneAndUpdateCommand;
+      expect(cmd.sort).toEqual({ amount: -1 });
+    });
+
+    it('throws on chains with non-deconstructable stages', () => {
+      const chain = orders()
+        .match((f) => f.status.eq('new'))
+        .addFields(() => ({})) as unknown as ReturnType<typeof orders>;
+      expect(() => chain.findOneAndUpdate((f) => [f.status.set('bad')])).toThrow(
+        /\$match\/\$sort\/\$skip/,
+      );
+    });
+  });
+
+  describe('PipelineChain.findOneAndDelete (chain deconstruction)', () => {
+    it('deconstructs match + sort into wire-command slots', () => {
+      const plan = orders()
+        .match((f) => f.status.eq('archived'))
+        .sort({ amount: 1 })
+        .findOneAndDelete();
+      expect(plan.command).toBeInstanceOf(FindOneAndDeleteCommand);
+      const cmd = plan.command as FindOneAndDeleteCommand;
+      expect(cmd.sort).toEqual({ amount: 1 });
+    });
+  });
+
   describe('upsertOne', () => {
     it('CollectionHandle.upsertOne emits UpdateOneCommand with upsert=true and the supplied filter', () => {
       const plan = orders().upsertOne(
