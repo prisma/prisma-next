@@ -143,8 +143,6 @@ For each executed op, record:
 - ADR 037 — Transactional DDL fallback & compensation
 - ADR 038 — Operation idempotency classification & enforcement
 - ADR 040 — Node task execution environment & sandboxing
-- ADR 028 — Migration structure & operations
-- ADR 188 — MongoDB migration operation model
 - ADR 029 — Shadow DB preflight semantics
 - ADR 051 — PPg preflight-as-a-service contract
 
