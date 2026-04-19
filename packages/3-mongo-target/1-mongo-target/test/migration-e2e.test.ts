@@ -1,6 +1,7 @@
 import { execFile, spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { join, resolve } from 'pathe';
@@ -12,8 +13,8 @@ const repoRoot = resolve(packageRoot, '../../..');
 const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
 
 const familyMongoRoot = resolve(repoRoot, 'packages/2-mongo-family/9-family');
-const migrationExport = join(familyMongoRoot, 'src/exports/migration.ts').replace(/\\/g, '/');
-const factoryExport = join(packageRoot, 'src/exports/migration.ts').replace(/\\/g, '/');
+const migrationExport = pathToFileURL(join(familyMongoRoot, 'src/exports/migration.ts')).href;
+const factoryExport = pathToFileURL(join(packageRoot, 'src/exports/migration.ts')).href;
 
 /**
  * `Migration.run(..., { dryRun })` prints both `--- migration.json ---` and
@@ -263,26 +264,25 @@ describe('migration file E2E', () => {
   });
 
   describe('scaffolded migration is directly runnable', () => {
-    const familyMongoDistMigration = join(familyMongoRoot, 'dist/migration.mjs').replace(
-      /\\/g,
-      '/',
-    );
-    const targetMongoDistMigration = join(packageRoot, 'dist/migration.mjs').replace(/\\/g, '/');
+    const familyMongoDistMigrationPath = join(familyMongoRoot, 'dist/migration.mjs');
+    const targetMongoDistMigrationPath = join(packageRoot, 'dist/migration.mjs');
+    const familyMongoDistMigration = pathToFileURL(familyMongoDistMigrationPath).href;
+    const targetMongoDistMigration = pathToFileURL(targetMongoDistMigrationPath).href;
 
     it('runs via ./migration.ts on POSIX (or node migration.ts on Windows) and prints operations JSON', async (ctx) => {
       const distsExist = await Promise.all([
-        stat(familyMongoDistMigration).then(
+        stat(familyMongoDistMigrationPath).then(
           () => true,
           () => false,
         ),
-        stat(targetMongoDistMigration).then(
+        stat(targetMongoDistMigrationPath).then(
           () => true,
           () => false,
         ),
       ]);
       if (!distsExist.every(Boolean)) {
         ctx.skip(
-          `dist migration entrypoints not built: ${familyMongoDistMigration}, ${targetMongoDistMigration} — run \`pnpm build\` for @prisma-next/family-mongo and @prisma-next/target-mongo`,
+          `dist migration entrypoints not built: ${familyMongoDistMigrationPath}, ${targetMongoDistMigrationPath} — run \`pnpm build\` for @prisma-next/family-mongo and @prisma-next/target-mongo`,
         );
       }
 
