@@ -297,7 +297,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
 
     expect(result.assertNotOk()).toMatchObject({
       code: 'POSTCHECK_FAILED',
-      summary: `Data transform "${op.name}" (${op.id}) failed post-check.`,
+      summary: `Operation ${op.id} failed during postcheck`,
       meta: { operationId: op.id, name: op.name },
     });
     expect(harness.driver.executeCalls.map((c) => c.kind)).toEqual([
