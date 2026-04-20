@@ -5,6 +5,7 @@ import {
   errorConfigValidation,
   errorUnexpected,
 } from '@prisma-next/errors/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { loadConfig as loadConfigC12 } from 'c12';
 import { dirname, resolve } from 'pathe';
 
@@ -15,7 +16,7 @@ async function loadValidatedConfig(configPath?: string): Promise<PrismaNextConfi
 
   const result = await loadConfigC12<PrismaNextConfig>({
     name: 'prisma-next',
-    ...(resolvedConfigPath ? { configFile: resolvedConfigPath } : {}),
+    ...ifDefined('configFile', resolvedConfigPath),
     cwd: configCwd,
   });
 
