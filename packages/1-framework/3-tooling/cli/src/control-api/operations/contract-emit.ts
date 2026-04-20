@@ -1,10 +1,10 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { dirname, isAbsolute, join, resolve } from 'pathe';
+import { basename, dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
@@ -15,6 +15,12 @@ interface ProviderFailureLike {
   readonly summary: string;
   readonly diagnostics: readonly unknown[];
   readonly meta?: unknown;
+}
+
+interface EmitWriteTargetState {
+  nextGeneration: number;
+  committedGeneration: number;
+  queue: Promise<void>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -29,6 +35,149 @@ function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
   return (
     isRecord(value) && typeof value['summary'] === 'string' && Array.isArray(value['diagnostics'])
   );
+}
+
+const emitWriteTargets = new Map<string, EmitWriteTargetState>();
+
+function getEmitWriteTargetState(outputJsonPath: string): EmitWriteTargetState {
+  const existing = emitWriteTargets.get(outputJsonPath);
+  if (existing) {
+    return existing;
+  }
+
+  const created: EmitWriteTargetState = {
+    nextGeneration: 0,
+    committedGeneration: 0,
+    queue: Promise.resolve(),
+  };
+  emitWriteTargets.set(outputJsonPath, created);
+  return created;
+}
+
+function issueEmitGeneration(outputJsonPath: string): number {
+  const state = getEmitWriteTargetState(outputJsonPath);
+  state.nextGeneration += 1;
+  return state.nextGeneration;
+}
+
+function queueEmitWrite<T>(
+  outputJsonPath: string,
+  action: (state: EmitWriteTargetState) => Promise<T>,
+): Promise<T> {
+  const state = getEmitWriteTargetState(outputJsonPath);
+  const run = state.queue.then(
+    () => action(state),
+    () => action(state),
+  );
+  state.queue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function createTempArtifactPath(path: string, generation: number, phase: string): string {
+  return join(dirname(path), `.${basename(path)}.${process.pid}.${generation}.${phase}.tmp`);
+}
+
+async function readExistingArtifact(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, 'utf-8');
+  } catch (error) {
+    if (isRecord(error) && error['code'] === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function restoreArtifact(
+  path: string,
+  content: string | undefined,
+  generation: number,
+): Promise<void> {
+  if (content === undefined) {
+    await rm(path, { force: true });
+    return;
+  }
+
+  const restorePath = createTempArtifactPath(path, generation, 'rollback');
+  await writeFile(restorePath, content, 'utf-8');
+  try {
+    await rename(restorePath, path);
+  } finally {
+    await rm(restorePath, { force: true });
+  }
+}
+
+async function writeContractArtifacts({
+  outputJsonPath,
+  outputDtsPath,
+  generation,
+  signal,
+  contractJson,
+  contractDts,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly generation: number;
+  readonly signal: AbortSignal;
+  readonly contractJson: string;
+  readonly contractDts: string;
+}): Promise<void> {
+  await queueEmitWrite(outputJsonPath, async (state) => {
+    signal.throwIfAborted();
+
+    if (generation < state.nextGeneration) {
+      return;
+    }
+
+    const tempJsonPath = createTempArtifactPath(outputJsonPath, generation, 'next');
+    const tempDtsPath = createTempArtifactPath(outputDtsPath, generation, 'next');
+    let cleanupJsonTemp = true;
+    let cleanupDtsTemp = true;
+
+    try {
+      await writeFile(tempJsonPath, contractJson, 'utf-8');
+      await writeFile(tempDtsPath, contractDts, 'utf-8');
+
+      signal.throwIfAborted();
+
+      if (generation < state.nextGeneration) {
+        return;
+      }
+
+      const previousDts = await readExistingArtifact(outputDtsPath);
+      const previousJson = await readExistingArtifact(outputJsonPath);
+      let replacedDts = false;
+      let replacedJson = false;
+
+      try {
+        await rename(tempDtsPath, outputDtsPath);
+        cleanupDtsTemp = false;
+        replacedDts = true;
+
+        await rename(tempJsonPath, outputJsonPath);
+        cleanupJsonTemp = false;
+        replacedJson = true;
+      } catch (error) {
+        await Promise.allSettled([
+          replacedDts ? restoreArtifact(outputDtsPath, previousDts, generation) : Promise.resolve(),
+          replacedJson
+            ? restoreArtifact(outputJsonPath, previousJson, generation)
+            : Promise.resolve(),
+        ]);
+        throw error;
+      }
+
+      state.committedGeneration = generation;
+    } finally {
+      await Promise.allSettled([
+        cleanupJsonTemp ? rm(tempJsonPath, { force: true }) : Promise.resolve(),
+        cleanupDtsTemp ? rm(tempDtsPath, { force: true }) : Promise.resolve(),
+      ]);
+    }
+  });
 }
 
 /**
@@ -93,6 +242,7 @@ export async function executeContractEmit(
     : join(configDir, contractConfig.output);
   // Colocate .d.ts with .json (contract.json → contract.d.ts)
   const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
+  const generation = issueEmitGeneration(outputJsonPath);
 
   const stack = createControlStack(config);
 
@@ -164,8 +314,14 @@ export async function executeContractEmit(
 
   // Create directory if needed and write files (both colocated)
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
-  await unlessAborted(writeFile(outputJsonPath, emitResult.contractJson, 'utf-8'));
-  await unlessAborted(writeFile(outputDtsPath, emitResult.contractDts, 'utf-8'));
+  await writeContractArtifacts({
+    outputJsonPath,
+    outputDtsPath,
+    generation,
+    signal,
+    contractJson: emitResult.contractJson,
+    contractDts: emitResult.contractDts,
+  });
 
   // Validate that contract.d.ts type imports are resolvable
   const { validateContractDeps } = await import('../../utils/validate-contract-deps');

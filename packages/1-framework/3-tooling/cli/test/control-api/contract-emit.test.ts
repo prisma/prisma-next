@@ -1,6 +1,31 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { Contract } from '@prisma-next/contract/types';
+import type { EmitResult } from '@prisma-next/emitter';
+import { emit as emitFn } from '@prisma-next/emitter';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as configLoader from '../../src/config-loader';
 import { executeContractEmit } from '../../src/control-api/operations/contract-emit';
+
+vi.mock('@prisma-next/emitter', () => ({
+  emit: vi.fn(),
+}));
+
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+  return {
+    ...actual,
+    mkdir: vi.fn(actual.mkdir),
+    rename: vi.fn(actual.rename),
+    writeFile: vi.fn(actual.writeFile),
+  };
+});
+
+type FsWriteFile = typeof import('node:fs/promises')['writeFile'];
+
+const mockedEmit = vi.mocked(emitFn);
+const mockedWriteFile = vi.mocked(writeFile);
 
 const stubDescriptor = (kind: string, id: string) => ({
   kind,
@@ -16,7 +41,105 @@ function mockConfigWithContract(contractOverrides: Record<string, unknown>) {
   } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>;
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, resolve, reject };
+}
+
+async function eventually(assertion: () => void): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      await Promise.resolve();
+    }
+  }
+  throw lastError;
+}
+
+function createMockContract(): Contract {
+  return {
+    capabilities: {},
+    extensionPacks: {},
+  } as unknown as Contract;
+}
+
+function createEmitResult(generation: string): EmitResult {
+  return {
+    storageHash: `storage-${generation}`,
+    profileHash: `profile-${generation}`,
+    contractJson: JSON.stringify({ generation }),
+    contractDts: `export type Generation = '${generation}';\n`,
+  };
+}
+
+function createSuccessfulConfig(output: string) {
+  const familyInstance = {
+    validateContract: vi.fn(),
+  };
+
+  return {
+    family: {
+      id: 'family:test',
+      version: '0.0.1',
+      familyId: 'test-family',
+      emission: {},
+      create: () => familyInstance,
+    },
+    target: {
+      kind: 'target',
+      id: 'target:test',
+      version: '0.0.1',
+      familyId: 'test-family',
+      targetId: 'test-target',
+    },
+    adapter: {
+      kind: 'adapter',
+      id: 'adapter:test',
+      version: '0.0.1',
+      familyId: 'test-family',
+      targetId: 'test-target',
+    },
+    extensionPacks: [],
+    contract: {
+      source: async () => ({
+        ok: true as const,
+        value: createMockContract(),
+      }),
+      output,
+    },
+  } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>;
+}
+
 describe('executeContractEmit', () => {
+  let tmpDir = '';
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'contract-emit-'));
+    mockedEmit.mockReset();
+    mockedWriteFile.mockReset();
+
+    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) =>
+      actualFs.writeFile(...args),
+    );
+  });
+
+  afterEach(async () => {
+    if (tmpDir.length > 0) {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+    vi.restoreAllMocks();
+  });
+
   async function withMockedConfig(
     config: Awaited<ReturnType<typeof configLoader.loadConfig>>,
     run: () => Promise<void>,
@@ -157,5 +280,107 @@ describe('executeContractEmit', () => {
         );
       },
     );
+  });
+
+  it('keeps the newer generation on disk when an older emit finishes later', async () => {
+    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
+    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
+    const firstEmit = createDeferred<EmitResult>();
+    const secondEmit = createDeferred<EmitResult>();
+
+    mockedEmit
+      .mockImplementationOnce(() => firstEmit.promise)
+      .mockImplementationOnce(() => secondEmit.promise);
+
+    await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
+      const first = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+      const second = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+
+      await eventually(() => {
+        expect(mockedEmit).toHaveBeenCalledTimes(2);
+      });
+
+      secondEmit.resolve(createEmitResult('newer'));
+      await second;
+
+      firstEmit.resolve(createEmitResult('older'));
+      await first;
+    });
+
+    expect(await readFile(outputJsonPath, 'utf-8')).toBe(JSON.stringify({ generation: 'newer' }));
+    expect(await readFile(outputDtsPath, 'utf-8')).toBe("export type Generation = 'newer';\n");
+  });
+
+  it('preserves the previous artifacts when a new emit write fails', async () => {
+    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
+    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
+    const previousJson = JSON.stringify({ generation: 'previous' });
+    const previousDts = "export type Generation = 'previous';\n";
+
+    await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
+    await writeFile(outputJsonPath, previousJson, 'utf-8');
+    await writeFile(outputDtsPath, previousDts, 'utf-8');
+
+    mockedEmit.mockResolvedValue(createEmitResult('next'));
+
+    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) => {
+      const [path] = args;
+      if (String(path).includes('contract.d.ts')) {
+        throw new Error('simulated dts write failure');
+      }
+      return actualFs.writeFile(...args);
+    });
+
+    await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
+      await expect(
+        executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') }),
+      ).rejects.toThrow('simulated dts write failure');
+    });
+
+    expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
+    expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
+  });
+
+  it('keeps the last good artifacts when a newer request fails after superseding an older emit', async () => {
+    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
+    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
+    const previousJson = JSON.stringify({ generation: 'previous' });
+    const previousDts = "export type Generation = 'previous';\n";
+    const firstEmit = createDeferred<EmitResult>();
+
+    await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
+    await writeFile(outputJsonPath, previousJson, 'utf-8');
+    await writeFile(outputDtsPath, previousDts, 'utf-8');
+
+    mockedEmit
+      .mockImplementationOnce(() => firstEmit.promise)
+      .mockResolvedValueOnce(createEmitResult('newer'));
+
+    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) => {
+      const [path] = args;
+      if (String(path).includes('.2.next.tmp')) {
+        throw new Error('simulated newer generation write failure');
+      }
+      return actualFs.writeFile(...args);
+    });
+
+    await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
+      const first = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+      const second = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+
+      await eventually(() => {
+        expect(mockedEmit).toHaveBeenCalledTimes(2);
+      });
+
+      await expect(second).rejects.toThrow('simulated newer generation write failure');
+
+      firstEmit.resolve(createEmitResult('older'));
+      await first;
+    });
+
+    expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
+    expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
   });
 });
