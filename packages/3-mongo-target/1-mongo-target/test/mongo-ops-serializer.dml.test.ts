@@ -424,6 +424,30 @@ describe('deserializeMongoQueryPlan', () => {
     );
   });
 
+  it('preserves annotations, refs, projection, and projectionTypes in meta when present', () => {
+    const plan = {
+      collection: 'users',
+      command: new RawInsertOneCommand('users', { name: 'test' }),
+      meta: {
+        target: 'mongo',
+        storageHash: 'sha256:abc',
+        lane: 'mongo-raw',
+        paramDescriptors: [],
+        annotations: { codecs: { email: 'mongo/string@1' } },
+        refs: { users: { collection: 'users' } },
+        projection: { name: 'name', email: 'email' },
+        projectionTypes: { name: 'mongo/string@1', email: 'mongo/string@1' },
+      },
+    };
+    const json = JSON.parse(JSON.stringify(plan));
+    const result = deserializeMongoQueryPlan(json);
+    const meta = result.meta as Record<string, unknown>;
+    expect(meta['annotations']).toEqual({ codecs: { email: 'mongo/string@1' } });
+    expect(meta['refs']).toEqual({ users: { collection: 'users' } });
+    expect(meta['projection']).toEqual({ name: 'name', email: 'email' });
+    expect(meta['projectionTypes']).toEqual({ name: 'mongo/string@1', email: 'mongo/string@1' });
+  });
+
   it('throws for missing collection', () => {
     expect(() =>
       deserializeMongoQueryPlan({
