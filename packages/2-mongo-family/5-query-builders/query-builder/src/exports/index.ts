@@ -35,4 +35,4 @@ export type {
   TypedAggExpr,
   UnwoundShape,
 } from '../types';
-export type { TypedUpdateOp } from '../update-ops';
+export type { TypedUpdateOp, UpdaterResult } from '../update-ops';

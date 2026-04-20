@@ -55,6 +55,7 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { createFieldAccessor, type Expression, type FieldAccessor } from './field-accessor';
 import type { FindAndModifyEnabled, UpdateEnabled } from './markers';
+import type { UpdateResult } from './result-types';
 import type {
   DocField,
   DocShape,
@@ -67,7 +68,7 @@ import type {
   TypedAggExpr,
   UnwoundShape,
 } from './types';
-import { resolveUpdaterResult, type UpdaterItem } from './update-ops';
+import { resolveUpdaterResult, type UpdaterResult } from './update-ops';
 
 interface PipelineChainState {
   readonly collection: string;
@@ -584,8 +585,8 @@ export class PipelineChain<
    */
   updateMany(
     this: PipelineChain<TContract, Shape, 'update-ok', F>,
-    updaterFn?: (fields: FieldAccessor<Shape>) => ReadonlyArray<UpdaterItem>,
-  ): MongoQueryPlan<unknown> {
+    updaterFn?: (fields: FieldAccessor<Shape>) => UpdaterResult,
+  ): MongoQueryPlan<UpdateResult> {
     if (updaterFn) {
       throw new Error(
         'updateMany() on a PipelineChain expects no arguments — the chain itself is the update pipeline. ' +
@@ -603,8 +604,8 @@ export class PipelineChain<
    */
   updateOne(
     this: PipelineChain<TContract, Shape, 'update-ok', F>,
-    updaterFn?: (fields: FieldAccessor<Shape>) => ReadonlyArray<UpdaterItem>,
-  ): MongoQueryPlan<unknown> {
+    updaterFn?: (fields: FieldAccessor<Shape>) => UpdaterResult,
+  ): MongoQueryPlan<UpdateResult> {
     if (updaterFn) {
       throw new Error(
         'updateOne() on a PipelineChain expects no arguments — the chain itself is the update pipeline. ' +
@@ -632,9 +633,9 @@ export class PipelineChain<
    */
   findOneAndUpdate(
     this: PipelineChain<TContract, Shape, U, 'fam-ok'>,
-    updaterFn: (fields: FieldAccessor<Shape>) => ReadonlyArray<UpdaterItem>,
+    updaterFn: (fields: FieldAccessor<Shape>) => UpdaterResult,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
-  ): MongoQueryPlan<unknown> {
+  ): MongoQueryPlan<ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null> {
     const { filter, sort, skip } = deconstructFindAndModifyChain(this.#state.stages);
     const accessor = createFieldAccessor<Shape>();
     const items = updaterFn(accessor);
@@ -661,7 +662,9 @@ export class PipelineChain<
    * Find a single document matching the accumulated pipeline and delete it.
    * Same marker gating and deconstruction as `findOneAndUpdate`.
    */
-  findOneAndDelete(this: PipelineChain<TContract, Shape, U, 'fam-ok'>): MongoQueryPlan<unknown> {
+  findOneAndDelete(
+    this: PipelineChain<TContract, Shape, U, 'fam-ok'>,
+  ): MongoQueryPlan<ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null> {
     const { filter, sort, skip } = deconstructFindAndModifyChain(this.#state.stages);
     const command = new FindOneAndDeleteCommand(this.#state.collection, filter, sort, skip);
     const meta: PlanMeta = {

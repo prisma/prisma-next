@@ -25,47 +25,72 @@ describe('state-machine surface (negative type tests)', () => {
     h.deleteOne();
   });
 
-  it('findOneAndUpdate / findOneAndDelete unavailable after FindAndModifyCompat-clearing stages', () => {
+  it('findOneAndUpdate / findOneAndDelete unavailable after FindAndModifyEnabled-clearing stages', () => {
     // .group() clears both markers
     const grouped = handle()
       .match(MongoFieldFilter.eq('status', 'new'))
       .group(() => ({ _id: null }));
-    // @ts-expect-error — group clears FindAndModifyCompat
+    // @ts-expect-error — group clears FindAndModifyEnabled
     grouped.findOneAndUpdate((f) => [f.amount.inc(1)]);
-    // @ts-expect-error — group clears FindAndModifyCompat
+    // @ts-expect-error — group clears FindAndModifyEnabled
     grouped.findOneAndDelete();
 
     // .limit() clears both markers
     const limited = handle().match(MongoFieldFilter.eq('status', 'new')).limit(1);
-    // @ts-expect-error — limit clears FindAndModifyCompat
+    // @ts-expect-error — limit clears FindAndModifyEnabled
     limited.findOneAndUpdate((f) => [f.amount.inc(1)]);
-    // @ts-expect-error — limit clears FindAndModifyCompat
+    // @ts-expect-error — limit clears FindAndModifyEnabled
     limited.findOneAndDelete();
 
-    // .addFields() clears FindAndModifyCompat
+    // .addFields() clears FindAndModifyEnabled
     const withAddFields = handle()
       .match(MongoFieldFilter.eq('status', 'new'))
       .addFields(() => ({}));
-    // @ts-expect-error — addFields clears FindAndModifyCompat
+    // @ts-expect-error — addFields clears FindAndModifyEnabled
     withAddFields.findOneAndUpdate((f) => [f.amount.inc(1)]);
-    // @ts-expect-error — addFields clears FindAndModifyCompat
+    // @ts-expect-error — addFields clears FindAndModifyEnabled
     withAddFields.findOneAndDelete();
 
-    // .project() clears FindAndModifyCompat
+    // .project() clears FindAndModifyEnabled
     const projected = handle().match(MongoFieldFilter.eq('status', 'new')).project('status');
-    // @ts-expect-error — project clears FindAndModifyCompat
+    // @ts-expect-error — project clears FindAndModifyEnabled
     projected.findOneAndUpdate((f) => [f.amount.inc(1)]);
-    // @ts-expect-error — project clears FindAndModifyCompat
+    // @ts-expect-error — project clears FindAndModifyEnabled
     projected.findOneAndDelete();
 
     // .unwind() clears both markers
     const unwound = handle()
       .match(MongoFieldFilter.eq('status', 'new'))
       .unwind('tags' as never);
-    // @ts-expect-error — unwind clears FindAndModifyCompat
+    // @ts-expect-error — unwind clears FindAndModifyEnabled
     unwound.findOneAndUpdate((f) => [f.amount.inc(1)]);
-    // @ts-expect-error — unwind clears FindAndModifyCompat
+    // @ts-expect-error — unwind clears FindAndModifyEnabled
     unwound.findOneAndDelete();
+  });
+
+  it('no-arg updateMany / updateOne unavailable after UpdateEnabled-clearing stages', () => {
+    // .group() clears both markers
+    const grouped = handle()
+      .match(MongoFieldFilter.eq('status', 'new'))
+      .group(() => ({ _id: null }));
+    // @ts-expect-error — group clears UpdateEnabled
+    grouped.updateMany();
+    // @ts-expect-error — group clears UpdateEnabled
+    grouped.updateOne();
+
+    // .limit() clears both markers
+    const limited = handle().match(MongoFieldFilter.eq('status', 'new')).limit(1);
+    // @ts-expect-error — limit clears UpdateEnabled
+    limited.updateMany();
+    // @ts-expect-error — limit clears UpdateEnabled
+    limited.updateOne();
+
+    // .sort() clears UpdateEnabled (preserves FindAndModifyEnabled)
+    const sorted = handle().match(MongoFieldFilter.eq('status', 'new')).sort({ amount: -1 });
+    // @ts-expect-error — sort clears UpdateEnabled
+    sorted.updateMany();
+    // @ts-expect-error — sort clears UpdateEnabled
+    sorted.updateOne();
   });
 
   it('FilteredCollection does not expose insert / unqualified-write terminals', () => {
