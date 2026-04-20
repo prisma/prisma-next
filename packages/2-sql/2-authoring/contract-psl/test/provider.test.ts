@@ -586,7 +586,7 @@ model Document {
         expect.arrayContaining([
           expect.objectContaining({
             code: 'PSL_SCHEMA_READ_FAILED',
-            sourceId: expect.stringMatching(/missing\.prisma$/),
+            sourceId: './missing.prisma',
           }),
         ]),
       );

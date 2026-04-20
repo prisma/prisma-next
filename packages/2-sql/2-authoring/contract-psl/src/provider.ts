@@ -51,7 +51,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
               {
                 code: 'PSL_SCHEMA_READ_FAILED',
                 message,
-                sourceId: absoluteSchemaPath,
+                sourceId: schemaPath,
               },
             ],
             meta: { schemaPath, absoluteSchemaPath, cause: message },
