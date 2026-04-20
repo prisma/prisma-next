@@ -23,6 +23,15 @@ import { notOk, ok } from '@prisma-next/utils/result';
 
 const READ_ONLY_CHECK_COMMAND_KINDS: ReadonlySet<string> = new Set(['aggregate', 'rawAggregate']);
 
+function hasProfileHash(value: unknown): value is { readonly profileHash: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Object.hasOwn(value, 'profileHash') &&
+    typeof (value as { profileHash: unknown }).profileHash === 'string'
+  );
+}
+
 import { FilterEvaluator } from './filter-evaluator';
 import { deserializeMongoOps } from './mongo-ops-serializer';
 
@@ -167,8 +176,9 @@ export class MongoMigrationRunner {
     }
 
     const destination = options.plan.destination;
-    const contract = options.destinationContract as { profileHash?: string };
-    const profileHash = contract.profileHash ?? destination.storageHash;
+    const profileHash = hasProfileHash(options.destinationContract)
+      ? options.destinationContract.profileHash
+      : destination.storageHash;
 
     if (
       operationsExecuted === 0 &&
