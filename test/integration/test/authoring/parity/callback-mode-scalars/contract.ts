@@ -1,3 +1,11 @@
+import {
+  boolColumn,
+  float8Column,
+  int4Column,
+  jsonbColumn,
+  textColumn,
+  timestamptzColumn,
+} from '@prisma-next/adapter-postgres/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract, rel } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -11,22 +19,22 @@ export const contract = defineContract(
     } as const;
     const User = model('User', {
       fields: {
-        id: field.int().defaultSql('autoincrement()').id(),
-        email: field.text().unique(),
-        age: field.int(),
-        isActive: field.boolean().default(true),
-        score: field.float().optional(),
-        profile: field.json().optional(),
+        id: field.column(int4Column).defaultSql('autoincrement()').id(),
+        email: field.column(textColumn).unique(),
+        age: field.column(int4Column),
+        isActive: field.column(boolColumn).default(true),
+        score: field.column(float8Column).optional(),
+        profile: field.column(jsonbColumn).optional(),
         embedding: field.namedType(types.Embedding).optional(),
-        createdAt: field.createdAt(),
+        createdAt: field.column(timestamptzColumn).defaultSql('now()'),
       },
     }).sql({ table: 'user' });
     const Post = model('Post', {
       fields: {
-        id: field.int().defaultSql('autoincrement()').id(),
-        userId: field.int(),
-        title: field.text(),
-        rating: field.float().optional(),
+        id: field.column(int4Column).defaultSql('autoincrement()').id(),
+        userId: field.column(int4Column),
+        title: field.column(textColumn),
+        rating: field.column(float8Column).optional(),
       },
       relations: {
         user: rel
