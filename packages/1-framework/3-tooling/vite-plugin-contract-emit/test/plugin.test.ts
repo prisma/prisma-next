@@ -209,6 +209,7 @@ describe('prismaVitePlugin', () => {
       ) => Promise<void>;
       await configureServer(mockServer);
 
+      expect(mockServer.watcher.add).toHaveBeenCalledWith('/project/prisma-next.config.ts');
       expect(mockServer.watcher.add).toHaveBeenCalledWith('/project/prisma/schema.prisma');
       expect(mockServer.watcher.add).not.toHaveBeenCalledWith('/project/src/prisma/contract.json');
       expect(mockServer.watcher.add).not.toHaveBeenCalledWith('/project/src/prisma/contract.d.ts');

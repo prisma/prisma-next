@@ -244,7 +244,10 @@ export function prismaVitePlugin(
         const configDir = dirname(absoluteConfigPath);
         return {
           files: filterOutputArtifacts(
-            authoritativeInputs.paths.map((input) => resolve(configDir, input)),
+            [
+              absoluteConfigPath,
+              ...authoritativeInputs.paths.map((input) => resolve(configDir, input)),
+            ],
             contract.output,
           ),
           warning: null,
@@ -259,7 +262,7 @@ export function prismaVitePlugin(
       logError('Failed to resolve watched files:', error);
       return {
         files: new Set([absoluteConfigPath]),
-        warning: null,
+        warning: PARTIAL_COVERAGE_WARNING,
       };
     }
   }
