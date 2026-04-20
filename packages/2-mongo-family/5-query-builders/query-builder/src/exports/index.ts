@@ -1,3 +1,9 @@
+export type {
+  DeleteResult,
+  InsertManyResult,
+  InsertOneResult,
+  UpdateResult,
+} from '@prisma-next/mongo-query-ast/execution';
 export { acc } from '../accumulator-helpers';
 export { PipelineChain } from '../builder';
 export { fn } from '../expression-helpers';
@@ -6,12 +12,6 @@ export { createFieldAccessor } from '../field-accessor';
 export type { FindAndModifyEnabled, UpdateEnabled } from '../markers';
 export type { QueryRoot } from '../query';
 export { mongoQuery } from '../query';
-export type {
-  DeleteResult,
-  InsertManyResult,
-  InsertOneResult,
-  UpdateResult,
-} from '../state-classes';
 export { CollectionHandle, FilteredCollection } from '../state-classes';
 export type {
   ArrayField,

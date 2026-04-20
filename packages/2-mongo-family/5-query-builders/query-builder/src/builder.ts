@@ -16,6 +16,7 @@ import type {
   MongoQueryPlan,
   MongoUpdatePipelineStage,
   MongoWindowField,
+  UpdateResult,
 } from '@prisma-next/mongo-query-ast/execution';
 import {
   AggregateCommand,
@@ -55,7 +56,6 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { createFieldAccessor, type Expression, type FieldAccessor } from './field-accessor';
 import type { FindAndModifyEnabled, UpdateEnabled } from './markers';
-import type { UpdateResult } from './result-types';
 import type {
   DocField,
   DocShape,
