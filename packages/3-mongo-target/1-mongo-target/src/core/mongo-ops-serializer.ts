@@ -202,7 +202,7 @@ const PlanMetaJson = type({
   'annotations?': 'Record<string, unknown>',
   'refs?': 'Record<string, unknown>',
   'projection?': 'Record<string, string> | string[]',
-  'columnTypeIds?': 'Record<string, string>',
+  'projectionTypes?': 'Record<string, string>',
 });
 
 const QueryPlanJson = type({
@@ -428,6 +428,12 @@ export function deserializeMongoQueryPlan(json: unknown): MongoQueryPlan {
     paramDescriptors: data.meta.paramDescriptors as PlanMeta['paramDescriptors'],
     ...(data.meta.targetFamily !== undefined && { targetFamily: data.meta.targetFamily }),
     ...(data.meta.profileHash !== undefined && { profileHash: data.meta.profileHash }),
+    ...(data.meta.annotations !== undefined && {
+      annotations: data.meta.annotations as PlanMeta['annotations'],
+    }),
+    ...(data.meta.refs !== undefined && { refs: data.meta.refs as PlanMeta['refs'] }),
+    ...(data.meta.projection !== undefined && { projection: data.meta.projection }),
+    ...(data.meta.projectionTypes !== undefined && { projectionTypes: data.meta.projectionTypes }),
   };
   return { collection: data.collection, command, meta };
 }
