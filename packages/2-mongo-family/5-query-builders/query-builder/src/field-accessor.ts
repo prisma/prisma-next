@@ -152,7 +152,7 @@ function buildExpression<F extends DocField>(path: string): Expression<F> {
     lt: (value) => MongoFieldFilter.lt(path, value),
     lte: (value) => MongoFieldFilter.lte(path, value),
     in: (values) => MongoFieldFilter.in(path, values),
-    nin: (values) => new MongoFieldFilter(path, '$nin', values),
+    nin: (values) => MongoFieldFilter.nin(path, values),
     exists: (flag) =>
       flag === false ? MongoExistsExpr.notExists(path) : MongoExistsExpr.exists(path),
 

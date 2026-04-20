@@ -570,8 +570,8 @@ export class PipelineChain<
   ): MongoQueryPlan<unknown> {
     if (updaterFn) {
       throw new Error(
-        'PipelineChain.updateMany() with a callback should not be called directly. ' +
-          'Use FilteredCollection.updateMany(updaterFn) instead.',
+        'updateMany() on a PipelineChain expects no arguments — the chain itself is the update pipeline. ' +
+          'To update with an operator callback, call .updateMany(fn) on a FilteredCollection (i.e. after .match()).',
       );
     }
     const { filter, updatePipeline } = deconstructUpdateChain(this.#state.stages);
@@ -589,8 +589,8 @@ export class PipelineChain<
   ): MongoQueryPlan<unknown> {
     if (updaterFn) {
       throw new Error(
-        'PipelineChain.updateOne() with a callback should not be called directly. ' +
-          'Use FilteredCollection.updateOne(updaterFn) instead.',
+        'updateOne() on a PipelineChain expects no arguments — the chain itself is the update pipeline. ' +
+          'To update with an operator callback, call .updateOne(fn) on a FilteredCollection (i.e. after .match()).',
       );
     }
     const { filter, updatePipeline } = deconstructUpdateChain(this.#state.stages);
@@ -745,15 +745,10 @@ function deconstructUpdateChain(stages: ReadonlyArray<MongoPipelineStage>): Deco
   const matchFilters: MongoFilterExpr[] = [];
   let boundary = 0;
 
-  for (let i = 0; i < stages.length; i++) {
-    const stage = stages[i];
-    if (stage === undefined) break;
-    if (stage instanceof MongoMatchStage) {
-      matchFilters.push(stage.filter);
-      boundary = i + 1;
-    } else {
-      break;
-    }
+  for (const stage of stages) {
+    if (!(stage instanceof MongoMatchStage)) break;
+    matchFilters.push(stage.filter);
+    boundary++;
   }
 
   if (matchFilters.length === 0) {
