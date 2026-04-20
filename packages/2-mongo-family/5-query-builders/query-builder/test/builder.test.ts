@@ -28,7 +28,7 @@ function createOrdersBuilder() {
   return mongoQuery<TContract>({ contractJson: testContractJson }).from('orders');
 }
 
-describe('PipelineBuilder', () => {
+describe('PipelineChain', () => {
   describe('build()', () => {
     it('produces AggregateCommand with correct collection', () => {
       const plan = createOrdersBuilder().build();

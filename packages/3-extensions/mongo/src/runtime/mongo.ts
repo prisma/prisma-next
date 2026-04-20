@@ -36,7 +36,7 @@ export default function mongo<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
 >(options: MongoOptions): MongoClient<TContract> {
   const { contract } = validateMongoContract<TContract>(options.contractJson);
-  const query = mongoQuery<TContract>({ contractJson: options.contractJson });
+  const query = mongoQuery<TContract>({ contractJson: contract });
 
   return {
     query,

@@ -54,7 +54,7 @@ interface EventTypeCount {
 }
 
 export async function aggregateEventsByType(db: Db, userId: string): Promise<EventTypeCount[]> {
-  const plan = db.pipeline
+  const plan = db.query
     .from('events')
     .match(MongoFieldFilter.eq('userId', userId))
     .group((f) => ({

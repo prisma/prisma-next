@@ -147,9 +147,7 @@ describe(
           .findOneAndUpdate((f) => [f.bio.set('changed')], { returnDocument: 'before' });
         const rows = await runtime.execute(plan);
         expect(rows).toHaveLength(1);
-        const doc = rows[0] as Record<string, unknown>;
-        expect(doc.bio).toBe('original');
-        expect(doc.name).toBe('Alice');
+        expect(rows[0]).toMatchObject({ bio: 'original', name: 'Alice' });
 
         const persisted = await usersCol().findOne({ name: 'Alice' });
         expect(persisted).toMatchObject({ bio: 'changed' });
