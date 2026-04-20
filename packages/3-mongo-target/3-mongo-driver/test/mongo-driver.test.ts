@@ -317,7 +317,11 @@ describe('MongoDriver', () => {
     it('close() is a no-op — does not close the external client', async () => {
       const driver = MongoDriverImpl.fromDb(seedClient.db(dbName));
       await expect(driver.close()).resolves.toBeUndefined();
-      // seedClient is still usable (afterAll would fail if it were closed)
+      // Explicit readiness check: seedClient must still respond after
+      // driver.close(). Catches regressions where fromDb() starts closing
+      // the caller-owned client.
+      const pingResult = await seedClient.db(dbName).command({ ping: 1 });
+      expect(pingResult).toMatchObject({ ok: 1 });
     });
   });
 });
