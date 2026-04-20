@@ -8,4 +8,6 @@ export type {
   ContractSourceDiagnostics,
   ContractSourceEnvironment,
   ContractSourceProvider,
+  PathBackedContractSourceInput,
 } from '../contract-source-types';
+export { createPathBackedSource } from '../contract-source-types';
