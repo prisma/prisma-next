@@ -566,7 +566,7 @@ describe('emit command', () => {
 
         const originalCwd = process.cwd();
         let sourceResult: Awaited<
-          ReturnType<NonNullable<typeof providerConfig.contract>['source']>
+          ReturnType<NonNullable<typeof providerConfig.contract>['source']['load']>
         >;
         try {
           process.chdir(testDirPsl);

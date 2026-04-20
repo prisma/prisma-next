@@ -36,7 +36,7 @@ const resolveContract = async (
   source: NonNullable<Awaited<ReturnType<typeof loadConfig>>['contract']>['source'],
   stack: ControlStack,
 ) => {
-  const sourceResult = await source(buildSourceContext(stack));
+  const sourceResult = await source.load(buildSourceContext(stack));
   if (!sourceResult.ok) {
     throw new Error(sourceResult.failure.summary);
   }

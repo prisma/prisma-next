@@ -1,7 +1,7 @@
-import { dirname, resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
 import { executeContractEmit } from '@prisma-next/cli/control-api';
+import { dirname, resolve } from 'pathe';
 import type { Plugin, ViteDevServer } from 'vite';
 import type { PrismaVitePluginOptions } from './types';
 

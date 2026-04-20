@@ -182,7 +182,7 @@ async function executeContractEmitCommand(
     // Call emit with progress callback
     const result = await client.emit({
       contractConfig: {
-        sourceProvider: contractConfig.source,
+        source: contractConfig.source,
         output: outputJsonPath,
       },
       onProgress,
