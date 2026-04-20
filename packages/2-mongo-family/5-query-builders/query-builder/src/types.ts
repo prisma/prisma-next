@@ -1,10 +1,5 @@
 import type { MongoContract } from '@prisma-next/mongo-contract';
-import type {
-  MongoAggAccumulator,
-  MongoAggExpr,
-  MongoFilterExpr,
-} from '@prisma-next/mongo-query-ast/execution';
-import type { MongoValue } from '@prisma-next/mongo-value';
+import type { MongoAggAccumulator, MongoAggExpr } from '@prisma-next/mongo-query-ast/execution';
 
 export interface DocField {
   readonly codecId: string;
@@ -73,25 +68,6 @@ export type ExtractDocShape<T extends Record<string, TypedAggExpr<DocField>>> = 
 };
 
 export type SortSpec<S extends DocShape> = Partial<Record<keyof S & string, 1 | -1>>;
-
-export type FieldProxy<S extends DocShape> = {
-  readonly [K in keyof S & string]: TypedAggExpr<S[K]>;
-};
-
-export type FilterHandle = {
-  eq(value: MongoValue): MongoFilterExpr;
-  ne(value: MongoValue): MongoFilterExpr;
-  gt(value: MongoValue): MongoFilterExpr;
-  gte(value: MongoValue): MongoFilterExpr;
-  lt(value: MongoValue): MongoFilterExpr;
-  lte(value: MongoValue): MongoFilterExpr;
-  in(values: ReadonlyArray<MongoValue>): MongoFilterExpr;
-  exists(flag?: boolean): MongoFilterExpr;
-};
-
-export type FilterProxy<S extends DocShape> = {
-  readonly [K in keyof S & string]: FilterHandle;
-};
 
 export type ProjectedShape<
   Shape extends DocShape,

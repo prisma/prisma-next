@@ -71,6 +71,10 @@ export class MongoFieldFilter extends MongoFilterExpression {
     return new MongoFieldFilter(field, '$in', values);
   }
 
+  static nin(field: string, values: ReadonlyArray<MongoValue>): MongoFieldFilter {
+    return new MongoFieldFilter(field, '$nin', values);
+  }
+
   static isNull(field: string): MongoFieldFilter {
     return new MongoFieldFilter(field, '$eq', null);
   }
