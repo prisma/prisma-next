@@ -153,6 +153,18 @@ function makeCheckPlan(): MongoQueryPlan {
   };
 }
 
+function makeWriteCheckPlan(): MongoQueryPlan {
+  return {
+    collection: RUN_COLLECTION,
+    command: new RawUpdateManyCommand(
+      RUN_COLLECTION,
+      { status: { $exists: false } },
+      { $set: { status: 'active' } },
+    ),
+    meta: PLAN_META,
+  };
+}
+
 function makeRunPlan(): MongoQueryPlan {
   return {
     collection: RUN_COLLECTION,
@@ -305,6 +317,31 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
       'updateMany',
       'aggregate',
     ]);
+  });
+
+  it('rejects a check whose source is not an aggregate command before invoking driver.execute', async () => {
+    const harness = makeHarness();
+    const op = dataTransform('backfill-status', {
+      check: { source: () => makeWriteCheckPlan() },
+      run: () => makeRunPlan(),
+    });
+
+    let thrown: unknown;
+    try {
+      await execute(harness, [op], { idempotencyChecks: false });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toMatchObject({
+      code: '3020',
+      meta: {
+        commandKind: 'rawUpdateMany',
+        collection: RUN_COLLECTION,
+      },
+    });
+    expect((thrown as Error).message).toContain('rawUpdateMany');
+    expect(harness.driver.executeCalls).toEqual([]);
   });
 
   it('dispatches DDL ops through the command executor and data ops through the driver, in plan order', async () => {

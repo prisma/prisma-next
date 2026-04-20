@@ -1,4 +1,5 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import { errorRunnerFailed } from '@prisma-next/errors/execution';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationOperationPolicy,
@@ -19,6 +20,9 @@ import type {
   MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
 import { notOk, ok } from '@prisma-next/utils/result';
+
+const READ_ONLY_CHECK_COMMAND_KINDS: ReadonlySet<string> = new Set(['aggregate', 'rawAggregate']);
+
 import { FilterEvaluator } from './filter-evaluator';
 import { deserializeMongoOps } from './mongo-ops-serializer';
 
@@ -278,6 +282,21 @@ export class MongoMigrationRunner {
     filterEvaluator: FilterEvaluator,
   ): Promise<boolean> {
     for (const check of checks) {
+      const commandKind = check.source.command.kind;
+      if (!READ_ONLY_CHECK_COMMAND_KINDS.has(commandKind)) {
+        throw errorRunnerFailed(
+          `Data-transform check rejected: command kind "${commandKind}" is not read-only`,
+          {
+            why: 'Data-transform checks must use aggregate or rawAggregate commands so the pre/postcheck path cannot mutate the database.',
+            fix: 'Author the check.source as an aggregate pipeline (or rawAggregate) rather than a DML write command.',
+            meta: {
+              checkDescription: check.description,
+              commandKind,
+              collection: check.source.collection,
+            },
+          },
+        );
+      }
       const wireCommand = adapter.lower(check.source);
       let matchFound = false;
       for await (const row of driver.execute<Record<string, unknown>>(wireCommand)) {
