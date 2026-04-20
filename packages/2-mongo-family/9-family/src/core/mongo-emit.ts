@@ -1,37 +1,39 @@
 /**
  * Mongo's in-process implementation of the `emit` capability on
- * `TargetMigrationsCapability`.
+ * `TargetMigrationsCapability`. Invoked by the framework's class-flow emit
+ * dispatcher in `@prisma-next/cli/lib/migration-emit` — see that module's
+ * preamble for the cross-cutting story (when the CLI dispatches here, who
+ * attests `migration.json`, why both flows produce byte-identical artifacts,
+ * and the relationship to the self-emitting `Migration.run` shebang path).
  *
- * The CLI's `migration emit` (and `migration plan`'s inline emit) dispatches
- * here for any target that does not implement `resolveDescriptors`. Two
- * authoring shapes are accepted, both of which adhere to the `MigrationPlan`
- * interface:
+ * Mongo-specific responsibilities of this helper:
  *
- *   1. Class subclass (canonical, scaffolded form):
- *        class M extends Migration {
- *          override get operations() { return [...]; }
- *          override describe() { return { from, to }; }
- *        }
- *        export default M;
- *        Migration.run(import.meta.url, M);
+ *  - Accept two authoring shapes for `migration.ts`'s default export, both
+ *    adhering to the `MigrationPlan` interface:
  *
- *   2. Factory function returning a MigrationPlan-shaped object:
- *        export default () => ({
- *          targetId: 'mongo',
- *          destination: { storageHash: '...' },
- *          operations: [createCollection("users")],
- *        });
+ *      1. Class subclass (canonical, scaffolded form):
+ *           class M extends Migration {
+ *             override get operations() { return [...]; }
+ *             override describe() { return { from, to }; }
+ *           }
+ *           export default M;
+ *           Migration.run(import.meta.url, M);
  *
- * Only the class form is scaffolded; the factory form is supported for
- * authors who prefer it. We dynamic-import the file (so that any structured
- * errors thrown by `placeholder(...)` propagate as real exceptions to the
- * CLI), dispatch on the export's shape (class subclass vs. callable factory),
- * and persist `ops.json` via the framework I/O helper. `Migration.run`
- * already guards itself against firing when the file is imported rather than
- * run as the main module, so it is a no-op on this code path; the
- * framework's `emitMigration` helper attests `migration.json` after we
- * return. The canonical (shebang) path attests itself inside `Migration.run`
- * — both paths converge on byte-identical artifacts.
+ *      2. Factory function returning a MigrationPlan-shaped object:
+ *           export default () => ({
+ *             targetId: 'mongo',
+ *             destination: { storageHash: '...' },
+ *             operations: [createCollection("users")],
+ *           });
+ *
+ *    Only the class form is scaffolded; the factory form is supported for
+ *    authors who prefer it.
+ *  - Dynamic-import the file so structured errors thrown during evaluation
+ *    (notably `placeholder(...)`) surface to the CLI as real exceptions.
+ *  - Dispatch on the default export's shape and validate the factory return
+ *    is `MigrationPlan`-shaped.
+ *  - Persist `ops.json` via the framework I/O helper and return the
+ *    operations to the caller (which performs attestation).
  */
 
 import { stat } from 'node:fs/promises';
