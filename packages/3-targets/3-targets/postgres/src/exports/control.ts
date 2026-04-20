@@ -17,7 +17,6 @@ import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlTargetInstance,
-  MigrationPlanner,
   MigrationRunner,
   OperationDescriptor,
 } from '@prisma-next/framework-components/control';
@@ -33,6 +32,7 @@ import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
+import { renderDescriptorTypeScript } from '../core/migrations/scaffolding';
 
 function parseDescriptors(descriptors: readonly OperationDescriptor[]) {
   const result = MigrationDescriptorArraySchema([...descriptors]);
@@ -127,7 +127,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     ...postgresTargetDescriptorMeta,
     migrations: {
       createPlanner(_family: SqlControlFamilyInstance) {
-        return createPostgresMigrationPlanner() as MigrationPlanner<'sql', 'postgres'>;
+        return createPostgresMigrationPlanner();
       },
       createRunner(family) {
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
@@ -198,6 +198,9 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           dependencies,
           db,
         });
+      },
+      renderDescriptorTypeScript(descriptors, context) {
+        return renderDescriptorTypeScript(descriptors, context);
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {

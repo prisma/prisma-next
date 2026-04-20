@@ -1050,8 +1050,8 @@ prisma-next migration emit --dir <path>
 ```
 
 Evaluates `migration.ts` in the package directory, resolves it to `ops.json`, then
-computes and persists `migrationId` in `manifest.json`. If `migration.ts` contains
-unfilled `placeholder()` slots, emit fails with `PN-RUN-3040` and reports the slot
+computes and persists `migrationId` in `migration.json`. If `migration.ts` contains
+unfilled `placeholder()` slots, emit fails with `PN-MIG-2001` and reports the slot
 to fill in.
 
 ### `prisma-next migration ref`

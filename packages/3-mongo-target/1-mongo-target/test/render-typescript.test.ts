@@ -7,9 +7,19 @@ import {
   DropCollectionCall,
   DropIndexCall,
 } from '../src/core/op-factory-call';
-import { renderTypeScript } from '../src/core/render-typescript';
+import { renderCallsToTypeScript } from '../src/core/render-typescript';
 
-describe('renderTypeScript', () => {
+const META = {
+  from: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
+  to: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+} as const;
+
+const renderTypeScript = (
+  calls: Parameters<typeof renderCallsToTypeScript>[0],
+  meta: Parameters<typeof renderCallsToTypeScript>[1] = META,
+) => renderCallsToTypeScript(calls, meta);
+
+describe('renderCallsToTypeScript', () => {
   it('generates valid TypeScript with correct imports', () => {
     const calls = [
       new CreateIndexCall('users', [{ field: 'email', direction: 1 }], { unique: true }),
@@ -20,8 +30,17 @@ describe('renderTypeScript', () => {
     expect(output).toContain("import { Migration } from '@prisma-next/family-mongo/migration';");
     expect(output).toContain("import { createIndex } from '@prisma-next/target-mongo/migration';");
     expect(output).toContain('class M extends Migration');
-    expect(output).toContain('override plan()');
+    expect(output).toContain('override get operations()');
     expect(output).toContain('export default M;');
+    expect(output).toContain('Migration.run(import.meta.url, M);');
+  });
+
+  it('prepends a node shebang as the first line under the default test env', () => {
+    const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
+
+    const output = renderTypeScript(calls);
+
+    expect(output.split('\n')[0]).toBe('#!/usr/bin/env -S node');
     expect(output).toContain('Migration.run(import.meta.url, M);');
   });
 
@@ -55,12 +74,12 @@ describe('renderTypeScript', () => {
     expect(output).toContain('"drop-users"');
   });
 
-  it('omits describe() method when meta is undefined', () => {
+  it('always renders describe() since migration.json is required', () => {
     const calls = [new DropCollectionCall('users')];
 
     const output = renderTypeScript(calls);
 
-    expect(output).not.toContain('describe()');
+    expect(output).toContain('override describe()');
   });
 
   it('renders createIndex with options', () => {

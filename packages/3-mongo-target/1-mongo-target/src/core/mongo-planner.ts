@@ -5,6 +5,8 @@ import type {
   MigrationPlanner,
   MigrationPlannerConflict,
   MigrationPlannerResult,
+  MigrationPlanWithAuthoringSurface,
+  MigrationScaffoldContext,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type {
@@ -26,7 +28,7 @@ import {
   schemaCollectionToCreateCollectionOptions,
   schemaIndexToCreateIndexOptions,
 } from './op-factory-call';
-import { renderOps } from './render-ops';
+import { PlannerProducedMongoMigration } from './planner-produced-migration';
 
 function buildIndexLookupKey(index: MongoSchemaIndex): string {
   const keys = index.keys.map((k) => `${k.field}:${k.direction}`).join(',');
@@ -223,6 +225,7 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
     readonly contract: unknown;
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
+    readonly fromHash: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
   }): MigrationPlannerResult {
     const contract = options.contract as MongoContract;
@@ -230,14 +233,28 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
     if (result.kind === 'failure') return result;
     return {
       kind: 'success',
-      plan: {
-        targetId: 'mongo',
-        destination: {
-          storageHash: contract.storage.storageHash,
-        },
-        operations: renderOps(result.calls),
-      },
+      plan: new PlannerProducedMongoMigration(result.calls, {
+        from: options.fromHash,
+        to: contract.storage.storageHash,
+      }),
     };
+  }
+
+  /**
+   * Produce an empty `migration.ts` authoring surface for `migration new`.
+   *
+   * Mongo is a class-flow target, so the "empty migration" is a
+   * `PlannerProducedMongoMigration` with no operations; `renderTypeScript()`
+   * emits a stub class with the correct `from`/`to` metadata that the user
+   * then fills in with operations. The contract path on the context is
+   * unused — Mongo's emitted source does not import from the generated
+   * contract `.d.ts`.
+   */
+  emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
+    return new PlannerProducedMongoMigration([], {
+      from: context.fromHash,
+      to: context.toHash,
+    });
   }
 }
 

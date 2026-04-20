@@ -1,7 +1,9 @@
-import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { execFile, spawnSync } from 'node:child_process';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -11,8 +13,20 @@ const repoRoot = resolve(packageRoot, '../../..');
 const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
 
 const familyMongoRoot = resolve(repoRoot, 'packages/2-mongo-family/9-family');
-const migrationExport = join(familyMongoRoot, 'src/exports/migration.ts').replace(/\\/g, '/');
-const factoryExport = join(packageRoot, 'src/exports/migration.ts').replace(/\\/g, '/');
+const migrationExport = pathToFileURL(join(familyMongoRoot, 'src/exports/migration.ts')).href;
+const factoryExport = pathToFileURL(join(packageRoot, 'src/exports/migration.ts')).href;
+
+/**
+ * `Migration.run(..., { dryRun })` prints both `--- migration.json ---` and
+ * `--- ops.json ---` sections to stdout. Tests only care about the ops body,
+ * so this helper extracts it.
+ */
+function extractDryRunOpsSection(stdout: string): string {
+  const marker = '--- ops.json ---\n';
+  const idx = stdout.indexOf(marker);
+  if (idx < 0) return stdout;
+  return stdout.slice(idx + marker.length);
+}
 
 describe('migration file E2E', () => {
   let tmpDir: string;
@@ -46,7 +60,8 @@ describe('migration file E2E', () => {
       `import { createIndex, createCollection } from '${factoryExport}';`,
       '',
       'class M extends Migration {',
-      '  plan() {',
+      "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+      '  get operations() {',
       '    return [',
       '      createCollection("users", {',
       '        validator: { $jsonSchema: { required: ["email"] } },',
@@ -86,7 +101,7 @@ describe('migration file E2E', () => {
       const result = await runFile('migration.ts', ['--dry-run']);
       expect(result.exitCode).toBe(0);
 
-      const parsed = JSON.parse(result.stdout);
+      const parsed = JSON.parse(extractDryRunOpsSection(result.stdout));
       expect(parsed).toHaveLength(2);
       expect(parsed[0].id).toBe('collection.users.create');
 
@@ -101,7 +116,8 @@ describe('migration file E2E', () => {
       `import { validatedCollection } from '${factoryExport}';`,
       '',
       'class M extends Migration {',
-      '  plan() {',
+      "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+      '  get operations() {',
       '    return validatedCollection(',
       '      "users",',
       '      { required: ["email", "name"] },',
@@ -136,9 +152,14 @@ describe('migration file E2E', () => {
     });
   });
 
-  describe('renderTypeScript round-trip', () => {
+  describe('renderCallsToTypeScript round-trip', () => {
+    const defaultMeta = {
+      from: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
+      to: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    } as const;
+
     it('produces ops.json identical to direct factory invocation', async () => {
-      const { renderTypeScript } = await import('../src/core/render-typescript');
+      const { renderCallsToTypeScript } = await import('../src/core/render-typescript');
       const { CreateCollectionCall, CreateIndexCall } = await import('../src/core/op-factory-call');
       const calls = [
         new CreateCollectionCall('users', {
@@ -148,7 +169,7 @@ describe('migration file E2E', () => {
         new CreateIndexCall('users', [{ field: 'email', direction: 1 as const }], { unique: true }),
       ];
 
-      const tsSource = renderTypeScript(calls);
+      const tsSource = renderCallsToTypeScript(calls, defaultMeta);
       const resolvedSource = tsSource
         .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
         .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`);
@@ -172,7 +193,7 @@ describe('migration file E2E', () => {
     });
 
     it('round-trips collMod with meta through TypeScript execution', async () => {
-      const { renderTypeScript } = await import('../src/core/render-typescript');
+      const { renderCallsToTypeScript } = await import('../src/core/render-typescript');
       const { CollModCall } = await import('../src/core/op-factory-call');
       const calls = [
         new CollModCall(
@@ -190,7 +211,7 @@ describe('migration file E2E', () => {
         ),
       ];
 
-      const tsSource = renderTypeScript(calls);
+      const tsSource = renderCallsToTypeScript(calls, defaultMeta);
       const resolvedSource = tsSource
         .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
         .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`);
@@ -210,11 +231,11 @@ describe('migration file E2E', () => {
     });
 
     it('round-trips describe() meta through TypeScript execution', async () => {
-      const { renderTypeScript } = await import('../src/core/render-typescript');
+      const { renderCallsToTypeScript } = await import('../src/core/render-typescript');
       const { DropCollectionCall } = await import('../src/core/op-factory-call');
       const calls = [new DropCollectionCall('legacy')];
 
-      const tsSource = renderTypeScript(calls, {
+      const tsSource = renderCallsToTypeScript(calls, {
         from: 'sha256:aaa',
         to: 'sha256:bbb',
         labels: ['cleanup'],
@@ -240,6 +261,70 @@ describe('migration file E2E', () => {
     });
   });
 
+  describe('scaffolded migration is directly runnable', () => {
+    const familyMongoDistMigrationPath = join(familyMongoRoot, 'dist/migration.mjs');
+    const targetMongoDistMigrationPath = join(packageRoot, 'dist/migration.mjs');
+    const familyMongoDistMigration = pathToFileURL(familyMongoDistMigrationPath).href;
+    const targetMongoDistMigration = pathToFileURL(targetMongoDistMigrationPath).href;
+
+    it('runs via ./migration.ts on POSIX (or node migration.ts on Windows) and prints operations JSON', async (ctx) => {
+      const distsExist = await Promise.all([
+        stat(familyMongoDistMigrationPath).then(
+          () => true,
+          () => false,
+        ),
+        stat(targetMongoDistMigrationPath).then(
+          () => true,
+          () => false,
+        ),
+      ]);
+      if (!distsExist.every(Boolean)) {
+        ctx.skip(
+          `dist migration entrypoints not built: ${familyMongoDistMigrationPath}, ${targetMongoDistMigrationPath} — run \`pnpm build\` for @prisma-next/family-mongo and @prisma-next/target-mongo`,
+        );
+      }
+
+      const { renderCallsToTypeScript } = await import('../src/core/render-typescript');
+      const { CreateCollectionCall, CreateIndexCall } = await import('../src/core/op-factory-call');
+      const calls = [
+        new CreateCollectionCall('users'),
+        new CreateIndexCall('users', [{ field: 'email', direction: 1 as const }], { unique: true }),
+      ];
+
+      const migrationSource = renderCallsToTypeScript(calls, {
+        from: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
+        to: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      })
+        .replace("'@prisma-next/family-mongo/migration'", `'${familyMongoDistMigration}'`)
+        .replace("'@prisma-next/target-mongo/migration'", `'${targetMongoDistMigration}'`);
+      await writeMigrationTs(tmpDir, migrationSource);
+
+      const migrationPath = join(tmpDir, 'migration.ts');
+      const content = await readFile(migrationPath, 'utf-8');
+      expect(content.split('\n')[0]).toBe('#!/usr/bin/env -S node');
+
+      const isWindows = process.platform === 'win32';
+      if (!isWindows) {
+        const s = await stat(migrationPath);
+        expect(s.mode & 0o100).toBe(0o100);
+      }
+
+      const spawn = isWindows
+        ? spawnSync(process.execPath, [migrationPath, '--dry-run'], {
+            cwd: tmpDir,
+            encoding: 'utf-8',
+          })
+        : spawnSync(migrationPath, ['--dry-run'], { cwd: tmpDir, encoding: 'utf-8' });
+
+      expect(spawn.status, `stderr: ${spawn.stderr}`).toBe(0);
+
+      const ops = JSON.parse(extractDryRunOpsSection(spawn.stdout));
+      expect(ops).toHaveLength(2);
+      expect(ops[0].id).toBe('collection.users.create');
+      expect(ops[1].id).toContain('index.users.create');
+    });
+  });
+
   describe('serialization format', () => {
     it('produces JSON that the runner can consume (correct kind discriminants)', async () => {
       const migration = [
@@ -247,7 +332,8 @@ describe('migration file E2E', () => {
         `import { createIndex, dropIndex, createCollection, dropCollection, setValidation } from '${factoryExport}';`,
         '',
         'class M extends Migration {',
-        '  plan() {',
+        "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+        '  get operations() {',
         '    return [',
         '      createCollection("users"),',
         '      createIndex("users", [{ field: "email", direction: 1 }]),',

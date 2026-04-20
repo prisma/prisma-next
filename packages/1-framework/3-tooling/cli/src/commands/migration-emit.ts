@@ -105,7 +105,9 @@ export function createMigrationEmitCommand(): Command {
     command,
     'Emit ops.json from migration.ts and compute migrationId',
     'Evaluates migration.ts in the package directory, resolves it to ops.json,\n' +
-      'then computes and persists the content-addressed migrationId in manifest.json.',
+      'then computes and persists the content-addressed migrationId in migration.json.\n' +
+      'If the file contains unfilled placeholder() slots, emit fails with PN-MIG-2001\n' +
+      'and reports the slot to fill in.',
   );
   setCommandExamples(command, ['prisma-next migration emit --dir migrations/20250101-add-users']);
   addGlobalOptions(command)

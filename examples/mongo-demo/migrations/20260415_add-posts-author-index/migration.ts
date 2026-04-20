@@ -10,7 +10,7 @@ class AddPostsAuthorIndex extends Migration {
     };
   }
 
-  override plan() {
+  override get operations() {
     return [
       createIndex('posts', [{ field: 'authorId', direction: 1 }]),
       createIndex('posts', [

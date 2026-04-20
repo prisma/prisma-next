@@ -69,7 +69,13 @@ function planSuccess(
   schema: MongoSchemaIR,
   policy = ALL_CLASSES_POLICY,
 ) {
-  const result = planner.plan({ contract, schema, policy, frameworkComponents: [] });
+  const result = planner.plan({
+    contract,
+    schema,
+    policy,
+    fromHash: 'sha256:00',
+    frameworkComponents: [],
+  });
   expect(result.kind).toBe('success');
   if (result.kind !== 'success') throw new Error('Expected success');
   return result.plan;
@@ -273,6 +279,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ADDITIVE_ONLY_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
 
@@ -302,6 +309,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ADDITIVE_ONLY_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -324,6 +332,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ADDITIVE_ONLY_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -905,6 +914,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -923,6 +933,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -944,6 +955,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -969,6 +981,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -996,6 +1009,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -1014,6 +1028,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: emptyIR(),
         policy: { allowedOperationClasses: [] },
+        fromHash: 'sha256:00',
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -1357,6 +1372,56 @@ describe('MongoMigrationPlanner', () => {
       expect(collectionNames).toEqual(['tasks']);
       expect(collectionNames).not.toContain('bug');
       expect(collectionNames).not.toContain('feature');
+    });
+  });
+
+  describe('emptyMigration', () => {
+    it("identifies as the 'mongo' target with no operations and the supplied destination hash", () => {
+      const empty = planner.emptyMigration({
+        packageDir: '/tmp/migration-pkg',
+        fromHash: 'sha256:00',
+        toHash: 'sha256:01',
+      });
+
+      expect(empty.targetId).toBe('mongo');
+      expect(empty.operations).toEqual([]);
+      expect(empty.destination).toEqual({ storageHash: 'sha256:01' });
+    });
+
+    it('renders a class-flow migration.ts stub that imports Migration and calls Migration.run', () => {
+      const empty = planner.emptyMigration({
+        packageDir: '/tmp/migration-pkg',
+        fromHash: 'sha256:00',
+        toHash: 'sha256:01',
+      });
+
+      const source = empty.renderTypeScript();
+
+      expect(source).toContain("import { Migration } from '@prisma-next/family-mongo/migration';");
+      expect(source).toContain('class M extends Migration');
+      expect(source).toContain('Migration.run(import.meta.url, M);');
+      expect(source).toContain('sha256:00');
+      expect(source).toContain('sha256:01');
+    });
+
+    it('produces a plan whose origin reflects the supplied fromHash', () => {
+      const empty = planner.emptyMigration({
+        packageDir: '/tmp/migration-pkg',
+        fromHash: 'sha256:00',
+        toHash: 'sha256:01',
+      });
+
+      expect(empty.origin).toEqual({ storageHash: 'sha256:00' });
+    });
+
+    it('treats an empty fromHash as a null origin', () => {
+      const empty = planner.emptyMigration({
+        packageDir: '/tmp/migration-pkg',
+        fromHash: '',
+        toHash: 'sha256:01',
+      });
+
+      expect(empty.origin).toBeNull();
     });
   });
 });

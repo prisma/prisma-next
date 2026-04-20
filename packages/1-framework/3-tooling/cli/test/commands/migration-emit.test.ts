@@ -1,6 +1,7 @@
 import {
   errorMigrationFileMissing,
   errorMigrationInvalidDefaultExport,
+  errorUnfilledPlaceholder,
 } from '@prisma-next/errors/migration';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -123,18 +124,43 @@ describe('migration emit command', () => {
   });
 
   describe('error propagation', () => {
-    it('propagates class-flow emit errors (e.g. invalid default export) structurally', async () => {
+    it('propagates PN-MIG-2001 when emitMigration throws an unfilled-placeholder error', async () => {
+      mockMigrationCapableConfig();
+      mocks.emitMigrationMock.mockRejectedValue(
+        errorUnfilledPlaceholder('backfill-product-status:run'),
+      );
+
+      const command = createMigrationEmitCommand();
+      await expect(
+        executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']),
+      ).rejects.toBeDefined();
+
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const envelope = JSON.parse(jsonLine!) as {
+        ok: false;
+        code: string;
+        domain: string;
+        meta: { slot: string };
+      };
+      expect(envelope).toMatchObject({
+        ok: false,
+        code: 'PN-MIG-2001',
+        domain: 'MIG',
+        meta: { slot: 'backfill-product-status:run' },
+      });
+    });
+
+    it('propagates other class-flow emit errors (e.g. invalid default export) structurally', async () => {
       mockMigrationCapableConfig();
       mocks.emitMigrationMock.mockRejectedValue(
         errorMigrationInvalidDefaultExport('migrations/20260101_test', 'undefined'),
       );
 
       const command = createMigrationEmitCommand();
-      try {
-        await executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']);
-      } catch {
-        /* expected non-zero exit */
-      }
+      await expect(
+        executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']),
+      ).rejects.toBeDefined();
 
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       expect(jsonLine).toBeDefined();
@@ -143,25 +169,31 @@ describe('migration emit command', () => {
       expect(envelope.code).toBe('PN-MIG-2003');
     });
 
-    it('propagates a structured error when migration.ts is missing', async () => {
+    it('propagates PN-MIG-2002 when migration.ts is missing', async () => {
       mockMigrationCapableConfig();
       mocks.emitMigrationMock.mockRejectedValue(
         errorMigrationFileMissing('migrations/20260101_test'),
       );
 
       const command = createMigrationEmitCommand();
-      try {
-        await executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']);
-      } catch {
-        /* expected non-zero exit */
-      }
+      await expect(
+        executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']),
+      ).rejects.toBeDefined();
 
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       expect(jsonLine).toBeDefined();
-      const envelope = JSON.parse(jsonLine!) as { ok: false; code: string; domain: string };
-      expect(envelope.ok).toBe(false);
-      expect(envelope.domain).toBe('MIG');
-      expect(envelope.code).toBe('PN-MIG-2002');
+      const envelope = JSON.parse(jsonLine!) as {
+        ok: false;
+        code: string;
+        domain: string;
+        meta: { dir: string };
+      };
+      expect(envelope).toMatchObject({
+        ok: false,
+        code: 'PN-MIG-2002',
+        domain: 'MIG',
+        meta: { dir: 'migrations/20260101_test' },
+      });
     });
 
     it('emits a CLI-domain envelope when the configured target does not support migrations', async () => {
@@ -172,11 +204,9 @@ describe('migration emit command', () => {
       });
 
       const command = createMigrationEmitCommand();
-      try {
-        await executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']);
-      } catch {
-        /* expected non-zero exit */
-      }
+      await expect(
+        executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']),
+      ).rejects.toBeDefined();
 
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       expect(jsonLine).toBeDefined();
@@ -191,11 +221,9 @@ describe('migration emit command', () => {
       mocks.emitMigrationMock.mockRejectedValue(new Error('boom'));
 
       const command = createMigrationEmitCommand();
-      try {
-        await executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']);
-      } catch {
-        /* expected non-zero exit */
-      }
+      await expect(
+        executeCommand(command, ['--dir', 'migrations/20260101_test', '--json']),
+      ).rejects.toBeDefined();
 
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       expect(jsonLine).toBeDefined();

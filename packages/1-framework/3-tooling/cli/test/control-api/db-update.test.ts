@@ -45,6 +45,9 @@ function createMockMigrations(overrides?: {
           operationClass: 'additive',
         },
       ],
+      renderTypeScript: () => {
+        throw new Error('not used in db update tests');
+      },
     },
   };
 
@@ -245,6 +248,9 @@ describe('executeDbUpdate', () => {
             targetId: 'postgres',
             destination: { storageHash: 'sha256:current', profileHash: 'sha256:current-profile' },
             operations: [],
+            renderTypeScript: () => {
+              throw new Error('not used in db update tests');
+            },
           },
         },
         runnerResult: ok({ operationsPlanned: 0, operationsExecuted: 0 }),
@@ -367,6 +373,9 @@ describe('executeDbUpdate', () => {
                 operationClass: 'additive',
               },
             ],
+            renderTypeScript: () => {
+              throw new Error('not used in db update tests');
+            },
           },
         },
       });

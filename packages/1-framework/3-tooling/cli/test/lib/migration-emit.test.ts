@@ -141,26 +141,19 @@ describe('emitMigration dispatcher', () => {
     expect(emit).not.toHaveBeenCalled();
   });
 
-  it('throws errorTargetMigrationNotSupported when neither capability is present', async () => {
+  it('throws errorTargetHasIncompleteMigrationCapabilities when neither capability is present', async () => {
     mocks.hasMigrationTs.mockResolvedValue(true);
 
-    let thrown: unknown;
-    try {
-      await emitMigration(
+    await expect(
+      emitMigration(
         DIR,
         makeCtx({ targetId: 'test-target' }) as unknown as Parameters<EmitMigration>[1],
-      );
-    } catch (error) {
-      thrown = error;
-    }
-
-    expect(thrown).toMatchObject({
-      code: '4021',
-      message: 'Target does not support migrations',
+      ),
+    ).rejects.toMatchObject({
+      code: '2011',
+      message: 'Target migrations capability is incomplete',
+      why: expect.stringContaining('implements neither `resolveDescriptors`'),
     });
-    expect((thrown as Error & { why: string }).why).toContain(
-      'does not implement resolveDescriptors or emit',
-    );
   });
 
   it('calls attestMigration exactly once after emit returns in class flow', async () => {

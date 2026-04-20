@@ -3,9 +3,38 @@ import {
   errorMigrationFileMissing,
   errorMigrationInvalidDefaultExport,
   errorMigrationPlanNotArray,
+  errorUnfilledPlaceholder,
+  placeholder,
 } from '../src/migration';
 
 describe('Migration Errors', () => {
+  it('errorUnfilledPlaceholder names the slot and carries structured metadata', () => {
+    const error = errorUnfilledPlaceholder('backfill-product-status:check.source');
+    expect(error).toMatchObject({
+      code: '2001',
+      domain: 'MIG',
+      message: 'Unfilled migration placeholder',
+      why: 'The migration contains a placeholder that has not been filled in: backfill-product-status:check.source',
+      meta: { slot: 'backfill-product-status:check.source' },
+    });
+    expect(error.toEnvelope().code).toBe('PN-MIG-2001');
+  });
+
+  it('placeholder throws a CliStructuredError that names the slot', () => {
+    expect(() => placeholder('foo')).toThrow(
+      expect.objectContaining({
+        code: '2001',
+        domain: 'MIG',
+        meta: { slot: 'foo' },
+      }),
+    );
+    // `placeholder(slot)` constructs and throws `errorUnfilledPlaceholder(slot)`,
+    // so envelope-mapping coverage is preserved by re-asserting the same builder
+    // here (matches the construction-side assertion above without re-invoking
+    // the throwing call twice).
+    expect(errorUnfilledPlaceholder('foo').toEnvelope().code).toBe('PN-MIG-2001');
+  });
+
   it('errorMigrationFileMissing names the dir and points at scaffolding commands', () => {
     const error = errorMigrationFileMissing('/tmp/migrations/20260101_x');
     expect(error).toMatchObject({
@@ -45,11 +74,11 @@ describe('Migration Errors', () => {
     expect(error).toMatchObject({
       code: '2004',
       domain: 'MIG',
-      message: 'Migration.plan() must return an array of operations',
+      message: 'Migration.operations must be an array of operations',
       meta: { dir: '/tmp/pkg', actualValue: 'a string' },
     });
     expect(error.why).toContain('a string');
-    expect(error.fix).toContain('plan()');
+    expect(error.fix).toContain('operations');
     expect(error.toEnvelope().code).toBe('PN-MIG-2004');
   });
 

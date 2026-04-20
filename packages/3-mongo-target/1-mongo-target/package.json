@@ -16,7 +16,9 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/errors": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/mongo-schema-ir": "workspace:*",
