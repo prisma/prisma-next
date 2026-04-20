@@ -14,7 +14,12 @@ export type BinaryOp =
   | 'like'
   | 'ilike'
   | 'in'
-  | 'notIn';
+  | 'notIn'
+  | 'add'
+  | 'sub'
+  | 'mul'
+  | 'div'
+  | 'mod';
 
 export type AggregateCountFn = 'count';
 export type AggregateOpFn = 'sum' | 'avg' | 'min' | 'max';
@@ -52,6 +57,7 @@ export interface ExprVisitor<R> {
   exists(expr: ExistsExpr): R;
   nullCheck(expr: NullCheckExpr): R;
   not(expr: NotExpr): R;
+  cast(expr: CastExpr): R;
   literal(expr: LiteralExpr): R;
   param(expr: ParamRef): R;
   list(expr: ListExpression): R;
@@ -813,6 +819,26 @@ export class BinaryExpr extends Expression {
     return new BinaryExpr('notIn', left, right);
   }
 
+  static add(left: AnyExpression, right: AnyExpression): BinaryExpr {
+    return new BinaryExpr('add', left, right);
+  }
+
+  static sub(left: AnyExpression, right: AnyExpression): BinaryExpr {
+    return new BinaryExpr('sub', left, right);
+  }
+
+  static mul(left: AnyExpression, right: AnyExpression): BinaryExpr {
+    return new BinaryExpr('mul', left, right);
+  }
+
+  static div(left: AnyExpression, right: AnyExpression): BinaryExpr {
+    return new BinaryExpr('div', left, right);
+  }
+
+  static mod(left: AnyExpression, right: AnyExpression): BinaryExpr {
+    return new BinaryExpr('mod', left, right);
+  }
+
   override accept<R>(visitor: ExprVisitor<R>): R {
     return visitor.binary(this);
   }
@@ -987,6 +1013,35 @@ export class NotExpr extends Expression {
 
   override rewrite(rewriter: ExpressionRewriter): AnyExpression {
     return new NotExpr(this.expr.rewrite(rewriter));
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return this.expr.fold(folder);
+  }
+}
+
+export class CastExpr extends Expression {
+  readonly kind = 'cast' as const;
+  readonly expr: AnyExpression;
+  readonly targetCodecId: string;
+
+  constructor(expr: AnyExpression, targetCodecId: string) {
+    super();
+    this.expr = expr;
+    this.targetCodecId = targetCodecId;
+    this.freeze();
+  }
+
+  static of(expr: AnyExpression, targetCodecId: string): CastExpr {
+    return new CastExpr(expr, targetCodecId);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.cast(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return new CastExpr(this.expr.rewrite(rewriter), this.targetCodecId);
   }
 
   override fold<T>(folder: ExpressionFolder<T>): T {
@@ -1688,7 +1743,8 @@ export type AnyExpression =
   | OrExpr
   | ExistsExpr
   | NullCheckExpr
-  | NotExpr;
+  | NotExpr
+  | CastExpr;
 export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
 export type AnyInsertValue = ColumnRef | ParamRef | DefaultValueExpr;
 export type AnyOperationArg = AnyExpression | ParamRef | LiteralExpr;

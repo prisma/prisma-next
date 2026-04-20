@@ -5,6 +5,7 @@ import {
   type AnyExpression,
   type AnyFromSource,
   BinaryExpr,
+  CastExpr,
   type ColumnRef,
   DerivedTableSource,
   ExistsExpr,
@@ -81,6 +82,9 @@ function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression):
     },
     not(expr) {
       return new NotExpr(bindWhereExprNode(contract, expr.expr));
+    },
+    cast(expr) {
+      return CastExpr.of(bindExpression(contract, expr.expr), expr.targetCodecId);
     },
   });
 }

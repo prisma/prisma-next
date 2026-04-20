@@ -108,6 +108,32 @@ export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown
   and: (...ands: ExpressionOrValue<BooleanCodecType, CT>[]) => Expression<BooleanCodecType>;
   or: (...ors: ExpressionOrValue<BooleanCodecType, CT>[]) => Expression<BooleanCodecType>;
 
+  add: <T extends ScopeField>(
+    a: ExpressionOrValue<T, CT>,
+    b: ExpressionOrValue<T, CT>,
+  ) => Expression<T>;
+  sub: <T extends ScopeField>(
+    a: ExpressionOrValue<T, CT>,
+    b: ExpressionOrValue<T, CT>,
+  ) => Expression<T>;
+  mul: <T extends ScopeField>(
+    a: ExpressionOrValue<T, CT>,
+    b: ExpressionOrValue<T, CT>,
+  ) => Expression<T>;
+  div: <T extends ScopeField>(
+    a: ExpressionOrValue<T, CT>,
+    b: ExpressionOrValue<T, CT>,
+  ) => Expression<T>;
+  mod: <T extends ScopeField>(
+    a: ExpressionOrValue<T, CT>,
+    b: ExpressionOrValue<T, CT>,
+  ) => Expression<T>;
+
+  cast: <TargetCodecId extends string, Nullable extends boolean>(
+    expr: Expression<ScopeField>,
+    target: { codecId: TargetCodecId; nullable: Nullable },
+  ) => Expression<{ codecId: TargetCodecId; nullable: Nullable }>;
+
   exists: (subquery: Subquery<Record<string, ScopeField>>) => Expression<BooleanCodecType>;
   notExists: (subquery: Subquery<Record<string, ScopeField>>) => Expression<BooleanCodecType>;
 
