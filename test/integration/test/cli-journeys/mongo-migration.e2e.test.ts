@@ -348,14 +348,12 @@ describe(
 
       // Hand-author the migration: a createIndex op (matches what the planner
       // would emit) plus a dataTransform that lowercases the `name` field.
-      // The data-transform's `run` returns a `MongoQueryPlan` constructed
-      // from the raw command constructor so the file does not depend on the
-      // typed query builder. We omit `check` so the runner always executes
-      // the transform; idempotency would be expressed via the structured
-      // check shape but is orthogonal to what this journey verifies.
+      // The check finds documents whose `name` contains an uppercase letter;
+      // after the transform all names are lower-case so the check is
+      // satisfied, enabling idempotency-skip on re-apply (tested below).
       const handAuthored = `import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex, dataTransform } from '@prisma-next/target-mongo/migration';
-import { RawUpdateManyCommand } from '@prisma-next/mongo-query-ast/execution';
+import { RawUpdateManyCommand, RawAggregateCommand } from '@prisma-next/mongo-query-ast/execution';
 
 const planMeta = {
   target: 'mongo',
@@ -376,6 +374,16 @@ class M extends Migration {
     return [
       createIndex('users', [{ field: 'name', direction: 1 }]),
       dataTransform('lowercase-user-name', {
+        check: {
+          source: () => ({
+            collection: 'users',
+            command: new RawAggregateCommand(
+              'users',
+              [{ $match: { name: { $regex: '[A-Z]' } } }, { $limit: 1 }],
+            ),
+            meta: { ...planMeta, lane: 'mongo-pipeline' },
+          }),
+        },
         run: () => ({
           collection: 'users',
           command: new RawUpdateManyCommand(
@@ -438,6 +446,19 @@ Migration.run(import.meta.url, M);
       expect(indexes.some((idx) => JSON.stringify(idx.key) === JSON.stringify({ name: 1 }))).toBe(
         true,
       );
+
+      // Re-apply: the runner postcheck sees all names are already lower-case,
+      // so the data transform is skipped. Data must be byte-identical.
+      const apply2 = await migrationApply(ctx);
+      expect(apply2.exitCode, `re-apply: ${apply2.stdout}\n${apply2.stderr}`).toBe(0);
+
+      const usersAfterReApply = await client
+        .db(dbName)
+        .collection('users')
+        .find({}, { projection: { _id: 0, email: 1, name: 1 } })
+        .sort({ email: 1 })
+        .toArray();
+      expect(usersAfterReApply).toEqual(users);
     });
   },
 );
