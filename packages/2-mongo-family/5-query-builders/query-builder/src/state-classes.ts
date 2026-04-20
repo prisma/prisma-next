@@ -6,9 +6,13 @@ import type {
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type {
+  DeleteResult,
+  InsertManyResult,
+  InsertOneResult,
   MongoFilterExpr,
   MongoQueryPlan,
   MongoUpdateSpec,
+  UpdateResult,
 } from '@prisma-next/mongo-query-ast/execution';
 import {
   DeleteManyCommand,
@@ -26,11 +30,8 @@ import {
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { PipelineChain } from './builder';
 import { createFieldAccessor, type FieldAccessor } from './field-accessor';
-import type { DeleteResult, InsertManyResult, InsertOneResult, UpdateResult } from './result-types';
 import type { ModelToDocShape, ResolveRow } from './types';
 import { resolveUpdaterResult, type UpdaterResult } from './update-ops';
-
-export type { DeleteResult, InsertManyResult, InsertOneResult, UpdateResult } from './result-types';
 
 /**
  * "Match-all" filter used by the unqualified-write terminals
