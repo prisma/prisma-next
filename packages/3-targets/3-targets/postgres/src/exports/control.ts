@@ -3,7 +3,6 @@ import {
   parsePostgresDefault,
 } from '@prisma-next/adapter-postgres/control';
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
-import { errorPlanDoesNotSupportAuthoringSurface } from '@prisma-next/errors/migration';
 import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
@@ -18,10 +17,7 @@ import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlTargetInstance,
-  MigrationPlanner,
-  MigrationPlanWithAuthoringSurface,
   MigrationRunner,
-  MigrationScaffoldContext,
   OperationDescriptor,
 } from '@prisma-next/framework-components/control';
 import { sql } from '@prisma-next/sql-builder/runtime';
@@ -130,38 +126,8 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
   {
     ...postgresTargetDescriptorMeta,
     migrations: {
-      createPlanner(_family: SqlControlFamilyInstance): MigrationPlanner<'sql', 'postgres'> {
-        const inner = createPostgresMigrationPlanner();
-        return {
-          plan(options) {
-            // The framework's planner options omit `schemaName`; Postgres's
-            // own planner defaults to `'public'` when it's absent, so this
-            // cast is safe for the framework-facing surface.
-            const result = inner.plan(options as never);
-            if (result.kind === 'failure') {
-              return { kind: 'failure', conflicts: result.conflicts };
-            }
-            return {
-              kind: 'success',
-              plan: {
-                ...result.plan,
-                renderTypeScript(): string {
-                  throw errorPlanDoesNotSupportAuthoringSurface({ targetId: 'postgres' });
-                },
-              },
-            };
-          },
-          emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
-            return {
-              targetId: 'postgres',
-              destination: { storageHash: context.toHash },
-              operations: [],
-              renderTypeScript(): string {
-                return renderDescriptorTypeScript([], context);
-              },
-            };
-          },
-        };
+      createPlanner(_family: SqlControlFamilyInstance) {
+        return createPostgresMigrationPlanner();
       },
       createRunner(family) {
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
