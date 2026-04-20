@@ -25,7 +25,7 @@ function buildControlStack(config: Awaited<ReturnType<typeof loadConfig>>) {
   });
 }
 
-function buildSourceContext(stack: ControlStack, configPath: string): ContractSourceContext {
+function buildSourceContext(stack: ControlStack): ContractSourceContext {
   return {
     composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
     scalarTypeDescriptors: stack.scalarTypeDescriptors,
@@ -47,7 +47,7 @@ const resolveContract = async (
   configPath: string,
 ) => {
   const sourceResult = await source.load(
-    buildSourceContext(stack, configPath),
+    buildSourceContext(stack),
     buildSourceEnvironment(configPath),
   );
   if (!sourceResult.ok) {
