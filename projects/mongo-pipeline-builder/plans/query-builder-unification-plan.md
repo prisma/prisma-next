@@ -2,11 +2,37 @@
 
 ## Summary
 
-Rename `@prisma-next/mongo-pipeline-builder` to `@prisma-next/mongo-query-builder` and grow it from a read-only pipeline builder into a typed builder for all MongoDB CRUD wire commands. The work splits the existing single `PipelineBuilder` runtime class into a three-state machine (`CollectionHandle` → `FilteredCollection` → `PipelineChain`), unifies the field/filter proxies into one ADR-180 accessor, and adds typed terminals for inserts, updates, deletes, upserts, find-and-modify, update-with-pipeline, and `$merge`/`$out`. Six milestones, each independently mergeable.
+Rename `@prisma-next/mongo-pipeline-builder` to `@prisma-next/mongo-query-builder` and grow it from a read-only pipeline builder into a typed builder for all MongoDB CRUD wire commands. The work splits the existing single `PipelineBuilder` runtime class into a three-state machine (`CollectionHandle` → `FilteredCollection` → `PipelineChain`), unifies the field/filter proxies into one ADR-180 accessor, and adds typed terminals for inserts, updates, deletes, upserts, find-and-modify, update-with-pipeline, and `$merge`/`$out`.
+
+This file is the single consolidated plan for the project. It covers the original M0–M5 milestones plus the follow-up milestones (F1–F6) that picked up items deferred during the first pass, and it absorbs the PR-355 code-review close-out.
 
 **Spec:** [`projects/mongo-pipeline-builder/specs/query-builder-unification.spec.md`](../specs/query-builder-unification.spec.md)
 
 **Linear:** [TML-2267](https://linear.app/prisma-company/issue/TML-2267/query-builder-unification)
+
+## Status at a glance
+
+| Bucket | State |
+| ------ | ----- |
+| M0 — Package rename | Done |
+| M1 — State split + unified accessor | Done |
+| M2 — Inserts / unqualified / filtered writes | Done (integration sweep moved to F4) |
+| M3 — Find-and-modify + upserts | Done (PipelineChain form moved to F2, integration sweep to F4) |
+| M4 — Pipeline-style updates + `$merge`/`$out` terminals | Done (capability work moved to F3, integration sweep to F4) |
+| M5 — Raw escape hatch + close-out | `rawCommand` done; close-out lives in F6 below |
+| F1 — AST/wire extensions (sort/skip/returnDocument) | Done |
+| F2 — `PipelineChain` find-and-modify terminals | Done |
+| F3 — Pipeline-style updates | Done |
+| F4 — `mongo-memory-server` integration sweep | Done |
+| F5 — Retail-store example conversion | **Outstanding** — blocked on PR [#349](https://github.com/prisma/prisma-next/pull/349) merging |
+| F6 — Close-out (docs migration + retire project folder) | **Outstanding** |
+| PR-355 code-review items #1–13 | Done |
+| PR-355 code-review item #14 (close-out) | Rolled into F6 |
+
+**Follow-up Linear tickets spun off during the review:**
+
+- [TML-2281](https://linear.app/prisma-company/issue/TML-2281) — Type-safe dot-path validation for query-builder callable field accessor (`f("dot.path")`).
+- [TML-2259](https://linear.app/prisma-company/issue/TML-2259) — Trait-gated operators, scope extended (task 5) to cover the query-builder's `Expression<F>`.
 
 ## Collaborators
 
@@ -14,115 +40,143 @@ Rename `@prisma-next/mongo-pipeline-builder` to `@prisma-next/mongo-query-builde
 | ------------ | ----------- | ---------------------------------------------------------------------- |
 | Maker        | Will        | Drives execution.                                                      |
 | Reviewer     | TBD         | Architectural review — particularly the state-machine + marker types.  |
-| Collaborator | PR [#349](https://github.com/prisma/prisma-next/pull/349) author | Migration-authoring consumer; coordinate retail-store example conversion. |
+| Collaborator | PR [#349](https://github.com/prisma/prisma-next/pull/349) author | Migration-authoring consumer; coordinates retail-store example conversion. |
 
 ## Branching strategy
 
-- All milestones land directly on `main`. **Not** stacked on PR [#349](https://github.com/prisma/prisma-next/pull/349) (`tml-2219-data-migrations-for-mongodb`); the unification work has no hard dependency on `dataTransform()`.
-- M0 ships as its own PR (rename only). M1–M5 may ship as separate PRs or combined; the boundary that matters is M0 vs M1+ because the rename is mechanical and reviewable in isolation.
-- Retail-store example conversion happens in a follow-up PR after both this branch and PR [#349](https://github.com/prisma/prisma-next/pull/349) merge to `main`.
+- M0–M5 and F1–F4 have landed on `main` (or on the current PR [#355](https://github.com/prisma/prisma-next/pull/355) branch awaiting merge). F5 and F6 are the only unmerged work.
+- F6 (close-out) lands last because it deletes `projects/mongo-pipeline-builder/`, which the earlier milestones reference.
+- F5 lands only after PR [#349](https://github.com/prisma/prisma-next/pull/349) is merged. If [#349](https://github.com/prisma/prisma-next/pull/349) merges before F5 is ready, F5 stays a separate PR; otherwise F5 can fold into F6.
 
 ---
 
 ## Milestones
 
-### Milestone 0 — Rename package and entry point
+### Milestone 0 — Rename package and entry point ✅
 
-Mechanical rename. No surface change. Lands first as a small standalone PR.
+Mechanical rename. No surface change. Landed first as a small standalone PR.
 
 **Tasks:**
 
 - [x] 0.1 — Move `packages/2-mongo-family/5-query-builders/pipeline-builder/` → `packages/2-mongo-family/5-query-builders/query-builder/`. Update `package.json#name` to `@prisma-next/mongo-query-builder`.
-- [x] 0.2 — Rename the `mongoPipeline` export to `mongoQuery` and the `PipelineRoot` interface to `QueryRoot`. Rename the file `src/pipeline.ts` → `src/query.ts` and update internal imports.
-- [x] 0.3 — Update all in-repo callers (runtime tests, integration tests, `@prisma-next/mongo` extension, examples, migration-authoring docs) to the new names. Renamed the extension's `pipeline:` field to `query:`.
-- [x] 0.4 — `pnpm lint:deps` passes (no architecture-config changes needed; layering rules use globs by layer index, not package name).
-- [x] 0.5 — Update repo-wide doc references: `docs/architecture docs/Package-Layering.md`, `docs/Architecture Overview.md`, `docs/reference/Package Naming Conventions.md`, READMEs. The historical `projects/mongo-pipeline-builder/{spec.md,plan.md}` are left intact; the new design lives under `projects/mongo-pipeline-builder/specs/query-builder-unification.spec.md` and the corresponding plan.
-- [x] 0.6 — Verified: `mongo-query-builder` typecheck + tests green (271 tests), `mongo-runtime` typecheck + tests green (51 tests), `lint:deps` clean, `lint` clean for touched packages.
+- [x] 0.2 — Rename `mongoPipeline` → `mongoQuery` and `PipelineRoot` → `QueryRoot`. Rename `src/pipeline.ts` → `src/query.ts`.
+- [x] 0.3 — Update all in-repo callers (runtime tests, integration tests, `@prisma-next/mongo` extension, examples, migration-authoring docs). Renamed the extension's `pipeline:` field to `query:`.
+- [x] 0.4 — `pnpm lint:deps` passes.
+- [x] 0.5 — Updated repo-wide doc references. Historical `projects/mongo-pipeline-builder/{spec.md,plan.md}` left intact; the new design lives under `projects/mongo-pipeline-builder/specs/query-builder-unification.spec.md` and this plan.
+- [x] 0.6 — Verified: `mongo-query-builder` typecheck + tests green, `mongo-runtime` typecheck + tests green, `lint:deps` clean, `lint` clean for touched packages.
 
-### Milestone 1 — State split + unified accessor (read-side parity)
+### Milestone 1 — State split + unified accessor (read-side parity) ✅
 
 Split the single `PipelineBuilder` into three concrete classes; unify `FieldProxy` + `FilterProxy` into the ADR-180 accessor; preserve all existing read-side behaviour and tests.
 
-**Validation:** all existing read-side tests pass with the new class topology. Type tests assert the method-set per state.
+- [x] 1.1 — Phantom marker types (renamed during review to `UpdateEnabled` / `FindAndModifyEnabled`) and `Preserve<M>` / `Clear<M>` helpers.
+- [x] 1.2 — `FieldAccessor<Shape>` per [ADR 180](../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md). Property-access for scalars + callable form for value-object dot-paths. Initial filter operators: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `nin`, `exists`.
+- [x] 1.3 — Migrated `match`, `addFields`, `project`, `group`, `sortByCount`, `replaceRoot`, `redact` callbacks to `FieldAccessor`; deleted `field-proxy.ts` and `filter-proxy.ts`.
+- [x] 1.4 — `CollectionHandle<TContract, ModelName>` implemented.
+- [x] 1.5 — `FilteredCollection<TContract, ModelName>` implemented with AND-folding of accumulated filters.
+- [x] 1.6 — `PipelineChain<TContract, Shape, U, F>` implemented with marker preservation/clearing and `build()` / `aggregate()`.
+- [x] 1.7 — Entry point `mongoQuery(...).from(...)` wired.
+- [x] 1.8 — State-machine type tests in `test/state-machine.test-d.ts`.
+- [x] 1.9 — Read-side integration tests adapted to the new entry shape.
 
-**Tasks:**
+### Milestone 2 — Inserts, unqualified writes, filtered writes ✅
 
-- [ ] 1.1 — Define phantom marker types: `type UpdateCompat = 'compat' | 'cleared'`; `type FindAndModifyCompat = 'compat' | 'cleared'`. Helper conditional types `Preserve<M>`, `Clear<M>` for chaining.
-- [ ] 1.2 — Implement `FieldAccessor<Shape>` per [ADR 180](../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md): property-access for scalars, callable form for value-object dot-paths via recursive `ResolvePath` template-literal type. Returned `Expression<F>` carries the trait-gated filter operators (initially: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `nin`, `exists`). Unit tests + `.test-d.ts` for path resolution and operator gating against the existing contract test fixtures.
-- [ ] 1.3 — Migrate the existing `match`, `addFields`, `project`, `group`, `sortByCount`, `replaceRoot`, `redact` callbacks from `FieldProxy`/`FilterProxy` to `FieldAccessor`. Delete `field-proxy.ts` and `filter-proxy.ts`. Existing tests and type tests must continue to pass.
-- [ ] 1.4 — Implement `CollectionHandle<TContract, ModelName>`. Constructor takes `(contract, collection, storageHash, modelName)`. Methods initially: `match` → `FilteredCollection`, plus the pipeline-stage methods that exist on the current builder (returning `PipelineChain<…, 'compat', 'compat'>` after a single stage). No write terminals yet.
-- [ ] 1.5 — Implement `FilteredCollection<TContract, ModelName>`. Holds an accumulated `MongoFilterExpr` (or `ReadonlyArray<MongoFilterExpr>`). `match` returns `FilteredCollection`. Pipeline-stage methods emit a leading `$match` stage and return `PipelineChain`. No write terminals yet.
-- [ ] 1.6 — Implement `PipelineChain<TContract, Shape, U, F>`. Holds the stage list, contract, collection, storage hash, and prior accumulated filter (if any). Each pipeline-stage method preserves/clears markers per the spec's marker table. `build()` and `aggregate()` return a `MongoQueryPlan` (parity with current builder).
-- [ ] 1.7 — Wire entry point: `mongoQuery<TContract>(opts).from(name)` returns `CollectionHandle`. `mongoQuery<TContract>(opts).rawCommand(cmd)` stub (full implementation in M5 — minimal placeholder ok for now, or defer fully to M5).
-- [ ] 1.8 — Type tests in `test/state-machine.test-d.ts` asserting the method-set of each state per the spec's [State machine acceptance criteria](../specs/query-builder-unification.spec.md#state-machine-m1).
-- [ ] 1.9 — Adapt all existing read-side integration tests to the new entry shape. They should require minimal changes (`mongoQuery` instead of `mongoPipeline`, otherwise identical chains).
+Typed CRUD write surface for inserts, deletes, and updates (traditional update-operators form).
 
-### Milestone 2 — Inserts, unqualified writes, filtered writes
+- [x] 2.1 — `Expression<F>` extended with Mongo update operators (`set`, `unset`, `inc`, `mul`, `min`, `max`, `rename`, `push`, `addToSet`, `pop`, `pull`, `pullAll`, `currentDate`, `setOnInsert`).
+- [x] 2.2 — `TypedUpdateOp` union + `foldUpdateOps` helper.
+- [x] 2.3 — `CollectionHandle.insertOne` / `.insertMany` typed against the contract's input row type.
+- [x] 2.4 — `CollectionHandle.updateAll(updaterFn)` / `.deleteAll()`. Tautological filter represented as empty `MongoAndExpr`.
+- [x] 2.5 — `FilteredCollection.updateMany` / `.updateOne` / `.deleteMany` / `.deleteOne`.
+- [x] 2.6 — Negative-type tests for method availability per state.
+- [x] 2.7 — Integration tests: **rolled forward into F4**.
 
-Add the typed CRUD write surface for inserts, deletes, and updates (with the traditional update-operators form).
+### Milestone 3 — Find-and-modify and upserts ✅
 
-**Validation:** integration tests against `mongo-memory-server` for each terminal.
+- [x] 3.1 — Extended `UpdateOneCommand` / `UpdateManyCommand` with `upsert: boolean`. Results carry optional `upsertedCount` / `upsertedId`.
+- [x] 3.2 — `FilteredCollection.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete()` implemented. `returnDocument` plumbed through in F1.
+- [x] 3.3 — `PipelineChain<…, _, 'compat'>.findOneAndUpdate` / `.findOneAndDelete`: **delivered in F2** on top of F1's AST/wire slots.
+- [x] 3.4 — `CollectionHandle.upsertOne(filterFn, updaterFn)` and `FilteredCollection.upsertOne(updaterFn)` produce `UpdateOneCommand` with `upsert: true`. `upsertMany` intentionally not shipped (Mongo multi-doc upsert footgun — route callers through `rawCommand`).
+- [x] 3.5 — Type tests for per-state method availability.
+- [x] 3.6 — Integration tests: **rolled forward into F4**.
 
-**Tasks:**
+### Milestone 4 — Update-with-pipeline + `$merge`/`$out` write terminals ✅
 
-- [ ] 2.1 — Extend `FieldAccessor`'s returned `Expression<F>` with the Mongo update operators: `set`, `unset`, `inc`, `mul`, `min`, `max`, `rename`, `push`, `addToSet`, `pop`, `pull`, `pullAll`, `currentDate`, `setOnInsert`. Trait-gate where cheap (numeric ops on numeric codecs, array ops on array codecs). Type tests for each operator's input type.
-- [ ] 2.2 — Define `UpdateOp` type (a discriminated union for emitted operator records) and a fold helper that turns `ReadonlyArray<UpdateOp>` into a `Record<string, MongoValue>` (`{ $set: {...}, $inc: {...}, ... }`).
-- [ ] 2.3 — Implement `CollectionHandle.insertOne(doc)` and `.insertMany(docs)`. Type `doc` against the contract's input row type (`ExtractMongoFieldInputTypes<TContract>[ModelName]`). Produce `InsertOneCommand` / `InsertManyCommand`.
-- [ ] 2.4 — Implement `CollectionHandle.updateAll(updaterFn)` and `.deleteAll()`. Decide tautological filter representation (see Open Item #2 in the spec); reuse across the two methods.
-- [ ] 2.5 — Implement `FilteredCollection.updateMany(updaterFn)`, `.updateOne(updaterFn)`, `.deleteMany()`, `.deleteOne()`. AND-fold the accumulated filters via `MongoAndExpr`. Use the M2.2 fold helper for updaters.
-- [ ] 2.6 — Type tests asserting the negative cases: `CollectionHandle` does not expose `updateMany`/`updateOne`/`deleteMany`/`deleteOne`/`findOneAndUpdate`/`findOneAndDelete`; `FilteredCollection` does not expose `insertOne`/`insertMany`/`updateAll`/`deleteAll`. (Use `// @ts-expect-error` in negative-type tests.)
-- [ ] 2.7 — Integration tests (`mongo-memory-server`): (a) insertOne + read back, (b) match → updateMany + verify affected docs, (c) match → deleteOne + verify, (d) updateAll on a small collection + verify.
+- [x] 4.1 — `FieldAccessor` pipeline-stage emitters (`f.stage.set`/`unset`/`replaceRoot`/`replaceWith`): **delivered in F3**.
+- [x] 4.2 — `resolveUpdaterResult` dispatch: **delivered in F3**.
+- [x] 4.3 — No-arg `PipelineChain.updateMany()` / `.updateOne()`: **delivered in F3**.
+- [x] 4.4 — `PipelineChain.merge(opts)` / `.out(coll)` as write terminals returning `MongoQueryPlan<unknown>`.
+- [x] 4.5 — Type tests.
+- [x] 4.6 — Integration tests: **rolled forward into F4**.
 
-### Milestone 3 — Find-and-modify and upserts
+### Milestone 5 — Raw escape hatch ✅ (close-out moved to F6)
 
-Add `findOneAndUpdate`, `findOneAndDelete`, `upsertOne`, `upsertMany`. Resolve the upsert AST extension from spec Open Item #1.
+- [x] 5.1 — `mongoQuery<TContract>(opts).rawCommand(cmd)` accepts any `AnyMongoCommand`, carries `storageHash` and `lane: 'mongo-raw'`. Validates the contract eagerly inside the `rawCommand` body.
+- [x] 5.2 — Integration sweep delivered in F4.
+- [ ] 5.3–5.6 — Close-out work folded into F6 below.
 
-**Validation:** integration tests for each terminal; type tests for the marker-gated forms on `PipelineChain`.
+---
 
-**Tasks:**
+### F1 — AST + wire extensions for find-and-modify slots ✅
 
-- [x] 3.1 — Extended `UpdateOneCommand` / `UpdateManyCommand` (and the corresponding `UpdateOneWireCommand` / `UpdateManyWireCommand`) with a defaulted `upsert: boolean` field. Adapter lowering threads it through; the driver passes it to the underlying `updateOne`/`updateMany` calls. Result types (`UpdateOneResult` / `UpdateManyResult`) gained optional `upsertedCount` / `upsertedId` so callers see the upserted id when the upsert path was taken.
-- [x] 3.2 — `FilteredCollection.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete()` implemented. Options for the update form: `upsert` (default `false`). `returnDocument` is now caller-controllable (plumbed through AST/wire in follow-up F1).
-- [x] 3.3 — Completed in follow-up F2. `PipelineChain<…, _, 'compat'>.findOneAndUpdate(updaterFn, opts?)` and `.findOneAndDelete()` implemented with chain deconstruction for `sort`/`skip` slots. AST/wire extensions landed in F1.
-- [x] 3.4 — `CollectionHandle.upsertOne(filterFn, updaterFn)` and `FilteredCollection.upsertOne(updaterFn)` implemented; both produce `UpdateOneCommand` with `upsert: true`. `upsertMany` deferred per the design discussion (multi-doc upserts are a Mongo-side gotcha — at most one inserts, the rest update; better to surface the unsafety with an explicit raw-command escape hatch).
-- [x] 3.5 — Type tests: `state-machine-surface.test-d.ts` asserts `findOneAndUpdate` / `findOneAndDelete` are absent on `CollectionHandle` (require `.match(...)` first). The marker-driven gating on `PipelineChain` is in place; per-stage `findOneAndUpdate` availability tests block on M3.3.
-- [x] 3.6 — Integration tests completed in follow-up F4. 14 end-to-end tests against `mongo-memory-server` in `examples/mongo-demo/test/query-builder-writes.test.ts`.
+Carry `sort` / `skip` / `returnDocument` through the find-and-modify command chain.
 
-### Milestone 4 — Update-with-pipeline + `$merge`/`$out` write terminals
+- [x] F1.1 — Extend `FindOneAndUpdateCommand` / `FindOneAndDeleteCommand` with optional `sort` / `skip`; add `returnDocument: 'before' | 'after'` (default `'after'`) to `FindOneAndUpdateCommand`. Same shape on the corresponding raw commands.
+- [x] F1.2 — Mirror on `FindOneAndUpdateWireCommand` / `FindOneAndDeleteWireCommand`.
+- [x] F1.3 — Adapter lowering threads fields through.
+- [x] F1.4 — Driver passes fields to underlying `findOneAndUpdate` / `findOneAndDelete`. Hardcoded `returnDocument: 'after'` dropped — AST default carries that semantics now.
+- [x] F1.5 — `FilteredCollection.findOneAndUpdate(updaterFn, opts?)` surfaces `returnDocument`.
+- [x] F1.6 — Typecheck + tests green on touched packages.
 
-Support the array-form updater (update-with-pipeline) and the `PipelineChain` no-arg `updateMany()`/`updateOne()` form. Wire `.merge` and `.out` as `WriteTerminal`s.
+### F2 — `PipelineChain` find-and-modify terminals ✅
 
-**Validation:** integration tests for pipeline-style updates with cross-field references and conditional logic.
+- [x] F2.1 — `findOneAndUpdate` / `findOneAndDelete` added to `PipelineChain` via `this:`-parameter gating on `F = 'compat'`.
+- [x] F2.2 — Chain deconstruction via `deconstructFindAndModifyChain`: validate `MongoMatchStage` / `MongoSortStage` / `MongoSkipStage` only, AND-fold matches, fold sorts last-writer-wins, pick largest skip, defensive throw on other stages.
+- [x] F2.3 — Type tests in `test/state-machine.test-d.ts` covering availability after `.match` / `.sort` / `.skip` and unavailability after marker-clearing stages.
+- [x] F2.4 — Unit tests in `test/find-and-modify.test.ts` covering chain → wire-command slot mapping plus defensive throw.
 
-**Tasks:**
+### F3 — Pipeline-style updates ✅
 
-- [x] 4.1 — Completed in follow-up F3. `FieldAccessor` extended with `f.stage.set(...)`, `f.stage.unset(...)`, `f.stage.replaceRoot(...)`, `f.stage.replaceWith(...)` pipeline-stage emitters.
-- [x] 4.2 — Completed in follow-up F3. `resolveUpdaterResult` dispatches between `TypedUpdateOp[]` and `MongoUpdatePipelineStage[]`; mixed arrays throw.
-- [x] 4.3 — Completed in follow-up F3. No-arg `PipelineChain.updateMany()` / `.updateOne()` with chain deconstruction.
-- [x] 4.4 — `PipelineChain.merge(opts)` and `.out(coll)` are now write terminals — they return `MongoQueryPlan<unknown>` (lane `mongo-write`) directly rather than another `PipelineChain`. The `$merge`/`$out` stage is appended internally so the wire `AggregateCommand` ends with the terminal stage as required by Mongo.
-- [x] 4.5 — Existing read-side type tests assert `merge`/`out` plans yield `unknown` rows. Pipeline-style update marker tests block on 4.1–4.3.
-- [x] 4.6 — Integration tests completed in follow-up F4.
+- [x] F3.1 — `FieldAccessor.stage.{set,unset,replaceRoot,replaceWith,redact}` emitters returning `MongoUpdatePipelineStage`.
+- [x] F3.2 — `resolveUpdaterResult` dispatches between `TypedUpdateOp[]` and `MongoUpdatePipelineStage[]`; mixed arrays throw.
+- [x] F3.3 — No-arg `PipelineChain.updateMany()` / `.updateOne()` gated on `U = 'compat'`, consuming the chain via `deconstructUpdateChain`.
+- [x] F3.4 — Existing `FilteredCollection.updateMany` / `.updateOne` / `CollectionHandle.updateAll` / `.upsertOne` dispatch through the fold helper.
+- [x] F3.5 — Type tests for pipeline-style update availability + mixed-shape rejection.
+- [x] F3.6 — Unit tests for each emitter + no-arg terminals.
 
-### Milestone 5 — Raw escape hatch + close-out
+### F4 — Integration sweep ✅
 
-Wire the `q.rawCommand(...)` escape hatch and close out the project.
+`mongo-memory-server`-backed end-to-end coverage for every write terminal.
 
-**Validation:** raw escape hatch round-trips through the runtime; all spec acceptance criteria are met; long-lived docs migrated; `projects/mongo-pipeline-builder/` removed.
+- [x] F4.1 — Harness reused from the existing `mongo-memory-server` setup in `examples/mongo-demo`.
+- [x] F4.2 — M2 coverage (insert, filtered update, filtered delete, `updateAll`, ordered `insertMany`).
+- [x] F4.3 — M3 coverage (`findOneAndUpdate` before/after, `findOneAndDelete`, upsert insert + update paths).
+- [x] F4.4 — M4 coverage (`f.stage.set` pipeline update, traditional-operator update, `$merge`, `$out`).
+- [x] F4.5 — 14 integration tests pass in `examples/mongo-demo/test/query-builder-writes.test.ts`.
 
-**Tasks:**
+### F5 — Retail-store example conversion — **OUTSTANDING** 🟡
 
-- [x] 5.1 — `mongoQuery<TContract>(opts).rawCommand(cmd: AnyMongoCommand): MongoQueryPlan<unknown>` accepts any `AnyMongoCommand` (typed CRUD or `RawMongoCommand`). The plan carries the contract's `storageHash` and `lane: 'mongo-raw'`. Validates the contract eagerly in the `rawCommand` body (vs. at `mongoQuery(...)` construction) so the type-test files exercising `from(...)` against a `{}`-shaped `unknown` contract continue to typecheck without a runtime guard fight.
-- [ ] 5.2 — Deferred to the close-out PR. The unit-test suite covers M2/M3/M4/M5 AST emission; the wider integration sweep (mongo-memory-server) for M2.7/M3.6/M4.6 is the gap.
-- [ ] 5.3 — Deferred to the close-out PR.
-- [ ] 5.4 — Deferred to the close-out PR.
-- [ ] 5.5 — Deferred to the close-out PR.
-- [ ] 5.6 — Deferred to the close-out PR.
+Blocked on PR [#349](https://github.com/prisma/prisma-next/pull/349) landing on `main` (the migration framework this ports onto comes from that branch).
 
-### Close-out
+- [ ] F5.1 — Confirm PR [#349](https://github.com/prisma/prisma-next/pull/349) is merged to `main` and the example's `dataTransform` API is in place. If not yet merged, defer this milestone.
+- [ ] F5.2 — Convert `examples/retail-store/migrations/20260416_backfill-product-status` to call `mongoQuery(...).from(...).match(...).updateMany(...)`. Verify the resulting `MongoQueryPlan` shape is consumed unchanged by `dataTransform.run`.
+- [ ] F5.3 — Update inline docs in the example to reference `mongoQuery` instead of the old `mongoPipeline` helper.
 
-- [ ] Verify all acceptance criteria in [`specs/query-builder-unification.spec.md`](../specs/query-builder-unification.spec.md) and the original [`spec.md`](../spec.md).
-- [ ] Convert `examples/retail-store/migrations/20260416_backfill-product-status` to use `mongoQuery` (after this branch + PR [#349](https://github.com/prisma/prisma-next/pull/349) both merge to `main`). Track as either the final task in M5 or a small follow-up PR depending on merge order.
-- [ ] Confirm the migration-authoring `dataTransform.run` consumes new builder plans without changes — the `{ collection, command, meta }` shape is unchanged.
+### F6 — Close-out — **OUTSTANDING** 🟡
+
+Migrate the long-lived design content out of the project folder, mark the project as superseded, scrub inbound references, and delete the folder. Absorbs PR-355 code-review item #14.
+
+- [ ] F6.1 — Migrate design content from `projects/mongo-pipeline-builder/specs/query-builder-unification.spec.md` (and the original `spec.md` where still relevant) into the MongoDB Family subsystem doc under `docs/architecture docs/`. Decide whether the state-machine pattern + unified accessor warrant new ADRs. Leading candidates: (a) a brief ADR documenting the three-class state-machine pattern for reuse by the SQL builder; (b) a tightening of [ADR 180](../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md) reflecting the consolidated accessor. Lean: yes to both, brief.
+- [ ] F6.2 — Update `projects/mongo-pipeline-builder/spec.md` and `plan.md` to mark this work as completed and superseding the original read-side scope. (These files get deleted in F6.4; F6.2 is for the historical record up to that point.)
+- [ ] F6.3 — Strip repo-wide references to `projects/mongo-pipeline-builder/**`: `rg -n 'projects/mongo-pipeline-builder' .` and replace each hit with the canonical `docs/` link from F6.1, or delete the reference if it's no longer load-bearing.
+- [ ] F6.4 — Delete `projects/mongo-pipeline-builder/`. Verify `rg -n 'mongo-pipeline-builder' .` returns no results except lockfiles / generated artefacts that rebuild on next install.
+- [ ] F6.5 — Final check: `pnpm lint:deps`, `pnpm -r typecheck`, and the full `pnpm -r test` sweep all pass.
+
+### Close-out checks
+
+- [ ] All deferred items from the earlier milestones (M0–M5, F1–F5) are either closed or tracked on a Linear ticket (TML-2281, TML-2259).
+- [ ] No `// TODO` / `// DEFERRED` markers referencing M0–M5 or F1–F6 remain in the query-builder source.
+- [ ] `dataTransform.run` consumes new builder plans unchanged (verified by F5.2).
 
 ---
 
@@ -132,40 +186,54 @@ Wire the `q.rawCommand(...)` escape hatch and close out the project.
 | ------------------------------------------------------------------------------------------ | ---------------- | ----------- | ---------------------------------------------------- |
 | Package directory + name renamed                                                           | Compilation      | 0.1, 0.6    | `pnpm lint:deps` enforces                            |
 | Entry point `mongoQuery(...).from(...)` typechecks                                         | Type             | 0.2, 1.7    |                                                      |
-| No occurrences of `mongoPipeline`/old package name                                         | Lint (rg)        | 0.3         |                                                      |
+| No occurrences of `mongoPipeline` / old package name                                       | Lint (rg)        | 0.3         |                                                      |
 | `CollectionHandle` exposes correct method-set                                              | Type (`.test-d`) | 1.8, 2.6    |                                                      |
 | `FilteredCollection` exposes correct method-set                                            | Type (`.test-d`) | 1.8, 2.6    |                                                      |
 | `PipelineChain<S, 'compat', 'compat'>` exposes update + findOneAndUpdate terminals         | Type (`.test-d`) | 1.8         |                                                      |
 | `PipelineChain<S, 'cleared', 'cleared'>` (post-group) hides update + findOneAnd terminals  | Type (`.test-d`) | 1.8, 3.5, 4.5 |                                                    |
 | `PipelineChain<S, 'preserve', 'cleared'>` (post-addFields) keeps update, hides findOneAnd  | Type (`.test-d`) | 3.5, 4.5    |                                                      |
-| `PipelineChain<S, 'cleared', 'preserve'>` (post-sort) keeps findOneAnd, hides update       | Type (`.test-d`) | 3.5         |                                                      |
-| Multiple `.match` calls AND-fold at the terminal                                           | Unit             | 1.5, 2.5    | Inspect produced `command.filter`                    |
+| `PipelineChain<S, 'cleared', 'preserve'>` (post-sort) keeps findOneAnd, hides update       | Type (`.test-d`) | 3.5, F2.3   |                                                      |
+| Multiple `.match` calls AND-fold at the terminal                                           | Unit             | 1.5, 2.5    |                                                      |
 | `FieldAccessor` property access typechecks against scalar codecs                           | Type (`.test-d`) | 1.2         |                                                      |
-| `FieldAccessor` callable dot-path resolves through `ContractValueObject`                   | Type (`.test-d`) | 1.2         | Uses existing test fixtures with value objects       |
+| `FieldAccessor` callable dot-path resolves through `ContractValueObject`                   | Type (`.test-d`) | 1.2         | Permissive today; type-safe variant tracked on TML-2281 |
 | All read-side tests pass with the unified accessor                                         | Unit + Type      | 1.3, 1.9    |                                                      |
-| `insertOne`/`insertMany` typecheck `doc` against input row type                            | Type + Integration | 2.3, 2.7   |                                                      |
-| `updateAll` / `deleteAll` produce tautological-filter commands                             | Unit + Integration | 2.4, 2.7   |                                                      |
-| `updateMany`/`updateOne`/`deleteMany`/`deleteOne` produce filtered commands                | Unit + Integration | 2.5, 2.7   |                                                      |
+| `insertOne` / `insertMany` typecheck `doc` against input row type                          | Type + Integration | 2.3, F4.2 |                                                      |
+| `updateAll` / `deleteAll` produce tautological-filter commands                             | Unit + Integration | 2.4, F4.2 |                                                      |
+| `updateMany` / `updateOne` / `deleteMany` / `deleteOne` produce filtered commands          | Unit + Integration | 2.5, F4.2 |                                                      |
 | `match → updateAll` is a type error                                                        | Negative type    | 2.6         |                                                      |
-| `findOneAndUpdate` deconstructs chain into wire-command slots                              | Unit + Integration | 3.2–3.3, 3.6 |                                                    |
-| `findOneAndDelete` returns deleted doc                                                     | Integration      | 3.6         |                                                      |
-| Upsert behaviours (insert if missing, update if present)                                   | Integration      | 3.4, 3.6    |                                                      |
-| Pipeline-style update with cross-field reference                                           | Integration      | 4.6         | Form 1                                               |
-| Pipeline-style update via chain consumption                                                | Integration      | 4.6         | Form 2                                               |
-| `.merge`/`.out` produce `AggregateCommand` plans with the right terminal stage             | Unit + Integration | 4.4, 4.6   |                                                      |
-| Traditional updates still work (backward compat)                                           | Integration      | 4.6         |                                                      |
+| `findOneAndUpdate` honours caller-supplied `returnDocument`                                | Unit + Integration | F1.5, F4.3 |                                                      |
+| `findOneAndUpdate` / `findOneAndDelete` accept `sort` / `skip` slots                       | Unit             | F1.1–F1.4   |                                                      |
+| `PipelineChain<S, _, 'compat'>.findOneAndUpdate` deconstructs leading `$match`/`$sort`/`$skip` | Unit + Integration | F2.2, F4.3 |                                                    |
+| `findOneAndDelete` returns deleted doc                                                     | Integration      | F4.3        |                                                      |
+| Upsert behaviours (insert if missing, update if present)                                   | Integration      | 3.4, F4.3   |                                                      |
+| `f.stage.{set,unset,replaceRoot,...}` typecheck                                            | Type + Unit      | F3.1, F3.6  |                                                      |
+| `PipelineChain<S, 'compat', _>.updateMany()` / `.updateOne()` consume the chain            | Unit + Integration | F3.3, F4.4 |                                                      |
+| Mixed `TypedUpdateOp` + `MongoUpdatePipelineStage` arrays are a type error                 | Negative type    | F3.5        |                                                      |
+| `addFields(...).updateMany()` round-trips against `mongo-memory-server`                    | Integration      | F4.4        |                                                      |
+| `.merge` / `.out` produce `AggregateCommand` plans with the right terminal stage           | Unit + Integration | 4.4, F4.4  |                                                      |
+| Traditional updates still work (backward compat)                                           | Integration      | F4.4        |                                                      |
 | `q.rawCommand(...)` packages a command into a plan with `lane: 'mongo-raw'`                | Unit             | 5.1         |                                                      |
-| `dataTransform.run` consumes new builder plans unchanged                                   | Manual           | Close-out   | Verified post-merge of PR [#349](https://github.com/prisma/prisma-next/pull/349) |
+| `dataTransform.run` consumes new builder plans unchanged                                   | Manual           | F5.2        |                                                      |
+| State-machine pattern + unified accessor documented as long-lived design content           | Manual           | F6.1        |                                                      |
+| `projects/mongo-pipeline-builder/` removed; no dangling inbound references                 | Lint (rg)        | F6.3, F6.4  |                                                      |
 
 ---
 
 ## Open Items
 
-Carried forward from the spec; resolve during the milestone they're scoped to.
+Resolved items omitted. Remaining:
 
-1. **Upsert AST shape** (M3) — extend `UpdateOneCommand`/`UpdateManyCommand` with `upsert: boolean`, vs. add sibling `UpsertOneCommand`/`UpsertManyCommand` classes. Lean: extend existing.
-2. **Tautological filter representation** (M2) — empty `MongoAndExpr` vs. new `MongoMatchAllExpr` node. Decide based on what the adapter's lowering produces today for an empty conjunction.
-3. **`AnyMongoCommand` for `rawCommand`** (M5) — keep narrow (typed CRUD + `RawMongoCommand`), or widen to a `Document`-typed escape. Lean: widen — escape hatch is escape hatch.
-4. **Trait-gating strictness for update operators** (M2) — strict gating on every codec vs. permit some over-acceptance. Lean: cheap gating only (numeric/array distinction); accept some over-permission elsewhere.
-5. **Retail-store example conversion timing** (close-out) — depends on PR [#349](https://github.com/prisma/prisma-next/pull/349) merge order. Convert in this branch's close-out if [#349](https://github.com/prisma/prisma-next/pull/349) merges first; otherwise small follow-up PR after [#349](https://github.com/prisma/prisma-next/pull/349) lands.
-6. **ADR for state-machine pattern** (M5) — decide whether the three-class state machine (with phantom marker types) warrants a new ADR documenting the pattern for reuse (e.g. SQL builder eventually adopting the same shape). Lean: yes, brief ADR.
+1. **ADR scope for the state-machine pattern** (F6.1) — narrow ADR documenting the three-class + phantom-marker pattern used here, vs. a wider ADR positioning it as the recommended approach for any future builder (SQL, etc.). Lean: narrow now, widen if/when the SQL builder picks it up.
+2. **F5 ↔ F6 ordering** — if PR [#349](https://github.com/prisma/prisma-next/pull/349) is still unmerged when F6 is ready, F6 may ship first to avoid blocking the close-out. In that case F5 becomes a tiny standalone PR after [#349](https://github.com/prisma/prisma-next/pull/349) lands.
+
+### Resolved during M0–M5 + F1–F4
+
+- Upsert AST shape (extended `UpdateOneCommand` / `UpdateManyCommand` with defaulted `upsert: boolean`).
+- Tautological filter representation (empty `MongoAndExpr`).
+- `AnyMongoCommand` for `rawCommand` (kept inclusive, threaded through a `Command` type parameter on `MongoQueryPlan`).
+- Trait-gating strictness for update operators (cheap numeric/array gating; full trait-gating tracked on TML-2259 task 5).
+- `upsertMany` — explicitly non-goal; callers with real multi-doc upsert needs route through `rawCommand`.
+- `PipelineChain.findOneAndUpdate` sort-fold semantics — fold last-writer-wins per key.
+- Pipeline-stage emitter namespace — nested `f.stage.*` to avoid collisions with per-field operators.
+- `mongo-memory-server` harness location — reused `examples/mongo-demo`'s harness.
+- Retail-store example timing — deferred to F5 behind PR [#349](https://github.com/prisma/prisma-next/pull/349).
