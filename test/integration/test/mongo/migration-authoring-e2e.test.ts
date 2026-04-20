@@ -21,7 +21,7 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const ALL_POLICY = {
-  allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
+  allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] as const,
 };
 
 describe(
