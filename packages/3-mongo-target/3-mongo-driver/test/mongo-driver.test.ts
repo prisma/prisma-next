@@ -12,7 +12,7 @@ import {
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createMongoDriver } from '../src/mongo-driver';
+import { createMongoDriver, MongoDriverImpl } from '../src/mongo-driver';
 
 let replSet: MongoMemoryReplSet;
 let connectionUri: string;
@@ -298,6 +298,26 @@ describe('MongoDriver', () => {
     it('closes without error', async () => {
       const driver = await createMongoDriver(connectionUri, dbName);
       await expect(driver.close()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('fromDb', () => {
+    it('executes commands on a pre-built Db without owning the client', async () => {
+      const db = seedClient.db(dbName);
+      const col = 'driver_from_db';
+      await db.collection(col).deleteMany({});
+
+      const driver = MongoDriverImpl.fromDb(db);
+      const cmd = new InsertOneWireCommand(col, { name: 'test' });
+      const rows = await collect(driver.execute(cmd));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toHaveProperty('insertedId');
+    });
+
+    it('close() is a no-op — does not close the external client', async () => {
+      const driver = MongoDriverImpl.fromDb(seedClient.db(dbName));
+      await expect(driver.close()).resolves.toBeUndefined();
+      // seedClient is still usable (afterAll would fail if it were closed)
     });
   });
 });

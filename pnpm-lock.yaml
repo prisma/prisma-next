@@ -1471,6 +1471,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
+      '@prisma-next/driver-mongo':
+        specifier: workspace:*
+        version: link:../../3-mongo-target/3-mongo-driver
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/emitter
@@ -2520,6 +2523,9 @@ importers:
         specifier: 'catalog:'
         version: 6.21.0
     devDependencies:
+      '@prisma-next/driver-mongo':
+        specifier: workspace:*
+        version: link:../3-mongo-driver
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
