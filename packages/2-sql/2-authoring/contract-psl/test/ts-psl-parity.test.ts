@@ -8,6 +8,7 @@ import type {
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, it } from 'vitest';
+import { countSemanticLines } from '../../../../../test/utils/src/semantic-lines';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import { createBuiltinLikeControlMutationDefaults } from './fixtures';
 
@@ -226,13 +227,6 @@ function buildTsContract() {
       };
     },
   );
-}
-
-function countSemanticLines(source: string): number {
-  return source
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith('//')).length;
 }
 
 describe('TS and PSL authoring parity', () => {

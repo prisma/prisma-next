@@ -2,23 +2,27 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { countSemanticLines } from '../../../utils/src/semantic-lines';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtureDir = join(__dirname, 'parity', 'callback-mode-scalars');
 
-/**
- * Counts semantic lines in a source file — non-blank lines that are not
- * comments. Matches the heuristic used by the contract-psl ts-psl-parity
- * test so results are comparable across parity tests.
- */
-function countSemanticLines(source: string): number {
-  return source
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith('//')).length;
-}
-
 describe('VP2: TS callback-mode authoring terseness parity', () => {
+  it('ignores block comments and trailing inline comments', () => {
+    expect(
+      countSemanticLines(`
+        // comment
+        model User {
+          /*
+           * comment
+           */
+          id Int // comment
+          email String
+        }
+      `),
+    ).toBe(4);
+  });
+
   const pslSource = readFileSync(join(fixtureDir, 'schema.prisma'), 'utf-8');
   const tsSource = readFileSync(join(fixtureDir, 'contract.ts'), 'utf-8');
   const pslLines = countSemanticLines(pslSource);
