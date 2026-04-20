@@ -10,7 +10,7 @@ import contractJson from './contract.json' with { type: 'json' };
 
 const { contract } = validateMongoContract<Contract>(contractJson);
 
-const pipeline = mongoQuery<Contract>({ contractJson });
+const query = mongoQuery<Contract>({ contractJson });
 
 export async function createClient(connectionUri: string, dbName: string) {
   const adapter = createMongoAdapter();
@@ -24,7 +24,7 @@ export async function createClient(connectionUri: string, dbName: string) {
   });
   const orm = mongoOrm({ contract, executor: runtime });
 
-  return { orm, runtime, pipeline, contract };
+  return { orm, runtime, query, contract };
 }
 
 export type Db = Awaited<ReturnType<typeof createClient>>;

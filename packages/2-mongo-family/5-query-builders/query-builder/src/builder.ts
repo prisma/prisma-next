@@ -793,19 +793,3 @@ function deconstructUpdateChain(stages: ReadonlyArray<MongoPipelineStage>): Deco
 
   return { filter, updatePipeline };
 }
-
-/**
- * Backwards-compatible alias for the previous read-only builder class. New
- * call sites should reference `PipelineChain` (or the higher-level
- * `CollectionHandle` / `FilteredCollection`) directly.
- *
- * @deprecated Use `PipelineChain` (or `CollectionHandle` / `FilteredCollection`)
- *   directly. Retained for the M0/M1 transition; will be removed once all
- *   internal references are migrated.
- */
-export type PipelineBuilder<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  Shape extends DocShape,
-> = PipelineChain<TContract, Shape, 'compat', 'compat'>;
-
-export const PipelineBuilder = PipelineChain;

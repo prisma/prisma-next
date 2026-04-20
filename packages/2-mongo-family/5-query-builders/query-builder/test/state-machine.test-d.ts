@@ -14,30 +14,10 @@ const contractJson = {} as unknown;
  * without having to reconstruct the full `Shape` parameter at the call site.
  */
 type GetU<T> =
-  T extends PipelineChain<
-    // biome-ignore lint/suspicious/noExplicitAny: phantom-marker probe
-    any,
-    // biome-ignore lint/suspicious/noExplicitAny: phantom-marker probe
-    any,
-    infer U,
-    // biome-ignore lint/suspicious/noExplicitAny: phantom-marker probe
-    any
-  >
-    ? U
-    : never;
+  T extends PipelineChain<infer _TContract, infer _Shape, infer U, infer _F> ? U : never;
 
 type GetF<T> =
-  T extends PipelineChain<
-    // biome-ignore lint/suspicious/noExplicitAny: phantom-marker probe
-    any,
-    // biome-ignore lint/suspicious/noExplicitAny: phantom-marker probe
-    any,
-    // biome-ignore lint/suspicious/noExplicitAny: phantom-marker probe
-    any,
-    infer F
-  >
-    ? F
-    : never;
+  T extends PipelineChain<infer _TContract, infer _Shape, infer _U, infer F> ? F : never;
 
 describe('state machine', () => {
   it('from(name) returns CollectionHandle (root state) inheriting PipelineChain', () => {

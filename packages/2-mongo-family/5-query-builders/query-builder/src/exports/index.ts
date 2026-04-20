@@ -1,5 +1,5 @@
 export { acc } from '../accumulator-helpers';
-export { PipelineBuilder, PipelineChain } from '../builder';
+export { PipelineChain } from '../builder';
 export { fn } from '../expression-helpers';
 export type { Expression, FieldAccessor } from '../field-accessor';
 export { createFieldAccessor } from '../field-accessor';

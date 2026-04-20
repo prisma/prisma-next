@@ -2,7 +2,7 @@
 
 Type-safe MongoDB query builder (reads, writes, find-and-modify, pipeline-terminal writes) with document shape tracking.
 
-> Read terminals are documented below. Write terminals (inserts, updates, deletes, upserts, find-and-modify, `$merge`/`$out`) are landing in [TML-2267](https://linear.app/prisma-company/issue/TML-2267); see [`projects/mongo-pipeline-builder/specs/query-builder-unification.spec.md`](../../../../projects/mongo-pipeline-builder/specs/query-builder-unification.spec.md) for the design.
+> Read terminals are documented below. Write terminals (inserts, updates, deletes, upserts, find-and-modify, `$merge`/`$out`) landed in [TML-2267](https://linear.app/prisma-company/issue/TML-2267). See [DEVELOPING.md](./DEVELOPING.md) for implementation details.
 
 ## What it does
 

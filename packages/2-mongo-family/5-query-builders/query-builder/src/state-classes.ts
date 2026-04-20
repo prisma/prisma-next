@@ -481,7 +481,7 @@ export class FilteredCollection<
       fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
     ) => ReadonlyArray<UpdaterItem>,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
-  ): MongoQueryPlan<ModelToDocShape<TContract, ModelName>> {
+  ): MongoQueryPlan<ModelToDocShape<TContract, ModelName> | null> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new FindOneAndUpdateCommand(
       this.#ctx.collection,
@@ -503,7 +503,7 @@ export class FilteredCollection<
    * Find a single matching document and delete it. Returns the deleted
    * document via the row stream.
    */
-  override findOneAndDelete(): MongoQueryPlan<ModelToDocShape<TContract, ModelName>> {
+  override findOneAndDelete(): MongoQueryPlan<ModelToDocShape<TContract, ModelName> | null> {
     const command = new FindOneAndDeleteCommand(this.#ctx.collection, this.#foldedFilter());
     return {
       collection: this.#ctx.collection,

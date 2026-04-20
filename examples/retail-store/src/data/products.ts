@@ -15,7 +15,7 @@ export async function findProductsPaginated(
   skip: number,
   take: number,
 ): Promise<Product[]> {
-  const plan = db.pipeline.from('products').sort({ _id: 1 }).skip(skip).limit(take).build();
+  const plan = db.query.from('products').sort({ _id: 1 }).skip(skip).limit(take).build();
   return collectResults<Product>(db, plan);
 }
 
@@ -34,12 +34,12 @@ export async function searchProducts(db: Db, query: string): Promise<Product[]> 
     MongoFieldFilter.of('brand', '$regex', regex),
     MongoFieldFilter.of('articleType', '$regex', regex),
   ]);
-  const plan = db.pipeline.from('products').match(filter).build();
+  const plan = db.query.from('products').match(filter).build();
   return collectResults<Product>(db, plan);
 }
 
 export async function getRandomProducts(db: Db, count: number): Promise<Product[]> {
-  const plan = db.pipeline.from('products').sample(count).build();
+  const plan = db.query.from('products').sample(count).build();
   return collectResults<Product>(db, plan);
 }
 
