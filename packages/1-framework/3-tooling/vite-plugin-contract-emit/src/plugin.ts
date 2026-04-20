@@ -11,11 +11,9 @@ const DEFAULT_CONFIG_PATH = 'prisma-next.config.ts';
 const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
 const MODULE_GRAPH_EXTENSIONS = new Set([
   '.js',
-  '.jsx',
   '.mjs',
   '.cjs',
   '.ts',
-  '.tsx',
   '.mts',
   '.cts',
 ]);
