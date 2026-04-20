@@ -5,6 +5,7 @@ import type {
   MigrationPlan,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { dirname, join } from 'pathe';
 import { computeMigrationId } from './attestation';
@@ -170,7 +171,7 @@ function buildAttestedManifest(
       plannerVersion: '2.0.0',
       planningStrategy: 'class-based',
     },
-    ...(existing?.authorship ? { authorship: existing.authorship } : {}),
+    ...ifDefined('authorship', existing?.authorship),
   };
 
   const migrationId = computeMigrationId(baseManifest, ops);
