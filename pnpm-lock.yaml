@@ -3088,6 +3088,9 @@ importers:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../../packages/2-sql/2-authoring/contract-ts
+      '@prisma-next/sql-errors':
+        specifier: workspace:*
+        version: link:../../../packages/2-sql/1-core/errors
       '@prisma-next/sql-orm-client':
         specifier: workspace:*
         version: link:../../../packages/3-extensions/sql-orm-client
@@ -3097,6 +3100,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../../packages/2-sql/5-runtime
+      '@prisma-next/sql-schema-ir':
+        specifier: workspace:*
+        version: link:../../../packages/2-sql/1-core/schema-ir
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../../packages/3-targets/3-targets/postgres
