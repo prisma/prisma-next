@@ -441,11 +441,13 @@ describe('deserializeMongoQueryPlan', () => {
     };
     const json = JSON.parse(JSON.stringify(plan));
     const result = deserializeMongoQueryPlan(json);
-    const meta = result.meta as Record<string, unknown>;
-    expect(meta['annotations']).toEqual({ codecs: { email: 'mongo/string@1' } });
-    expect(meta['refs']).toEqual({ users: { collection: 'users' } });
-    expect(meta['projection']).toEqual({ name: 'name', email: 'email' });
-    expect(meta['projectionTypes']).toEqual({ name: 'mongo/string@1', email: 'mongo/string@1' });
+    expect(result.meta.annotations).toEqual({ codecs: { email: 'mongo/string@1' } });
+    expect(result.meta.refs).toEqual({ users: { collection: 'users' } });
+    expect(result.meta.projection).toEqual({ name: 'name', email: 'email' });
+    expect(result.meta.projectionTypes).toEqual({
+      name: 'mongo/string@1',
+      email: 'mongo/string@1',
+    });
   });
 
   it('throws for missing collection', () => {
