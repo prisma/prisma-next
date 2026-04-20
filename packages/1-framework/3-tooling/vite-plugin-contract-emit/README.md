@@ -9,10 +9,11 @@ This plugin integrates with Vite's dev server to automatically emit contract art
 ## Features
 
 - **Emit on startup**: Emits contract artifacts when the Vite dev server starts
-- **Watch mode**: Re-emits on changes to the config file and its transitive imports
+- **Authoritative watch mode**: Re-emits from `contract.source.authoritativeInputs`
 - **Debounce**: Configurable debounce prevents rapid re-emission during rapid edits
 - **Last-change-wins**: Overlapping emit requests are cancelled to avoid stale results
 - **Error overlay**: Emission failures are surfaced via Vite's error overlay
+- **Partial coverage warning**: Surfaces `configPathOnly` as a warning instead of guessing
 - **Console logging**: Compact success/error messages with optional debug output
 
 ## Installation
@@ -60,11 +61,15 @@ interface PrismaVitePluginOptions {
 
 ## How It Works
 
-1. **On server start**: The plugin loads your config module through Vite's SSR loader
-2. **Module graph crawling**: It crawls the module graph to find all transitive imports
-3. **Watch setup**: All discovered files are added to Vite's watcher
-4. **Initial emit**: The contract is emitted immediately on server start
-5. **Hot updates**: When any watched file changes, a debounced re-emit is triggered
+1. **On server start**: The plugin loads `prisma-next.config.ts` via the CLI config loader
+2. **Resolve authoritative inputs**: It inspects `contract.source.authoritativeInputs`
+3. **Choose watch strategy**:
+   - `moduleGraph`: crawl the Vite module graph from the config entrypoint
+   - `paths`: watch the explicit provider paths
+   - `configPathOnly`: watch only the config file and log a partial-coverage warning
+4. **Filter emitted artifacts**: Output files are removed from the watch set to avoid self-trigger loops
+5. **Initial emit**: The contract is emitted immediately on server start
+6. **Hot updates**: When any watched file changes, a debounced re-emit is triggered
 
 ## Architecture
 
@@ -72,17 +77,20 @@ interface PrismaVitePluginOptions {
 graph TD
     A[Vite Dev Server] --> B[prismaVitePlugin]
     B --> C[configureServer hook]
-    C --> D[Load config via SSR]
-    D --> E[Crawl module graph]
-    E --> F[Add files to watcher]
-    F --> G[Initial emit]
+    C --> D[Load config via CLI loader]
+    D --> E[Read authoritativeInputs]
+    E --> F{moduleGraph / paths / configPathOnly}
+    F --> G[Resolve watched files]
+    G --> H[Filter emitted artifacts]
+    H --> I[Add files to watcher]
+    I --> J[Initial emit]
     
-    H[File change] --> I[handleHotUpdate hook]
-    I --> J[Schedule debounced emit]
-    J --> K[executeContractEmit]
-    K --> L[Write artifacts]
+    K[File change] --> L[handleHotUpdate hook]
+    L --> M[Schedule debounced emit]
+    M --> N[executeContractEmit]
+    N --> O[Write artifacts]
     
-    M[Error] --> N[Error overlay + console]
+    P[Error or partial coverage] --> Q[Overlay or console warning]
 ```
 
 ## Dependencies

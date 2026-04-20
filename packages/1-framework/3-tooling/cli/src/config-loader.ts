@@ -1,5 +1,5 @@
 import { dirname, resolve } from 'node:path';
-import type { ContractConfig, PrismaNextConfig } from '@prisma-next/config/config-types';
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { ConfigValidationError, validateConfig } from '@prisma-next/config/config-validation';
 import {
   errorConfigFileNotFound,
@@ -8,79 +8,7 @@ import {
 } from '@prisma-next/errors/control';
 import { loadConfig as loadConfigC12 } from 'c12';
 
-const DEFAULT_CONFIG_FILE = 'prisma-next.config.ts';
-const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
-
-export interface ContractWatchWarning {
-  readonly code: 'CONTRACT_WATCH_INPUTS_PARTIAL';
-  readonly message: string;
-}
-
-export interface LoadedContractWatchMetadata {
-  readonly inputs: readonly string[];
-  readonly warnings: readonly ContractWatchWarning[];
-}
-
-export interface LoadedConfigMetadata {
-  readonly resolvedConfigPath: string;
-  readonly contractWatch: LoadedContractWatchMetadata | null;
-}
-
-export interface LoadedConfigResult {
-  readonly config: PrismaNextConfig;
-  readonly metadata: LoadedConfigMetadata;
-}
-
-function uniqueStrings(values: readonly string[]): readonly string[] {
-  return [...new Set(values)];
-}
-
-function buildContractWatchMetadata(
-  contract: ContractConfig | undefined,
-  resolvedConfigPath: string,
-): LoadedContractWatchMetadata | null {
-  if (!contract) {
-    return null;
-  }
-
-  const configDir = dirname(resolvedConfigPath);
-  const outputJsonPath = resolve(configDir, contract.output ?? DEFAULT_CONTRACT_OUTPUT);
-  const outputDtsPath = outputJsonPath?.endsWith('.json')
-    ? `${outputJsonPath.slice(0, -5)}.d.ts`
-    : undefined;
-  const authoritativeInputs = contract.source.authoritativeInputs;
-
-  if (authoritativeInputs.kind === 'moduleGraph') {
-    return {
-      inputs: [],
-      warnings: [],
-    };
-  }
-
-  if (authoritativeInputs.kind === 'paths') {
-    return {
-      inputs: uniqueStrings(
-        authoritativeInputs.paths.map((input) => resolve(configDir, input)),
-      ).filter((input) => input !== outputJsonPath && input !== outputDtsPath),
-      warnings: [],
-    };
-  }
-
-  return {
-    inputs: [resolvedConfigPath],
-    warnings: [
-      {
-        code: 'CONTRACT_WATCH_INPUTS_PARTIAL',
-        message:
-          'Contract source provider declared configPathOnly. Watching only the config file; dev watch coverage is partial until authoritative paths or moduleGraph are declared.',
-      },
-    ],
-  };
-}
-
-async function loadValidatedConfig(
-  configPath?: string,
-): Promise<{ config: PrismaNextConfig; resolvedConfigPath: string }> {
+async function loadValidatedConfig(configPath?: string): Promise<PrismaNextConfig> {
   const cwd = process.cwd();
   const resolvedConfigPath = configPath ? resolve(cwd, configPath) : undefined;
   const configCwd = resolvedConfigPath ? dirname(resolvedConfigPath) : cwd;
@@ -107,12 +35,7 @@ async function loadValidatedConfig(
   // Validate config structure
   validateConfig(result.config);
 
-  return {
-    config: result.config,
-    resolvedConfigPath: result.configFile
-      ? resolve(result.configFile)
-      : (resolvedConfigPath ?? resolve(configCwd, DEFAULT_CONFIG_FILE)),
-  };
+  return result.config;
 }
 
 /**
@@ -121,22 +44,12 @@ async function loadValidatedConfig(
  * Uses c12 to automatically handle TypeScript compilation and config file discovery.
  *
  * @param configPath - Optional path to config file. Defaults to `./prisma-next.config.ts` in current directory.
- * @returns The loaded config object plus resolved dev-watch metadata.
+ * @returns The loaded config object.
  * @throws Error if config file doesn't exist or is invalid.
  */
-export async function loadConfigWithMetadata(configPath?: string): Promise<LoadedConfigResult> {
+export async function loadConfig(configPath?: string): Promise<PrismaNextConfig> {
   try {
-    const loaded = await loadValidatedConfig(configPath);
-    return {
-      config: loaded.config,
-      metadata: {
-        resolvedConfigPath: loaded.resolvedConfigPath,
-        contractWatch: buildContractWatchMetadata(
-          loaded.config.contract,
-          loaded.resolvedConfigPath,
-        ),
-      },
-    };
+    return await loadValidatedConfig(configPath);
   } catch (error) {
     if (error instanceof ConfigValidationError) {
       throw errorConfigValidation(error.field, {
@@ -173,11 +86,4 @@ export async function loadConfigWithMetadata(configPath?: string): Promise<Loade
     }
     throw errorUnexpected(String(error));
   }
-}
-
-/**
- * Loads only the normalized config object.
- */
-export async function loadConfig(configPath?: string): Promise<PrismaNextConfig> {
-  return (await loadConfigWithMetadata(configPath)).config;
 }

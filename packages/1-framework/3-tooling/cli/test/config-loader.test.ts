@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadConfig, loadConfigWithMetadata } from '../src/config-loader';
+import { loadConfig } from '../src/config-loader';
 
 describe('config loader', () => {
   let testDir: string;
@@ -70,7 +70,7 @@ describe('config loader', () => {
   );
 
   it(
-    'surfaces normalized contract watch inputs alongside config',
+    'loads explicit provider paths alongside config',
     async () => {
       const configPath = join(testDir, 'prisma-next.config.ts');
       writeFileSync(
@@ -86,19 +86,19 @@ describe('config loader', () => {
         'utf-8',
       );
 
-      const result = await loadConfigWithMetadata(configPath);
+      const config = await loadConfig(configPath);
 
-      expect(result.config.contract?.output).toBe('generated/contract.json');
-      expect(result.metadata.contractWatch).toEqual({
-        inputs: [join(testDir, 'prisma', 'schema.prisma')],
-        warnings: [],
+      expect(config.contract?.output).toBe('generated/contract.json');
+      expect(config.contract?.source.authoritativeInputs).toEqual({
+        kind: 'paths',
+        paths: ['./prisma/schema.prisma', './generated/contract.json', './generated/contract.d.ts'],
       });
     },
     timeouts.typeScriptCompilation,
   );
 
   it(
-    'returns no warning when contract watch strategy is module graph',
+    'loads moduleGraph provider metadata',
     async () => {
       const configPath = join(testDir, 'prisma-next.config.ts');
       writeFileSync(
@@ -113,45 +113,17 @@ describe('config loader', () => {
         'utf-8',
       );
 
-      const result = await loadConfigWithMetadata(configPath);
+      const config = await loadConfig(configPath);
 
-      expect(result.metadata.contractWatch).toEqual({
-        inputs: [],
-        warnings: [],
+      expect(config.contract?.source.authoritativeInputs).toEqual({
+        kind: 'moduleGraph',
       });
     },
     timeouts.typeScriptCompilation,
   );
 
   it(
-    'filters default output artifact paths from watch inputs when output is omitted',
-    async () => {
-      const configPath = join(testDir, 'prisma-next.config.ts');
-      writeFileSync(
-        configPath,
-        createValidConfig(`
-      contract: {
-        source: createSource(
-          { kind: 'paths', paths: ['./prisma/schema.prisma', './src/prisma/contract.json', './src/prisma/contract.d.ts'] },
-          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
-        ),
-      }`),
-        'utf-8',
-      );
-
-      const result = await loadConfigWithMetadata(configPath);
-
-      expect(result.config.contract?.output).toBeUndefined();
-      expect(result.metadata.contractWatch).toEqual({
-        inputs: [join(testDir, 'prisma', 'schema.prisma')],
-        warnings: [],
-      });
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
-    'returns config path warning when provider declares configPathOnly',
+    'loads configPathOnly provider metadata',
     async () => {
       const configPath = join(testDir, 'prisma-next.config.ts');
       writeFileSync(
@@ -166,15 +138,11 @@ describe('config loader', () => {
         'utf-8',
       );
 
-      const result = await loadConfigWithMetadata(configPath);
+      const config = await loadConfig(configPath);
 
-      expect(result.metadata.contractWatch?.inputs).toEqual([configPath]);
-      expect(result.metadata.contractWatch?.warnings).toEqual([
-        expect.objectContaining({
-          code: 'CONTRACT_WATCH_INPUTS_PARTIAL',
-          message: expect.stringContaining('configPathOnly'),
-        }),
-      ]);
+      expect(config.contract?.source.authoritativeInputs).toEqual({
+        kind: 'configPathOnly',
+      });
     },
     timeouts.typeScriptCompilation,
   );

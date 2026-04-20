@@ -5,6 +5,29 @@ vi.mock('@prisma-next/cli/control-api', () => ({
   executeContractEmit: vi.fn(),
 }));
 
+vi.mock('@prisma-next/cli/config-loader', () => ({
+  loadConfig: vi.fn(),
+}));
+
+async function mockLoadedConfig(
+  authoritativeInputs:
+    | { kind: 'moduleGraph' }
+    | { kind: 'configPathOnly' }
+    | { kind: 'paths'; paths: string[] } = { kind: 'moduleGraph' },
+  output = 'src/prisma/contract.json',
+) {
+  const { loadConfig } = await import('@prisma-next/cli/config-loader');
+  vi.mocked(loadConfig).mockResolvedValue({
+    contract: {
+      source: {
+        authoritativeInputs,
+        load: async () => ({ ok: true, value: {} }),
+      },
+      output,
+    },
+  } as never);
+}
+
 function createMockServer() {
   return {
     httpServer: {
@@ -26,8 +49,9 @@ function createMockServer() {
 }
 
 describe('prismaVitePlugin', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
+    await mockLoadedConfig();
   });
 
   afterEach(() => {
@@ -125,7 +149,7 @@ describe('prismaVitePlugin', () => {
   });
 
   describe('configureServer', () => {
-    it('registers file watchers on server', async () => {
+    it('registers file watchers from the module graph when provider declares moduleGraph', async () => {
       const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
       mockExecute.mockResolvedValue({
@@ -133,6 +157,46 @@ describe('prismaVitePlugin', () => {
         profileHash: 'def456',
         files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
       });
+      await mockLoadedConfig({ kind: 'moduleGraph' });
+
+      const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'silent' });
+      const mockServer = createMockServer();
+
+      mockServer.moduleGraph.getModuleById.mockReturnValue({
+        file: '/project/prisma-next.config.ts',
+        importedModules: [],
+      });
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      expect(mockServer.ssrLoadModule).toHaveBeenCalled();
+    });
+
+    it('registers explicit provider paths and filters emitted artifacts', async () => {
+      const { executeContractEmit } = await import('@prisma-next/cli/control-api');
+      const mockExecute = vi.mocked(executeContractEmit);
+      mockExecute.mockResolvedValue({
+        storageHash: 'abc123',
+        profileHash: 'def456',
+        files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
+      });
+      await mockLoadedConfig(
+        {
+          kind: 'paths',
+          paths: [
+            './prisma/schema.prisma',
+            './src/prisma/contract.json',
+            './src/prisma/contract.d.ts',
+          ],
+        },
+        'src/prisma/contract.json',
+      );
 
       const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'silent' });
       const mockServer = createMockServer();
@@ -145,7 +209,10 @@ describe('prismaVitePlugin', () => {
       ) => Promise<void>;
       await configureServer(mockServer);
 
-      expect(mockServer.ssrLoadModule).toHaveBeenCalled();
+      expect(mockServer.watcher.add).toHaveBeenCalledWith('/project/prisma/schema.prisma');
+      expect(mockServer.watcher.add).not.toHaveBeenCalledWith('/project/src/prisma/contract.json');
+      expect(mockServer.watcher.add).not.toHaveBeenCalledWith('/project/src/prisma/contract.d.ts');
+      expect(mockServer.ssrLoadModule).not.toHaveBeenCalled();
     });
 
     it('triggers initial emit on server start', async () => {
@@ -200,6 +267,32 @@ describe('prismaVitePlugin', () => {
       expect(mockServer.watcher.on).toHaveBeenCalledWith('close', expect.any(Function));
     });
 
+    it('warns when provider declares configPathOnly', async () => {
+      const { executeContractEmit } = await import('@prisma-next/cli/control-api');
+      const mockExecute = vi.mocked(executeContractEmit);
+      mockExecute.mockResolvedValue({
+        storageHash: 'abc123',
+        profileHash: 'def456',
+        files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
+      });
+      await mockLoadedConfig({ kind: 'configPathOnly' });
+
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'info' });
+      const mockServer = createMockServer();
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      expect(mockServer.watcher.add).toHaveBeenCalledWith('/project/prisma-next.config.ts');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('configPathOnly'));
+    });
+
     it('shows error overlay when no files are being watched', async () => {
       const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
@@ -208,6 +301,7 @@ describe('prismaVitePlugin', () => {
         profileHash: 'def456',
         files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
       });
+      await mockLoadedConfig({ kind: 'moduleGraph' });
 
       vi.spyOn(console, 'error').mockImplementation(() => {});
 

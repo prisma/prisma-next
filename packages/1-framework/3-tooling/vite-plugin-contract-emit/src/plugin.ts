@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
 import { executeContractEmit } from '@prisma-next/cli/control-api';
 import type { Plugin, ViteDevServer } from 'vite';
@@ -7,12 +8,16 @@ import type { PrismaVitePluginOptions } from './types';
 const PLUGIN_NAME = 'prisma-vite-plugin-contract-emit';
 const DEFAULT_DEBOUNCE_MS = 150;
 const DEFAULT_CONFIG_PATH = 'prisma-next.config.ts';
+const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
+const PARTIAL_COVERAGE_WARNING =
+  'Contract source provider declared configPathOnly. Watching only the config file; dev watch coverage is partial until authoritative paths or moduleGraph are declared.';
 
 /**
  * Creates a Vite plugin that automatically emits Prisma Next contract artifacts.
  *
- * The plugin watches the config file and its transitive dependencies, re-emitting
- * contract artifacts on changes with debounce and "last change wins" semantics.
+ * The plugin resolves watched files from contract source provider metadata,
+ * re-emitting contract artifacts on changes with debounce and "last change wins"
+ * semantics.
  *
  * @param configPath - Path to prisma-next.config.ts (relative or absolute). Defaults to 'prisma-next.config.ts'
  * @param options - Optional plugin configuration
@@ -47,11 +52,17 @@ export function prismaVitePlugin(
   let currentAbortController: AbortController | null = null;
   let server: ViteDevServer | null = null;
   let emitRequestId = 0;
+  let lastWatchWarning: string | null = null;
 
   function log(message: string, level: 'info' | 'debug' = 'info') {
     if (logLevel === 'silent') return;
     if (level === 'debug' && logLevel !== 'debug') return;
     console.log(`[${PLUGIN_NAME}] ${message}`);
+  }
+
+  function logWarning(message: string) {
+    if (logLevel === 'silent') return;
+    console.warn(`[${PLUGIN_NAME}] ${message}`);
   }
 
   function logError(message: string, error?: unknown) {
@@ -138,7 +149,32 @@ export function prismaVitePlugin(
     }, debounceMs);
   }
 
-  async function collectWatchedFiles(viteServer: ViteDevServer): Promise<Set<string>> {
+  function filterOutputArtifacts(
+    values: readonly string[],
+    contractOutput: string | undefined,
+  ): Set<string> {
+    const configDir = dirname(absoluteConfigPath);
+    const outputJsonPath = resolve(configDir, contractOutput ?? DEFAULT_CONTRACT_OUTPUT);
+    const outputDtsPath = outputJsonPath.endsWith('.json')
+      ? `${outputJsonPath.slice(0, -5)}.d.ts`
+      : undefined;
+
+    return new Set(
+      [...new Set(values)].filter((value) => value !== outputJsonPath && value !== outputDtsPath),
+    );
+  }
+
+  function syncWatchWarning(warning: string | null) {
+    if (warning === lastWatchWarning) {
+      return;
+    }
+    lastWatchWarning = warning;
+    if (warning) {
+      logWarning(warning);
+    }
+  }
+
+  async function collectModuleGraphFiles(viteServer: ViteDevServer): Promise<Set<string>> {
     const files = new Set<string>();
 
     try {
@@ -178,8 +214,59 @@ export function prismaVitePlugin(
     return files;
   }
 
+  async function resolveWatchedFiles(
+    viteServer: ViteDevServer,
+  ): Promise<{ files: Set<string>; warning: string | null }> {
+    try {
+      const config = await loadConfig(absoluteConfigPath);
+      const contract = config.contract;
+
+      if (!contract) {
+        return {
+          files: new Set([absoluteConfigPath]),
+          warning: null,
+        };
+      }
+
+      const authoritativeInputs = contract.source.authoritativeInputs;
+
+      if (authoritativeInputs.kind === 'moduleGraph') {
+        return {
+          files: filterOutputArtifacts(
+            [...(await collectModuleGraphFiles(viteServer))],
+            contract.output,
+          ),
+          warning: null,
+        };
+      }
+
+      if (authoritativeInputs.kind === 'paths') {
+        const configDir = dirname(absoluteConfigPath);
+        return {
+          files: filterOutputArtifacts(
+            authoritativeInputs.paths.map((input) => resolve(configDir, input)),
+            contract.output,
+          ),
+          warning: null,
+        };
+      }
+
+      return {
+        files: new Set([absoluteConfigPath]),
+        warning: PARTIAL_COVERAGE_WARNING,
+      };
+    } catch (error) {
+      logError('Failed to resolve watched files:', error);
+      return {
+        files: new Set([absoluteConfigPath]),
+        warning: null,
+      };
+    }
+  }
+
   async function updateWatchedFiles(viteServer: ViteDevServer): Promise<void> {
-    const newWatchedFiles = await collectWatchedFiles(viteServer);
+    const { files: newWatchedFiles, warning } = await resolveWatchedFiles(viteServer);
+    syncWatchWarning(warning);
 
     // Find files to add and remove
     const toAdd: string[] = [];
@@ -238,6 +325,7 @@ export function prismaVitePlugin(
           currentAbortController.abort();
           currentAbortController = null;
         }
+        lastWatchWarning = null;
         server = null;
         watchedFiles.clear();
         log('Server closed, cleaned up resources', 'debug');
@@ -247,8 +335,11 @@ export function prismaVitePlugin(
       viteServer.httpServer?.on('close', cleanup);
       viteServer.watcher?.on?.('close', cleanup);
 
-      // Collect files to watch from the module graph
-      for (const file of await collectWatchedFiles(viteServer)) {
+      const { files: initialWatchedFiles, warning } = await resolveWatchedFiles(viteServer);
+      syncWatchWarning(warning);
+
+      // Collect files to watch from provider metadata
+      for (const file of initialWatchedFiles) {
         watchedFiles.add(file);
       }
 
