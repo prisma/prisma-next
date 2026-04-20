@@ -18,7 +18,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         paths: [schemaPath],
       },
       load: async (context: ContractSourceContext) => {
-        const absoluteSchemaPath = resolve(schemaPath);
+        const absoluteSchemaPath = resolve(context.configDir, schemaPath);
         let schema: string;
         try {
           schema = await readFile(absoluteSchemaPath, 'utf-8');
