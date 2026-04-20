@@ -22,7 +22,7 @@ const MigrationMetaSchema = type({
   from: 'string',
   to: 'string',
   'kind?': "'regular' | 'baseline'",
-  'labels?': 'string[]',
+  'labels?': type('string').array(),
 });
 
 /**
