@@ -13,7 +13,7 @@ import contractJson from '../src/contract.json' with { type: 'json' };
 import type { Db } from '../src/db';
 
 const { contract } = validateMongoContract<Contract>(contractJson);
-const pipeline = mongoQuery<Contract>({ contractJson });
+const query = mongoQuery<Contract>({ contractJson });
 const raw = mongoRaw({ contract });
 
 export function setupTestDb(dbName: string) {
@@ -34,7 +34,7 @@ export function setupTestDb(dbName: string) {
     runtime = createMongoRuntime({ adapter, driver, contract, targetId: 'mongo' });
     const orm = mongoOrm({ contract, executor: runtime });
 
-    db = { orm, runtime, pipeline, raw, contract };
+    db = { orm, runtime, query, raw, contract };
   }, timeouts.spinUpMongoMemoryServer);
 
   beforeEach(async () => {
