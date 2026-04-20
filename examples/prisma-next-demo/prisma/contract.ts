@@ -39,7 +39,7 @@ export const contract = defineContract(
       fields: {
         id: field.id.uuidv4(),
         title: field.text(),
-        userId: field.text(),
+        userId: field.uuid(),
         createdAt: field.createdAt(),
         embedding: field.namedType(types.Embedding1536).optional(),
       },
