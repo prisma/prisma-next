@@ -55,6 +55,8 @@ export function prismaVitePlugin(
 
   let absoluteConfigPath: string;
   const watchedFiles = new Set<string>();
+  // Vite watches the project root, so writes to emitted artifacts can still surface as change
+  // events even when those files are excluded from watchedFiles.
   const ignoredOutputFiles = new Set<string>();
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let currentAbortController: AbortController | null = null;
