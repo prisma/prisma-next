@@ -1153,6 +1153,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -1710,6 +1713,9 @@ importers:
       arktype:
         specifier: ^2.1.25
         version: 2.1.29
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       ts-toolbelt:
         specifier: ^9.6.0
         version: 9.6.0

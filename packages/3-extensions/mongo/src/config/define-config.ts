@@ -1,15 +1,11 @@
-import { pathToFileURL } from 'node:url';
 import mongoAdapter from '@prisma-next/adapter-mongo/control';
-import type {
-  ContractSourceContext,
-  ContractSourceEnvironment,
-  PrismaNextConfig,
-} from '@prisma-next/config/config-types';
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
 import mongoDriver from '@prisma-next/driver-mongo/control';
 import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
 import { mongoContract } from '@prisma-next/mongo-contract-psl/provider';
-import { extname, isAbsolute, resolve } from 'pathe';
+import { typescriptContractFromPath } from '@prisma-next/mongo-contract-ts/config-types';
+import { extname } from 'pathe';
 
 export interface MongoConfigOptions {
   readonly contract: string;
@@ -32,26 +28,7 @@ export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mon
 
   const contractConfig =
     ext === '.ts'
-      ? {
-          source: {
-            inputs: [options.contract],
-            load: async (
-              context: ContractSourceContext,
-              environment: ContractSourceEnvironment,
-            ) => {
-              const absolutePath = isAbsolute(options.contract)
-                ? options.contract
-                : resolve(environment.configDir, options.contract);
-              const { typescriptContract } = await import(
-                '@prisma-next/mongo-contract-ts/config-types'
-              );
-              const mod = await import(pathToFileURL(absolutePath).href);
-              const contract = mod.default ?? mod.contract;
-              return typescriptContract(contract, output).source.load(context, environment);
-            },
-          },
-          output,
-        }
+      ? typescriptContractFromPath(options.contract, output)
       : mongoContract(options.contract, { output });
 
   return coreDefineConfig({

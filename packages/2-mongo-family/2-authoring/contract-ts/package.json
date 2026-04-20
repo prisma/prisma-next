@@ -19,7 +19,8 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
-    "@prisma-next/utils": "workspace:*"
+    "@prisma-next/utils": "workspace:*",
+    "pathe": "^2.0.3"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
