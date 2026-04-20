@@ -705,8 +705,8 @@
           "collection": "carts",
           "keys": [
             {
-              "direction": 1,
-              "field": "userId"
+              "field": "userId",
+              "direction": 1
             }
           ],
           "name": "userId_1"
@@ -763,12 +763,12 @@
           "collection": "events",
           "keys": [
             {
-              "direction": 1,
-              "field": "userId"
+              "field": "userId",
+              "direction": 1
             },
             {
-              "direction": -1,
-              "field": "timestamp"
+              "field": "timestamp",
+              "direction": -1
             }
           ],
           "name": "userId_1_timestamp_-1"
@@ -825,8 +825,8 @@
           "collection": "events",
           "keys": [
             {
-              "direction": 1,
-              "field": "timestamp"
+              "field": "timestamp",
+              "direction": 1
             }
           ],
           "expireAfterSeconds": 7776000,
@@ -883,8 +883,8 @@
           "collection": "invoices",
           "keys": [
             {
-              "direction": 1,
-              "field": "orderId"
+              "field": "orderId",
+              "direction": 1
             }
           ],
           "name": "orderId_1"
@@ -940,8 +940,8 @@
           "collection": "invoices",
           "keys": [
             {
-              "direction": -1,
-              "field": "issuedAt"
+              "field": "issuedAt",
+              "direction": -1
             }
           ],
           "sparse": true,
@@ -999,12 +999,12 @@
           "collection": "locations",
           "keys": [
             {
-              "direction": 1,
-              "field": "city"
+              "field": "city",
+              "direction": 1
             },
             {
-              "direction": 1,
-              "field": "country"
+              "field": "country",
+              "direction": 1
             }
           ],
           "name": "city_1_country_1",
@@ -1065,8 +1065,8 @@
           "collection": "orders",
           "keys": [
             {
-              "direction": 1,
-              "field": "userId"
+              "field": "userId",
+              "direction": 1
             }
           ],
           "name": "userId_1"
@@ -1120,12 +1120,12 @@
           "collection": "products",
           "keys": [
             {
-              "direction": "text",
-              "field": "name"
+              "field": "name",
+              "direction": "text"
             },
             {
-              "direction": "text",
-              "field": "description"
+              "field": "description",
+              "direction": "text"
             }
           ],
           "name": "name_text_description_text",
@@ -1184,12 +1184,12 @@
           "collection": "products",
           "keys": [
             {
-              "direction": 1,
-              "field": "brand"
+              "field": "brand",
+              "direction": 1
             },
             {
-              "direction": 1,
-              "field": "subCategory"
+              "field": "subCategory",
+              "direction": 1
             }
           ],
           "name": "brand_1_subCategory_1"
@@ -1246,8 +1246,8 @@
           "collection": "products",
           "keys": [
             {
-              "direction": "hashed",
-              "field": "code"
+              "field": "code",
+              "direction": "hashed"
             }
           ],
           "name": "code_hashed"
@@ -1303,8 +1303,8 @@
           "collection": "users",
           "keys": [
             {
-              "direction": 1,
-              "field": "email"
+              "field": "email",
+              "direction": 1
             }
           ],
           "unique": true,

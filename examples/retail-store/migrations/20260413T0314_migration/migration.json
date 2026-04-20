@@ -1,8 +1,10 @@
 {
+  "migrationId": "sha256:a7ab7bb65551fa263fdb34765d4c19acf8b3d0abb36407f3c43657ae64cc366e",
   "from": "sha256:empty",
   "to": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d",
-  "migrationId": "sha256:e3960312bdd88da15123ae50c272af5fb45c6cc0cc3f0ff187937b50773b5d13",
   "kind": "regular",
+  "labels": [],
+  "createdAt": "2026-04-13T03:14:54.111Z",
   "fromContract": null,
   "toContract": {
     "schemaVersion": "1",
@@ -1266,7 +1268,5 @@
     "applied": [],
     "plannerVersion": "1.0.0",
     "planningStrategy": "diff"
-  },
-  "labels": [],
-  "createdAt": "2026-04-13T03:14:54.111Z"
+  }
 }
