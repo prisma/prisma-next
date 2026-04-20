@@ -43,6 +43,8 @@ function resolveQuery(value: MongoQueryPlan | Buildable): MongoQueryPlan {
   return isBuildable(value) ? value.build() : value;
 }
 
+// Every MongoDB document carries `_id`, so `exists('_id')` is equivalent to
+// "match all". The filter AST has no identity/always-true expression.
 const MATCH_ALL_FILTER: MongoFilterExpr = MongoExistsExpr.exists('_id');
 
 export function dataTransform(
@@ -54,7 +56,7 @@ export function dataTransform(
       expect?: 'exists' | 'notExists';
       description?: string;
     };
-    run: (() => MongoQueryPlan | Buildable) | MongoQueryPlan | Buildable;
+    run: () => MongoQueryPlan | Buildable;
   },
 ): MongoDataTransformOperation {
   let precheck: readonly MongoDataTransformCheck[] = [];
@@ -72,12 +74,7 @@ export function dataTransform(
     postcheck = [{ description, source, filter, expect: postcheckExpect }];
   }
 
-  const run: MongoQueryPlan[] = [];
-  if (typeof options.run === 'function') {
-    run.push(resolveQuery(options.run()));
-  } else {
-    run.push(resolveQuery(options.run));
-  }
+  const run: MongoQueryPlan[] = [resolveQuery(options.run())];
 
   return {
     id: `data_transform.${name}`,

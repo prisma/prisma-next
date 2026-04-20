@@ -167,24 +167,6 @@ describe('dataTransform', () => {
     expect(op.run[0]!.command.kind).toBe('rawUpdateMany');
   });
 
-  it('accepts Buildable directly for run (not wrapped in closure)', () => {
-    const buildable = { build: () => makeRunPlan() };
-    const op = dataTransform('test', {
-      run: buildable,
-    });
-
-    expect(op.run).toHaveLength(1);
-    expect(op.run[0]!.command.kind).toBe('rawUpdateMany');
-  });
-
-  it('accepts MongoQueryPlan directly for run', () => {
-    const op = dataTransform('test', {
-      run: makeRunPlan(),
-    });
-
-    expect(op.run[0]!.collection).toBe('users');
-  });
-
   it('propagates placeholder() errors from check.source as structured CliStructuredError (PN-MIG-2001)', () => {
     let thrown: unknown;
     try {
