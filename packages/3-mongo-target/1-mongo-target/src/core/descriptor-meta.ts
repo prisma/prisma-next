@@ -1,4 +1,6 @@
-export const mongoTargetDescriptorMeta = {
+import type { CodecTypes } from '../exports/codec-types';
+
+const mongoTargetDescriptorMetaBase = {
   kind: 'target',
   familyId: 'mongo',
   targetId: 'mongo',
@@ -6,3 +8,7 @@ export const mongoTargetDescriptorMeta = {
   version: '0.0.1',
   capabilities: {},
 } as const;
+
+export const mongoTargetDescriptorMeta: typeof mongoTargetDescriptorMetaBase & {
+  readonly __codecTypes?: CodecTypes;
+} = mongoTargetDescriptorMetaBase;
