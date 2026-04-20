@@ -709,6 +709,7 @@
               "direction": 1
             }
           ],
+          "unique": true,
           "name": "userId_1"
         }
       }
@@ -721,12 +722,23 @@
           "collection": "carts"
         },
         "filter": {
-          "kind": "field",
-          "field": "key",
-          "op": "$eq",
-          "value": {
-            "userId": 1
-          }
+          "kind": "and",
+          "exprs": [
+            {
+              "kind": "field",
+              "field": "key",
+              "op": "$eq",
+              "value": {
+                "userId": 1
+              }
+            },
+            {
+              "kind": "field",
+              "field": "unique",
+              "op": "$eq",
+              "value": true
+            }
+          ]
         },
         "expect": "exists"
       }

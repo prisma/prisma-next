@@ -283,7 +283,7 @@ class InitialMigration extends Migration {
         validationAction: 'error',
       }),
 
-      createIndex('carts', [{ field: 'userId', direction: 1 }]),
+      createIndex('carts', [{ field: 'userId', direction: 1 }], { unique: true }),
       createIndex('events', [
         { field: 'userId', direction: 1 },
         { field: 'timestamp', direction: -1 },
