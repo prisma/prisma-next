@@ -100,10 +100,10 @@ describe('emit parity fixtures', () => {
             process.chdir(testSetup.testDir);
             const tsContext = sourceContextFromConfig(tsConfig);
             const pslContext = sourceContextFromConfig(pslConfig);
-            tsProviderResultFirst = await tsConfig.contract.source(tsContext);
-            tsProviderResultSecond = await tsConfig.contract.source(tsContext);
-            pslProviderResultFirst = await pslConfig.contract.source(pslContext);
-            pslProviderResultSecond = await pslConfig.contract.source(pslContext);
+            tsProviderResultFirst = await tsConfig.contract.source.load(tsContext);
+            tsProviderResultSecond = await tsConfig.contract.source.load(tsContext);
+            pslProviderResultFirst = await pslConfig.contract.source.load(pslContext);
+            pslProviderResultSecond = await pslConfig.contract.source.load(pslContext);
           } finally {
             process.chdir(originalCwd);
           }
@@ -241,7 +241,7 @@ describe('emit parity fixture diagnostics', () => {
           let sourceResult: Awaited<ReturnType<typeof pslConfig.contract.source>>;
           try {
             process.chdir(testSetup.testDir);
-            sourceResult = await pslConfig.contract.source(sourceContextFromConfig(pslConfig));
+            sourceResult = await pslConfig.contract.source.load(sourceContextFromConfig(pslConfig));
           } finally {
             process.chdir(originalCwd);
           }

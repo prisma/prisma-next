@@ -10,7 +10,10 @@ export default defineConfig({
   target: mongoTargetDescriptor,
   adapter: mongoAdapter,
   contract: {
-    source: async () => ok(contract as Contract),
+    source: {
+      authoritativeInputs: { kind: 'moduleGraph' },
+      load: async () => ok(contract as Contract),
+    },
     output: 'output/contract.json',
   },
 });

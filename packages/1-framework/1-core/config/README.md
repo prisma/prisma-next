@@ -12,7 +12,7 @@ This package owns the shared config contract used by tooling and authoring packa
 
 - `PrismaNextConfig` and `ContractConfig` types
 - contract source provider + diagnostics protocol
-- dev watch metadata for tooling integrations (`contract.watchInputs`, `contract.watchStrategy`)
+- provider-owned authoritative input metadata for tooling integrations
 - `defineConfig()` normalization/defaulting
 - `validateConfig()` structural/runtime-shape validation
 
@@ -20,7 +20,7 @@ This package owns the shared config contract used by tooling and authoring packa
 
 - Type-safe config composition for `family`, `target`, `adapter`, optional `driver`, and optional `extensionPacks` (`extensions` is rejected at runtime)
 - Contract source provider protocol (`contract.source`) and diagnostics shape
-- Optional dev watch hints for build integrations. `contract.watchInputs` declares authoritative source files that are not visible in the config module graph, while `contract.watchStrategy: 'moduleGraph'` declares that the config module graph is authoritative.
+- Tool-agnostic authoritative input metadata for build integrations via `contract.source.authoritativeInputs` (`moduleGraph`, `paths`, or `configPathOnly`)
 - Pure config validation and normalization with no file system access
 
 ## Non-responsibilities
@@ -40,14 +40,19 @@ const config = defineConfig({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   contract: {
-    source: async () => /* Result<Contract, ContractSourceDiagnostics> */ null as never,
-    watchInputs: ['./prisma/schema.prisma'],
+    source: {
+      authoritativeInputs: {
+        kind: 'paths',
+        paths: ['./prisma/schema.prisma'],
+      },
+      load: async () => /* Result<Contract, ContractSourceDiagnostics> */ null as never,
+    },
   },
 });
 
 validateConfig(config);
 ```
 
-If neither `contract.watchInputs` nor `contract.watchStrategy` is declared, config loading falls
-back to the config file path for dev watchers and returns a partial-coverage warning so build
-integrations can surface that limitation explicitly.
+Use `kind: 'moduleGraph'` when the config module graph is authoritative, `kind: 'paths'` for
+explicit non-graph inputs, and `kind: 'configPathOnly'` when tooling can only reliably watch the
+config file itself and should surface a partial-coverage warning.

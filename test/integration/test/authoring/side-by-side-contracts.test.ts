@@ -145,7 +145,7 @@ describe('side-by-side contract examples', () => {
         target: postgres,
       });
 
-      const providerResult = await provider.source(sqlSourceContext);
+      const providerResult = await provider.source.load(sqlSourceContext);
       expect(providerResult.ok).toBe(true);
       if (!providerResult.ok) {
         throw new Error(providerResult.failure.summary);
@@ -207,7 +207,7 @@ describe('side-by-side contract examples', () => {
 
       const fixture = await loadFixture(fixtureCase);
       const provider = mongoContract(fixtureCase.contractPslPath);
-      const providerResult = await provider.source(mongoSourceContext);
+      const providerResult = await provider.source.load(mongoSourceContext);
       expect(providerResult.ok).toBe(true);
       if (!providerResult.ok) {
         throw new Error(providerResult.failure.summary);

@@ -8,6 +8,9 @@ describe('mongoContract provider helper', () => {
     });
 
     expect(config.output).toBe('output/contract.json');
-    expect(config.watchInputs).toEqual(['./schema.prisma']);
+    expect(config.source.authoritativeInputs).toEqual({
+      kind: 'paths',
+      paths: ['./schema.prisma'],
+    });
   });
 });

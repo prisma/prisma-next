@@ -79,9 +79,9 @@ export async function executeContractEmit(
   }
 
   // Validate source exists and is callable
-  if (typeof contractConfig.source !== 'function') {
+  if (typeof contractConfig.source?.load !== 'function') {
     throw errorContractConfigMissing({
-      why: 'Contract config must include a valid source provider function',
+      why: 'Contract config must include a valid source provider object',
     });
   }
 
@@ -104,37 +104,37 @@ export async function executeContractEmit(
     controlMutationDefaults: stack.controlMutationDefaults,
   };
 
-  let providerResult: Awaited<ReturnType<typeof contractConfig.source>>;
+  let providerResult: Awaited<ReturnType<typeof contractConfig.source.load>>;
   try {
-    providerResult = await unlessAborted(contractConfig.source(sourceContext));
+    providerResult = await unlessAborted(contractConfig.source.load(sourceContext));
   } catch (error) {
     if (signal.aborted || isAbortError(error)) {
       throw error;
     }
     throw errorRuntime('Failed to resolve contract source', {
       why: error instanceof Error ? error.message : String(error),
-      fix: 'Ensure contract.source resolves to ok(Contract) or returns structured diagnostics.',
+      fix: 'Ensure contract.source.load resolves to ok(Contract) or returns structured diagnostics.',
     });
   }
 
   if (!isRecord(providerResult) || typeof providerResult.ok !== 'boolean') {
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed result shape.',
-      fix: 'Ensure contract.source resolves to ok(Contract) or notOk({ summary, diagnostics }).',
+      fix: 'Ensure contract.source.load resolves to ok(Contract) or notOk({ summary, diagnostics }).',
     });
   }
 
   if (providerResult.ok && !('value' in providerResult)) {
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed success result: missing value.',
-      fix: 'Ensure contract.source success payload is ok(Contract).',
+      fix: 'Ensure contract.source.load success payload is ok(Contract).',
     });
   }
 
   if (!providerResult.ok && !isProviderFailureLike(providerResult.failure)) {
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed failure result: expected summary and diagnostics.',
-      fix: 'Ensure contract.source failure payload is notOk({ summary, diagnostics, meta? }).',
+      fix: 'Ensure contract.source.load failure payload is notOk({ summary, diagnostics, meta? }).',
     });
   }
 

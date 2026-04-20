@@ -1,10 +1,10 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 import { describe, expect, it } from 'vitest';
+import { defineConfig as coreDefineConfig } from '../../../../1-framework/1-core/config/src/config-types';
 import { defineConfig } from '../../src/config/define-config';
 
 describe('defineConfig facade', () => {
@@ -33,8 +33,10 @@ describe('defineConfig facade', () => {
     expect(facadeConfig.driver).toBe(manualConfig.driver);
     expect(facadeConfig.extensionPacks).toEqual(manualConfig.extensionPacks);
     expect(facadeConfig.contract?.output).toBe(manualConfig.contract?.output);
-    expect(facadeConfig.contract?.watchInputs).toEqual(manualConfig.contract?.watchInputs);
-    expect(typeof facadeConfig.contract?.source).toBe('function');
+    expect(facadeConfig.contract?.source.authoritativeInputs).toEqual(
+      manualConfig.contract?.source.authoritativeInputs,
+    );
+    expect(typeof facadeConfig.contract?.source.load).toBe('function');
   });
 
   it('derives output path by swapping .prisma to .json', () => {
@@ -53,9 +55,12 @@ describe('defineConfig facade', () => {
     const tsConfig = defineConfig({ contract: './prisma/contract.ts' });
     const pslConfig = defineConfig({ contract: './prisma/contract.prisma' });
 
-    expect(typeof tsConfig.contract?.source).toBe('function');
+    expect(typeof tsConfig.contract?.source.load).toBe('function');
     expect(tsConfig.contract?.output).toBe('./prisma/contract.json');
-    expect(tsConfig.contract?.watchInputs).toEqual(['./prisma/contract.ts']);
+    expect(tsConfig.contract?.source.authoritativeInputs).toEqual({
+      kind: 'paths',
+      paths: ['./prisma/contract.ts'],
+    });
     expect(tsConfig.contract?.source).not.toBe(pslConfig.contract?.source);
   });
 

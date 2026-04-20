@@ -12,7 +12,10 @@ export default defineConfig({
   driver: postgresDriver,
   extensionPacks: [],
   contract: {
-    source: async () => ({ ok: true as const, value: contract }),
+    source: {
+      authoritativeInputs: { kind: 'moduleGraph' },
+      load: async () => ({ ok: true as const, value: contract }),
+    },
     output: 'output/contract.json',
     types: 'output/contract.d.ts',
   },

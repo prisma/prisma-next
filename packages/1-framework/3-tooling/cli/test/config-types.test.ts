@@ -6,6 +6,11 @@ import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 
 describe('defineConfig', () => {
+  const createSourceProvider = (authoritativeInputs = { kind: 'moduleGraph' as const }) => ({
+    authoritativeInputs,
+    load: async () => ok({ targetFamily: 'sql' } as Contract),
+  });
+
   const mockHook = {
     id: 'sql',
     generateStorageType: () => '{}',
@@ -109,11 +114,10 @@ describe('defineConfig', () => {
   });
 
   it('normalizes contract config with default output', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
-        source: sourceProvider,
+        source: createSourceProvider(),
       },
     };
 
@@ -122,37 +126,39 @@ describe('defineConfig', () => {
   });
 
   it('normalizes contract config with custom output', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
-        source: sourceProvider,
+        source: createSourceProvider({
+          kind: 'paths',
+          paths: ['./schema.prisma'],
+        }),
         output: 'custom/contract.json',
-        watchInputs: ['./schema.prisma'],
       },
     };
 
     const result = defineConfig(config);
     expect(result.contract?.output).toBe('custom/contract.json');
-    expect(result.contract?.watchInputs).toEqual(['./schema.prisma']);
+    expect(result.contract?.source.authoritativeInputs).toEqual({
+      kind: 'paths',
+      paths: ['./schema.prisma'],
+    });
   });
 
-  it('preserves contract watch strategy', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
+  it('preserves contract authoritative inputs', () => {
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
-        source: sourceProvider,
-        watchStrategy: 'moduleGraph',
+        source: createSourceProvider(),
       },
     };
 
     const result = defineConfig(config);
-    expect(result.contract?.watchStrategy).toBe('moduleGraph');
+    expect(result.contract?.source.authoritativeInputs).toEqual({ kind: 'moduleGraph' });
   });
 
-  it('validates contract source accepts provider function', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
+  it('validates contract source accepts provider objects', () => {
+    const sourceProvider = createSourceProvider();
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
@@ -164,7 +170,7 @@ describe('defineConfig', () => {
     expect(result.contract?.source).toBe(sourceProvider);
   });
 
-  it('throws when source is not a provider function', () => {
+  it('throws when source is not a provider object', () => {
     const config = {
       ...baseConfig,
       contract: {
@@ -172,9 +178,7 @@ describe('defineConfig', () => {
       },
     } as unknown as PrismaNextConfig;
 
-    expect(() => defineConfig(config)).toThrow(
-      'Config.contract.source must be a provider function',
-    );
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
   });
 
   it('throws error on invalid config structure', () => {
@@ -193,15 +197,13 @@ describe('defineConfig', () => {
       },
     } as unknown as PrismaNextConfig;
 
-    expect(() => defineConfig(config)).toThrow(
-      'Config.contract.source must be a provider function',
-    );
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
   });
 
   it('builds TypeScript contract config via helper utility', async () => {
     const contract = { targetFamily: 'sql' } as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
-    const result = await config.source({
+    const result = await config.source.load({
       composedExtensionPacks: [],
       scalarTypeDescriptors: new Map(),
       authoringContributions: { field: {}, type: {} },
@@ -210,7 +212,7 @@ describe('defineConfig', () => {
     });
 
     expect(config.output).toBe('output/contract.json');
-    expect(config.watchStrategy).toBe('moduleGraph');
+    expect(config.source.authoritativeInputs).toEqual({ kind: 'moduleGraph' });
     expect(result.ok).toBe(true);
     expect(result.assertOk()).toBe(contract);
   });

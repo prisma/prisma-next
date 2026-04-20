@@ -33,16 +33,21 @@ export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mon
   const contractConfig =
     ext === '.ts'
       ? {
-          source: async (context: ContractSourceContext) => {
-            const { typescriptContract } = await import(
-              '@prisma-next/mongo-contract-ts/config-types'
-            );
-            const mod = await import(pathToFileURL(absoluteContractPath).href);
-            const contract = mod.default ?? mod.contract;
-            return typescriptContract(contract, output).source(context);
+          source: {
+            authoritativeInputs: {
+              kind: 'paths' as const,
+              paths: [options.contract],
+            },
+            load: async (context: ContractSourceContext) => {
+              const { typescriptContract } = await import(
+                '@prisma-next/mongo-contract-ts/config-types'
+              );
+              const mod = await import(pathToFileURL(absoluteContractPath).href);
+              const contract = mod.default ?? mod.contract;
+              return typescriptContract(contract, output).source.load(context);
+            },
           },
           output,
-          watchInputs: [options.contract],
         }
       : mongoContract(options.contract, { output });
 

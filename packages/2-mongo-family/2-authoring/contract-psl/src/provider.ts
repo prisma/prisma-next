@@ -12,43 +12,48 @@ export interface MongoContractOptions {
 
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
   return {
-    source: async (context: ContractSourceContext) => {
-      const absoluteSchemaPath = resolve(schemaPath);
-      let schema: string;
-      try {
-        schema = await readFile(absoluteSchemaPath, 'utf-8');
-      } catch (error) {
-        const message = String(error);
-        return notOk({
-          summary: `Failed to read Prisma schema at "${schemaPath}"`,
-          diagnostics: [
-            {
-              code: 'PSL_SCHEMA_READ_FAILED',
-              message,
-              sourceId: schemaPath,
-            },
-          ],
-          meta: { schemaPath, absoluteSchemaPath, cause: message },
+    source: {
+      authoritativeInputs: {
+        kind: 'paths',
+        paths: [schemaPath],
+      },
+      load: async (context: ContractSourceContext) => {
+        const absoluteSchemaPath = resolve(schemaPath);
+        let schema: string;
+        try {
+          schema = await readFile(absoluteSchemaPath, 'utf-8');
+        } catch (error) {
+          const message = String(error);
+          return notOk({
+            summary: `Failed to read Prisma schema at "${schemaPath}"`,
+            diagnostics: [
+              {
+                code: 'PSL_SCHEMA_READ_FAILED',
+                message,
+                sourceId: schemaPath,
+              },
+            ],
+            meta: { schemaPath, absoluteSchemaPath, cause: message },
+          });
+        }
+
+        const document = parsePslDocument({
+          schema,
+          sourceId: schemaPath,
         });
-      }
 
-      const document = parsePslDocument({
-        schema,
-        sourceId: schemaPath,
-      });
+        const interpreted = interpretPslDocumentToMongoContract({
+          document,
+          scalarTypeDescriptors: context.scalarTypeDescriptors,
+          codecLookup: context.codecLookup,
+        });
+        if (!interpreted.ok) {
+          return interpreted;
+        }
 
-      const interpreted = interpretPslDocumentToMongoContract({
-        document,
-        scalarTypeDescriptors: context.scalarTypeDescriptors,
-        codecLookup: context.codecLookup,
-      });
-      if (!interpreted.ok) {
-        return interpreted;
-      }
-
-      return ok(interpreted.value);
+        return ok(interpreted.value);
+      },
     },
-    watchInputs: [schemaPath],
     ...ifDefined('output', options?.output),
   };
 }

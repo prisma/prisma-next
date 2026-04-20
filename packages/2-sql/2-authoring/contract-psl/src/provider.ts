@@ -32,60 +32,67 @@ function buildColumnDescriptorMap(
 
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
   return {
-    source: async (context: ContractSourceContext) => {
-      const absoluteSchemaPath = resolve(schemaPath);
-      let schema: string;
-      try {
-        schema = await readFile(absoluteSchemaPath, 'utf-8');
-      } catch (error) {
-        const message = String(error);
-        return notOk({
-          summary: `Failed to read Prisma schema at "${schemaPath}"`,
-          diagnostics: [
-            {
-              code: 'PSL_SCHEMA_READ_FAILED',
-              message,
-              sourceId: schemaPath,
-            },
-          ],
-          meta: { schemaPath, absoluteSchemaPath, cause: message },
+    source: {
+      authoritativeInputs: {
+        kind: 'paths',
+        paths: [schemaPath],
+      },
+      load: async (context: ContractSourceContext) => {
+        const absoluteSchemaPath = resolve(schemaPath);
+        let schema: string;
+        try {
+          schema = await readFile(absoluteSchemaPath, 'utf-8');
+        } catch (error) {
+          const message = String(error);
+          return notOk({
+            summary: `Failed to read Prisma schema at "${schemaPath}"`,
+            diagnostics: [
+              {
+                code: 'PSL_SCHEMA_READ_FAILED',
+                message,
+                sourceId: schemaPath,
+              },
+            ],
+            meta: { schemaPath, absoluteSchemaPath, cause: message },
+          });
+        }
+
+        const document = parsePslDocument({
+          schema,
+          sourceId: schemaPath,
         });
-      }
 
-      const document = parsePslDocument({
-        schema,
-        sourceId: schemaPath,
-      });
+        const scalarTypeDescriptors = buildColumnDescriptorMap(
+          context.scalarTypeDescriptors,
+          context.codecLookup,
+        );
 
-      const scalarTypeDescriptors = buildColumnDescriptorMap(
-        context.scalarTypeDescriptors,
-        context.codecLookup,
-      );
+        const interpreted = interpretPslDocumentToSqlContract({
+          document,
+          target: options.target,
+          authoringContributions: context.authoringContributions,
+          scalarTypeDescriptors,
+          ...ifDefined(
+            'composedExtensionPacks',
+            context.composedExtensionPacks.length > 0
+              ? [...context.composedExtensionPacks]
+              : undefined,
+          ),
+          ...ifDefined(
+            'composedExtensionPackRefs',
+            options.composedExtensionPackRefs?.length
+              ? options.composedExtensionPackRefs
+              : undefined,
+          ),
+          controlMutationDefaults: context.controlMutationDefaults,
+        });
+        if (!interpreted.ok) {
+          return interpreted;
+        }
 
-      const interpreted = interpretPslDocumentToSqlContract({
-        document,
-        target: options.target,
-        authoringContributions: context.authoringContributions,
-        scalarTypeDescriptors,
-        ...ifDefined(
-          'composedExtensionPacks',
-          context.composedExtensionPacks.length > 0
-            ? [...context.composedExtensionPacks]
-            : undefined,
-        ),
-        ...ifDefined(
-          'composedExtensionPackRefs',
-          options.composedExtensionPackRefs?.length ? options.composedExtensionPackRefs : undefined,
-        ),
-        controlMutationDefaults: context.controlMutationDefaults,
-      });
-      if (!interpreted.ok) {
-        return interpreted;
-      }
-
-      return ok(interpreted.value);
+        return ok(interpreted.value);
+      },
     },
-    watchInputs: [schemaPath],
     ...ifDefined('output', options.output),
   };
 }

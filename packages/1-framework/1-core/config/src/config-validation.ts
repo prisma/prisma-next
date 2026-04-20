@@ -1,8 +1,40 @@
-import type { PrismaNextConfig } from './config-types';
+import { type } from 'arktype';
+import { ContractConfigSchema, type PrismaNextConfig } from './config-types';
 import { ConfigValidationError } from './errors';
 
 function throwValidation(field: string, why?: string): never {
   throw new ConfigValidationError(field, why);
+}
+
+interface ValidationProblemLike {
+  readonly message: string;
+  readonly problem?: string;
+  readonly propString?: string;
+}
+
+function normalizeContractForValidation(
+  contract: Record<string, unknown>,
+): Record<string, unknown> {
+  const source = Object.hasOwn(contract, 'source') ? contract['source'] : undefined;
+  return {
+    ...contract,
+    ...(source && typeof source === 'object'
+      ? { source: { ...(source as Record<string, unknown>) } }
+      : {}),
+  };
+}
+
+function validateContractConfig(contract: Record<string, unknown>): void {
+  const validated = ContractConfigSchema(normalizeContractForValidation(contract));
+  if (!(validated instanceof type.errors)) {
+    return;
+  }
+
+  const firstProblem = validated[0] as ValidationProblemLike | undefined;
+  const fieldSuffix = firstProblem?.propString ?? '';
+  const field = fieldSuffix.length > 0 ? `contract.${fieldSuffix}` : 'contract';
+  const problem = firstProblem?.problem ?? firstProblem?.message;
+  throwValidation(field, problem ? `Config.${field} ${problem}` : undefined);
 }
 
 /**
@@ -221,44 +253,6 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
     if (!contract || typeof contract !== 'object') {
       throwValidation('contract', 'Config.contract must be an object');
     }
-    if (!Object.hasOwn(contract, 'source')) {
-      throwValidation(
-        'contract.source',
-        'Config.contract.source is required when contract is provided',
-      );
-    }
-
-    if (typeof contract['source'] !== 'function') {
-      throwValidation('contract.source', 'Config.contract.source must be a provider function');
-    }
-
-    if (contract['output'] !== undefined && typeof contract['output'] !== 'string') {
-      throwValidation('contract.output', 'Config.contract.output must be a string when provided');
-    }
-
-    if (contract['watchInputs'] !== undefined) {
-      if (!Array.isArray(contract['watchInputs'])) {
-        throwValidation(
-          'contract.watchInputs',
-          'Config.contract.watchInputs must be an array of strings when provided',
-        );
-      }
-
-      for (const input of contract['watchInputs']) {
-        if (typeof input !== 'string') {
-          throwValidation(
-            'contract.watchInputs',
-            'Config.contract.watchInputs must contain only strings',
-          );
-        }
-      }
-    }
-
-    if (contract['watchStrategy'] !== undefined && contract['watchStrategy'] !== 'moduleGraph') {
-      throwValidation(
-        'contract.watchStrategy',
-        'Config.contract.watchStrategy must be "moduleGraph" when provided',
-      );
-    }
+    validateContractConfig(contract);
   }
 }

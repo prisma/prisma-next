@@ -12,7 +12,10 @@ export default {
   // driver is missing - this is what we're testing
   extensionPacks: [],
   contract: {
-    source: async () => ({ ok: true, value: contract }),
+    source: {
+      authoritativeInputs: { kind: 'moduleGraph' },
+      load: async () => ({ ok: true, value: contract }),
+    },
     output: 'output/contract.json',
   },
   db: {

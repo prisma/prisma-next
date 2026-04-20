@@ -576,7 +576,7 @@ describe('emit command', () => {
             adapter: providerConfig.adapter,
             extensionPacks: providerConfig.extensionPacks ?? [],
           });
-          sourceResult = await contractConfig!.source({
+          sourceResult = await contractConfig!.source.load({
             composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
             scalarTypeDescriptors: stack.scalarTypeDescriptors,
             authoringContributions: stack.authoringContributions,

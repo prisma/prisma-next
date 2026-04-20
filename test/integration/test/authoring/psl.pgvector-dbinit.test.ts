@@ -48,7 +48,7 @@ describe(
         target: postgres,
       });
 
-      const pslResult = await contractConfig.source({
+      const pslResult = await contractConfig.source.load({
         composedExtensionPacks: [pgvector.id],
         scalarTypeDescriptors: stack.scalarTypeDescriptors,
         authoringContributions: stack.authoringContributions,

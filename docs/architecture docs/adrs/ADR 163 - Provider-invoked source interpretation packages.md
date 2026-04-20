@@ -24,7 +24,7 @@ Input-specific parsing and interpretation live in **provider-invoked authoring p
 
 For SQL PSL-first, we create `@prisma-next/sql-contract-psl` as the dedicated package that interprets PSL input into a SQL `Contract<SqlStorage, SqlModelStorage>`.
 
-The CLI / ControlClient remain source-agnostic and do not import PSL-specific packages. They only call `config.contract.source()` and then emit from the returned `Contract`.
+The CLI / ControlClient remain source-agnostic and do not import PSL-specific packages. They only call `config.contract.source.load()` and then emit from the returned `Contract`.
 
 ## Consequences
 
@@ -56,4 +56,3 @@ The CLI / ControlClient remain source-agnostic and do not import PSL-specific pa
 - `packages/2-sql/2-authoring/contract-psl/README.md`
 - `docs/architecture docs/adrs/ADR 006 - Dual Authoring Modes.md`
 - `docs/architecture docs/adrs/ADR 150 - Family-Agnostic CLI and Pack Entry Points.md`
-

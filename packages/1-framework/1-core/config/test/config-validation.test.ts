@@ -20,6 +20,14 @@ const mockHook = {
     `export type Contract = ${base} & { typeMaps: ${tm} };`,
 };
 
+function createSourceProvider(overrides: Record<string, unknown> = {}) {
+  return {
+    authoritativeInputs: { kind: 'moduleGraph' as const },
+    load: async () => ok({ targetFamily: 'sql' } as Contract),
+    ...overrides,
+  };
+}
+
 function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextConfig {
   return {
     family: {
@@ -319,7 +327,7 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ contract: 'invalid' }), 'contract');
     expectFieldError(createValidRawConfig({ contract: {} }), 'contract.source');
     const inheritedSourceContract = Object.create({
-      source: async () => ok({ targetFamily: 'sql' } as Contract),
+      source: createSourceProvider(),
     }) as Record<string, unknown>;
     expectFieldError(
       createValidRawConfig({ contract: inheritedSourceContract }),
@@ -327,14 +335,51 @@ describe('validateConfig', () => {
     );
     expectFieldError(
       createValidRawConfig({
-        contract: { source: { kind: 'psl', schemaPath: './schema.prisma' } },
+        contract: {
+          source: {
+            load: async () => ok({ targetFamily: 'sql' } as Contract),
+          },
+        },
       }),
-      'contract.source',
+      'contract.source.authoritativeInputs',
     );
     expectFieldError(
       createValidRawConfig({
         contract: {
-          source: async () => ok({ targetFamily: 'sql' } as Contract),
+          source: {
+            authoritativeInputs: { kind: 'paths' },
+            load: async () => ok({ targetFamily: 'sql' } as Contract),
+          },
+        },
+      }),
+      'contract.source.authoritativeInputs.paths',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
+          source: {
+            authoritativeInputs: { kind: 'invalid' },
+            load: async () => ok({ targetFamily: 'sql' } as Contract),
+          },
+        },
+      }),
+      'contract.source.authoritativeInputs.kind',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
+          source: {
+            authoritativeInputs: { kind: 'moduleGraph' },
+            load: 'invalid',
+          },
+        },
+      }),
+      'contract.source.load',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
+          source: createSourceProvider(),
           output: 123,
         },
       }),
@@ -356,7 +401,7 @@ describe('validateConfig', () => {
         },
       ],
       contract: {
-        source: async () => ok({ targetFamily: 'sql' } as Contract),
+        source: createSourceProvider(),
         output: 'src/prisma/contract.json',
       },
     });
@@ -410,10 +455,9 @@ describe('defineConfig', () => {
   });
 
   it('applies default output path when contract output is missing', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config = createValidConfig({
       contract: {
-        source: sourceProvider,
+        source: createSourceProvider(),
       },
     });
 
@@ -421,25 +465,30 @@ describe('defineConfig', () => {
     expect(result.contract?.output).toBe('src/prisma/contract.json');
   });
 
-  it('omits watch metadata when it is not provided', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
+  it('preserves source provider metadata', () => {
     const config = createValidConfig({
       contract: {
-        source: sourceProvider,
+        source: createSourceProvider({
+          authoritativeInputs: {
+            kind: 'paths' as const,
+            paths: ['./schema.prisma'],
+          },
+        }),
       },
     });
 
     const result = defineConfig(config);
     expect(result.contract).toBeDefined();
-    expect(Object.hasOwn(result.contract ?? {}, 'watchInputs')).toBe(false);
-    expect(Object.hasOwn(result.contract ?? {}, 'watchStrategy')).toBe(false);
+    expect(result.contract?.source.authoritativeInputs).toEqual({
+      kind: 'paths',
+      paths: ['./schema.prisma'],
+    });
   });
 
   it('preserves custom output path', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config = createValidConfig({
       contract: {
-        source: sourceProvider,
+        source: createSourceProvider(),
         output: 'custom/contract.json',
       },
     });
@@ -448,16 +497,14 @@ describe('defineConfig', () => {
     expect(result.contract?.output).toBe('custom/contract.json');
   });
 
-  it('throws when contract source is not a function', () => {
+  it('throws when contract source is not a provider object', () => {
     const config = createValidConfig({
       contract: {
         source: 'invalid',
       },
     }) as unknown as PrismaNextConfig;
 
-    expect(() => defineConfig(config)).toThrow(
-      'Config.contract.source must be a provider function',
-    );
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
   });
 
   it('throws for invalid top-level shape', () => {

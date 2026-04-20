@@ -19,7 +19,7 @@ describe('typescriptContract', () => {
   it('returns provider result with contract', async () => {
     const contract = { targetFamily: 'mongo', target: 'mongo' } as unknown as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
-    const result = await config.source(emptyContext);
+    const result = await config.source.load(emptyContext);
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -28,7 +28,7 @@ describe('typescriptContract', () => {
 
     expect(result.value).toBe(contract);
     expect(config.output).toBe('output/contract.json');
-    expect(config.watchStrategy).toBe('moduleGraph');
+    expect(config.source.authoritativeInputs).toEqual({ kind: 'moduleGraph' });
   });
 
   it('omits output when not provided', () => {
@@ -36,6 +36,6 @@ describe('typescriptContract', () => {
     const config = typescriptContract(contract);
 
     expect(config.output).toBeUndefined();
-    expect(config.watchStrategy).toBe('moduleGraph');
+    expect(config.source.authoritativeInputs).toEqual({ kind: 'moduleGraph' });
   });
 });

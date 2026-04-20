@@ -44,6 +44,21 @@ export interface ContractSourceContext {
   readonly controlMutationDefaults: ControlMutationDefaults;
 }
 
-export type ContractSourceProvider = (
-  context: ContractSourceContext,
-) => Promise<Result<Contract, ContractSourceDiagnostics>>;
+export type ContractAuthoritativeInputs =
+  | {
+      readonly kind: 'moduleGraph';
+    }
+  | {
+      readonly kind: 'paths';
+      readonly paths: readonly string[];
+    }
+  | {
+      readonly kind: 'configPathOnly';
+    };
+
+export interface ContractSourceProvider {
+  readonly authoritativeInputs: ContractAuthoritativeInputs;
+  readonly load: (
+    context: ContractSourceContext,
+  ) => Promise<Result<Contract, ContractSourceDiagnostics>>;
+}

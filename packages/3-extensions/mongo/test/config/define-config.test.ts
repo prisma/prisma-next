@@ -27,8 +27,10 @@ describe('defineConfig facade', () => {
     expect(facadeConfig.adapter).toBe(manualConfig.adapter);
     expect(facadeConfig.driver).toBe(manualConfig.driver);
     expect(facadeConfig.contract?.output).toBe(manualConfig.contract?.output);
-    expect(facadeConfig.contract?.watchInputs).toEqual(manualConfig.contract?.watchInputs);
-    expect(typeof facadeConfig.contract?.source).toBe('function');
+    expect(facadeConfig.contract?.source.authoritativeInputs).toEqual(
+      manualConfig.contract?.source.authoritativeInputs,
+    );
+    expect(typeof facadeConfig.contract?.source.load).toBe('function');
   });
 
   it('derives output path by swapping .prisma to .json', () => {
@@ -47,9 +49,12 @@ describe('defineConfig facade', () => {
     const tsConfig = defineConfig({ contract: './prisma/contract.ts' });
     const pslConfig = defineConfig({ contract: './prisma/contract.prisma' });
 
-    expect(typeof tsConfig.contract?.source).toBe('function');
+    expect(typeof tsConfig.contract?.source.load).toBe('function');
     expect(tsConfig.contract?.output).toBe('./prisma/contract.json');
-    expect(tsConfig.contract?.watchInputs).toEqual(['./prisma/contract.ts']);
+    expect(tsConfig.contract?.source.authoritativeInputs).toEqual({
+      kind: 'paths',
+      paths: ['./prisma/contract.ts'],
+    });
     expect(tsConfig.contract?.source).not.toBe(pslConfig.contract?.source);
   });
 

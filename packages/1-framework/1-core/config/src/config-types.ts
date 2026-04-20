@@ -6,7 +6,6 @@ import type {
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
 } from '@prisma-next/framework-components/control';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import type { ContractSourceProvider } from './contract-source-types';
 
@@ -15,8 +14,6 @@ import type { ContractSourceProvider } from './contract-source-types';
  * Uses string for both family and target IDs for maximum flexibility.
  */
 export type CliDriver = ControlDriverInstance<string, string>;
-
-export type ContractWatchStrategy = 'moduleGraph';
 
 /**
  * Contract configuration specifying source and artifact locations.
@@ -32,17 +29,6 @@ export interface ContractConfig {
    * The .d.ts types file will be colocated (e.g., contract.json -> contract.d.ts).
    */
   readonly output?: string;
-  /**
-   * Optional authoritative source files for development watch integrations.
-   * Use this when contract inputs are not visible through the config module graph
-   * (for example PSL schema paths passed as strings).
-   */
-  readonly watchInputs?: readonly string[];
-  /**
-   * Declares that the config module graph remains authoritative for contract
-   * invalidation. Use this for TS-first contract modules imported by the config.
-   */
-  readonly watchStrategy?: ContractWatchStrategy;
 }
 
 /**
@@ -103,13 +89,28 @@ export interface PrismaNextConfig<
 /**
  * Arktype schema for ContractConfig validation.
  * Validates presence/shape only.
- * contract.source is validated as a provider function at runtime in defineConfig().
  */
-const ContractConfigSchema = type({
-  source: 'unknown', // Runtime check enforces provider function shape
+export const ContractAuthoritativeInputsSchema = type.or(
+  {
+    kind: "'moduleGraph'",
+  },
+  {
+    kind: "'configPathOnly'",
+  },
+  {
+    kind: "'paths'",
+    paths: 'string[]',
+  },
+);
+
+export const ContractSourceProviderSchema = type({
+  authoritativeInputs: ContractAuthoritativeInputsSchema,
+  load: 'Function',
+});
+
+export const ContractConfigSchema = type({
+  source: ContractSourceProviderSchema,
   'output?': 'string',
-  'watchInputs?': 'string[]',
-  'watchStrategy?': "'moduleGraph'",
 });
 
 /**
@@ -154,20 +155,12 @@ export function defineConfig<TFamilyId extends string = string, TTargetId extend
 
   // Normalize contract config if present
   if (config.contract) {
-    // Validate contract.source provider function shape at runtime.
-    const source = config.contract.source;
-    if (typeof source !== 'function') {
-      throw new Error('Config.contract.source must be a provider function');
-    }
-
     // Apply defaults
     const output = config.contract.output ?? 'src/prisma/contract.json';
 
     const normalizedContract: ContractConfig = {
       source: config.contract.source,
       output,
-      ...ifDefined('watchInputs', config.contract.watchInputs),
-      ...ifDefined('watchStrategy', config.contract.watchStrategy),
     };
 
     // Return normalized config

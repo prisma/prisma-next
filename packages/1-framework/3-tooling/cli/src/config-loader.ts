@@ -48,13 +48,20 @@ function buildContractWatchMetadata(
   const outputDtsPath = outputJsonPath?.endsWith('.json')
     ? `${outputJsonPath.slice(0, -5)}.d.ts`
     : undefined;
-  const resolvedInputs = uniqueStrings(
-    (contract.watchInputs ?? []).map((input) => resolve(configDir, input)),
-  ).filter((input) => input !== outputJsonPath && input !== outputDtsPath);
+  const authoritativeInputs = contract.source.authoritativeInputs;
 
-  if (contract.watchInputs !== undefined || contract.watchStrategy === 'moduleGraph') {
+  if (authoritativeInputs.kind === 'moduleGraph') {
     return {
-      inputs: resolvedInputs,
+      inputs: [],
+      warnings: [],
+    };
+  }
+
+  if (authoritativeInputs.kind === 'paths') {
+    return {
+      inputs: uniqueStrings(
+        authoritativeInputs.paths.map((input) => resolve(configDir, input)),
+      ).filter((input) => input !== outputJsonPath && input !== outputDtsPath),
       warnings: [],
     };
   }
@@ -65,7 +72,7 @@ function buildContractWatchMetadata(
       {
         code: 'CONTRACT_WATCH_INPUTS_PARTIAL',
         message:
-          'Contract source provider did not declare watch inputs. Falling back to the config file only; dev watch coverage is partial until contract.watchInputs or contract.watchStrategy is set.',
+          'Contract source provider declared configPathOnly. Watching only the config file; dev watch coverage is partial until authoritative paths or moduleGraph are declared.',
       },
     ],
   };

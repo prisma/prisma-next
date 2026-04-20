@@ -29,6 +29,10 @@ describe('config loader', () => {
       getTypeMapsExpression: () => 'never',
       getContractWrapper: () => '',
     };
+    const createSource = (authoritativeInputs, load) => ({
+      authoritativeInputs,
+      load,
+    });
     export default {
       family: {
         kind: 'family',
@@ -73,9 +77,11 @@ describe('config loader', () => {
         configPath,
         createValidConfig(`
       contract: {
-        source: async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        source: createSource(
+          { kind: 'paths', paths: ['./prisma/schema.prisma', './generated/contract.json', './generated/contract.d.ts'] },
+          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        ),
         output: 'generated/contract.json',
-        watchInputs: ['./prisma/schema.prisma', './generated/contract.json', './generated/contract.d.ts'],
       }`),
         'utf-8',
       );
@@ -99,8 +105,10 @@ describe('config loader', () => {
         configPath,
         createValidConfig(`
       contract: {
-        source: async () => ({ ok: true, value: { targetFamily: 'sql' } }),
-        watchStrategy: 'moduleGraph',
+        source: createSource(
+          { kind: 'moduleGraph' },
+          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        ),
       }`),
         'utf-8',
       );
@@ -123,8 +131,10 @@ describe('config loader', () => {
         configPath,
         createValidConfig(`
       contract: {
-        source: async () => ({ ok: true, value: { targetFamily: 'sql' } }),
-        watchInputs: ['./prisma/schema.prisma', './src/prisma/contract.json', './src/prisma/contract.d.ts'],
+        source: createSource(
+          { kind: 'paths', paths: ['./prisma/schema.prisma', './src/prisma/contract.json', './src/prisma/contract.d.ts'] },
+          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        ),
       }`),
         'utf-8',
       );
@@ -141,14 +151,17 @@ describe('config loader', () => {
   );
 
   it(
-    'falls back to config path and returns partial coverage warning when watch metadata is omitted',
+    'returns config path warning when provider declares configPathOnly',
     async () => {
       const configPath = join(testDir, 'prisma-next.config.ts');
       writeFileSync(
         configPath,
         createValidConfig(`
       contract: {
-        source: async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        source: createSource(
+          { kind: 'configPathOnly' },
+          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        ),
       }`),
         'utf-8',
       );
@@ -159,7 +172,7 @@ describe('config loader', () => {
       expect(result.metadata.contractWatch?.warnings).toEqual([
         expect.objectContaining({
           code: 'CONTRACT_WATCH_INPUTS_PARTIAL',
-          message: expect.stringContaining('contract.watchInputs'),
+          message: expect.stringContaining('configPathOnly'),
         }),
       ]);
     },

@@ -16,6 +16,16 @@ function mockConfigWithContract(contractOverrides: Record<string, unknown>) {
   } as unknown as Awaited<ReturnType<typeof configLoader.loadConfig>>;
 }
 
+function createSourceProvider(load: () => Promise<unknown>): {
+  authoritativeInputs: { kind: 'configPathOnly' };
+  load: () => Promise<unknown>;
+} {
+  return {
+    authoritativeInputs: { kind: 'configPathOnly' },
+    load,
+  };
+}
+
 describe('executeContractEmit', () => {
   async function withMockedConfig(
     config: Awaited<ReturnType<typeof configLoader.loadConfig>>,
@@ -45,9 +55,9 @@ describe('executeContractEmit', () => {
   it('preserves AbortError from contract source provider', async () => {
     await withMockedConfig(
       mockConfigWithContract({
-        source: async () => {
+        source: createSourceProvider(async () => {
           throw new DOMException('Aborted by test', 'AbortError');
-        },
+        }),
         output: './src/prisma/contract.json',
       }),
       async () => {
@@ -74,7 +84,7 @@ describe('executeContractEmit', () => {
             error instanceof Error &&
             'why' in error &&
             typeof error.why === 'string' &&
-            error.why.includes('valid source provider function'),
+            error.why.includes('valid source provider object'),
         );
       },
     );
@@ -83,14 +93,14 @@ describe('executeContractEmit', () => {
   it('throws runtime error when contract source provider returns failure result', async () => {
     await withMockedConfig(
       mockConfigWithContract({
-        source: async () => ({
+        source: createSourceProvider(async () => ({
           ok: false,
           failure: {
             summary: 'Provider parse failed',
             diagnostics: [{ code: 'PSL_PARSE_ERROR', message: 'Unexpected token' }],
             meta: { sourceId: 'schema.prisma' },
           },
-        }),
+        })),
         output: './src/prisma/contract.json',
       }),
       async () => {
@@ -112,10 +122,12 @@ describe('executeContractEmit', () => {
   it('throws runtime error when contract source provider returns malformed failure result', async () => {
     await withMockedConfig(
       mockConfigWithContract({
-        source: async () =>
-          ({
-            ok: false,
-          }) as unknown,
+        source: createSourceProvider(
+          async () =>
+            ({
+              ok: false,
+            }) as unknown,
+        ),
         output: './src/prisma/contract.json',
       }),
       async () => {
@@ -137,10 +149,12 @@ describe('executeContractEmit', () => {
   it('throws runtime error when contract source provider returns malformed success result', async () => {
     await withMockedConfig(
       mockConfigWithContract({
-        source: async () =>
-          ({
-            ok: true,
-          }) as unknown,
+        source: createSourceProvider(
+          async () =>
+            ({
+              ok: true,
+            }) as unknown,
+        ),
         output: './src/prisma/contract.json',
       }),
       async () => {

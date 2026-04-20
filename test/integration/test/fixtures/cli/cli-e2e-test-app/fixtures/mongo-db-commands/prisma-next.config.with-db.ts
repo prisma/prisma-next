@@ -10,7 +10,10 @@ export default defineConfig({
   driver: mongoDriver,
   extensionPacks: [],
   contract: {
-    source: async () => ({ ok: true, value: {} }),
+    source: {
+      authoritativeInputs: { kind: 'moduleGraph' },
+      load: async () => ({ ok: true, value: {} }),
+    },
     output: 'output/contract.json',
   },
   db: {

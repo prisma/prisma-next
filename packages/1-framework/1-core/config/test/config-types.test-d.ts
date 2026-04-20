@@ -1,4 +1,5 @@
 import type {
+  ContractSourceProvider,
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
   ControlDriverInstance,
@@ -98,21 +99,29 @@ test('accepts compatible control descriptors', () => {
   expectTypeOf(result).toExtend<PrismaNextConfig<'sql', 'postgres'>>();
 });
 
-test('accepts contract watch metadata', () => {
+test('accepts contract source providers with authoritative inputs', () => {
   const config: PrismaNextConfig<'sql', 'postgres'> = {
     family: sqlFamilyDescriptor,
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
     contract: {
-      source: async () => ok({} as never),
-      watchInputs: ['./schema.prisma'],
-      watchStrategy: 'moduleGraph',
+      source: {
+        authoritativeInputs: {
+          kind: 'paths',
+          paths: ['./schema.prisma'],
+        },
+        load: async () => ok({} as never),
+      },
     },
   };
 
   const result = defineConfig(config);
-  expectTypeOf(result.contract?.watchInputs).toEqualTypeOf<readonly string[] | undefined>();
-  expectTypeOf(result.contract?.watchStrategy).toEqualTypeOf<'moduleGraph' | undefined>();
+  expectTypeOf(result.contract?.source.authoritativeInputs.kind).toEqualTypeOf<
+    'configPathOnly' | 'moduleGraph' | 'paths'
+  >();
+  expectTypeOf(result.contract?.source.load).toEqualTypeOf<
+    ContractSourceProvider['load'] | undefined
+  >();
 });
 
 test('rejects mismatched target in target descriptor', () => {
