@@ -1,5 +1,6 @@
-import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
 import type { JsonValue } from '@prisma-next/contract/types';
+import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -87,7 +88,9 @@ async function planAndApply(
   const serialized = JSON.parse(serializeMongoOps(ops));
   const controlDriver = await mongoControlDriver.create(replSetUri);
   try {
-    const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
+    const runner = new MongoMigrationRunner(
+      createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+    );
     const runResult = await runner.execute({
       plan: {
         targetId: 'mongo',
