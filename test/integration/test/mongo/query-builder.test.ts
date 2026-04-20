@@ -477,8 +477,7 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
 
       const plan = products()
         .match((f) => f.category.eq('electronics'))
-        .out('electronics')
-        .build();
+        .out('electronics');
 
       await exec(plan);
 
@@ -502,8 +501,7 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
           _id: f.category,
           total: acc.sum(f.price),
         }))
-        .merge({ into: 'summary', whenNotMatched: 'insert' })
-        .build();
+        .merge({ into: 'summary', whenNotMatched: 'insert' });
 
       await exec(plan);
 
