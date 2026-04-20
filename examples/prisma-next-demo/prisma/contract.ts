@@ -1,75 +1,69 @@
-import {
-  enumType,
-  jsonbColumn,
-  textColumn,
-  timestamptzColumn,
-} from '@prisma-next/adapter-postgres/column-types';
-import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import { uuidv4 } from '@prisma-next/ids';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-const types = {
-  Embedding1536: vector(1536),
-  user_type: enumType('user_type', ['admin', 'user']),
-} as const;
-
-const User = model('User', {
-  fields: {
-    id: field.generated(uuidv4()).id(),
-    email: field.column(textColumn),
-    createdAt: field.column(timestamptzColumn).defaultSql('now()'),
-    kind: field.namedType(types.user_type),
-    address: field.column(jsonbColumn).optional(),
-  },
-});
-
-const Post = model('Post', {
-  fields: {
-    id: field.generated(uuidv4()).id(),
-    title: field.column(textColumn),
-    userId: field.column(textColumn),
-    createdAt: field.column(timestamptzColumn).defaultSql('now()'),
-    embedding: field.namedType(types.Embedding1536).optional(),
-  },
-});
-
-const UserModel = User.relations({
-  posts: rel.hasMany(Post, { by: 'userId' }),
-}).sql({
-  table: 'user',
-});
-
-const PostModel = Post.relations({
-  user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
-}).sql(({ cols, constraints }) => ({
-  table: 'post',
-  foreignKeys: [
-    constraints.foreignKey(cols.userId, User.refs.id, {
-      name: 'post_userId_fkey',
-    }),
-  ],
-}));
-
-export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
-  extensionPacks: { pgvector },
-  capabilities: {
-    postgres: {
-      lateral: true,
-      jsonAgg: true,
-      returning: true,
-      'pgvector.cosine': true,
-      'defaults.now': true,
-      'defaults.uuidv4': true,
+export const contract = defineContract(
+  {
+    family: sqlFamily,
+    target: postgresPack,
+    extensionPacks: { pgvector },
+    capabilities: {
+      postgres: {
+        lateral: true,
+        jsonAgg: true,
+        returning: true,
+        'pgvector.cosine': true,
+        'defaults.now': true,
+        'defaults.uuidv4': true,
+      },
     },
   },
-  types,
-  models: {
-    User: UserModel,
-    Post: PostModel,
+  ({ field, model, type }) => {
+    const types = {
+      Embedding1536: type.pgvector.Vector(1536),
+      user_type: type.enum('user_type', ['admin', 'user'] as const),
+    } as const;
+
+    const User = model('User', {
+      fields: {
+        id: field.id.uuidv4(),
+        email: field.text(),
+        createdAt: field.createdAt(),
+        kind: field.namedType(types.user_type),
+        address: field.json().optional(),
+      },
+    });
+
+    const Post = model('Post', {
+      fields: {
+        id: field.id.uuidv4(),
+        title: field.text(),
+        userId: field.uuid(),
+        createdAt: field.createdAt(),
+        embedding: field.namedType(types.Embedding1536).optional(),
+      },
+    });
+
+    return {
+      types,
+      models: {
+        User: User.relations({
+          posts: rel.hasMany(Post, { by: 'userId' }),
+        }).sql({
+          table: 'user',
+        }),
+        Post: Post.relations({
+          user: rel.belongsTo(User, { from: 'userId', to: 'id' }),
+        }).sql(({ cols, constraints }) => ({
+          table: 'post',
+          foreignKeys: [
+            constraints.foreignKey(cols.userId, User.refs.id, {
+              name: 'post_userId_fkey',
+            }),
+          ],
+        })),
+      },
+    };
   },
-});
+);

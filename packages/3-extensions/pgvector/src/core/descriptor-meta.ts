@@ -1,4 +1,5 @@
 import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
+import type { CodecTypes } from '../types/codec-types';
 import { pgvectorAuthoringTypes } from './authoring';
 import { codecDefinitions } from './codecs';
 
@@ -33,7 +34,7 @@ export const pgvectorQueryOperations: readonly SqlOperationDescriptor[] = [
   },
 ];
 
-export const pgvectorPackMeta = {
+const pgvectorPackMetaBase = {
   kind: 'extension',
   id: 'pgvector',
   familyId: 'sql',
@@ -82,3 +83,7 @@ export const pgvectorPackMeta = {
     ],
   },
 } as const;
+
+export const pgvectorPackMeta: typeof pgvectorPackMetaBase & {
+  readonly __codecTypes?: CodecTypes;
+} = pgvectorPackMetaBase;

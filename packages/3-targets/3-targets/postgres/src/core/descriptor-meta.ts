@@ -1,6 +1,7 @@
-import { postgresAuthoringTypes } from './authoring';
+import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import { postgresAuthoringFieldPresets, postgresAuthoringTypes } from './authoring';
 
-export const postgresTargetDescriptorMeta = {
+const postgresTargetDescriptorMetaBase = {
   kind: 'target',
   familyId: 'sql',
   targetId: 'postgres',
@@ -9,5 +10,10 @@ export const postgresTargetDescriptorMeta = {
   capabilities: {},
   authoring: {
     type: postgresAuthoringTypes,
+    field: postgresAuthoringFieldPresets,
   },
 } as const;
+
+export const postgresTargetDescriptorMeta: typeof postgresTargetDescriptorMetaBase & {
+  readonly __codecTypes?: CodecTypes;
+} = postgresTargetDescriptorMetaBase;

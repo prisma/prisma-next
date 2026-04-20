@@ -1665,6 +1665,9 @@ importers:
       '@prisma-next/contract-authoring':
         specifier: workspace:*
         version: link:../../../1-framework/2-authoring/contract
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../../test/utils
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../0-config/tsconfig
