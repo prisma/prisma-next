@@ -1,4 +1,3 @@
-import { dirname, resolve } from 'node:path';
 import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { ConfigValidationError, validateConfig } from '@prisma-next/config/config-validation';
 import {
@@ -7,6 +6,7 @@ import {
   errorUnexpected,
 } from '@prisma-next/errors/control';
 import { loadConfig as loadConfigC12 } from 'c12';
+import { dirname, resolve } from 'pathe';
 
 async function loadValidatedConfig(configPath?: string): Promise<PrismaNextConfig> {
   const cwd = process.cwd();

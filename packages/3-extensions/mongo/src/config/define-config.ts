@@ -26,10 +26,6 @@ export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mon
   const output = deriveOutputPath(options.contract);
   const ext = extname(options.contract);
 
-  const absoluteContractPath = isAbsolute(options.contract)
-    ? options.contract
-    : resolve(process.cwd(), options.contract);
-
   const contractConfig =
     ext === '.ts'
       ? {
@@ -39,10 +35,13 @@ export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mon
               paths: [options.contract],
             },
             load: async (context: ContractSourceContext) => {
+              const absolutePath = isAbsolute(options.contract)
+                ? options.contract
+                : resolve(context.configDir, options.contract);
               const { typescriptContract } = await import(
                 '@prisma-next/mongo-contract-ts/config-types'
               );
-              const mod = await import(pathToFileURL(absoluteContractPath).href);
+              const mod = await import(pathToFileURL(absolutePath).href);
               const contract = mod.default ?? mod.contract;
               return typescriptContract(contract, output).source.load(context);
             },
