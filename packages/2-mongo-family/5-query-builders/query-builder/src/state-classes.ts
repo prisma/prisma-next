@@ -149,7 +149,9 @@ export class CollectionHandle<
    * Returns a `MongoQueryPlan<InsertOneResult>` whose row stream yields a
    * single result document with the server-assigned `insertedId`.
    */
-  insertOne(document: Record<string, MongoValue>): MongoQueryPlan<InsertOneResult> {
+  insertOne(
+    document: Record<string, MongoValue>,
+  ): MongoQueryPlan<InsertOneResult, InsertOneCommand> {
     const command = new InsertOneCommand(this.#ctx.collection, document);
     return {
       collection: this.#ctx.collection,
@@ -164,7 +166,7 @@ export class CollectionHandle<
    */
   insertMany(
     documents: ReadonlyArray<Record<string, MongoValue>>,
-  ): MongoQueryPlan<InsertManyResult> {
+  ): MongoQueryPlan<InsertManyResult, InsertManyCommand> {
     if (documents.length === 0) {
       throw new Error('insertMany() requires at least one document.');
     }
@@ -187,7 +189,7 @@ export class CollectionHandle<
    */
   updateAll(
     updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
-  ): MongoQueryPlan<UpdateResult> {
+  ): MongoQueryPlan<UpdateResult, UpdateManyCommand> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateManyCommand(this.#ctx.collection, matchAllFilter(), update);
     return {
@@ -202,7 +204,7 @@ export class CollectionHandle<
    * rationale around the unqualified-write surface being limited to this
    * state class.
    */
-  deleteAll(): MongoQueryPlan<DeleteResult> {
+  deleteAll(): MongoQueryPlan<DeleteResult, DeleteManyCommand> {
     const command = new DeleteManyCommand(this.#ctx.collection, matchAllFilter());
     return {
       collection: this.#ctx.collection,
@@ -226,7 +228,7 @@ export class CollectionHandle<
   upsertOne(
     filterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => MongoFilterExpr,
     updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
-  ): MongoQueryPlan<UpdateResult> {
+  ): MongoQueryPlan<UpdateResult, UpdateOneCommand> {
     const accessor = createFieldAccessor<ModelToDocShape<TContract, ModelName>>();
     const filter = filterFn(accessor);
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
@@ -356,7 +358,7 @@ export class FilteredCollection<
    */
   override updateMany(
     updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
-  ): MongoQueryPlan<UpdateResult> {
+  ): MongoQueryPlan<UpdateResult, UpdateManyCommand> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateManyCommand(this.#ctx.collection, this.#foldedFilter(), update);
     return {
@@ -374,7 +376,7 @@ export class FilteredCollection<
    */
   override updateOne(
     updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
-  ): MongoQueryPlan<UpdateResult> {
+  ): MongoQueryPlan<UpdateResult, UpdateOneCommand> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateOneCommand(this.#ctx.collection, this.#foldedFilter(), update);
     return {
@@ -387,7 +389,7 @@ export class FilteredCollection<
   /**
    * Delete every matching document.
    */
-  deleteMany(): MongoQueryPlan<DeleteResult> {
+  deleteMany(): MongoQueryPlan<DeleteResult, DeleteManyCommand> {
     const command = new DeleteManyCommand(this.#ctx.collection, this.#foldedFilter());
     return {
       collection: this.#ctx.collection,
@@ -400,7 +402,7 @@ export class FilteredCollection<
    * Delete at most one matching document. See the `updateOne` note about
    * driver-chosen victim selection.
    */
-  deleteOne(): MongoQueryPlan<DeleteResult> {
+  deleteOne(): MongoQueryPlan<DeleteResult, DeleteOneCommand> {
     const command = new DeleteOneCommand(this.#ctx.collection, this.#foldedFilter());
     return {
       collection: this.#ctx.collection,
@@ -419,7 +421,7 @@ export class FilteredCollection<
    */
   upsertOne(
     updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
-  ): MongoQueryPlan<UpdateResult> {
+  ): MongoQueryPlan<UpdateResult, UpdateOneCommand> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateOneCommand(this.#ctx.collection, this.#foldedFilter(), update, true);
     return {
@@ -441,10 +443,10 @@ export class FilteredCollection<
   override findOneAndUpdate(
     updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
-  ): MongoQueryPlan<ResolveRow<
-    ModelToDocShape<TContract, ModelName>,
-    ExtractMongoCodecTypes<TContract>
-  > | null> {
+  ): MongoQueryPlan<
+    ResolveRow<ModelToDocShape<TContract, ModelName>, ExtractMongoCodecTypes<TContract>> | null,
+    FindOneAndUpdateCommand
+  > {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new FindOneAndUpdateCommand(
       this.#ctx.collection,
@@ -466,10 +468,10 @@ export class FilteredCollection<
    * Find a single matching document and delete it. Returns the deleted
    * document via the row stream.
    */
-  override findOneAndDelete(): MongoQueryPlan<ResolveRow<
-    ModelToDocShape<TContract, ModelName>,
-    ExtractMongoCodecTypes<TContract>
-  > | null> {
+  override findOneAndDelete(): MongoQueryPlan<
+    ResolveRow<ModelToDocShape<TContract, ModelName>, ExtractMongoCodecTypes<TContract>> | null,
+    FindOneAndDeleteCommand
+  > {
     const command = new FindOneAndDeleteCommand(this.#ctx.collection, this.#foldedFilter());
     return {
       collection: this.#ctx.collection,

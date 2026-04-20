@@ -24,7 +24,7 @@ export interface QueryRoot<
   from<K extends keyof TContract['roots'] & string>(
     rootName: K,
   ): CollectionHandle<TContract, TContract['roots'][K] & string & keyof TContract['models']>;
-  rawCommand(command: AnyMongoCommand): MongoQueryPlan<unknown>;
+  rawCommand<C extends AnyMongoCommand>(command: C): MongoQueryPlan<unknown, C>;
 }
 
 export function mongoQuery<
@@ -35,7 +35,7 @@ export function mongoQuery<
     from<K extends keyof TContract['roots'] & string>(rootName: K) {
       return createCollectionHandle(contract, rootName);
     },
-    rawCommand(command: AnyMongoCommand): MongoQueryPlan<unknown> {
+    rawCommand<C extends AnyMongoCommand>(command: C): MongoQueryPlan<unknown, C> {
       const c = contract as unknown as MongoContract;
       const storageHash = c.storage?.storageHash;
       if (!storageHash) {

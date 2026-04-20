@@ -390,7 +390,7 @@ export class PipelineChain<
    * The result row stream is empty (`unknown` row type) — the data lives
    * in the destination collection, not the response.
    */
-  out(collection: string, db?: string): MongoQueryPlan<unknown> {
+  out(collection: string, db?: string): MongoQueryPlan<unknown, AggregateCommand> {
     return this.#writeTerminal(new MongoOutStage(collection, db));
   }
 
@@ -405,11 +405,11 @@ export class PipelineChain<
     on?: string | ReadonlyArray<string>;
     whenMatched?: string | ReadonlyArray<MongoUpdatePipelineStage>;
     whenNotMatched?: string;
-  }): MongoQueryPlan<unknown> {
+  }): MongoQueryPlan<unknown, AggregateCommand> {
     return this.#writeTerminal(new MongoMergeStage(options));
   }
 
-  #writeTerminal(stage: MongoPipelineStage): MongoQueryPlan<unknown> {
+  #writeTerminal(stage: MongoPipelineStage): MongoQueryPlan<unknown, AggregateCommand> {
     const pipeline = [...this.#state.stages, stage];
     const command = new AggregateCommand(this.#state.collection, pipeline);
     const meta: PlanMeta = {
@@ -586,7 +586,7 @@ export class PipelineChain<
   updateMany(
     this: PipelineChain<TContract, Shape, 'update-ok', F>,
     updaterFn?: (fields: FieldAccessor<Shape>) => UpdaterResult,
-  ): MongoQueryPlan<UpdateResult> {
+  ): MongoQueryPlan<UpdateResult, UpdateManyCommand> {
     if (updaterFn) {
       throw new Error(
         'updateMany() on a PipelineChain expects no arguments — the chain itself is the update pipeline. ' +
@@ -605,7 +605,7 @@ export class PipelineChain<
   updateOne(
     this: PipelineChain<TContract, Shape, 'update-ok', F>,
     updaterFn?: (fields: FieldAccessor<Shape>) => UpdaterResult,
-  ): MongoQueryPlan<UpdateResult> {
+  ): MongoQueryPlan<UpdateResult, UpdateOneCommand> {
     if (updaterFn) {
       throw new Error(
         'updateOne() on a PipelineChain expects no arguments — the chain itself is the update pipeline. ' +
@@ -635,7 +635,10 @@ export class PipelineChain<
     this: PipelineChain<TContract, Shape, U, 'fam-ok'>,
     updaterFn: (fields: FieldAccessor<Shape>) => UpdaterResult,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
-  ): MongoQueryPlan<ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null> {
+  ): MongoQueryPlan<
+    ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null,
+    FindOneAndUpdateCommand
+  > {
     const { filter, sort, skip } = deconstructFindAndModifyChain(this.#state.stages);
     const accessor = createFieldAccessor<Shape>();
     const items = updaterFn(accessor);
@@ -664,7 +667,10 @@ export class PipelineChain<
    */
   findOneAndDelete(
     this: PipelineChain<TContract, Shape, U, 'fam-ok'>,
-  ): MongoQueryPlan<ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null> {
+  ): MongoQueryPlan<
+    ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null,
+    FindOneAndDeleteCommand
+  > {
     const { filter, sort, skip } = deconstructFindAndModifyChain(this.#state.stages);
     const command = new FindOneAndDeleteCommand(this.#state.collection, filter, sort, skip);
     const meta: PlanMeta = {
@@ -681,7 +687,7 @@ export class PipelineChain<
   /**
    * Materialise the chain as a `MongoQueryPlan` wrapping an `AggregateCommand`.
    */
-  build(): MongoQueryPlan<ResolveRow<Shape, ExtractMongoCodecTypes<TContract>>> {
+  build(): MongoQueryPlan<ResolveRow<Shape, ExtractMongoCodecTypes<TContract>>, AggregateCommand> {
     const command = new AggregateCommand(this.#state.collection, this.#state.stages);
     const meta: PlanMeta = {
       target: 'mongo',
@@ -695,7 +701,10 @@ export class PipelineChain<
   /**
    * Alias for `build()` — surfaces the read intent at the call site.
    */
-  aggregate(): MongoQueryPlan<ResolveRow<Shape, ExtractMongoCodecTypes<TContract>>> {
+  aggregate(): MongoQueryPlan<
+    ResolveRow<Shape, ExtractMongoCodecTypes<TContract>>,
+    AggregateCommand
+  > {
     return this.build();
   }
 }
