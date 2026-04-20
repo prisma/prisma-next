@@ -18,7 +18,7 @@ describe('F3 pipeline-style updates', () => {
       const plan = orders()
         .match((f) => f.status.eq('new'))
         .updateMany((f) => [f.stage.set({ total: f.amount.node })]);
-      const cmd = plan.command as UpdateManyCommand;
+      const cmd = plan.command;
       expect(cmd.update).toHaveLength(1);
       expect((cmd.update as ReadonlyArray<unknown>)[0]).toBeInstanceOf(MongoAddFieldsStage);
     });
@@ -27,7 +27,7 @@ describe('F3 pipeline-style updates', () => {
       const plan = orders()
         .match((f) => f.status.eq('new'))
         .updateMany((f) => [f.stage.unset('amount', 'status')]);
-      const cmd = plan.command as UpdateManyCommand;
+      const cmd = plan.command;
       expect(cmd.update).toHaveLength(1);
       const stage = (cmd.update as ReadonlyArray<unknown>)[0] as MongoProjectStage;
       expect(stage).toBeInstanceOf(MongoProjectStage);
@@ -38,7 +38,7 @@ describe('F3 pipeline-style updates', () => {
       const plan = orders()
         .match((f) => f.status.eq('new'))
         .updateMany((f) => [f.stage.replaceRoot(f.amount.node)]);
-      const cmd = plan.command as UpdateManyCommand;
+      const cmd = plan.command;
       expect((cmd.update as ReadonlyArray<unknown>)[0]).toBeInstanceOf(MongoReplaceRootStage);
     });
 
@@ -46,7 +46,7 @@ describe('F3 pipeline-style updates', () => {
       const plan = orders()
         .match((f) => f.status.eq('new'))
         .updateMany((f) => [f.stage.replaceWith(f.amount.node)]);
-      const cmd = plan.command as UpdateManyCommand;
+      const cmd = plan.command;
       expect((cmd.update as ReadonlyArray<unknown>)[0]).toBeInstanceOf(MongoReplaceRootStage);
     });
   });
@@ -69,7 +69,7 @@ describe('F3 pipeline-style updates', () => {
         .addFields((f) => ({ total: f.amount }))
         .updateMany();
       expect(plan.command).toBeInstanceOf(UpdateManyCommand);
-      const cmd = plan.command as UpdateManyCommand;
+      const cmd = plan.command;
       expect(cmd.update).toHaveLength(1);
       expect((cmd.update as ReadonlyArray<unknown>)[0]).toBeInstanceOf(MongoAddFieldsStage);
       expect(plan.meta.lane).toBe('mongo-query');
@@ -81,7 +81,7 @@ describe('F3 pipeline-style updates', () => {
         .match((f) => f.amount.gt(10))
         .addFields((f) => ({ total: f.amount }))
         .updateMany();
-      const cmd = plan.command as UpdateManyCommand;
+      const cmd = plan.command;
       expect(cmd.filter.kind).toBe('and');
     });
 

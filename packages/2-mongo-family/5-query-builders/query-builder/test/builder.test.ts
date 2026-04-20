@@ -34,7 +34,7 @@ describe('PipelineChain', () => {
       const plan = createOrdersBuilder().build();
       expect(plan.collection).toBe('orders');
       expect(plan.command).toBeInstanceOf(AggregateCommand);
-      expect((plan.command as AggregateCommand).collection).toBe('orders');
+      expect(plan.command.collection).toBe('orders');
     });
 
     it('produces PlanMeta with lane: mongo-query', () => {
@@ -49,7 +49,7 @@ describe('PipelineChain', () => {
     it('match(filter) appends MongoMatchStage', () => {
       const filter = MongoFieldFilter.eq('status', 'active');
       const plan = createOrdersBuilder().match(filter).build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoMatchStage);
     });
@@ -58,14 +58,14 @@ describe('PipelineChain', () => {
       const plan = createOrdersBuilder()
         .match((f) => f.status.eq('active'))
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoMatchStage);
     });
 
     it('sort() appends MongoSortStage', () => {
       const plan = createOrdersBuilder().sort({ amount: -1 }).build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoSortStage);
       expect((pipeline[0] as MongoSortStage).sort).toEqual({ amount: -1 });
@@ -73,7 +73,7 @@ describe('PipelineChain', () => {
 
     it('limit() appends MongoLimitStage', () => {
       const plan = createOrdersBuilder().limit(10).build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoLimitStage);
       expect((pipeline[0] as MongoLimitStage).limit).toBe(10);
@@ -81,7 +81,7 @@ describe('PipelineChain', () => {
 
     it('skip() appends MongoSkipStage', () => {
       const plan = createOrdersBuilder().skip(5).build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoSkipStage);
       expect((pipeline[0] as MongoSkipStage).skip).toBe(5);
@@ -89,7 +89,7 @@ describe('PipelineChain', () => {
 
     it('sample() appends MongoSampleStage', () => {
       const plan = createOrdersBuilder().sample(3).build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoSampleStage);
       expect((pipeline[0] as MongoSampleStage).size).toBe(3);
@@ -103,7 +103,7 @@ describe('PipelineChain', () => {
           fullName: fn.concat(f.status, fn.literal(' ')),
         }))
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoAddFieldsStage);
       const stage = pipeline[0] as MongoAddFieldsStage;
@@ -115,7 +115,7 @@ describe('PipelineChain', () => {
   describe('project()', () => {
     it('inclusion form produces MongoProjectStage', () => {
       const plan = createOrdersBuilder().project('status', 'amount').build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoProjectStage);
       const stage = pipeline[0] as MongoProjectStage;
@@ -129,7 +129,7 @@ describe('PipelineChain', () => {
           upper: fn.toUpper(f.status),
         }))
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       const stage = pipeline[0] as MongoProjectStage;
       expect(stage.projection['status']).toBe(1);
@@ -146,7 +146,7 @@ describe('PipelineChain', () => {
           orderCount: acc.count(),
         }))
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoGroupStage);
       const stage = pipeline[0] as MongoGroupStage;
@@ -182,7 +182,7 @@ describe('PipelineChain', () => {
           total: acc.sum(f.amount),
         }))
         .build();
-      const stage = (plan.command as AggregateCommand).pipeline[0] as MongoGroupStage;
+      const stage = plan.command.pipeline[0] as MongoGroupStage;
       expect(stage.groupId).toBeNull();
     });
   });
@@ -190,7 +190,7 @@ describe('PipelineChain', () => {
   describe('unwind()', () => {
     it('produces MongoUnwindStage', () => {
       const plan = createOrdersBuilder().unwind('status').build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoUnwindStage);
       expect((pipeline[0] as MongoUnwindStage).path).toBe('$status');
@@ -200,7 +200,7 @@ describe('PipelineChain', () => {
       const plan = createOrdersBuilder()
         .unwind('status', { preserveNullAndEmptyArrays: true })
         .build();
-      const stage = (plan.command as AggregateCommand).pipeline[0] as MongoUnwindStage;
+      const stage = plan.command.pipeline[0] as MongoUnwindStage;
       expect(stage.preserveNullAndEmptyArrays).toBe(true);
     });
   });
@@ -208,7 +208,7 @@ describe('PipelineChain', () => {
   describe('count()', () => {
     it('produces MongoCountStage', () => {
       const plan = createOrdersBuilder().count('total').build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoCountStage);
       expect((pipeline[0] as MongoCountStage).field).toBe('total');
@@ -220,7 +220,7 @@ describe('PipelineChain', () => {
       const plan = createOrdersBuilder()
         .sortByCount((f) => f.status)
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoSortByCountStage);
     });
@@ -244,7 +244,7 @@ describe('PipelineChain', () => {
       const plan = createOrdersBuilder()
         .replaceRoot((f) => f.status)
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoReplaceRootStage);
     });
@@ -254,7 +254,7 @@ describe('PipelineChain', () => {
     it('appends raw stage preserving shape', () => {
       const rawStage = new MongoLimitStage(5);
       const plan = createOrdersBuilder().pipe(rawStage).build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoLimitStage);
     });
@@ -267,7 +267,7 @@ describe('PipelineChain', () => {
         .sort({ amount: -1 })
         .limit(10)
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(3);
       expect(pipeline[0]).toBeInstanceOf(MongoMatchStage);
       expect(pipeline[1]).toBeInstanceOf(MongoSortStage);

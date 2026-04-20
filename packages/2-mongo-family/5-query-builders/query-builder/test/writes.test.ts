@@ -20,8 +20,8 @@ describe('M2 write terminals', () => {
     it('insertOne emits an InsertOneCommand carrying the document', () => {
       const plan = orders().insertOne({ status: 'new', amount: 10 });
       expect(plan.command).toBeInstanceOf(InsertOneCommand);
-      expect((plan.command as InsertOneCommand).collection).toBe('orders');
-      expect((plan.command as InsertOneCommand).document).toEqual({ status: 'new', amount: 10 });
+      expect(plan.command.collection).toBe('orders');
+      expect(plan.command.document).toEqual({ status: 'new', amount: 10 });
       expect(plan.meta.lane).toBe('mongo-query');
     });
 
@@ -32,7 +32,7 @@ describe('M2 write terminals', () => {
       ];
       const plan = orders().insertMany(docs);
       expect(plan.command).toBeInstanceOf(InsertManyCommand);
-      expect((plan.command as InsertManyCommand).documents).toEqual(docs);
+      expect(plan.command.documents).toEqual(docs);
     });
 
     it('insertMany rejects an empty batch (no-op writes are nearly always a bug)', () => {
@@ -44,22 +44,16 @@ describe('M2 write terminals', () => {
     it('updateAll emits UpdateManyCommand with a tautological match-all filter', () => {
       const plan = orders().updateAll((f) => [f.status.set('reviewed')]);
       expect(plan.command).toBeInstanceOf(UpdateManyCommand);
-      const cmd = plan.command as UpdateManyCommand;
-      // The match-all sentinel resolution is a private implementation detail;
-      // we assert structurally rather than by reference identity so the
-      // eventual switch to a dedicated `MongoMatchAllExpr` (Open Item #2)
-      // doesn't churn this test.
-      expect(cmd.filter).toBeInstanceOf(MongoExistsExpr);
-      expect((cmd.filter as MongoExistsExpr).field).toBe('_id');
-      expect((cmd.filter as MongoExistsExpr).exists).toBe(true);
-      expect(cmd.update).toEqual({ $set: { status: 'reviewed' } });
+      expect(plan.command.filter).toBeInstanceOf(MongoExistsExpr);
+      expect((plan.command.filter as MongoExistsExpr).field).toBe('_id');
+      expect((plan.command.filter as MongoExistsExpr).exists).toBe(true);
+      expect(plan.command.update).toEqual({ $set: { status: 'reviewed' } });
     });
 
     it('deleteAll emits DeleteManyCommand with a tautological match-all filter', () => {
       const plan = orders().deleteAll();
       expect(plan.command).toBeInstanceOf(DeleteManyCommand);
-      const cmd = plan.command as DeleteManyCommand;
-      expect(cmd.filter).toBeInstanceOf(MongoExistsExpr);
+      expect(plan.command.filter).toBeInstanceOf(MongoExistsExpr);
     });
 
     it('updateAll rejects an empty operator list (caller almost certainly forgot something)', () => {
@@ -74,11 +68,8 @@ describe('M2 write terminals', () => {
         .match((f) => f.amount.gt(5))
         .updateMany((f) => [f.status.set('processed'), f.amount.inc(1)]);
       expect(plan.command).toBeInstanceOf(UpdateManyCommand);
-      const cmd = plan.command as UpdateManyCommand;
-      // Two .match() calls AND-fold; one .match() short-circuits to the bare
-      // filter — both paths land here, so we assert the AND-fold shape.
-      expect(cmd.filter.kind).toBe('and');
-      expect(cmd.update).toEqual({
+      expect(plan.command.filter.kind).toBe('and');
+      expect(plan.command.update).toEqual({
         $set: { status: 'processed' },
         $inc: { amount: 1 },
       });
@@ -89,10 +80,8 @@ describe('M2 write terminals', () => {
         .match(MongoFieldFilter.eq('status', 'new'))
         .updateOne((f) => [f.amount.inc(-1)]);
       expect(plan.command).toBeInstanceOf(UpdateOneCommand);
-      const cmd = plan.command as UpdateOneCommand;
-      // Single .match() doesn't get wrapped in $and.
-      expect(cmd.filter).toBeInstanceOf(MongoFieldFilter);
-      expect(cmd.update).toEqual({ $inc: { amount: -1 } });
+      expect(plan.command.filter).toBeInstanceOf(MongoFieldFilter);
+      expect(plan.command.update).toEqual({ $inc: { amount: -1 } });
     });
 
     it('deleteMany / deleteOne emit the corresponding wire commands with the folded filter', () => {
@@ -100,7 +89,7 @@ describe('M2 write terminals', () => {
         .match((f) => f.status.eq('archived'))
         .deleteMany();
       expect(many.command).toBeInstanceOf(DeleteManyCommand);
-      expect((many.command as DeleteManyCommand).filter).toBeInstanceOf(MongoFieldFilter);
+      expect(many.command.filter).toBeInstanceOf(MongoFieldFilter);
 
       const one = orders()
         .match((f) => f.status.eq('archived'))

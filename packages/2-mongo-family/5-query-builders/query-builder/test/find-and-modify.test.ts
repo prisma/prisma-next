@@ -17,11 +17,9 @@ describe('M3 find-and-modify and upsert terminals', () => {
         .match((f) => f.status.eq('new'))
         .findOneAndUpdate((f) => [f.status.set('processed'), f.amount.inc(1)]);
       expect(plan.command).toBeInstanceOf(FindOneAndUpdateCommand);
-      const cmd = plan.command as FindOneAndUpdateCommand;
-      expect(cmd.collection).toBe('orders');
-      expect(cmd.update).toEqual({ $set: { status: 'processed' }, $inc: { amount: 1 } });
-      // Default upsert is false — explicit guard so the default change is loud.
-      expect(cmd.upsert).toBe(false);
+      expect(plan.command.collection).toBe('orders');
+      expect(plan.command.update).toEqual({ $set: { status: 'processed' }, $inc: { amount: 1 } });
+      expect(plan.command.upsert).toBe(false);
       expect(plan.meta.lane).toBe('mongo-query');
     });
 
@@ -29,21 +27,21 @@ describe('M3 find-and-modify and upsert terminals', () => {
       const plan = orders()
         .match((f) => f.status.eq('new'))
         .findOneAndUpdate((f) => [f.status.set('seen')], { upsert: true });
-      expect((plan.command as FindOneAndUpdateCommand).upsert).toBe(true);
+      expect(plan.command.upsert).toBe(true);
     });
 
     it('defaults returnDocument to after', () => {
       const plan = orders()
         .match((f) => f.status.eq('new'))
         .findOneAndUpdate((f) => [f.status.set('seen')]);
-      expect((plan.command as FindOneAndUpdateCommand).returnDocument).toBe('after');
+      expect(plan.command.returnDocument).toBe('after');
     });
 
     it('threads opts.returnDocument through to the wire command', () => {
       const plan = orders()
         .match((f) => f.status.eq('new'))
         .findOneAndUpdate((f) => [f.status.set('seen')], { returnDocument: 'before' });
-      expect((plan.command as FindOneAndUpdateCommand).returnDocument).toBe('before');
+      expect(plan.command.returnDocument).toBe('before');
     });
 
     it('rejects an empty updater (caller almost certainly forgot something)', () => {
@@ -61,7 +59,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
         .match((f) => f.status.eq('archived'))
         .findOneAndDelete();
       expect(plan.command).toBeInstanceOf(FindOneAndDeleteCommand);
-      expect((plan.command as FindOneAndDeleteCommand).collection).toBe('orders');
+      expect(plan.command.collection).toBe('orders');
     });
   });
 
@@ -73,10 +71,9 @@ describe('M3 find-and-modify and upsert terminals', () => {
         .skip(5)
         .findOneAndUpdate((f) => [f.status.set('processed')]);
       expect(plan.command).toBeInstanceOf(FindOneAndUpdateCommand);
-      const cmd = plan.command as FindOneAndUpdateCommand;
-      expect(cmd.sort).toEqual({ amount: -1 });
-      expect(cmd.skip).toBe(5);
-      expect(cmd.update).toEqual({ $set: { status: 'processed' } });
+      expect(plan.command.sort).toEqual({ amount: -1 });
+      expect(plan.command.skip).toBe(5);
+      expect(plan.command.update).toEqual({ $set: { status: 'processed' } });
     });
 
     it('AND-folds multiple match stages', () => {
@@ -84,8 +81,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
         .match((f) => f.status.eq('new'))
         .match((f) => f.amount.gt(10))
         .findOneAndUpdate((f) => [f.status.set('big')]);
-      const cmd = plan.command as FindOneAndUpdateCommand;
-      expect(cmd.filter.kind).toBe('and');
+      expect(plan.command.filter.kind).toBe('and');
     });
 
     it('last-writer-wins per sort key across multiple sort stages', () => {
@@ -94,8 +90,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
         .sort({ amount: 1 })
         .sort({ amount: -1 })
         .findOneAndUpdate((f) => [f.status.set('seen')]);
-      const cmd = plan.command as FindOneAndUpdateCommand;
-      expect(cmd.sort).toEqual({ amount: -1 });
+      expect(plan.command.sort).toEqual({ amount: -1 });
     });
 
     it('throws on chains with non-deconstructable stages', () => {
@@ -115,8 +110,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
         .sort({ amount: 1 })
         .findOneAndDelete();
       expect(plan.command).toBeInstanceOf(FindOneAndDeleteCommand);
-      const cmd = plan.command as FindOneAndDeleteCommand;
-      expect(cmd.sort).toEqual({ amount: 1 });
+      expect(plan.command.sort).toEqual({ amount: 1 });
     });
   });
 
@@ -127,9 +121,8 @@ describe('M3 find-and-modify and upsert terminals', () => {
         (f) => [f.amount.set(0)],
       );
       expect(plan.command).toBeInstanceOf(UpdateOneCommand);
-      const cmd = plan.command as UpdateOneCommand;
-      expect(cmd.upsert).toBe(true);
-      expect(cmd.update).toEqual({ $set: { amount: 0 } });
+      expect(plan.command.upsert).toBe(true);
+      expect(plan.command.update).toEqual({ $set: { amount: 0 } });
     });
 
     it('FilteredCollection.upsertOne reuses the accumulated filter', () => {
@@ -137,7 +130,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
         .match((f) => f.status.eq('pending'))
         .upsertOne((f) => [f.amount.set(0)]);
       expect(plan.command).toBeInstanceOf(UpdateOneCommand);
-      expect((plan.command as UpdateOneCommand).upsert).toBe(true);
+      expect(plan.command.upsert).toBe(true);
     });
   });
 });

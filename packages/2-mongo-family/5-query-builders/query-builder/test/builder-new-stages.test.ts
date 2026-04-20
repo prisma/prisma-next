@@ -1,5 +1,4 @@
 import {
-  type AggregateCommand,
   MongoAggAccumulator,
   MongoAggFieldRef,
   MongoBucketAutoStage,
@@ -38,7 +37,7 @@ describe('new stage builder methods', () => {
       const plan = createOrdersBuilder()
         .redact((f) => f.status)
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoRedactStage);
     });
@@ -47,7 +46,7 @@ describe('new stage builder methods', () => {
   describe('out()', () => {
     it('terminates the chain into a write plan with $out as the final stage', () => {
       const plan = createOrdersBuilder().out('results');
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoOutStage);
       expect((pipeline[0] as MongoOutStage).collection).toBe('results');
@@ -56,7 +55,7 @@ describe('new stage builder methods', () => {
 
     it('threads the optional db parameter through to the stage', () => {
       const plan = createOrdersBuilder().out('results', 'archive');
-      const stage = (plan.command as AggregateCommand).pipeline[0] as MongoOutStage;
+      const stage = plan.command.pipeline[0] as MongoOutStage;
       expect(stage.db).toBe('archive');
     });
   });
@@ -64,7 +63,7 @@ describe('new stage builder methods', () => {
   describe('merge()', () => {
     it('terminates the chain into a write plan with $merge as the final stage', () => {
       const plan = createOrdersBuilder().merge({ into: 'output', whenMatched: 'replace' });
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoMergeStage);
       expect((pipeline[0] as MongoMergeStage).into).toBe('output');
@@ -75,7 +74,7 @@ describe('new stage builder methods', () => {
   describe('unionWith()', () => {
     it('adds MongoUnionWithStage', () => {
       const plan = createOrdersBuilder().unionWith('archived_orders').build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoUnionWithStage);
       expect((pipeline[0] as MongoUnionWithStage).collection).toBe('archived_orders');
@@ -85,7 +84,7 @@ describe('new stage builder methods', () => {
       const plan = createOrdersBuilder()
         .unionWith('archived_orders', [new MongoMatchStage(MongoFieldFilter.eq('active', true))])
         .build();
-      const stage = (plan.command as AggregateCommand).pipeline[0] as MongoUnionWithStage;
+      const stage = plan.command.pipeline[0] as MongoUnionWithStage;
       expect(stage.pipeline).toHaveLength(1);
     });
   });
@@ -98,7 +97,7 @@ describe('new stage builder methods', () => {
           boundaries: [0, 100, 500],
         })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoBucketStage);
     });
@@ -112,7 +111,7 @@ describe('new stage builder methods', () => {
           buckets: 5,
         })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoBucketAutoStage);
     });
@@ -126,7 +125,7 @@ describe('new stage builder methods', () => {
           distanceField: 'dist',
         })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoGeoNearStage);
     });
@@ -140,7 +139,7 @@ describe('new stage builder methods', () => {
           topItems: [new MongoSortStage({ amount: -1 }), new MongoLimitStage(5)],
         })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoFacetStage);
       const facet = pipeline[0] as MongoFacetStage;
@@ -159,7 +158,7 @@ describe('new stage builder methods', () => {
           as: 'ancestors',
         })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoGraphLookupStage);
     });
@@ -178,7 +177,7 @@ describe('new stage builder methods', () => {
           },
         })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoSetWindowFieldsStage);
     });
@@ -189,7 +188,7 @@ describe('new stage builder methods', () => {
       const plan = createOrdersBuilder()
         .densify({ field: 'date', range: { step: 1, unit: 'day', bounds: 'full' } })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoDensifyStage);
     });
@@ -200,7 +199,7 @@ describe('new stage builder methods', () => {
       const plan = createOrdersBuilder()
         .fill({ sortBy: { date: 1 }, output: { amount: { method: 'linear' } } })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoFillStage);
     });
@@ -211,7 +210,7 @@ describe('new stage builder methods', () => {
       const plan = createOrdersBuilder()
         .search({ text: { query: 'widget', path: 'description' } })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoSearchStage);
     });
@@ -222,7 +221,7 @@ describe('new stage builder methods', () => {
       const plan = createOrdersBuilder()
         .searchMeta({ facet: { operator: {} } })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoSearchMetaStage);
     });
@@ -239,7 +238,7 @@ describe('new stage builder methods', () => {
           limit: 10,
         })
         .build();
-      const pipeline = (plan.command as AggregateCommand).pipeline;
+      const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoVectorSearchStage);
     });
