@@ -1,0 +1,8 @@
+{
+  "migrationId": null,
+  "from": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
+  "to": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
+  "kind": "regular",
+  "labels": ["add-posts-author-index"],
+  "createdAt": "2026-04-15T17:17:30.570Z"
+}

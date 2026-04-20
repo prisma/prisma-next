@@ -1,12 +1,13 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { printPsl } from '@prisma-next/psl-printer';
+import { errorRuntime } from '@prisma-next/errors/execution';
+import { printPsl, validatePrintableSqlSchemaIR } from '@prisma-next/psl-printer';
 import {
   createPostgresDefaultMapping,
   createPostgresTypeMap,
   extractEnumInfo,
   parseRawDefault,
 } from '@prisma-next/psl-printer/postgres';
-import { ok, type Result } from '@prisma-next/utils/result';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { dirname, relative } from 'pathe';
 import type { CliStructuredError } from '../utils/cli-errors';
@@ -58,7 +59,18 @@ async function executeContractInferCommand(
     return inspectResult;
   }
 
-  const { config, schema, target, meta } = inspectResult.value;
+  const { config, target, meta } = inspectResult.value;
+
+  if (target.familyId !== 'sql') {
+    return notOk(
+      errorRuntime(`contract infer is not supported for family "${target.familyId}"`, {
+        why: 'contract infer currently supports SQL targets only',
+        fix: 'Use an SQL target (e.g. Postgres) with this command',
+      }),
+    );
+  }
+
+  const schema = validatePrintableSqlSchemaIR(inspectResult.value.schema);
   const outputPath = resolveContractInferOutputPath(options, config.contract?.output);
   const enumInfo = extractEnumInfo(schema.annotations);
   const pslContent = printPsl(schema, {

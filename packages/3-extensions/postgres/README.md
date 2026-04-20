@@ -1,14 +1,41 @@
 # @prisma-next/postgres
 
-Composition-root Postgres helper that builds a Prisma Next runtime client and exposes SQL, ORM, schema, and Kysely-integrated query access.
+One-package Postgres setup for Prisma Next. Install this single package to get config, runtime, and all transitive type dependencies.
 
 ## Package Classification
 
 - **Domain**: extensions
 - **Layer**: adapters
-- **Plane**: runtime
+- **Planes**: shared (config), runtime (runtime)
 
-## Overview
+## Quick Start
+
+```typescript
+// prisma-next.config.ts
+import { defineConfig } from '@prisma-next/postgres/config';
+
+export default defineConfig({
+  contract: './prisma/contract.prisma',
+  db: { connection: process.env['DATABASE_URL']! },
+});
+```
+
+```typescript
+// db.ts
+import postgres from '@prisma-next/postgres/runtime';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
+
+export const db = postgres<Contract>({ contractJson });
+```
+
+## Exports
+
+### `@prisma-next/postgres/config`
+
+Simplified `defineConfig` that pre-wires all Postgres internals (family, target, adapter, driver, contract providers). Pass a contract path and optional db/migrations/extensions config.
+
+### `@prisma-next/postgres/runtime`
 
 `@prisma-next/postgres/runtime` exposes a single `postgres(...)` helper that composes the Postgres execution stack and returns query/runtime roots:
 
@@ -77,5 +104,5 @@ flowchart TD
 ## Related Docs
 
 - Architecture: `docs/Architecture Overview.md`
-- Subsystem: `docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md`
+- Subsystem: `docs/architecture docs/subsystems/4. Runtime & Middleware Framework.md`
 - Subsystem: `docs/architecture docs/subsystems/5. Adapters & Targets.md`

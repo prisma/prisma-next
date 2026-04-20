@@ -24,4 +24,12 @@ export interface MongoMigrationPlanOperation extends MigrationPlanOperation {
   readonly postcheck: readonly MongoMigrationCheck[];
 }
 
+/**
+ * Union of all Mongo migration operation kinds. The class-flow scaffolding
+ * (e.g. `PlannerProducedMongoMigration`) parameterises `Migration` over this
+ * union so that future operation kinds can extend it without changes to the
+ * spine.
+ */
+export type AnyMongoMigrationOperation = MongoMigrationPlanOperation;
+
 export type { MigrationOperationClass, MigrationPlanOperation };

@@ -1,5 +1,9 @@
 # @prisma-next/emitter
 
+> **Internal package.** This package is an implementation detail of [`prisma-next`](https://www.npmjs.com/package/prisma-next)
+> and is published only to support its runtime. Its API is unstable and may change
+> without notice. Do not depend on this package directly; install `prisma-next` instead.
+
 Contract emission engine that transforms authored data models into canonical JSON contracts and TypeScript type definitions.
 
 ## Overview

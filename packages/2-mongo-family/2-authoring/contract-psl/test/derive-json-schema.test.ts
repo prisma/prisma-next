@@ -1,0 +1,329 @@
+import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { describe, expect, it } from 'vitest';
+import { deriveJsonSchema, derivePolymorphicJsonSchema } from '../src/derive-json-schema';
+
+const mongoCodecLookup: CodecLookup = {
+  get(id: string) {
+    const codecs: Record<string, { id: string; targetTypes: readonly string[] }> = {
+      'mongo/string@1': { id: 'mongo/string@1', targetTypes: ['string'] },
+      'mongo/int32@1': { id: 'mongo/int32@1', targetTypes: ['int'] },
+      'mongo/bool@1': { id: 'mongo/bool@1', targetTypes: ['bool'] },
+      'mongo/date@1': { id: 'mongo/date@1', targetTypes: ['date'] },
+      'mongo/objectId@1': { id: 'mongo/objectId@1', targetTypes: ['objectId'] },
+      'mongo/double@1': { id: 'mongo/double@1', targetTypes: ['double'] },
+    };
+    const entry = codecs[id];
+    if (!entry) return undefined;
+    return {
+      ...entry,
+      decode: (w: unknown) => w,
+      encodeJson: (v: unknown) => v,
+      decodeJson: (j: unknown) => j,
+    } as ReturnType<CodecLookup['get']>;
+  },
+};
+
+function scalarField(codecId: string, nullable = false): ContractField {
+  return { type: { kind: 'scalar', codecId }, nullable };
+}
+
+function arrayField(codecId: string, nullable = false): ContractField {
+  return { type: { kind: 'scalar', codecId }, nullable, many: true };
+}
+
+function voField(name: string, nullable = false): ContractField {
+  return { type: { kind: 'valueObject', name }, nullable };
+}
+
+function voArrayField(name: string, nullable = false): ContractField {
+  return { type: { kind: 'valueObject', name }, nullable, many: true };
+}
+
+describe('deriveJsonSchema', () => {
+  it('maps String, Int, Boolean, DateTime, ObjectId to correct BSON types', () => {
+    const result = deriveJsonSchema(
+      {
+        name: scalarField('mongo/string@1'),
+        age: scalarField('mongo/int32@1'),
+        active: scalarField('mongo/bool@1'),
+        created: scalarField('mongo/date@1'),
+        _id: scalarField('mongo/objectId@1'),
+      },
+      undefined,
+      mongoCodecLookup,
+    );
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      required: ['_id', 'active', 'age', 'created', 'name'],
+      properties: {
+        name: { bsonType: 'string' },
+        age: { bsonType: 'int' },
+        active: { bsonType: 'bool' },
+        created: { bsonType: 'date' },
+        _id: { bsonType: 'objectId' },
+      },
+    });
+    expect(result.validationLevel).toBe('strict');
+    expect(result.validationAction).toBe('error');
+  });
+
+  it('handles nullable field with bsonType array including null', () => {
+    const result = deriveJsonSchema(
+      { email: scalarField('mongo/string@1', true) },
+      undefined,
+      mongoCodecLookup,
+    );
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      properties: {
+        email: { bsonType: ['null', 'string'] },
+      },
+    });
+  });
+
+  it('handles array field (many: true)', () => {
+    const result = deriveJsonSchema(
+      { tags: arrayField('mongo/string@1') },
+      undefined,
+      mongoCodecLookup,
+    );
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      required: ['tags'],
+      properties: {
+        tags: { bsonType: 'array', items: { bsonType: 'string' } },
+      },
+    });
+  });
+
+  it('handles nullable array field', () => {
+    const result = deriveJsonSchema(
+      { tags: arrayField('mongo/string@1', true) },
+      undefined,
+      mongoCodecLookup,
+    );
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      properties: {
+        tags: { bsonType: 'array', items: { bsonType: 'string' } },
+      },
+    });
+  });
+
+  it('handles value object field as nested object', () => {
+    const valueObjects: Record<string, ContractValueObject> = {
+      Address: {
+        fields: {
+          street: scalarField('mongo/string@1'),
+          city: scalarField('mongo/string@1'),
+          zip: scalarField('mongo/string@1', true),
+        },
+      },
+    };
+
+    const result = deriveJsonSchema(
+      { address: voField('Address') },
+      valueObjects,
+      mongoCodecLookup,
+    );
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      required: ['address'],
+      properties: {
+        address: {
+          bsonType: 'object',
+          required: ['city', 'street'],
+          properties: {
+            street: { bsonType: 'string' },
+            city: { bsonType: 'string' },
+            zip: { bsonType: ['null', 'string'] },
+          },
+        },
+      },
+    });
+  });
+
+  it('handles value object array field', () => {
+    const valueObjects: Record<string, ContractValueObject> = {
+      Tag: {
+        fields: {
+          label: scalarField('mongo/string@1'),
+        },
+      },
+    };
+
+    const result = deriveJsonSchema({ tags: voArrayField('Tag') }, valueObjects, mongoCodecLookup);
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      required: ['tags'],
+      properties: {
+        tags: {
+          bsonType: 'array',
+          items: {
+            bsonType: 'object',
+            required: ['label'],
+            properties: {
+              label: { bsonType: 'string' },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('derives minimal schema from empty model', () => {
+    const result = deriveJsonSchema({}, undefined, mongoCodecLookup);
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      properties: {},
+    });
+  });
+
+  it('handles mixed nullable and non-nullable fields', () => {
+    const result = deriveJsonSchema(
+      {
+        name: scalarField('mongo/string@1'),
+        bio: scalarField('mongo/string@1', true),
+        age: scalarField('mongo/int32@1'),
+      },
+      undefined,
+      mongoCodecLookup,
+    );
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      required: ['age', 'name'],
+      properties: {
+        name: { bsonType: 'string' },
+        bio: { bsonType: ['null', 'string'] },
+        age: { bsonType: 'int' },
+      },
+    });
+  });
+
+  it('skips fields with unknown codec IDs', () => {
+    const result = deriveJsonSchema(
+      {
+        name: scalarField('mongo/string@1'),
+        custom: scalarField('custom/unknown@1'),
+      },
+      undefined,
+      mongoCodecLookup,
+    );
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      required: ['name'],
+      properties: {
+        name: { bsonType: 'string' },
+      },
+    });
+  });
+
+  it('handles nested value objects (recursive)', () => {
+    const valueObjects: Record<string, ContractValueObject> = {
+      Geo: {
+        fields: {
+          lat: scalarField('mongo/int32@1'),
+          lng: scalarField('mongo/int32@1'),
+        },
+      },
+      Address: {
+        fields: {
+          city: scalarField('mongo/string@1'),
+          geo: voField('Geo'),
+        },
+      },
+    };
+
+    const result = deriveJsonSchema(
+      { address: voField('Address') },
+      valueObjects,
+      mongoCodecLookup,
+    );
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      required: ['address'],
+      properties: {
+        address: {
+          bsonType: 'object',
+          required: ['city', 'geo'],
+          properties: {
+            city: { bsonType: 'string' },
+            geo: {
+              bsonType: 'object',
+              required: ['lat', 'lng'],
+              properties: {
+                lat: { bsonType: 'int' },
+                lng: { bsonType: 'int' },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('maps Float (mongo/double@1) to bsonType "double"', () => {
+    const result = deriveJsonSchema(
+      { price: scalarField('mongo/double@1') },
+      undefined,
+      mongoCodecLookup,
+    );
+
+    expect(result.jsonSchema).toEqual({
+      bsonType: 'object',
+      required: ['price'],
+      properties: {
+        price: { bsonType: 'double' },
+      },
+    });
+  });
+});
+
+describe('derivePolymorphicJsonSchema', () => {
+  it('includes discriminatorField in required for each oneOf branch', () => {
+    const result = derivePolymorphicJsonSchema(
+      { _id: scalarField('mongo/objectId@1'), name: scalarField('mongo/string@1') },
+      '_type',
+      [
+        { discriminatorValue: 'Dog', fields: { breed: scalarField('mongo/string@1') } },
+        { discriminatorValue: 'Cat', fields: { indoor: scalarField('mongo/bool@1') } },
+      ],
+      undefined,
+      mongoCodecLookup,
+    );
+
+    const oneOf = result.jsonSchema['oneOf'] as Record<string, unknown>[];
+    expect(oneOf).toHaveLength(2);
+    for (const branch of oneOf) {
+      expect(branch['required']).toContain('_type');
+    }
+  });
+
+  it('emits oneOf branch even for single variant with no extra fields', () => {
+    const result = derivePolymorphicJsonSchema(
+      { _id: scalarField('mongo/objectId@1'), name: scalarField('mongo/string@1') },
+      '_type',
+      [{ discriminatorValue: 'OnlyVariant', fields: {} }],
+      undefined,
+      mongoCodecLookup,
+    );
+
+    const oneOf = result.jsonSchema['oneOf'] as Record<string, unknown>[];
+    expect(oneOf).toHaveLength(1);
+    expect(oneOf[0]).toMatchObject({
+      properties: { _type: { enum: ['OnlyVariant'] } },
+      required: ['_type'],
+    });
+  });
+});

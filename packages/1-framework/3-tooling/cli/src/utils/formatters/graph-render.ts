@@ -155,6 +155,7 @@ const DIR = {
   down: 2,
   left: 4,
   right: 8,
+  dashed: 16,
 } as const;
 
 /** Arrow characters for edge termination (one cell before the target node). */
@@ -178,6 +179,13 @@ const BOX_CHAR: Record<number, string> = {
   [DIR.left | DIR.right | DIR.down]: '┬',
   [DIR.left | DIR.right | DIR.up]: '┴',
   [DIR.up | DIR.down | DIR.left | DIR.right]: '┼',
+  // Dashed variants — straight segments only, corners fall back to solid
+  [DIR.up | DIR.dashed]: '┊',
+  [DIR.down | DIR.dashed]: '┊',
+  [DIR.up | DIR.down | DIR.dashed]: '┊',
+  [DIR.left | DIR.dashed]: '┈',
+  [DIR.right | DIR.dashed]: '┈',
+  [DIR.left | DIR.right | DIR.dashed]: '┈',
 };
 
 // ---------------------------------------------------------------------------
@@ -303,26 +311,41 @@ class CharGrid {
   }
 
   /** Stamp a horizontal edge segment from x1 to x2 at row y. */
-  markHorizontal(y: number, x1: number, x2: number, color?: ColorFn, priority?: number): void {
+  markHorizontal(
+    y: number,
+    x1: number,
+    x2: number,
+    color?: ColorFn,
+    priority?: number,
+    extraBits = 0,
+  ): void {
     const lo = Math.min(x1, x2);
     const hi = Math.max(x1, x2);
     /* v8 ignore next -- @preserve */
     if (lo === hi) return;
-    this.addConnection(lo, y, DIR.right, color, priority);
+    this.addConnection(lo, y, DIR.right | extraBits, color, priority);
     for (let x = lo + 1; x < hi; x++)
-      this.addConnection(x, y, DIR.left | DIR.right, color, priority);
-    this.addConnection(hi, y, DIR.left, color, priority);
+      this.addConnection(x, y, DIR.left | DIR.right | extraBits, color, priority);
+    this.addConnection(hi, y, DIR.left | extraBits, color, priority);
   }
 
   /** Stamp a vertical edge segment from y1 to y2 at column x. */
-  markVertical(x: number, y1: number, y2: number, color?: ColorFn, priority?: number): void {
+  markVertical(
+    x: number,
+    y1: number,
+    y2: number,
+    color?: ColorFn,
+    priority?: number,
+    extraBits = 0,
+  ): void {
     const lo = Math.min(y1, y2);
     const hi = Math.max(y1, y2);
     /* v8 ignore next -- @preserve */
     if (lo === hi) return;
-    this.addConnection(x, lo, DIR.down, color, priority);
-    for (let y = lo + 1; y < hi; y++) this.addConnection(x, y, DIR.up | DIR.down, color, priority);
-    this.addConnection(x, hi, DIR.up, color, priority);
+    this.addConnection(x, lo, DIR.down | extraBits, color, priority);
+    for (let y = lo + 1; y < hi; y++)
+      this.addConnection(x, y, DIR.up | DIR.down | extraBits, color, priority);
+    this.addConnection(x, hi, DIR.up | extraBits, color, priority);
   }
 
   /** Place literal text at (x, y). Each character occupies one cell. Text stamps override connections. */
@@ -394,7 +417,8 @@ class CharGrid {
           color = label.color;
         } else {
           const conn = this.connections.get(k) ?? 0;
-          ch = BOX_CHAR[conn] ?? ' ';
+          // Dashed corners don't exist — strip the bit and fall back to solid
+          ch = BOX_CHAR[conn] ?? BOX_CHAR[conn & ~DIR.dashed] ?? ' ';
           color = conn === 0 ? undefined : this.cellColors.get(k)?.color;
         }
 
@@ -840,8 +864,17 @@ function selectBestVariant(
  */
 export function extractSubgraph(graph: RenderGraph, path: readonly string[]): RenderGraph {
   const pathIndex = new Map(path.map((id, i) => [id, i]));
-  const filteredNodes = graph.nodes.filter((n) => pathIndex.has(n.id) || n.style === 'detached');
+  const nodeSet = new Set(path);
+  // Always keep dashed edges and their endpoints
+  for (const e of graph.edges) {
+    if (e.style === 'dashed') {
+      nodeSet.add(e.from);
+      nodeSet.add(e.to);
+    }
+  }
+  const filteredNodes = graph.nodes.filter((n) => nodeSet.has(n.id));
   const filteredEdges = graph.edges.filter((e) => {
+    if (e.style === 'dashed') return true;
     const fromIdx = pathIndex.get(e.from);
     const toIdx = pathIndex.get(e.to);
     return fromIdx !== undefined && toIdx !== undefined && fromIdx < toIdx;
@@ -877,8 +910,17 @@ export function extractRelevantSubgraph(
     }
   }
 
-  const filteredNodes = graph.nodes.filter((n) => nodeSet.has(n.id) || n.style === 'detached');
-  const filteredEdges = graph.edges.filter((e) => edgePairs.has(`${e.from}\0${e.to}`));
+  // Always keep dashed (draft) edges and their endpoints
+  const dashedEdges = graph.edges.filter((e) => e.style === 'dashed');
+  for (const e of dashedEdges) {
+    nodeSet.add(e.from);
+    nodeSet.add(e.to);
+  }
+
+  const filteredNodes = graph.nodes.filter((n) => nodeSet.has(n.id));
+  const filteredEdges = graph.edges.filter(
+    (e) => edgePairs.has(`${e.from}\0${e.to}`) || e.style === 'dashed',
+  );
   return new RenderGraph(filteredNodes, filteredEdges);
 }
 
@@ -950,11 +992,6 @@ export function truncateGraph(
     }
   }
 
-  // Also include detached nodes (they're appended at the bottom, not in the graph)
-  for (const n of graph.nodes) {
-    if (n.style === 'detached') reachable.add(n.id);
-  }
-
   const truncatedNodes = graph.nodes.filter((n) => reachable.has(n.id));
   const truncatedEdges = graph.edges.filter((e) => reachable.has(e.from) && reachable.has(e.to));
   const elidedCount = spine.length - 1 - effectiveEdges;
@@ -995,7 +1032,7 @@ function layoutAndRender(graph: RenderGraph, options: GraphRenderOptions, elided
   const colorize = options.colorize ?? true;
   const colors = buildColors(colorize);
 
-  const layoutNodes = graph.nodes.filter((n) => n.style !== 'detached');
+  const layoutNodes = graph.nodes;
   const layoutNodeIds = new Set(layoutNodes.map((n) => n.id));
   const requestedRoot = options.rootId ?? layoutNodes[0]?.id ?? '∅';
   const rootId = layoutNodeIds.has(requestedRoot)
@@ -1018,13 +1055,6 @@ function layoutAndRender(graph: RenderGraph, options: GraphRenderOptions, elided
   const edgeNames: string[] = [];
   for (let i = 0; i < graph.edges.length; i++) {
     const edge = graph.edges[i]!;
-    const fromDetached = graph.nodeById.get(edge.from)?.style === 'detached';
-    const toDetached = graph.nodeById.get(edge.to)?.style === 'detached';
-    /* v8 ignore next 3 -- @preserve */
-    if (fromDetached || toDetached) {
-      edgeNames.push('');
-      continue;
-    }
     const name = `e${i}`;
     edgeNames.push(name);
     g.setEdge(edge.from, edge.to, { label: edge.label ?? '' }, name);
@@ -1095,11 +1125,15 @@ function layoutAndRender(graph: RenderGraph, options: GraphRenderOptions, elided
 
     const { poly } = selectBestVariant(src, dagrePoints, tgt, edge.label, grid);
 
+    const dashedBit = edge.style === 'dashed' ? DIR.dashed : 0;
     for (let j = 0; j < poly.length - 1; j++) {
       const a = poly[j]!;
       const b = poly[j + 1]!;
-      if (a.y === b.y) grid.markHorizontal(a.y, a.x, b.x, edgeColor, priority);
-      else if (a.x === b.x) grid.markVertical(a.x, a.y, b.y, edgeColor, priority);
+      if (a.y === b.y) {
+        grid.markHorizontal(a.y, a.x, b.x, edgeColor, priority, dashedBit);
+      } else if (a.x === b.x) {
+        grid.markVertical(a.x, a.y, b.y, edgeColor, priority, dashedBit);
+      }
     }
 
     drawnEdges.push({ edge, poly, role: entry.role, srcY: src.y });
@@ -1212,42 +1246,6 @@ function layoutAndRender(graph: RenderGraph, options: GraphRenderOptions, elided
     }
   }
 
-  // --- Detached nodes ---
-  const detachedNodes = graph.nodes.filter((n) => n.style === 'detached');
-  if (detachedNodes.length > 0) {
-    // Align detached nodes with the bottom-most node in the graph so the
-    // dashed connector visually continues from the last rendered node.
-    let bottomNodeX = nodePos.values().next().value?.x ?? 0;
-    let bottomNodeY = -1;
-    for (const [, pos] of nodePos) {
-      if (pos.y > bottomNodeY) {
-        bottomNodeY = pos.y;
-        bottomNodeX = pos.x;
-      }
-    }
-    const spineX = bottomNodeX;
-    let bottomY = grid.getMaxY() + 1;
-
-    for (const node of detachedNodes) {
-      grid.stampText(spineX, bottomY, '┊', colors.branch);
-      bottomY++;
-      grid.stampText(spineX, bottomY, '◇', colors.branch);
-      grid.stampText(spineX + 2, bottomY, node.id, dim);
-
-      const tags = buildInlineTags(node.markers ?? [], colors);
-      if (tags.length > 0) {
-        let bx = spineX + 2 + node.id.length;
-        for (const tag of tags) {
-          grid.stampText(bx, bottomY, ' ');
-          bx++;
-          grid.stampText(bx, bottomY, tag.text, tag.color);
-          bx += tag.text.length;
-        }
-      }
-      bottomY++;
-    }
-  }
-
   return grid.render();
 }
 
@@ -1315,11 +1313,11 @@ export const graphRenderer: GraphRenderer = {
   render,
 };
 
-/** True if the graph is a single linear chain (no branching), ignoring detached nodes. */
+/** True if the graph is a single linear chain (no branching), ignoring dashed edges. */
 export function isLinearGraph(graph: RenderGraph): boolean {
   for (const node of graph.nodes) {
-    if (node.style === 'detached') continue;
-    if (graph.outgoing(node.id).length > 1) return false;
+    const solidOutgoing = graph.outgoing(node.id).filter((e) => e.style !== 'dashed');
+    if (solidOutgoing.length > 1) return false;
   }
   return true;
 }

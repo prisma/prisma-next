@@ -215,89 +215,159 @@ export function generateHashTypeAliases(hashes: {
   ].join('\n');
 }
 
-export function generateFieldResolvedType(field: ContractField, codecLookup?: CodecLookup): string {
-  let baseType: string;
+export type ResolvedFieldType = { readonly input: string; readonly output: string };
+
+function applyModifiers(base: string, field: ContractField): string {
+  let result = base;
+  if (field.many === true) result = `ReadonlyArray<${result}>`;
+  if (field.dict === true) result = `Readonly<Record<string, ${result}>>`;
+  if (field.nullable) result = `${result} | null`;
+  return result;
+}
+
+export function resolveFieldType(
+  field: ContractField,
+  codecLookup?: CodecLookup,
+): ResolvedFieldType {
   const { type } = field;
 
   switch (type.kind) {
     case 'scalar': {
-      let resolved: string | undefined;
+      let outputResolved: string | undefined;
       if (codecLookup && type.typeParams && Object.keys(type.typeParams).length > 0) {
         const codec = codecLookup.get(type.codecId);
         if (codec?.renderOutputType) {
           const rendered = codec.renderOutputType(type.typeParams);
           if (rendered && isSafeTypeExpression(rendered)) {
-            resolved = rendered;
+            outputResolved = rendered;
           }
         }
       }
-      baseType = resolved ?? `CodecTypes[${serializeValue(type.codecId)}]['output']`;
-      break;
+      const codecAccessor = `CodecTypes[${serializeValue(type.codecId)}]`;
+      return {
+        output: applyModifiers(outputResolved ?? `${codecAccessor}['output']`, field),
+        input: applyModifiers(`${codecAccessor}['input']`, field),
+      };
     }
     case 'valueObject':
-      baseType = type.name;
-      break;
+      return {
+        output: applyModifiers(`${type.name}Output`, field),
+        input: applyModifiers(`${type.name}Input`, field),
+      };
     case 'union': {
-      const memberTypes = type.members.map((m) => {
-        if (m.kind === 'scalar') return `CodecTypes[${serializeValue(m.codecId)}]['output']`;
-        return m.name;
-      });
-      baseType = memberTypes.join(' | ');
-      break;
+      const outputMembers = type.members.map((m) =>
+        m.kind === 'scalar'
+          ? `CodecTypes[${serializeValue(m.codecId)}]['output']`
+          : `${m.name}Output`,
+      );
+      const inputMembers = type.members.map((m) =>
+        m.kind === 'scalar'
+          ? `CodecTypes[${serializeValue(m.codecId)}]['input']`
+          : `${m.name}Input`,
+      );
+      return {
+        output: applyModifiers(outputMembers.join(' | '), field),
+        input: applyModifiers(inputMembers.join(' | '), field),
+      };
     }
     default:
-      baseType = 'unknown';
-      break;
+      return {
+        output: applyModifiers('unknown', field),
+        input: applyModifiers('unknown', field),
+      };
+  }
+}
+
+export function generateFieldResolvedType(
+  field: ContractField,
+  codecLookup?: CodecLookup,
+  side: 'input' | 'output' = 'output',
+): string {
+  return resolveFieldType(field, codecLookup)[side];
+}
+
+export function generateBothFieldTypesMaps(
+  models: Record<string, ContractModel> | undefined,
+  codecLookup?: CodecLookup,
+): ResolvedFieldType {
+  if (!models || Object.keys(models).length === 0) {
+    return { output: 'Record<string, never>', input: 'Record<string, never>' };
   }
 
-  if (field.many === true) {
-    baseType = `ReadonlyArray<${baseType}>`;
-  }
-  if (field.dict === true) {
-    baseType = `Readonly<Record<string, ${baseType}>>`;
-  }
-  if (field.nullable) {
-    baseType = `${baseType} | null`;
+  const outputModelEntries: string[] = [];
+  const inputModelEntries: string[] = [];
+  for (const [modelName, model] of Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!model) continue;
+    const outputFieldEntries: string[] = [];
+    const inputFieldEntries: string[] = [];
+    for (const [fieldName, field] of Object.entries(model.fields)) {
+      const resolved = resolveFieldType(field, codecLookup);
+      const key = `readonly ${serializeObjectKey(fieldName)}`;
+      outputFieldEntries.push(`${key}: ${resolved.output}`);
+      inputFieldEntries.push(`${key}: ${resolved.input}`);
+    }
+    const outputFields =
+      outputFieldEntries.length > 0
+        ? `{ ${outputFieldEntries.join('; ')} }`
+        : 'Record<string, never>';
+    const inputFields =
+      inputFieldEntries.length > 0
+        ? `{ ${inputFieldEntries.join('; ')} }`
+        : 'Record<string, never>';
+    const modelKey = `readonly ${serializeObjectKey(modelName)}`;
+    outputModelEntries.push(`${modelKey}: ${outputFields}`);
+    inputModelEntries.push(`${modelKey}: ${inputFields}`);
   }
 
-  return baseType;
+  return {
+    output: `{ ${outputModelEntries.join('; ')} }`,
+    input: `{ ${inputModelEntries.join('; ')} }`,
+  };
 }
 
 export function generateFieldOutputTypesMap(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
 ): string {
-  if (!models || Object.keys(models).length === 0) {
-    return 'Record<string, never>';
-  }
+  return generateBothFieldTypesMaps(models, codecLookup).output;
+}
 
-  const modelEntries: string[] = [];
-  for (const [modelName, model] of Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) {
-    if (!model) continue;
-    const fieldEntries: string[] = [];
-    for (const [fieldName, field] of Object.entries(model.fields)) {
-      const resolvedType = generateFieldResolvedType(field, codecLookup);
-      fieldEntries.push(`readonly ${serializeObjectKey(fieldName)}: ${resolvedType}`);
-    }
-    const fieldsType =
-      fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';
-    modelEntries.push(`readonly ${serializeObjectKey(modelName)}: ${fieldsType}`);
-  }
-
-  return `{ ${modelEntries.join('; ')} }`;
+export function generateFieldInputTypesMap(
+  models: Record<string, ContractModel> | undefined,
+  codecLookup?: CodecLookup,
+): string {
+  return generateBothFieldTypesMaps(models, codecLookup).input;
 }
 
 export function generateValueObjectType(
   _voName: string,
   vo: ContractValueObject,
   _valueObjects: Record<string, ContractValueObject>,
+  side: 'input' | 'output' = 'output',
+  codecLookup?: CodecLookup,
 ): string {
-  const fieldEntries: string[] = [];
+  return resolveValueObjectType(_voName, vo, _valueObjects, codecLookup)[side];
+}
+
+export function resolveValueObjectType(
+  _voName: string,
+  vo: ContractValueObject,
+  _valueObjects: Record<string, ContractValueObject>,
+  codecLookup?: CodecLookup,
+): ResolvedFieldType {
+  const outputEntries: string[] = [];
+  const inputEntries: string[] = [];
   for (const [fieldName, field] of Object.entries(vo.fields)) {
-    const tsType = generateFieldResolvedType(field);
-    fieldEntries.push(`readonly ${serializeObjectKey(fieldName)}: ${tsType}`);
+    const resolved = resolveFieldType(field, codecLookup);
+    const key = `readonly ${serializeObjectKey(fieldName)}`;
+    outputEntries.push(`${key}: ${resolved.output}`);
+    inputEntries.push(`${key}: ${resolved.input}`);
   }
-  return fieldEntries.length > 0 ? `{ ${fieldEntries.join('; ')} }` : 'Record<string, never>';
+  const empty = 'Record<string, never>';
+  return {
+    output: outputEntries.length > 0 ? `{ ${outputEntries.join('; ')} }` : empty,
+    input: inputEntries.length > 0 ? `{ ${inputEntries.join('; ')} }` : empty,
+  };
 }
 
 export function generateContractFieldDescriptor(fieldName: string, field: ContractField): string {
@@ -343,6 +413,7 @@ export function generateValueObjectsDescriptorType(
 
 export function generateValueObjectTypeAliases(
   valueObjects: Record<string, ContractValueObject> | undefined,
+  codecLookup?: CodecLookup,
 ): string {
   if (!valueObjects || Object.keys(valueObjects).length === 0) {
     return '';
@@ -350,8 +421,9 @@ export function generateValueObjectTypeAliases(
 
   const aliases: string[] = [];
   for (const [voName, vo] of Object.entries(valueObjects)) {
-    const voType = generateValueObjectType(voName, vo, valueObjects);
-    aliases.push(`export type ${voName} = ${voType};`);
+    const resolved = resolveValueObjectType(voName, vo, valueObjects, codecLookup);
+    aliases.push(`export type ${voName}Output = ${resolved.output};`);
+    aliases.push(`export type ${voName}Input = ${resolved.input};`);
   }
   return aliases.join('\n');
 }

@@ -240,10 +240,65 @@ const IndexSchema = type({
   'options?': IndexOptionsSchema,
 });
 
+const MongoIndexKeySchema = type({
+  '+': 'reject',
+  field: 'string',
+  direction: '1 | -1 | "text" | "2dsphere" | "2d" | "hashed"',
+});
+
+const MongoStorageIndexSchema = type({
+  '+': 'reject',
+  keys: MongoIndexKeySchema.array().atLeastLength(1),
+  'unique?': 'boolean',
+  'sparse?': 'boolean',
+  'expireAfterSeconds?': 'number',
+  'partialFilterExpression?': 'Record<string, unknown>',
+  'wildcardProjection?': 'Record<string, 0 | 1>',
+  'collation?': 'Record<string, unknown>',
+  'weights?': 'Record<string, number>',
+  'default_language?': 'string',
+  'language_override?': 'string',
+});
+
+const MongoStorageValidatorSchema = type({
+  '+': 'reject',
+  jsonSchema: 'Record<string, unknown>',
+  validationLevel: "'strict' | 'moderate'",
+  validationAction: "'error' | 'warn'",
+});
+
+const CappedOptionsSchema = type({
+  '+': 'reject',
+  size: 'number',
+  'max?': 'number',
+});
+
+const TimeseriesOptionsSchema = type({
+  '+': 'reject',
+  timeField: 'string',
+  'metaField?': 'string',
+  'granularity?': "'seconds' | 'minutes' | 'hours'",
+});
+
+const ClusteredIndexSchema = type({
+  '+': 'reject',
+  'name?': 'string',
+});
+
+const MongoCollectionOptionsSchema = type({
+  '+': 'reject',
+  'capped?': CappedOptionsSchema,
+  'timeseries?': TimeseriesOptionsSchema,
+  'collation?': 'Record<string, unknown>',
+  'changeStreamPreAndPostImages?': ChangeStreamPreAndPostImagesSchema,
+  'clusteredIndex?': ClusteredIndexSchema,
+});
+
 const StorageCollectionSchema = type({
   '+': 'reject',
-  'indexes?': IndexSchema.array(),
-  'options?': CollectionOptionsSchema,
+  'indexes?': MongoStorageIndexSchema.array(),
+  'validator?': MongoStorageValidatorSchema,
+  'options?': MongoCollectionOptionsSchema,
 });
 
 export const MongoContractSchema = type({
@@ -269,3 +324,15 @@ export const MongoContractSchema = type({
     '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
   }),
 });
+
+export {
+  CollationSchema,
+  CollectionOptionsSchema,
+  IndexFieldsSchema,
+  IndexOptionsSchema,
+  IndexSchema,
+  MongoIndexKeySchema,
+  MongoStorageIndexSchema,
+  NumberRecordSchema,
+  WildcardProjectionSchema,
+};

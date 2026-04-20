@@ -1,30 +1,33 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
-import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
-import type { ControlMutationDefaults } from './default-function-registry';
 import { interpretPslDocumentToSqlContract } from './interpreter';
+import type { ColumnDescriptor } from './psl-column-resolution';
 
 export interface PrismaContractOptions {
   readonly output?: string;
   readonly target: TargetPackRef<'sql', 'postgres'>;
-  readonly authoringContributions?: AuthoringContributions;
-  readonly scalarTypeDescriptors: ReadonlyMap<
-    string,
-    {
-      readonly codecId: string;
-      readonly nativeType: string;
-      readonly typeRef?: string;
-      readonly typeParams?: Record<string, unknown>;
-    }
-  >;
-  readonly controlMutationDefaults?: ControlMutationDefaults;
-  readonly composedExtensionPacks?: readonly string[];
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', 'postgres'>[];
+}
+
+function buildColumnDescriptorMap(
+  scalarTypeDescriptors: ReadonlyMap<string, string>,
+  codecLookup: CodecLookup,
+): ReadonlyMap<string, ColumnDescriptor> {
+  const result = new Map<string, ColumnDescriptor>();
+  for (const [typeName, codecId] of scalarTypeDescriptors) {
+    const codec = codecLookup.get(codecId);
+    if (!codec) continue;
+    const nativeType = codec.targetTypes[0];
+    if (nativeType === undefined) continue;
+    result.set(typeName, { codecId, nativeType });
+  }
+  return result;
 }
 
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
@@ -53,25 +56,28 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         schema,
         sourceId: schemaPath,
       });
-      const composedExtensionPacks = [
-        ...(context.composedExtensionPacks ?? []),
-        ...(options.composedExtensionPacks ?? []),
-      ];
+
+      const scalarTypeDescriptors = buildColumnDescriptorMap(
+        context.scalarTypeDescriptors,
+        context.codecLookup,
+      );
 
       const interpreted = interpretPslDocumentToSqlContract({
         document,
         target: options.target,
-        ...ifDefined('authoringContributions', options.authoringContributions),
-        scalarTypeDescriptors: options.scalarTypeDescriptors,
+        authoringContributions: context.authoringContributions,
+        scalarTypeDescriptors,
         ...ifDefined(
           'composedExtensionPacks',
-          composedExtensionPacks.length > 0 ? composedExtensionPacks : undefined,
+          context.composedExtensionPacks.length > 0
+            ? [...context.composedExtensionPacks]
+            : undefined,
         ),
         ...ifDefined(
           'composedExtensionPackRefs',
           options.composedExtensionPackRefs?.length ? options.composedExtensionPackRefs : undefined,
         ),
-        ...ifDefined('controlMutationDefaults', options.controlMutationDefaults),
+        controlMutationDefaults: context.controlMutationDefaults,
       });
       if (!interpreted.ok) {
         return interpreted;

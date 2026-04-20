@@ -1,0 +1,68 @@
+import { acc } from '@prisma-next/mongo-pipeline-builder';
+import { MongoFieldFilter } from '@prisma-next/mongo-query-ast/execution';
+import type { FieldInputTypes } from '../contract';
+import type { Db } from '../db';
+import { collectResults } from './execute-raw';
+
+type EventBase = Omit<FieldInputTypes['Event'], '_id' | 'type'>;
+
+export function createViewProductEvent(
+  db: Db,
+  event: EventBase & FieldInputTypes['ViewProductEvent'],
+) {
+  return db.orm.events.variant('ViewProductEvent').create({
+    userId: event.userId,
+    sessionId: event.sessionId,
+    timestamp: event.timestamp,
+    productId: event.productId,
+    subCategory: event.subCategory,
+    brand: event.brand,
+    exitMethod: event.exitMethod,
+  });
+}
+
+export function createSearchEvent(db: Db, event: EventBase & FieldInputTypes['SearchEvent']) {
+  return db.orm.events.variant('SearchEvent').create({
+    userId: event.userId,
+    sessionId: event.sessionId,
+    timestamp: event.timestamp,
+    query: event.query,
+  });
+}
+
+export function createAddToCartEvent(db: Db, event: EventBase & FieldInputTypes['AddToCartEvent']) {
+  return db.orm.events.variant('AddToCartEvent').create({
+    userId: event.userId,
+    sessionId: event.sessionId,
+    timestamp: event.timestamp,
+    productId: event.productId,
+    brand: event.brand,
+  });
+}
+
+export function findEventsByUser(db: Db, userId: string) {
+  return db.orm.events.where(MongoFieldFilter.eq('userId', userId)).all();
+}
+
+export function findSearchEventsByUser(db: Db, userId: string) {
+  return db.orm.events.variant('SearchEvent').where(MongoFieldFilter.eq('userId', userId)).all();
+}
+
+interface EventTypeCount {
+  _id: string;
+  count: number;
+}
+
+export async function aggregateEventsByType(db: Db, userId: string): Promise<EventTypeCount[]> {
+  const plan = db.pipeline
+    .from('events')
+    .match(MongoFieldFilter.eq('userId', userId))
+    .group((f) => ({
+      _id: f.type,
+      count: acc.count(),
+    }))
+    .sort({ count: -1 })
+    .build();
+
+  return collectResults<EventTypeCount>(db, plan);
+}

@@ -5,16 +5,14 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { resolve } from 'pathe';
 import { interpretPslDocumentToMongoContract } from './interpreter';
-import { createMongoScalarTypeDescriptors } from './scalar-type-descriptors';
 
 export interface MongoContractOptions {
   readonly output?: string;
-  readonly scalarTypeDescriptors?: ReadonlyMap<string, string>;
 }
 
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
   return {
-    source: async (_context: ContractSourceContext) => {
+    source: async (context: ContractSourceContext) => {
       const absoluteSchemaPath = resolve(schemaPath);
       let schema: string;
       try {
@@ -41,7 +39,8 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
 
       const interpreted = interpretPslDocumentToMongoContract({
         document,
-        scalarTypeDescriptors: options?.scalarTypeDescriptors ?? createMongoScalarTypeDescriptors(),
+        scalarTypeDescriptors: context.scalarTypeDescriptors,
+        codecLookup: context.codecLookup,
       });
       if (!interpreted.ok) {
         return interpreted;

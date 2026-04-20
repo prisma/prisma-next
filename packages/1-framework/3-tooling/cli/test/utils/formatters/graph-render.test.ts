@@ -133,14 +133,18 @@ describe('extractRelevantSubgraph', () => {
     expect(multi.edges).toHaveLength(single.edges.length);
   });
 
-  it('preserves detached nodes', () => {
+  it('preserves dashed edges and their targets', () => {
     const path = ['∅', 'A'];
     const graph = new RenderGraph(
-      [{ id: '∅' }, { id: 'A' }, { id: 'detached', style: 'detached' }],
-      [{ from: '∅', to: 'A' }],
+      [{ id: '∅' }, { id: 'A' }, { id: 'contract' }],
+      [
+        { from: '∅', to: 'A' },
+        { from: 'A', to: 'contract', style: 'dashed' },
+      ],
     );
     const sub = extractRelevantSubgraph(graph, [path]);
-    expect(sub.nodes.some((n) => n.id === 'detached')).toBe(true);
+    expect(sub.nodes.some((n) => n.id === 'contract')).toBe(true);
+    expect(sub.edges.some((e) => e.style === 'dashed')).toBe(true);
   });
 
   it('returns empty for no paths', () => {
@@ -222,10 +226,10 @@ describe('truncateGraph', () => {
     expect(result.graph.nodes.some((n) => n.id === 'B4a')).toBe(false);
   });
 
-  it('preserves detached nodes even when truncated', () => {
+  it('preserves dashed edges and their targets when truncated', () => {
     const result = truncateGraph(longSpineWithBranches.graph, longSpine, 3);
-    expect(result.graph.nodes.some((n) => n.style === 'detached')).toBe(true);
     expect(result.graph.nodes.some((n) => n.id === 'planned')).toBe(true);
+    expect(result.graph.edges.some((e) => e.style === 'dashed')).toBe(true);
   });
 
   it('handles single-node spine', () => {
@@ -264,7 +268,7 @@ describe('render with truncation', { timeout: GRAPH_TIMEOUT }, () => {
     });
     expect(output).toContain('earlier migrations');
     expect(output).toContain('planned');
-    expect(output).toContain('◆ contract');
+    expect(output).toContain('◇ contract');
     expect(output).toMatchSnapshot();
   });
 
@@ -404,12 +408,12 @@ describe('Graph renderer — colorize and markers', { timeout: GRAPH_TIMEOUT }, 
     expect(output).toContain('B');
   });
 
-  it('renders detached node without markers', () => {
+  it('renders dashed edge to node without markers', () => {
     const graph = new RenderGraph(
-      [{ id: '∅' }, { id: 'A' }, { id: 'orphan', style: 'detached' }],
+      [{ id: '∅' }, { id: 'A' }, { id: 'orphan' }],
       [
         { from: '∅', to: 'A' },
-        { from: 'A', to: 'orphan', label: 'to-detached' },
+        { from: 'A', to: 'orphan', label: 'to-detached', style: 'dashed' },
       ],
     );
     const output = graphRenderer.render(graph, {
@@ -418,7 +422,7 @@ describe('Graph renderer — colorize and markers', { timeout: GRAPH_TIMEOUT }, 
       colorize: false,
     });
     expect(output).toContain('orphan');
-    expect(output).toContain('◇');
+    expect(output).toContain('┊');
   });
 
   it('renders with default colorize and rootId', () => {

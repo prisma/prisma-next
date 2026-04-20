@@ -112,7 +112,7 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
 ## Checks and diagnostics
 
 ### What runs in CHECKING
-- Pre and post checks defined on edges per ADR 044
+- Pre and post checks defined on edges per [ADR 028](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md) (SQL) / [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md) (Mongo)
 - Lint rules at the configured policy level per ADR 022
 - Budgets evaluation including EXPLAIN policies per ADR 023
 - Optional dry-run of sample Plans against shadow with bounded LIMIT and statement timeouts

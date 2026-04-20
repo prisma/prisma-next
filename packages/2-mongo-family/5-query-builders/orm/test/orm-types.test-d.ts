@@ -1,7 +1,13 @@
-import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import type { MongoCollection } from '../src/collection';
+import type {
+  DotPath,
+  FieldAccessor,
+  FieldExpression,
+  ResolveDotPathType,
+} from '../src/field-accessor';
 import type { MongoOrmClient } from '../src/mongo-orm';
 import type {
   CreateInput,
@@ -69,6 +75,25 @@ test('where filter keys are constrained to model field names', () => {
   expectTypeOf<UserFilter>().toHaveProperty('email');
 });
 
+test('where filter rejects invalid field names', () => {
+  type UserFilter = MongoWhereFilter<Contract, 'User'>;
+  // @ts-expect-error 'nonexistent' is not a field on User
+  void ({ nonexistent: 'value' } satisfies UserFilter);
+});
+
+test('where filter enforces value types from codec', () => {
+  type UserFilter = MongoWhereFilter<Contract, 'User'>;
+  void ({ name: 'Alice' } satisfies UserFilter);
+  // @ts-expect-error number is not assignable to string field
+  void ({ name: 123 } satisfies UserFilter);
+});
+
+test('object-based where() accepts MongoWhereFilter', () => {
+  const col = {} as MongoCollection<Contract, 'User'>;
+  const filtered = col.where({ name: 'Alice' });
+  expectTypeOf(filtered).toExtend<MongoCollection<Contract, 'User'>>();
+});
+
 // --- Include constrained to reference relations only ---
 
 test('ReferenceRelationKeys picks only reference relations', () => {
@@ -87,9 +112,9 @@ test('MongoIncludeSpec only allows reference relation keys', () => {
   expectTypeOf<TaskInclude>().not.toHaveProperty('comments');
 });
 
-test('MongoIncludeSpec has no includable keys for models with only embed relations', () => {
+test('ReferenceRelationKeys picks reference relations on User', () => {
   type UserRefKeys = ReferenceRelationKeys<Contract, 'User'>;
-  expectTypeOf<UserRefKeys>().toBeNever();
+  expectTypeOf<UserRefKeys>().toEqualTypeOf<'tasks'>();
 });
 
 // --- Polymorphic root returns discriminated union ---
@@ -326,4 +351,75 @@ test('variant() preserves TVariant through chaining', () => {
   type CreateParam = Parameters<typeof chained.create>[0];
   expectTypeOf<CreateParam>().toHaveProperty('severity');
   expectTypeOf<CreateParam>().not.toHaveProperty('type');
+});
+
+// --- 1:N reference relation include ---
+
+test('include() on 1:N reference relation returns array type', () => {
+  const col = {} as MongoCollection<Contract, 'User'>;
+  const result = col.include('tasks').first();
+  expectTypeOf(result).toExtend<
+    Promise<(InferRootRow<Contract, 'User'> & { tasks: InferFullRow<Contract, 'Task'>[] }) | null>
+  >();
+});
+
+test('include() on 1:N reference relation all() returns array type', () => {
+  const col = {} as MongoCollection<Contract, 'User'>;
+  const result = col.include('tasks').all();
+  expectTypeOf(result).toExtend<
+    AsyncIterableResult<
+      InferRootRow<Contract, 'User'> & { tasks: InferFullRow<Contract, 'Task'>[] }
+    >
+  >();
+});
+
+// --- Field accessor types ---
+
+test('FieldAccessor has FieldExpression for scalar fields', () => {
+  type Accessor = FieldAccessor<Contract, 'User'>;
+  expectTypeOf<Accessor['name']>().toExtend<FieldExpression<string>>();
+  expectTypeOf<Accessor['loginCount']>().toExtend<FieldExpression<number>>();
+});
+
+test('FieldAccessor has FieldExpression for array fields', () => {
+  type Accessor = FieldAccessor<Contract, 'User'>;
+  expectTypeOf<Accessor['tags']>().toExtend<FieldExpression<string[]>>();
+});
+
+test('FieldAccessor resolves value-object field to concrete type, not unknown', () => {
+  type Accessor = FieldAccessor<Contract, 'User'>;
+  type HomeAddressExpr = Accessor['homeAddress'];
+
+  // @ts-expect-error set() rejects a number when field type is value-object
+  void ({} as HomeAddressExpr).set(42);
+});
+
+test('DotPath resolves value object dot-paths', () => {
+  type Paths = DotPath<Contract, 'User'>;
+  expectTypeOf<'homeAddress.city'>().toExtend<Paths>();
+  expectTypeOf<'homeAddress.country'>().toExtend<Paths>();
+});
+
+test('DotPath rejects invalid paths', () => {
+  type Paths = DotPath<Contract, 'User'>;
+  expectTypeOf<'homeAddress.nonexistent'>().not.toExtend<Paths>();
+  expectTypeOf<'nonexistent.field'>().not.toExtend<Paths>();
+});
+
+test('ResolveDotPathType resolves to scalar type', () => {
+  type CityType = ResolveDotPathType<Contract, 'User', 'homeAddress.city'>;
+  expectTypeOf<CityType>().toEqualTypeOf<string>();
+});
+
+test('FieldExpression inc/mul restricted to numeric types', () => {
+  type StringExpr = FieldExpression<string>;
+  type NumberExpr = FieldExpression<number>;
+
+  // @ts-expect-error inc is not available on string fields
+  void ({} as StringExpr).inc(1);
+  // @ts-expect-error mul is not available on string fields
+  void ({} as StringExpr).mul(2);
+
+  void ({} as NumberExpr).inc(1);
+  void ({} as NumberExpr).mul(2);
 });

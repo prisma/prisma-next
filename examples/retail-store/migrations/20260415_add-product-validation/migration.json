@@ -1,0 +1,8 @@
+{
+  "migrationId": null,
+  "from": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d",
+  "to": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d",
+  "kind": "regular",
+  "labels": ["add-product-validation"],
+  "createdAt": "2026-04-15T18:46:18.776Z"
+}

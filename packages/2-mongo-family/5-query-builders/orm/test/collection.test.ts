@@ -1,3 +1,4 @@
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import {
   MongoFieldFilter,
@@ -9,14 +10,29 @@ import {
   type MongoSkipStage,
   type MongoSortStage,
 } from '@prisma-next/mongo-query-ast/execution';
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import type { MongoValue } from '@prisma-next/mongo-value';
+import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { createMongoCollection } from '../src/collection';
 import type { MongoQueryExecutor } from '../src/executor';
+import {
+  compileFieldOperations,
+  createFieldAccessor,
+  type FieldAccessor,
+  type FieldOperation,
+} from '../src/field-accessor';
 
 const contract = ormContractJson as unknown as Contract;
+
+const defaultUserData = {
+  name: 'Alice',
+  email: 'a@b.c',
+  loginCount: 0,
+  tags: [] as string[],
+  homeAddress: null,
+};
 
 function createMockExecutor(...responses: unknown[][]): MongoQueryExecutor & {
   lastPlan: MongoQueryPlan | undefined;
@@ -143,6 +159,205 @@ describe('MongoCollection chaining', () => {
   });
 });
 
+describe('MongoCollection object-based where()', () => {
+  it('produces eq filter with string codecId for string field', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor).where({ name: 'Alice' });
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('field');
+    if (match.filter.kind === 'field') {
+      expect(match.filter.field).toBe('name');
+      expect(match.filter.op).toBe('$eq');
+      const ref = match.filter.value as MongoParamRef;
+      expect(ref).toBeInstanceOf(MongoParamRef);
+      expect(ref.codecId).toBe('mongo/string@1');
+      expect(ref.value).toBe('Alice');
+    }
+  });
+
+  it('produces eq filter with objectId codecId for ObjectId field', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'Task', executor).where({
+      assigneeId: 'abc123',
+    });
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('field');
+    if (match.filter.kind === 'field') {
+      expect(match.filter.field).toBe('assigneeId');
+      expect(match.filter.op).toBe('$eq');
+      const ref = match.filter.value as MongoParamRef;
+      expect(ref).toBeInstanceOf(MongoParamRef);
+      expect(ref.codecId).toBe('mongo/objectId@1');
+      expect(ref.value).toBe('abc123');
+    }
+  });
+
+  it('produces AND of multiple eq filters for multi-field object', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor).where({
+      name: 'Alice',
+      email: 'a@b.c',
+    });
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('and');
+    if (match.filter.kind === 'and') {
+      expect(match.filter.exprs).toHaveLength(2);
+      const first = match.filter.exprs[0]!;
+      const second = match.filter.exprs[1]!;
+      expect(first.kind).toBe('field');
+      expect(second.kind).toBe('field');
+    }
+  });
+
+  it('chains with MongoFilterExpr where()', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor)
+      .where({ name: 'Alice' })
+      .where(MongoFieldFilter.gte('email', 'a'));
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('and');
+  });
+
+  it('chains MongoFilterExpr where() then object where()', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor)
+      .where(MongoFieldFilter.eq('_id', 'id-1'))
+      .where({ name: 'Alice' });
+    col.all();
+    const match = executor.lastStages![0] as MongoMatchStage;
+    expect(match.filter.kind).toBe('and');
+  });
+});
+
+describe('createFieldAccessor()', () => {
+  it('property access returns FieldExpression for top-level field', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.name.set('Bob');
+    expect(op.operator).toBe('$set');
+    expect(op.field).toBe('name');
+    expect((op.value as MongoParamRef).value).toBe('Bob');
+  });
+
+  it('set() produces $set operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.name.set('Alice');
+    expect(op.operator).toBe('$set');
+    expect(op.field).toBe('name');
+  });
+
+  it('unset() produces $unset operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.name.unset();
+    expect(op.operator).toBe('$unset');
+    expect(op.field).toBe('name');
+  });
+
+  it('inc() produces $inc operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.loginCount.inc(1);
+    expect(op.operator).toBe('$inc');
+    expect(op.field).toBe('loginCount');
+    expect((op.value as MongoParamRef).value).toBe(1);
+  });
+
+  it('mul() produces $mul operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.loginCount.mul(2);
+    expect(op.operator).toBe('$mul');
+    expect(op.field).toBe('loginCount');
+    expect((op.value as MongoParamRef).value).toBe(2);
+  });
+
+  it('push() produces $push operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.tags.push('admin');
+    expect(op.operator).toBe('$push');
+    expect(op.field).toBe('tags');
+    expect((op.value as MongoParamRef).value).toBe('admin');
+  });
+
+  it('pull() produces $pull operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.tags.pull('admin');
+    expect(op.operator).toBe('$pull');
+    expect(op.field).toBe('tags');
+    expect((op.value as MongoParamRef).value).toBe('admin');
+  });
+
+  it('addToSet() produces $addToSet operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.tags.addToSet('admin');
+    expect(op.operator).toBe('$addToSet');
+    expect(op.field).toBe('tags');
+  });
+
+  it('pop() produces $pop operation', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u.tags.pop(1);
+    expect(op.operator).toBe('$pop');
+    expect(op.field).toBe('tags');
+    expect((op.value as MongoParamRef).value).toBe(1);
+  });
+
+  it('call signature returns FieldExpression for dot-path', () => {
+    const u = createFieldAccessor<Contract, 'User'>();
+    const op = u('homeAddress.city').set('NYC');
+    expect(op.operator).toBe('$set');
+    expect(op.field).toBe('homeAddress.city');
+    expect((op.value as MongoParamRef).value).toBe('NYC');
+  });
+});
+
+describe('compileFieldOperations()', () => {
+  const identity = (_field: string, value: MongoValue) => value;
+
+  it('groups operations by operator', () => {
+    const ops: FieldOperation[] = [
+      { operator: '$set', field: 'name', value: new MongoParamRef('Alice') },
+      { operator: '$inc', field: 'loginCount', value: new MongoParamRef(1) },
+      { operator: '$set', field: 'email', value: new MongoParamRef('a@b.c') },
+    ];
+    const result = compileFieldOperations(ops, identity);
+    expect(result).toEqual({
+      $set: {
+        name: new MongoParamRef('Alice'),
+        email: new MongoParamRef('a@b.c'),
+      },
+      $inc: {
+        loginCount: new MongoParamRef(1),
+      },
+    });
+  });
+
+  it('applies wrapValue to each operation', () => {
+    const ops: FieldOperation[] = [
+      { operator: '$set', field: 'name', value: new MongoParamRef('Alice') },
+    ];
+    const wrap = (_field: string, value: MongoValue) =>
+      new MongoParamRef((value as MongoParamRef).value, { codecId: 'mongo/string@1' });
+    const result = compileFieldOperations(ops, wrap);
+    expect(result['$set']!['name']!).toBeInstanceOf(MongoParamRef);
+    expect((result['$set']!['name']! as MongoParamRef).codecId).toBe('mongo/string@1');
+  });
+
+  it('passes operator to wrapValue callback', () => {
+    const ops: FieldOperation[] = [
+      { operator: '$set', field: 'name', value: new MongoParamRef('Alice') },
+      { operator: '$unset', field: 'email', value: new MongoParamRef('') },
+    ];
+    const operators: string[] = [];
+    compileFieldOperations(ops, (_field, value, operator) => {
+      operators.push(operator);
+      return value;
+    });
+    expect(operators).toEqual(['$set', '$unset']);
+  });
+});
+
 describe('MongoCollection variant()', () => {
   it('returns a new instance from variant()', () => {
     const executor = createMockExecutor();
@@ -252,6 +467,20 @@ describe('MongoCollection include()', () => {
     // @ts-expect-error 'comments' is an embed relation, not a reference relation
     expect(() => col.include('comments')).toThrow('embed relation');
   });
+
+  it('produces $lookup without $unwind for 1:N reference relation', () => {
+    const executor = createMockExecutor();
+    const col = createMongoCollection(contract, 'User', executor).include('tasks');
+    col.all();
+    const stages = executor.lastStages!;
+    const lookup = stages.find((s) => s.kind === 'lookup') as MongoLookupStage;
+    expect(lookup.from).toBe('tasks');
+    expect(lookup.localField).toBe('_id');
+    expect(lookup.foreignField).toBe('assigneeId');
+    expect(lookup.as).toBe('tasks');
+    const unwind = stages.find((s) => s.kind === 'unwind');
+    expect(unwind).toBeUndefined();
+  });
 });
 
 describe('MongoCollection terminal methods', () => {
@@ -297,17 +526,46 @@ describe('MongoCollection write methods', () => {
     it('returns created row with _id from insertedId', async () => {
       const executor = createMockExecutor([{ insertedId: 'new-id-1' }]);
       const col = createMongoCollection(contract, 'User', executor);
-      const result = await col.create({ name: 'Alice', email: 'a@b.c' });
-      expect(result).toEqual({ _id: 'new-id-1', name: 'Alice', email: 'a@b.c' });
+      const result = await col.create(defaultUserData);
+      expect(result).toEqual({ _id: 'new-id-1', ...defaultUserData });
     });
 
     it('sends an InsertOneCommand', async () => {
       const executor = createMockExecutor([{ insertedId: 'id' }]);
       const col = createMongoCollection(contract, 'User', executor);
-      await col.create({ name: 'Bob', email: 'b@b.c' });
+      await col.create({ ...defaultUserData, name: 'Bob', email: 'b@b.c' });
       expect(executor.lastCommand).toBeDefined();
       expect(executor.lastCommand!.kind).toBe('insertOne');
       expect(executor.lastCommand!.collection).toBe('users');
+    });
+
+    it('attaches codecId from contract fields to MongoParamRef in document', async () => {
+      const executor = createMockExecutor([{ insertedId: 'id' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.create(defaultUserData);
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('insertOne');
+      if (command.kind === 'insertOne') {
+        const nameRef = command.document['name'] as MongoParamRef;
+        expect(nameRef).toBeInstanceOf(MongoParamRef);
+        expect(nameRef.codecId).toBe('mongo/string@1');
+        const emailRef = command.document['email'] as MongoParamRef;
+        expect(emailRef).toBeInstanceOf(MongoParamRef);
+        expect(emailRef.codecId).toBe('mongo/string@1');
+      }
+    });
+
+    it('attaches objectId codecId for ObjectId-typed fields', async () => {
+      const executor = createMockExecutor([{ insertedId: 'id' }]);
+      const col = createMongoCollection(contract, 'Task', executor);
+      await col.create({ title: 'Fix bug', assigneeId: 'abc123', type: 'bug' });
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('insertOne');
+      if (command.kind === 'insertOne') {
+        const assigneeRef = command.document['assigneeId'] as MongoParamRef;
+        expect(assigneeRef).toBeInstanceOf(MongoParamRef);
+        expect(assigneeRef.codecId).toBe('mongo/objectId@1');
+      }
     });
   });
 
@@ -317,14 +575,14 @@ describe('MongoCollection write methods', () => {
       const col = createMongoCollection(contract, 'User', executor);
       const rows: unknown[] = [];
       for await (const row of col.createAll([
-        { name: 'Alice', email: 'a@b.c' },
-        { name: 'Bob', email: 'b@b.c' },
+        defaultUserData,
+        { ...defaultUserData, name: 'Bob', email: 'b@b.c' },
       ])) {
         rows.push(row);
       }
       expect(rows).toEqual([
-        { _id: 'id-1', name: 'Alice', email: 'a@b.c' },
-        { _id: 'id-2', name: 'Bob', email: 'b@b.c' },
+        { _id: 'id-1', ...defaultUserData },
+        { _id: 'id-2', ...defaultUserData, name: 'Bob', email: 'b@b.c' },
       ]);
     });
   });
@@ -334,8 +592,8 @@ describe('MongoCollection write methods', () => {
       const executor = createMockExecutor([{ insertedIds: ['a', 'b'], insertedCount: 2 }]);
       const col = createMongoCollection(contract, 'User', executor);
       const count = await col.createCount([
-        { name: 'Alice', email: 'a@b.c' },
-        { name: 'Bob', email: 'b@b.c' },
+        defaultUserData,
+        { ...defaultUserData, name: 'Bob', email: 'b@b.c' },
       ]);
       expect(count).toBe(2);
     });
@@ -375,6 +633,177 @@ describe('MongoCollection write methods', () => {
       const col = createMongoCollection(contract, 'User', executor);
       const result = await col.where(MongoFieldFilter.eq('_id', 'missing')).update({ name: 'X' });
       expect(result).toBeNull();
+    });
+
+    it('attaches codecId to $set fields from contract', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1', name: 'Updated', email: 'a@b.c' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update({ name: 'Updated' });
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('findOneAndUpdate');
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        const nameRef = update['$set']!['name']!;
+        expect(nameRef).toBeInstanceOf(MongoParamRef);
+        expect(nameRef.codecId).toBe('mongo/string@1');
+      }
+    });
+  });
+
+  describe('update() with callback', () => {
+    it('produces correct update doc from field operations', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1', name: 'Updated' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col
+        .where(MongoFieldFilter.eq('_id', 'id-1'))
+        .update((u) => [u.name.set('Updated'), u.loginCount.inc(1)]);
+      const command = executor.lastCommand!;
+      expect(command.kind).toBe('findOneAndUpdate');
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        expect(update['$set']!['name']).toBeInstanceOf(MongoParamRef);
+        expect(update['$inc']!['loginCount']).toBeInstanceOf(MongoParamRef);
+      }
+    });
+
+    it('applies codec to callback operations for scalar fields', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1', name: 'Updated' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update((u) => [u.name.set('Updated')]);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        expect(update['$set']!['name']!.codecId).toBe('mongo/string@1');
+      }
+    });
+
+    it('produces $push operations from callback', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update((u) => [u.tags.push('admin')]);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        expect(update['$push']).toBeDefined();
+        expect(update['$push']!['tags']).toBeInstanceOf(MongoParamRef);
+      }
+    });
+
+    it('does not attach codecId to $unset sentinel value', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update((u) => [u.name.unset()]);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        const unsetRef = update['$unset']!['name']!;
+        expect(unsetRef).toBeInstanceOf(MongoParamRef);
+        expect(unsetRef.codecId).toBeUndefined();
+        expect(unsetRef.value).toBe('');
+      }
+    });
+
+    it('produces dot-path operations from callback', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col
+        .where(MongoFieldFilter.eq('_id', 'id-1'))
+        .update((u) => [u('homeAddress.city').set('NYC')]);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        expect(update['$set']!['homeAddress.city']).toBeInstanceOf(MongoParamRef);
+        expect(update['$set']!['homeAddress.city']!.codecId).toBe('mongo/string@1');
+      }
+    });
+
+    it('normalizes empty callback to { $set: {} }', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('_id', 'id-1')).update(() => []);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        expect(command.update).toEqual({ $set: {} });
+      }
+    });
+
+    it('wraps value-object payload through codec in set()', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col
+        .where(MongoFieldFilter.eq('_id', 'id-1'))
+        .update((u) => [u.homeAddress.set({ city: 'NYC', country: 'US' })]);
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, unknown>>;
+        const setDoc = update['$set']!['homeAddress'] as Record<string, MongoParamRef>;
+        expect(setDoc['city']).toBeInstanceOf(MongoParamRef);
+        expect(setDoc['city']!.codecId).toBe('mongo/string@1');
+        expect(setDoc['country']).toBeInstanceOf(MongoParamRef);
+        expect(setDoc['country']!.codecId).toBe('mongo/string@1');
+      }
+    });
+  });
+
+  describe('updateAll() with callback', () => {
+    it('produces correct update doc from field operations', async () => {
+      const executor = createMockExecutor(
+        [{ _id: 'id-1' }, { _id: 'id-2' }],
+        [{ matchedCount: 2, modifiedCount: 2 }],
+        [
+          { _id: 'id-1', name: 'Alice', loginCount: 1 },
+          { _id: 'id-2', name: 'Bob', loginCount: 1 },
+        ],
+      );
+      const col = createMongoCollection(contract, 'User', executor);
+      const rows: unknown[] = [];
+      for await (const row of col
+        .where(MongoFieldFilter.eq('email', 'a@b.c'))
+        .updateAll((u) => [u.loginCount.inc(1)])) {
+        rows.push(row);
+      }
+      expect(rows).toHaveLength(2);
+      const updateCommand = executor.lastPlan;
+      expect(updateCommand).toBeDefined();
+    });
+  });
+
+  describe('updateCount() with callback', () => {
+    it('produces correct update doc from field operations', async () => {
+      const executor = createMockExecutor([{ modifiedCount: 1 }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      const count = await col
+        .where(MongoFieldFilter.eq('email', 'a'))
+        .updateCount((u) => [u.name.set('X')]);
+      expect(count).toBe(1);
+    });
+  });
+
+  describe('upsert() with callback', () => {
+    it('uses field operations for update part', async () => {
+      const executor = createMockExecutor([{ _id: 'new-id' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      await col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
+        create: defaultUserData,
+        update: (u: FieldAccessor<Contract, 'User'>) => [u.loginCount.inc(1)],
+      });
+      const command = executor.lastCommand!;
+      if (command.kind === 'findOneAndUpdate') {
+        const update = command.update as Record<string, Record<string, MongoParamRef>>;
+        expect(update['$inc']!['loginCount']).toBeInstanceOf(MongoParamRef);
+        expect(update['$setOnInsert']).toBeDefined();
+      }
+    });
+
+    it('throws when callback produces dot-path operations', async () => {
+      const executor = createMockExecutor();
+      const col = createMongoCollection(contract, 'User', executor);
+      await expect(
+        col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
+          create: { ...defaultUserData, homeAddress: { city: 'SF', country: 'US' } },
+          update: (u) => [u('homeAddress.city').set('LA')],
+        }),
+      ).rejects.toThrow('dot-path');
     });
   });
 
@@ -447,7 +876,7 @@ describe('MongoCollection write methods', () => {
       const executor = createMockExecutor([{ _id: 'new-id', name: 'Alice', email: 'a@b.c' }]);
       const col = createMongoCollection(contract, 'User', executor);
       const result = await col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
-        create: { name: 'Alice', email: 'a@b.c' },
+        create: defaultUserData,
         update: { name: 'Alice Updated' },
       });
       expect(result).toEqual({ _id: 'new-id', name: 'Alice', email: 'a@b.c' });
@@ -459,7 +888,7 @@ describe('MongoCollection write methods', () => {
       const col = createMongoCollection(contract, 'User', executor);
       await expect(
         col.upsert({
-          create: { name: 'A', email: 'a@b.c' },
+          create: { ...defaultUserData, name: 'A' },
           update: { name: 'B' },
         }),
       ).rejects.toThrow('requires a .where()');
@@ -516,7 +945,7 @@ describe('MongoCollection write methods', () => {
       await expect(
         withFilter(executor)
           .take(1)
-          .upsert({ create: { name: 'A', email: 'a@b.c' }, update: { name: 'B' } }),
+          .upsert({ create: { ...defaultUserData, name: 'A' }, update: { name: 'B' } }),
       ).rejects.toThrow('orderBy/skip/take');
     });
   });
@@ -659,8 +1088,40 @@ describe('MongoCollection write methods', () => {
       const col = createMongoCollection(contract, 'User', executor);
       await expect(
         col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
-          create: { name: 'Alice', email: 'a@b.c' },
+          create: defaultUserData,
           update: { _id: 'new-id', name: 'B' },
+        }),
+      ).rejects.toThrow('_id');
+    });
+
+    it('update() with callback throws when _id is targeted', async () => {
+      const executor = createMockExecutor();
+      const col = createMongoCollection(contract, 'User', executor);
+      await expect(
+        col.where(MongoFieldFilter.eq('_id', 'id-1')).update((u) => [u._id.set('new-id')]),
+      ).rejects.toThrow('_id');
+    });
+
+    it('updateAll() with callback throws when _id is targeted', async () => {
+      const executor = createMockExecutor([{ _id: 'id-1' }]);
+      const col = createMongoCollection(contract, 'User', executor);
+      const result = col
+        .where(MongoFieldFilter.eq('_id', 'id-1'))
+        .updateAll((u: FieldAccessor<Contract, 'User'>) => [u._id.set('new-id')]);
+      await expect(async () => {
+        for await (const _ of result) {
+          /* drain */
+        }
+      }).rejects.toThrow('_id');
+    });
+
+    it('upsert() with callback throws when _id is targeted', async () => {
+      const executor = createMockExecutor();
+      const col = createMongoCollection(contract, 'User', executor);
+      await expect(
+        col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
+          create: defaultUserData,
+          update: (u: FieldAccessor<Contract, 'User'>) => [u._id.set('new-id')],
         }),
       ).rejects.toThrow('_id');
     });
@@ -670,7 +1131,7 @@ describe('MongoCollection write methods', () => {
     it('write methods do not mutate collection state', async () => {
       const executor = createMockExecutor([{ insertedId: 'x' }]);
       const col = createMongoCollection(contract, 'User', executor);
-      await col.create({ name: 'Alice', email: 'a@b.c' });
+      await col.create(defaultUserData);
       const filtered = col.where(MongoFieldFilter.eq('name', 'Alice'));
       expect(filtered).not.toBe(col);
     });

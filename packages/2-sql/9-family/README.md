@@ -20,8 +20,7 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Destructive Change Detection**: Compares two `SqlStorage` values and identifies destructive changes (dropped tables/columns) for migration policy enforcement
 - **Storage Type Control Hooks**: Extracts codec-owned control hooks for planning/verification/introspection of `storage.types` without adding enum-specific fields to shared IR
 - **Codec Ownership**: Enforces a single owner per `codecId` for parameterized renderers and control-plane hooks to prevent ambiguous conflicts during assembly
-- **Mutation Default Registry Assembly**: Assembles control-plane default-function entries and generator descriptors from composed components with hard-error collisions
-- **PSL Interpretation Input Assembly**: Assembles target-bound scalar type descriptors plus mutation-default contributions for PSL provider/interpreter inputs
+- **Authoring Contribution Assembly**: Assembles authoring contributions (type constructors, field presets) from composed components for PSL interpretation
 - **Parameterized Type Verification**: Expands contract `typeParams` into expected native type strings during schema verification and flags missing parameters as type mismatches
 - **Schema Defaults Policy**: Ignores execution mutation defaults during schema verification since they are applied before DB writes
 - **Foreign Key Config Awareness**: Schema verification respects the contract's `foreignKeys` configuration — when `foreignKeys.constraints` is `false`, FK constraint checks are skipped during verification (see [ADR 161](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md))
@@ -30,35 +29,34 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 ## Usage
 
 ```typescript
-import sql, {
-  assembleAuthoringContributions,
-  assemblePslInterpretationContributions,
-} from '@prisma-next/family-sql/control';
+import sql from '@prisma-next/family-sql/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 
 // sql is a ControlFamilyDescriptor with:
 // - kind: 'family'
 // - id: 'sql'
 // - familyId: 'sql'
 // - hook: TargetFamilyHook
-// - create: (options) => SqlFamilyInstance
+// - create: (stack) => SqlFamilyInstance
 
-// Create a family instance for control-plane operations
-const familyInstance = sql.create({
+// Build a control stack (assembles all contributions from components)
+const stack = createControlStack({
+  family: sql,
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
-  driver: postgresDriverDescriptor, // Required
-  extensions: [pgVectorExtensionDescriptor],
+  driver: postgresDriverDescriptor,
+  extensionPacks: [pgVectorExtensionDescriptor],
 });
+
+// Create a family instance for control-plane operations
+const familyInstance = sql.create(stack);
 
 // Use instance methods for domain actions
 const contract = familyInstance.validateContract(contractJson);
 const verifyResult = await familyInstance.verify({ driver, contract, ... });
-const emitResult = await familyInstance.emitContract({ contract: rawContract }); // Handles stripping mappings and validation internally
 
 // Targets that implement SqlControlTargetDescriptor can build planners
 const planner = postgresTargetDescriptor.migrations.createPlanner(familyInstance);
-// frameworkComponents should include the active target, adapter, and any extension descriptors so
-// planner/runner can resolve database dependencies declared by those components.
 const planResult = planner.plan({
   contract: sqlContract,
   schema,
@@ -75,29 +73,10 @@ const executeResult = await runner.execute({
   frameworkComponents: [postgresTargetDescriptor, postgresAdapterDescriptor, pgVectorExtensionDescriptor],
 });
 
-// Assemble PSL interpretation inputs for sql-contract-psl/provider
-const authoringContributions = assembleAuthoringContributions([
-  sql,
-  postgresTargetDescriptor,
-  postgresAdapterDescriptor,
-  pgVectorExtensionDescriptor,
-]);
-const pslInputs = assemblePslInterpretationContributions([
-  sql,
-  postgresTargetDescriptor,
-  postgresAdapterDescriptor,
-  pgVectorExtensionDescriptor,
-]);
-const providerOptions = {
-  target: postgresTargetDescriptor,
-  authoringContributions,
-  scalarTypeDescriptors: pslInputs.scalarTypeDescriptors,
-  controlMutationDefaults: {
-    defaultFunctionRegistry: pslInputs.defaultFunctionRegistry,
-    generatorDescriptors: pslInputs.generatorDescriptors,
-  },
-  composedExtensionPacks: [pgVectorExtensionDescriptor.id],
-};
+// PSL contribution assembly (scalar type descriptors, mutation defaults, authoring
+// contributions, codec lookup) is handled at the framework level by createControlStack.
+// The CLI passes assembled contributions via ContractSourceContext when calling
+// contract source providers — no manual assembly needed in user configs.
 
 // executeResult is a Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>
 if (executeResult.ok) {

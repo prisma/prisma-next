@@ -6,7 +6,10 @@ import type { CoreSchemaView } from './control-schema-view';
 export interface MigratableTargetDescriptor<
   TFamilyId extends string,
   TTargetId extends string,
-  TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
+  TFamilyInstance extends ControlFamilyInstance<TFamilyId, unknown> = ControlFamilyInstance<
+    TFamilyId,
+    unknown
+  >,
 > extends ControlTargetDescriptor<TFamilyId, TTargetId> {
   readonly migrations: TargetMigrationsCapability<TFamilyId, TTargetId, TFamilyInstance>;
 }
@@ -21,9 +24,9 @@ export interface SchemaViewCapable<TSchemaIR = unknown> {
   toSchemaView(schema: TSchemaIR): CoreSchemaView;
 }
 
-export function hasSchemaView<TFamilyId extends string>(
-  instance: ControlFamilyInstance<TFamilyId>,
-): instance is ControlFamilyInstance<TFamilyId> & SchemaViewCapable {
+export function hasSchemaView<TFamilyId extends string, TSchemaIR>(
+  instance: ControlFamilyInstance<TFamilyId, TSchemaIR>,
+): instance is ControlFamilyInstance<TFamilyId, TSchemaIR> & SchemaViewCapable<TSchemaIR> {
   return (
     'toSchemaView' in instance &&
     typeof (instance as Record<string, unknown>)['toSchemaView'] === 'function'

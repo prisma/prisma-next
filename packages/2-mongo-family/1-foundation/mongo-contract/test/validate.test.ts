@@ -77,15 +77,10 @@ describe('validateMongoContract()', () => {
             items: {
               indexes: [
                 {
-                  fields: { _id: 1 },
-                  options: {
-                    unique: true,
-                    hidden: true,
-                    name: 'item_id_idx',
-                    collation: { locale: 'en', strength: 2 },
-                  },
+                  keys: [{ field: '_id', direction: 1 }],
+                  unique: true,
                 },
-                { fields: { name: 'text' } },
+                { keys: [{ field: 'name', direction: 'text' }] },
               ],
             },
           },
@@ -106,26 +101,21 @@ describe('validateMongoContract()', () => {
       expect(result.contract.storage.collections['items']).toEqual({
         indexes: [
           {
-            fields: { _id: 1 },
-            options: {
-              unique: true,
-              hidden: true,
-              name: 'item_id_idx',
-              collation: { locale: 'en', strength: 2 },
-            },
+            keys: [{ field: '_id', direction: 1 }],
+            unique: true,
           },
-          { fields: { name: 'text' } },
+          { keys: [{ field: 'name', direction: 'text' }] },
         ],
       });
     });
 
-    it('rejects empty index field maps', () => {
+    it('rejects empty index keys array', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
           collections: {
             items: {
-              indexes: [{ fields: {} }],
+              indexes: [{ keys: [] }],
             },
           },
         },
@@ -141,9 +131,7 @@ describe('validateMongoContract()', () => {
           collections: {
             items: {
               options: {
-                capped: true,
-                size: 4096,
-                expireAfterSeconds: 3600,
+                capped: { size: 4096, max: 100 },
                 collation: { locale: 'en', strength: 2 },
                 changeStreamPreAndPostImages: { enabled: true },
                 timeseries: {
@@ -152,8 +140,6 @@ describe('validateMongoContract()', () => {
                 },
                 clusteredIndex: {
                   name: '_id_',
-                  key: { _id: 1 },
-                  unique: true,
                 },
               },
             },
@@ -165,9 +151,7 @@ describe('validateMongoContract()', () => {
 
       expect(result.contract.storage.collections['items']).toEqual({
         options: {
-          capped: true,
-          size: 4096,
-          expireAfterSeconds: 3600,
+          capped: { size: 4096, max: 100 },
           collation: { locale: 'en', strength: 2 },
           changeStreamPreAndPostImages: { enabled: true },
           timeseries: {
@@ -176,14 +160,12 @@ describe('validateMongoContract()', () => {
           },
           clusteredIndex: {
             name: '_id_',
-            key: { _id: 1 },
-            unique: true,
           },
         },
       });
     });
 
-    it('accepts record-shaped index and collection option maps', () => {
+    it('accepts record-shaped index partialFilterExpression', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
@@ -191,32 +173,13 @@ describe('validateMongoContract()', () => {
             items: {
               indexes: [
                 {
-                  fields: { name: 'text' },
-                  options: {
-                    partialFilterExpression: {
-                      archived: false,
-                      $or: [{ status: 'active' }, { tags: ['priority', 'searchable'] }],
-                    },
-                    weights: { name: 10 },
+                  keys: [{ field: 'name', direction: 'text' }],
+                  partialFilterExpression: {
+                    archived: false,
+                    $or: [{ status: 'active' }, { tags: ['priority', 'searchable'] }],
                   },
                 },
               ],
-              options: {
-                storageEngine: {
-                  wiredTiger: {
-                    configString: 'block_compressor=zstd',
-                    nested: [{ compression: 'zstd' }, 1, true, null],
-                  },
-                },
-                indexOptionDefaults: {
-                  storageEngine: {
-                    wiredTiger: {
-                      configString: 'prefix_compression=true',
-                      nested: [{ prefixCompression: true }],
-                    },
-                  },
-                },
-              },
             },
           },
         },
@@ -236,139 +199,24 @@ describe('validateMongoContract()', () => {
       expect(result.contract.storage.collections['items']).toEqual({
         indexes: [
           {
-            fields: { name: 'text' },
-            options: {
-              partialFilterExpression: {
-                archived: false,
-                $or: [{ status: 'active' }, { tags: ['priority', 'searchable'] }],
-              },
-              weights: { name: 10 },
+            keys: [{ field: 'name', direction: 'text' }],
+            partialFilterExpression: {
+              archived: false,
+              $or: [{ status: 'active' }, { tags: ['priority', 'searchable'] }],
             },
           },
         ],
-        options: {
-          storageEngine: {
-            wiredTiger: {
-              configString: 'block_compressor=zstd',
-              nested: [{ compression: 'zstd' }, 1, true, null],
-            },
-          },
-          indexOptionDefaults: {
-            storageEngine: {
-              wiredTiger: {
-                configString: 'prefix_compression=true',
-                nested: [{ prefixCompression: true }],
-              },
-            },
-          },
-        },
       });
     });
 
-    it('rejects non-JSON values in record-shaped index and collection option maps', () => {
-      const json = {
-        ...makeValidContractJson(),
-        storage: {
-          collections: {
-            items: {
-              indexes: [
-                {
-                  fields: { name: 'text' },
-                  options: {
-                    partialFilterExpression: {
-                      $or: [{ status: 'active' }, { updatedAt: 1n }],
-                    },
-                  },
-                },
-              ],
-              options: {
-                storageEngine: {
-                  wiredTiger: { configString: 'block_compressor=zstd' },
-                },
-              },
-            },
-          },
-        },
-        models: {
-          Item: {
-            fields: {
-              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
-              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
-            },
-            storage: { collection: 'items' },
-          },
-        },
-      };
-
-      expect(() => validateMongoContract(json)).toThrow();
-    });
-
-    it('rejects cyclic record-shaped index and collection option maps without overflowing the stack', () => {
-      const cyclicPartialFilterExpression: Record<string, unknown> = {
-        archived: false,
-      };
-      cyclicPartialFilterExpression['self'] = cyclicPartialFilterExpression;
-
-      const cyclicStorageEngineEntries: unknown[] = [];
-      cyclicStorageEngineEntries.push(cyclicStorageEngineEntries);
-
-      const json = {
-        ...makeValidContractJson(),
-        storage: {
-          collections: {
-            items: {
-              indexes: [
-                {
-                  fields: { name: 'text' },
-                  options: {
-                    partialFilterExpression: cyclicPartialFilterExpression,
-                  },
-                },
-              ],
-              options: {
-                storageEngine: {
-                  wiredTiger: {
-                    nested: cyclicStorageEngineEntries,
-                  },
-                },
-              },
-            },
-          },
-        },
-        models: {
-          Item: {
-            fields: {
-              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
-              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
-            },
-            storage: { collection: 'items' },
-          },
-        },
-      };
-
-      let error: unknown;
-
-      try {
-        validateMongoContract(json);
-      } catch (caught) {
-        error = caught;
-      }
-
-      expect(error).toBeDefined();
-      expect(error).not.toBeInstanceOf(RangeError);
-    });
-
-    it('rejects empty clustered index keys', () => {
+    it('rejects unknown collection option properties', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
           collections: {
             items: {
               options: {
-                clusteredIndex: {
-                  key: {},
-                  unique: true,
-                },
+                unsupported: true,
               },
             },
           },
@@ -384,7 +232,7 @@ describe('validateMongoContract()', () => {
         storage: {
           collections: {
             items: {
-              indexes: [{ fields: { _id: 1 }, options: { unsupported: true } }],
+              indexes: [{ keys: [{ field: '_id', direction: 1 }], unsupported: true }],
             },
           },
         },
@@ -483,17 +331,23 @@ describe('validateMongoContract()', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
         indexes: [
-          { fields: { name: 1 } },
-          { fields: { email: 1 }, options: { unique: true } },
+          { keys: [{ field: 'name', direction: 1 }] },
+          { keys: [{ field: 'email', direction: 1 }], unique: true },
           {
-            fields: { createdAt: -1 },
-            options: { sparse: true, expireAfterSeconds: 3600 },
+            keys: [{ field: 'createdAt', direction: -1 }],
+            sparse: true,
+            expireAfterSeconds: 3600,
           },
-          { fields: { a: 1, b: -1 } },
-          { fields: { description: 'text' } },
-          { fields: { location: '2dsphere' } },
-          { fields: { coords: '2d' } },
-          { fields: { hash: 'hashed' } },
+          {
+            keys: [
+              { field: 'a', direction: 1 },
+              { field: 'b', direction: -1 },
+            ],
+          },
+          { keys: [{ field: 'description', direction: 'text' }] },
+          { keys: [{ field: 'location', direction: '2dsphere' }] },
+          { keys: [{ field: 'coords', direction: '2d' }] },
+          { keys: [{ field: 'hash', direction: 'hashed' }] },
         ],
       } as typeof json.storage.collections.items;
       const result = validateMongoContract(json);
@@ -505,8 +359,8 @@ describe('validateMongoContract()', () => {
       json.storage.collections.items = {
         indexes: [
           {
-            fields: { status: 1 },
-            options: { partialFilterExpression: { status: { $eq: 'active' } } },
+            keys: [{ field: 'status', direction: 1 }],
+            partialFilterExpression: { status: { $eq: 'active' } },
           },
         ],
       } as typeof json.storage.collections.items;
@@ -514,26 +368,26 @@ describe('validateMongoContract()', () => {
       expect(result.contract).toBeDefined();
     });
 
-    it('rejects index with empty fields', () => {
+    it('rejects index with empty keys array', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ fields: {} }],
+        indexes: [{ keys: [] }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
-    it('rejects index field with invalid direction', () => {
+    it('rejects index key with invalid direction', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ fields: { name: 'invalid' } }],
+        indexes: [{ keys: [{ field: 'name', direction: 'invalid' }] }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
-    it('rejects index missing fields', () => {
+    it('rejects index key missing field', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{}],
+        indexes: [{ keys: [{ direction: 1 }] }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
@@ -541,7 +395,7 @@ describe('validateMongoContract()', () => {
     it('rejects index with extra properties', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ fields: { name: 1 }, extra: true }],
+        indexes: [{ keys: [{ field: 'name', direction: 1 }], extra: true }],
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
     });
@@ -549,10 +403,244 @@ describe('validateMongoContract()', () => {
     it('rejects collection with extra properties', () => {
       const json = makeValidContractJson();
       json.storage.collections.items = {
-        indexes: [{ fields: { name: 1 } }],
+        indexes: [{ keys: [{ field: 'name', direction: 1 }] }],
         extra: true,
       } as typeof json.storage.collections.items;
       expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('accepts index with wildcardProjection', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [
+          {
+            keys: [{ field: '$**', direction: 1 }],
+            wildcardProjection: { name: 1, email: 1 },
+          },
+        ],
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts index with collation', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [
+          {
+            keys: [{ field: 'name', direction: 1 }],
+            collation: { locale: 'en', strength: 2 },
+          },
+        ],
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts index with text options (weights, default_language, language_override)', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [
+          {
+            keys: [{ field: 'bio', direction: 'text' }],
+            weights: { bio: 10 },
+            default_language: 'english',
+            language_override: 'lang',
+          },
+        ],
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+  });
+
+  describe('storage validator validation', () => {
+    it('accepts collection with valid validator', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        validator: {
+          jsonSchema: { bsonType: 'object', properties: { name: { bsonType: 'string' } } },
+          validationLevel: 'strict',
+          validationAction: 'error',
+        },
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts collection with validator and indexes', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [{ keys: [{ field: 'name', direction: 1 }] }],
+        validator: {
+          jsonSchema: { bsonType: 'object' },
+          validationLevel: 'moderate',
+          validationAction: 'warn',
+        },
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('rejects validator with invalid validationLevel', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        validator: {
+          jsonSchema: {},
+          validationLevel: 'invalid',
+          validationAction: 'error',
+        },
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects validator with invalid validationAction', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        validator: {
+          jsonSchema: {},
+          validationLevel: 'strict',
+          validationAction: 'invalid',
+        },
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects validator missing jsonSchema', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        validator: {
+          validationLevel: 'strict',
+          validationAction: 'error',
+        },
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects validator missing validationLevel', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        validator: {
+          jsonSchema: { bsonType: 'object' },
+          validationAction: 'error',
+        },
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects validator missing validationAction', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        validator: {
+          jsonSchema: { bsonType: 'object' },
+          validationLevel: 'strict',
+        },
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+  });
+
+  describe('storage collection options validation', () => {
+    it('accepts collection with capped option', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        options: { capped: { size: 1048576 } },
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts collection with capped option including max', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        options: { capped: { size: 1048576, max: 1000 } },
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts collection with timeseries option', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        options: {
+          timeseries: { timeField: 'timestamp', metaField: 'meta', granularity: 'hours' },
+        },
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts collection with collation option', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        options: { collation: { locale: 'en', strength: 2 } },
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts collection with changeStreamPreAndPostImages', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        options: { changeStreamPreAndPostImages: { enabled: true } },
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts collection with clusteredIndex', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        options: { clusteredIndex: { name: 'myCluster' } },
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('rejects capped option without required size', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        options: { capped: { max: 100 } },
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('rejects invalid wildcardProjection values', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [
+          {
+            keys: [{ field: '$**', direction: 1 }],
+            wildcardProjection: { name: 2 },
+          },
+        ],
+      } as typeof json.storage.collections.items;
+      expect(() => validateMongoContract(json)).toThrow();
+    });
+
+    it('accepts collection with no validator or options (backward compat)', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {};
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
+    });
+
+    it('accepts collection with all options combined', () => {
+      const json = makeValidContractJson();
+      json.storage.collections.items = {
+        indexes: [{ keys: [{ field: 'name', direction: 1 }] }],
+        validator: {
+          jsonSchema: { bsonType: 'object' },
+          validationLevel: 'strict',
+          validationAction: 'error',
+        },
+        options: {
+          changeStreamPreAndPostImages: { enabled: true },
+          collation: { locale: 'en' },
+        },
+      } as typeof json.storage.collections.items;
+      const result = validateMongoContract(json);
+      expect(result.contract).toBeDefined();
     });
   });
 

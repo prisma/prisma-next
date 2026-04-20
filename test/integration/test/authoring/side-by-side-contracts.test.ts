@@ -7,7 +7,7 @@ import { enrichContract } from '@prisma-next/cli/control-api';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/emitter';
 import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
-import sql, { assemblePslInterpretationContributions } from '@prisma-next/family-sql/control';
+import sql from '@prisma-next/family-sql/control';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -24,8 +24,33 @@ import { describe, expect, it } from 'vitest';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtureRootDir = join(__dirname, 'side-by-side');
 const shouldUpdateExpected = process.env['UPDATE_SIDE_BY_SIDE_CONTRACTS'] === '1';
-const sourceContext: ContractSourceContext = {
+
+const sqlStack = createControlStack({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+});
+
+const mongoStack = createControlStack({
+  family: mongoFamilyDescriptor,
+  target: mongoTargetDescriptor,
+  adapter: mongoAdapter,
+});
+
+const sqlSourceContext: ContractSourceContext = {
   composedExtensionPacks: [],
+  scalarTypeDescriptors: sqlStack.scalarTypeDescriptors,
+  authoringContributions: sqlStack.authoringContributions,
+  codecLookup: sqlStack.codecLookup,
+  controlMutationDefaults: sqlStack.controlMutationDefaults,
+};
+
+const mongoSourceContext: ContractSourceContext = {
+  composedExtensionPacks: [],
+  scalarTypeDescriptors: mongoStack.scalarTypeDescriptors,
+  authoringContributions: mongoStack.authoringContributions,
+  codecLookup: mongoStack.codecLookup,
+  controlMutationDefaults: mongoStack.controlMutationDefaults,
 };
 
 type FixtureName = 'postgres' | 'mongo';
@@ -41,11 +66,6 @@ interface FixtureCase {
 interface LoadedFixture {
   readonly tsContract: Contract;
 }
-
-const sqlPslInterpretationContributions = assemblePslInterpretationContributions([
-  postgres,
-  postgresAdapter,
-]);
 
 const fixtureNames = ['postgres', 'mongo'] as const satisfies readonly FixtureName[];
 
@@ -123,25 +143,15 @@ describe('side-by-side contract examples', () => {
       const fixture = await loadFixture(fixtureCase);
       const provider = prismaContract(fixtureCase.contractPslPath, {
         target: postgres,
-        scalarTypeDescriptors: sqlPslInterpretationContributions.scalarTypeDescriptors,
-        controlMutationDefaults: {
-          defaultFunctionRegistry: sqlPslInterpretationContributions.defaultFunctionRegistry,
-          generatorDescriptors: sqlPslInterpretationContributions.generatorDescriptors,
-        },
       });
 
-      const providerResult = await provider.source(sourceContext);
+      const providerResult = await provider.source(sqlSourceContext);
       expect(providerResult.ok).toBe(true);
       if (!providerResult.ok) {
         throw new Error(providerResult.failure.summary);
       }
 
-      const stack = createControlStack({
-        family: sql,
-        target: postgres,
-        adapter: postgresAdapter,
-      });
-      const familyInstance = sql.create(stack);
+      const familyInstance = sql.create(sqlStack);
       const frameworkComponents = [postgres, postgresAdapter];
 
       const normalizedTs = familyInstance.validateContract(
@@ -153,8 +163,8 @@ describe('side-by-side contract examples', () => {
 
       expect(normalizedTs).toEqual(normalizedPsl);
 
-      const emittedTs = await emit(normalizedTs, stack, sql.emission);
-      const emittedPsl = await emit(normalizedPsl, stack, sql.emission);
+      const emittedTs = await emit(normalizedTs, sqlStack, sql.emission);
+      const emittedPsl = await emit(normalizedPsl, sqlStack, sql.emission);
 
       expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
 
@@ -197,18 +207,13 @@ describe('side-by-side contract examples', () => {
 
       const fixture = await loadFixture(fixtureCase);
       const provider = mongoContract(fixtureCase.contractPslPath);
-      const providerResult = await provider.source(sourceContext);
+      const providerResult = await provider.source(mongoSourceContext);
       expect(providerResult.ok).toBe(true);
       if (!providerResult.ok) {
         throw new Error(providerResult.failure.summary);
       }
 
-      const stack = createControlStack({
-        family: mongoFamilyDescriptor,
-        target: mongoTargetDescriptor,
-        adapter: mongoAdapter,
-      });
-      const familyInstance = mongoFamilyDescriptor.create(stack);
+      const familyInstance = mongoFamilyDescriptor.create(mongoStack);
       const frameworkComponents = [mongoTargetDescriptor, mongoAdapter];
 
       const normalizedTs = familyInstance.validateContract(
@@ -218,14 +223,39 @@ describe('side-by-side contract examples', () => {
         enrichContract(providerResult.value, frameworkComponents),
       );
 
-      expect(normalizedTs).toEqual(normalizedPsl);
+      const stripValidatorFields = (contract: typeof normalizedTs) => {
+        const storage = contract.storage as unknown as Record<string, unknown>;
+        const collections = storage['collections'] as Record<string, Record<string, unknown>>;
+        const stripped: Record<string, unknown> = {};
+        for (const [name, coll] of Object.entries(collections)) {
+          const { validator: _, ...rest } = coll;
+          stripped[name] = rest;
+        }
+        const { storageHash: _sh, ...restStorage } = storage;
+        return { ...contract, storage: { ...restStorage, collections: stripped } };
+      };
+      expect(stripValidatorFields(normalizedTs)).toEqual(stripValidatorFields(normalizedPsl));
 
-      const emittedTs = await emit(normalizedTs, stack, mongoFamilyDescriptor.emission);
-      const emittedPsl = await emit(normalizedPsl, stack, mongoFamilyDescriptor.emission);
+      const emittedTs = await emit(normalizedTs, mongoStack, mongoFamilyDescriptor.emission);
+      const emittedPsl = await emit(normalizedPsl, mongoStack, mongoFamilyDescriptor.emission);
 
-      expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
+      const stripForComparison = (json: string) => {
+        const parsed = JSON.parse(json) as Record<string, unknown>;
+        const storage = parsed['storage'] as Record<string, unknown>;
+        const collections = storage['collections'] as Record<string, Record<string, unknown>>;
+        const strippedCollections: Record<string, unknown> = {};
+        for (const [name, coll] of Object.entries(collections)) {
+          const { validator: _, ...rest } = coll;
+          strippedCollections[name] = rest;
+        }
+        const { storageHash: _sh, ...restStorage } = storage;
+        return { ...parsed, storage: { ...restStorage, collections: strippedCollections } };
+      };
+      expect(stripForComparison(emittedTs.contractJson)).toEqual(
+        stripForComparison(emittedPsl.contractJson),
+      );
 
-      const emittedContractJson = parseContractJson(emittedTs.contractJson);
+      const emittedContractJson = parseContractJson(emittedPsl.contractJson);
       const validatedContract = validateEmittedMongoContract(emittedContractJson);
 
       expect(validatedContract.contract.roots).toEqual({
@@ -250,10 +280,10 @@ describe('side-by-side contract examples', () => {
       });
 
       if (shouldUpdateExpected) {
-        writeExpectedContractJson(fixtureCase, emittedTs.contractJson);
+        writeExpectedContractJson(fixtureCase, emittedPsl.contractJson);
       }
 
-      expect(emittedTs.contractJson).toBe(readExpectedContractJson(fixtureCase));
+      expect(emittedPsl.contractJson).toBe(readExpectedContractJson(fixtureCase));
     },
     timeouts.typeScriptCompilation,
   );

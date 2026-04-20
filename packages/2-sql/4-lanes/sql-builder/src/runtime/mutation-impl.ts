@@ -119,7 +119,7 @@ export class InsertQueryImpl<
     },
   );
 
-  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>> {
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
     const paramValues = buildParamValues(
       this.#values,
       this.#table,
@@ -134,7 +134,11 @@ export class InsertQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes']>>(ast, this.#rowFields, this.ctx);
+    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>(
+      ast,
+      this.#rowFields,
+      this.ctx,
+    );
   }
 }
 
@@ -210,7 +214,7 @@ export class UpdateQueryImpl<
     },
   );
 
-  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>> {
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
     const setParams = buildParamValues(
       this.#setValues,
       this.#table,
@@ -233,7 +237,11 @@ export class UpdateQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes']>>(ast, this.#rowFields, this.ctx);
+    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>(
+      ast,
+      this.#rowFields,
+      this.ctx,
+    );
   }
 }
 
@@ -299,7 +307,7 @@ export class DeleteQueryImpl<
     },
   );
 
-  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes']>> {
+  build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
     const whereExpr = combineWhereExprs(
       this.#whereCallbacks.map((cb) =>
         evaluateWhere(cb, this.#scope, this.ctx.queryOperationTypes),
@@ -312,6 +320,10 @@ export class DeleteQueryImpl<
       ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
     }
 
-    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes']>>(ast, this.#rowFields, this.ctx);
+    return buildQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>(
+      ast,
+      this.#rowFields,
+      this.ctx,
+    );
   }
 }

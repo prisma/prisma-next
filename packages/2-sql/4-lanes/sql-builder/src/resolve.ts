@@ -1,14 +1,24 @@
 import type { Expand, ScopeField } from './scope';
 
-/// Given a row type of { <fieldName>: { codecId: <codecId>, nullable: <nullable> } }, return a record of { <fieldName>: <codecOutputType> }
-/// Also resolves nullability of the field.
+type ResolveField<
+  F extends ScopeField,
+  CodecTypes extends Record<string, { readonly output: unknown }>,
+> = F['codecId'] extends keyof CodecTypes
+  ? F['nullable'] extends true
+    ? CodecTypes[F['codecId']]['output'] | null
+    : CodecTypes[F['codecId']]['output']
+  : unknown;
+
+type ApplyNullable<T, F extends ScopeField> = F['nullable'] extends true ? T | null : T;
+
 export type ResolveRow<
   Row extends Record<string, ScopeField>,
   CodecTypes extends Record<string, { readonly output: unknown }>,
+  PreResolved extends Record<string, unknown> = Record<string, never>,
 > = Expand<{
-  -readonly [K in keyof Row]: Row[K]['codecId'] extends keyof CodecTypes
-    ? Row[K]['nullable'] extends true
-      ? CodecTypes[Row[K]['codecId']]['output'] | null
-      : CodecTypes[Row[K]['codecId']]['output']
-    : unknown;
+  -readonly [K in keyof Row]: string extends keyof PreResolved
+    ? ResolveField<Row[K], CodecTypes>
+    : K extends keyof PreResolved
+      ? ApplyNullable<NonNullable<PreResolved[K & keyof PreResolved]>, Row[K]>
+      : ResolveField<Row[K], CodecTypes>;
 }>;

@@ -15,11 +15,24 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/framework-components": "workspace:*"
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/errors": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
+    "@prisma-next/mongo-contract": "workspace:*",
+    "@prisma-next/mongo-query-ast": "workspace:*",
+    "@prisma-next/mongo-schema-ir": "workspace:*",
+    "@prisma-next/mongo-value": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
+    "arktype": "catalog:",
+    "mongodb": "catalog:"
   },
   "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
+    "mongodb-memory-server": "catalog:",
+    "pathe": "^2.0.3",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
@@ -30,6 +43,8 @@
   ],
   "exports": {
     "./codec-types": "./dist/codec-types.mjs",
+    "./control": "./dist/control.mjs",
+    "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
     "./package.json": "./package.json"
   },

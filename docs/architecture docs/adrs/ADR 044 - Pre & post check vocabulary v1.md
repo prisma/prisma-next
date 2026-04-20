@@ -1,5 +1,7 @@
 # ADR 044 — Pre/post check vocabulary v1
 
+> **Superseded.** The v1 check vocabulary described here is not used by any target. MongoDB uses `{ source, filter, expect, description }` with reused filter expressions (see [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)). SQL uses SQL statements directly. Check semantics are now defined per-family in their respective operation model ADRs (ADR 188 for Mongo, ADR 028 for SQL). This ADR is retained for historical context.
+
 ## Context
 
 Migration edges in Prisma Next carry pre and post checks to prove applicability and success. Other ADRs define how we execute and recover (transactions, idempotency, sandboxing), but we lack a shared, versioned vocabulary for checks. Without a canonical set of check IDs, parameter schemas, and evaluation rules, op authors cannot interoperate and PPg or the local runner cannot provide consistent diagnostics

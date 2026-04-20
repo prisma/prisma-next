@@ -218,12 +218,13 @@
       "users": {
         "indexes": [
           {
-            "fields": {
-              "email": 1
-            },
-            "options": {
-              "unique": true
-            }
+            "keys": [
+              {
+                "direction": 1,
+                "field": "email"
+              }
+            ],
+            "unique": true
           }
         ],
         "options": {
@@ -234,7 +235,7 @@
         }
       }
     },
-    "storageHash": "sha256:177d25ad859f5fed519710a605cfbd84efba7f3d3eab32b6d2ac5756350c7fe3"
+    "storageHash": "sha256:7146bd2870044773881d126136be3b87f5b15d6456dafcdc30ac1d834cbbaa6b"
   },
   "capabilities": {},
   "extensionPacks": {},

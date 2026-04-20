@@ -94,8 +94,14 @@ export async function executeContractEmit(
   // Colocate .d.ts with .json (contract.json → contract.d.ts)
   const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 
+  const stack = createControlStack(config);
+
   const sourceContext = {
-    composedExtensionPacks: (config.extensionPacks ?? []).map((p) => p.id),
+    composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+    scalarTypeDescriptors: stack.scalarTypeDescriptors,
+    authoringContributions: stack.authoringContributions,
+    codecLookup: stack.codecLookup,
+    controlMutationDefaults: stack.controlMutationDefaults,
   };
 
   let providerResult: Awaited<ReturnType<typeof contractConfig.source>>;
@@ -143,7 +149,6 @@ export async function executeContractEmit(
     });
   }
 
-  const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
 
   const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
@@ -161,6 +166,13 @@ export async function executeContractEmit(
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
   await unlessAborted(writeFile(outputJsonPath, emitResult.contractJson, 'utf-8'));
   await unlessAborted(writeFile(outputDtsPath, emitResult.contractDts, 'utf-8'));
+
+  // Validate that contract.d.ts type imports are resolvable
+  const { validateContractDeps } = await import('../../utils/validate-contract-deps');
+  const depsValidation = validateContractDeps(emitResult.contractDts, dirname(outputDtsPath));
+  if (depsValidation.warning) {
+    process.stderr.write(`\n⚠ ${depsValidation.warning}\n`);
+  }
 
   return {
     storageHash: emitResult.storageHash,

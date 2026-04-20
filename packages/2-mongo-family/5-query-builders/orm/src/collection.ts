@@ -1,4 +1,10 @@
-import type { ContractReferenceRelation, PlanMeta } from '@prisma-next/contract/types';
+import type {
+  ContractField,
+  ContractReferenceRelation,
+  ContractValueObject,
+  PlanMeta,
+} from '@prisma-next/contract/types';
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -16,21 +22,28 @@ import {
   FindOneAndUpdateCommand,
   InsertManyCommand,
   InsertOneCommand,
+  isMongoFilterExpr,
   MongoAndExpr,
   MongoFieldFilter,
   UpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';
 import { compileMongoQuery } from './compile';
 import type { MongoQueryExecutor } from './executor';
+import {
+  compileFieldOperations,
+  createFieldAccessor,
+  type FieldAccessor,
+  type FieldOperation,
+} from './field-accessor';
 import type {
   DefaultModelRow,
   IncludedRow,
   MongoIncludeSpec,
+  MongoWhereFilter,
   NoIncludes,
   ReferenceRelationKeys,
   ResolvedCreateInput,
@@ -52,7 +65,11 @@ export interface MongoCollection<
   variant<V extends VariantNames<TContract, ModelName>>(
     variantName: V,
   ): MongoCollection<TContract, ModelName, TIncludes, V>;
-  /** Appends a filter condition. Returns a new immutable collection. */
+  /** Appends equality filters from a plain object. Values are encoded through codecs. */
+  where(
+    filter: MongoWhereFilter<TContract, ModelName>,
+  ): MongoCollection<TContract, ModelName, TIncludes, TVariant>;
+  /** Appends a filter condition from a raw filter expression. */
   where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes, TVariant>;
   /** Restricts returned fields to the given subset. Returns a new immutable collection. */
   select(
@@ -90,12 +107,24 @@ export interface MongoCollection<
   update(
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
+  /** Updates one matching document using field operations from a callback. Requires `.where()`. */
+  update(
+    callback: (u: FieldAccessor<TContract, ModelName>) => FieldOperation[],
+  ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
   /** Non-atomic: captures matching `_id`s, updates, then re-reads by `_id`. Requires `.where()`. */
   updateAll(
     data: Partial<DefaultModelRow<TContract, ModelName>>,
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
+  /** Updates all matching documents using field operations from a callback. Requires `.where()`. */
+  updateAll(
+    callback: (u: FieldAccessor<TContract, ModelName>) => FieldOperation[],
+  ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
   /** Updates all matching documents and returns the number modified. Requires `.where()`. */
   updateCount(data: Partial<DefaultModelRow<TContract, ModelName>>): Promise<number>;
+  /** Updates all matching documents using field operations and returns the number modified. Requires `.where()`. */
+  updateCount(
+    callback: (u: FieldAccessor<TContract, ModelName>) => FieldOperation[],
+  ): Promise<number>;
   /** Deletes one matching document via `findOneAndDelete`. Returns the deleted document or `null`. Requires `.where()`. */
   delete(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null>;
   /** Non-atomic: reads matching docs then deletes them. Concurrent writes may cause stale results. Requires `.where()`. */
@@ -110,6 +139,11 @@ export interface MongoCollection<
   upsert(input: {
     create: ResolvedCreateInput<TContract, ModelName, TVariant>;
     update: Partial<DefaultModelRow<TContract, ModelName>>;
+  }): Promise<IncludedRow<TContract, ModelName, TIncludes>>;
+  /** Upsert using field operations callback for the update part. Requires `.where()`. */
+  upsert(input: {
+    create: ResolvedCreateInput<TContract, ModelName, TVariant>;
+    update: (u: FieldAccessor<TContract, ModelName>) => FieldOperation[];
   }): Promise<IncludedRow<TContract, ModelName, TIncludes>>;
 }
 
@@ -166,10 +200,14 @@ class MongoCollectionImpl<
     );
   }
 
-  where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
-    return this.#clone({
-      filters: [...this.#state.filters, filter],
-    });
+  where(
+    filter: MongoWhereFilter<TContract, ModelName> | MongoFilterExpr,
+  ): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
+    if (isMongoFilterExpr(filter)) {
+      return this.#clone({ filters: [...this.#state.filters, filter] });
+    }
+    const compiled = this.#compileWhereObject(filter as Record<string, unknown>);
+    return this.#clone({ filters: [...this.#state.filters, ...compiled] });
   }
 
   select(
@@ -311,20 +349,24 @@ class MongoCollectionImpl<
   }
 
   async update(
-    data: Partial<DefaultModelRow<TContract, ModelName>>,
+    dataOrCallback:
+      | Partial<DefaultModelRow<TContract, ModelName>>
+      | ((u: FieldAccessor<TContract, ModelName>) => FieldOperation[]),
   ): Promise<IncludedRow<TContract, ModelName, TIncludes> | null> {
     this.#requireFilters('update');
     this.#rejectWindowing('update');
     this.#rejectIncludes('update');
     const filter = this.#mergeFilters();
-    const updateDoc = this.#toUpdateDocument(data as Record<string, unknown>);
+    const updateDoc = this.#resolveUpdateDoc(dataOrCallback);
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, false);
     const results = await this.#drainPlan(command);
     return (results[0] as IncludedRow<TContract, ModelName, TIncludes>) ?? null;
   }
 
   updateAll(
-    data: Partial<DefaultModelRow<TContract, ModelName>>,
+    dataOrCallback:
+      | Partial<DefaultModelRow<TContract, ModelName>>
+      | ((u: FieldAccessor<TContract, ModelName>) => FieldOperation[]),
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>> {
     this.#requireFilters('updateAll');
     this.#rejectWindowing('updateAll');
@@ -334,7 +376,7 @@ class MongoCollectionImpl<
       if (ids.length === 0) return;
 
       const filter = self.#mergeFilters();
-      const updateDoc = self.#toUpdateDocument(data as Record<string, unknown>);
+      const updateDoc = self.#resolveUpdateDoc(dataOrCallback);
       const command = new UpdateManyCommand(self.#collectionName, filter, updateDoc);
       await self.#drainPlan(command);
 
@@ -347,12 +389,16 @@ class MongoCollectionImpl<
     return new AsyncIterableResult(gen());
   }
 
-  async updateCount(data: Partial<DefaultModelRow<TContract, ModelName>>): Promise<number> {
+  async updateCount(
+    dataOrCallback:
+      | Partial<DefaultModelRow<TContract, ModelName>>
+      | ((u: FieldAccessor<TContract, ModelName>) => FieldOperation[]),
+  ): Promise<number> {
     this.#requireFilters('updateCount');
     this.#rejectWindowing('updateCount');
     this.#rejectIncludes('updateCount');
     const filter = this.#mergeFilters();
-    const updateDoc = this.#toUpdateDocument(data as Record<string, unknown>);
+    const updateDoc = this.#resolveUpdateDoc(dataOrCallback);
     const command = new UpdateManyCommand(this.#collectionName, filter, updateDoc);
     const results = await this.#drainPlan(command);
     return (results[0] as { modifiedCount: number }).modifiedCount;
@@ -397,30 +443,62 @@ class MongoCollectionImpl<
 
   async upsert(input: {
     create: ResolvedCreateInput<TContract, ModelName, TVariant>;
-    update: Partial<DefaultModelRow<TContract, ModelName>>;
+    update:
+      | Partial<DefaultModelRow<TContract, ModelName>>
+      | ((u: FieldAccessor<TContract, ModelName>) => FieldOperation[]);
   }): Promise<IncludedRow<TContract, ModelName, TIncludes>> {
     this.#requireFilters('upsert');
     this.#rejectWindowing('upsert');
     this.#rejectIncludes('upsert');
     const filter = this.#mergeFilters();
-    const setFields = this.#toSetFields(input.update as Record<string, unknown>);
+
     const allCreateFields = this.#toDocument(
       this.#injectDiscriminator(input.create as Record<string, unknown>),
     );
-    const setKeys = new Set(Object.keys(setFields));
-    const insertOnlyFields: Record<string, MongoValue> = {};
-    for (const [key, value] of Object.entries(allCreateFields)) {
-      if (!setKeys.has(key)) {
-        insertOnlyFields[key] = value;
+
+    let updateDoc: Record<string, Record<string, MongoValue>>;
+    if (typeof input.update === 'function') {
+      const accessor = createFieldAccessor<TContract, ModelName>();
+      const ops = input.update(accessor);
+      const idOp = ops.find((op) => op.field === '_id');
+      if (idOp) {
+        throw new Error('Mutation payloads cannot modify `_id`');
+      }
+      const dotPathOp = ops.find((op) => op.field.includes('.'));
+      if (dotPathOp) {
+        throw new Error(
+          `upsert() does not support dot-path field operations (found "${dotPathOp.field}"). ` +
+            'Dot-path updates conflict with $setOnInsert on the insert path, producing incomplete documents. ' +
+            'Use top-level field operations instead.',
+        );
+      }
+      updateDoc = compileFieldOperations(ops, (field, value, operator) =>
+        this.#wrapFieldOpValue(field, value, operator),
+      );
+    } else {
+      const setFields = this.#toSetFields(input.update as Record<string, unknown>);
+      updateDoc = {};
+      if (Object.keys(setFields).length > 0) {
+        updateDoc['$set'] = setFields;
       }
     }
-    const updateDoc: Record<string, MongoValue> = {};
-    if (Object.keys(setFields).length > 0) {
-      updateDoc['$set'] = setFields;
+
+    const updatedFields = new Set<string>();
+    for (const operatorGroup of Object.values(updateDoc)) {
+      for (const fieldPath of Object.keys(operatorGroup)) {
+        updatedFields.add(fieldPath.split('.')[0] ?? fieldPath);
+      }
+    }
+    const insertOnlyFields: Record<string, MongoValue> = {};
+    for (const [key, value] of Object.entries(allCreateFields)) {
+      if (!updatedFields.has(key)) {
+        insertOnlyFields[key] = value;
+      }
     }
     if (Object.keys(insertOnlyFields).length > 0) {
       updateDoc['$setOnInsert'] = insertOnlyFields;
     }
+
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, true);
     const results = await this.#drainPlan(command);
     return results[0] as IncludedRow<TContract, ModelName, TIncludes>;
@@ -468,27 +546,82 @@ class MongoCollectionImpl<
     return rows;
   }
 
+  #modelFields(): Record<string, ContractField> {
+    const model = this.#contract.models[this.#modelName] as MongoModelDefinition | undefined;
+    return model?.fields ?? {};
+  }
+
+  #compileWhereObject(data: Record<string, unknown>): MongoFilterExpr[] {
+    const fields = this.#modelFields();
+    const filters: MongoFilterExpr[] = [];
+    for (const [key, value] of Object.entries(data)) {
+      if (value === undefined) continue;
+      const wrapped = this.#wrapFieldValue(value, fields[key]);
+      filters.push(MongoFieldFilter.eq(key, wrapped));
+    }
+    return filters;
+  }
+
+  #wrapFieldValue(value: unknown, field: ContractField | undefined): MongoValue {
+    if (field === undefined) return new MongoParamRef(value);
+
+    if (field.type.kind === 'scalar') {
+      return new MongoParamRef(value, { codecId: field.type.codecId });
+    }
+
+    if (field.type.kind === 'valueObject') {
+      const voName = field.type.name;
+      const voDef = (this.#contract as { valueObjects?: Record<string, ContractValueObject> })
+        .valueObjects?.[voName];
+      if (!voDef || value === null) return new MongoParamRef(value);
+
+      if (field.many && Array.isArray(value)) {
+        return value.map((item) =>
+          this.#wrapValueObject(item as Record<string, unknown>, voDef),
+        ) as unknown as MongoValue;
+      }
+      return this.#wrapValueObject(value as Record<string, unknown>, voDef);
+    }
+
+    return new MongoParamRef(value);
+  }
+
+  #wrapValueObject(
+    data: Record<string, unknown>,
+    voDef: ContractValueObject,
+  ): Record<string, MongoValue> {
+    const doc: Record<string, MongoValue> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value === undefined) continue;
+      const fieldDef = voDef.fields[key];
+      doc[key] = this.#wrapFieldValue(value, fieldDef);
+    }
+    return doc;
+  }
+
   #toDocument(data: Record<string, unknown>): Record<string, MongoValue> {
+    const fields = this.#modelFields();
     const doc: Record<string, MongoValue> = {};
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined) {
-        doc[key] = new MongoParamRef(value);
+        doc[key] = this.#wrapFieldValue(value, fields[key]);
       }
     }
     return doc;
   }
 
   #toSetFields(data: Record<string, unknown>): Record<string, MongoValue> {
-    const fields: Record<string, MongoValue> = {};
+    const fields = this.#modelFields();
+    const result: Record<string, MongoValue> = {};
     for (const [key, value] of Object.entries(data)) {
       if (key === '_id' && value !== undefined) {
         throw new Error('Mutation payloads cannot modify `_id`');
       }
       if (value !== undefined) {
-        fields[key] = new MongoParamRef(value);
+        result[key] = this.#wrapFieldValue(value, fields[key]);
       }
     }
-    return fields;
+    return result;
   }
 
   #stripUndefined(data: Record<string, unknown>): Record<string, unknown> {
@@ -501,8 +634,95 @@ class MongoCollectionImpl<
     return result;
   }
 
-  #toUpdateDocument(data: Record<string, unknown>): Record<string, MongoValue> {
+  #toUpdateDocument(data: Record<string, unknown>): Record<string, Record<string, MongoValue>> {
     return { $set: this.#toSetFields(data) };
+  }
+
+  #resolveUpdateDoc(
+    dataOrCallback:
+      | Partial<DefaultModelRow<TContract, ModelName>>
+      | ((u: FieldAccessor<TContract, ModelName>) => FieldOperation[]),
+  ): Record<string, Record<string, MongoValue>> {
+    if (typeof dataOrCallback === 'function') {
+      const accessor = createFieldAccessor<TContract, ModelName>();
+      const ops = dataOrCallback(accessor);
+      const idOp = ops.find((op) => op.field === '_id');
+      if (idOp) {
+        throw new Error('Mutation payloads cannot modify `_id`');
+      }
+      if (ops.length === 0) {
+        return { $set: {} };
+      }
+      return compileFieldOperations(ops, (field, value, operator) =>
+        this.#wrapFieldOpValue(field, value, operator),
+      );
+    }
+    return this.#toUpdateDocument(dataOrCallback as Record<string, unknown>);
+  }
+
+  #wrapFieldOpValue(field: string, value: MongoValue, operator?: string): MongoValue {
+    if (operator === '$unset') return value;
+
+    const topLevelField = field.split('.')[0] ?? field;
+    const fields = this.#modelFields();
+    const contractField = fields[topLevelField];
+    if (!contractField) return value;
+
+    if (field.includes('.')) {
+      return this.#wrapDotPathValue(field, value);
+    }
+
+    if (value instanceof MongoParamRef && contractField.type.kind === 'scalar') {
+      return new MongoParamRef(value.value, { codecId: contractField.type.codecId });
+    }
+
+    if (contractField.type.kind === 'valueObject' && value instanceof MongoParamRef) {
+      const raw = value.value;
+      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        const voName = contractField.type.name;
+        const voDef = (this.#contract as { valueObjects?: Record<string, ContractValueObject> })
+          .valueObjects?.[voName];
+        if (voDef) {
+          return this.#wrapValueObject(raw as Record<string, unknown>, voDef);
+        }
+      }
+    }
+
+    return value;
+  }
+
+  #wrapDotPathValue(dotPath: string, value: MongoValue): MongoValue {
+    const parts = dotPath.split('.');
+    const fields = this.#modelFields();
+    let currentField: ContractField | undefined = parts[0] ? fields[parts[0]] : undefined;
+
+    for (let i = 1; i < parts.length; i++) {
+      if (!currentField || currentField.type.kind !== 'valueObject') return value;
+      const voName = currentField.type.name;
+      const voDef = (this.#contract as { valueObjects?: Record<string, ContractValueObject> })
+        .valueObjects?.[voName];
+      if (!voDef) return value;
+      const partKey = parts[i];
+      currentField = partKey ? voDef.fields[partKey] : undefined;
+    }
+
+    if (currentField?.type.kind === 'scalar' && value instanceof MongoParamRef) {
+      return new MongoParamRef(value.value, { codecId: currentField.type.codecId });
+    }
+
+    if (currentField?.type.kind === 'valueObject' && value instanceof MongoParamRef) {
+      const raw = value.value;
+      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        const voName = currentField.type.name;
+        const voDef = (this.#contract as { valueObjects?: Record<string, ContractValueObject> })
+          .valueObjects?.[voName];
+        if (voDef) {
+          return this.#wrapValueObject(raw as Record<string, unknown>, voDef);
+        }
+      }
+    }
+
+    return value;
   }
 
   #mergeFilters(): MongoFilterExpr {

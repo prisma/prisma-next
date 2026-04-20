@@ -5,8 +5,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    testTimeout: timeouts.spinUpDbServer,
-    hookTimeout: timeouts.spinUpDbServer,
+    testTimeout: timeouts.spinUpMongoMemoryServer,
+    hookTimeout: timeouts.spinUpMongoMemoryServer,
     fileParallelism: false,
     typecheck: {
       enabled: true,
@@ -23,6 +23,7 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
+        'src/mongo-middleware.ts',
       ],
       thresholds: {
         statements: 100,

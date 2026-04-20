@@ -132,4 +132,4 @@ At the boundary (e.g. `postgres().runtime()`), we:
 
 - [ADR 152 — Execution Plane Descriptors and Instances](./ADR%20152%20-%20Execution%20Plane%20Descriptors%20and%20Instances.md)
 - TML-1837 spec: `agent-os/specs/2026-02-15-runtime-dx-decouple-runtime-driver-instantiation-from-connection-binding/spec.md`
-- [Runtime & Plugin Framework](../subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)
+- [Runtime & Middleware Framework](../subsystems/4.%20Runtime%20&%20Middleware%20Framework.md)

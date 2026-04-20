@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { loadConfig } from '@prisma-next/cli/config-loader';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -569,12 +570,19 @@ describe('emit command', () => {
         >;
         try {
           process.chdir(testDirPsl);
-          const sourceContext = {
-            composedExtensionPacks: (providerConfig.extensionPacks ?? []).map(
-              (p: { id: string }) => p.id,
-            ),
-          };
-          sourceResult = await contractConfig!.source(sourceContext);
+          const stack = createControlStack({
+            family: providerConfig.family,
+            target: providerConfig.target,
+            adapter: providerConfig.adapter,
+            extensionPacks: providerConfig.extensionPacks ?? [],
+          });
+          sourceResult = await contractConfig!.source({
+            composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+            scalarTypeDescriptors: stack.scalarTypeDescriptors,
+            authoringContributions: stack.authoringContributions,
+            codecLookup: stack.codecLookup,
+            controlMutationDefaults: stack.controlMutationDefaults,
+          });
         } finally {
           process.chdir(originalCwd);
         }
@@ -794,7 +802,7 @@ model Post {
           storage: {
             collections: {
               users: {
-                indexes: [{ fields: { email: 1 }, options: { unique: true } }],
+                indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
                 options: {
                   collation: { locale: 'en', strength: 2 },
                 },
@@ -829,7 +837,8 @@ model Post {
         expect(contractDts).toContain("readonly discriminator: { readonly field: 'type' }");
         expect(contractDts).toContain('readonly users: {');
         expect(contractDts).toContain('readonly indexes:');
-        expect(contractDts).toContain('readonly email: 1');
+        expect(contractDts).toContain("readonly field: 'email'");
+        expect(contractDts).toContain('readonly direction: 1');
         expect(contractDts).toContain('readonly unique: true');
         expect(contractDts).toContain('readonly options:');
         expect(contractDts).toContain(

@@ -18,6 +18,7 @@ import type {
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
 import { type Db, MongoClient } from 'mongodb';
+import { DRIVER_INFO } from './core/driver-info';
 
 class MongoDriverImpl implements MongoDriver {
   readonly #db: Db;
@@ -128,7 +129,7 @@ class MongoDriverImpl implements MongoDriver {
 }
 
 export async function createMongoDriver(uri: string, dbName: string): Promise<MongoDriver> {
-  const client = new MongoClient(uri);
+  const client = new MongoClient(uri, { driverInfo: DRIVER_INFO });
   await client.connect();
   const db = client.db(dbName);
   return new MongoDriverImpl(db, client);

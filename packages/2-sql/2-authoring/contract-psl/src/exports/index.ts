@@ -5,7 +5,7 @@ export type {
   DefaultFunctionRegistry,
   DefaultFunctionRegistryEntry,
   MutationDefaultGeneratorDescriptor,
-} from '../default-function-registry';
+} from '@prisma-next/framework-components/control';
 export {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract,

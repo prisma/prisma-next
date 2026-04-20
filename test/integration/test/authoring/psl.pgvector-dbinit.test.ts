@@ -4,10 +4,7 @@ import { createControlClient, enrichContract } from '@prisma-next/cli/control-ap
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import { emit } from '@prisma-next/emitter';
 import pgvector from '@prisma-next/extension-pgvector/control';
-import sql, {
-  assembleAuthoringContributions,
-  assemblePslInterpretationContributions,
-} from '@prisma-next/family-sql/control';
+import sql from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
@@ -23,6 +20,13 @@ describe(
     const originalCwd = process.cwd();
     const frameworkComponents = [postgres, postgresAdapter, pgvector] as const;
     let testDir: string;
+
+    const stack = createControlStack({
+      family: sql,
+      target: postgres,
+      adapter: postgresAdapter,
+      extensionPacks: [pgvector],
+    });
 
     beforeEach(() => {
       testDir = createIntegrationTestDir();
@@ -40,22 +44,16 @@ describe(
       writeFileSync(schemaPath, schemaText, 'utf-8');
 
       process.chdir(testDir);
-      const authoringContributions = assembleAuthoringContributions(frameworkComponents);
-      const pslContributions = assemblePslInterpretationContributions(frameworkComponents);
       const contractConfig = prismaContract('./schema.prisma', {
         target: postgres,
-        authoringContributions,
-        scalarTypeDescriptors: pslContributions.scalarTypeDescriptors,
-        controlMutationDefaults: {
-          defaultFunctionRegistry: pslContributions.defaultFunctionRegistry,
-          generatorDescriptors: pslContributions.generatorDescriptors,
-        },
-        composedExtensionPacks: ['pgvector'],
-        composedExtensionPackRefs: [pgvector],
       });
 
       const pslResult = await contractConfig.source({
-        composedExtensionPacks: [],
+        composedExtensionPacks: [pgvector.id],
+        scalarTypeDescriptors: stack.scalarTypeDescriptors,
+        authoringContributions: stack.authoringContributions,
+        codecLookup: stack.codecLookup,
+        controlMutationDefaults: stack.controlMutationDefaults,
       });
       expect(pslResult.ok).toBe(true);
       if (!pslResult.ok) {
@@ -63,13 +61,6 @@ describe(
       }
 
       const enrichedIR = enrichContract(pslResult.value, frameworkComponents);
-      const stack = createControlStack({
-        family: sql,
-        target: postgres,
-        adapter: postgresAdapter,
-        driver: undefined,
-        extensionPacks: [pgvector],
-      });
 
       const emitted = await emit(enrichedIR, stack, sqlEmission);
       return JSON.parse(emitted.contractJson) as Record<string, unknown>;

@@ -1,6 +1,7 @@
 const BASE_TIMEOUTS = {
   spinUpPpgDev: 30000,
   spinUpDbServer: 30000,
+  spinUpMongoMemoryServer: 60000,
   typeScriptCompilation: 8000,
   databaseOperation: 5000,
   default: 100,
@@ -58,6 +59,19 @@ export const timeouts = {
    */
   get spinUpDbServer(): number {
     return Math.round(BASE_TIMEOUTS.spinUpDbServer * getMultiplier());
+  },
+  /**
+   * Timeout for mongodb-memory-server startup, which includes binary download,
+   * extraction, and mongod replica set initialization. Must be large enough to
+   * survive a cold-cache download on CI — if the beforeAll hook is killed early,
+   * the partially-extracted binary corrupts the shared cache and every subsequent
+   * mongo test in the CI run will SIGSEGV.
+   *
+   * Use this for `hookTimeout` and `testTimeout` in vitest configs of any package
+   * that depends on `mongodb-memory-server`.
+   */
+  get spinUpMongoMemoryServer(): number {
+    return Math.round(BASE_TIMEOUTS.spinUpMongoMemoryServer * getMultiplier());
   },
   /**
    * Timeout for tests that perform TypeScript compilation.

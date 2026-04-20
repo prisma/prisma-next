@@ -8,6 +8,11 @@ export interface MongoSchemaIndexOptions {
   readonly sparse?: boolean | undefined;
   readonly expireAfterSeconds?: number | undefined;
   readonly partialFilterExpression?: Record<string, unknown> | undefined;
+  readonly wildcardProjection?: Record<string, 0 | 1> | undefined;
+  readonly collation?: Record<string, unknown> | undefined;
+  readonly weights?: Record<string, number> | undefined;
+  readonly default_language?: string | undefined;
+  readonly language_override?: string | undefined;
 }
 
 export class MongoSchemaIndex extends MongoSchemaNode {
@@ -17,6 +22,11 @@ export class MongoSchemaIndex extends MongoSchemaNode {
   readonly sparse?: boolean | undefined;
   readonly expireAfterSeconds?: number | undefined;
   readonly partialFilterExpression?: Record<string, unknown> | undefined;
+  readonly wildcardProjection?: Record<string, 0 | 1> | undefined;
+  readonly collation?: Record<string, unknown> | undefined;
+  readonly weights?: Record<string, number> | undefined;
+  readonly default_language?: string | undefined;
+  readonly language_override?: string | undefined;
 
   constructor(options: MongoSchemaIndexOptions) {
     super();
@@ -25,6 +35,11 @@ export class MongoSchemaIndex extends MongoSchemaNode {
     this.sparse = options.sparse;
     this.expireAfterSeconds = options.expireAfterSeconds;
     this.partialFilterExpression = options.partialFilterExpression;
+    this.wildcardProjection = options.wildcardProjection;
+    this.collation = options.collation;
+    this.weights = options.weights;
+    this.default_language = options.default_language;
+    this.language_override = options.language_override;
     this.freeze();
   }
 

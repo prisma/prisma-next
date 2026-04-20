@@ -28,7 +28,7 @@ Prisma Next rethinks Prisma's data layer around a **contract-first model**, wher
 - Hashes enable verification and drift detection
 - Structured Plans include AST, referenced columns, and contract hash
 
-### Extensible Plugin Framework
+### Extensible Middleware Framework
 
 - First-class hook system for Plan lifecycle events (`beforeCompile`, `afterExecute`, `onError`)
 - Composable linting, telemetry, query budgets, and policy enforcement

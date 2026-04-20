@@ -15,6 +15,7 @@ export type {
   ControlTargetInstance,
 } from '../control-instances';
 export type {
+  DataTransformOperation,
   MigrationOperationClass,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -24,15 +25,21 @@ export type {
   MigrationPlannerResult,
   MigrationPlannerSuccessResult,
   MigrationPlanOperation,
+  MigrationPlanWithAuthoringSurface,
   MigrationRunner,
   MigrationRunnerExecutionChecks,
   MigrationRunnerFailure,
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
+  MigrationScaffoldContext,
+  OperationDescriptor,
+  SerializedQueryPlan,
   TargetMigrationsCapability,
 } from '../control-migration-types';
 export type {
+  BaseSchemaIssue,
   EmitContractResult,
+  EnumValuesChangedIssue,
   IntrospectSchemaResult,
   OperationContext,
   SchemaIssue,
@@ -41,7 +48,19 @@ export type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '../control-result-types';
-export type { CoreSchemaView, SchemaNodeKind, SchemaTreeNode } from '../control-schema-view';
+export {
+  VERIFY_CODE_HASH_MISMATCH,
+  VERIFY_CODE_MARKER_MISSING,
+  VERIFY_CODE_SCHEMA_FAILURE,
+  VERIFY_CODE_TARGET_MISMATCH,
+} from '../control-result-types';
+export type {
+  CoreSchemaView,
+  SchemaNodeKind,
+  SchemaTreeNodeOptions,
+  SchemaTreeVisitor,
+} from '../control-schema-view';
+export { SchemaTreeNode } from '../control-schema-view';
 export type {
   AssembledAuthoringContributions,
   ControlStack,
@@ -49,6 +68,8 @@ export type {
 } from '../control-stack';
 export {
   assembleAuthoringContributions,
+  assembleControlMutationDefaults,
+  assembleScalarTypeDescriptors,
   assertUniqueCodecOwner,
   createControlStack,
   extractCodecLookup,
@@ -57,3 +78,18 @@ export {
   extractOperationTypeImports,
   extractQueryOperationTypeImports,
 } from '../control-stack';
+export type {
+  ControlMutationDefaultEntry,
+  ControlMutationDefaultRegistry,
+  ControlMutationDefaults,
+  DefaultFunctionLoweringContext,
+  DefaultFunctionLoweringHandler,
+  DefaultFunctionRegistry,
+  DefaultFunctionRegistryEntry,
+  LoweredDefaultResult,
+  LoweredDefaultValue,
+  MutationDefaultGeneratorDescriptor,
+  ParsedDefaultFunctionCall,
+  SourceDiagnostic,
+  SourceSpan,
+} from '../mutation-default-types';

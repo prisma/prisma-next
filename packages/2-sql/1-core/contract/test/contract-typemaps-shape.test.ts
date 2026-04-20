@@ -1,5 +1,11 @@
 import { describe, it } from 'vitest';
-import type { CodecTypesOf, OperationTypesOf, TypeMaps } from '../src/types';
+import type {
+  CodecTypesOf,
+  FieldInputTypesOf,
+  FieldOutputTypesOf,
+  OperationTypesOf,
+  TypeMaps,
+} from '../src/types';
 
 describe('Contract and TypeMaps shape', () => {
   describe('TypeMaps shape', () => {
@@ -21,6 +27,53 @@ describe('Contract and TypeMaps shape', () => {
       type TM = TypeMaps<Record<string, never>, { bar: Record<string, unknown> }>;
       type OT = OperationTypesOf<TM>;
       const _ot: OT = { bar: {} };
+    });
+
+    it('TypeMaps accepts 5th TFieldInputTypes parameter', () => {
+      type TM = TypeMaps<
+        Record<string, never>,
+        Record<string, never>,
+        Record<string, never>,
+        Record<string, never>,
+        { User: { name: string } }
+      >;
+      type HasFieldInputTypes = TM extends { readonly fieldInputTypes: unknown } ? true : false;
+      const _fit: HasFieldInputTypes = true;
+    });
+
+    it('TypeMaps defaults TFieldInputTypes to Record<string, never>', () => {
+      type TM = TypeMaps;
+      type FIT = FieldInputTypesOf<TM>;
+      const _fit: FIT = {};
+    });
+
+    it('FieldOutputTypesOf extracts fieldOutputTypes from TypeMaps', () => {
+      type TM = TypeMaps<
+        Record<string, never>,
+        Record<string, never>,
+        Record<string, never>,
+        { User: { name: string } }
+      >;
+      type FOT = FieldOutputTypesOf<TM>;
+      const _fot: FOT = { User: { name: 'test' } };
+    });
+
+    it('FieldInputTypesOf extracts fieldInputTypes from TypeMaps', () => {
+      type TM = TypeMaps<
+        Record<string, never>,
+        Record<string, never>,
+        Record<string, never>,
+        Record<string, never>,
+        { User: { name: string } }
+      >;
+      type FIT = FieldInputTypesOf<TM>;
+      const _fit: FIT = { User: { name: 'test' } };
+    });
+
+    it('backward compat: 2-param TypeMaps compiles', () => {
+      type TM = TypeMaps<{ 'pg/text@1': { output: string } }, Record<string, never>>;
+      type CT = CodecTypesOf<TM>;
+      const _ct: CT = { 'pg/text@1': { output: '' } };
     });
   });
 });

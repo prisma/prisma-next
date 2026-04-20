@@ -135,6 +135,14 @@ export function errorInvalidRefs(refsPath: string, reason: string): MigrationToo
   });
 }
 
+export function errorInvalidRefFile(filePath: string, reason: string): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.INVALID_REF_FILE', 'Invalid ref file', {
+    why: `Ref file at "${filePath}" is invalid: ${reason}`,
+    fix: 'Ensure the ref file contains valid JSON with { "hash": "sha256:<64 hex chars>", "invariants": ["..."] }.',
+    details: { path: filePath, reason },
+  });
+}
+
 export function errorInvalidRefName(refName: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.INVALID_REF_NAME', 'Invalid ref name', {
     why: `Ref name "${refName}" is invalid. Names must be lowercase alphanumeric with hyphens or forward slashes (no "." or ".." segments).`,

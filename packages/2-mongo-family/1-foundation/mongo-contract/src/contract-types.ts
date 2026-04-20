@@ -117,11 +117,35 @@ export interface MongoStorageIndex {
   readonly sparse?: boolean;
   readonly expireAfterSeconds?: number;
   readonly partialFilterExpression?: Record<string, unknown>;
+  readonly wildcardProjection?: Record<string, 0 | 1>;
+  readonly collation?: Record<string, unknown>;
+  readonly weights?: Record<string, number>;
+  readonly default_language?: string;
+  readonly language_override?: string;
+}
+
+export interface MongoStorageValidator {
+  readonly jsonSchema: Record<string, unknown>;
+  readonly validationLevel: 'strict' | 'moderate';
+  readonly validationAction: 'error' | 'warn';
+}
+
+export interface MongoStorageCollectionOptions {
+  readonly capped?: { size: number; max?: number };
+  readonly timeseries?: {
+    timeField: string;
+    metaField?: string;
+    granularity?: 'seconds' | 'minutes' | 'hours';
+  };
+  readonly collation?: Record<string, unknown>;
+  readonly changeStreamPreAndPostImages?: { enabled: boolean };
+  readonly clusteredIndex?: { name?: string };
 }
 
 export interface MongoStorageCollection {
-  readonly indexes?: readonly MongoIndex[];
-  readonly options?: MongoCollectionOptions;
+  readonly indexes?: ReadonlyArray<MongoStorageIndex>;
+  readonly validator?: MongoStorageValidator;
+  readonly options?: MongoStorageCollectionOptions;
 }
 
 export type MongoStorage<THash extends string = string> = StorageBase<THash> & {
@@ -147,10 +171,15 @@ export type MongoTypeMaps<
     string,
     Record<string, unknown>
   >,
+  TFieldInputTypes extends Record<string, Record<string, unknown>> = Record<
+    string,
+    Record<string, unknown>
+  >,
 > = {
   readonly codecTypes: TCodecTypes;
   readonly operationTypes: TOperationTypes;
   readonly fieldOutputTypes: TFieldOutputTypes;
+  readonly fieldInputTypes: TFieldInputTypes;
 };
 
 export type MongoTypeMapsPhantomKey = '__@prisma-next/mongo-core/typeMaps@__';
@@ -172,6 +201,13 @@ export type ExtractMongoCodecTypes<T> =
 
 export type ExtractMongoFieldOutputTypes<T> =
   ExtractMongoTypeMaps<T> extends { fieldOutputTypes: infer F }
+    ? F extends Record<string, Record<string, unknown>>
+      ? F
+      : Record<string, never>
+    : Record<string, never>;
+
+export type ExtractMongoFieldInputTypes<T> =
+  ExtractMongoTypeMaps<T> extends { fieldInputTypes: infer F }
     ? F extends Record<string, Record<string, unknown>>
       ? F
       : Record<string, never>

@@ -100,6 +100,7 @@ function isAdditiveIssue(issue: SchemaIssue): boolean {
   switch (issue.kind) {
     case 'type_missing':
     case 'type_values_mismatch':
+    case 'enum_values_changed':
     case 'missing_table':
     case 'missing_column':
     case 'dependency_missing':
@@ -709,11 +710,12 @@ function convertIssueToConflict(issue: SchemaIssue): SqlPlannerConflict | null {
 
 function buildConflict(kind: SqlPlannerConflict['kind'], issue: SchemaIssue): SqlPlannerConflict {
   const location = buildConflictLocation(issue);
+  const base = issue.kind !== 'enum_values_changed' ? issue : undefined;
   const meta =
-    issue.expected || issue.actual
+    base?.expected || base?.actual
       ? Object.freeze({
-          ...ifDefined('expected', issue.expected),
-          ...ifDefined('actual', issue.actual),
+          ...ifDefined('expected', base.expected),
+          ...ifDefined('actual', base.actual),
         })
       : undefined;
 
@@ -735,19 +737,24 @@ function sortSchemaIssues(issues: readonly SchemaIssue[]): readonly SchemaIssue[
     if (kindCompare !== 0) {
       return kindCompare;
     }
-    const tableCompare = compareStrings(a.table, b.table);
+    const aBase = a.kind !== 'enum_values_changed' ? a : undefined;
+    const bBase = b.kind !== 'enum_values_changed' ? b : undefined;
+    const tableCompare = compareStrings(aBase?.table, bBase?.table);
     if (tableCompare !== 0) {
       return tableCompare;
     }
-    const columnCompare = compareStrings(a.column, b.column);
+    const columnCompare = compareStrings(aBase?.column, bBase?.column);
     if (columnCompare !== 0) {
       return columnCompare;
     }
-    return compareStrings(a.indexOrConstraint, b.indexOrConstraint);
+    return compareStrings(aBase?.indexOrConstraint, bBase?.indexOrConstraint);
   });
 }
 
 function buildConflictLocation(issue: SchemaIssue) {
+  if (issue.kind === 'enum_values_changed') {
+    return { type: issue.typeName };
+  }
   const location = {
     ...ifDefined('table', issue.table),
     ...ifDefined('column', issue.column),

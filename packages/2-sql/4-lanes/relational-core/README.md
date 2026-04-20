@@ -134,7 +134,7 @@ This enables subpath imports like `@prisma-next/sql-relational-core/schema`, `@p
 ## Related Subsystems
 
 - **[Query Lanes](../../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)**: Detailed subsystem specification
-- **[Runtime & Plugin Framework](../../../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)**: Plan execution
+- **[Runtime & Middleware Framework](../../../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Middleware%20Framework.md)**: Plan execution
 
 ## Related ADRs
 

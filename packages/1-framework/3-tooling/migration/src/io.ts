@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
 import {
@@ -8,7 +8,7 @@ import {
   errorInvalidSlug,
   errorMissingFile,
 } from './errors';
-import type { MigrationBundle, MigrationManifest, MigrationOps } from './types';
+import type { BaseMigrationBundle, MigrationManifest, MigrationOps } from './types';
 
 const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
@@ -48,7 +48,7 @@ const MigrationManifestSchema = type({
 const MigrationOpSchema = type({
   id: 'string',
   label: 'string',
-  operationClass: "'additive' | 'widening' | 'destructive'",
+  operationClass: "'additive' | 'widening' | 'destructive' | 'data'",
 });
 
 // Intentionally shallow: operation-specific payload validation is owned by planner/runner layers.
@@ -74,7 +74,43 @@ export async function writeMigrationPackage(
   await writeFile(join(dir, OPS_FILE), JSON.stringify(ops, null, 2), { flag: 'wx' });
 }
 
-export async function readMigrationPackage(dir: string): Promise<MigrationBundle> {
+/**
+ * Copy the destination contract artifacts (`contract.json` and the
+ * colocated `contract.d.ts`) into the migration package directory so
+ * authors of the scaffolded `migration.ts` can import the typed
+ * contract relative to the migration directory
+ * (`import type { Contract } from './contract'`).
+ *
+ * A missing `.d.ts` is tolerated (only the `.json` is required) so the
+ * helper stays usable in tests that hand-roll a bare `contract.json`.
+ * A missing `contract.json` — or any other I/O failure — throws.
+ */
+export async function copyContractToMigrationDir(
+  packageDir: string,
+  contractJsonPath: string,
+): Promise<void> {
+  await copyFile(contractJsonPath, join(packageDir, 'contract.json'));
+  const dtsPath = `${contractJsonPath.slice(0, -'.json'.length)}.d.ts`;
+  try {
+    await copyFile(dtsPath, join(packageDir, 'contract.d.ts'));
+  } catch (error) {
+    if (hasErrnoCode(error, 'ENOENT')) return;
+    throw error;
+  }
+}
+
+export async function writeMigrationManifest(
+  dir: string,
+  manifest: MigrationManifest,
+): Promise<void> {
+  await writeFile(join(dir, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise<void> {
+  await writeFile(join(dir, OPS_FILE), `${JSON.stringify(ops, null, 2)}\n`);
+}
+
+export async function readMigrationPackage(dir: string): Promise<BaseMigrationBundle> {
   const manifestPath = join(dir, MANIFEST_FILE);
   const opsPath = join(dir, OPS_FILE);
 
@@ -142,7 +178,7 @@ function validateOps(ops: unknown, filePath: string): asserts ops is MigrationOp
 
 export async function readMigrationsDir(
   migrationsRoot: string,
-): Promise<readonly MigrationBundle[]> {
+): Promise<readonly BaseMigrationBundle[]> {
   let entries: string[];
   try {
     entries = await readdir(migrationsRoot);
@@ -153,7 +189,7 @@ export async function readMigrationsDir(
     throw error;
   }
 
-  const packages: MigrationBundle[] = [];
+  const packages: BaseMigrationBundle[] = [];
 
   for (const entry of entries.sort()) {
     const entryPath = join(migrationsRoot, entry);

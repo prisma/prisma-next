@@ -16,14 +16,14 @@ import type {
 
 export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
-  readonly familyInstance: ControlFamilyInstance<TFamilyId>;
+  readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   readonly originHash: string;
   readonly destinationHash: string;
   readonly pendingMigrations: readonly MigrationApplyStep[];
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
     TTargetId,
-    ControlFamilyInstance<TFamilyId>
+    ControlFamilyInstance<TFamilyId, unknown>
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly targetId: string;
@@ -117,7 +117,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     // apply time — the planner already decided what to emit. Restricting here
     // would be a tautology (the allowed set would just mirror what's in ops).
     const policy = {
-      allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
+      allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] as const,
     };
 
     // EMPTY_CONTRACT_HASH means "no prior state" — the runner expects origin: null

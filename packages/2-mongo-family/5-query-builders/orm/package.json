@@ -18,8 +18,8 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
-    "@prisma-next/mongo-value": "workspace:*",
-    "@prisma-next/runtime-executor": "workspace:*"
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/mongo-value": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/adapter-mongo": "workspace:*",
@@ -29,7 +29,7 @@
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "mongodb": "catalog:",
-    "mongodb-memory-server": "^10.4.0",
+    "mongodb-memory-server": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

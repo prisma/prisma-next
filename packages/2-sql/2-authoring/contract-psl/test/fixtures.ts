@@ -1,10 +1,12 @@
+import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaults,
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
-} from '../src/default-function-registry';
+} from '@prisma-next/framework-components/control';
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
@@ -90,6 +92,7 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
  *  Real-pack parity is covered by
  *  `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`. */
 export const pgvectorAuthoringContributions = {
+  field: {},
   type: {
     pgvector: {
       Vector: {
@@ -118,6 +121,60 @@ export const postgresScalarTypeDescriptors = new Map([
   ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
   ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
 ] as const);
+
+export const postgresCodecIdOnlyDescriptors = new Map<string, string>([
+  ['String', 'pg/text@1'],
+  ['Boolean', 'pg/bool@1'],
+  ['Int', 'pg/int4@1'],
+  ['BigInt', 'pg/int8@1'],
+  ['Float', 'pg/float8@1'],
+  ['Decimal', 'pg/numeric@1'],
+  ['DateTime', 'pg/timestamptz@1'],
+  ['Json', 'pg/jsonb@1'],
+  ['Bytes', 'pg/bytea@1'],
+]);
+
+const targetTypesByCodecId: Record<string, readonly string[]> = {
+  'pg/text@1': ['text'],
+  'pg/bool@1': ['bool'],
+  'pg/int4@1': ['int4'],
+  'pg/int8@1': ['int8'],
+  'pg/float8@1': ['float8'],
+  'pg/numeric@1': ['numeric'],
+  'pg/timestamptz@1': ['timestamptz'],
+  'pg/jsonb@1': ['jsonb'],
+  'pg/bytea@1': ['bytea'],
+  'sql/char@1': ['character'],
+  'sql/varchar@1': ['character varying'],
+  'pg/int2@1': ['int2'],
+  'pg/float4@1': ['float4'],
+  'pg/timestamp@1': ['timestamp'],
+  'pg/time@1': ['time'],
+  'pg/timetz@1': ['timetz'],
+  'pg/json@1': ['json'],
+  'pg/vector@1': ['vector'],
+};
+
+export const postgresCodecLookup: CodecLookup = {
+  get: (id: string) => {
+    const targetTypes = targetTypesByCodecId[id];
+    if (!targetTypes) return undefined;
+    return { id, targetTypes } as ReturnType<CodecLookup['get']>;
+  },
+};
+
+export function createPostgresTestContext(
+  overrides?: Partial<ContractSourceContext>,
+): ContractSourceContext {
+  return {
+    composedExtensionPacks: [],
+    scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
+    authoringContributions: { field: {}, type: {} },
+    codecLookup: postgresCodecLookup,
+    controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+    ...overrides,
+  };
+}
 
 export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefaults {
   return {

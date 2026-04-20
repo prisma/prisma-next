@@ -1,13 +1,18 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
+import type { CodecLookup } from '../src/codec-types';
 import type { CreateControlStackInput } from '../src/control-stack';
 import {
   assembleAuthoringContributions,
+  assembleControlMutationDefaults,
+  assembleScalarTypeDescriptors,
   createControlStack,
   extractCodecLookup,
   extractCodecTypeImports,
   extractComponentIds,
   extractOperationTypeImports,
   extractQueryOperationTypeImports,
+  validateScalarTypeCodecIds,
 } from '../src/control-stack';
 import type { ComponentDescriptor } from '../src/framework-components';
 
@@ -225,6 +230,126 @@ describe('extractCodecLookup', () => {
   });
 });
 
+describe('assembleScalarTypeDescriptors', () => {
+  it('returns empty map when no descriptors contribute', () => {
+    const result = assembleScalarTypeDescriptors([createDescriptor()]);
+    expect(result.size).toBe(0);
+  });
+
+  it('merges scalar type descriptors from multiple descriptors', () => {
+    const result = assembleScalarTypeDescriptors([
+      createDescriptor({
+        id: 'target',
+        scalarTypeDescriptors: new Map([
+          ['String', 'pg/text@1'],
+          ['Int', 'pg/int4@1'],
+        ]),
+      }),
+      createDescriptor({
+        id: 'extension',
+        scalarTypeDescriptors: new Map([['Vector', 'pgvector/vector@1']]),
+      }),
+    ]);
+    expect(result.size).toBe(3);
+    expect(result.get('String')).toBe('pg/text@1');
+    expect(result.get('Int')).toBe('pg/int4@1');
+    expect(result.get('Vector')).toBe('pgvector/vector@1');
+  });
+
+  it('throws on duplicate type name from different descriptors', () => {
+    expect(() =>
+      assembleScalarTypeDescriptors([
+        createDescriptor({
+          id: 'desc-a',
+          scalarTypeDescriptors: new Map([['String', 'a/text@1']]),
+        }),
+        createDescriptor({
+          id: 'desc-b',
+          scalarTypeDescriptors: new Map([['String', 'b/text@1']]),
+        }),
+      ]),
+    ).toThrow(/Duplicate scalar type descriptor "String".*"desc-b".*"desc-a"/);
+  });
+});
+
+describe('assembleControlMutationDefaults', () => {
+  const stubLower = () => ({
+    ok: true as const,
+    value: { kind: 'storage' as const, defaultValue: { kind: 'literal' as const, value: 0 } },
+  });
+
+  it('returns empty registry and generators when no descriptors contribute', () => {
+    const result = assembleControlMutationDefaults([createDescriptor()]);
+    expect(result.defaultFunctionRegistry.size).toBe(0);
+    expect(result.generatorDescriptors).toEqual([]);
+  });
+
+  it('merges function registries from multiple descriptors', () => {
+    const result = assembleControlMutationDefaults([
+      createDescriptor({
+        id: 'desc-a',
+        controlMutationDefaults: {
+          defaultFunctionRegistry: new Map([['now', { lower: stubLower }]]),
+          generatorDescriptors: [],
+        },
+      }),
+      createDescriptor({
+        id: 'desc-b',
+        controlMutationDefaults: {
+          defaultFunctionRegistry: new Map([['uuid', { lower: stubLower }]]),
+          generatorDescriptors: [{ id: 'uuidv4', applicableCodecIds: ['pg/text@1'] }],
+        },
+      }),
+    ]);
+    expect(result.defaultFunctionRegistry.size).toBe(2);
+    expect(result.defaultFunctionRegistry.has('now')).toBe(true);
+    expect(result.defaultFunctionRegistry.has('uuid')).toBe(true);
+    expect(result.generatorDescriptors).toHaveLength(1);
+  });
+
+  it('throws on duplicate function name', () => {
+    expect(() =>
+      assembleControlMutationDefaults([
+        createDescriptor({
+          id: 'desc-a',
+          controlMutationDefaults: {
+            defaultFunctionRegistry: new Map([['now', { lower: stubLower }]]),
+            generatorDescriptors: [],
+          },
+        }),
+        createDescriptor({
+          id: 'desc-b',
+          controlMutationDefaults: {
+            defaultFunctionRegistry: new Map([['now', { lower: stubLower }]]),
+            generatorDescriptors: [],
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate mutation default function "now".*"desc-b".*"desc-a"/);
+  });
+
+  it('throws on duplicate generator id', () => {
+    expect(() =>
+      assembleControlMutationDefaults([
+        createDescriptor({
+          id: 'desc-a',
+          controlMutationDefaults: {
+            defaultFunctionRegistry: new Map(),
+            generatorDescriptors: [{ id: 'uuidv4', applicableCodecIds: ['a@1'] }],
+          },
+        }),
+        createDescriptor({
+          id: 'desc-b',
+          controlMutationDefaults: {
+            defaultFunctionRegistry: new Map(),
+            generatorDescriptors: [{ id: 'uuidv4', applicableCodecIds: ['b@1'] }],
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate mutation default generator id "uuidv4".*"desc-b".*"desc-a"/);
+  });
+});
+
 describe('createControlStack', () => {
   it('assembles all component state from family + target + adapter + extensions', () => {
     const state = createControlStack(
@@ -325,5 +450,33 @@ describe('createControlStack', () => {
     expect(state.queryOperationTypeImports).toEqual([]);
     expect(state.extensionIds).toEqual(['fam', 'tgt']);
     expect(state.authoringContributions).toEqual({ field: {}, type: {} });
+  });
+});
+
+describe('validateScalarTypeCodecIds', () => {
+  it('returns errors for unregistered codec IDs', () => {
+    const descriptors = new Map([['String', 'missing/codec@1']]);
+    const lookup = { get: () => undefined };
+    const errors = validateScalarTypeCodecIds(descriptors, lookup);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/Scalar type "String" references codec "missing\/codec@1"/);
+  });
+
+  it('returns empty array when all codec IDs are registered', () => {
+    const descriptors = new Map([['String', 'test/text@1']]);
+    const lookup: CodecLookup = {
+      get: (id: string) =>
+        id === 'test/text@1'
+          ? {
+              id,
+              targetTypes: ['text'],
+              decode: (v: unknown) => v,
+              encodeJson: (v: unknown) => v as JsonValue,
+              decodeJson: (v: JsonValue) => v,
+            }
+          : undefined,
+    };
+    const errors = validateScalarTypeCodecIds(descriptors, lookup);
+    expect(errors).toEqual([]);
   });
 });

@@ -259,7 +259,7 @@ The ORM handles the common case. When you need a `$group`, `$unwind`, or a multi
 
 ### Family-agnostic middleware and plugins
 
-> **Status: Implemented** — plugin pipeline proven for SQL, same pipeline available for Mongo. See [Runtime & Plugin Framework](../../architecture%20docs/subsystems/4.%20Runtime%20%26%20Plugin%20Framework.md).
+> **Status: Implemented** — plugin pipeline proven for SQL, same pipeline available for Mongo. See [Runtime & Middleware Framework](../../architecture%20docs/subsystems/4.%20Runtime%20%26%20Middleware%20Framework.md).
 
 The runtime's plugin pipeline is family-agnostic. Any middleware that doesn't inspect the query AST works identically for SQL and Mongo:
 

@@ -546,10 +546,10 @@ describe('pgEnumControlHooks.verifyType', () => {
 
     expect(issues).toMatchObject([
       {
-        kind: 'type_values_mismatch',
+        kind: 'enum_values_changed',
         typeName: 'Role',
-        expected: 'ADMIN',
-        actual: 'USER',
+        addedValues: ['ADMIN'],
+        removedValues: ['USER'],
       },
     ]);
   });

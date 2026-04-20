@@ -1,11 +1,42 @@
 import type { ContractField, ContractReferenceRelation } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToMongoContractInput,
   interpretPslDocumentToMongoContract,
 } from '../src/interpreter';
-import { createMongoScalarTypeDescriptors } from '../src/scalar-type-descriptors';
+
+const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
+  ['String', 'mongo/string@1'],
+  ['Int', 'mongo/int32@1'],
+  ['Boolean', 'mongo/bool@1'],
+  ['DateTime', 'mongo/date@1'],
+  ['ObjectId', 'mongo/objectId@1'],
+  ['Float', 'mongo/double@1'],
+]);
+
+const mongoCodecLookup: CodecLookup = {
+  get(id: string) {
+    const types: Record<string, readonly string[]> = {
+      'mongo/string@1': ['string'],
+      'mongo/int32@1': ['int'],
+      'mongo/bool@1': ['bool'],
+      'mongo/date@1': ['date'],
+      'mongo/objectId@1': ['objectId'],
+      'mongo/double@1': ['double'],
+    };
+    const targetTypes = types[id];
+    if (!targetTypes) return undefined;
+    return {
+      id,
+      targetTypes,
+      decode: (w: unknown) => w,
+      encodeJson: (v: unknown) => v,
+      decodeJson: (j: unknown) => j,
+    } as ReturnType<CodecLookup['get']>;
+  },
+};
 
 interface MongoModel {
   readonly fields: Record<string, ContractField>;
@@ -24,7 +55,8 @@ function interpret(
   const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
   return interpretPslDocumentToMongoContract({
     document,
-    scalarTypeDescriptors: createMongoScalarTypeDescriptors(),
+    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    codecLookup: mongoCodecLookup,
     ...overrides,
   });
 }
@@ -37,6 +69,20 @@ function interpretOk(
   expect(result.ok).toBe(true);
   if (!result.ok) throw new Error('Expected ok result');
   return result.value;
+}
+
+function getIndexes(
+  ir: unknown,
+  collectionName: string,
+): ReadonlyArray<Record<string, unknown>> | undefined {
+  const contract = ir as Record<string, unknown>;
+  const storage = contract['storage'] as unknown as Record<
+    string,
+    Record<string, Record<string, unknown>>
+  >;
+  return storage['collections']?.[collectionName]?.['indexes'] as
+    | ReadonlyArray<Record<string, unknown>>
+    | undefined;
 }
 
 describe('interpretPslDocumentToMongoContract', () => {
@@ -68,23 +114,18 @@ describe('interpretPslDocumentToMongoContract', () => {
         model Item {
           id    ObjectId @id @map("_id")
           big   BigInt
-          score Float
           data  Bytes
         }
       `);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
-      expect(result.failure.diagnostics).toHaveLength(3);
+      expect(result.failure.diagnostics).toHaveLength(2);
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             code: 'PSL_UNSUPPORTED_FIELD_TYPE',
             message: expect.stringContaining('BigInt'),
-          }),
-          expect.objectContaining({
-            code: 'PSL_UNSUPPORTED_FIELD_TYPE',
-            message: expect.stringContaining('Float'),
           }),
           expect.objectContaining({
             code: 'PSL_UNSUPPORTED_FIELD_TYPE',
@@ -635,10 +676,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `,
         {
-          scalarTypeDescriptors: new Map([
-            ...createMongoScalarTypeDescriptors(),
-            ['Float', 'mongo/double@1'],
-          ]),
+          scalarTypeDescriptors: mongoScalarTypeDescriptors,
         },
       );
 
@@ -739,14 +777,742 @@ describe('interpretPslDocumentToMongoContract', () => {
         storage: {
           storageHash: expect.stringMatching(/^sha256:/),
           collections: {
-            users: {},
-            posts: {},
+            users: {
+              validator: {
+                jsonSchema: {
+                  bsonType: 'object',
+                  required: ['_id', 'email', 'name'],
+                  properties: {
+                    _id: { bsonType: 'objectId' },
+                    name: { bsonType: 'string' },
+                    email: { bsonType: 'string' },
+                    bio: { bsonType: ['null', 'string'] },
+                  },
+                },
+                validationLevel: 'strict',
+                validationAction: 'error',
+              },
+            },
+            posts: {
+              validator: {
+                jsonSchema: {
+                  bsonType: 'object',
+                  required: ['_id', 'authorId', 'content', 'createdAt', 'title'],
+                  properties: {
+                    _id: { bsonType: 'objectId' },
+                    title: { bsonType: 'string' },
+                    content: { bsonType: 'string' },
+                    authorId: { bsonType: 'objectId' },
+                    createdAt: { bsonType: 'date' },
+                  },
+                },
+                validationLevel: 'strict',
+                validationAction: 'error',
+              },
+            },
           },
         },
         extensionPacks: {},
         capabilities: {},
         meta: {},
       });
+    });
+  });
+
+  describe('index authoring', () => {
+    it('creates ascending index from @@index', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@index([email])
+        }
+      `);
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['user']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['keys']).toEqual([{ field: 'email', direction: 1 }]);
+    });
+
+    it('creates unique index from @@unique', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@unique([email])
+        }
+      `);
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['user']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['unique']).toBe(true);
+    });
+
+    it('creates compound index', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          name  String
+          @@index([email, name])
+        }
+      `);
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['user']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['keys']).toEqual([
+        { field: 'email', direction: 1 },
+        { field: 'name', direction: 1 },
+      ]);
+    });
+
+    it('creates field-level @unique index', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String   @unique
+        }
+      `);
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['user']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['unique']).toBe(true);
+      expect(indexes![0]!['keys']).toEqual([{ field: 'email', direction: 1 }]);
+    });
+
+    it('creates index with sparse and TTL options', () => {
+      const ir = interpretOk(`
+        model Session {
+          id        ObjectId @id @map("_id")
+          expiresAt DateTime
+          @@index([expiresAt], sparse: true, expireAfterSeconds: 3600)
+        }
+      `);
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['session']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['sparse']).toBe(true);
+      expect(indexes![0]!['expireAfterSeconds']).toBe(3600);
+    });
+
+    it('respects @map on indexed fields', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String   @map("email_address")
+          @@index([email])
+        }
+      `);
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const indexes = storage['collections']?.['user']?.['indexes'] as
+        | ReadonlyArray<Record<string, unknown>>
+        | undefined;
+      expect(indexes![0]!['keys']).toEqual([{ field: 'email_address', direction: 1 }]);
+    });
+
+    it('creates no indexes when none declared', () => {
+      const ir = interpretOk(`
+        model User {
+          id ObjectId @id @map("_id")
+        }
+      `);
+      const storage = ir.storage as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const userColl = storage['collections']?.['user'];
+      expect(userColl?.['indexes']).toBeUndefined();
+    });
+
+    it('creates wildcard index from wildcard()', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard()])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['keys']).toEqual([{ field: '$**', direction: 1 }]);
+    });
+
+    it('creates scoped wildcard index from wildcard(field)', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard(metadata)])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['keys']).toEqual([{ field: 'metadata.$**', direction: 1 }]);
+    });
+
+    it('creates compound wildcard index', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          tenantId String
+          metadata String
+          @@index([tenantId, wildcard(metadata)])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['keys']).toEqual([
+        { field: 'tenantId', direction: 1 },
+        { field: 'metadata.$**', direction: 1 },
+      ]);
+    });
+
+    it('applies @map to scoped wildcard field', () => {
+      const ir = interpretOk(`
+        model Events {
+          id   ObjectId @id @map("_id")
+          meta String   @map("metadata")
+          @@index([wildcard(meta)])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['keys']).toEqual([{ field: 'metadata.$**', direction: 1 }]);
+    });
+
+    it('creates descending index from sort: Desc', () => {
+      const ir = interpretOk(`
+        model Events {
+          id        ObjectId @id @map("_id")
+          createdAt DateTime
+          @@index([createdAt(sort: Desc)])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['keys']).toEqual([{ field: 'createdAt', direction: -1 }]);
+    });
+
+    it('creates mixed-direction compound index', () => {
+      const ir = interpretOk(`
+        model Events {
+          id        ObjectId @id @map("_id")
+          status    String
+          createdAt DateTime
+          @@index([status, createdAt(sort: Desc)])
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['keys']).toEqual([
+        { field: 'status', direction: 1 },
+        { field: 'createdAt', direction: -1 },
+      ]);
+    });
+
+    it('creates hashed index from type: "hashed"', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          tenantId String
+          @@index([tenantId], type: "hashed")
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['keys']).toEqual([{ field: 'tenantId', direction: 'hashed' }]);
+    });
+
+    it('creates 2dsphere index', () => {
+      const ir = interpretOk(`
+        model Places {
+          id       ObjectId @id @map("_id")
+          location String
+          @@index([location], type: "2dsphere")
+        }
+      `);
+      const indexes = getIndexes(ir, 'places');
+      expect(indexes![0]!['keys']).toEqual([{ field: 'location', direction: '2dsphere' }]);
+    });
+
+    it('parses filter as partialFilterExpression', () => {
+      const ir = interpretOk(`
+        model Events {
+          id     ObjectId @id @map("_id")
+          status String
+          @@index([status], filter: "{\\"status\\": \\"active\\"}")
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['partialFilterExpression']).toEqual({ status: 'active' });
+    });
+
+    it('parses collation from named scalar arguments', () => {
+      const ir = interpretOk(`
+        model Events {
+          id     ObjectId @id @map("_id")
+          status String
+          @@index([status], collationLocale: "fr", collationStrength: 2)
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['collation']).toEqual({ locale: 'fr', strength: 2 });
+    });
+
+    it('parses all collation arguments', () => {
+      const ir = interpretOk(`
+        model Events {
+          id     ObjectId @id @map("_id")
+          status String
+          @@index([status], collationLocale: "en", collationStrength: 2, collationCaseLevel: true, collationCaseFirst: "upper", collationNumericOrdering: true, collationAlternate: "shifted", collationMaxVariable: "punct", collationBackwards: false, collationNormalization: true)
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['collation']).toEqual({
+        locale: 'en',
+        strength: 2,
+        caseLevel: true,
+        caseFirst: 'upper',
+        numericOrdering: true,
+        alternate: 'shifted',
+        maxVariable: 'punct',
+        backwards: false,
+        normalization: true,
+      });
+    });
+
+    it('parses include as wildcardProjection with 1 values', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          tags     String
+          @@index([wildcard()], include: "[metadata, tags]")
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['wildcardProjection']).toEqual({ metadata: 1, tags: 1 });
+    });
+
+    it('parses exclude as wildcardProjection with 0 values', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          internal String
+          @@index([wildcard()], exclude: "[internal, _class]")
+        }
+      `);
+      const indexes = getIndexes(ir, 'events');
+      expect(indexes![0]!['wildcardProjection']).toEqual({ internal: 0, _class: 0 });
+    });
+
+    it('creates @@textIndex with direction text', () => {
+      const ir = interpretOk(`
+        model Article {
+          id    ObjectId @id @map("_id")
+          title String
+          body  String
+          @@textIndex([title, body])
+        }
+      `);
+      const indexes = getIndexes(ir, 'article');
+      expect(indexes).toHaveLength(1);
+      expect(indexes![0]!['keys']).toEqual([
+        { field: 'title', direction: 'text' },
+        { field: 'body', direction: 'text' },
+      ]);
+    });
+
+    it('creates @@textIndex with weights and language options', () => {
+      const ir = interpretOk(`
+        model Article {
+          id    ObjectId @id @map("_id")
+          title String
+          body  String
+          @@textIndex([title, body], weights: "{\\"title\\": 10, \\"body\\": 5}", language: "english", languageOverride: "idioma")
+        }
+      `);
+      const indexes = getIndexes(ir, 'article');
+      expect(indexes![0]!['weights']).toEqual({ title: 10, body: 5 });
+      expect(indexes![0]!['default_language']).toBe('english');
+      expect(indexes![0]!['language_override']).toBe('idioma');
+    });
+
+    it('creates @@unique with collation', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@unique([email], collationLocale: "en", collationStrength: 2)
+        }
+      `);
+      const indexes = getIndexes(ir, 'user');
+      expect(indexes![0]!['unique']).toBe(true);
+      expect(indexes![0]!['collation']).toEqual({ locale: 'en', strength: 2 });
+    });
+
+    it('creates @@unique with filter', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@unique([email], filter: "{\\"active\\": true}")
+        }
+      `);
+      const indexes = getIndexes(ir, 'user');
+      expect(indexes![0]!['unique']).toBe(true);
+      expect(indexes![0]!['partialFilterExpression']).toEqual({ active: true });
+    });
+  });
+
+  describe('index validation', () => {
+    it('rejects multiple wildcard() fields in one index', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          tags     String
+          @@index([wildcard(metadata), wildcard(tags)])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) => d.message.includes('at most one wildcard()')),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects wildcard() in @@unique', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@unique([wildcard(metadata)])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('Unique indexes cannot use wildcard()'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects include and exclude on the same index', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard()], include: "[metadata]", exclude: "[_class]")
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('Cannot specify both include and exclude'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects include/exclude without wildcard', () => {
+      const result = interpret(`
+        model Events {
+          id     ObjectId @id @map("_id")
+          status String
+          @@index([status], include: "[status]")
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('only valid when the index contains a wildcard()'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects TTL with wildcard', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard()], expireAfterSeconds: 3600)
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('expireAfterSeconds cannot be combined with wildcard()'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects wildcard with hashed type', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard()], type: "hashed")
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('wildcard() fields cannot be combined with type'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects multiple @@textIndex on same collection', () => {
+      const result = interpret(`
+        model Article {
+          id    ObjectId @id @map("_id")
+          title String
+          body  String
+          @@textIndex([title])
+          @@textIndex([body])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('Only one @@textIndex is allowed'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects hashed index with multiple fields', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          tenantId String
+          status   String
+          @@index([tenantId, status], type: "hashed")
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) =>
+            d.message.includes('Hashed indexes must have exactly one field'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects collation options without collationLocale', () => {
+      const result = interpret(`
+        model Events {
+          id     ObjectId @id @map("_id")
+          status String
+          @@index([status], collationStrength: 2)
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.failure.diagnostics.some((d) => d.message.includes('collationLocale is required')),
+        ).toBe(true);
+      }
+    });
+  });
+
+  describe('validator derivation', () => {
+    function getValidator(ir: unknown, collectionName: string) {
+      const contract = ir as Record<string, unknown>;
+      const storage = contract['storage'] as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      return storage['collections']?.[collectionName]?.['validator'] as
+        | Record<string, unknown>
+        | undefined;
+    }
+
+    it('derives $jsonSchema from model fields', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          name  String
+          age   Int
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      expect(validator).toBeDefined();
+      expect(validator!['validationLevel']).toBe('strict');
+      expect(validator!['validationAction']).toBe('error');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      expect(schema['bsonType']).toBe('object');
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['_id']).toEqual({ bsonType: 'objectId' });
+      expect(props['name']).toEqual({ bsonType: 'string' });
+      expect(props['age']).toEqual({ bsonType: 'int' });
+    });
+
+    it('handles nullable fields with bsonType array', () => {
+      const ir = interpretOk(`
+        model User {
+          id   ObjectId @id @map("_id")
+          bio  String?
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['bio']).toEqual({ bsonType: ['null', 'string'] });
+    });
+
+    it('handles array fields', () => {
+      const ir = interpretOk(`
+        model User {
+          id   ObjectId @id @map("_id")
+          tags String[]
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['tags']).toEqual({ bsonType: 'array', items: { bsonType: 'string' } });
+    });
+
+    it('uses @map names in jsonSchema properties', () => {
+      const ir = interpretOk(`
+        model User {
+          id        ObjectId @id @map("_id")
+          firstName String   @map("first_name")
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['first_name']).toEqual({ bsonType: 'string' });
+      expect(props['firstName']).toBeUndefined();
+    });
+
+    it('includes non-nullable fields in required array', () => {
+      const ir = interpretOk(`
+        model User {
+          id   ObjectId @id @map("_id")
+          name String
+          bio  String?
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const required = schema['required'] as string[];
+      expect(required).toContain('_id');
+      expect(required).toContain('name');
+      expect(required).not.toContain('bio');
+    });
+
+    it('includes validator alongside indexes', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@index([email])
+        }
+      `);
+      const storage = ir['storage'] as unknown as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      const userColl = storage['collections']?.['user'];
+      expect(userColl?.['indexes']).toBeDefined();
+      expect(userColl?.['validator']).toBeDefined();
+    });
+
+    it('handles value object fields as nested objects', () => {
+      const ir = interpretOk(`
+        type Address {
+          street String
+          city   String
+        }
+
+        model User {
+          id      ObjectId @id @map("_id")
+          address Address
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['address']).toEqual({
+        bsonType: 'object',
+        required: ['city', 'street'],
+        properties: {
+          street: { bsonType: 'string' },
+          city: { bsonType: 'string' },
+        },
+      });
+    });
+
+    it('handles nullable value object fields with oneOf null or object', () => {
+      const ir = interpretOk(`
+        type Address {
+          street String
+          city   String
+        }
+
+        model User {
+          id      ObjectId @id @map("_id")
+          address Address?
+        }
+      `);
+      const validator = getValidator(ir, 'user');
+      const schema = validator!['jsonSchema'] as Record<string, unknown>;
+      const props = schema['properties'] as Record<string, Record<string, unknown>>;
+      expect(props['address']).toEqual({
+        oneOf: [
+          { bsonType: 'null' },
+          {
+            bsonType: 'object',
+            required: ['city', 'street'],
+            properties: {
+              street: { bsonType: 'string' },
+              city: { bsonType: 'string' },
+            },
+          },
+        ],
+      });
+      const required = schema['required'] as string[];
+      expect(required).not.toContain('address');
     });
   });
 });

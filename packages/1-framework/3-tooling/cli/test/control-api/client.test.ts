@@ -80,7 +80,7 @@ function createMockComponents() {
       marker: { created: false, updated: true },
       timings: { total: 10 },
     }),
-  } as unknown as ControlFamilyInstance<string>;
+  } as unknown as ControlFamilyInstance<string, unknown>;
 
   const mockHook: EmissionSpi = {
     id: 'sql',
@@ -606,7 +606,7 @@ describe('ControlClient progress emission', () => {
         introspect: async () => ({ tables: {}, dependencies: [] }),
         validateContract: (ir: unknown) => ir as Contract,
         readMarker: async () => ({ storageHash: 'sha256:origin' }),
-      } as unknown as ControlFamilyInstance<string>;
+      } as unknown as ControlFamilyInstance<string, unknown>;
 
       const mockFamilyWithMarker = {
         familyId: 'sql',
@@ -712,7 +712,7 @@ describe('ControlClient progress emission', () => {
         introspect: async () => ({ tables: {}, dependencies: [] }),
         validateContract: (ir: unknown) => ir as Contract,
         readMarker: async () => null,
-      } as unknown as ControlFamilyInstance<string>;
+      } as unknown as ControlFamilyInstance<string, unknown>;
 
       const noMarkerFamily = {
         familyId: 'sql',

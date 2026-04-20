@@ -13,14 +13,16 @@ export default defineConfig({
     'src/commands/db-verify.ts',
     'src/commands/contract-emit.ts',
     'src/commands/migration-apply.ts',
+    'src/commands/migration-emit.ts',
+    'src/commands/migration-new.ts',
     'src/commands/migration-plan.ts',
     'src/commands/migration-ref.ts',
     'src/commands/migration-show.ts',
     'src/commands/migration-status.ts',
-    'src/commands/migration-verify.ts',
     'src/config-loader.ts',
     'src/exports/control-api.ts',
   ],
+  copy: [{ from: 'src/commands/init/templates/*.md' }],
   // Keep manual exports to preserve stable CLI public subpaths.
   exports: { enabled: false },
   outputOptions: (opts) => ({

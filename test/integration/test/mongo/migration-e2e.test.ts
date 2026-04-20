@@ -1,14 +1,15 @@
+import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import type { MongoContract } from '@prisma-next/mongo-contract';
+import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
   contractToMongoSchemaIR,
   MongoMigrationPlanner,
   MongoMigrationRunner,
   readMarker,
   serializeMongoOps,
-} from '@prisma-next/adapter-mongo/control';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
-import mongoControlDriver from '@prisma-next/driver-mongo/control';
-import type { MongoContract } from '@prisma-next/mongo-contract';
-import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
+} from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -59,7 +60,7 @@ const indexedContract: MongoContract = {
   storage: {
     collections: {
       users: {
-        indexes: [{ fields: { email: 1 }, options: { unique: true } }],
+        indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
       },
     },
     storageHash: coreHash('sha256:indexed-contract'),
@@ -74,7 +75,7 @@ const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 };
 
-describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
+describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
   let db: Db;
@@ -82,13 +83,15 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
 
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({
-      instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
       replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
     client = new MongoClient(replSet.getUri());
     await client.connect();
     db = client.db(dbName);
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   beforeEach(async () => {
     await db.dropDatabase();
@@ -101,7 +104,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
     } catch {
       // Ignore cleanup errors
     }
-  }, timeouts.spinUpDbServer);
+  }, timeouts.spinUpMongoMemoryServer);
 
   describe('plan + apply create index', () => {
     it('plans a createIndex operation from empty to indexed contract', () => {
@@ -111,6 +114,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         contract: indexedContract,
         schema,
         policy: ALL_POLICY,
+        fromHash: 'sha256:origin',
         frameworkComponents: [],
       });
 
@@ -131,6 +135,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         contract: indexedContract,
         schema,
         policy: ALL_POLICY,
+        fromHash: 'sha256:origin',
         frameworkComponents: [],
       });
       if (result.kind !== 'success') throw new Error('Plan failed unexpectedly');
@@ -140,14 +145,14 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner();
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
         const runResult = await runner.execute({
           plan: {
             targetId: 'mongo',
             destination: { storageHash: indexedContract.storage.storageHash },
             operations: serialized,
           },
-          driver: controlDriver,
+
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -174,6 +179,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         contract: indexedContract,
         schema,
         policy: ALL_POLICY,
+        fromHash: 'sha256:origin',
         frameworkComponents: [],
       });
       if (result.kind !== 'success') throw new Error('Plan failed');
@@ -183,14 +189,14 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner();
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
         await runner.execute({
           plan: {
             targetId: 'mongo',
             destination: { storageHash: indexedContract.storage.storageHash },
             operations: serialized,
           },
-          driver: controlDriver,
+
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -211,6 +217,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         contract: indexedContract,
         schema,
         policy: ALL_POLICY,
+        fromHash: 'sha256:origin',
         frameworkComponents: [],
       });
       if (result.kind !== 'success') throw new Error('Plan failed');
@@ -220,14 +227,14 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner();
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
         await runner.execute({
           plan: {
             targetId: 'mongo',
             destination: { storageHash: indexedContract.storage.storageHash },
             operations: serialized,
           },
-          driver: controlDriver,
+
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -250,7 +257,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
         const planner = new MongoMigrationPlanner();
-        const runner = new MongoMigrationRunner();
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
 
         // Step 1: Apply create index
         const createSchema = contractToMongoSchemaIR(null);
@@ -258,6 +265,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
           contract: indexedContract,
           schema: createSchema,
           policy: ALL_POLICY,
+          fromHash: 'sha256:origin',
           frameworkComponents: [],
         });
         if (createResult.kind !== 'success') throw new Error('Create plan failed');
@@ -270,7 +278,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
             destination: { storageHash: indexedContract.storage.storageHash },
             operations: createSerialized,
           },
-          driver: controlDriver,
+
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -286,6 +294,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
           contract: emptyContract,
           schema: dropSchema,
           policy: ALL_POLICY,
+          fromHash: 'sha256:origin',
           frameworkComponents: [],
         });
         if (dropResult.kind !== 'success') throw new Error('Drop plan failed');
@@ -304,7 +313,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
             destination: { storageHash: emptyContract.storage.storageHash },
             operations: dropSerialized,
           },
-          driver: controlDriver,
+
           destinationContract: emptyContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -341,7 +350,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
         const planner = new MongoMigrationPlanner();
-        const runner = new MongoMigrationRunner();
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
 
         // First apply
         const schema = contractToMongoSchemaIR(null);
@@ -349,6 +358,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
           contract: indexedContract,
           schema,
           policy: ALL_POLICY,
+          fromHash: 'sha256:origin',
           frameworkComponents: [],
         });
         if (result.kind !== 'success') throw new Error('Plan failed');
@@ -363,7 +373,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
 
         await runner.execute({
           plan: bootstrapPlan,
-          driver: controlDriver,
+
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -376,7 +386,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         };
         const reapplyResult = await runner.execute({
           plan: reapplyPlan,
-          driver: controlDriver,
+
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -402,12 +412,13 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
         expect(controlDriver.db.databaseName).toBe(dbName);
 
         const planner = new MongoMigrationPlanner();
-        const runner = new MongoMigrationRunner();
+        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
         const schema = contractToMongoSchemaIR(null);
         const result = planner.plan({
           contract: indexedContract,
           schema,
           policy: ALL_POLICY,
+          fromHash: 'sha256:origin',
           frameworkComponents: [],
         });
         if (result.kind !== 'success') throw new Error('Plan failed');
@@ -420,7 +431,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpDbServer }, () => {
             destination: { storageHash: indexedContract.storage.storageHash },
             operations: serialized,
           },
-          driver: controlDriver,
+
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],

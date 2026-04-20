@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MongoAggFieldRef, MongoAggOperator } from '../src/aggregation-expressions';
 import type { MongoFilterExpr } from '../src/filter-expressions';
 import {
+  isMongoFilterExpr,
   MongoAndExpr,
   MongoExistsExpr,
   MongoExprFilter,
@@ -261,6 +262,45 @@ describe('MongoFilterRewriter', () => {
     const original = MongoExprFilter.of(MongoAggFieldRef.of('x'));
     const rewritten = original.rewrite(rewriter);
     expect(rewritten.kind).toBe('field');
+  });
+});
+
+describe('isMongoFilterExpr', () => {
+  it('returns true for all filter expression types', () => {
+    const field = MongoFieldFilter.eq('x', 1);
+    const and = MongoAndExpr.of([field]);
+    const or = MongoOrExpr.of([field]);
+    const not = new MongoNotExpr(field);
+    const exists = MongoExistsExpr.exists('x');
+    const expr = MongoExprFilter.of(MongoAggFieldRef.of('x'));
+
+    for (const node of [field, and, or, not, exists, expr]) {
+      expect(isMongoFilterExpr(node)).toBe(true);
+    }
+  });
+
+  it('returns false for plain objects with a kind property', () => {
+    const impersonator = { kind: 'field', field: 'x', op: '$eq', value: 1 };
+    expect(isMongoFilterExpr(impersonator)).toBe(false);
+  });
+
+  it('returns false for null and primitives', () => {
+    expect(isMongoFilterExpr(null)).toBe(false);
+    expect(isMongoFilterExpr(undefined)).toBe(false);
+    expect(isMongoFilterExpr(42)).toBe(false);
+  });
+
+  it('brand property is non-enumerable', () => {
+    const field = MongoFieldFilter.eq('x', 1);
+    const brandKey = '__prismaNextMongoFilter__';
+    expect(Object.keys(field)).not.toContain(brandKey);
+    expect(JSON.parse(JSON.stringify(field))).not.toHaveProperty(brandKey);
+  });
+
+  it('survives dual-package scenario (string-based lookup)', () => {
+    const field = MongoFieldFilter.eq('x', 1);
+    const brandKey = '__prismaNextMongoFilter__';
+    expect(brandKey in field).toBe(true);
   });
 });
 

@@ -30,3 +30,10 @@ export {
   errorSchemaVerificationFailed,
   errorTargetMismatch,
 } from '@prisma-next/errors/execution';
+export {
+  errorMigrationFileMissing,
+  errorMigrationInvalidDefaultExport,
+  errorMigrationPlanNotArray,
+  errorUnfilledPlaceholder,
+  placeholder,
+} from '@prisma-next/errors/migration';

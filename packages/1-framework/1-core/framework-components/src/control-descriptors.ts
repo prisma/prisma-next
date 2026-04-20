@@ -17,7 +17,10 @@ import type {
 
 export interface ControlFamilyDescriptor<
   TFamilyId extends string,
-  TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
+  TFamilyInstance extends ControlFamilyInstance<TFamilyId, unknown> = ControlFamilyInstance<
+    TFamilyId,
+    unknown
+  >,
 > extends FamilyDescriptor<TFamilyId> {
   readonly emission: EmissionSpi;
   create<TTargetId extends string>(stack: ControlStack<TFamilyId, TTargetId>): TFamilyInstance;

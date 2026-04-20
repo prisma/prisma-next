@@ -8,8 +8,10 @@ import type { TypesImportSpec } from '@prisma-next/framework-components/emission
 import { describe, expect, it, vi } from 'vitest';
 import {
   deduplicateImports,
+  generateBothFieldTypesMaps,
   generateCodecTypeIntersection,
   generateContractFieldDescriptor,
+  generateFieldInputTypesMap,
   generateFieldOutputTypesMap,
   generateFieldResolvedType,
   generateHashTypeAliases,
@@ -21,6 +23,7 @@ import {
   generateValueObjectsDescriptorType,
   generateValueObjectType,
   generateValueObjectTypeAliases,
+  resolveFieldType,
   serializeExecutionType,
   serializeObjectKey,
   serializeValue,
@@ -479,12 +482,12 @@ describe('generateFieldResolvedType', () => {
     expect(generateFieldResolvedType(field)).toBe("CodecTypes['mongo/string@1']['output']");
   });
 
-  it('generates named type reference for value object fields', () => {
+  it('generates suffixed type reference for value object fields', () => {
     const field: ContractField = {
       nullable: false,
       type: { kind: 'valueObject', name: 'Address' },
     };
-    expect(generateFieldResolvedType(field)).toBe('Address');
+    expect(generateFieldResolvedType(field)).toBe('AddressOutput');
   });
 
   it('wraps in ReadonlyArray for many: true', () => {
@@ -493,7 +496,7 @@ describe('generateFieldResolvedType', () => {
       type: { kind: 'valueObject', name: 'Address' },
       many: true,
     };
-    expect(generateFieldResolvedType(field)).toBe('ReadonlyArray<Address>');
+    expect(generateFieldResolvedType(field)).toBe('ReadonlyArray<AddressOutput>');
   });
 
   it('wraps in Readonly<Record> for dict: true', () => {
@@ -512,7 +515,7 @@ describe('generateFieldResolvedType', () => {
       nullable: true,
       type: { kind: 'valueObject', name: 'Address' },
     };
-    expect(generateFieldResolvedType(field)).toBe('Address | null');
+    expect(generateFieldResolvedType(field)).toBe('AddressOutput | null');
   });
 
   it('combines many and nullable', () => {
@@ -521,10 +524,10 @@ describe('generateFieldResolvedType', () => {
       type: { kind: 'valueObject', name: 'Address' },
       many: true,
     };
-    expect(generateFieldResolvedType(field)).toBe('ReadonlyArray<Address> | null');
+    expect(generateFieldResolvedType(field)).toBe('ReadonlyArray<AddressOutput> | null');
   });
 
-  it('handles union types', () => {
+  it('handles union types with output side', () => {
     const field: ContractField = {
       nullable: false,
       type: {
@@ -536,7 +539,41 @@ describe('generateFieldResolvedType', () => {
       },
     };
     expect(generateFieldResolvedType(field)).toBe(
-      "CodecTypes['mongo/string@1']['output'] | Address",
+      "CodecTypes['mongo/string@1']['output'] | AddressOutput",
+    );
+  });
+
+  it('generates input side for scalar fields', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+    };
+    expect(generateFieldResolvedType(field, undefined, 'input')).toBe(
+      "CodecTypes['mongo/string@1']['input']",
+    );
+  });
+
+  it('generates input-suffixed type for value object fields on input side', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'valueObject', name: 'Price' },
+    };
+    expect(generateFieldResolvedType(field, undefined, 'input')).toBe('PriceInput');
+  });
+
+  it('generates input side for union types', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: {
+        kind: 'union',
+        members: [
+          { kind: 'scalar', codecId: 'mongo/string@1' },
+          { kind: 'valueObject', name: 'Address' },
+        ],
+      },
+    };
+    expect(generateFieldResolvedType(field, undefined, 'input')).toBe(
+      "CodecTypes['mongo/string@1']['input'] | AddressInput",
     );
   });
 });
@@ -558,7 +595,7 @@ describe('generateValueObjectType', () => {
     expect(result).toContain("readonly zip: CodecTypes['mongo/string@1']['output']");
   });
 
-  it('handles value object field referencing another value object', () => {
+  it('handles value object field referencing another value object (output)', () => {
     const companyVo: ContractValueObject = {
       fields: {
         name: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
@@ -567,7 +604,19 @@ describe('generateValueObjectType', () => {
     };
     const vos = { ...valueObjects, Company: companyVo };
     const result = generateValueObjectType('Company', companyVo, vos);
-    expect(result).toContain('readonly address: Address');
+    expect(result).toContain('readonly address: AddressOutput');
+  });
+
+  it('handles value object field referencing another value object (input)', () => {
+    const companyVo: ContractValueObject = {
+      fields: {
+        name: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        address: { nullable: false, type: { kind: 'valueObject', name: 'Address' } },
+      },
+    };
+    const vos = { ...valueObjects, Company: companyVo };
+    const result = generateValueObjectType('Company', companyVo, vos, 'input');
+    expect(result).toContain('readonly address: AddressInput');
   });
 
   it('handles self-referencing value object (no infinite recursion)', () => {
@@ -583,7 +632,7 @@ describe('generateValueObjectType', () => {
     };
     const vos = { NavItem: navItemVo };
     const result = generateValueObjectType('NavItem', navItemVo, vos);
-    expect(result).toContain('readonly children: ReadonlyArray<NavItem>');
+    expect(result).toContain('readonly children: ReadonlyArray<NavItemOutput>');
   });
 
   it('returns Record<string, never> for empty value object', () => {
@@ -678,7 +727,7 @@ describe('generateValueObjectTypeAliases', () => {
     expect(generateValueObjectTypeAliases({})).toBe('');
   });
 
-  it('generates export type alias for each value object', () => {
+  it('generates output and input type alias pairs for each value object', () => {
     const valueObjects: Record<string, ContractValueObject> = {
       Address: {
         fields: {
@@ -687,11 +736,14 @@ describe('generateValueObjectTypeAliases', () => {
       },
     };
     const result = generateValueObjectTypeAliases(valueObjects);
-    expect(result).toContain('export type Address =');
+    expect(result).toContain('export type AddressOutput =');
+    expect(result).toContain('export type AddressInput =');
     expect(result).toContain("readonly street: CodecTypes['mongo/string@1']['output']");
+    expect(result).toContain("readonly street: CodecTypes['mongo/string@1']['input']");
+    expect(result).not.toMatch(/export type Address =/);
   });
 
-  it('generates multiple type aliases', () => {
+  it('generates multiple type alias pairs', () => {
     const valueObjects: Record<string, ContractValueObject> = {
       Address: {
         fields: {
@@ -706,8 +758,10 @@ describe('generateValueObjectTypeAliases', () => {
       },
     };
     const result = generateValueObjectTypeAliases(valueObjects);
-    expect(result).toContain('export type Address =');
-    expect(result).toContain('export type GeoPoint =');
+    expect(result).toContain('export type AddressOutput =');
+    expect(result).toContain('export type AddressInput =');
+    expect(result).toContain('export type GeoPointOutput =');
+    expect(result).toContain('export type GeoPointInput =');
   });
 });
 
@@ -820,5 +874,124 @@ describe('generateFieldOutputTypesMap', () => {
   it('returns Record<string, never> for empty models', () => {
     expect(generateFieldOutputTypesMap(undefined)).toBe('Record<string, never>');
     expect(generateFieldOutputTypesMap({})).toBe('Record<string, never>');
+  });
+
+  it('references {Name}Output for value object fields', () => {
+    const models: Record<string, ContractModel> = {
+      Product: {
+        fields: {
+          price: {
+            nullable: false,
+            type: { kind: 'valueObject', name: 'Price' },
+          },
+        },
+        relations: {},
+        storage: {},
+      },
+    };
+    const result = generateFieldOutputTypesMap(models);
+    expect(result).toContain('readonly price: PriceOutput');
+  });
+});
+
+describe('generateFieldInputTypesMap', () => {
+  it('generates input-side codec lookups', () => {
+    const models: Record<string, ContractModel> = {
+      User: {
+        fields: {
+          name: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'mongo/string@1' },
+          },
+        },
+        relations: {},
+        storage: {},
+      },
+    };
+    const result = generateFieldInputTypesMap(models);
+    expect(result).toContain("CodecTypes['mongo/string@1']['input']");
+  });
+
+  it('references {Name}Input for value object fields', () => {
+    const models: Record<string, ContractModel> = {
+      Product: {
+        fields: {
+          price: {
+            nullable: false,
+            type: { kind: 'valueObject', name: 'Price' },
+          },
+        },
+        relations: {},
+        storage: {},
+      },
+    };
+    const result = generateFieldInputTypesMap(models);
+    expect(result).toContain('readonly price: PriceInput');
+  });
+
+  it('returns Record<string, never> for empty models', () => {
+    expect(generateFieldInputTypesMap(undefined)).toBe('Record<string, never>');
+    expect(generateFieldInputTypesMap({})).toBe('Record<string, never>');
+  });
+});
+
+describe('generateBothFieldTypesMaps', () => {
+  it('generates both output and input maps in a single pass', () => {
+    const models: Record<string, ContractModel> = {
+      User: {
+        fields: {
+          _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+        },
+        relations: {},
+        storage: {},
+      },
+    };
+    const result = generateBothFieldTypesMaps(models);
+    expect(result.output).toContain("CodecTypes['mongo/objectId@1']['output']");
+    expect(result.input).toContain("CodecTypes['mongo/objectId@1']['input']");
+  });
+
+  it('returns Record<string, never> for empty models on both sides', () => {
+    const result = generateBothFieldTypesMaps(undefined);
+    expect(result.output).toBe('Record<string, never>');
+    expect(result.input).toBe('Record<string, never>');
+  });
+});
+
+describe('resolveFieldType', () => {
+  it('returns both input and output for scalar fields', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+    };
+    const result = resolveFieldType(field);
+    expect(result.output).toBe("CodecTypes['mongo/string@1']['output']");
+    expect(result.input).toBe("CodecTypes['mongo/string@1']['input']");
+  });
+
+  it('returns suffixed types for value object fields', () => {
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'valueObject', name: 'Price' },
+    };
+    const result = resolveFieldType(field);
+    expect(result.output).toBe('PriceOutput');
+    expect(result.input).toBe('PriceInput');
+  });
+
+  it('uses renderOutputType only for output side of parameterized codecs', () => {
+    const lookup = stubCodecLookup({
+      'pg/char@1': stubCodec({
+        id: 'pg/char@1',
+        renderOutputType: (p) => `Char<${p['length']}>`,
+      }),
+    });
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/char@1', typeParams: { length: 36 } },
+    };
+    const result = resolveFieldType(field, lookup);
+    expect(result.output).toBe('Char<36>');
+    expect(result.input).toBe("CodecTypes['pg/char@1']['input']");
   });
 });

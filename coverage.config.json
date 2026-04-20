@@ -1,6 +1,16 @@
 {
   "$schema": "./coverage.config.schema.json",
   "description": "WARNING-ONLY PACKAGES: Time-limited exceptions for packages with coverage/test failures. Each entry MUST have an expiry date. When expired, CI will fail until issues are resolved or config is updated with justification.",
-  "warningOnly": [],
+  "warningOnly": [
+    {
+      "package": "3-targets/3-targets/postgres",
+      "reason": "operation-resolver.ts and runner.ts have descriptor-pipeline coverage gaps. The legacy planner is exhaustively integration-tested but bypasses the new resolver. Targeted tests added for dataTransform lifecycle and addColumn/alterColumnType options; per-kind glue coverage deferred until the descriptor pipeline replaces the legacy planner.",
+      "addedDate": "2026-04-15",
+      "expiryDays": 90,
+      "assignee": null,
+      "linear": null,
+      "notes": "See packages/3-targets/3-targets/postgres/test/migrations/operation-resolver.integration.test.ts for the targeted coverage. Coverage will recover naturally when existing legacy-planner integration tests migrate to the descriptor pipeline."
+    }
+  ],
   "excludedPackages": ["1-framework/3-tooling/eslint-plugin"]
 }

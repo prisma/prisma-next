@@ -36,7 +36,7 @@ Adopt a local-only ops model plus a deterministic migration bundle for hosted pr
 - Each op file or package export must co-locate a manifest with:
   - name, version, target (postgres | mysql | mongo | multi)
   - inputsSchema (JSON Schema)
-  - preChecks, postChecks using ADR 044 vocabulary
+  - preChecks, postChecks using per-family check vocabulary ([ADR 028](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md) / [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md))
   - privilege (read | write | admin)
   - safety (idempotent | bestEffort | nonIdempotent)
   - requiresTx optional
@@ -143,7 +143,6 @@ For each executed op, record:
 - ADR 037 — Transactional DDL fallback & compensation
 - ADR 038 — Operation idempotency classification & enforcement
 - ADR 040 — Node task execution environment & sandboxing
-- ADR 044 — Pre/post check vocabulary v1
 - ADR 029 — Shadow DB preflight semantics
 - ADR 051 — PPg preflight-as-a-service contract
 

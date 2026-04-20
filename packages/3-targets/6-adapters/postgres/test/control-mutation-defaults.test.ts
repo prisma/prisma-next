@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createPostgresDefaultFunctionRegistry,
   createPostgresMutationDefaultGeneratorDescriptors,
-  createPostgresPslScalarTypeDescriptors,
+  createPostgresScalarTypeDescriptors,
 } from '../src/core/control-mutation-defaults';
 
 const stubSpan = {
@@ -269,8 +269,8 @@ describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
   });
 });
 
-describe('createPostgresPslScalarTypeDescriptors', () => {
-  const descriptors = createPostgresPslScalarTypeDescriptors();
+describe('createPostgresScalarTypeDescriptors', () => {
+  const descriptors = createPostgresScalarTypeDescriptors();
 
   it('maps all standard PSL scalar types', () => {
     expect([...descriptors.keys()]).toEqual(
@@ -289,9 +289,6 @@ describe('createPostgresPslScalarTypeDescriptors', () => {
   });
 
   it('maps String to pg/text@1', () => {
-    expect(descriptors.get('String')).toEqual({
-      codecId: 'pg/text@1',
-      nativeType: 'text',
-    });
+    expect(descriptors.get('String')).toBe('pg/text@1');
   });
 });

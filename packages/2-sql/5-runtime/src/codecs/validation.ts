@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { runtimeError } from '@prisma-next/runtime-executor';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 

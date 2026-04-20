@@ -3,14 +3,23 @@ import type {
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
+import {
+  MongoSchemaCollection,
+  MongoSchemaIndex,
+  MongoSchemaIR,
+} from '@prisma-next/mongo-schema-ir';
+import {
+  initMarker,
+  MongoMigrationPlanner,
+  MongoMigrationRunner,
+  readMarker,
+  serializeMongoOps,
+} from '@prisma-next/target-mongo/control';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { initMarker, readMarker } from '../src/core/marker-ledger';
 import { createMongoControlDriver } from '../src/core/mongo-control-driver';
-import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
-import { MongoMigrationPlanner } from '../src/core/mongo-planner';
-import { MongoMigrationRunner } from '../src/core/mongo-runner';
+import { createMongoRunnerDeps } from '../src/core/runner-deps';
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -41,7 +50,13 @@ beforeEach(async () => {
 function makeContract(
   collections: Record<
     string,
-    { indexes?: Array<{ fields: Record<string, 1 | -1>; options?: { unique?: boolean } }> }
+    {
+      indexes?: Array<{
+        keys: Array<{ field: string; direction: 1 | -1 }>;
+        unique?: boolean;
+        sparse?: boolean;
+      }>;
+    }
   >,
   storageHash = 'sha256:dest',
 ) {
@@ -59,13 +74,15 @@ function makeContract(
 
 function planForContract(
   contract: ReturnType<typeof makeContract>,
-  origin: { collections: Record<string, { indexes: never[] }> } = { collections: {} },
+  origin: MongoSchemaIR = new MongoSchemaIR([]),
+  fromHash = '',
 ) {
   const planner = new MongoMigrationPlanner();
   const result = planner.plan({
     contract,
     schema: origin,
     policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+    fromHash,
     frameworkComponents: [],
   });
   if (result.kind !== 'success') throw new Error('Planner failed unexpectedly');
@@ -76,25 +93,29 @@ function serializePlan(plan: MigrationPlan): MigrationPlan {
   const serialized = JSON.parse(
     serializeMongoOps(plan.operations as MongoMigrationPlanOperation[]),
   );
-  return { ...plan, operations: serialized };
+  return {
+    targetId: plan.targetId,
+    origin: plan.origin ?? null,
+    destination: plan.destination,
+    operations: serialized,
+  };
 }
 
-function makeDriver() {
-  return createMongoControlDriver(db, client);
+function makeRunner() {
+  return new MongoMigrationRunner(createMongoRunnerDeps(createMongoControlDriver(db, client)));
 }
 
 describe('MongoMigrationRunner', () => {
   it('creates an index on a real MongoDB instance', async () => {
     const contract = makeContract({
-      users: { indexes: [{ fields: { email: 1 }, options: { unique: true } }] },
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -115,29 +136,24 @@ describe('MongoMigrationRunner', () => {
     await db.createCollection('posts');
     await db.collection('posts').createIndex({ title: 1 }, { name: 'title_1' });
 
-    const originIR = {
-      collections: {
-        posts: {
-          name: 'posts',
-          indexes: [
-            {
-              name: 'title_1',
-              keys: [{ field: 'title', direction: 1 as const }],
-              unique: false,
-              sparse: false,
-            },
-          ],
-        },
-      },
-    };
+    const originIR = new MongoSchemaIR([
+      new MongoSchemaCollection({
+        name: 'posts',
+        indexes: [
+          new MongoSchemaIndex({
+            keys: [{ field: 'title', direction: 1 }],
+          }),
+        ],
+      }),
+    ]);
     const contract = makeContract({ posts: {} }, 'sha256:dropped');
-    const plan = planForContract(contract, originIR as never);
+    const plan = planForContract(contract, originIR);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -155,15 +171,15 @@ describe('MongoMigrationRunner', () => {
     await db.collection('items').createIndex({ sku: 1 }, { unique: true, name: 'sku_1' });
 
     const contract = makeContract({
-      items: { indexes: [{ fields: { sku: 1 }, options: { unique: true } }] },
+      items: { indexes: [{ keys: [{ field: 'sku', direction: 1 }], unique: true }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -180,15 +196,15 @@ describe('MongoMigrationRunner', () => {
     await db.collection('users').createIndex({ email: 1 }, { name: 'email_1' });
 
     const contract = makeContract({
-      users: { indexes: [{ fields: { email: 1 } }] },
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       executionChecks: { idempotencyChecks: false },
@@ -203,17 +219,17 @@ describe('MongoMigrationRunner', () => {
 
   it('executes multiple operations in order', async () => {
     const contract = makeContract({
-      alpha: { indexes: [{ fields: { a: 1 } }] },
-      beta: { indexes: [{ fields: { b: 1 } }] },
+      alpha: { indexes: [{ keys: [{ field: 'a', direction: 1 }] }] },
+      beta: { indexes: [{ keys: [{ field: 'b', direction: 1 }] }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
     const executedOps: string[] = [];
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       callbacks: {
@@ -241,18 +257,15 @@ describe('MongoMigrationRunner', () => {
     await initMarker(db, { storageHash: 'sha256:different', profileHash: 'sha256:p1' });
 
     const contract = makeContract({
-      users: { indexes: [{ fields: { email: 1 } }] },
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
-    const plan = planForContract(contract);
-    const serialized = serializePlan({
-      ...plan,
-      origin: { storageHash: 'sha256:expected' },
-    });
+    const plan = planForContract(contract, undefined, 'sha256:expected');
+    const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -264,17 +277,97 @@ describe('MongoMigrationRunner', () => {
     }
   });
 
-  it('returns POLICY_VIOLATION for disallowed operation class', async () => {
+  it('returns MARKER_ORIGIN_MISMATCH when marker exists but plan has no origin', async () => {
+    await initMarker(db, { storageHash: 'sha256:existing', profileHash: 'sha256:p1' });
+
     const contract = makeContract({
-      users: { indexes: [{ fields: { email: 1 } }] },
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+    }
+  });
+
+  it('returns MARKER_ORIGIN_MISMATCH when no marker but plan has origin', async () => {
+    const contract = makeContract({
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
+    });
+    const plan = planForContract(contract, undefined, 'sha256:something');
+    const serialized = serializePlan(plan);
+
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan: serialized,
+
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+    }
+  });
+
+  it('returns MARKER_CAS_FAILURE when concurrent marker change causes CAS miss', async () => {
+    await initMarker(db, { storageHash: 'sha256:origin', profileHash: 'sha256:profile' });
+
+    const contract = makeContract({
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
+    });
+    const plan = planForContract(contract, undefined, 'sha256:origin');
+    const serialized = serializePlan(plan);
+
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan: serialized,
+
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      callbacks: {
+        async onOperationComplete() {
+          await db
+            .collection('_prisma_migrations')
+            .updateOne(
+              { _id: 'marker' as never },
+              { $set: { storageHash: 'sha256:tampered-by-other-process' } },
+            );
+        },
+      },
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('MARKER_CAS_FAILURE');
+    }
+  });
+
+  it('returns POLICY_VIOLATION for disallowed operation class', async () => {
+    const contract = makeContract({
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
+    });
+    const plan = planForContract(contract);
+    const serialized = serializePlan(plan);
+
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan: serialized,
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['destructive'] },
       frameworkComponents: [],
@@ -288,15 +381,15 @@ describe('MongoMigrationRunner', () => {
 
   it('updates marker and writes ledger entry after successful execution', async () => {
     const contract = makeContract({
-      users: { indexes: [{ fields: { email: 1 } }] },
+      users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
     const plan = planForContract(contract);
     const serialized = serializePlan(plan);
 
-    const runner = new MongoMigrationRunner();
+    const runner = makeRunner();
     await runner.execute({
       plan: serialized,
-      driver: makeDriver(),
+
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],

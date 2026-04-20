@@ -3,24 +3,30 @@ import {
   parsePostgresDefault,
   quoteIdentifier,
 } from '@prisma-next/adapter-postgres/control';
+import { errorPlanDoesNotSupportAuthoringSurface } from '@prisma-next/errors/migration';
 import type {
   CodecControlHooks,
   ComponentDatabaseDependency,
   MigrationOperationPolicy,
-  SqlMigrationPlanner,
   SqlMigrationPlannerPlanOptions,
   SqlMigrationPlanOperation,
   SqlPlannerConflict,
+  SqlPlannerFailureResult,
 } from '@prisma-next/family-sql/control';
 import {
   collectInitDependencies,
   createMigrationPlan,
   extractCodecControlHooks,
   plannerFailure,
-  plannerSuccess,
 } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import type {
+  MigrationPlanner,
+  MigrationPlanWithAuthoringSurface,
+  MigrationScaffoldContext,
+  SchemaIssue,
+} from '@prisma-next/framework-components/control';
 import type {
   StorageColumn,
   StorageTable,
@@ -58,6 +64,7 @@ import {
   type PlanningMode,
   type PostgresPlanTargetDetails,
 } from './planner-target-details';
+import { renderDescriptorTypeScript } from './scaffolding';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -89,17 +96,79 @@ const DEFAULT_PLANNER_CONFIG: PlannerConfig = {
 
 export function createPostgresMigrationPlanner(
   config: Partial<PlannerConfig> = {},
-): SqlMigrationPlanner<PostgresPlanTargetDetails> {
+): PostgresMigrationPlanner {
   return new PostgresMigrationPlanner({
     ...DEFAULT_PLANNER_CONFIG,
     ...config,
   });
 }
 
-class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTargetDetails> {
+/**
+ * Postgres planner success plan: the SQL-typed plan (so target-detail
+ * typing is preserved for direct SQL callers, including this package's unit
+ * tests) plus the framework-required `renderTypeScript()` stub.
+ */
+export type PostgresPlanWithRender = ReturnType<
+  typeof createMigrationPlan<PostgresPlanTargetDetails>
+> & {
+  renderTypeScript(): string;
+};
+
+/**
+ * Result of `PostgresMigrationPlanner.plan()`. A discriminated union that
+ * satisfies both the framework's `MigrationPlannerResult` (success plan
+ * carries `renderTypeScript()`) and the SQL family's typed result shape
+ * (success plan is a `SqlMigrationPlan<PostgresPlanTargetDetails>`).
+ */
+export type PostgresPlanResult =
+  | { readonly kind: 'success'; readonly plan: PostgresPlanWithRender }
+  | SqlPlannerFailureResult;
+
+/**
+ * Postgres migration planner.
+ *
+ * Implements the framework's `MigrationPlanner<'sql', 'postgres'>` directly
+ * — meaning it owns `emptyMigration()` and attaches the `renderTypeScript()`
+ * stub to success plans (Postgres uses descriptor-flow authoring, so
+ * `renderTypeScript()` throws on planner-produced plans). No external wrapper
+ * is required at the descriptor level.
+ *
+ * `plan()` accepts the framework's option shape (with `contract`/`schema`
+ * typed as `unknown`); SQL-typed callers may pass the more specific
+ * `SqlMigrationPlannerPlanOptions`, since those structurally satisfy the
+ * looser framework contract. Internally we treat options as the SQL-typed
+ * superset so the existing planner logic stays identical.
+ *
+ * `fromHash` is accepted but ignored: Postgres is descriptor-flow and never
+ * needs it (only class-flow planners like Mongo populate `describe()` from
+ * `fromHash`).
+ */
+export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
   constructor(private readonly config: PlannerConfig) {}
 
-  plan(options: SqlMigrationPlannerPlanOptions) {
+  plan(options: {
+    readonly contract: unknown;
+    readonly schema: unknown;
+    readonly policy: MigrationOperationPolicy;
+    readonly fromHash?: string;
+    readonly schemaName?: string;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  }): PostgresPlanResult {
+    return this.planSql(options as SqlMigrationPlannerPlanOptions);
+  }
+
+  emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
+    return {
+      targetId: 'postgres',
+      destination: { storageHash: context.toHash },
+      operations: [],
+      renderTypeScript(): string {
+        return renderDescriptorTypeScript([], context);
+      },
+    };
+  }
+
+  private planSql(options: SqlMigrationPlannerPlanOptions): PostgresPlanResult {
     const schemaName = options.schemaName ?? this.config.defaultSchema;
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) {
@@ -176,7 +245,15 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       operations,
     });
 
-    return plannerSuccess(plan);
+    return Object.freeze({
+      kind: 'success' as const,
+      plan: Object.freeze({
+        ...plan,
+        renderTypeScript(): string {
+          throw errorPlanDoesNotSupportAuthoringSurface({ targetId: 'postgres' });
+        },
+      }),
+    });
   }
 
   private ensureAdditivePolicy(policy: MigrationOperationPolicy) {

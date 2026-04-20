@@ -1,25 +1,16 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
+import type { ContractSourceContext } from '@prisma-next/cli/config-types';
 import { emit } from '@prisma-next/emitter';
+import type { ControlStack } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers';
 
-// Fixture subdirectory for emit-contract tests
 const fixtureSubdir = 'emit-contract';
-
-const resolveContract = async (
-  source: NonNullable<Awaited<ReturnType<typeof loadConfig>>['contract']>['source'],
-) => {
-  const sourceResult = await source({ composedExtensionPacks: [] });
-  if (!sourceResult.ok) {
-    throw new Error(sourceResult.failure.summary);
-  }
-  return sourceResult.value;
-};
 
 function buildControlStack(config: Awaited<ReturnType<typeof loadConfig>>) {
   return createControlStack({
@@ -30,6 +21,27 @@ function buildControlStack(config: Awaited<ReturnType<typeof loadConfig>>) {
     extensionPacks: config.extensionPacks ?? [],
   });
 }
+
+function buildSourceContext(stack: ControlStack): ContractSourceContext {
+  return {
+    composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+    scalarTypeDescriptors: stack.scalarTypeDescriptors,
+    authoringContributions: stack.authoringContributions,
+    codecLookup: stack.codecLookup,
+    controlMutationDefaults: stack.controlMutationDefaults,
+  };
+}
+
+const resolveContract = async (
+  source: NonNullable<Awaited<ReturnType<typeof loadConfig>>['contract']>['source'],
+  stack: ControlStack,
+) => {
+  const sourceResult = await source(buildSourceContext(stack));
+  if (!sourceResult.ok) {
+    throw new Error(sourceResult.failure.summary);
+  }
+  return sourceResult.value;
+};
 
 describe('emitContract API', () => {
   let testDir: string;
@@ -56,13 +68,13 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      const contractRaw = await resolveContract(contractConfig.source);
+      const stack = buildControlStack(config);
+      const contractRaw = await resolveContract(contractConfig.source, stack);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
       }
 
-      const stack = buildControlStack(config);
       const result = await emit(contractRaw, stack, sqlEmission);
 
       expect(result).toBeDefined();
@@ -102,13 +114,13 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      const contractRaw = await resolveContract(contractConfig.source);
+      const stack = buildControlStack(config);
+      const contractRaw = await resolveContract(contractConfig.source, stack);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
       }
 
-      const stack = buildControlStack(config);
       const result = await emit(contractRaw, stack, sqlEmission);
 
       const contractJsonPath = resolve(testDir, contractConfig.output);
@@ -142,13 +154,13 @@ describe('emitContract API', () => {
         }
 
         const contractConfig = config.contract;
-        const contractRaw = await resolveContract(contractConfig.source);
+        const stack = buildControlStack(config);
+        const contractRaw = await resolveContract(contractConfig.source, stack);
 
         if (!contractConfig.output) {
           throw new Error('Contract config must have output path');
         }
 
-        const stack = buildControlStack(config);
         const result = await emit(contractRaw, stack, sqlEmission);
 
         const contractJsonPath = resolve(customTestDir, contractConfig.output);
@@ -175,13 +187,13 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      const contractRaw = await resolveContract(contractConfig.source);
+      const stack = buildControlStack(config);
+      const contractRaw = await resolveContract(contractConfig.source, stack);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
       }
 
-      const stack = buildControlStack(config);
       const result = await emit(contractRaw, stack, sqlEmission);
 
       expect(typeof result.profileHash).toBe('string');
@@ -199,13 +211,13 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      const contractRaw = await resolveContract(contractConfig.source);
+      const stack = buildControlStack(config);
+      const contractRaw = await resolveContract(contractConfig.source, stack);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
       }
 
-      const stack = buildControlStack(config);
       const result = await emit(contractRaw, stack, sqlEmission);
 
       expect(result.storageHash).toBeDefined();

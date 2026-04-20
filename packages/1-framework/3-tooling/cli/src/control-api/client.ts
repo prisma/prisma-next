@@ -64,7 +64,7 @@ class ControlClientImpl implements ControlClient {
   private readonly options: ControlClientOptions;
   private stack: ControlStack | null = null;
   private driver: ControlDriverInstance<string, string> | null = null;
-  private familyInstance: ControlFamilyInstance<string> | null = null;
+  private familyInstance: ControlFamilyInstance<string, unknown> | null = null;
   private frameworkComponents: ReadonlyArray<
     TargetBoundComponentDescriptor<string, string>
   > | null = null;
@@ -142,7 +142,7 @@ class ControlClientImpl implements ControlClient {
 
   private async ensureConnected(): Promise<{
     driver: ControlDriverInstance<string, string>;
-    familyInstance: ControlFamilyInstance<string>;
+    familyInstance: ControlFamilyInstance<string, unknown>;
     frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<string, string>>;
   }> {
     // Auto-init if needed
@@ -489,8 +489,13 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
+      const stack = this.stack!;
       const sourceContext = {
-        composedExtensionPacks: (this.options.extensionPacks ?? []).map((p) => p.id),
+        composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+        scalarTypeDescriptors: stack.scalarTypeDescriptors,
+        authoringContributions: stack.authoringContributions,
+        codecLookup: stack.codecLookup,
+        controlMutationDefaults: stack.controlMutationDefaults,
       };
       const providerResult = await contractConfig.sourceProvider(sourceContext);
       if (!providerResult.ok) {

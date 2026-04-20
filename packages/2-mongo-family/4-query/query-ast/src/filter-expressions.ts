@@ -3,6 +3,12 @@ import type { MongoAggExpr } from './aggregation-expressions';
 import { MongoAstNode } from './ast-node';
 import type { MongoFilterRewriter, MongoFilterVisitor } from './visitors';
 
+const FILTER_EXPR_BRAND = '__prismaNextMongoFilter__';
+
+export function isMongoFilterExpr(value: unknown): value is MongoFilterExpr {
+  return typeof value === 'object' && value !== null && FILTER_EXPR_BRAND in value;
+}
+
 abstract class MongoFilterExpression extends MongoAstNode {
   abstract accept<R>(visitor: MongoFilterVisitor<R>): R;
   abstract rewrite(rewriter: MongoFilterRewriter): MongoFilterExpr;
@@ -11,6 +17,13 @@ abstract class MongoFilterExpression extends MongoAstNode {
     return new MongoNotExpr(this);
   }
 }
+
+Object.defineProperty(MongoFilterExpression.prototype, FILTER_EXPR_BRAND, {
+  value: true,
+  writable: false,
+  enumerable: false,
+  configurable: false,
+});
 
 export class MongoFieldFilter extends MongoFilterExpression {
   readonly kind = 'field' as const;

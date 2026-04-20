@@ -13,7 +13,7 @@ import {
   type RuntimeTargetDescriptor,
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
-import { runtimeError } from '@prisma-next/runtime-executor';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
   createSqlOperationRegistry,

@@ -23,7 +23,9 @@ const stubMeta: PlanMeta = {
 
 export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Promise<T> {
   const replSet = await MongoMemoryReplSet.create({
-    instanceOpts: [{ launchTimeout: timeouts.spinUpDbServer, storageEngine: 'wiredTiger' }],
+    instanceOpts: [
+      { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+    ],
     replSet: { count: 1, storageEngine: 'wiredTiger' },
   });
   const connectionUri = replSet.getUri();
@@ -33,7 +35,7 @@ export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Pro
 
   const adapter = createMongoAdapter();
   const driver = await createMongoDriver(connectionUri, dbName);
-  const runtime = createMongoRuntime({ adapter, driver });
+  const runtime = createMongoRuntime({ adapter, driver, contract: {}, targetId: 'mongo' });
 
   const ctx: MongodContext = {
     connectionUri,

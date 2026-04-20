@@ -146,9 +146,10 @@ describe('contract.d.ts imports resolution', () => {
         },
       });
 
-      const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
-      const codecTypeImports = extractCodecTypeImports(descriptors);
-      const operationTypeImports = extractOperationTypeImports(descriptors);
+      const { adapter, target, extensions } = getSqlDescriptorBundle();
+      const allDescriptors = [target, adapter, ...extensions];
+      const codecTypeImports = extractCodecTypeImports(allDescriptors);
+      const operationTypeImports = extractOperationTypeImports(allDescriptors);
       const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitStackInput = {
         codecTypeImports,
@@ -280,9 +281,10 @@ type UserIdColumn = UserColumns['id'];
         },
       });
 
-      const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
-      const codecTypeImports = extractCodecTypeImports(descriptors);
-      const operationTypeImports = extractOperationTypeImports(descriptors);
+      const { adapter, target, extensions } = getSqlDescriptorBundle();
+      const allDescriptors = [target, adapter, ...extensions];
+      const codecTypeImports = extractCodecTypeImports(allDescriptors);
+      const operationTypeImports = extractOperationTypeImports(allDescriptors);
       const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitStackInput = {
         codecTypeImports,

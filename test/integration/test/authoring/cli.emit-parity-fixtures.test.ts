@@ -19,8 +19,18 @@ import {
 const writeExpected = process.env['UPDATE_AUTHORING_PARITY_EXPECTED'] === '1';
 
 function sourceContextFromConfig(config: PrismaNextConfig): ContractSourceContext {
+  const stack = createControlStack({
+    family: config.family,
+    target: config.target,
+    adapter: config.adapter,
+    extensionPacks: config.extensionPacks ?? [],
+  });
   return {
-    composedExtensionPacks: (config.extensionPacks ?? []).map((p: { id: string }) => p.id),
+    composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+    scalarTypeDescriptors: stack.scalarTypeDescriptors,
+    authoringContributions: stack.authoringContributions,
+    codecLookup: stack.codecLookup,
+    controlMutationDefaults: stack.controlMutationDefaults,
   };
 }
 

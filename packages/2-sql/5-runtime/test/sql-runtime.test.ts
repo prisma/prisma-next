@@ -323,4 +323,45 @@ describe('createRuntime', () => {
     expect(driver.__spies.connectionExecute).not.toHaveBeenCalled();
     expect(driver.__spies.transactionExecute).not.toHaveBeenCalled();
   });
+
+  it('accepts a generic middleware (no familyId)', () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    expect(() =>
+      createRuntime({
+        stackInstance,
+        context,
+        driver,
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        middleware: [{ name: 'generic' }],
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts an SQL middleware', () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    expect(() =>
+      createRuntime({
+        stackInstance,
+        context,
+        driver,
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        middleware: [{ name: 'sql-lints', familyId: 'sql' }],
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects a Mongo middleware with a clear error', () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    expect(() =>
+      createRuntime({
+        stackInstance,
+        context,
+        driver,
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        middleware: [{ name: 'mongo-mw', familyId: 'mongo' }],
+      }),
+    ).toThrow(
+      "Middleware 'mongo-mw' requires family 'mongo' but the runtime is configured for family 'sql'",
+    );
+  });
 });

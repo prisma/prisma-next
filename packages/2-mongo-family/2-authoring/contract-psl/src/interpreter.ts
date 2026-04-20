@@ -9,13 +9,18 @@ import type {
   ContractReferenceRelation,
   ContractValueObject,
 } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { MongoIndexKeyDirection, MongoStorageIndex } from '@prisma-next/mongo-contract';
 import type { ParsePslDocumentResult, PslField, PslModel } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
   getAttribute,
   getMapName,
+  getNamedArgument,
   getPositionalArgument,
   lowerFirst,
+  parseIndexFieldList,
   parseQuotedStringLiteral,
   parseRelationAttribute,
 } from './psl-helpers';
@@ -23,6 +28,7 @@ import {
 export interface InterpretPslDocumentToMongoContractInput {
   readonly document: ParsePslDocumentResult;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
+  readonly codecLookup?: CodecLookup;
 }
 
 interface FieldMappings {
@@ -142,6 +148,7 @@ function collectPolymorphismDeclarations(
 function resolvePolymorphism(input: {
   models: Record<string, MongoModelEntry>;
   roots: Record<string, string>;
+  collections: Record<string, Record<string, unknown>>;
   document: ParsePslDocumentResult;
   discriminatorDeclarations: Map<string, DiscriminatorDeclaration>;
   baseDeclarations: Map<string, BaseDeclaration>;
@@ -150,11 +157,13 @@ function resolvePolymorphism(input: {
 }): {
   models: Record<string, MongoModelEntry>;
   roots: Record<string, string>;
+  collections: Record<string, Record<string, unknown>>;
   diagnostics: ContractSourceDiagnostic[];
 } {
   const { discriminatorDeclarations, baseDeclarations, modelNames, sourceId, document } = input;
   let patched = input.models;
   let roots = input.roots;
+  let collections = input.collections;
   const diagnostics: ContractSourceDiagnostic[] = [];
 
   for (const [modelName, decl] of discriminatorDeclarations) {
@@ -171,7 +180,12 @@ function resolvePolymorphism(input: {
     const model = patched[modelName];
     if (!model) continue;
 
-    if (!Object.hasOwn(model.fields, decl.fieldName)) {
+    const pslModel = document.ast.models.find((m) => m.name === modelName);
+    const mappedDiscriminatorField = pslModel
+      ? (resolveFieldMappings(pslModel).pslNameToMapped.get(decl.fieldName) ?? decl.fieldName)
+      : decl.fieldName;
+
+    if (!Object.hasOwn(model.fields, mappedDiscriminatorField)) {
       diagnostics.push({
         code: 'PSL_DISCRIMINATOR_FIELD_NOT_FOUND',
         message: `Discriminator field "${decl.fieldName}" is not a field on model "${modelName}"`,
@@ -199,7 +213,7 @@ function resolvePolymorphism(input: {
 
     patched = {
       ...patched,
-      [modelName]: { ...model, discriminator: { field: decl.fieldName }, variants },
+      [modelName]: { ...model, discriminator: { field: mappedDiscriminatorField }, variants },
     };
   }
 
@@ -266,9 +280,358 @@ function resolvePolymorphism(input: {
         );
       }
     }
+
+    const variantColl = collections[variantCollectionName];
+    const variantIndexes = (variantColl?.['indexes'] ?? []) as MongoStorageIndex[];
+    const baseColl = collections[baseCollection];
+
+    if (variantCollectionName !== baseCollection) {
+      const filtered = Object.fromEntries(
+        Object.entries(collections).filter(([key]) => key !== variantCollectionName),
+      );
+      if (variantIndexes.length > 0 && baseColl) {
+        const baseIndexes = (baseColl['indexes'] ?? []) as MongoStorageIndex[];
+        collections = {
+          ...filtered,
+          [baseCollection]: { ...baseColl, indexes: [...baseIndexes, ...variantIndexes] },
+        };
+      } else {
+        collections = filtered;
+      }
+    } else if (variantIndexes.length > 0 && baseColl) {
+      const baseIndexes = (baseColl['indexes'] ?? []) as MongoStorageIndex[];
+      const mergedIndexes = [...baseIndexes];
+      for (const idx of variantIndexes) {
+        const isDuplicate = baseIndexes.some(
+          (existing) => JSON.stringify(existing) === JSON.stringify(idx),
+        );
+        if (!isDuplicate) {
+          mergedIndexes.push(idx);
+        }
+      }
+      if (mergedIndexes.length > baseIndexes.length) {
+        collections = {
+          ...collections,
+          [baseCollection]: { ...baseColl, indexes: mergedIndexes },
+        };
+      }
+    }
   }
 
-  return { models: patched, roots, diagnostics };
+  return { models: patched, roots, collections, diagnostics };
+}
+
+function parseIndexDirection(raw: string | undefined): MongoIndexKeyDirection {
+  if (!raw) return 1;
+  const stripped = raw.replace(/^["']/, '').replace(/["']$/, '');
+  const num = Number(stripped);
+  if (num === 1 || num === -1) return num;
+  if (['text', '2dsphere', '2d', 'hashed'].includes(stripped))
+    return stripped as MongoIndexKeyDirection;
+  return 1;
+}
+
+function parseNumericArg(raw: string | undefined): number | undefined {
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseBooleanArg(raw: string | undefined): boolean | undefined {
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return undefined;
+}
+
+function parseJsonArg(raw: string | undefined): Record<string, unknown> | undefined {
+  if (!raw) return undefined;
+  const stripped = raw.replace(/^["']/, '').replace(/["']$/, '').replace(/\\"/g, '"');
+  try {
+    const parsed = JSON.parse(stripped);
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // not valid JSON
+  }
+  return undefined;
+}
+
+function parseCollation(
+  attr: import('@prisma-next/psl-parser').PslAttribute,
+): Record<string, unknown> | null | undefined {
+  const locale = stripQuotesHelper(getNamedArgument(attr, 'collationLocale'));
+  if (!locale) {
+    const hasAnyCollationArg =
+      getNamedArgument(attr, 'collationStrength') != null ||
+      getNamedArgument(attr, 'collationCaseLevel') != null ||
+      getNamedArgument(attr, 'collationCaseFirst') != null ||
+      getNamedArgument(attr, 'collationNumericOrdering') != null ||
+      getNamedArgument(attr, 'collationAlternate') != null ||
+      getNamedArgument(attr, 'collationMaxVariable') != null ||
+      getNamedArgument(attr, 'collationBackwards') != null ||
+      getNamedArgument(attr, 'collationNormalization') != null;
+    return hasAnyCollationArg ? null : undefined;
+  }
+
+  const collation: Record<string, unknown> = { locale };
+  const strength = parseNumericArg(getNamedArgument(attr, 'collationStrength'));
+  if (strength != null) collation['strength'] = strength;
+  const caseLevel = parseBooleanArg(getNamedArgument(attr, 'collationCaseLevel'));
+  if (caseLevel != null) collation['caseLevel'] = caseLevel;
+  const caseFirst = stripQuotesHelper(getNamedArgument(attr, 'collationCaseFirst'));
+  if (caseFirst != null) collation['caseFirst'] = caseFirst;
+  const numericOrdering = parseBooleanArg(getNamedArgument(attr, 'collationNumericOrdering'));
+  if (numericOrdering != null) collation['numericOrdering'] = numericOrdering;
+  const alternate = stripQuotesHelper(getNamedArgument(attr, 'collationAlternate'));
+  if (alternate != null) collation['alternate'] = alternate;
+  const maxVariable = stripQuotesHelper(getNamedArgument(attr, 'collationMaxVariable'));
+  if (maxVariable != null) collation['maxVariable'] = maxVariable;
+  const backwards = parseBooleanArg(getNamedArgument(attr, 'collationBackwards'));
+  if (backwards != null) collation['backwards'] = backwards;
+  const normalization = parseBooleanArg(getNamedArgument(attr, 'collationNormalization'));
+  if (normalization != null) collation['normalization'] = normalization;
+  return collation;
+}
+
+function stripQuotesHelper(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  return raw.replace(/^["']/, '').replace(/["']$/, '');
+}
+
+function parseProjectionList(
+  raw: string | undefined,
+  value: 0 | 1,
+): Record<string, 0 | 1> | undefined {
+  if (!raw) return undefined;
+  const stripped = raw.replace(/^["']/, '').replace(/["']$/, '');
+  const inner = stripped.replace(/^\[/, '').replace(/\]$/, '').trim();
+  if (inner.length === 0) return undefined;
+  const fields = inner
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  const result: Record<string, 0 | 1> = {};
+  for (const f of fields) {
+    result[f] = value;
+  }
+  return result;
+}
+
+function collectIndexes(
+  pslModel: PslModel,
+  fieldMappings: FieldMappings,
+  modelNames: ReadonlySet<string>,
+  sourceId: string,
+  diagnostics: ContractSourceDiagnostic[],
+): MongoStorageIndex[] {
+  const indexes: MongoStorageIndex[] = [];
+  let textIndexCount = 0;
+
+  for (const field of pslModel.fields) {
+    if (modelNames.has(field.typeName)) continue;
+    const uniqueAttr = getAttribute(field.attributes, 'unique');
+    if (!uniqueAttr) continue;
+    const mappedName = fieldMappings.pslNameToMapped.get(field.name) ?? field.name;
+    indexes.push({
+      keys: [{ field: mappedName, direction: 1 }],
+      unique: true,
+    });
+  }
+
+  for (const attr of pslModel.attributes) {
+    const isIndex = attr.name === 'index';
+    const isUnique = attr.name === 'unique';
+    const isTextIndex = attr.name === 'textIndex';
+    if (!isIndex && !isUnique && !isTextIndex) continue;
+
+    const fieldsArg = getPositionalArgument(attr, 0);
+    if (!fieldsArg) continue;
+    const parsedFields = parseIndexFieldList(fieldsArg);
+    if (parsedFields.length === 0) continue;
+
+    const hasWildcard = parsedFields.some((f) => f.isWildcard);
+    const wildcardCount = parsedFields.filter((f) => f.isWildcard).length;
+
+    if (wildcardCount > 1) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'An index can contain at most one wildcard() field',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    if (isUnique && hasWildcard) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'Unique indexes cannot use wildcard() fields',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    if (isTextIndex) {
+      textIndexCount++;
+      if (textIndexCount > 1) {
+        diagnostics.push({
+          code: 'PSL_INVALID_INDEX',
+          message: `Only one @@textIndex is allowed per collection (model "${pslModel.name}")`,
+          sourceId,
+          span: attr.span,
+        });
+        continue;
+      }
+
+      if (hasWildcard) {
+        diagnostics.push({
+          code: 'PSL_INVALID_INDEX',
+          message:
+            'wildcard() fields cannot be combined with type: hashed/2dsphere/2d or @@textIndex',
+          sourceId,
+          span: attr.span,
+        });
+        continue;
+      }
+    }
+
+    const typeArg = getNamedArgument(attr, 'type');
+    const defaultDirection: MongoIndexKeyDirection = isTextIndex
+      ? 'text'
+      : parseIndexDirection(typeArg);
+
+    if (
+      hasWildcard &&
+      typeof defaultDirection === 'string' &&
+      ['hashed', '2dsphere', '2d'].includes(defaultDirection)
+    ) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: `wildcard() fields cannot be combined with type: ${defaultDirection}`,
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    if (defaultDirection === 'hashed' && parsedFields.length > 1) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'Hashed indexes must have exactly one field',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    const keys = parsedFields.map((pf) => {
+      const mappedName = pf.isWildcard
+        ? pf.name.replace(/^(.+)\.\$\*\*$/, (_, prefix: string) => {
+            const mapped = fieldMappings.pslNameToMapped.get(prefix);
+            return mapped ? `${mapped}.$**` : `${prefix}.$**`;
+          })
+        : (fieldMappings.pslNameToMapped.get(pf.name) ?? pf.name);
+      const direction: MongoIndexKeyDirection =
+        pf.direction != null ? (pf.direction as MongoIndexKeyDirection) : defaultDirection;
+      return { field: mappedName, direction };
+    });
+
+    const unique = isUnique ? true : undefined;
+    const sparse = isTextIndex ? undefined : parseBooleanArg(getNamedArgument(attr, 'sparse'));
+    const expireAfterSeconds = isTextIndex
+      ? undefined
+      : parseNumericArg(getNamedArgument(attr, 'expireAfterSeconds'));
+
+    if (hasWildcard && expireAfterSeconds != null) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'expireAfterSeconds cannot be combined with wildcard() fields',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    const partialFilterExpression = parseJsonArg(getNamedArgument(attr, 'filter'));
+
+    const includeArg = getNamedArgument(attr, 'include');
+    const excludeArg = getNamedArgument(attr, 'exclude');
+
+    if (includeArg != null && excludeArg != null) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'Cannot specify both include and exclude on the same index',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    if ((includeArg != null || excludeArg != null) && !hasWildcard) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message:
+          'include/exclude options are only valid when the index contains a wildcard() field',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    const wildcardProjection =
+      includeArg != null
+        ? parseProjectionList(includeArg, 1)
+        : excludeArg != null
+          ? parseProjectionList(excludeArg, 0)
+          : undefined;
+
+    const collation = parseCollation(attr);
+    if (collation === null) {
+      diagnostics.push({
+        code: 'PSL_INVALID_INDEX',
+        message: 'collationLocale is required when using collation options',
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
+    const rawWeights = parseJsonArg(getNamedArgument(attr, 'weights'));
+    let weights: Record<string, number> | undefined;
+    if (rawWeights) {
+      weights = {};
+      for (const [k, v] of Object.entries(rawWeights)) {
+        if (typeof v === 'number') weights[k] = v;
+      }
+    }
+
+    const rawDefaultLang = isTextIndex
+      ? getNamedArgument(attr, 'language')
+      : getNamedArgument(attr, 'default_language');
+    const default_language = stripQuotesHelper(rawDefaultLang);
+
+    const rawLangOverride = getNamedArgument(attr, 'languageOverride');
+    const language_override = stripQuotesHelper(rawLangOverride);
+
+    const index: MongoStorageIndex = {
+      keys,
+      ...(unique != null && { unique }),
+      ...(sparse != null && { sparse }),
+      ...(expireAfterSeconds != null && { expireAfterSeconds }),
+      ...(partialFilterExpression != null && { partialFilterExpression }),
+      ...(wildcardProjection != null && { wildcardProjection }),
+      ...(collation != null && { collation }),
+      ...(weights != null && { weights }),
+      ...(default_language != null && { default_language }),
+      ...(language_override != null && { language_override }),
+    };
+
+    indexes.push(index);
+  }
+
+  return indexes;
 }
 
 function isRelationField(field: PslField, modelNames: ReadonlySet<string>): boolean {
@@ -319,7 +682,7 @@ function resolveNonRelationField(
 export function interpretPslDocumentToMongoContract(
   input: InterpretPslDocumentToMongoContractInput,
 ): Result<Contract, ContractSourceDiagnostics> {
-  const { document, scalarTypeDescriptors } = input;
+  const { document, scalarTypeDescriptors, codecLookup } = input;
   const sourceId = document.ast.sourceId;
   const diagnostics: ContractSourceDiagnostic[] = [];
   const modelNames = new Set(document.ast.models.map((m) => m.name));
@@ -420,7 +783,14 @@ export function interpretPslDocumentToMongoContract(
     }
 
     models[pslModel.name] = { fields, relations, storage: { collection: collectionName } };
-    collections[collectionName] = {};
+    const modelIndexes = collectIndexes(pslModel, fieldMappings, modelNames, sourceId, diagnostics);
+    const existingColl = collections[collectionName];
+    if (existingColl && modelIndexes.length > 0) {
+      const existingIndexes = (existingColl['indexes'] ?? []) as MongoStorageIndex[];
+      collections[collectionName] = { indexes: [...existingIndexes, ...modelIndexes] };
+    } else if (!existingColl) {
+      collections[collectionName] = modelIndexes.length > 0 ? { indexes: modelIndexes } : {};
+    }
     roots[collectionName] = pslModel.name;
   }
 
@@ -501,6 +871,7 @@ export function interpretPslDocumentToMongoContract(
   const polyResult = resolvePolymorphism({
     models,
     roots,
+    collections,
     document,
     discriminatorDeclarations,
     baseDeclarations,
@@ -515,9 +886,38 @@ export function interpretPslDocumentToMongoContract(
     });
   }
 
+  const resolvedModels = polyResult.models;
+  const resolvedCollections = polyResult.collections;
+
+  for (const [, modelEntry] of Object.entries(resolvedModels)) {
+    if (modelEntry.base) continue;
+
+    const collectionName = modelEntry.storage.collection;
+    const coll = resolvedCollections[collectionName];
+    if (!coll) continue;
+
+    if (modelEntry.discriminator && modelEntry.variants) {
+      const variantEntries = Object.entries(modelEntry.variants).map(
+        ([variantName, { value }]) => ({
+          discriminatorValue: value,
+          fields: resolvedModels[variantName]?.fields ?? {},
+        }),
+      );
+      coll['validator'] = derivePolymorphicJsonSchema(
+        modelEntry.fields,
+        modelEntry.discriminator.field,
+        variantEntries,
+        valueObjects,
+        codecLookup,
+      );
+    } else {
+      coll['validator'] = deriveJsonSchema(modelEntry.fields, valueObjects, codecLookup);
+    }
+  }
+
   const target = 'mongo';
   const targetFamily = 'mongo';
-  const storageWithoutHash = { collections };
+  const storageWithoutHash = { collections: resolvedCollections };
   const storageHash = computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
   const capabilities: Record<string, Record<string, boolean>> = {};
 

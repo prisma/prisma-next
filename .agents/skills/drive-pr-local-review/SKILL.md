@@ -7,7 +7,7 @@ description: Generate local PR/branch review artifacts for the current branch vs
   PR/branch review, a code review, a system design review, to "review this branch", or to produce
   written review docs. Do not modify implementation code.
 metadata:
-  version: "2026.3.26.1"
+  version: "2026.4.15.1"
 ---
 
 # Local PR Review
@@ -161,7 +161,7 @@ Evaluate changes against:
 - Correctness & edge cases (boundary conditions, failure modes, concurrency/reentrancy where relevant)
 - Documentation (public API docs, READMEs, breaking changes, usage examples when appropriate)
 - Tests as evidence of behavior (call out gaps and mismatches with expectations)
-- Spec traceability (map key requirements → implementation touchpoints + tests)
+- Acceptance-criteria verification (see 4.5 — verify each AC against code and test assertions, not just map to files)
 
 ### 4.2) Output structure (required)
 
@@ -171,7 +171,7 @@ Evaluate changes against:
 - Findings (flat list — everything to address in this PR)
 - Deferred (out of scope) (issues explicitly not addressed because they expand scope beyond what this PR delivers; must state *why* each is out of scope)
 - Already addressed (table of findings from prior review rounds that have been fixed; include commit hash when available)
-- Acceptance-criteria traceability (acceptance criteria → implementation → evidence)
+- Acceptance-criteria verification (see 4.5)
 
 #### Categorization heuristic
 
@@ -194,10 +194,7 @@ For each finding, include:
 - **Suggestion**: concrete fix or improvement
 - **Code example** (when helpful): suggested change
 
-For acceptance-criteria traceability entries, include:
-- **Acceptance criterion**: a short statement from the spec (or inferred requirement)
-- **Implementation**: the primary code touchpoints
-- **Evidence**: tests, fixtures, or other verification that prove behavior
+For acceptance-criteria verification entries, see 4.5.
 
 ### 4.4) Review boundaries (required)
 
@@ -207,6 +204,59 @@ Do not:
 - Suggest large rewrites when the current approach is acceptable
 - Flag issues in unchanged code unless directly impacted by the change
 - Use absolute filesystem paths in the review
+
+### 4.5) Acceptance-criteria verification (required)
+
+If the spec (or inferred review spec) contains acceptance criteria, the code review **must verify each one** against the actual implementation. This is the most important part of the review — it answers "did we build what we said we'd build?"
+
+#### What "verify" means
+
+Pointing to a file is not verification. For each acceptance criterion:
+
+1. **Read the AC literally.** What observable behavior or property does it require?
+2. **Find the implementation code** that is supposed to satisfy it. Read the code — does it actually do what the AC says?
+3. **Find the test(s)** that prove it. Read the test assertions — do they actually assert the AC's requirement, or do they assert something weaker?
+4. **Assign a verdict**: one of PASS, FAIL, NOT VERIFIED, or WEAK.
+
+Verdict definitions:
+- **PASS**: The implementation satisfies the AC, and a test exists that asserts the specific behavior the AC requires.
+- **FAIL**: The implementation does not satisfy the AC (missing, incomplete, or incorrect behavior). State what is missing or wrong.
+- **NOT VERIFIED**: No test or manual evidence exists to confirm the AC. The implementation may look correct by inspection but nothing proves it works. State what verification is missing.
+- **WEAK**: A test exists but its assertions do not actually prove the AC (e.g. the AC requires byte-identical output but the test only checks object references; the AC requires a specific provider is selected but the test only checks `typeof === 'function'`). State what the test actually asserts vs. what the AC requires.
+
+#### Common traps to avoid
+
+- **Mapping, not verifying**: Listing a file path next to an AC is not verification. You must read the code and test assertions and confirm they match the AC's requirement.
+- **Trusting test names**: A test named "selects TypeScript provider" that only asserts `typeof source === 'function'` does not verify provider selection. Read the assertions, not the test name.
+- **Confusing structural equivalence with behavioral equivalence**: Checking that two config objects have the same `.family` reference is not the same as checking that they produce identical emit output.
+- **Assuming E2E coverage exists**: If an AC requires end-to-end behavior (e.g. "tsc reports no errors"), check whether an E2E test actually exists. If it doesn't, the verdict is NOT VERIFIED regardless of how correct the unit tests look.
+
+#### Noting the absence of integration/E2E tests
+
+When acceptance criteria describe end-to-end behavior (user runs command → observable outcome), they are most reliably verified by integration or E2E tests that exercise the full stack. If such tests are absent:
+- Flag this explicitly in the verification table.
+- Note it as a finding (not deferred — missing AC evidence is in scope for any PR that claims to deliver those ACs).
+- Recommend the specific integration/E2E tests that would close the gap.
+
+#### Output format
+
+Include a verification table with a row per AC and a summary count:
+
+```markdown
+| AC | Verdict | Detail |
+|---|---|---|
+| AC1: <short statement> | **PASS** / **FAIL** / **NOT VERIFIED** / **WEAK** | <What you checked, what you found, why this verdict> |
+| ... | ... | ... |
+
+### Summary
+
+| Result | Count | ACs |
+|---|---|---|
+| PASS | N | AC2, AC3, ... |
+| FAIL | N | AC1, ... |
+| NOT VERIFIED | N | AC4, ... |
+| WEAK | N | AC8, ... |
+```
 
 ## 5) Write the walkthrough
 

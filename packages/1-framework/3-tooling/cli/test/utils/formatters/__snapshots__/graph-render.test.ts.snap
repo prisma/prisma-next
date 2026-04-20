@@ -136,7 +136,10 @@ exports[`Graph renderer — render full graph > renders Detached contract node 1
 ▾
 ○ B prod ◆ db
 ┊
-◇ planned ◆ contract"
+┊
+┊
+▾
+○ planned ◇ contract"
 `;
 
 exports[`Graph renderer — render full graph > renders Diamond (convergence) 1`] = `
@@ -418,7 +421,10 @@ exports[`Graph renderer — render full graph > renders Long spine with varied b
                                                                                             ▾
                                                                                             ○ S14 prod
                                                                                             ┊
-                                                                                            ◇ planned ◆ contract"
+                                                                                            ┊
+                                                                                            ┊
+                                                                                            ▾
+                                                                                            ○ planned ◇ contract"
 `;
 
 exports[`Graph renderer — render full graph > renders Multi-branch (3 branches) 1`] = `
@@ -497,7 +503,10 @@ exports[`Graph renderer — render full graph > renders Multi-team workflow (7 r
                                         └─────────▾─────────┘                      ▾
                                                   ○ qa00001 qa                     ○ re1ea5e prod ◆ db
                                                                                    ┊
-                                                                                   ◇ c0n7rac ◆ contract"
+                                                                                   ┊
+                                                                                   ┊
+                                                                                   ▾
+                                                                                   ○ c0n7rac ◇ contract"
 `;
 
 exports[`Graph renderer — render full graph > renders Multiple rollbacks + branch 1`] = `
@@ -609,7 +618,10 @@ exports[`Graph renderer — render full graph > renders Realistic team workflow 
 ▾                           ▾
 ○ t9u0v1w staging           ○ p6q7r8s prod ◆ db
                             ┊
-                            ◇ x2y3z4a ◇ contract"
+                            ┊
+                            ┊
+                            ▾
+                            ○ x2y3z4a ◇ contract"
 `;
 
 exports[`Graph renderer — render full graph > renders Refs + DB combined 1`] = `
@@ -903,7 +915,10 @@ exports[`render with truncation > renders truncated graph with detached contract
                                             ▾
                                             ○ S14 prod
                                             ┊
-                                            ◇ planned ◆ contract"
+                                            ┊
+                                            ┊
+                                            ▾
+                                            ○ planned ◇ contract"
 `;
 
 exports[`render with truncation > renders truncated graph with ⋮ indicator 1`] = `

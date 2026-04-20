@@ -5,10 +5,11 @@ import {
   findPathWithDecision,
   findReachableLeaves,
 } from '@prisma-next/migration-tools/dag';
+import type { Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
   AttestedMigrationBundle,
-  MigrationBundle,
+  DraftMigrationBundle,
   MigrationChainEntry,
   MigrationGraph,
 } from '@prisma-next/migration-tools/types';
@@ -23,7 +24,7 @@ import { createControlClient } from '../control-api/client';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadMigrationBundles,
+  loadAllBundles,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -94,7 +95,8 @@ export interface MigrationStatusResult {
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
   readonly graph?: MigrationGraph;
-  readonly bundles?: readonly MigrationBundle[];
+  readonly bundles?: readonly AttestedMigrationBundle[];
+  readonly drafts?: readonly DraftMigrationBundle[];
   readonly edgeStatuses?: readonly EdgeStatus[];
   readonly activeRefHash?: string;
   readonly activeRefName?: string;
@@ -225,7 +227,7 @@ export function deriveEdgeStatuses(
  */
 function buildMigrationEntries(
   chain: readonly MigrationChainEntry[],
-  packages: readonly MigrationBundle[],
+  packages: readonly AttestedMigrationBundle[],
   mode: 'online' | 'offline',
   markerHash: string | undefined,
   edgeStatuses?: readonly EdgeStatus[],
@@ -355,7 +357,7 @@ async function executeMigrationStatusCommand(
 
   let activeRefName: string | undefined;
   let activeRefHash: string | undefined;
-  let allRefs: Record<string, string> = {};
+  let allRefs: Refs = {};
   try {
     allRefs = await readRefs(refsPath);
   } catch (error) {
@@ -373,23 +375,27 @@ async function executeMigrationStatusCommand(
 
   if (options.ref) {
     activeRefName = options.ref;
-    try {
-      activeRefHash = resolveRef(allRefs, activeRefName);
-    } catch (error) {
-      if (MigrationToolsError.is(error)) {
-        return notOk(
-          errorRuntime(error.message, {
-            why: error.why,
-            fix: error.fix,
-            meta: { code: error.code },
-          }),
-        );
+    const refHash = allRefs[activeRefName];
+    if (refHash) {
+      activeRefHash = refHash;
+    } else {
+      try {
+        activeRefHash = resolveRef(allRefs, activeRefName);
+      } catch (error) {
+        if (MigrationToolsError.is(error)) {
+          return notOk(
+            errorRuntime(error.message, {
+              why: error.why,
+              fix: error.fix,
+              meta: { code: error.code },
+            }),
+          );
+        }
+        throw error;
       }
-      throw error;
     }
   }
 
-  // todo: can't we derive this without modifying the StatusRef obj
   const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, hash]) => ({
     name,
     hash,
@@ -431,9 +437,10 @@ async function executeMigrationStatusCommand(
   }
 
   let attested: readonly AttestedMigrationBundle[];
+  let drafts: readonly DraftMigrationBundle[];
   let graph: MigrationGraph;
   try {
-    ({ bundles: attested, graph } = await loadMigrationBundles(migrationsDir));
+    ({ attested, drafts, graph } = await loadAllBundles(migrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -445,6 +452,17 @@ async function executeMigrationStatusCommand(
         why: `Failed to read migrations directory: ${error instanceof Error ? error.message : String(error)}`,
       }),
     );
+  }
+
+  if (drafts.length > 0) {
+    diagnostics.push({
+      code: 'MIGRATION.DRAFTS',
+      severity: 'warn',
+      message: `${drafts.length} draft migration(s) found: ${drafts.map((d) => d.dirName).join(', ')}`,
+      hints: [
+        "Run 'prisma-next migration emit --dir <path>' to attest draft migrations before applying",
+      ],
+    });
   }
 
   if (attested.length === 0) {
@@ -689,6 +707,7 @@ async function executeMigrationStatusCommand(
     ...ifDefined('pathDecision', pathDecision),
     graph,
     bundles: attested,
+    ...(drafts.length > 0 ? { drafts } : {}),
     edgeStatuses,
     ...ifDefined('activeRefHash', activeRefHash),
     ...ifDefined('activeRefName', activeRefName),
@@ -712,7 +731,7 @@ export function createMigrationStatusCommand(): Command {
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--ref <name>', 'Target ref name from migrations/refs.json')
+    .option('--ref <name>', 'Target ref name from migrations/refs/')
     .option('--graph', 'Show the full migration graph with all branches')
     .option('--limit <n>', 'Maximum number of migrations to display (default: 10)')
     .option('--all', 'Show full history (disables truncation)')
@@ -749,17 +768,24 @@ export function createMigrationStatusCommand(): Command {
               activeRefHash: statusResult.activeRefHash,
               activeRefName: statusResult.activeRefName,
               edgeStatuses: statusResult.edgeStatuses,
+              draftEdges: statusResult.drafts?.map((d) => ({
+                from: d.manifest.from,
+                to: d.manifest.to,
+                dirName: d.dirName,
+              })),
             });
 
             const graphToRender =
               options.graph || statusResult.diverged
                 ? renderInput.graph
                 : extractRelevantSubgraph(renderInput.graph, renderInput.relevantPaths);
+            const dagreOptions =
+              !options.graph && isLinearGraph(graphToRender) ? { ranksep: 1 } : undefined;
             const renderOptions = {
               ...renderInput.options,
               colorize,
               ...ifDefined('limit', limit),
-              ...(isLinearGraph(graphToRender) ? { dagreOptions: { ranksep: 1 } } : {}),
+              ...ifDefined('dagreOptions', dagreOptions),
             };
             const graphOutput = graphRenderer.render(graphToRender, renderOptions);
             ui.log(graphOutput);

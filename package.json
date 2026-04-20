@@ -1,5 +1,5 @@
 {
-  "name": "prisma-next",
+  "name": "@prisma-next/monorepo",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
@@ -67,7 +67,7 @@
     }
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,jsonc}": [
+    "*.{ts,tsx,js,jsx,mjs,json,jsonc,css}": [
       "biome format --write --no-errors-on-unmatched",
       "biome check --write --no-errors-on-unmatched"
     ],

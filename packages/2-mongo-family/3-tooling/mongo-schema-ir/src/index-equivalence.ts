@@ -1,5 +1,10 @@
+import { canonicalize } from './canonicalize';
 import type { MongoSchemaIndex } from './schema-index';
 
+/**
+ * Key-order-sensitive structural comparison. For key-order-independent
+ * comparison (e.g. lookup key construction), use {@link canonicalize}.
+ */
 export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
@@ -44,5 +49,12 @@ export function indexesEquivalent(a: MongoSchemaIndex, b: MongoSchemaIndex): boo
   if (a.unique !== b.unique) return false;
   if (a.sparse !== b.sparse) return false;
   if (a.expireAfterSeconds !== b.expireAfterSeconds) return false;
-  return deepEqual(a.partialFilterExpression, b.partialFilterExpression);
+  if (canonicalize(a.partialFilterExpression) !== canonicalize(b.partialFilterExpression))
+    return false;
+  if (canonicalize(a.wildcardProjection) !== canonicalize(b.wildcardProjection)) return false;
+  if (canonicalize(a.collation) !== canonicalize(b.collation)) return false;
+  if (canonicalize(a.weights) !== canonicalize(b.weights)) return false;
+  if (a.default_language !== b.default_language) return false;
+  if (a.language_override !== b.language_override) return false;
+  return true;
 }

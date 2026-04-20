@@ -14,6 +14,11 @@ import type {
   AuthoringTypeNamespace,
 } from './framework-authoring';
 import type { ComponentMetadata } from './framework-components';
+import type {
+  ControlMutationDefaultEntry,
+  ControlMutationDefaults,
+  MutationDefaultGeneratorDescriptor,
+} from './mutation-default-types';
 import type { TypesImportSpec } from './types-import-spec';
 
 export interface AssembledAuthoringContributions {
@@ -37,6 +42,8 @@ export interface ControlStack<
   readonly extensionIds: ReadonlyArray<string>;
   readonly codecLookup: CodecLookup;
   readonly authoringContributions: AssembledAuthoringContributions;
+  readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
+  readonly controlMutationDefaults: ControlMutationDefaults;
 }
 
 export interface CreateControlStackInput<
@@ -244,6 +251,80 @@ export function assembleAuthoringContributions(
   };
 }
 
+export function assembleScalarTypeDescriptors(
+  descriptors: ReadonlyArray<
+    Pick<ComponentMetadata, 'scalarTypeDescriptors'> & { readonly id?: string }
+  >,
+): ReadonlyMap<string, string> {
+  const result = new Map<string, string>();
+  const owners = new Map<string, string>();
+
+  for (const descriptor of descriptors) {
+    const descriptorMap = descriptor.scalarTypeDescriptors;
+    if (!descriptorMap) continue;
+    const descriptorId = descriptor.id ?? '<unknown>';
+    for (const [typeName, codecId] of descriptorMap) {
+      const existingOwner = owners.get(typeName);
+      if (existingOwner !== undefined) {
+        throw new Error(
+          `Duplicate scalar type descriptor "${typeName}". ` +
+            `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
+        );
+      }
+      result.set(typeName, codecId);
+      owners.set(typeName, descriptorId);
+    }
+  }
+
+  return result;
+}
+
+export function assembleControlMutationDefaults(
+  descriptors: ReadonlyArray<
+    Pick<ComponentMetadata, 'controlMutationDefaults'> & { readonly id?: string }
+  >,
+): ControlMutationDefaults {
+  const defaultFunctionRegistry = new Map<string, ControlMutationDefaultEntry>();
+  const functionOwners = new Map<string, string>();
+  const generatorMap = new Map<string, MutationDefaultGeneratorDescriptor>();
+  const generatorOwners = new Map<string, string>();
+
+  for (const descriptor of descriptors) {
+    const contributions = descriptor.controlMutationDefaults;
+    if (!contributions) continue;
+    const descriptorId = descriptor.id ?? '<unknown>';
+
+    for (const generatorDescriptor of contributions.generatorDescriptors) {
+      const existingOwner = generatorOwners.get(generatorDescriptor.id);
+      if (existingOwner !== undefined) {
+        throw new Error(
+          `Duplicate mutation default generator id "${generatorDescriptor.id}". ` +
+            `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
+        );
+      }
+      generatorMap.set(generatorDescriptor.id, generatorDescriptor);
+      generatorOwners.set(generatorDescriptor.id, descriptorId);
+    }
+
+    for (const [functionName, handler] of contributions.defaultFunctionRegistry) {
+      const existingOwner = functionOwners.get(functionName);
+      if (existingOwner !== undefined) {
+        throw new Error(
+          `Duplicate mutation default function "${functionName}". ` +
+            `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
+        );
+      }
+      defaultFunctionRegistry.set(functionName, handler);
+      functionOwners.set(functionName, descriptorId);
+    }
+  }
+
+  return {
+    defaultFunctionRegistry,
+    generatorDescriptors: Array.from(generatorMap.values()),
+  };
+}
+
 export function extractCodecLookup(
   descriptors: ReadonlyArray<Pick<ComponentMetadata & { id?: string }, 'types' | 'id'>>,
 ): CodecLookup {
@@ -268,12 +349,30 @@ export function extractCodecLookup(
   return { get: (id) => byId.get(id) };
 }
 
+export function validateScalarTypeCodecIds(
+  scalarTypeDescriptors: ReadonlyMap<string, string>,
+  codecLookup: CodecLookup,
+): string[] {
+  const errors: string[] = [];
+  for (const [typeName, codecId] of scalarTypeDescriptors) {
+    if (!codecLookup.get(codecId)) {
+      errors.push(
+        `Scalar type "${typeName}" references codec "${codecId}" which is not registered by any component.`,
+      );
+    }
+  }
+  return errors;
+}
+
 export function createControlStack<TFamilyId extends string, TTargetId extends string>(
   input: CreateControlStackInput<TFamilyId, TTargetId>,
 ): ControlStack<TFamilyId, TTargetId> {
   const { family, target, adapter, driver, extensionPacks = [] } = input;
 
   const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...extensionPacks];
+
+  const codecLookup = extractCodecLookup(allDescriptors);
+  const scalarTypeDescriptors = assembleScalarTypeDescriptors(allDescriptors);
 
   return {
     family,
@@ -286,7 +385,9 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     operationTypeImports: extractOperationTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
     extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
-    codecLookup: extractCodecLookup(allDescriptors),
+    codecLookup,
     authoringContributions: assembleAuthoringContributions(allDescriptors),
+    scalarTypeDescriptors,
+    controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
   };
 }

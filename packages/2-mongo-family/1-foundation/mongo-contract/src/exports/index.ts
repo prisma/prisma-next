@@ -1,5 +1,6 @@
 export type {
   ExtractMongoCodecTypes,
+  ExtractMongoFieldInputTypes,
   ExtractMongoFieldOutputTypes,
   ExtractMongoTypeMaps,
   InferModelRow,
@@ -28,7 +29,9 @@ export type {
   MongoModelStorage,
   MongoStorage,
   MongoStorageCollection,
+  MongoStorageCollectionOptions,
   MongoStorageIndex,
+  MongoStorageValidator,
   MongoTimeSeriesCollectionOptions,
   MongoTimeSeriesGranularity,
   MongoTypeMaps,

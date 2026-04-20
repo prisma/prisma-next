@@ -4,8 +4,12 @@ import { hasMigrations } from '@prisma-next/framework-components/control';
 import type { PathDecision } from '@prisma-next/migration-tools/dag';
 import { reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
-import type { AttestedMigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
-import { isAttested } from '@prisma-next/migration-tools/types';
+import type {
+  AttestedMigrationBundle,
+  DraftMigrationBundle,
+  MigrationGraph,
+} from '@prisma-next/migration-tools/types';
+import { isAttested, isDraft } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -158,6 +162,20 @@ export async function loadMigrationBundles(migrationsDir: string): Promise<{
   const bundles = allBundles.filter(isAttested);
   const graph = reconstructGraph(bundles);
   return { bundles, graph };
+}
+
+export interface MigrationBundleSet {
+  readonly attested: readonly AttestedMigrationBundle[];
+  readonly drafts: readonly DraftMigrationBundle[];
+  readonly graph: MigrationGraph;
+}
+
+export async function loadAllBundles(migrationsDir: string): Promise<MigrationBundleSet> {
+  const all = await readMigrationsDir(migrationsDir);
+  const attested = all.filter(isAttested);
+  const drafts = all.filter(isDraft);
+  const graph = reconstructGraph(attested);
+  return { attested, drafts, graph };
 }
 
 /**

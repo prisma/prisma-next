@@ -1,13 +1,45 @@
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToMongoContract } from '../src/interpreter';
-import { createMongoScalarTypeDescriptors } from '../src/scalar-type-descriptors';
+
+const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
+  ['String', 'mongo/string@1'],
+  ['Int', 'mongo/int32@1'],
+  ['Boolean', 'mongo/bool@1'],
+  ['DateTime', 'mongo/date@1'],
+  ['ObjectId', 'mongo/objectId@1'],
+  ['Float', 'mongo/double@1'],
+]);
+
+const mongoCodecLookup: CodecLookup = {
+  get(id: string) {
+    const types: Record<string, readonly string[]> = {
+      'mongo/string@1': ['string'],
+      'mongo/int32@1': ['int'],
+      'mongo/bool@1': ['bool'],
+      'mongo/date@1': ['date'],
+      'mongo/objectId@1': ['objectId'],
+      'mongo/double@1': ['double'],
+    };
+    const targetTypes = types[id];
+    if (!targetTypes) return undefined;
+    return {
+      id,
+      targetTypes,
+      decode: (w: unknown) => w,
+      encodeJson: (v: unknown) => v,
+      decodeJson: (j: unknown) => j,
+    } as ReturnType<CodecLookup['get']>;
+  },
+};
 
 function interpret(schema: string) {
   const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
   return interpretPslDocumentToMongoContract({
     document,
-    scalarTypeDescriptors: createMongoScalarTypeDescriptors(),
+    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    codecLookup: mongoCodecLookup,
   });
 }
 
@@ -310,6 +342,226 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
           expect.objectContaining({ code: 'PSL_MONGO_VARIANT_SEPARATE_COLLECTION' }),
         ]),
       );
+    });
+  });
+
+  describe('FL-09: variant collection suppression', () => {
+    it('does not create separate storage collection entries for variant models', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+        }
+
+        model Feature {
+          id       ObjectId @id @map("_id")
+          priority Int
+
+          @@base(Task, "feature")
+        }
+      `);
+
+      const storage = ir.storage as unknown as { collections: Record<string, unknown> };
+      expect(Object.keys(storage.collections)).toEqual(['tasks']);
+    });
+
+    it('merges variant indexes into base collection', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+          @@index([title])
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+          @@index([severity])
+        }
+      `);
+
+      const storage = ir.storage as unknown as {
+        collections: Record<
+          string,
+          { indexes?: Array<{ keys: Array<{ field: string; direction: number }> }> }
+        >;
+      };
+      const tasksColl = storage.collections['tasks'];
+      expect(tasksColl?.indexes).toBeDefined();
+      const indexFields = (tasksColl?.indexes ?? []).map((idx) => idx.keys.map((k) => k.field));
+      expect(indexFields).toEqual(
+        expect.arrayContaining([
+          expect.arrayContaining(['title']),
+          expect.arrayContaining(['severity']),
+        ]),
+      );
+    });
+
+    it('merges variant indexes when variant maps to same collection as base', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+          @@index([title])
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+          @@map("tasks")
+          @@index([severity])
+        }
+      `);
+
+      const storage = ir.storage as unknown as {
+        collections: Record<
+          string,
+          { indexes?: Array<{ keys: Array<{ field: string; direction: number }> }> }
+        >;
+      };
+      const tasksColl = storage.collections['tasks'];
+      expect(tasksColl?.indexes).toBeDefined();
+      const indexFields = (tasksColl?.indexes ?? []).map((idx) => idx.keys.map((k) => k.field));
+      expect(indexFields).toEqual(
+        expect.arrayContaining([
+          expect.arrayContaining(['title']),
+          expect.arrayContaining(['severity']),
+        ]),
+      );
+    });
+  });
+
+  describe('FL-10: polymorphic validators', () => {
+    it('generates validator with oneOf for variant-specific fields', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+        }
+
+        model Feature {
+          id       ObjectId @id @map("_id")
+          priority Int
+
+          @@base(Task, "feature")
+        }
+      `);
+
+      const storage = ir.storage as unknown as {
+        collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
+      };
+      const validator = storage.collections['tasks']?.validator;
+      expect(validator).toBeDefined();
+      const schema = validator?.jsonSchema;
+      expect(schema).toHaveProperty('properties._id');
+      expect(schema).toHaveProperty('properties.title');
+      expect(schema).toHaveProperty('properties.type');
+      expect(schema).toHaveProperty('oneOf');
+      const oneOf = schema?.['oneOf'] as Array<Record<string, unknown>>;
+      expect(oneOf).toHaveLength(2);
+    });
+
+    it('emits oneOf with discriminator constraint even when no variant has extra fields', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id    ObjectId @id @map("_id")
+
+          @@base(Task, "bug")
+        }
+      `);
+
+      const storage = ir.storage as unknown as {
+        collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
+      };
+      const validator = storage.collections['tasks']?.validator;
+      expect(validator).toBeDefined();
+      const schema = validator?.jsonSchema;
+      expect(schema).toHaveProperty('oneOf');
+      const oneOf = schema?.['oneOf'] as Array<Record<string, unknown>>;
+      expect(oneOf).toHaveLength(1);
+      expect(oneOf[0]).toMatchObject({
+        properties: { type: { enum: ['bug'] } },
+        required: ['type'],
+      });
+    });
+
+    it('uses storage-mapped discriminator field name in validator', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String   @map("_type")
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+        }
+      `);
+
+      const storage = ir.storage as unknown as {
+        collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
+      };
+      const validator = storage.collections['tasks']?.validator;
+      expect(validator).toBeDefined();
+      const schema = validator?.jsonSchema;
+      expect(schema).toHaveProperty('properties._type');
+      expect(schema).not.toHaveProperty('properties.type');
+      expect(schema).toHaveProperty('oneOf');
+      const oneOf = schema?.['oneOf'] as Array<Record<string, unknown>> | undefined;
+      expect(oneOf).toBeDefined();
+      expect(oneOf![0]).toMatchObject({
+        properties: { _type: { enum: ['bug'] } },
+      });
+      expect(oneOf![0]!['required']).toContain('_type');
     });
   });
 });

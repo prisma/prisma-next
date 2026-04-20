@@ -138,7 +138,7 @@ export interface TaskResult {
 
 ## Pre and post checks
 
-- Tasks leverage ADR 044 checks declaratively
+- Tasks leverage per-family pre/post checks declaratively ([ADR 028](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md), [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md))
 - **Pre**: assert preconditions before any work
 - **Post**: assert invariants after successful completion
 - The runner blocks execution if pre-checks fail and marks the edge as not applicable
@@ -193,6 +193,7 @@ Organization and project policies can set:
 - ADR 037 — Transactional DDL fallback & compensation
 - ADR 038 — Operation idempotency classification & enforcement
 - ADR 043 — Advisory lock domain & key strategy
-- ADR 044 — Pre/post check vocabulary v1
+- ADR 028 — Migration structure & operations
+- ADR 188 — MongoDB migration operation model
 - ADR 024 — Telemetry schema & privacy
 - ADR 028 — Migration structure & operations

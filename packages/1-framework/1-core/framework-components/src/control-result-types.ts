@@ -1,3 +1,8 @@
+export const VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001';
+export const VERIFY_CODE_HASH_MISMATCH = 'PN-RUN-3002';
+export const VERIFY_CODE_TARGET_MISMATCH = 'PN-RUN-3003';
+export const VERIFY_CODE_SCHEMA_FAILURE = 'PN-RUN-3010';
+
 export interface OperationContext {
   readonly contractPath?: string;
   readonly configPath?: string;
@@ -31,7 +36,7 @@ export interface VerifyDatabaseResult {
   };
 }
 
-export interface SchemaIssue {
+export interface BaseSchemaIssue {
   readonly kind:
     | 'missing_table'
     | 'missing_column'
@@ -41,6 +46,7 @@ export interface SchemaIssue {
     | 'extra_foreign_key'
     | 'extra_unique_constraint'
     | 'extra_index'
+    | 'extra_validator'
     | 'type_mismatch'
     | 'type_missing'
     | 'type_values_mismatch'
@@ -57,10 +63,21 @@ export interface SchemaIssue {
   readonly column?: string;
   readonly indexOrConstraint?: string;
   readonly typeName?: string;
+  readonly dependencyId?: string;
   readonly expected?: string;
   readonly actual?: string;
   readonly message: string;
 }
+
+export interface EnumValuesChangedIssue {
+  readonly kind: 'enum_values_changed';
+  readonly typeName: string;
+  readonly addedValues: readonly string[];
+  readonly removedValues: readonly string[];
+  readonly message: string;
+}
+
+export type SchemaIssue = BaseSchemaIssue | EnumValuesChangedIssue;
 
 export interface SchemaVerificationNode {
   readonly status: 'pass' | 'warn' | 'fail';

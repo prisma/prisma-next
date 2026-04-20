@@ -1,7 +1,7 @@
+import type { DefaultFunctionRegistryEntry } from '@prisma-next/framework-components/control';
 import type { PslSpan } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
-  type DefaultFunctionRegistryEntry,
   lowerDefaultFunctionWithRegistry,
   parseDefaultFunctionCall,
 } from '../src/default-function-registry';

@@ -109,10 +109,70 @@
   },
   "storage": {
     "collections": {
-      "posts": {},
-      "users": {}
+      "posts": {
+        "validator": {
+          "jsonSchema": {
+            "bsonType": "object",
+            "properties": {
+              "_id": {
+                "bsonType": "objectId"
+              },
+              "authorId": {
+                "bsonType": "objectId"
+              },
+              "publishedAt": {
+                "bsonType": [
+                  "null",
+                  "date"
+                ]
+              },
+              "title": {
+                "bsonType": "string"
+              }
+            },
+            "required": [
+              "_id",
+              "authorId",
+              "title"
+            ]
+          },
+          "validationAction": "error",
+          "validationLevel": "strict"
+        }
+      },
+      "users": {
+        "validator": {
+          "jsonSchema": {
+            "bsonType": "object",
+            "properties": {
+              "_id": {
+                "bsonType": "objectId"
+              },
+              "bio": {
+                "bsonType": [
+                  "null",
+                  "string"
+                ]
+              },
+              "email": {
+                "bsonType": "string"
+              },
+              "name": {
+                "bsonType": "string"
+              }
+            },
+            "required": [
+              "_id",
+              "email",
+              "name"
+            ]
+          },
+          "validationAction": "error",
+          "validationLevel": "strict"
+        }
+      }
     },
-    "storageHash": "sha256:3dc942d093b714429d2c735418815d37860c04e151bb78258ab6fa113e8a0141"
+    "storageHash": "sha256:cb09278a4bee1b0db899b70cf67fe96bc858f63b4faa1e5c41c69785abae4c4b"
   },
   "capabilities": {},
   "extensionPacks": {},

@@ -20,6 +20,7 @@ catalog:
   arktype: ^2.1.29
   gray-matter: ^4.0.3
   mongodb: ^6.16.0
+  mongodb-memory-server: 10.4.3
   pg: 8.16.3
   tsdown: 0.18.4
   typescript: 5.9.3

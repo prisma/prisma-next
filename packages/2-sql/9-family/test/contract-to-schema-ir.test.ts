@@ -398,7 +398,7 @@ describe('contractToSchemaIR', () => {
     expect(result.tables['T']!.columns['embedding']!.nativeType).toBe('vector');
     expect((result.annotations as Record<string, unknown>)?.['pg']).toMatchObject({
       storageTypes: {
-        Embedding: {
+        vector: {
           codecId: 'pgvector/vector@1',
           nativeType: 'vector',
           typeParams: { dimensions: 1536 },
@@ -431,7 +431,7 @@ describe('contractToSchemaIR', () => {
     });
     expect((result.annotations as Record<string, unknown>)?.['custom']).toMatchObject({
       storageTypes: {
-        Embedding: {
+        vector: {
           codecId: 'pgvector/vector@1',
           nativeType: 'vector',
           typeParams: { dimensions: 1536 },

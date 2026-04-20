@@ -1,7 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { CreateIndexCommand, DropIndexCommand } from '../src/ddl-commands';
+import {
+  CollModCommand,
+  CreateCollectionCommand,
+  CreateIndexCommand,
+  DropCollectionCommand,
+  DropIndexCommand,
+} from '../src/ddl-commands';
 import type { MongoDdlCommandVisitor, MongoInspectionCommandVisitor } from '../src/ddl-visitors';
 import { ListCollectionsCommand, ListIndexesCommand } from '../src/inspection-commands';
+
+function makeDdlVisitor(
+  overrides?: Partial<MongoDdlCommandVisitor<string>>,
+): MongoDdlCommandVisitor<string> {
+  return {
+    createIndex: () => 'createIndex',
+    dropIndex: () => 'dropIndex',
+    createCollection: () => 'createCollection',
+    dropCollection: () => 'dropCollection',
+    collMod: () => 'collMod',
+    ...overrides,
+  };
+}
 
 describe('CreateIndexCommand', () => {
   it('constructs with required fields', () => {
@@ -27,6 +46,26 @@ describe('CreateIndexCommand', () => {
     expect(cmd.name).toBe('email_1');
   });
 
+  it('constructs with M2 index options', () => {
+    const cmd = new CreateIndexCommand('users', [{ field: 'bio', direction: 'text' }], {
+      weights: { bio: 10 },
+      default_language: 'english',
+      language_override: 'lang',
+      collation: { locale: 'en', strength: 2 },
+    });
+    expect(cmd.weights).toEqual({ bio: 10 });
+    expect(cmd.default_language).toBe('english');
+    expect(cmd.language_override).toBe('lang');
+    expect(cmd.collation).toEqual({ locale: 'en', strength: 2 });
+  });
+
+  it('constructs with wildcardProjection', () => {
+    const cmd = new CreateIndexCommand('users', [{ field: '$**', direction: 1 }], {
+      wildcardProjection: { name: 1, email: 1 },
+    });
+    expect(cmd.wildcardProjection).toEqual({ name: 1, email: 1 });
+  });
+
   it('is frozen', () => {
     const cmd = new CreateIndexCommand('users', [{ field: 'email', direction: 1 }]);
     expect(() => {
@@ -36,10 +75,9 @@ describe('CreateIndexCommand', () => {
 
   it('dispatches via DDL visitor', () => {
     const cmd = new CreateIndexCommand('users', [{ field: 'email', direction: 1 }]);
-    const visitor: MongoDdlCommandVisitor<string> = {
+    const visitor = makeDdlVisitor({
       createIndex: (c) => `create:${c.collection}`,
-      dropIndex: () => 'drop',
-    };
+    });
     expect(cmd.accept(visitor)).toBe('create:users');
   });
 });
@@ -61,11 +99,134 @@ describe('DropIndexCommand', () => {
 
   it('dispatches via DDL visitor', () => {
     const cmd = new DropIndexCommand('users', 'email_1');
-    const visitor: MongoDdlCommandVisitor<string> = {
-      createIndex: () => 'create',
+    const visitor = makeDdlVisitor({
       dropIndex: (c) => `drop:${c.name}`,
-    };
+    });
     expect(cmd.accept(visitor)).toBe('drop:email_1');
+  });
+});
+
+describe('CreateCollectionCommand', () => {
+  it('constructs with collection name only', () => {
+    const cmd = new CreateCollectionCommand('events');
+    expect(cmd.kind).toBe('createCollection');
+    expect(cmd.collection).toBe('events');
+    expect(cmd.capped).toBeUndefined();
+    expect(cmd.validator).toBeUndefined();
+  });
+
+  it('constructs with capped options', () => {
+    const cmd = new CreateCollectionCommand('events', {
+      capped: true,
+      size: 1048576,
+      max: 1000,
+    });
+    expect(cmd.capped).toBe(true);
+    expect(cmd.size).toBe(1048576);
+    expect(cmd.max).toBe(1000);
+  });
+
+  it('constructs with validator', () => {
+    const cmd = new CreateCollectionCommand('events', {
+      validator: { $jsonSchema: { bsonType: 'object' } },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+    expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
+  });
+
+  it('constructs with timeseries', () => {
+    const cmd = new CreateCollectionCommand('metrics', {
+      timeseries: { timeField: 'ts', metaField: 'meta', granularity: 'hours' },
+    });
+    expect(cmd.timeseries).toEqual({ timeField: 'ts', metaField: 'meta', granularity: 'hours' });
+  });
+
+  it('constructs with clusteredIndex', () => {
+    const cmd = new CreateCollectionCommand('items', {
+      clusteredIndex: { key: { _id: 1 }, unique: true, name: 'myCluster' },
+    });
+    expect(cmd.clusteredIndex).toEqual({ key: { _id: 1 }, unique: true, name: 'myCluster' });
+  });
+
+  it('constructs with collation and changeStreamPreAndPostImages', () => {
+    const cmd = new CreateCollectionCommand('items', {
+      collation: { locale: 'en' },
+      changeStreamPreAndPostImages: { enabled: true },
+    });
+    expect(cmd.collation).toEqual({ locale: 'en' });
+    expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
+  });
+
+  it('is frozen', () => {
+    const cmd = new CreateCollectionCommand('events');
+    expect(Object.isFrozen(cmd)).toBe(true);
+  });
+
+  it('dispatches via DDL visitor', () => {
+    const cmd = new CreateCollectionCommand('events');
+    const visitor = makeDdlVisitor({
+      createCollection: (c) => `create:${c.collection}`,
+    });
+    expect(cmd.accept(visitor)).toBe('create:events');
+  });
+});
+
+describe('DropCollectionCommand', () => {
+  it('constructs correctly', () => {
+    const cmd = new DropCollectionCommand('events');
+    expect(cmd.kind).toBe('dropCollection');
+    expect(cmd.collection).toBe('events');
+  });
+
+  it('is frozen', () => {
+    const cmd = new DropCollectionCommand('events');
+    expect(Object.isFrozen(cmd)).toBe(true);
+  });
+
+  it('dispatches via DDL visitor', () => {
+    const cmd = new DropCollectionCommand('events');
+    const visitor = makeDdlVisitor({
+      dropCollection: (c) => `drop:${c.collection}`,
+    });
+    expect(cmd.accept(visitor)).toBe('drop:events');
+  });
+});
+
+describe('CollModCommand', () => {
+  it('constructs with validator', () => {
+    const cmd = new CollModCommand('users', {
+      validator: { $jsonSchema: { bsonType: 'object' } },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+    expect(cmd.kind).toBe('collMod');
+    expect(cmd.collection).toBe('users');
+    expect(cmd.validator).toEqual({ $jsonSchema: { bsonType: 'object' } });
+    expect(cmd.validationLevel).toBe('strict');
+    expect(cmd.validationAction).toBe('error');
+  });
+
+  it('constructs with changeStreamPreAndPostImages', () => {
+    const cmd = new CollModCommand('users', {
+      changeStreamPreAndPostImages: { enabled: true },
+    });
+    expect(cmd.changeStreamPreAndPostImages).toEqual({ enabled: true });
+  });
+
+  it('is frozen', () => {
+    const cmd = new CollModCommand('users', { validationLevel: 'strict' });
+    expect(Object.isFrozen(cmd)).toBe(true);
+  });
+
+  it('dispatches via DDL visitor', () => {
+    const cmd = new CollModCommand('users', { validationLevel: 'strict' });
+    const visitor = makeDdlVisitor({
+      collMod: (c) => `collMod:${c.collection}`,
+    });
+    expect(cmd.accept(visitor)).toBe('collMod:users');
   });
 });
 

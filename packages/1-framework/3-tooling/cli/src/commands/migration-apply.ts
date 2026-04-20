@@ -1,7 +1,7 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findPathWithDecision } from '@prisma-next/migration-tools/dag';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
-import type { AttestedMigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
+import type { AttestedMigrationBundle } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -20,7 +20,8 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadMigrationBundles,
+  loadAllBundles,
+  type MigrationBundleSet,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -194,10 +195,15 @@ async function executeMigrationApplyCommand(
   }
 
   // Read migrations and build migration chain model (offline — no DB needed)
-  let bundles: readonly AttestedMigrationBundle[];
-  let graph: MigrationGraph;
+  let migrations: MigrationBundleSet;
   try {
-    ({ bundles, graph } = await loadMigrationBundles(migrationsDir));
+    migrations = await loadAllBundles(migrationsDir);
+    if (migrations.drafts.length > 0 && !flags.quiet) {
+      ui.warn(
+        `${migrations.drafts.length} draft migration(s) found: ${migrations.drafts.map((d) => d.dirName).join(', ')}. ` +
+          "Run 'prisma-next migration emit --dir <path>' to attest before applying.",
+      );
+    }
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -218,7 +224,7 @@ async function executeMigrationApplyCommand(
     const marker = await client.readMarker();
 
     // --- No attested migrations on disk ---
-    if (bundles.length === 0) {
+    if (migrations.attested.length === 0) {
       if (marker?.storageHash) {
         return notOk(
           errorRuntime('Database has state but no migrations exist', {
@@ -266,22 +272,27 @@ async function executeMigrationApplyCommand(
 
     const markerHash = marker?.storageHash;
 
-    if (markerHash !== undefined && !graph.nodes.has(markerHash)) {
+    if (markerHash !== undefined && !migrations.graph.nodes.has(markerHash)) {
       return notOk(
         errorRuntime('Database marker does not match any known migration', {
           why: `The database marker hash "${markerHash}" is not found in the migration history at ${migrationsRelative}`,
           fix: 'Ensure the migrations directory matches this database. If the database was managed with `db init` or `db update`, run `prisma-next db sign` to update the marker.',
-          meta: { markerHash, knownNodes: [...graph.nodes] },
+          meta: { markerHash, knownNodes: [...migrations.graph.nodes] },
         }),
       );
     }
 
-    if (!graph.nodes.has(destinationHash)) {
+    if (!migrations.graph.nodes.has(destinationHash)) {
+      const matchingDraft = migrations.drafts.find((d) => d.manifest.to === destinationHash);
       return notOk(
         errorRuntime('Current contract has no planned migration path', {
-          why: `Current contract hash "${destinationHash}" is not present in the migration history at ${migrationsRelative}`,
-          fix: 'Run `prisma-next migration plan` to create a migration for the current contract, then re-run apply.',
-          meta: { destinationHash, knownNodes: [...graph.nodes] },
+          why: matchingDraft
+            ? `A draft migration exists at "${matchingDraft.dirName}" but has not been attested`
+            : `Current contract hash "${destinationHash}" is not present in the migration history at ${migrationsRelative}`,
+          fix: matchingDraft
+            ? `Run 'prisma-next migration emit --dir "${migrationsRelative}/${matchingDraft.dirName}"' to attest, then re-run apply.`
+            : 'Run `prisma-next migration plan` to create a migration for the current contract, then re-run apply.',
+          meta: { destinationHash, knownNodes: [...migrations.graph.nodes] },
         }),
       );
     }
@@ -291,7 +302,7 @@ async function executeMigrationApplyCommand(
     // "No marker" means the database is fresh — start from the empty contract hash.
     const originHash = markerHash ?? EMPTY_CONTRACT_HASH;
 
-    const decision = findPathWithDecision(graph, originHash, destinationHash, refName);
+    const decision = findPathWithDecision(migrations.graph, originHash, destinationHash, refName);
     if (!decision) {
       return notOk(
         errorRuntime('No migration path from current state to target', {
@@ -318,7 +329,7 @@ async function executeMigrationApplyCommand(
       });
     }
 
-    const bundleByDir = new Map(bundles.map((b) => [b.dirName, b]));
+    const bundleByDir = new Map(migrations.attested.map((b) => [b.dirName, b]));
     const pendingMigrations: MigrationApplyStep[] = [];
     for (const migration of pendingPath) {
       const pkg = bundleByDir.get(migration.dirName);
@@ -389,7 +400,7 @@ export function createMigrationApplyCommand(): Command {
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--ref <name>', 'Target ref name from migrations/refs.json')
+    .option('--ref <name>', 'Target ref name from migrations/refs/')
     .action(async (options: MigrationApplyCommandOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();

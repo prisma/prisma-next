@@ -7,8 +7,8 @@ import type {
 } from '@prisma-next/framework-components/emission';
 import {
   deduplicateImports,
+  generateBothFieldTypesMaps,
   generateCodecTypeIntersection,
-  generateFieldOutputTypesMap,
   generateHashTypeAliases,
   generateImportLines,
   generateModelsType,
@@ -60,7 +60,7 @@ export function generateContractDts(
   const rootsType = generateRootsType(contract.roots);
 
   const valueObjects = contract.valueObjects as Record<string, ContractValueObject> | undefined;
-  const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects);
+  const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects, codecLookup);
   const valueObjectsDescriptor = generateValueObjectsDescriptorType(valueObjects);
 
   const executionClause =
@@ -68,7 +68,7 @@ export function generateContractDts(
       ? `\n  readonly execution: ${serializeExecutionType(contract.execution)};`
       : '';
 
-  const fieldOutputTypesMap = generateFieldOutputTypesMap(
+  const fieldTypesMaps = generateBothFieldTypesMaps(
     contract.models as Record<string, ContractModel> | undefined,
     codecLookup,
   );
@@ -94,7 +94,8 @@ export type CodecTypes = ${codecTypes};
 export type OperationTypes = ${operationTypes};
 ${familyTypeAliases}
 ${valueObjectTypeAliases}
-export type FieldOutputTypes = ${fieldOutputTypesMap};
+export type FieldOutputTypes = ${fieldTypesMaps.output};
+export type FieldInputTypes = ${fieldTypesMaps.input};
 export type TypeMaps = ${typeMapsExpr};
 
 type ContractBase = ContractType<

@@ -1,8 +1,12 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
     environment: 'node',
+    testTimeout: timeouts.spinUpMongoMemoryServer,
+    hookTimeout: timeouts.spinUpMongoMemoryServer,
+    fileParallelism: false,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx,js,jsx}'],
@@ -15,6 +19,7 @@ export default defineConfig({
         '**/*.d.ts',
         '**/*.config.ts',
         '**/exports/**',
+        '**/mongo-runner.ts',
       ],
       reporter: ['text', 'html'],
       thresholds: {

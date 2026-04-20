@@ -29,7 +29,7 @@ function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextC
       version: '0.0.1',
       manifest: {},
       emission: mockHook,
-      create: () => ({ familyId: 'sql' }) as unknown as ControlFamilyInstance<'sql'>,
+      create: () => ({ familyId: 'sql' }) as unknown as ControlFamilyInstance<'sql', unknown>,
     },
     target: {
       kind: 'target',

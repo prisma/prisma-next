@@ -15,11 +15,17 @@
     "@prisma-next/adapter-mongo": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/errors": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-emitter": "workspace:*",
+    "@prisma-next/mongo-query-ast": "workspace:*",
+    "@prisma-next/mongo-schema-ir": "workspace:*",
     "@prisma-next/target-mongo": "workspace:*",
-    "mongodb": "catalog:"
+    "@prisma-next/utils": "workspace:*",
+    "mongodb": "catalog:",
+    "pathe": "^2.0.3"
   },
   "devDependencies": {
     "@prisma-next/mongo-contract-ts": "workspace:*",
@@ -43,6 +49,7 @@
   "types": "./dist/control.d.mts",
   "exports": {
     "./control": "./dist/control.mjs",
+    "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
     "./package.json": "./package.json"
   }

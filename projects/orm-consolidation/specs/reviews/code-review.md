@@ -1,100 +1,60 @@
-# Code Review — SQL ORM Polymorphism Runtime (STI + MTI)
+# Code Review — Codec Output Types (TML-2245)
 
-**Branch:** `tml-2227-sql-orm-polymorphism-runtime-sti-mti`
-**Base:** `origin/main`
-**Spec:** [sql-orm-polymorphism-runtime.spec.md](../sql-orm-polymorphism-runtime.spec.md)
-**Linear:** [TML-2227](https://linear.app/prisma-company/issue/TML-2227)
-**Diff range:** `origin/main...HEAD` (17 commits, 20 files, +1818 / −444)
+**Spec**: [projects/orm-consolidation/specs/codec-output-types.spec.md](../codec-output-types.spec.md)
+**Branch**: `tml-2245-mongo-type-ergonomics-fix-codec-output-types-fl-010203-tml`
+**Range**: `83905f098..f7e664124` (11 commits)
 
 ## Summary
 
-The implementation delivers the full STI + MTI read and write runtime for the SQL ORM as specified. All previously raised findings (F01–F08) have been addressed. One minor cleanup item remains: dead `tableName` in mutation dispatch interfaces (F09). All 395 tests pass, including 14 type tests.
+This change wires pre-resolved `FieldOutputTypes` and a new `FieldInputTypes` from emitted contracts into the Mongo ORM's row type resolution, replacing a deep conditional type chain that TypeScript couldn't fully evaluate. It eliminates ~100 codec-related casts from the retail store example. The implementation is well-tested at the type level and correctly handles backward compatibility.
 
-## What looks solid
+## What Looks Solid
 
-- **`resolvePolymorphismInfo`** derives strategy from storage comparison, caches via WeakMap, and cleanly separates by-name and by-value lookups.
-- **Model-first refactor is complete.** `findModelNameForTable` is removed. `mapStorageRowToModelFields`, `stripHiddenMappedFields`, `createRowEnvelope` require `modelName`. No fallback paths.
-- **`mapPolymorphicRow`** handles unknown discriminator values gracefully (base-only fallback). Merged column→field maps are cached and correctly use table-qualified keys (`${table}__${col}`) for MTI variant columns.
-- **MTI column aliasing.** `buildMtiJoins` projects variant columns with `${variant.table}__${col}` aliases. `getMergedColumnToFieldMap` builds the merged map with matching prefixed keys for MTI variants. `#executeMtiCreate` prefixes the variant row before passing to `mapPolymorphicRow`. This prevents column name collisions across MTI variant tables.
-- **Type-level write gating** via `ResolvedCreateInput` — `never` for polymorphic bases without a variant, `VariantCreateInput` with a variant.
-- **MTI create** correctly orchestrates two INSERTs with PK propagation and calls `applyCreateDefaults` for both base and variant tables.
-- **MTI mutation guards** via `#assertNotMtiVariant` for `createCount` and `upsert`.
-- **Shared test helpers.** `buildMixedPolyContract()` and `buildStiPolyContract()` extracted to `test/helpers.ts`, eliminating duplication across four test files.
-- **Test coverage** is thorough: 395 tests pass including strategy resolution (7), polymorphic mapping (5), MTI JOIN compilation (5), pipeline tests, write tests, mutation guard tests (2), and type tests (14).
+- **Elegant fallback heuristic**: `string extends keyof ExtractMongoFieldOutputTypes<TContract>` is a well-known TypeScript idiom that correctly distinguishes "real" field type maps (with specific model keys) from the defaulted `Record<string, Record<string, unknown>>`.
+
+- **`resolveFieldType` returns both sides**: The core resolution function returns `{ input, output }` in one call, eliminating the double iteration and keeping the caller's concern separate from field resolution. The `renderOutputType` asymmetry is now explicit — it only fires for the output side.
+
+- **Thorough type-level test coverage**: The ORM type tests cover `DefaultModelRow`, `CreateInput`, `InferFullRow` with embedded relations, `IncludedRow` with reference relations, and `VariantCreateInput` — all with `FieldOutputTypes`/`FieldInputTypes` present.
+
+- **Retail store cleanup**: The cast removal is systematic and thorough. The remaining `String()` / `Number()` / `new Date()` calls are legitimate (URL params, random IDs, date construction), not codec casts.
+
+- **`products.ts` demonstrates the value**: The data layer uses `FieldOutputTypes['Product']` as a direct type alias, cleanly expressing the product shape without casts.
 
 ## Findings
 
-### F09 — Dead `tableName` in mutation dispatch interfaces
+(No open findings — all addressed or deferred.)
 
-**Location:** [packages/3-extensions/sql-orm-client/src/collection-mutation-dispatch.ts (L20)](packages/3-extensions/sql-orm-client/src/collection-mutation-dispatch.ts) and [L75](packages/3-extensions/sql-orm-client/src/collection-mutation-dispatch.ts)
+## Deferred (Out of Scope)
 
-**Issue:** `DispatchMutationRowsOptions` and `ExecuteSingleMutationOptions` still declare `readonly tableName: string`, but `tableName` is no longer destructured or used in either function after the model-first refactor. Callers still pass it.
+### F05 — `VariantRow` / `InferFullRow` still use `InferModelRow` internally for non-model-row parts
 
-**Suggestion:** Remove `tableName` from both interfaces and from all call sites.
+- **Why deferred**: `InferFullRow` intersects `ResolvedOutputRow` with embedded relation types (which also use `ResolvedOutputRow`). The `VariantRow` type still uses `InferFullRow` correctly. The type chain for variant discrimination uses `Record<DiscField, V[VK]['value']>` which is a literal string — not derived from codecs. Fixing this would require rethinking the variant type resolution, which is beyond this PR's scope.
 
-## PR review comments (@aqrln)
+## Already Addressed
 
-### R01 — Missing Postgres integration tests
+| # | Finding | Addressed in |
+|---|---------|-------------|
+| F01 | `VariantCreateInput` uses output types for variant fields, not input types | `a235100b0` — TODO comment noting the asymmetry, deferred to TML-2229 |
+| F02 | `renderOutputType` used on input side for parameterized codecs | `b9a94cd33` — `resolveFieldType` returns both sides; `renderOutputType` now only fires for output side; test verifies the asymmetry |
+| F03 | No type-level tests for `VariantCreateInput`, `InferFullRow`, `IncludedRow` with field type maps | `17ff685c2` — Added type-level tests for all three |
+| F04 | `FieldInputTypes` children reference `NavItemOutput` in self-referencing value objects | `17ff685c2` — Added assertion for `NavItemInput` self-reference |
+| F06 | SQL `TypeMaps` does not carry `FieldInputTypes`; emitter does not pass it | `f7e664124` — Added `TFieldInputTypes` 5th parameter to SQL `TypeMaps`, `FieldInputTypesOf` extractor, `ExtractFieldInputTypes`, updated SQL emitter `getTypeMapsExpression`. |
+| F07 | `generateFieldResolvedType` uses a `side` flag instead of returning both sides | `b9a94cd33`
+|| F08 | SQL query builders resolve types through `CodecTypes` conditionals instead of pre-resolved field type maps | `945471aed` — Refactored to `resolveFieldType` returning `{ input, output }`, single-pass maps via `generateBothFieldTypesMaps` |
 
-**Comment:** [aqrln on plan L112](https://github.com/prisma/prisma-next/pull/321#discussion_r3056923234): "Where are those integration tests? It seems that there are only unit tests in the PR."
+## Acceptance-Criteria Traceability
 
-**Triage:** Accept. The plan calls for integration tests (tasks 2.5, 3.6, 4.7). Add integration tests in this PR.
-
-### R02 — MTI writes need transaction wrapping via `withMutationScope`
-
-**Comment:** [aqrln on plan L127](https://github.com/prisma/prisma-next/pull/321#discussion_r3056930622): "Why defer it? We already use transactions for nested inserts, it should be easy to wrap MTI writes with `withMutationScope` too."
-
-**Triage:** Accept. `withMutationScope` already exists in `mutation-executor.ts` (L129) and handles `runtime.transaction()` → commit/rollback. Wrap the two-INSERT MTI create in `withMutationScope`.
-
-### R03 — MTI JOIN tests: assert on full AST shape
-
-**Comment:** [aqrln on query-plan-select.test.ts L387](https://github.com/prisma/prisma-next/pull/321#discussion_r3056970455): "I'd prefer asserting on the whole AST using `expect(plan.ast).toEqual(SelectAst.from(...).withJoins(...))`. That's generally easier to read and understand when the AST is small even in the tests like those above, but the tests that check the absence of a property (like this one and the one below) are especially brittle."
-
-**Triage:** Accept. Rewrite the MTI JOIN tests to assert on the full AST shape instead of checking individual properties.
-
-## Deferred (out of scope)
-
-### D01 — No transaction wrapping for MTI writes
-
-Promoted to R02 (addressing in this PR).
-
-### D04 — Promoted to F05 (addressed in `17765bc38`)
-
-## Already addressed
-
-| Finding | Description | Commit |
-|---|---|---|
-| F01 | `createCount` skips the MTI two-INSERT path | `13b264f33` |
-| F02 | Redundant variable alias in `mapPolymorphicRow` | `1fb288bad` |
-| F03 | `upsert` not guarded for MTI variants | `13b264f33` |
-| F04 | `compileSelectWithIncludeStrategy` does not add MTI JOINs | `464d50c95` |
-| F05 | `findModelNameForTable` retained as fallback instead of removed | `17765bc38` |
-| F06 | Duplicated `buildPolyContract()` test helpers | `00c1a5330` |
-| F07 | MTI projection does not alias variant columns | `28001b18c` |
-| F08 | `applyCreateDefaults` not called for variant table in MTI create | `c73c769d5` |
-
-## Acceptance-criteria traceability
-
-| Acceptance Criterion | Implementation | Evidence |
-|---|---|---|
-| `PolymorphismInfo` classifies Bug as STI, Feature as MTI | [collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — `resolvePolymorphismInfo` | [collection-contract.test.ts](packages/3-extensions/sql-orm-client/test/collection-contract.test.ts) — 7 tests |
-| `PolymorphismInfo` cached per (contract, modelName) | [collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — WeakMap cache | [collection-contract.test.ts](packages/3-extensions/sql-orm-client/test/collection-contract.test.ts) — "caches results" test |
-| Non-polymorphic models: no PolymorphismInfo | [collection-contract.ts](packages/3-extensions/sql-orm-client/src/collection-contract.ts) — early return | [collection-contract.test.ts](packages/3-extensions/sql-orm-client/test/collection-contract.test.ts) — "returns undefined" test |
-| STI base query includes variant columns in SELECT | Implicit — `resolveTableColumns` returns all physical columns | [collection-variant.test.ts](packages/3-extensions/sql-orm-client/test/collection-variant.test.ts) — "base query maps mixed-variant rows" |
-| `.variant('Bug').all()` adds WHERE on discriminator | Pre-existing from TML-2205 | [collection-variant.test.ts](packages/3-extensions/sql-orm-client/test/collection-variant.test.ts) — existing variant WHERE tests |
-| Result mapping inspects discriminator value | [collection-runtime.ts](packages/3-extensions/sql-orm-client/src/collection-runtime.ts) — `mapPolymorphicRow` | [collection-runtime.test.ts](packages/3-extensions/sql-orm-client/test/collection-runtime.test.ts) — 5 tests |
-| Variant-specific columns stripped from non-matching variants | [collection-runtime.ts](packages/3-extensions/sql-orm-client/src/collection-runtime.ts) — merged map filtering | [collection-runtime.test.ts](packages/3-extensions/sql-orm-client/test/collection-runtime.test.ts) — "strips non-matching variant columns" |
-| Base query LEFT JOINs MTI variant tables | [query-plan-select.ts](packages/3-extensions/sql-orm-client/src/query-plan-select.ts) — `buildMtiJoins` | [query-plan-select.test.ts](packages/3-extensions/sql-orm-client/test/query-plan-select.test.ts) — "base query LEFT JOINs" |
-| MTI variant query uses INNER JOIN | [query-plan-select.ts](packages/3-extensions/sql-orm-client/src/query-plan-select.ts) — `buildMtiJoins` | [query-plan-select.test.ts](packages/3-extensions/sql-orm-client/test/query-plan-select.test.ts) — "variant query INNER JOINs" |
-| MTI columns projected with table-qualified aliases | [query-plan-select.ts](packages/3-extensions/sql-orm-client/src/query-plan-select.ts) — `${variant.table}__${col}` | [query-plan-select.test.ts](packages/3-extensions/sql-orm-client/test/query-plan-select.test.ts) — expects `features__priority` |
-| `modelName` flows without `findModelNameForTable` | `findModelNameForTable` removed. `modelName` required in all mapping functions. | [collection-runtime.test.ts](packages/3-extensions/sql-orm-client/test/collection-runtime.test.ts) — pass `modelName` directly |
-| STI create auto-injects discriminator | [collection.ts](packages/3-extensions/sql-orm-client/src/collection.ts) — `#mapCreateRows` | [collection-variant.test.ts](packages/3-extensions/sql-orm-client/test/collection-variant.test.ts) — "injects discriminator" |
-| MTI create produces two INSERTs | [collection.ts](packages/3-extensions/sql-orm-client/src/collection.ts) — `#executeMtiCreate` | [collection-variant.test.ts](packages/3-extensions/sql-orm-client/test/collection-variant.test.ts) — "executes two INSERTs" |
-| MTI create applies defaults to both tables | [collection.ts](packages/3-extensions/sql-orm-client/src/collection.ts) — two `applyCreateDefaults` calls | [collection-variant.test.ts](packages/3-extensions/sql-orm-client/test/collection-variant.test.ts) — MTI create tests |
-| Base INSERT RETURNING feeds variant INSERT PK | [collection.ts](packages/3-extensions/sql-orm-client/src/collection.ts) — PK propagation | [collection-variant.test.ts](packages/3-extensions/sql-orm-client/test/collection-variant.test.ts) — PK verification |
-| `create()` on polymorphic base is type error | [types.ts](packages/3-extensions/sql-orm-client/src/types.ts) — `ResolvedCreateInput` → `never` | [polymorphism.test-d.ts](packages/3-extensions/sql-orm-client/test/polymorphism.test-d.ts) — "is never" test |
-| `.variant()` narrows CreateInput, excluding discriminator | [types.ts](packages/3-extensions/sql-orm-client/src/types.ts) — `VariantCreateInput` | [polymorphism.test-d.ts](packages/3-extensions/sql-orm-client/test/polymorphism.test-d.ts) — "includes base + variant fields minus discriminator" |
-| `createCount` and `upsert` guarded for MTI | [collection.ts](packages/3-extensions/sql-orm-client/src/collection.ts) — `#assertNotMtiVariant` | [collection-variant.test.ts](packages/3-extensions/sql-orm-client/test/collection-variant.test.ts) — 2 guard tests |
-| Shared test helpers (no duplication) | [test/helpers.ts](packages/3-extensions/sql-orm-client/test/helpers.ts) — `buildMixedPolyContract`, `buildStiPolyContract` | 4 test files import from shared helpers |
-| All existing non-polymorphic tests pass | Regression | 395 tests pass |
-| Integration tests against Postgres | **Not present** | Plan tasks 2.5, 3.6, 4.7 — not yet implemented |
+| AC | Criterion | Implementation | Evidence |
+|----|-----------|----------------|----------|
+| AC-1 | `contract.d.ts` contains both `FieldOutputTypes` and `FieldInputTypes` | [packages/1-framework/3-tooling/emitter/src/generate-contract-dts.ts](packages/1-framework/3-tooling/emitter/src/generate-contract-dts.ts) — lines 71–98 | Retail store `contract.d.ts` contains both maps; [packages/2-mongo-family/3-tooling/emitter/test/emitter-hook.generation.test.ts](packages/2-mongo-family/3-tooling/emitter/test/emitter-hook.generation.test.ts) — lines 489–508 |
+| AC-2 | Value object aliases emitted as `{Name}Input` / `{Name}Output` | [packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts](packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts) — lines 418–425 | [packages/1-framework/3-tooling/emitter/test/domain-type-generation.test.ts](packages/1-framework/3-tooling/emitter/test/domain-type-generation.test.ts) — `generateValueObjectTypeAliases` tests; [packages/2-mongo-family/3-tooling/emitter/test/emitter-hook.generation.test.ts](packages/2-mongo-family/3-tooling/emitter/test/emitter-hook.generation.test.ts) — lines 345–369 |
+| AC-3 | `FieldInputTypes` uses `CodecTypes[codecId]['input']` | [packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts](packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts) — `resolveFieldType`, lines 228–279 | [packages/1-framework/3-tooling/emitter/test/domain-type-generation.test.ts](packages/1-framework/3-tooling/emitter/test/domain-type-generation.test.ts) — `resolveFieldType` tests for input side |
+| AC-4 | `FieldOutputTypes` uses `CodecTypes[codecId]['output']` | Same as AC-3, output key of `resolveFieldType` | Existing tests for `resolveFieldType` output side |
+| AC-5 | `MongoTypeMaps` 4th type parameter | [packages/2-mongo-family/1-foundation/mongo-contract/src/contract-types.ts](packages/2-mongo-family/1-foundation/mongo-contract/src/contract-types.ts) — lines 167–183 | [packages/2-mongo-family/1-foundation/mongo-contract/test/contract-types.test-d.ts](packages/2-mongo-family/1-foundation/mongo-contract/test/contract-types.test-d.ts) — lines 148–196 |
+| AC-6 | `DefaultModelRow` resolves via `FieldOutputTypes` | [packages/2-mongo-family/5-query-builders/orm/src/types.ts](packages/2-mongo-family/5-query-builders/orm/src/types.ts) — lines 53–62, 207–210 | [packages/2-mongo-family/5-query-builders/orm/test/value-object-inputs.test-d.ts](packages/2-mongo-family/5-query-builders/orm/test/value-object-inputs.test-d.ts) — lines 203–209 |
+| AC-7 | `CreateInput` resolves via `FieldInputTypes` | [packages/2-mongo-family/5-query-builders/orm/src/types.ts](packages/2-mongo-family/5-query-builders/orm/src/types.ts) — lines 64–73, 212–221 | [packages/2-mongo-family/5-query-builders/orm/test/value-object-inputs.test-d.ts](packages/2-mongo-family/5-query-builders/orm/test/value-object-inputs.test-d.ts) — lines 217–221 |
+| AC-8 | Fallback to `InferModelRow` | [packages/2-mongo-family/5-query-builders/orm/src/types.ts](packages/2-mongo-family/5-query-builders/orm/src/types.ts) — lines 56–57, 62, 67–68, 73 | [packages/2-mongo-family/5-query-builders/orm/test/value-object-inputs.test-d.ts](packages/2-mongo-family/5-query-builders/orm/test/value-object-inputs.test-d.ts) — lines 211–215 |
+| AC-9 | Retail store zero codec casts | Commit `8d94a359d` | Grep for `as string`, `String()`, `Number()`, `as unknown as string` shows zero codec-related casts remaining |
+| AC-10 | Mongo demo backward compat | `examples/mongo-demo/src/contract.d.ts` re-emitted with 4-param `MongoTypeMaps` | Compilation (needs `pnpm typecheck` verification) |
+| AC-11 | ORM type assertion — primitives when present | — | [packages/2-mongo-family/5-query-builders/orm/test/value-object-inputs.test-d.ts](packages/2-mongo-family/5-query-builders/orm/test/value-object-inputs.test-d.ts) — lines 203–209 |
+| AC-12 | ORM type assertion — fallback when absent | — | [packages/2-mongo-family/5-query-builders/orm/test/value-object-inputs.test-d.ts](packages/2-mongo-family/5-query-builders/orm/test/value-object-inputs.test-d.ts) — lines 211–215 |

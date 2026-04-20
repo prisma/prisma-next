@@ -74,35 +74,49 @@ Proves the full migration architecture works for MongoDB by cutting a thin verti
 
 ### Milestone 2: Full index vocabulary + validators + collection options
 
-Extends every layer to cover the full breadth of MongoDB server-side configuration. Still validates with hand-crafted contracts for indexes/validators/options, plus adds authoring + emitter support.
+Extends every layer to cover the full breadth of MongoDB server-side configuration: all index types and options, `$jsonSchema` validators, collection options, and PSL authoring support.
+
+**Spec:** [m2-full-vocabulary.spec.md](specs/m2-full-vocabulary.spec.md)
+**Plan:** [m2-plan.md](plans/m2-plan.md)
 
 **Tasks:**
 
-**Full index vocabulary:**
+**Phase 1 — Foundation types:**
 
-- [ ] **2.1 Extend index key types.** Support compound indexes, descending (`-1`), text (`"text"`), geospatial (`"2dsphere"`), wildcard (`"$**"`). Update `MongoStorageIndex` type, schema IR, Arktype validation, planner diffing, and runner execution. Tests for each key type.
-- [ ] **2.2 Extend index options.** Support `sparse`, `expireAfterSeconds` (TTL), `partialFilterExpression` (partial indexes). Update types, IR, validation, planner, runner. Tests for each option. Include index identity tests: same keys + different options = different index. **Note:** `buildIndexLookupKey` in the planner uses `JSON.stringify` for `partialFilterExpression`, which is key-order dependent. Replace with canonical serialization so that structurally equivalent partial filter expressions with different key ordering produce the same lookup key (important when comparing contract-derived IR against live-introspected IR in M4).
+- [ ] **2.1 Extend index options in contract types.** Add `wildcardProjection`, `collation`, `weights`, `default_language`, `language_override` to `MongoStorageIndex`. Update Arktype schema.
+- [ ] **2.2 Add validator and collection options to contract types.** Define `MongoStorageValidator` and `MongoStorageCollectionOptions` types. Update `MongoStorageCollection` and Arktype schema.
+- [ ] **2.3 Extend schema IR with new index options.** Add new options to `MongoSchemaIndex`, update `indexesEquivalent`.
+- [ ] **2.4 Add MongoSchemaValidator and MongoSchemaCollectionOptions to schema IR.** Implement node classes, update visitor interface from `unknown` to concrete types.
+- [ ] **2.5 Add new DDL command classes.** `CreateCollectionCommand`, `DropCollectionCommand`, `CollModCommand`. Update `CreateIndexCommand` with new options. Update `MongoDdlCommandVisitor`.
+- [ ] **2.6 Implement canonical serialization utility.** Key-order-independent serialization for index lookup keys.
 
-**Validators:**
+**Phase 2 — Composition:**
 
-- [ ] **2.3 Extend `MongoStorageCollection` with validator.** Add `validator?: { jsonSchema: Record<string, unknown>; validationLevel: 'strict' | 'moderate'; validationAction: 'error' | 'warn' }` to the contract type. Update Arktype schema. Type and validation tests.
-- [ ] **2.4 Extend schema IR and planner for validators.** Add validator representation to `MongoSchemaIR`. Add `CollModCommand` DDL command class. Planner generates `collMod` operations with appropriate `MongoFilterExpr`-based postchecks against `listCollections` results. Classify: relaxing validation = `widening`, tightening = `destructive`. Unit tests for add/remove/change validator. Integration test: planner output → runner → verify validator applied on `mongodb-memory-server`.
-- [ ] **2.5 Runner executes validator operations.** Command executor handles `CollModCommand` with `$jsonSchema`, `validationLevel`, `validationAction`. Integration tests.
+- [ ] **2.7 Update `contractToSchema` for validators, options, and new index options.**
+- [ ] **2.8 Update serializer/deserializer for new DDL commands and index options.**
+- [ ] **2.9 Update DDL formatter for new commands and index options.**
 
-**Collection options:**
+**Phase 3 — Planner extensions:**
 
-- [ ] **2.6 Extend `MongoStorageCollection` with collection options.** Capped settings, time series configuration, collation, change stream pre/post images. Update Arktype schema. Tests.
-- [ ] **2.7 Extend schema IR and planner for collection options.** Add `CreateCollectionCommand` and `DropCollectionCommand` DDL command classes. Planner generates operations with `listCollections`-based checks for new collections and option changes. Unit tests. Integration test: planner output → runner → verify collection options on `mongodb-memory-server`.
-- [ ] **2.8 Runner executes collection option operations.** Command executor handles `CreateCollectionCommand` (with options), `DropCollectionCommand`, and `CollModCommand` for option changes. Integration tests.
+- [ ] **2.10 Extend planner for full index vocabulary.** Canonical lookup keys, new index options in diffing.
+- [ ] **2.11 Extend planner for validators.** `collMod` generation, widening/destructive classification.
+- [ ] **2.12 Extend planner for collection options.** `createCollection`/`dropCollection` generation, immutable option conflicts.
 
-**Authoring + emitter:**
+**Phase 4 — Runner + command executor:**
 
-- [ ] **2.9 Add PSL authoring support for Mongo indexes.** Support `@@index` and `@@unique` annotations in the Mongo PSL interpreter. Update `@prisma-next/mongo-contract-psl` to populate `storage.collections[].indexes` from annotations. Tests with PSL fixtures.
-- [ ] **2.10 Update Mongo emitter to populate enriched `storage.collections`.** Emit index definitions, validator (auto-derived `$jsonSchema` from model field definitions), and collection options into the contract. Tests verifying emitted contracts match expected shapes.
+- [ ] **2.13 Extend command executor for new DDL commands.** `createCollection`, `dropCollection`, `collMod`, updated `createIndex` with new options.
+- [ ] **2.14 Extend inspection executor for collection option/validator checks.**
 
-**End-to-end proof:**
+**Phase 5 — PSL authoring + emitter:**
 
-- [ ] **2.11 End-to-end test: full vocabulary against real MongoDB.** Hand-crafted contracts exercising compound indexes, TTL indexes, partial indexes, validators (`$jsonSchema` + `validationLevel`), and collection options (capped, collation). Verify: `migration plan` produces correct operations → `migration apply` applies them on `mongodb-memory-server` → introspect database to confirm all configuration matches. Second contract modifying validators and removing indexes → plan produces correct `collMod`/`dropIndex` → apply succeeds.
+- [ ] **2.15 Add `@@index` and `@@unique` to Mongo PSL interpreter.**
+- [ ] **2.16 Auto-derive `$jsonSchema` validator from model fields.**
+- [ ] **2.17 Update Mongo emitter to populate enriched `storage.collections`.**
+
+**Phase 6 — End-to-end proof:**
+
+- [ ] **2.18 End-to-end integration tests: full vocabulary.** Compound, text, wildcard, TTL, partial, geospatial, hashed indexes + validators + collection options against `mongodb-memory-server`.
+- [ ] **2.19 End-to-end PSL authoring test.** PSL → contract → plan → apply → verify.
 
 ### Milestone 3: Polymorphic index generation
 
@@ -171,16 +185,25 @@ Adds Mongo support to all CLI commands that interact with a live database. The o
 | CLI `migration plan` works with Mongo | Integration | 1.12 | End-to-end with hand-crafted contract |
 | CLI `migration apply` works with Mongo | Integration | 1.12 | End-to-end with `mongodb-memory-server` |
 | End-to-end single index | Integration | 1.12 | Plan → apply → verify index exists |
-| All index key types | Unit + Integration | 2.1 | Each key type tested |
-| All index options | Unit + Integration | 2.2 | Each option tested, identity tests |
-| Validator in contract | Unit | 2.3 | Type + Arktype validation |
-| Planner generates `collMod` for validators | Unit + Integration | 2.4 | Widening/destructive classification; applied on `mongodb-memory-server` |
-| Runner executes validator operations | Integration | 2.5 | `mongodb-memory-server` |
-| Collection options in contract | Unit | 2.6 | Type + Arktype validation |
-| Planner generates collection option ops | Unit + Integration | 2.7 | New collection + option changes; applied on `mongodb-memory-server` |
-| Runner executes collection option ops | Integration | 2.8 | `mongodb-memory-server` |
-| Emitter populates enriched collections | Unit | 2.10 | PSL → contract verification |
-| End-to-end full vocabulary | Integration | 2.11 | Compound/TTL/partial indexes + validators + collection options on `mongodb-memory-server` |
+| New index options in contract (`wildcardProjection`, `collation`, `weights`, etc.) | Unit | 2.1 | Arktype validates all option shapes |
+| Validator + collection options in contract | Unit | 2.2 | Type shapes + Arktype validation |
+| New index options in schema IR | Unit | 2.3 | `indexesEquivalent` identity tests |
+| `MongoSchemaValidator` + `MongoSchemaCollectionOptions` in IR | Unit | 2.4 | Construction, freeze, visitor dispatch |
+| New DDL commands (`CreateCollectionCommand`, etc.) | Unit | 2.5 | Construction, freeze, visitor dispatch |
+| Canonical serialization for lookup keys | Unit | 2.6 | Key-order independence |
+| `contractToSchema` handles validators, options, new index options | Unit | 2.7 | Full contract → IR conversion |
+| Serializer/deserializer handles new commands + options | Unit | 2.8 | Round-trip equality |
+| DDL formatter renders new commands | Unit | 2.9 | Correct display strings |
+| Planner: full index vocabulary with canonical keys | Unit + Integration | 2.10 | Text/wildcard/compound wildcard diffing |
+| Planner generates `collMod` for validators | Unit + Integration | 2.11 | Widening/destructive classification |
+| Planner: collection lifecycle + option conflicts | Unit + Integration | 2.12 | `createCollection`/`dropCollection`/conflicts |
+| Command executor handles new DDL commands | Integration | 2.13 | `mongodb-memory-server` |
+| Inspection executor validates option checks | Integration | 2.14 | `listCollections` filter evaluation |
+| PSL `@@index`/`@@unique`/`@unique` → contract indexes | Unit | 2.15 | All index attribute combinations |
+| `$jsonSchema` derivation from model fields | Unit | 2.16 | Type mapping, nullable, arrays, value objects |
+| Emitter populates enriched collections | Unit | 2.17 | PSL → contract with indexes + validator |
+| End-to-end full vocabulary | Integration | 2.18 | All index types + validators + options on `mongodb-memory-server` |
+| End-to-end PSL authoring | Integration | 2.19 | PSL → contract → plan → apply → verify |
 | Polymorphic partial indexes auto-generated | Unit + Integration | 3.1 | Discriminator → partialFilterExpression; planner output applied on `mongodb-memory-server` |
 | End-to-end polymorphic proof | Integration | 3.2 | `mongodb-memory-server` |
 | Live introspection produces `MongoSchemaIR` | Integration | 4.1 | `mongodb-memory-server` |

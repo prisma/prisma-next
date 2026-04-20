@@ -21,6 +21,7 @@ This package is the Mongo family integration point for both control-plane assemb
 ## Entrypoints
 
 - `./control`: control-plane entrypoint exporting `mongoFamilyDescriptor`, `mongoTargetDescriptor`, `createMongoFamilyInstance`, and `MongoControlFamilyInstance`
+- `./migration`: migration authoring — `Migration` class, factory functions, and strategies (re-exported from `@prisma-next/target-mongo/migration`)
 - `./pack`: pure pack ref for TypeScript authoring flows such as `@prisma-next/mongo-contract-ts/contract-builder`
 
 ## Usage
@@ -95,18 +96,50 @@ export const contract = defineContract({
 
 The current `contract.ts` slice supports roots and collections, typed reference relations, owned models with `storage.relations`, value objects, and discriminator-based polymorphism.
 
+### Migration authoring
+
+```typescript
+import { Migration, createIndex, createCollection }
+  from "@prisma-next/family-mongo/migration"
+
+class AddUsersCollection extends Migration {
+  describe() {
+    return { from: "abc123", to: "def456", labels: ["add-users"] }
+  }
+
+  plan() {
+    return [
+      createCollection("users", {
+        validator: { $jsonSchema: { required: ["email"] } },
+        validationLevel: "strict",
+      }),
+      createIndex("users", [{ field: "email", direction: 1 }], { unique: true }),
+    ]
+  }
+}
+
+export default AddUsersCollection;
+Migration.run(import.meta.url, AddUsersCollection)
+```
+
+Run `node migration.ts` to produce `ops.json` and `migration.json`. Use `--dry-run` to preview without writing.
+
 ## Package Structure
 
 - `src/core/control-descriptor.ts`: `MongoFamilyDescriptor` implementation
 - `src/core/control-instance.ts`: `createMongoFamilyInstance()` and `MongoControlFamilyInstance`
 - `src/core/mongo-target-descriptor.ts`: pre-built control target descriptor derived from `@prisma-next/target-mongo/pack`
+- `src/core/mongo-migration.ts`: `MongoMigration` class (fixes the `Migration<TOperation>` type parameter to `MongoMigrationPlanOperation`)
 - `src/exports/control.ts`: control-plane entrypoint
+- `src/exports/migration.ts`: migration authoring entrypoint
 - `src/exports/pack.ts`: authoring-time family pack ref
 
 ## Dependencies
 
 - `@prisma-next/framework-components`: control-plane types and stack assembly
+- `@prisma-next/migration-tools`: generic `Migration<TOperation>` base class
 - `@prisma-next/mongo-contract`: Mongo contract validation and types
 - `@prisma-next/mongo-contract-ts`: Mongo `contract.ts` authoring surface
 - `@prisma-next/mongo-emitter`: Mongo family emission hook
-- `@prisma-next/target-mongo`: Mongo target pack metadata
+- `@prisma-next/mongo-query-ast`: Mongo command AST types (`MongoMigrationPlanOperation`)
+- `@prisma-next/target-mongo`: Mongo target pack metadata and migration factories

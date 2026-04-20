@@ -76,7 +76,7 @@ MongoDB has a small set of server-side objects that migrations manage. Each one 
 | `MongoSchemaCollectionOptions` | Capped, timeseries, collation, etc. | `{ capped: true, size: 1048576 }`             |
 
 
-Currently only `MongoSchemaCollection` and `MongoSchemaIndex` are implemented. Validators and collection options are defined in the visitor interface (so adding them later produces a compile error in all consumers) but not yet built.
+All four node types are implemented. `MongoSchemaValidator` holds `$jsonSchema`, `validationLevel`, and `validationAction`. `MongoSchemaCollectionOptions` holds capped, timeseries, collation, clusteredIndex, and changeStreamPreAndPostImages.
 
 ## Decision
 
@@ -94,17 +94,19 @@ interface MongoSchemaIR {
 
 An empty IR (for a new project with no prior contract) is `{ collections: {} }`.
 
-A collection groups its indexes (and, in the future, its validator and options):
+A collection groups its indexes, validator, and options:
 
 ```ts
 class MongoSchemaCollection extends MongoSchemaNode {
   readonly kind = 'collection' as const;
   readonly name: string;
   readonly indexes: ReadonlyArray<MongoSchemaIndex>;
+  readonly validator?: MongoSchemaValidator;
+  readonly options?: MongoSchemaCollectionOptions;
 }
 ```
 
-An index — the most important node — is defined by its keys and options:
+An index is defined by its keys and options:
 
 ```ts
 class MongoSchemaIndex extends MongoSchemaNode {
@@ -114,6 +116,11 @@ class MongoSchemaIndex extends MongoSchemaNode {
   readonly sparse?: boolean;
   readonly expireAfterSeconds?: number;
   readonly partialFilterExpression?: Record<string, unknown>;
+  readonly wildcardProjection?: Record<string, 0 | 1>;
+  readonly collation?: Record<string, unknown>;
+  readonly weights?: Record<string, number>;
+  readonly default_language?: string;
+  readonly language_override?: string;
 }
 ```
 
@@ -133,12 +140,12 @@ Each node extends `MongoSchemaNode` and implements `accept<R>(visitor: MongoSche
 interface MongoSchemaVisitor<R> {
   collection(node: MongoSchemaCollection): R;
   index(node: MongoSchemaIndex): R;
-  validator(node: unknown): R;
-  collectionOptions(node: unknown): R;
+  validator(node: MongoSchemaValidator): R;
+  collectionOptions(node: MongoSchemaCollectionOptions): R;
 }
 ```
 
-Adding a new node type (e.g. `MongoSchemaValidator`) requires adding a method to this interface. Every existing visitor implementation gets a compile error until it handles the new case. This is the same exhaustiveness guarantee used by the DDL command visitors and filter expression visitors elsewhere in the codebase.
+Adding a new node type requires adding a method to this interface. Every existing visitor implementation gets a compile error until it handles the new case. This is the same exhaustiveness guarantee used by the DDL command visitors and filter expression visitors elsewhere in the codebase.
 
 ### Structural identity for indexes
 
@@ -168,4 +175,4 @@ We considered a generic `DocumentSchemaIR` shared across all document databases 
 
 ### Define only the nodes needed today
 
-We considered defining nodes only for indexes and adding collection/validator/options nodes later. We chose to define the full visitor interface up front (with `unknown` parameter types for unimplemented nodes) so that future additions produce compile errors in existing code. The node classes themselves are added incrementally — only `MongoSchemaCollection` and `MongoSchemaIndex` exist today.
+We considered defining nodes only for indexes and adding collection/validator/options nodes later. We chose to define the full visitor interface up front so that future additions produce compile errors in existing code. All four node types (`MongoSchemaCollection`, `MongoSchemaIndex`, `MongoSchemaValidator`, `MongoSchemaCollectionOptions`) are now implemented.

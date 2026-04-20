@@ -1,6 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { JsonValue } from '@prisma-next/adapter-sqlite/codec-types';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 import { withSqliteTestRuntime } from './utils';
@@ -8,7 +9,7 @@ import { withSqliteTestRuntime } from './utils';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
-describe('e2e: ORM on SQLite', () => {
+describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('findMany', () => {
     it('returns all rows', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {

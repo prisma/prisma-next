@@ -4,20 +4,18 @@ import { PostgresControlAdapter } from '../core/control-adapter';
 import {
   createPostgresDefaultFunctionRegistry,
   createPostgresMutationDefaultGeneratorDescriptors,
-  createPostgresPslScalarTypeDescriptors,
+  createPostgresScalarTypeDescriptors,
 } from '../core/control-mutation-defaults';
 import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
 import { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError } from '../core/sql-utils';
 
 const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
   ...postgresAdapterDescriptorMeta,
-  pslTypeDescriptors: () => ({
-    scalarTypeDescriptors: createPostgresPslScalarTypeDescriptors(),
-  }),
-  controlMutationDefaults: () => ({
+  scalarTypeDescriptors: createPostgresScalarTypeDescriptors(),
+  controlMutationDefaults: {
     defaultFunctionRegistry: createPostgresDefaultFunctionRegistry(),
     generatorDescriptors: createPostgresMutationDefaultGeneratorDescriptors(),
-  }),
+  },
   create(): SqlControlAdapter<'postgres'> {
     return new PostgresControlAdapter();
   },

@@ -38,6 +38,7 @@
     "colorette": "^2.0.20",
     "commander": "^12.0.0",
     "esbuild": "^0.25.11",
+    "package-manager-detector": "^1.6.0",
     "pathe": "^2.0.3",
     "string-width": "^8.2.0",
     "strip-ansi": "^7.1.2",
@@ -94,6 +95,10 @@
       "types": "./dist/commands/contract-infer.d.mts",
       "import": "./dist/commands/contract-infer.mjs"
     },
+    "./commands/migration-new": {
+      "types": "./dist/commands/migration-new.d.mts",
+      "import": "./dist/commands/migration-new.mjs"
+    },
     "./commands/migration-plan": {
       "types": "./dist/commands/migration-plan.d.mts",
       "import": "./dist/commands/migration-plan.mjs"
@@ -106,9 +111,9 @@
       "types": "./dist/commands/migration-status.d.mts",
       "import": "./dist/commands/migration-status.mjs"
     },
-    "./commands/migration-verify": {
-      "types": "./dist/commands/migration-verify.d.mts",
-      "import": "./dist/commands/migration-verify.mjs"
+    "./commands/migration-emit": {
+      "types": "./dist/commands/migration-emit.d.mts",
+      "import": "./dist/commands/migration-emit.mjs"
     },
     "./commands/migration-apply": {
       "types": "./dist/commands/migration-apply.d.mts",

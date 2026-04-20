@@ -13,7 +13,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:177d25ad859f5fed519710a605cfbd84efba7f3d3eab32b6d2ac5756350c7fe3'>;
+  StorageHashBase<'sha256:7146bd2870044773881d126136be3b87f5b15d6456dafcdc30ac1d834cbbaa6b'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -49,7 +49,35 @@ export type FieldOutputTypes = {
     readonly email: CodecTypes['mongo/string@1']['output'];
   };
 };
-export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes>;
+export type FieldInputTypes = {
+  readonly Address: {
+    readonly street: CodecTypes['mongo/string@1']['input'];
+    readonly city: CodecTypes['mongo/string@1']['input'];
+    readonly zip: CodecTypes['mongo/string@1']['input'];
+  };
+  readonly Bug: { readonly severity: CodecTypes['mongo/string@1']['input'] };
+  readonly Comment: {
+    readonly _id: CodecTypes['mongo/objectId@1']['input'];
+    readonly text: CodecTypes['mongo/string@1']['input'];
+    readonly createdAt: CodecTypes['mongo/date@1']['input'];
+  };
+  readonly Feature: {
+    readonly priority: CodecTypes['mongo/string@1']['input'];
+    readonly targetRelease: CodecTypes['mongo/string@1']['input'];
+  };
+  readonly Task: {
+    readonly _id: CodecTypes['mongo/objectId@1']['input'];
+    readonly title: CodecTypes['mongo/string@1']['input'];
+    readonly type: CodecTypes['mongo/string@1']['input'];
+    readonly assigneeId: CodecTypes['mongo/objectId@1']['input'];
+  };
+  readonly User: {
+    readonly _id: CodecTypes['mongo/objectId@1']['input'];
+    readonly name: CodecTypes['mongo/string@1']['input'];
+    readonly email: CodecTypes['mongo/string@1']['input'];
+  };
+};
+export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = ContractType<
   {
@@ -57,7 +85,10 @@ type ContractBase = ContractType<
       readonly tasks: Record<string, never>;
       readonly users: {
         readonly indexes: readonly [
-          { readonly fields: { readonly email: 1 }; readonly options: { readonly unique: true } },
+          {
+            readonly keys: readonly [{ readonly field: 'email'; readonly direction: 1 }];
+            readonly unique: true;
+          },
         ];
         readonly options: { readonly collation: { readonly locale: 'en'; readonly strength: 2 } };
       };
