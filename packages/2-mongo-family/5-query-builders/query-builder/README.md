@@ -1,104 +1,138 @@
 # @prisma-next/mongo-query-builder
 
-Type-safe MongoDB query builder (reads, writes, find-and-modify, pipeline-terminal writes) with document shape tracking.
+A typed CRUD query builder for MongoDB contracts. Reads, writes, pipeline aggregations, and find-and-modify operations all produce `MongoQueryPlan` values that the runtime executes. Authored against a contract, not directly against the driver.
 
-> Read terminals are documented below. Write terminals (inserts, updates, deletes, upserts, find-and-modify, `$merge`/`$out`) landed in [TML-2267](https://linear.app/prisma-company/issue/TML-2267). See [DEVELOPING.md](./DEVELOPING.md) for implementation details.
-
-## What it does
-
-Builds `MongoQueryPlan` instances from a fluent, chainable API. The builder tracks document shape transformations at the type level — each stage method returns a new builder whose shape reflects the transformation (e.g. `group()` replaces the shape with the grouped fields, `project()` narrows it, `addFields()` extends it).
-
-## When to use it
-
-Use this package when you need to construct MongoDB aggregation pipelines with compile-time guarantees that:
-
-- Field references are valid for the current pipeline stage
-- Sort/filter operations only target existing fields
-- The final output type reflects all shape transformations
-
-## Usage
+## Quick start
 
 ```typescript
-import { mongoQuery, fn, acc } from '@prisma-next/mongo-query-builder';
-import type { Contract, TypeMaps } from './contract.d';
-import contractJson from './contract.json' with { type: 'json' };
+import { mongoQuery } from '@prisma-next/mongo-query-builder';
 
-type TContract = MongoContractWithTypeMaps<Contract, TypeMaps>;
+const q = mongoQuery<TContract>({ contractJson: contract });
 
-const p = mongoQuery<TContract>({ contractJson });
-
-// Analytics query: revenue by department
-const plan = p
+// Read — aggregation pipeline
+const analytics = q
   .from('orders')
   .match((f) => f.status.eq('completed'))
   .group((f) => ({
     _id: f.department,
     totalRevenue: acc.sum(f.amount),
-    count: acc.count(),
   }))
   .sort({ totalRevenue: -1 })
-  .limit(10)
   .build();
 
-// plan is MongoQueryPlan<{ _id: string; totalRevenue: number; count: number }>
+// Write — filtered update
+const updated = q
+  .from('orders')
+  .match((f) => f.total.gt(100))
+  .updateMany((f) => [f.status.set('shipped')]);
+
+// Find-and-modify
+const doc = q
+  .from('orders')
+  .match((f) => f.status.eq('pending'))
+  .sort({ createdAt: 1 })
+  .findOneAndUpdate((f) => [f.status.set('processing')], { returnDocument: 'after' });
 ```
 
-## API
+Each call returns a `MongoQueryPlan` with a narrowly typed `command` field and a phantom `Row` type parameter that tracks the shape of the result.
 
-### Entry point
+## The three states
 
-- `mongoQuery<TContract>({ contractJson })` — returns a `QueryRoot` with `.from(rootName)` to start building
+The builder is a three-state machine. The available terminals depend on where you are in the chain.
 
-### Stage methods
+### CollectionHandle
 
-| Method | Shape effect |
-|--------|-------------|
-| `match(filter)` / `match(fn)` | Preserves shape |
-| `sort(spec)` | Preserves shape (keys constrained to current fields) |
-| `limit(n)`, `skip(n)`, `sample(n)` | Preserves shape |
-| `addFields(fn)` | Extends shape with new fields |
-| `project(...keys)` | Narrows shape to selected fields |
-| `project(fn)` | Replaces shape with computed projection |
-| `group(fn)` | Replaces shape with grouped/accumulated fields |
-| `unwind(field)` | Unwraps array field to element type |
-| `lookup(opts)` | Adds array field from foreign collection |
-| `replaceRoot(fn)` | Replaces entire shape |
-| `count(field)` | Replaces shape with single count field |
-| `sortByCount(fn)` | Replaces shape with `{ _id, count }` |
-| `pipe(stage)` | Escape hatch — preserves or asserts new shape |
+Returned by `q.from('rootName')`. Represents an unfiltered collection binding.
 
-### Expression helpers (`fn`)
+| Terminals | Description |
+|-----------|-------------|
+| `insertOne(doc)` | Insert a single document |
+| `insertMany(docs)` | Insert a batch of documents |
+| `updateAll(fn)` | Update every document (match-all filter) |
+| `deleteAll()` | Delete every document |
+| `upsertOne(filterFn, updaterFn)` | Insert-or-update with an explicit filter |
+| `match(...)` | Transitions to **FilteredCollection** |
+| *stage methods* | Transitions to **PipelineChain** |
 
-| Category | Helpers |
-|----------|---------|
-| Arithmetic | `add`, `subtract`, `multiply`, `divide` |
-| String | `concat`, `toLower`, `toUpper`, `substr`, `substrBytes`, `trim`, `ltrim`, `rtrim`, `split`, `strLenCP`, `strLenBytes`, `replaceOne`, `replaceAll` |
-| Regex | `regexMatch`, `regexFind`, `regexFindAll` |
-| Date | `year`, `month`, `dayOfMonth`, `hour`, `minute`, `second`, `millisecond`, `dateToString`, `dateFromString`, `dateDiff`, `dateAdd`, `dateSubtract`, `dateTrunc` |
-| Comparison | `cmp`, `eq`, `ne`, `gt`, `gte`, `lt`, `lte` |
-| Array | `size`, `arrayElemAt`, `concatArrays`, `firstElem`, `lastElem`, `isIn`, `indexOfArray`, `isArray`, `reverseArray`, `slice`, `zip`, `range` |
-| Set | `setUnion`, `setIntersection`, `setDifference`, `setEquals`, `setIsSubset`, `anyElementTrue`, `allElementsTrue` |
-| Type | `typeOf`, `convert`, `toInt`, `toLong`, `toDouble`, `toDecimal`, `toString_`, `toObjectId`, `toBool`, `toDate` |
-| Object | `objectToArray`, `arrayToObject`, `getField`, `setField` |
-| Control flow | `cond`, `literal` |
+### FilteredCollection
 
-Named-argument operators (e.g. `dateToString`, `trim`, `regexMatch`) accept a record of `TypedAggExpr` values. Scalar options like format strings or unit names should be passed via `fn.literal(...)`.
+Reached after one or more `.match(...)` calls on a `CollectionHandle`. Filters accumulate via AND-folding.
 
-### Accumulator helpers (`acc`)
+| Terminals | Description |
+|-----------|-------------|
+| `updateMany(fn)` | Update all matching documents |
+| `updateOne(fn)` | Update one matching document |
+| `deleteMany()` | Delete all matching documents |
+| `deleteOne()` | Delete one matching document |
+| `upsertOne(fn)` | Upsert against the accumulated filter |
+| `findOneAndUpdate(fn, opts?)` | Find + update, returns the document |
+| `findOneAndDelete()` | Find + delete, returns the deleted document |
+| `match(...)` | Appends another filter |
+| *stage methods* | Transitions to **PipelineChain** |
 
-| Category | Helpers |
-|----------|---------|
-| Basic | `sum`, `avg`, `min`, `max`, `first`, `last`, `push`, `addToSet`, `count` |
-| Deviation | `stdDevPop`, `stdDevSamp` |
-| N-variant | `firstN`, `lastN`, `maxN`, `minN` |
-| Top/bottom | `top`, `bottom`, `topN`, `bottomN` |
+### PipelineChain
 
-N-variant and top/bottom accumulators accept a record of `TypedAggExpr` values (e.g. `{ input, n }` or `{ output, sortBy, n }`).
+The general-purpose aggregation chain. Reached after calling any pipeline stage (e.g. `.sort()`, `.group()`, `.addFields()`).
 
-### Terminal
+| Terminals | Description |
+|-----------|-------------|
+| `build()` / `aggregate()` | Produce an `AggregateCommand` |
+| `out(collection)` | `$out` terminal |
+| `merge(opts)` | `$merge` terminal |
+| `updateMany()` / `updateOne()` | Pipeline-style update (no callback — the chain _is_ the update) |
+| `findOneAndUpdate(fn)` | Deconstructs `$match`/`$sort`/`$skip` into command slots |
+| `findOneAndDelete()` | Same deconstruction |
 
-- `build()` — produces `MongoQueryPlan<ResolvedRow>` with the fully resolved output type
+## Field accessor
+
+Stage callbacks receive a `FieldAccessor<Shape>` (typically named `f`):
+
+- **Property form** — `f.status`, `f.amount`: produces a `TypedAggExpr` bound to the field's declared type.
+- **Callable form** — `f("address.city")`: accesses nested paths. Note: the callable form does not currently validate the path against the contract at the type level.
+
+## Update operators
+
+Write terminals accept a callback `(f) => [...]` returning an array of `TypedUpdateOp`:
+
+```typescript
+.updateMany((f) => [
+  f.status.set('shipped'),
+  f.amount.inc(1),
+  f.tags.push('processed'),
+])
+```
+
+Available operators: `.set`, `.unset`, `.inc`, `.mul`, `.min`, `.max`, `.push`, `.pull`, `.addToSet`, `.pop`, `.rename`, `.currentDate`, `.bit`.
+
+## Pipeline-style updates
+
+For updates expressed as aggregation pipeline stages, use `f.stage.*`:
+
+```typescript
+q.from('orders')
+  .match((f) => f.status.eq('new'))
+  .addFields((f) => ({ total: fn.multiply(f.quantity, f.price) }))
+  .updateMany()  // no callback — the chain is the update pipeline
+```
+
+Stage emitters: `f.stage.set(fields)`, `f.stage.unset(...fields)`, `f.stage.replaceRoot(expr)`, `f.stage.replaceWith(expr)`.
+
+## Marker gating
+
+Some pipeline stages (`group`, `project`, `replaceRoot`, `limit`, etc.) change the chain's document shape in ways that make typed `update`/`findOneAndModify` unsound. Those terminals disappear from the type after such stages. Trust the compiler; use `.aggregate()` for untyped pipeline results.
+
+## `rawCommand` escape hatch
+
+```typescript
+const plan = q.rawCommand(new InsertOneCommand('orders', { status: 'new' }));
+```
+
+Bypasses the typed builder surface entirely. The plan still carries `meta.storageHash` from the contract, but the row type is `unknown`. Use this for commands the typed API does not yet cover.
+
+## Observability
+
+All plans carry `meta.lane === 'mongo-query'`. Middleware that needs finer-grained read-vs-write discrimination can inspect `plan.command` (which is a tagged union — `instanceof AggregateCommand`, `instanceof UpdateManyCommand`, etc.).
 
 ## Architecture
 
-See [DEVELOPING.md](./DEVELOPING.md) for internal implementation details.
+See [DEVELOPING.md](./DEVELOPING.md) for internal implementation details, module structure, and design decisions.
