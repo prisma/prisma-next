@@ -491,6 +491,7 @@ class ControlClientImpl implements ControlClient {
     try {
       const stack = this.stack!;
       const sourceContext = {
+        configDir: contractConfig.configDir,
         composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
         scalarTypeDescriptors: stack.scalarTypeDescriptors,
         authoringContributions: stack.authoringContributions,

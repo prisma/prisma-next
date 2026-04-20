@@ -66,6 +66,37 @@ describe('prismaContract provider helper', () => {
       });
     });
 
+    it('resolves relative schema paths from configDir when cwd differs', async () => {
+      const configDir = await mkdtemp(join(tmpdir(), 'psl-provider-config-'));
+      const cwdDir = await mkdtemp(join(tmpdir(), 'psl-provider-cwd-'));
+      tempDirs.push(configDir, cwdDir);
+      const schemaPath = join(configDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+  email String
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(cwdDir);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source.load(createPostgresTestContext({ configDir }));
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(result.value).toMatchObject({
+        storage: {
+          tables: {
+            user: expect.any(Object),
+          },
+        },
+      });
+    });
+
     it('interprets relation backrelation lists and emits relation metadata', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
@@ -527,10 +558,14 @@ model Document {
         expect.arrayContaining([
           expect.objectContaining({
             code: 'PSL_SCHEMA_READ_FAILED',
-            sourceId: './missing.prisma',
+            sourceId: expect.stringMatching(/missing\.prisma$/),
           }),
         ]),
       );
+      expect(result.failure.meta).toMatchObject({
+        schemaPath: './missing.prisma',
+        absoluteSchemaPath: expect.stringMatching(/missing\.prisma$/),
+      });
     });
   });
 });

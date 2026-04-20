@@ -183,6 +183,7 @@ async function executeContractEmitCommand(
     const result = await client.emit({
       contractConfig: {
         source: contractConfig.source,
+        configDir,
         output: outputJsonPath,
       },
       onProgress,

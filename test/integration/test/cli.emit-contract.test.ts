@@ -22,8 +22,9 @@ function buildControlStack(config: Awaited<ReturnType<typeof loadConfig>>) {
   });
 }
 
-function buildSourceContext(stack: ControlStack): ContractSourceContext {
+function buildSourceContext(stack: ControlStack, configPath: string): ContractSourceContext {
   return {
+    configDir: dirname(configPath),
     composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
     scalarTypeDescriptors: stack.scalarTypeDescriptors,
     authoringContributions: stack.authoringContributions,
@@ -35,8 +36,9 @@ function buildSourceContext(stack: ControlStack): ContractSourceContext {
 const resolveContract = async (
   source: NonNullable<Awaited<ReturnType<typeof loadConfig>>['contract']>['source'],
   stack: ControlStack,
+  configPath: string,
 ) => {
-  const sourceResult = await source.load(buildSourceContext(stack));
+  const sourceResult = await source.load(buildSourceContext(stack, configPath));
   if (!sourceResult.ok) {
     throw new Error(sourceResult.failure.summary);
   }
@@ -69,7 +71,7 @@ describe('emitContract API', () => {
 
       const contractConfig = config.contract;
       const stack = buildControlStack(config);
-      const contractRaw = await resolveContract(contractConfig.source, stack);
+      const contractRaw = await resolveContract(contractConfig.source, stack, configPath);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -115,7 +117,7 @@ describe('emitContract API', () => {
 
       const contractConfig = config.contract;
       const stack = buildControlStack(config);
-      const contractRaw = await resolveContract(contractConfig.source, stack);
+      const contractRaw = await resolveContract(contractConfig.source, stack, configPath);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -155,7 +157,7 @@ describe('emitContract API', () => {
 
         const contractConfig = config.contract;
         const stack = buildControlStack(config);
-        const contractRaw = await resolveContract(contractConfig.source, stack);
+        const contractRaw = await resolveContract(contractConfig.source, stack, customConfigPath);
 
         if (!contractConfig.output) {
           throw new Error('Contract config must have output path');
@@ -188,7 +190,7 @@ describe('emitContract API', () => {
 
       const contractConfig = config.contract;
       const stack = buildControlStack(config);
-      const contractRaw = await resolveContract(contractConfig.source, stack);
+      const contractRaw = await resolveContract(contractConfig.source, stack, configPath);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -212,7 +214,7 @@ describe('emitContract API', () => {
 
       const contractConfig = config.contract;
       const stack = buildControlStack(config);
-      const contractRaw = await resolveContract(contractConfig.source, stack);
+      const contractRaw = await resolveContract(contractConfig.source, stack, configPath);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');

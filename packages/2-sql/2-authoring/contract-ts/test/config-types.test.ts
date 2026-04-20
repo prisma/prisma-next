@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { typescriptContract } from '../src/config-types';
 
 const stubContext: ContractSourceContext = {
+  configDir: process.cwd(),
   composedExtensionPacks: [],
   scalarTypeDescriptors: new Map(),
   authoringContributions: { field: {}, type: {} },

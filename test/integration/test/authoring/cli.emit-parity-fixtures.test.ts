@@ -26,6 +26,7 @@ function sourceContextFromConfig(config: PrismaNextConfig): ContractSourceContex
     extensionPacks: config.extensionPacks ?? [],
   });
   return {
+    configDir: process.cwd(),
     composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
     scalarTypeDescriptors: stack.scalarTypeDescriptors,
     authoringContributions: stack.authoringContributions,

@@ -432,6 +432,7 @@ describe('ControlClient progress emission', () => {
       const result = await client.emit({
         contractConfig: {
           source: createSourceProvider(),
+          configDir: '/tmp',
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -476,6 +477,7 @@ describe('ControlClient progress emission', () => {
       const result = await client.emit({
         contractConfig: {
           source: createSourceProvider(),
+          configDir: '/tmp',
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -511,6 +513,7 @@ describe('ControlClient progress emission', () => {
           source: createSourceProvider(async () => {
             throw new Error('Source load error');
           }),
+          configDir: '/tmp',
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -561,6 +564,7 @@ describe('ControlClient progress emission', () => {
               ],
             }),
           ),
+          configDir: '/tmp',
           output: '/tmp/contract.json',
         },
       });
@@ -590,6 +594,7 @@ describe('ControlClient progress emission', () => {
       const result = await client.emit({
         contractConfig: {
           source: createSourceProvider(),
+          configDir: '/tmp',
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -1139,6 +1144,7 @@ describe('ControlClient progress emission', () => {
       const result = await client.emit({
         contractConfig: {
           source: createSourceProvider(),
+          configDir: '/tmp',
           output: '/tmp/contract.json',
         },
       });

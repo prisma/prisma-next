@@ -167,6 +167,7 @@ export function createPostgresTestContext(
   overrides?: Partial<ContractSourceContext>,
 ): ContractSourceContext {
   return {
+    configDir: process.cwd(),
     composedExtensionPacks: [],
     scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
     authoringContributions: { field: {}, type: {} },

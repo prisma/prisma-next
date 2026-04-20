@@ -49,6 +49,7 @@ describe(
       });
 
       const pslResult = await contractConfig.source.load({
+        configDir: testDir,
         composedExtensionPacks: [pgvector.id],
         scalarTypeDescriptors: stack.scalarTypeDescriptors,
         authoringContributions: stack.authoringContributions,

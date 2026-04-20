@@ -1,4 +1,7 @@
-import type { PrismaNextConfig } from '@prisma-next/config/config-types';
+import type {
+  ContractAuthoritativeInputs,
+  PrismaNextConfig,
+} from '@prisma-next/config/config-types';
 import { defineConfig } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
@@ -6,7 +9,9 @@ import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 
 describe('defineConfig', () => {
-  const createSourceProvider = (authoritativeInputs = { kind: 'moduleGraph' as const }) => ({
+  const createSourceProvider = (
+    authoritativeInputs: ContractAuthoritativeInputs = { kind: 'moduleGraph' },
+  ) => ({
     authoritativeInputs,
     load: async () => ok({ targetFamily: 'sql' } as Contract),
   });
@@ -204,6 +209,7 @@ describe('defineConfig', () => {
     const contract = { targetFamily: 'sql' } as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
     const result = await config.source.load({
+      configDir: process.cwd(),
       composedExtensionPacks: [],
       scalarTypeDescriptors: new Map(),
       authoringContributions: { field: {}, type: {} },

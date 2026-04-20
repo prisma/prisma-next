@@ -38,6 +38,7 @@ const mongoStack = createControlStack({
 });
 
 const sqlSourceContext: ContractSourceContext = {
+  configDir: fixtureRootDir,
   composedExtensionPacks: [],
   scalarTypeDescriptors: sqlStack.scalarTypeDescriptors,
   authoringContributions: sqlStack.authoringContributions,
@@ -46,6 +47,7 @@ const sqlSourceContext: ContractSourceContext = {
 };
 
 const mongoSourceContext: ContractSourceContext = {
+  configDir: fixtureRootDir,
   composedExtensionPacks: [],
   scalarTypeDescriptors: mongoStack.scalarTypeDescriptors,
   authoringContributions: mongoStack.authoringContributions,

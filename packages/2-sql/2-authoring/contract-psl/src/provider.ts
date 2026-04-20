@@ -38,7 +38,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         paths: [schemaPath],
       },
       load: async (context: ContractSourceContext) => {
-        const absoluteSchemaPath = resolve(schemaPath);
+        const absoluteSchemaPath = resolve(context.configDir, schemaPath);
         let schema: string;
         try {
           schema = await readFile(absoluteSchemaPath, 'utf-8');
@@ -50,7 +50,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
               {
                 code: 'PSL_SCHEMA_READ_FAILED',
                 message,
-                sourceId: schemaPath,
+                sourceId: absoluteSchemaPath,
               },
             ],
             meta: { schemaPath, absoluteSchemaPath, cause: message },

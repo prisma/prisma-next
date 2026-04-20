@@ -37,6 +37,7 @@ export interface ContractSourceDiagnostics {
 }
 
 export interface ContractSourceContext {
+  readonly configDir: string;
   readonly composedExtensionPacks: readonly string[];
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly authoringContributions: AssembledAuthoringContributions;
