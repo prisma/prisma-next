@@ -8,7 +8,6 @@ import type { PrismaVitePluginOptions } from './types';
 const PLUGIN_NAME = 'prisma-vite-plugin-contract-emit';
 const DEFAULT_DEBOUNCE_MS = 150;
 const DEFAULT_CONFIG_PATH = 'prisma-next.config.ts';
-const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
 const MODULE_GRAPH_EXTENSIONS = new Set([
   '.js',
   '.jsx',
@@ -78,13 +77,14 @@ export function prismaVitePlugin(
   }
 
   function handleTrackedFileChange(file: string) {
-    if (ignoredOutputFiles.has(file)) {
-      log(`Ignoring emitted artifact update: ${file}`, 'debug');
+    const normalized = resolve(file);
+    if (ignoredOutputFiles.has(normalized)) {
+      log(`Ignoring emitted artifact update: ${normalized}`, 'debug');
       return;
     }
 
-    if (watchedFiles.has(file)) {
-      log(`Detected change: ${file}`, 'debug');
+    if (watchedFiles.has(normalized)) {
+      log(`Detected change: ${normalized}`, 'debug');
       scheduleEmit();
     }
   }
@@ -167,8 +167,11 @@ export function prismaVitePlugin(
   }
 
   function resolveContractOutputFiles(contractOutput: string | undefined): Set<string> {
+    if (contractOutput === undefined) {
+      return new Set();
+    }
     const configDir = dirname(absoluteConfigPath);
-    const outputJsonPath = resolve(configDir, contractOutput ?? DEFAULT_CONTRACT_OUTPUT);
+    const outputJsonPath = resolve(configDir, contractOutput);
     const outputFiles = new Set<string>([outputJsonPath]);
 
     if (outputJsonPath.endsWith('.json')) {
