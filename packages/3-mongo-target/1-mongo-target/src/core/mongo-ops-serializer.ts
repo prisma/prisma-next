@@ -46,6 +46,7 @@ import {
   RawUpdateManyCommand,
   RawUpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 
 const IndexKeyDirection = type('1 | -1 | "text" | "2dsphere" | "2d" | "hashed"');
@@ -422,20 +423,18 @@ export function deserializeMongoQueryPlan(json: unknown): MongoQueryPlan {
   const data = validate(QueryPlanJson, json, 'Mongo query plan');
   const command = deserializeDmlCommand(data.command);
   const m = data.meta;
-  const meta: PlanMeta = Object.assign(
-    {
-      target: m.target,
-      storageHash: m.storageHash,
-      lane: m.lane,
-      paramDescriptors: m.paramDescriptors as PlanMeta['paramDescriptors'],
-    },
-    m.targetFamily !== undefined && { targetFamily: m.targetFamily },
-    m.profileHash !== undefined && { profileHash: m.profileHash },
-    m.annotations !== undefined && { annotations: m.annotations },
-    m.refs !== undefined && { refs: m.refs },
-    m.projection !== undefined && { projection: m.projection },
-    m.projectionTypes !== undefined && { projectionTypes: m.projectionTypes },
-  ) as PlanMeta;
+  const meta: PlanMeta = {
+    target: m.target,
+    storageHash: m.storageHash,
+    lane: m.lane,
+    paramDescriptors: m.paramDescriptors as PlanMeta['paramDescriptors'],
+    ...ifDefined('targetFamily', m.targetFamily),
+    ...ifDefined('profileHash', m.profileHash),
+    ...ifDefined('annotations', m.annotations),
+    ...ifDefined('refs', m.refs),
+    ...ifDefined('projection', m.projection),
+    ...ifDefined('projectionTypes', m.projectionTypes),
+  };
   return { collection: data.collection, command, meta };
 }
 
