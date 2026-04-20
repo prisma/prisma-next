@@ -4,10 +4,6 @@
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "files": [
-    "dist",
-    "src"
-  ],
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --passWithNoTests",
@@ -50,18 +46,6 @@
     "./typed-expectations": {
       "types": "./dist/exports/typed-expectations.d.mts",
       "import": "./dist/exports/typed-expectations.mjs"
-    },
-    "./package.json": "./package.json"
-  },
-  "main": "./dist/exports/index.mjs",
-  "module": "./dist/exports/index.mjs",
-  "types": "./dist/exports/index.d.mts",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "test/utils"
-  },
-  "engines": {
-    "node": ">=20"
+    }
   }
 }
