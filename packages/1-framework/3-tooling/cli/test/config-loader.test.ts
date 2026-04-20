@@ -78,7 +78,7 @@ describe('config loader', () => {
         createValidConfig(`
       contract: {
         source: createSource(
-          ['./prisma/schema.prisma', './generated/contract.json', './generated/contract.d.ts'],
+          ['./prisma/schema.prisma', './prisma/schema.patch'],
           async () => ({ ok: true, value: { targetFamily: 'sql' } }),
         ),
         output: 'generated/contract.json',
@@ -91,9 +91,33 @@ describe('config loader', () => {
       expect(config.contract?.output).toBe('generated/contract.json');
       expect(config.contract?.source.inputs).toEqual([
         './prisma/schema.prisma',
-        './generated/contract.json',
-        './generated/contract.d.ts',
+        './prisma/schema.patch',
       ]);
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'rejects emitted artifact paths in provider inputs',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        createValidConfig(`
+      contract: {
+        source: createSource(
+          ['./prisma/schema.prisma', './generated/contract.json', './generated/contract.d.ts'],
+          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        ),
+        output: 'generated/contract.json',
+      }`),
+        'utf-8',
+      );
+
+      await expect(loadConfig(configPath)).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        why: 'Config.contract.source.inputs must not include emitted artifact paths derived from contract.output',
+      });
     },
     timeouts.typeScriptCompilation,
   );

@@ -357,6 +357,30 @@ describe('validateConfig', () => {
     expectFieldError(
       createValidRawConfig({
         contract: {
+          source: {
+            inputs: ['./generated/contract.json'],
+            load: async () => ok({ targetFamily: 'sql' } as Contract),
+          },
+          output: 'generated/contract.json',
+        },
+      }),
+      'contract.source.inputs[]',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
+          source: {
+            inputs: ['./generated/contract.d.ts'],
+            load: async () => ok({ targetFamily: 'sql' } as Contract),
+          },
+          output: 'generated/contract.json',
+        },
+      }),
+      'contract.source.inputs[]',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
           source: {},
         },
       }),

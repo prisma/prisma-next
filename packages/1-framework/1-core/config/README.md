@@ -52,5 +52,7 @@ validateConfig(config);
 ```
 
 Declare `source.inputs` only for source files that are not already covered by the config module
-graph, such as PSL schema paths or TypeScript contract paths passed as strings. Tooling should
-always treat the config module graph as watched by default.
+graph, such as PSL schema paths or TypeScript contract paths passed as strings. Do not include
+emitted artifact paths derived from `contract.output` (for example `contract.json` or the
+colocated `contract.d.ts`). Tooling should always treat the config module graph as watched by
+default.
