@@ -1,10 +1,10 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 import { describe, expect, it } from 'vitest';
-import { defineConfig as coreDefineConfig } from '../../../../1-framework/1-core/config/src/config-types';
 import { defineConfig } from '../../src/config/define-config';
 
 describe('defineConfig facade', () => {

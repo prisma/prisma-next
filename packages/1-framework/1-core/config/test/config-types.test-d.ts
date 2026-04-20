@@ -1,5 +1,4 @@
 import type {
-  ContractSourceProvider,
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
   ControlDriverInstance,
@@ -11,6 +10,7 @@ import type {
 import { ok } from '@prisma-next/utils/result';
 import { expectTypeOf, test } from 'vitest';
 import { defineConfig, type PrismaNextConfig } from '../src/config-types';
+import type { ContractSourceProvider } from '../src/contract-source-types';
 
 const mockHook = {
   id: 'sql',
@@ -116,12 +116,10 @@ test('accepts contract source providers with authoritative inputs', () => {
   };
 
   const result = defineConfig(config);
-  expectTypeOf(result.contract?.source.authoritativeInputs.kind).toEqualTypeOf<
+  expectTypeOf(result.contract!.source.authoritativeInputs.kind).toEqualTypeOf<
     'configPathOnly' | 'moduleGraph' | 'paths'
   >();
-  expectTypeOf(result.contract?.source.load).toEqualTypeOf<
-    ContractSourceProvider['load'] | undefined
-  >();
+  expectTypeOf(result.contract!.source.load).toEqualTypeOf<ContractSourceProvider['load']>();
 });
 
 test('rejects mismatched target in target descriptor', () => {
