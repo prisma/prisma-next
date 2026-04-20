@@ -1,13 +1,12 @@
 import type { ControlAdapterDescriptor } from '@prisma-next/framework-components/control';
 
 export { MongoCommandExecutor, MongoInspectionExecutor } from '../core/command-executor';
-export { MigrationMongoDriver } from '../core/dml-executor';
 export { introspectSchema } from '../core/introspect-schema';
 export {
   createMongoControlDriver,
   type MongoControlDriverInstance,
 } from '../core/mongo-control-driver';
-export { createMongoRunnerDeps } from '../core/runner-deps';
+export { createMongoRunnerDeps, extractDb } from '../core/runner-deps';
 
 import {
   mongoBooleanCodec,

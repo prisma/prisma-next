@@ -1,3 +1,4 @@
+import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type {
   MigrationPlan,
   MigrationPlanOperation,
@@ -103,7 +104,9 @@ function serializePlan(plan: MigrationPlan): MigrationPlan {
 }
 
 function makeRunner() {
-  return new MongoMigrationRunner(createMongoRunnerDeps(createMongoControlDriver(db, client)));
+  return new MongoMigrationRunner(
+    createMongoRunnerDeps(createMongoControlDriver(db, client), MongoDriverImpl.fromDb(db)),
+  );
 }
 
 describe('MongoMigrationRunner', () => {

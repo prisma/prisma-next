@@ -20,13 +20,23 @@ import type {
 import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from './core/driver-info';
 
-class MongoDriverImpl implements MongoDriver {
+export class MongoDriverImpl implements MongoDriver {
   readonly #db: Db;
-  readonly #client: MongoClient;
+  readonly #client: MongoClient | undefined;
 
-  constructor(db: Db, client: MongoClient) {
+  private constructor(db: Db, client: MongoClient | undefined) {
     this.#db = db;
     this.#client = client;
+  }
+
+  static async fromConnection(uri: string, dbName: string): Promise<MongoDriverImpl> {
+    const client = new MongoClient(uri, { driverInfo: DRIVER_INFO });
+    await client.connect();
+    return new MongoDriverImpl(client.db(dbName), client);
+  }
+
+  static fromDb(db: Db): MongoDriverImpl {
+    return new MongoDriverImpl(db, undefined);
   }
 
   execute<Row = Record<string, unknown>>(wireCommand: AnyMongoWireCommand): AsyncIterable<Row> {
@@ -58,7 +68,7 @@ class MongoDriverImpl implements MongoDriver {
   }
 
   async close(): Promise<void> {
-    await this.#client.close();
+    await this.#client?.close();
   }
 
   async *#executeInsertOneCommand(cmd: InsertOneWireCommand): AsyncIterable<InsertOneResult> {
@@ -129,8 +139,5 @@ class MongoDriverImpl implements MongoDriver {
 }
 
 export async function createMongoDriver(uri: string, dbName: string): Promise<MongoDriver> {
-  const client = new MongoClient(uri, { driverInfo: DRIVER_INFO });
-  await client.connect();
-  const db = client.db(dbName);
-  return new MongoDriverImpl(db, client);
+  return MongoDriverImpl.fromConnection(uri, dbName);
 }

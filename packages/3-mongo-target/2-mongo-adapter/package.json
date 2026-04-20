@@ -32,6 +32,7 @@
     "mongodb": "catalog:"
   },
   "devDependencies": {
+    "@prisma-next/driver-mongo": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
