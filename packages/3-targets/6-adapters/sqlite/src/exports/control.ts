@@ -4,20 +4,18 @@ import { SqliteControlAdapter } from '../core/control-adapter';
 import {
   createSqliteDefaultFunctionRegistry,
   createSqliteMutationDefaultGeneratorDescriptors,
-  createSqlitePslScalarTypeDescriptors,
+  createSqliteScalarTypeDescriptors,
 } from '../core/control-mutation-defaults';
 import { sqliteAdapterDescriptorMeta } from '../core/descriptor-meta';
 import { escapeLiteral, quoteIdentifier, SqlEscapeError } from '../core/sql-utils';
 
 const sqliteAdapterDescriptor: SqlControlAdapterDescriptor<'sqlite'> = {
   ...sqliteAdapterDescriptorMeta,
-  pslTypeDescriptors: () => ({
-    scalarTypeDescriptors: createSqlitePslScalarTypeDescriptors(),
-  }),
-  controlMutationDefaults: () => ({
+  scalarTypeDescriptors: createSqliteScalarTypeDescriptors(),
+  controlMutationDefaults: {
     defaultFunctionRegistry: createSqliteDefaultFunctionRegistry(),
     generatorDescriptors: createSqliteMutationDefaultGeneratorDescriptors(),
-  }),
+  },
   create(): SqlControlAdapter<'sqlite'> {
     return new SqliteControlAdapter();
   },

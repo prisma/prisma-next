@@ -53,74 +53,122 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       return policyCheck;
     }
 
-    await this.beginExclusiveTransaction(driver);
-    let committed = false;
+    // SQLite recreate-table drops and rebuilds the table. If foreign_keys is ON,
+    // dropping a referenced parent cascade-deletes child rows; we must disable FK
+    // enforcement for the duration of the migration and validate integrity before
+    // committing. PRAGMA foreign_keys is a no-op inside a transaction, so toggle
+    // around BEGIN/COMMIT.
+    const fkWasEnabled = await this.readForeignKeysEnabled(driver);
+    if (fkWasEnabled) {
+      await driver.query('PRAGMA foreign_keys = OFF');
+    }
+
     try {
-      await this.ensureControlTables(driver);
-      const existingMarker = await this.readMarker(driver);
+      await this.beginExclusiveTransaction(driver);
+      let committed = false;
+      try {
+        await this.ensureControlTables(driver);
+        const existingMarker = await this.readMarker(driver);
 
-      const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
-      if (!markerCheck.ok) {
-        return markerCheck;
-      }
-
-      const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
-      const skipOperations = markerAtDestination && options.plan.origin != null;
-
-      let operationsExecuted: number;
-      let executedOperations: readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[];
-
-      if (skipOperations) {
-        operationsExecuted = 0;
-        executedOperations = [];
-      } else {
-        const applyResult = await this.applyPlan(driver, options);
-        if (!applyResult.ok) {
-          return applyResult;
+        const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
+        if (!markerCheck.ok) {
+          return markerCheck;
         }
-        operationsExecuted = applyResult.value.operationsExecuted;
-        executedOperations = applyResult.value.executedOperations;
-      }
 
-      // Verify resulting schema matches contract
-      const schemaIR = await this.family.introspect({
-        driver,
-        contract: options.destinationContract,
-      });
+        const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
+        const skipOperations = markerAtDestination && options.plan.origin != null;
 
-      const schemaVerifyResult = verifySqlSchema({
-        contract: options.destinationContract,
-        schema: schemaIR,
-        strict: options.strictVerification ?? true,
-        context: options.context ?? {},
-        typeMetadataRegistry: this.family.typeMetadataRegistry,
-        frameworkComponents: options.frameworkComponents,
-        normalizeDefault: parseSqliteDefault,
-        normalizeNativeType: normalizeSqliteNativeType,
-      });
-      if (!schemaVerifyResult.ok) {
-        return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
-          why: 'The resulting database schema does not satisfy the destination contract.',
-          meta: {
-            issues: schemaVerifyResult.schema.issues,
-          },
+        let operationsExecuted: number;
+        let executedOperations: readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[];
+
+        if (skipOperations) {
+          operationsExecuted = 0;
+          executedOperations = [];
+        } else {
+          const applyResult = await this.applyPlan(driver, options);
+          if (!applyResult.ok) {
+            return applyResult;
+          }
+          operationsExecuted = applyResult.value.operationsExecuted;
+          executedOperations = applyResult.value.executedOperations;
+        }
+
+        // Verify resulting schema matches contract
+        const schemaIR = await this.family.introspect({
+          driver,
+          contract: options.destinationContract,
         });
+
+        const schemaVerifyResult = verifySqlSchema({
+          contract: options.destinationContract,
+          schema: schemaIR,
+          strict: options.strictVerification ?? true,
+          context: options.context ?? {},
+          typeMetadataRegistry: this.family.typeMetadataRegistry,
+          frameworkComponents: options.frameworkComponents,
+          normalizeDefault: parseSqliteDefault,
+          normalizeNativeType: normalizeSqliteNativeType,
+        });
+        if (!schemaVerifyResult.ok) {
+          return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
+            why: 'The resulting database schema does not satisfy the destination contract.',
+            meta: {
+              issues: schemaVerifyResult.schema.issues,
+            },
+          });
+        }
+
+        await this.upsertMarker(driver, options, existingMarker);
+        await this.recordLedgerEntry(driver, options, existingMarker, executedOperations);
+
+        if (fkWasEnabled) {
+          const fkIntegrityCheck = await this.verifyForeignKeyIntegrity(driver);
+          if (!fkIntegrityCheck.ok) {
+            return fkIntegrityCheck;
+          }
+        }
+
+        await this.commitTransaction(driver);
+        committed = true;
+        return runnerSuccess({
+          operationsPlanned: options.plan.operations.length,
+          operationsExecuted,
+        });
+      } finally {
+        if (!committed) {
+          await this.rollbackTransaction(driver);
+        }
       }
-
-      await this.upsertMarker(driver, options, existingMarker);
-      await this.recordLedgerEntry(driver, options, existingMarker, executedOperations);
-
-      await this.commitTransaction(driver);
-      committed = true;
-      return runnerSuccess({
-        operationsPlanned: options.plan.operations.length,
-        operationsExecuted,
-      });
     } finally {
-      if (!committed) {
-        await this.rollbackTransaction(driver);
+      if (fkWasEnabled) {
+        await driver.query('PRAGMA foreign_keys = ON');
       }
     }
+  }
+
+  private async readForeignKeysEnabled(
+    driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
+  ): Promise<boolean> {
+    const result = await driver.query<{ foreign_keys: number }>('PRAGMA foreign_keys');
+    const row = result.rows[0];
+    return row?.foreign_keys === 1;
+  }
+
+  private async verifyForeignKeyIntegrity(
+    driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
+    const result = await driver.query<Record<string, unknown>>('PRAGMA foreign_key_check');
+    if (result.rows.length === 0) {
+      return okVoid();
+    }
+    return runnerFailure(
+      'FOREIGN_KEY_VIOLATION',
+      `Foreign key integrity check failed after migration: ${result.rows.length} violation(s).`,
+      {
+        why: 'PRAGMA foreign_key_check reported violations after applying recreate-table operations.',
+        meta: { violations: result.rows },
+      },
+    );
   }
 
   private async applyPlan(

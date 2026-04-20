@@ -343,11 +343,22 @@ class SqliteMigrationPlanner implements SqlMigrationPlanner<SqlitePlanTargetDeta
       const issueDescriptions = classified.issues.map((i) => i.message).join('; ');
 
       const indexStatements: Array<{ description: string; sql: string }> = [];
+      const declaredIndexColumnKeys = new Set<string>();
       for (const idx of contractTable.indexes) {
         const indexName = idx.name ?? defaultIndexName(tableName, idx.columns);
+        declaredIndexColumnKeys.add(idx.columns.join(','));
         indexStatements.push({
           description: `recreate index "${indexName}" on "${tableName}"`,
           sql: buildCreateIndexSql(tableName, indexName, idx.columns),
+        });
+      }
+      for (const fk of contractTable.foreignKeys) {
+        if (fk.index === false) continue;
+        if (declaredIndexColumnKeys.has(fk.columns.join(','))) continue;
+        const indexName = defaultIndexName(tableName, fk.columns);
+        indexStatements.push({
+          description: `recreate FK-backing index "${indexName}" on "${tableName}"`,
+          sql: buildCreateIndexSql(tableName, indexName, fk.columns),
         });
       }
 
@@ -562,6 +573,7 @@ function classifyRecreateTableIssues(
   const byTable = new Map<string, { issues: SchemaIssue[]; hasDestructive: boolean }>();
 
   for (const issue of issues) {
+    if (issue.kind === 'enum_values_changed') continue;
     if (!issue.table) continue;
 
     let opClass: 'widening' | 'destructive' | null = null;
@@ -612,6 +624,7 @@ function buildIssuePostchecks(
   const t = esc(tableName);
 
   for (const issue of issues) {
+    if (issue.kind === 'enum_values_changed') continue;
     if (issue.column) {
       const c = esc(issue.column);
       if (issue.kind === 'nullability_mismatch') {
@@ -684,11 +697,14 @@ function issueConflicts(issues: readonly SchemaIssue[]): SqlPlannerConflict[] {
   return issues.map((issue) => ({
     kind: issueConflictKind(issue),
     summary: issue.message,
-    location: {
-      ...(issue.table ? { table: issue.table } : {}),
-      ...(issue.column ? { column: issue.column } : {}),
-      ...(issue.indexOrConstraint ? { constraint: issue.indexOrConstraint } : {}),
-    },
+    location:
+      issue.kind === 'enum_values_changed'
+        ? {}
+        : {
+            ...(issue.table ? { table: issue.table } : {}),
+            ...(issue.column ? { column: issue.column } : {}),
+            ...(issue.indexOrConstraint ? { constraint: issue.indexOrConstraint } : {}),
+          },
   }));
 }
 

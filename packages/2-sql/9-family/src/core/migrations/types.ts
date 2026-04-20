@@ -311,6 +311,7 @@ export type SqlMigrationRunnerErrorCode =
   | 'PRECHECK_FAILED'
   | 'POSTCHECK_FAILED'
   | 'SCHEMA_VERIFY_FAILED'
+  | 'FOREIGN_KEY_VIOLATION'
   | 'EXECUTION_FAILED';
 
 export interface SqlMigrationRunnerFailure extends MigrationRunnerFailure {
