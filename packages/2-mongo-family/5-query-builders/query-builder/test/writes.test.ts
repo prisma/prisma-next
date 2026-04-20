@@ -22,7 +22,7 @@ describe('M2 write terminals', () => {
       expect(plan.command).toBeInstanceOf(InsertOneCommand);
       expect((plan.command as InsertOneCommand).collection).toBe('orders');
       expect((plan.command as InsertOneCommand).document).toEqual({ status: 'new', amount: 10 });
-      expect(plan.meta.lane).toBe('mongo-write');
+      expect(plan.meta.lane).toBe('mongo-query');
     });
 
     it('insertMany emits an InsertManyCommand carrying every document in order', () => {

@@ -37,9 +37,9 @@ describe('PipelineChain', () => {
       expect((plan.command as AggregateCommand).collection).toBe('orders');
     });
 
-    it('produces PlanMeta with lane: mongo-pipeline', () => {
+    it('produces PlanMeta with lane: mongo-query', () => {
       const plan = createOrdersBuilder().build();
-      expect(plan.meta.lane).toBe('mongo-pipeline');
+      expect(plan.meta.lane).toBe('mongo-query');
       expect(plan.meta.target).toBe('mongo');
       expect(plan.meta.storageHash).toBe('test-hash');
     });

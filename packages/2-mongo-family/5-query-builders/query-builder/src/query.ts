@@ -15,7 +15,7 @@ import { type CollectionHandle, createCollectionHandle } from './state-classes';
  * `rawCommand(cmd)` is the escape hatch for cases the typed surface does
  * not cover (yet) — it accepts any `AnyMongoCommand` (typed CRUD or a
  * `RawMongoCommand` of `Document`s) and packages it into a `MongoQueryPlan`
- * with `lane: 'mongo-raw'`. Row type is `unknown` because the runtime
+ * with `lane: 'mongo-query'`. Row type is `unknown` because the runtime
  * cannot know what the caller's command yields.
  */
 export interface QueryRoot<
@@ -46,7 +46,7 @@ export function mongoQuery<
       const meta: PlanMeta = {
         target: 'mongo',
         storageHash: String(storageHash),
-        lane: 'mongo-raw',
+        lane: 'mongo-query',
         paramDescriptors: [],
       };
       return { collection: command.collection, command, meta };

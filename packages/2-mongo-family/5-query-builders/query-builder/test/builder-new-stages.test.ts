@@ -51,7 +51,7 @@ describe('new stage builder methods', () => {
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoOutStage);
       expect((pipeline[0] as MongoOutStage).collection).toBe('results');
-      expect(plan.meta.lane).toBe('mongo-write');
+      expect(plan.meta.lane).toBe('mongo-query');
     });
 
     it('threads the optional db parameter through to the stage', () => {
@@ -68,7 +68,7 @@ describe('new stage builder methods', () => {
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoMergeStage);
       expect((pipeline[0] as MongoMergeStage).into).toBe('output');
-      expect(plan.meta.lane).toBe('mongo-write');
+      expect(plan.meta.lane).toBe('mongo-query');
     });
   });
 
