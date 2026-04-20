@@ -13,7 +13,6 @@ export default defineConfig({
   extensionPacks: [],
   contract: {
     source: {
-      authoritativeInputs: { kind: 'moduleGraph' },
       load: async () => ({ ok: true, value: contract }),
     },
     output: './contract.json',

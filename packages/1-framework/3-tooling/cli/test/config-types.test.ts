@@ -1,7 +1,4 @@
-import type {
-  ContractAuthoritativeInputs,
-  PrismaNextConfig,
-} from '@prisma-next/config/config-types';
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { defineConfig } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
@@ -9,10 +6,8 @@ import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 
 describe('defineConfig', () => {
-  const createSourceProvider = (
-    authoritativeInputs: ContractAuthoritativeInputs = { kind: 'moduleGraph' },
-  ) => ({
-    authoritativeInputs,
+  const createSourceProvider = (inputs: readonly string[] | undefined = undefined) => ({
+    ...(!inputs ? {} : { inputs }),
     load: async () => ok({ targetFamily: 'sql' } as Contract),
   });
 
@@ -134,23 +129,17 @@ describe('defineConfig', () => {
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
-        source: createSourceProvider({
-          kind: 'paths',
-          paths: ['./schema.prisma'],
-        }),
+        source: createSourceProvider(['./schema.prisma']),
         output: 'custom/contract.json',
       },
     };
 
     const result = defineConfig(config);
     expect(result.contract?.output).toBe('custom/contract.json');
-    expect(result.contract?.source.authoritativeInputs).toEqual({
-      kind: 'paths',
-      paths: ['./schema.prisma'],
-    });
+    expect(result.contract?.source.inputs).toEqual(['./schema.prisma']);
   });
 
-  it('preserves contract authoritative inputs', () => {
+  it('preserves omitted contract inputs', () => {
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
@@ -159,7 +148,7 @@ describe('defineConfig', () => {
     };
 
     const result = defineConfig(config);
-    expect(result.contract?.source.authoritativeInputs).toEqual({ kind: 'moduleGraph' });
+    expect(result.contract?.source.inputs).toBeUndefined();
   });
 
   it('validates contract source accepts provider objects', () => {
@@ -208,17 +197,19 @@ describe('defineConfig', () => {
   it('builds TypeScript contract config via helper utility', async () => {
     const contract = { targetFamily: 'sql' } as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
-    const result = await config.source.load({
-      configDir: process.cwd(),
-      composedExtensionPacks: [],
-      scalarTypeDescriptors: new Map(),
-      authoringContributions: { field: {}, type: {} },
-      codecLookup: { get: () => undefined },
-      controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
-    });
+    const result = await config.source.load(
+      {
+        composedExtensionPacks: [],
+        scalarTypeDescriptors: new Map(),
+        authoringContributions: { field: {}, type: {} },
+        codecLookup: { get: () => undefined },
+        controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
+      },
+      { configDir: process.cwd() },
+    );
 
     expect(config.output).toBe('output/contract.json');
-    expect(config.source.authoritativeInputs).toEqual({ kind: 'moduleGraph' });
+    expect(config.source.inputs).toBeUndefined();
     expect(result.ok).toBe(true);
     expect(result.assertOk()).toBe(contract);
   });

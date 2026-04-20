@@ -1,5 +1,9 @@
 import { readFile } from 'node:fs/promises';
-import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
+import type {
+  ContractConfig,
+  ContractSourceContext,
+  ContractSourceEnvironment,
+} from '@prisma-next/config/config-types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -13,12 +17,9 @@ export interface MongoContractOptions {
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
   return {
     source: {
-      authoritativeInputs: {
-        kind: 'paths',
-        paths: [schemaPath],
-      },
-      load: async (context: ContractSourceContext) => {
-        const absoluteSchemaPath = resolve(context.configDir, schemaPath);
+      inputs: [schemaPath],
+      load: async (context: ContractSourceContext, environment: ContractSourceEnvironment) => {
+        const absoluteSchemaPath = resolve(environment.configDir, schemaPath);
         let schema: string;
         try {
           schema = await readFile(absoluteSchemaPath, 'utf-8');

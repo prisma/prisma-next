@@ -99,26 +99,21 @@ test('accepts compatible control descriptors', () => {
   expectTypeOf(result).toExtend<PrismaNextConfig<'sql', 'postgres'>>();
 });
 
-test('accepts contract source providers with authoritative inputs', () => {
+test('accepts contract source providers with declared inputs', () => {
   const config: PrismaNextConfig<'sql', 'postgres'> = {
     family: sqlFamilyDescriptor,
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
     contract: {
       source: {
-        authoritativeInputs: {
-          kind: 'paths',
-          paths: ['./schema.prisma'],
-        },
-        load: async () => ok({} as never),
+        inputs: ['./schema.prisma'],
+        load: async (_context, _environment) => ok({} as never),
       },
     },
   };
 
   const result = defineConfig(config);
-  expectTypeOf(result.contract!.source.authoritativeInputs.kind).toEqualTypeOf<
-    'configPathOnly' | 'moduleGraph' | 'paths'
-  >();
+  expectTypeOf(result.contract!.source.inputs).toEqualTypeOf<readonly string[] | undefined>();
   expectTypeOf(result.contract!.source.load).toEqualTypeOf<ContractSourceProvider['load']>();
 });
 

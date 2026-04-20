@@ -576,14 +576,16 @@ describe('emit command', () => {
             adapter: providerConfig.adapter,
             extensionPacks: providerConfig.extensionPacks ?? [],
           });
-          sourceResult = await contractConfig!.source.load({
-            configDir: testDirPsl,
-            composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
-            scalarTypeDescriptors: stack.scalarTypeDescriptors,
-            authoringContributions: stack.authoringContributions,
-            codecLookup: stack.codecLookup,
-            controlMutationDefaults: stack.controlMutationDefaults,
-          });
+          sourceResult = await contractConfig!.source.load(
+            {
+              composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+              scalarTypeDescriptors: stack.scalarTypeDescriptors,
+              authoringContributions: stack.authoringContributions,
+              codecLookup: stack.codecLookup,
+              controlMutationDefaults: stack.controlMutationDefaults,
+            },
+            { configDir: testDirPsl },
+          );
         } finally {
           process.chdir(originalCwd);
         }

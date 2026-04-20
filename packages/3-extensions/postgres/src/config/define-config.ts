@@ -1,6 +1,10 @@
 import { pathToFileURL } from 'node:url';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/config/config-types';
+import type {
+  ContractSourceContext,
+  ContractSourceEnvironment,
+  PrismaNextConfig,
+} from '@prisma-next/config/config-types';
 import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
@@ -37,20 +41,20 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
     ext === '.ts'
       ? {
           source: {
-            authoritativeInputs: {
-              kind: 'paths' as const,
-              paths: [options.contract],
-            },
-            load: async (context: ContractSourceContext) => {
+            inputs: [options.contract],
+            load: async (
+              context: ContractSourceContext,
+              environment: ContractSourceEnvironment,
+            ) => {
               const absolutePath = isAbsolute(options.contract)
                 ? options.contract
-                : resolve(context.configDir, options.contract);
+                : resolve(environment.configDir, options.contract);
               const { typescriptContract } = await import(
                 '@prisma-next/sql-contract-ts/config-types'
               );
               const mod = await import(pathToFileURL(absolutePath).href);
               const contract = mod.default ?? mod.contract;
-              return typescriptContract(contract, output).source.load(context);
+              return typescriptContract(contract, output).source.load(context, environment);
             },
           },
           output,

@@ -13,7 +13,6 @@ export default defineConfig({
   extensionPacks: [pgvector],
   contract: {
     source: {
-      authoritativeInputs: { kind: 'moduleGraph' },
       load: async () => ok(contract),
     },
     output: 'generated/contract.json',

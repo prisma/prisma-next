@@ -38,7 +38,6 @@ function createSourceProvider(
   load: ContractSourceProvider['load'] = async () => ok({ test: true } as unknown as Contract),
 ): ContractSourceProvider {
   return {
-    authoritativeInputs: { kind: 'moduleGraph' },
     load,
   };
 }

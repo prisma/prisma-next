@@ -22,7 +22,6 @@ const mockHook = {
 
 function createSourceProvider(overrides: Record<string, unknown> = {}) {
   return {
-    authoritativeInputs: { kind: 'moduleGraph' as const },
     load: async () => ok({ targetFamily: 'sql' } as Contract),
     ...overrides,
   };
@@ -337,39 +336,36 @@ describe('validateConfig', () => {
       createValidRawConfig({
         contract: {
           source: {
+            inputs: 123,
             load: async () => ok({ targetFamily: 'sql' } as Contract),
           },
         },
       }),
-      'contract.source.authoritativeInputs',
+      'contract.source.inputs',
     );
     expectFieldError(
       createValidRawConfig({
         contract: {
           source: {
-            authoritativeInputs: { kind: 'paths' },
+            inputs: ['valid', 123],
             load: async () => ok({ targetFamily: 'sql' } as Contract),
           },
         },
       }),
-      'contract.source.authoritativeInputs.paths',
+      'contract.source.inputs[]',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
+          source: {},
+        },
+      }),
+      'contract.source.load',
     );
     expectFieldError(
       createValidRawConfig({
         contract: {
           source: {
-            authoritativeInputs: { kind: 'invalid' },
-            load: async () => ok({ targetFamily: 'sql' } as Contract),
-          },
-        },
-      }),
-      'contract.source.authoritativeInputs.kind',
-    );
-    expectFieldError(
-      createValidRawConfig({
-        contract: {
-          source: {
-            authoritativeInputs: { kind: 'moduleGraph' },
             load: 'invalid',
           },
         },
@@ -469,20 +465,14 @@ describe('defineConfig', () => {
     const config = createValidConfig({
       contract: {
         source: createSourceProvider({
-          authoritativeInputs: {
-            kind: 'paths' as const,
-            paths: ['./schema.prisma'],
-          },
+          inputs: ['./schema.prisma'],
         }),
       },
     });
 
     const result = defineConfig(config);
     expect(result.contract).toBeDefined();
-    expect(result.contract?.source.authoritativeInputs).toEqual({
-      kind: 'paths',
-      paths: ['./schema.prisma'],
-    });
+    expect(result.contract?.source.inputs).toEqual(['./schema.prisma']);
   });
 
   it('preserves custom output path', () => {

@@ -97,7 +97,6 @@ export async function executeContractEmit(
   const stack = createControlStack(config);
 
   const sourceContext = {
-    configDir,
     composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
     scalarTypeDescriptors: stack.scalarTypeDescriptors,
     authoringContributions: stack.authoringContributions,
@@ -107,7 +106,7 @@ export async function executeContractEmit(
 
   let providerResult: Awaited<ReturnType<typeof contractConfig.source.load>>;
   try {
-    providerResult = await unlessAborted(contractConfig.source.load(sourceContext));
+    providerResult = await unlessAborted(contractConfig.source.load(sourceContext, { configDir }));
   } catch (error) {
     if (signal.aborted || isAbortError(error)) {
       throw error;

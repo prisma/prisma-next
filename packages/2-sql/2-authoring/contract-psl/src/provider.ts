@@ -1,5 +1,9 @@
 import { readFile } from 'node:fs/promises';
-import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
+import type {
+  ContractConfig,
+  ContractSourceContext,
+  ContractSourceEnvironment,
+} from '@prisma-next/config/config-types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
@@ -33,12 +37,9 @@ function buildColumnDescriptorMap(
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
   return {
     source: {
-      authoritativeInputs: {
-        kind: 'paths',
-        paths: [schemaPath],
-      },
-      load: async (context: ContractSourceContext) => {
-        const absoluteSchemaPath = resolve(context.configDir, schemaPath);
+      inputs: [schemaPath],
+      load: async (context: ContractSourceContext, environment: ContractSourceEnvironment) => {
+        const absoluteSchemaPath = resolve(environment.configDir, schemaPath);
         let schema: string;
         try {
           schema = await readFile(absoluteSchemaPath, 'utf-8');

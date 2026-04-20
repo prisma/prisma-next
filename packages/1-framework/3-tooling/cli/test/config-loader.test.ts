@@ -29,8 +29,8 @@ describe('config loader', () => {
       getTypeMapsExpression: () => 'never',
       getContractWrapper: () => '',
     };
-    const createSource = (authoritativeInputs, load) => ({
-      authoritativeInputs,
+    const createSource = (inputs, load) => ({
+      ...(inputs === undefined ? {} : { inputs }),
       load,
     });
     export default {
@@ -78,7 +78,7 @@ describe('config loader', () => {
         createValidConfig(`
       contract: {
         source: createSource(
-          { kind: 'paths', paths: ['./prisma/schema.prisma', './generated/contract.json', './generated/contract.d.ts'] },
+          ['./prisma/schema.prisma', './generated/contract.json', './generated/contract.d.ts'],
           async () => ({ ok: true, value: { targetFamily: 'sql' } }),
         ),
         output: 'generated/contract.json',
@@ -89,16 +89,17 @@ describe('config loader', () => {
       const config = await loadConfig(configPath);
 
       expect(config.contract?.output).toBe('generated/contract.json');
-      expect(config.contract?.source.authoritativeInputs).toEqual({
-        kind: 'paths',
-        paths: ['./prisma/schema.prisma', './generated/contract.json', './generated/contract.d.ts'],
-      });
+      expect(config.contract?.source.inputs).toEqual([
+        './prisma/schema.prisma',
+        './generated/contract.json',
+        './generated/contract.d.ts',
+      ]);
     },
     timeouts.typeScriptCompilation,
   );
 
   it(
-    'loads moduleGraph provider metadata',
+    'loads provider config with omitted inputs',
     async () => {
       const configPath = join(testDir, 'prisma-next.config.ts');
       writeFileSync(
@@ -106,7 +107,7 @@ describe('config loader', () => {
         createValidConfig(`
       contract: {
         source: createSource(
-          { kind: 'moduleGraph' },
+          undefined,
           async () => ({ ok: true, value: { targetFamily: 'sql' } }),
         ),
       }`),
@@ -115,34 +116,7 @@ describe('config loader', () => {
 
       const config = await loadConfig(configPath);
 
-      expect(config.contract?.source.authoritativeInputs).toEqual({
-        kind: 'moduleGraph',
-      });
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
-    'loads configPathOnly provider metadata',
-    async () => {
-      const configPath = join(testDir, 'prisma-next.config.ts');
-      writeFileSync(
-        configPath,
-        createValidConfig(`
-      contract: {
-        source: createSource(
-          { kind: 'configPathOnly' },
-          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
-        ),
-      }`),
-        'utf-8',
-      );
-
-      const config = await loadConfig(configPath);
-
-      expect(config.contract?.source.authoritativeInputs).toEqual({
-        kind: 'configPathOnly',
-      });
+      expect(config.contract?.source.inputs).toBeUndefined();
     },
     timeouts.typeScriptCompilation,
   );

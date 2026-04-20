@@ -13,10 +13,7 @@ export default defineConfig({
   extensionPacks: [],
   contract: {
     source: {
-      authoritativeInputs: {
-        kind: 'paths',
-        paths: ['./contract.ts'],
-      },
+      inputs: ['./contract.ts'],
       load: async () => {
         const { contract } = await import('./contract');
         return ok(contract);

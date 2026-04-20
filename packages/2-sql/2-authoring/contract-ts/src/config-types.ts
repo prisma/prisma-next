@@ -6,10 +6,7 @@ import { ok } from '@prisma-next/utils/result';
 export function typescriptContract(contract: Contract, output?: string): ContractConfig {
   return {
     source: {
-      authoritativeInputs: {
-        kind: 'moduleGraph',
-      },
-      load: async (_context) => ok(contract),
+      load: async (_context, _environment) => ok(contract),
     },
     ...ifDefined('output', output),
   };

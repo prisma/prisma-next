@@ -86,25 +86,8 @@ export interface PrismaNextConfig<
   };
 }
 
-/**
- * Arktype schema for ContractConfig validation.
- * Validates presence/shape only.
- */
-export const ContractAuthoritativeInputsSchema = type.or(
-  {
-    kind: type.unit('moduleGraph'),
-  },
-  {
-    kind: type.unit('configPathOnly'),
-  },
-  {
-    kind: type.unit('paths'),
-    paths: 'string[]',
-  },
-);
-
 export const ContractSourceProviderSchema = type({
-  authoritativeInputs: ContractAuthoritativeInputsSchema,
+  'inputs?': 'string[]',
   load: 'Function',
 });
 

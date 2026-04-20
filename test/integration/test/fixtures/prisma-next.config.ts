@@ -10,7 +10,6 @@ export default defineConfig({
   adapter: postgresAdapter,
   contract: {
     source: {
-      authoritativeInputs: { kind: 'moduleGraph' },
       load: async () => ({ ok: true, value: contract }),
     },
     output: 'contract.json',

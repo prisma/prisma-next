@@ -1,7 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
-import type { ContractSourceContext } from '@prisma-next/cli/config-types';
+import type {
+  ContractSourceContext,
+  ContractSourceEnvironment,
+} from '@prisma-next/cli/config-types';
 import { emit } from '@prisma-next/emitter';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
@@ -24,7 +27,6 @@ function buildControlStack(config: Awaited<ReturnType<typeof loadConfig>>) {
 
 function buildSourceContext(stack: ControlStack, configPath: string): ContractSourceContext {
   return {
-    configDir: dirname(configPath),
     composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
     scalarTypeDescriptors: stack.scalarTypeDescriptors,
     authoringContributions: stack.authoringContributions,
@@ -33,12 +35,21 @@ function buildSourceContext(stack: ControlStack, configPath: string): ContractSo
   };
 }
 
+function buildSourceEnvironment(configPath: string): ContractSourceEnvironment {
+  return {
+    configDir: dirname(configPath),
+  };
+}
+
 const resolveContract = async (
   source: NonNullable<Awaited<ReturnType<typeof loadConfig>>['contract']>['source'],
   stack: ControlStack,
   configPath: string,
 ) => {
-  const sourceResult = await source.load(buildSourceContext(stack, configPath));
+  const sourceResult = await source.load(
+    buildSourceContext(stack, configPath),
+    buildSourceEnvironment(configPath),
+  );
   if (!sourceResult.ok) {
     throw new Error(sourceResult.failure.summary);
   }

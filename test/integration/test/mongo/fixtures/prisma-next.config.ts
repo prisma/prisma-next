@@ -11,7 +11,6 @@ export default defineConfig({
   adapter: mongoAdapter,
   contract: {
     source: {
-      authoritativeInputs: { kind: 'moduleGraph' },
       load: async () => ok(contract as Contract),
     },
     output: 'generated/contract.json',

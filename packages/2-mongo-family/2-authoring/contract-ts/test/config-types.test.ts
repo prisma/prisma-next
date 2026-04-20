@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { typescriptContract } from '../src/config-types';
 
 const emptyContext: ContractSourceContext = {
-  configDir: process.cwd(),
   composedExtensionPacks: [],
   scalarTypeDescriptors: new Map(),
   authoringContributions: { field: {}, type: {} },
@@ -20,7 +19,7 @@ describe('typescriptContract', () => {
   it('returns provider result with contract', async () => {
     const contract = { targetFamily: 'mongo', target: 'mongo' } as unknown as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
-    const result = await config.source.load(emptyContext);
+    const result = await config.source.load(emptyContext, { configDir: process.cwd() });
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -29,7 +28,7 @@ describe('typescriptContract', () => {
 
     expect(result.value).toBe(contract);
     expect(config.output).toBe('output/contract.json');
-    expect(config.source.authoritativeInputs).toEqual({ kind: 'moduleGraph' });
+    expect(config.source.inputs).toBeUndefined();
   });
 
   it('omits output when not provided', () => {
@@ -37,6 +36,6 @@ describe('typescriptContract', () => {
     const config = typescriptContract(contract);
 
     expect(config.output).toBeUndefined();
-    expect(config.source.authoritativeInputs).toEqual({ kind: 'moduleGraph' });
+    expect(config.source.inputs).toBeUndefined();
   });
 });

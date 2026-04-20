@@ -12,7 +12,7 @@ This package owns the shared config contract used by tooling and authoring packa
 
 - `PrismaNextConfig` and `ContractConfig` types
 - contract source provider + diagnostics protocol
-- provider-owned authoritative input metadata for tooling integrations
+- provider-declared input metadata for tooling integrations
 - `defineConfig()` normalization/defaulting
 - `validateConfig()` structural/runtime-shape validation
 
@@ -20,7 +20,7 @@ This package owns the shared config contract used by tooling and authoring packa
 
 - Type-safe config composition for `family`, `target`, `adapter`, optional `driver`, and optional `extensionPacks` (`extensions` is rejected at runtime)
 - Contract source provider protocol (`contract.source`) and diagnostics shape
-- Tool-agnostic authoritative input metadata for build integrations via `contract.source.authoritativeInputs` (`moduleGraph`, `paths`, or `configPathOnly`)
+- Tool-agnostic provider input metadata for build integrations via `contract.source.inputs`
 - Pure config validation and normalization with no file system access
 
 ## Non-responsibilities
@@ -41,11 +41,9 @@ const config = defineConfig({
   adapter: postgresAdapterDescriptor,
   contract: {
     source: {
-      authoritativeInputs: {
-        kind: 'paths',
-        paths: ['./prisma/schema.prisma'],
-      },
-      load: async () => /* Result<Contract, ContractSourceDiagnostics> */ null as never,
+      inputs: ['./prisma/schema.prisma'],
+      load: async (_context, _environment) =>
+        /* Result<Contract, ContractSourceDiagnostics> */ null as never,
     },
   },
 });
@@ -53,6 +51,6 @@ const config = defineConfig({
 validateConfig(config);
 ```
 
-Use `kind: 'moduleGraph'` when the config module graph is authoritative, `kind: 'paths'` for
-explicit non-graph inputs, and `kind: 'configPathOnly'` when tooling can only reliably watch the
-config file itself and should surface a partial-coverage warning.
+Declare `source.inputs` only for source files that are not already covered by the config module
+graph, such as PSL schema paths or TypeScript contract paths passed as strings. Tooling should
+always treat the config module graph as watched by default.

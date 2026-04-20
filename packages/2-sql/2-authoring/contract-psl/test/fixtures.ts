@@ -1,4 +1,7 @@
-import type { ContractSourceContext } from '@prisma-next/config/config-types';
+import type {
+  ContractSourceContext,
+  ContractSourceEnvironment,
+} from '@prisma-next/config/config-types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
@@ -167,12 +170,20 @@ export function createPostgresTestContext(
   overrides?: Partial<ContractSourceContext>,
 ): ContractSourceContext {
   return {
-    configDir: process.cwd(),
     composedExtensionPacks: [],
     scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
     authoringContributions: { field: {}, type: {} },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+    ...overrides,
+  };
+}
+
+export function createPostgresTestEnvironment(
+  overrides?: Partial<ContractSourceEnvironment>,
+): ContractSourceEnvironment {
+  return {
+    configDir: process.cwd(),
     ...overrides,
   };
 }

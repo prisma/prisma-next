@@ -37,7 +37,6 @@ export interface ContractSourceDiagnostics {
 }
 
 export interface ContractSourceContext {
-  readonly configDir: string;
   readonly composedExtensionPacks: readonly string[];
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly authoringContributions: AssembledAuthoringContributions;
@@ -45,21 +44,14 @@ export interface ContractSourceContext {
   readonly controlMutationDefaults: ControlMutationDefaults;
 }
 
-export type ContractAuthoritativeInputs =
-  | {
-      readonly kind: 'moduleGraph';
-    }
-  | {
-      readonly kind: 'paths';
-      readonly paths: readonly string[];
-    }
-  | {
-      readonly kind: 'configPathOnly';
-    };
+export interface ContractSourceEnvironment {
+  readonly configDir: string;
+}
 
 export interface ContractSourceProvider {
-  readonly authoritativeInputs: ContractAuthoritativeInputs;
+  readonly inputs?: readonly string[];
   readonly load: (
     context: ContractSourceContext,
+    environment: ContractSourceEnvironment,
   ) => Promise<Result<Contract, ContractSourceDiagnostics>>;
 }

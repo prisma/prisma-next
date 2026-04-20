@@ -491,14 +491,15 @@ class ControlClientImpl implements ControlClient {
     try {
       const stack = this.stack!;
       const sourceContext = {
-        configDir: contractConfig.configDir,
         composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
         scalarTypeDescriptors: stack.scalarTypeDescriptors,
         authoringContributions: stack.authoringContributions,
         codecLookup: stack.codecLookup,
         controlMutationDefaults: stack.controlMutationDefaults,
       };
-      const providerResult = await contractConfig.source.load(sourceContext);
+      const providerResult = await contractConfig.source.load(sourceContext, {
+        configDir: contractConfig.configDir,
+      });
       if (!providerResult.ok) {
         onProgress?.({
           action: 'emit',

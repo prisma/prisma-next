@@ -17,11 +17,10 @@ function mockConfigWithContract(contractOverrides: Record<string, unknown>) {
 }
 
 function createSourceProvider(load: () => Promise<unknown>): {
-  authoritativeInputs: { kind: 'configPathOnly' };
+  readonly inputs?: readonly string[];
   load: () => Promise<unknown>;
 } {
   return {
-    authoritativeInputs: { kind: 'configPathOnly' },
     load,
   };
 }

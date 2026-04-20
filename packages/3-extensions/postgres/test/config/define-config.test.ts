@@ -33,9 +33,7 @@ describe('defineConfig facade', () => {
     expect(facadeConfig.driver).toBe(manualConfig.driver);
     expect(facadeConfig.extensionPacks).toEqual(manualConfig.extensionPacks);
     expect(facadeConfig.contract?.output).toBe(manualConfig.contract?.output);
-    expect(facadeConfig.contract?.source.authoritativeInputs).toEqual(
-      manualConfig.contract?.source.authoritativeInputs,
-    );
+    expect(facadeConfig.contract?.source.inputs).toEqual(manualConfig.contract?.source.inputs);
     expect(typeof facadeConfig.contract?.source.load).toBe('function');
   });
 
@@ -57,10 +55,7 @@ describe('defineConfig facade', () => {
 
     expect(typeof tsConfig.contract?.source.load).toBe('function');
     expect(tsConfig.contract?.output).toBe('./prisma/contract.json');
-    expect(tsConfig.contract?.source.authoritativeInputs).toEqual({
-      kind: 'paths',
-      paths: ['./prisma/contract.ts'],
-    });
+    expect(tsConfig.contract?.source.inputs).toEqual(['./prisma/contract.ts']);
     expect(tsConfig.contract?.source).not.toBe(pslConfig.contract?.source);
   });
 
