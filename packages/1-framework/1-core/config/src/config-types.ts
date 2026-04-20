@@ -92,13 +92,13 @@ export interface PrismaNextConfig<
  */
 export const ContractAuthoritativeInputsSchema = type.or(
   {
-    kind: "'moduleGraph'",
+    kind: type.unit('moduleGraph'),
   },
   {
-    kind: "'configPathOnly'",
+    kind: type.unit('configPathOnly'),
   },
   {
-    kind: "'paths'",
+    kind: type.unit('paths'),
     paths: 'string[]',
   },
 );
