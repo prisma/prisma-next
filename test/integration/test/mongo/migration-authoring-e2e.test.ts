@@ -1,4 +1,5 @@
-import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
+import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import {
@@ -62,7 +63,9 @@ describe(
       const serialized = JSON.parse(serializeMongoOps(ops));
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
+        const runner = new MongoMigrationRunner(
+          createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+        );
         const result = await runner.execute({
           plan: {
             targetId: 'mongo',
@@ -298,7 +301,12 @@ describe(
         const serialized2 = JSON.parse(serializeMongoOps(step2));
         const controlDriver2 = await mongoControlDriver.create(replSet.getUri(dbName));
         try {
-          const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver2));
+          const runner = new MongoMigrationRunner(
+            createMongoRunnerDeps(
+              controlDriver2,
+              MongoDriverImpl.fromDb(extractDb(controlDriver2)),
+            ),
+          );
           const result2 = await runner.execute({
             plan: {
               targetId: 'mongo',
@@ -330,7 +338,12 @@ describe(
         const serialized3 = JSON.parse(serializeMongoOps(step3));
         const controlDriver3 = await mongoControlDriver.create(replSet.getUri(dbName));
         try {
-          const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver3));
+          const runner = new MongoMigrationRunner(
+            createMongoRunnerDeps(
+              controlDriver3,
+              MongoDriverImpl.fromDb(extractDb(controlDriver3)),
+            ),
+          );
           const result3 = await runner.execute({
             plan: {
               targetId: 'mongo',
