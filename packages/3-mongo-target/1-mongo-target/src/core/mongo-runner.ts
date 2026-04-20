@@ -261,11 +261,9 @@ export class MongoMigrationRunner {
       if (!passed) {
         return {
           executed: false,
-          failure: runnerFailure(
-            'POSTCHECK_FAILED',
-            `Data transform "${op.name}" (${op.id}) failed post-check.`,
-            { meta: { operationId: op.id, name: op.name } },
-          ),
+          failure: runnerFailure('POSTCHECK_FAILED', `Operation ${op.id} failed during postcheck`, {
+            meta: { operationId: op.id, name: op.name },
+          }),
         };
       }
     }
