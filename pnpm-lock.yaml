@@ -1474,6 +1474,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/emitter
+      '@prisma-next/errors':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/errors
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
@@ -1501,6 +1504,9 @@ importers:
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
     devDependencies:
       '@prisma-next/mongo-contract-ts':
         specifier: workspace:*
@@ -2404,9 +2410,15 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
+      '@prisma-next/errors':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/errors
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/migration
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../2-mongo-family/1-foundation/mongo-contract
@@ -2572,6 +2584,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/errors':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/errors
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../2-sql/9-family
@@ -2605,6 +2620,9 @@ importers:
       arktype:
         specifier: ^2.0.0
         version: 2.1.29
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
     devDependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*

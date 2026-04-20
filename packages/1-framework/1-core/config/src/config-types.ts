@@ -6,6 +6,7 @@ import type {
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
 } from '@prisma-next/framework-components/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import type { ContractSourceProvider } from './contract-source-types';
 
@@ -165,12 +166,8 @@ export function defineConfig<TFamilyId extends string = string, TTargetId extend
     const normalizedContract: ContractConfig = {
       source: config.contract.source,
       output,
-      ...(config.contract.watchInputs !== undefined
-        ? { watchInputs: config.contract.watchInputs }
-        : {}),
-      ...(config.contract.watchStrategy !== undefined
-        ? { watchStrategy: config.contract.watchStrategy }
-        : {}),
+      ...ifDefined('watchInputs', config.contract.watchInputs),
+      ...ifDefined('watchStrategy', config.contract.watchStrategy),
     };
 
     // Return normalized config

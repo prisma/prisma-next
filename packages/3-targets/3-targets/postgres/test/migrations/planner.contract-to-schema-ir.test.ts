@@ -3,9 +3,9 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type {
   CodecControlHooks,
   ComponentDatabaseDependency,
-  MigrationPlannerResult,
   NativeTypeExpander,
   SqlControlExtensionDescriptor,
+  SqlPlannerResult,
 } from '@prisma-next/family-sql/control';
 import {
   contractToSchemaIR as contractToSchemaIRImpl,
@@ -16,6 +16,7 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner-target-details';
 import { postgresRenderDefault } from '../../src/exports/control';
 
 const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
@@ -73,7 +74,7 @@ function contractToSchemaIR(
 function planFromStorages(
   from: Omit<SqlStorage, 'storageHash'> | null,
   to: Omit<SqlStorage, 'storageHash'>,
-): MigrationPlannerResult {
+): SqlPlannerResult<PostgresPlanTargetDetails> {
   const toContract = createTestContract(to);
   const fromSchemaIR = contractToSchemaIR(from ? createTestContract(from) : null, {
     expandNativeType: expandParameterizedNativeType,

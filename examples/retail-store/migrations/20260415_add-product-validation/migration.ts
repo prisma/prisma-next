@@ -10,7 +10,7 @@ class AddProductValidation extends Migration {
     };
   }
 
-  override plan() {
+  override get operations() {
     return [
       setValidation(
         'products',

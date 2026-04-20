@@ -30,12 +30,32 @@ export interface CliErrorConflict {
 }
 
 /**
+ * Domain prefix for structured CLI error codes.
+ *
+ * The full envelope code is rendered as `PN-<domain>-<code>` (see
+ * `CliStructuredError.toEnvelope`). The supported domains follow the
+ * taxonomy documented in `docs/CLI Style Guide.md`:
+ *
+ * - `CLI`    — CLI command processing (config, validation, planning)
+ * - `MIG`    — Migration subsystem (authoring, planning conflicts, runner)
+ * - `RUN`    — Application runtime (query execution, streaming)
+ * - `CON`    — Contract subsystem (validation, normalization)
+ * - `SCHEMA` — Schema subsystem
+ *
+ * Sub-clustering within a domain is conveyed by the numeric code range; see
+ * the per-domain source files for reserved ranges.
+ */
+const CLI_ERROR_DOMAINS = ['CLI', 'RUN', 'MIG', 'CON', 'SCHEMA'] as const;
+
+export type CliErrorDomain = (typeof CLI_ERROR_DOMAINS)[number];
+
+/**
  * Structured CLI error that contains all information needed for error envelopes.
  * Call sites throw these errors with full context.
  */
 export class CliStructuredError extends Error {
   readonly code: string;
-  readonly domain: 'CLI' | 'RUN';
+  readonly domain: CliErrorDomain;
   readonly severity: 'error' | 'warn' | 'info';
   readonly why: string | undefined;
   readonly fix: string | undefined;
@@ -52,7 +72,7 @@ export class CliStructuredError extends Error {
     code: string,
     summary: string,
     options?: {
-      readonly domain?: 'CLI' | 'RUN';
+      readonly domain?: CliErrorDomain;
       readonly severity?: 'error' | 'warn' | 'info';
       readonly why?: string;
       readonly fix?: string;
@@ -82,10 +102,9 @@ export class CliStructuredError extends Error {
    * Converts this error to a CLI error envelope for output formatting.
    */
   toEnvelope(): CliErrorEnvelope {
-    const codePrefix = this.domain === 'CLI' ? 'PN-CLI-' : 'PN-RUN-';
     return {
       ok: false as const,
-      code: `${codePrefix}${this.code}`,
+      code: `PN-${this.domain}-${this.code}`,
       domain: this.domain,
       severity: this.severity,
       summary: this.message,
@@ -109,10 +128,16 @@ export class CliStructuredError extends Error {
     return (
       candidate.name === 'CliStructuredError' &&
       typeof candidate.code === 'string' &&
-      (candidate.domain === 'CLI' || candidate.domain === 'RUN') &&
+      isCliErrorDomain(candidate.domain) &&
       typeof candidate.toEnvelope === 'function'
     );
   }
+}
+
+const CLI_ERROR_DOMAIN_SET: ReadonlySet<CliErrorDomain> = new Set(CLI_ERROR_DOMAINS);
+
+function isCliErrorDomain(value: unknown): value is CliErrorDomain {
+  return typeof value === 'string' && CLI_ERROR_DOMAIN_SET.has(value as CliErrorDomain);
 }
 
 // ============================================================================

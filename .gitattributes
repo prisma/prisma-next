@@ -1,2 +1,6 @@
 # Mark ASCII recordings as generated so they don't inflate PR diff stats
 packages/1-framework/3-tooling/cli/recordings/ascii/** linguist-generated
+**/contract.d.ts linguist-generated
+**/contract.json linguist-generated
+**/ops.json linguist-generated
+**/migration.json linguist-generated

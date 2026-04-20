@@ -10,7 +10,24 @@ import {
 } from '@prisma-next/target-mongo/control';
 import mongoTargetDescriptorMeta from '@prisma-next/target-mongo/pack';
 import type { MongoControlFamilyInstance } from './control-instance';
+import { mongoEmit } from './mongo-emit';
 
+/**
+ * The Mongo target uses the **class-flow** migration authoring strategy.
+ *
+ * `migration.ts` default-exports a `Migration` subclass whose `operations`
+ * getter returns the ordered list of operations and whose `describe()`
+ * returns the manifest identity metadata. `MongoMigrationPlanner.plan()`
+ * returns a `MigrationPlanWithAuthoringSurface` that knows how to render
+ * itself back to such a file; `MongoMigrationPlanner.emptyMigration()`
+ * returns the same shape for `migration new`. `migration emit` dispatches
+ * to `mongoEmit`, which dynamic-imports the class and writes `ops.json`.
+ *
+ * The descriptor-flow hooks (`planWithDescriptors`, `resolveDescriptors`,
+ * `renderDescriptorTypeScript`) are intentionally omitted — the CLI's
+ * `migrationStrategy` selector routes Mongo down the class-flow path by
+ * observing their absence.
+ */
 export const mongoTargetDescriptor: MigratableTargetDescriptor<
   'mongo',
   'mongo',
@@ -37,6 +54,7 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
     contractToSchema(contract: Contract | null) {
       return contractToMongoSchemaIR(contract as MongoContract | null);
     },
+    emit: mongoEmit,
   },
   create() {
     return { familyId: 'mongo' as const, targetId: 'mongo' as const };
