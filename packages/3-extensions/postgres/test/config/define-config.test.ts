@@ -77,6 +77,15 @@ describe('defineConfig facade', () => {
     expect(config.migrations?.dir).toBe('custom-migrations');
   });
 
+  it('omits db and migrations when they are not provided', () => {
+    const config = defineConfig({
+      contract: './prisma/contract.prisma',
+    });
+
+    expect(Object.hasOwn(config, 'db')).toBe(false);
+    expect(Object.hasOwn(config, 'migrations')).toBe(false);
+  });
+
   it('passes extensions through to config', () => {
     const mockExtension = {
       kind: 'extension' as const,

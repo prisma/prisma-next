@@ -2257,6 +2257,9 @@ importers:
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../3-targets/3-targets/postgres
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/utils
       pathe:
         specifier: ^2.0.3
         version: 2.0.3

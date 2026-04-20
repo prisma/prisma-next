@@ -7,6 +7,7 @@ import type { ControlExtensionDescriptor } from '@prisma-next/framework-componen
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import { typescriptContractFromPath } from '@prisma-next/sql-contract-ts/config-types';
 import postgres from '@prisma-next/target-postgres/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { extname } from 'pathe';
 
 export interface PostgresConfigOptions {
@@ -48,7 +49,7 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
     driver: postgresDriver,
     extensionPacks: extensions,
     contract: contractConfig,
-    ...(options.db !== undefined ? { db: options.db } : {}),
-    ...(options.migrations !== undefined ? { migrations: options.migrations } : {}),
+    ...ifDefined('db', options.db),
+    ...ifDefined('migrations', options.migrations),
   });
 }
