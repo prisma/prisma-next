@@ -35,6 +35,10 @@
       "types": "./dist/exports/operation-descriptors.d.mts",
       "import": "./dist/exports/operation-descriptors.mjs"
     },
+    "./semantic-lines": {
+      "types": "./dist/exports/semantic-lines.d.mts",
+      "import": "./dist/exports/semantic-lines.mjs"
+    },
     "./timeouts": {
       "types": "./dist/exports/timeouts.d.mts",
       "import": "./dist/exports/timeouts.mjs"

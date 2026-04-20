@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
 import { describe, expect, it } from 'vitest';
-import { countSemanticLines } from '../../../utils/src/semantic-lines';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtureDir = join(__dirname, 'parity', 'callback-mode-scalars');
@@ -21,6 +21,10 @@ describe('VP2: TS callback-mode authoring terseness parity', () => {
         }
       `),
     ).toBe(4);
+  });
+
+  it('preserves line breaks from multi-line block comments', () => {
+    expect(countSemanticLines('const a = 1; /* comment\nstill comment */ const b = 2;')).toBe(2);
   });
 
   const pslSource = readFileSync(join(fixtureDir, 'schema.prisma'), 'utf-8');

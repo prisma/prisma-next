@@ -7,8 +7,8 @@ import type {
 } from '@prisma-next/framework-components/components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
 import { describe, expect, it } from 'vitest';
-import { countSemanticLines } from '../../../../../test/utils/src/semantic-lines';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import { createBuiltinLikeControlMutationDefaults } from './fixtures';
 
