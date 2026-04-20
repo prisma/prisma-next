@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
+import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import { deserializeMongoOps, MongoMigrationRunner } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
@@ -60,7 +61,7 @@ describe(
     it('migration.json has expected structure', () => {
       const manifest = JSON.parse(readFileSync(resolve(migrationDir, 'migration.json'), 'utf-8'));
 
-      expect(manifest.migrationId).toBeNull();
+      expect(manifest.migrationId).toMatch(/^sha256:/);
       expect(manifest.kind).toBe('regular');
       expect(manifest.labels).toEqual(['add-posts-author-index']);
       expect(manifest.from).toMatch(/^sha256:/);
@@ -77,7 +78,9 @@ describe(
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
+        const runner = new MongoMigrationRunner(
+          createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+        );
         const result = await runner.execute({
           plan: {
             targetId: 'mongo',
