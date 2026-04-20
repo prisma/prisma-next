@@ -22,7 +22,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
       expect(cmd.update).toEqual({ $set: { status: 'processed' }, $inc: { amount: 1 } });
       // Default upsert is false — explicit guard so the default change is loud.
       expect(cmd.upsert).toBe(false);
-      expect(plan.meta.lane).toBe('mongo-write');
+      expect(plan.meta.lane).toBe('mongo-query');
     });
 
     it('threads opts.upsert through to the wire command', () => {

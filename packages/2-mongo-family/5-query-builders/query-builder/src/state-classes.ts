@@ -88,14 +88,14 @@ function resolveUpdaterCallback<Shape extends ModelToDocShape<MongoContract, str
 
 /**
  * Build the `PlanMeta` envelope shared by every write terminal in this
- * package. Lane is `mongo-write` (vs. `mongo-pipeline` for read terminals)
+ * package. Lane is `mongo-query` (single lane for all query-builder terminals)
  * so middleware can dispatch on intent without inspecting the command.
  */
 function writeMeta(storageHash: string): PlanMeta {
   return {
     target: 'mongo',
     storageHash,
-    lane: 'mongo-write',
+    lane: 'mongo-query',
     paramDescriptors: [],
   };
 }

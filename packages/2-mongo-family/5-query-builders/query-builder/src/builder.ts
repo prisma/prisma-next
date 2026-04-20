@@ -130,7 +130,7 @@ export class PipelineChain<
     return {
       target: 'mongo',
       storageHash: this.#state.storageHash,
-      lane: 'mongo-write',
+      lane: 'mongo-query',
       paramDescriptors: [],
     };
   }
@@ -383,7 +383,7 @@ export class PipelineChain<
    * returns a `MongoQueryPlan` rather than another `PipelineChain`, since
    * `$out` must be the final stage and there is nothing further to chain.
    *
-   * Lane is `mongo-write` (vs. `mongo-pipeline` for read terminals) so
+   * Lane is `mongo-query` (matching all other terminals in this package) so
    * middleware can dispatch on intent without inspecting the command.
    *
    * The result row stream is empty (`unknown` row type) — the data lives
@@ -414,7 +414,7 @@ export class PipelineChain<
     const meta: PlanMeta = {
       target: 'mongo',
       storageHash: this.#state.storageHash,
-      lane: 'mongo-write',
+      lane: 'mongo-query',
       paramDescriptors: [],
     };
     return { collection: this.#state.collection, command, meta };
@@ -651,7 +651,7 @@ export class PipelineChain<
     const meta: PlanMeta = {
       target: 'mongo',
       storageHash: this.#state.storageHash,
-      lane: 'mongo-write',
+      lane: 'mongo-query',
       paramDescriptors: [],
     };
     return { collection: this.#state.collection, command, meta };
@@ -667,7 +667,7 @@ export class PipelineChain<
     const meta: PlanMeta = {
       target: 'mongo',
       storageHash: this.#state.storageHash,
-      lane: 'mongo-write',
+      lane: 'mongo-query',
       paramDescriptors: [],
     };
     return { collection: this.#state.collection, command, meta };
@@ -683,7 +683,7 @@ export class PipelineChain<
     const meta: PlanMeta = {
       target: 'mongo',
       storageHash: this.#state.storageHash,
-      lane: 'mongo-pipeline',
+      lane: 'mongo-query',
       paramDescriptors: [],
     };
     return { collection: this.#state.collection, command, meta };

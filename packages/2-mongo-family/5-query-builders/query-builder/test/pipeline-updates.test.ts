@@ -72,7 +72,7 @@ describe('F3 pipeline-style updates', () => {
       const cmd = plan.command as UpdateManyCommand;
       expect(cmd.update).toHaveLength(1);
       expect((cmd.update as ReadonlyArray<unknown>)[0]).toBeInstanceOf(MongoAddFieldsStage);
-      expect(plan.meta.lane).toBe('mongo-write');
+      expect(plan.meta.lane).toBe('mongo-query');
     });
 
     it('AND-folds multiple $match stages in the filter', () => {
