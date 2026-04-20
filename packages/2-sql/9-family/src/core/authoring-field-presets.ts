@@ -1,5 +1,21 @@
 import type { AuthoringFieldNamespace } from '@prisma-next/framework-components/authoring';
 
+/**
+ * Family-level SQL authoring field presets.
+ *
+ * Only presets whose codec IDs align with the ID generator metadata live here
+ * (see `@prisma-next/ids`). These presets are target-agnostic because the
+ * generator metadata fixes their codec/native-type to `sql/char@1`
+ * (`character`) regardless of target, and the PSL interpreter lets the
+ * generator override the scalar descriptor.
+ *
+ * Scalar presets that map to target-specific codecs (e.g. `text`, `int`,
+ * `boolean`, `dateTime`) are contributed by the target pack (see
+ * `postgresAuthoringFieldPresets` in `@prisma-next/target-postgres`) so the
+ * TS callback surface and the PSL scalar surface lower to byte-identical
+ * contracts for the active target.
+ */
+
 const CHARACTER_CODEC_ID = 'sql/char@1';
 const CHARACTER_NATIVE_TYPE = 'character';
 
@@ -18,31 +34,6 @@ const nanoidOptionsArgument = {
 } as const;
 
 export const sqlFamilyAuthoringFieldPresets = {
-  text: {
-    kind: 'fieldPreset',
-    output: {
-      codecId: 'sql/text@1',
-      nativeType: 'text',
-    },
-  },
-  timestamp: {
-    kind: 'fieldPreset',
-    output: {
-      codecId: 'sql/timestamp@1',
-      nativeType: 'timestamp',
-    },
-  },
-  createdAt: {
-    kind: 'fieldPreset',
-    output: {
-      codecId: 'sql/timestamp@1',
-      nativeType: 'timestamp',
-      default: {
-        kind: 'function',
-        expression: 'CURRENT_TIMESTAMP',
-      },
-    },
-  },
   uuid: {
     kind: 'fieldPreset',
     output: {
