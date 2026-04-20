@@ -7,7 +7,7 @@ const mongoTargetPack: {
   readonly targetId: 'mongo';
   readonly id: 'mongo';
   readonly version: '0.0.1';
-  readonly capabilities: {};
+  readonly capabilities: Record<string, never>;
   readonly __codecTypes?: CodecTypes;
 } = mongoTargetDescriptorMeta;
 
