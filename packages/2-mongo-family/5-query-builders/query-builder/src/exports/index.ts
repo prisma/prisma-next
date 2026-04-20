@@ -3,7 +3,7 @@ export { PipelineChain } from '../builder';
 export { fn } from '../expression-helpers';
 export type { Expression, FieldAccessor } from '../field-accessor';
 export { createFieldAccessor } from '../field-accessor';
-export type { FindAndModifyCompat, UpdateCompat } from '../markers';
+export type { FindAndModifyEnabled, UpdateEnabled } from '../markers';
 export type { QueryRoot } from '../query';
 export { mongoQuery } from '../query';
 export type {

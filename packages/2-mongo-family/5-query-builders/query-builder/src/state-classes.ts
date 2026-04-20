@@ -119,7 +119,7 @@ function writeMeta(storageHash: string): PlanMeta {
 export class CollectionHandle<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends keyof TContract['models'] & string,
-> extends PipelineChain<TContract, ModelToDocShape<TContract, ModelName>, 'compat', 'compat'> {
+> extends PipelineChain<TContract, ModelToDocShape<TContract, ModelName>, 'update-ok', 'fam-ok'> {
   readonly #ctx: BindingContext<TContract>;
   readonly #modelName: ModelName;
 
@@ -297,7 +297,7 @@ export class CollectionHandle<
 export class FilteredCollection<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends keyof TContract['models'] & string,
-> extends PipelineChain<TContract, ModelToDocShape<TContract, ModelName>, 'compat', 'compat'> {
+> extends PipelineChain<TContract, ModelToDocShape<TContract, ModelName>, 'update-ok', 'fam-ok'> {
   readonly #ctx: BindingContext<TContract>;
   readonly #modelName: ModelName;
   readonly #filters: ReadonlyArray<MongoFilterExpr>;
