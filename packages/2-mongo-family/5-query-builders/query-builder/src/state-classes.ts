@@ -1,5 +1,6 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type {
+  ExtractMongoCodecTypes,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
@@ -25,41 +26,11 @@ import {
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { PipelineChain } from './builder';
 import { createFieldAccessor, type FieldAccessor } from './field-accessor';
-import type { ModelToDocShape } from './types';
-import { resolveUpdaterResult, type UpdaterItem } from './update-ops';
+import type { DeleteResult, InsertManyResult, InsertOneResult, UpdateResult } from './result-types';
+import type { ModelToDocShape, ResolveRow } from './types';
+import { resolveUpdaterResult, type UpdaterResult } from './update-ops';
 
-/**
- * Wire-result row types for the M2 write terminals. The runtime/driver
- * yields a single result document per write command — these types describe
- * its shape so callers receive a typed plan rather than `unknown`.
- *
- * Field optionality reflects what every supported driver guarantees vs.
- * what may be present (e.g. `acknowledged` is universal but
- * `upsertedId`/`upsertedCount` only appear when an upsert path was taken).
- */
-export interface InsertOneResult {
-  readonly insertedId: unknown;
-  readonly acknowledged?: boolean;
-}
-
-export interface InsertManyResult {
-  readonly insertedIds: ReadonlyArray<unknown>;
-  readonly insertedCount: number;
-  readonly acknowledged?: boolean;
-}
-
-export interface UpdateResult {
-  readonly matchedCount: number;
-  readonly modifiedCount: number;
-  readonly upsertedCount?: number;
-  readonly upsertedId?: unknown;
-  readonly acknowledged?: boolean;
-}
-
-export interface DeleteResult {
-  readonly deletedCount: number;
-  readonly acknowledged?: boolean;
-}
+export type { DeleteResult, InsertManyResult, InsertOneResult, UpdateResult } from './result-types';
 
 /**
  * "Match-all" filter used by the unqualified-write terminals
@@ -79,7 +50,7 @@ function matchAllFilter(): MongoFilterExpr {
  * terminals share the same fold / dispatch semantics.
  */
 function resolveUpdaterCallback<Shape extends ModelToDocShape<MongoContract, string>>(
-  updaterFn: (fields: FieldAccessor<Shape>) => ReadonlyArray<UpdaterItem>,
+  updaterFn: (fields: FieldAccessor<Shape>) => UpdaterResult,
 ): MongoUpdateSpec {
   const accessor = createFieldAccessor<Shape>();
   const items = updaterFn(accessor);
@@ -214,9 +185,7 @@ export class CollectionHandle<
    * `.match(...).updateMany(...)` for the filtered case.
    */
   updateAll(
-    updaterFn: (
-      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<UpdaterItem>,
+    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateManyCommand(this.#ctx.collection, matchAllFilter(), update);
@@ -255,9 +224,7 @@ export class CollectionHandle<
    */
   upsertOne(
     filterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => MongoFilterExpr,
-    updaterFn: (
-      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<UpdaterItem>,
+    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult> {
     const accessor = createFieldAccessor<ModelToDocShape<TContract, ModelName>>();
     const filter = filterFn(accessor);
@@ -387,9 +354,7 @@ export class FilteredCollection<
    * collisions.
    */
   override updateMany(
-    updaterFn: (
-      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<UpdaterItem>,
+    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateManyCommand(this.#ctx.collection, this.#foldedFilter(), update);
@@ -407,9 +372,7 @@ export class FilteredCollection<
    * `.findOneAndUpdate(...)` terminal when ordering matters.
    */
   override updateOne(
-    updaterFn: (
-      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<UpdaterItem>,
+    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateOneCommand(this.#ctx.collection, this.#foldedFilter(), update);
@@ -454,9 +417,7 @@ export class FilteredCollection<
    * already-accumulated `.match(...)` filter chain.
    */
   upsertOne(
-    updaterFn: (
-      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<UpdaterItem>,
+    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new UpdateOneCommand(this.#ctx.collection, this.#foldedFilter(), update, true);
@@ -477,11 +438,12 @@ export class FilteredCollection<
    * stream yields the document as it was before or after the update.
    */
   override findOneAndUpdate(
-    updaterFn: (
-      fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>,
-    ) => ReadonlyArray<UpdaterItem>,
+    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
-  ): MongoQueryPlan<ModelToDocShape<TContract, ModelName> | null> {
+  ): MongoQueryPlan<ResolveRow<
+    ModelToDocShape<TContract, ModelName>,
+    ExtractMongoCodecTypes<TContract>
+  > | null> {
     const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
     const command = new FindOneAndUpdateCommand(
       this.#ctx.collection,
@@ -503,7 +465,10 @@ export class FilteredCollection<
    * Find a single matching document and delete it. Returns the deleted
    * document via the row stream.
    */
-  override findOneAndDelete(): MongoQueryPlan<ModelToDocShape<TContract, ModelName> | null> {
+  override findOneAndDelete(): MongoQueryPlan<ResolveRow<
+    ModelToDocShape<TContract, ModelName>,
+    ExtractMongoCodecTypes<TContract>
+  > | null> {
     const command = new FindOneAndDeleteCommand(this.#ctx.collection, this.#foldedFilter());
     return {
       collection: this.#ctx.collection,

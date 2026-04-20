@@ -164,6 +164,14 @@ export function foldUpdateOps(ops: ReadonlyArray<TypedUpdateOp>): Record<string,
 export type UpdaterItem = TypedUpdateOp | MongoUpdatePipelineStage;
 
 /**
+ * The return type for updater callbacks. Typed as a union of homogeneous
+ * arrays so mixed-shape updaters (operator + pipeline stage in the same
+ * array) are a compile error. The runtime guard in `resolveUpdaterResult`
+ * remains as defence-in-depth.
+ */
+export type UpdaterResult = ReadonlyArray<TypedUpdateOp> | ReadonlyArray<MongoUpdatePipelineStage>;
+
+/**
  * Classify an array of updater items and produce a `MongoUpdateSpec`.
  *
  * - All `TypedUpdateOp` → fold via `foldUpdateOps` (classic `{ $set, $inc, … }`)
