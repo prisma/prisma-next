@@ -1,4 +1,4 @@
-import type { CodecTypes } from '../exports/codec-types';
+import type { CodecTypes } from './codec-types';
 
 const mongoTargetDescriptorMetaBase = {
   kind: 'target',
