@@ -76,7 +76,6 @@ CollectionHandle<Row>                   (from q.from('x'))
   ├─ .updateAll(updater)                ─▶ UpdateTerminal       (explicit unqualified)
   ├─ .deleteAll()                       ─▶ DeleteTerminal       (explicit unqualified)
   ├─ .upsertOne(filter, updater)        ─▶ UpsertTerminal       (filter required for upsert)
-  ├─ .upsertMany(filter, updater)       ─▶ UpsertTerminal
   ├─ .match(filter | fn)                ─▶ FilteredCollection<Row>
   └─ .<pipeline stage>                  ─▶ PipelineChain<Row, …markers>
 
@@ -85,20 +84,19 @@ FilteredCollection<Row>                 (one or more .match() calls, AND-folded)
   ├─ .updateMany(updater)               ─▶ UpdateTerminal
   ├─ .updateOne(updater)                ─▶ UpdateTerminal
   ├─ .upsertOne(updater)                ─▶ UpsertTerminal
-  ├─ .upsertMany(updater)               ─▶ UpsertTerminal
   ├─ .deleteMany()                      ─▶ DeleteTerminal
   ├─ .deleteOne()                       ─▶ DeleteTerminal
   ├─ .findOneAndUpdate(updater, opts?)  ─▶ ReturningTerminal
   ├─ .findOneAndDelete(opts?)           ─▶ ReturningTerminal
   └─ .<pipeline stage>                  ─▶ PipelineChain<Row, …markers>
 
-PipelineChain<Shape, UpdateCompat?, FindAndModifyCompat?>
+PipelineChain<Shape, UpdateEnabled?, FindAndModifyEnabled?>
   ├─ .<pipeline stage>                  ─▶ PipelineChain        (markers preserved or cleared)
   ├─ .merge(opts) / .out(coll)          ─▶ WriteTerminal        (always available)
-  ├─ .updateMany(updater?)              ─▶ UpdateTerminal       *only if UpdateCompat
-  ├─ .updateOne(updater?)               ─▶ UpdateTerminal       *only if UpdateCompat
-  ├─ .findOneAndUpdate(updater, opts?)  ─▶ ReturningTerminal    *only if FindAndModifyCompat
-  ├─ .findOneAndDelete(opts?)           ─▶ ReturningTerminal    *only if FindAndModifyCompat
+  ├─ .updateMany(updater?)              ─▶ UpdateTerminal       *only if UpdateEnabled
+  ├─ .updateOne(updater?)               ─▶ UpdateTerminal       *only if UpdateEnabled
+  ├─ .findOneAndUpdate(updater, opts?)  ─▶ ReturningTerminal    *only if FindAndModifyEnabled
+  ├─ .findOneAndDelete(opts?)           ─▶ ReturningTerminal    *only if FindAndModifyEnabled
   └─ .build() / .aggregate()            ─▶ ReadTerminal
 ```
 
@@ -108,7 +106,7 @@ Each terminal exposes `.build()` returning a `MongoQueryPlan<Result>`, where `Re
 
 Each pipeline stage method either **preserves** or **clears** the two capability markers:
 
-| Stage method                            | `UpdateCompat` | `FindAndModifyCompat` |
+| Stage method                            | `UpdateEnabled` | `FindAndModifyEnabled` |
 | --------------------------------------- | -------------- | --------------------- |
 | `.match(...)`                           | preserve       | preserve              |
 | `.sort(...)`                            | clear          | preserve              |
@@ -124,8 +122,8 @@ Each pipeline stage method either **preserves** or **clears** the two capability
 | `.facet(...)`                           | clear          | clear                 |
 | other shape-changing stages             | clear          | clear                 |
 
-- `UpdateCompat` permits `.updateMany(...)` / `.updateOne(...)` to consume the accumulated pipeline as an **update-with-pipeline** spec.
-- `FindAndModifyCompat` permits `.findOneAndUpdate(...)` / `.findOneAndDelete(...)` to deconstruct the accumulated pipeline into the command's `{filter, sort, skip}` slots. (`limit` always clears the marker — `findOneAnd*` already implies single-document semantics.)
+- `UpdateEnabled` permits `.updateMany(...)` / `.updateOne(...)` to consume the accumulated pipeline as an **update-with-pipeline** spec.
+- `FindAndModifyEnabled` permits `.findOneAndUpdate(...)` / `.findOneAndDelete(...)` to deconstruct the accumulated pipeline into the command's `{filter, sort, skip}` slots. (`limit` always clears the marker — `findOneAnd*` already implies single-document semantics.)
 
 Markers live as phantom type parameters on `PipelineChain`; they have no runtime presence.
 
@@ -167,15 +165,17 @@ The methods take no filter argument. The names exist solely to force the reader 
 - **Single object**: traditional update-operators document. `f => [f.status.set('active'), f.views.inc(1)]` returns an array of update ops; the builder folds it into a `{ $set, $inc, … }` record.
 - **Array form**: update-with-pipeline (Mongo 4.2+). `f => [f.set('total', fn.multiply(f.price, f.qty)), f.unset('legacyTotal')]`. The terminal emits a `MongoUpdateSpec` array of `MongoUpdatePipelineStage`.
 
-On `PipelineChain` (when `UpdateCompat` is set), `.updateMany()` and `.updateOne()` may also be called **with no argument**: the accumulated pipeline (excluding leading `.match`es, which become the filter) becomes the update-with-pipeline spec. This is form 2 in the original Linear ticket.
+On `PipelineChain` (when `UpdateEnabled` is set), `.updateMany()` and `.updateOne()` may also be called **with no argument**: the accumulated pipeline (excluding leading `.match`es, which become the filter) becomes the update-with-pipeline spec. This is form 2 in the original Linear ticket.
 
 ### Upsert terminals
 
-Distinct from `update*`: `.upsertOne(...)` / `.upsertMany(...)`. On `CollectionHandle` they take `(filter, updater)`; on `FilteredCollection` they take `(updater)`. Modelled as separate methods (rather than an `{ upsert: true }` option on `update*`) for the same explicit-footgun reason as `updateAll`/`deleteAll` — upsert behaviour is grep-visible.
+Distinct from `update*`: `.upsertOne(...)`. On `CollectionHandle` it takes `(filter, updater)`; on `FilteredCollection` it takes `(updater)`. Modelled as a separate method (rather than an `{ upsert: true }` option on `update*`) for the same explicit-footgun reason as `updateAll`/`deleteAll` — upsert behaviour is grep-visible.
+
+> **Non-goal:** `upsertMany` is explicitly excluded. MongoDB's `updateMany` with `upsert: true` inserts at most one document when no match is found — the name `upsertMany` would imply bulk-insert semantics that the wire command doesn't provide. Use `updateAll` with `upsert: true` on individual calls if multi-document upsert-like behaviour is needed.
 
 ### `findOneAndUpdate` / `findOneAndDelete`
 
-Reuse the chain vocabulary instead of introducing a parallel options API. Available on `FilteredCollection` (always) and `PipelineChain` (gated by `FindAndModifyCompat`).
+Reuse the chain vocabulary instead of introducing a parallel options API. Available on `FilteredCollection` (always) and `PipelineChain` (gated by `FindAndModifyEnabled`).
 
 ```ts
 q.from('users')
@@ -188,7 +188,7 @@ Terminal options (subset of the wire command, for things the chain can't express
 
 - `returnDocument: 'before' | 'after'` (default `'after'`)
 - `upsert: boolean` (default `false`)
-- `projection`: omitted; users `.project(...)` in the chain instead. (Note: `.project()` clears `FindAndModifyCompat`, so users who want both need to project on the *result* of `.build()` — acceptable trade-off.)
+- `projection`: omitted; users `.project(...)` in the chain instead. (Note: `.project()` clears `FindAndModifyEnabled`, so users who want both need to project on the *result* of `.build()` — acceptable trade-off.)
 
 ### Pipeline-terminal writes (`$merge`, `$out`)
 
@@ -221,7 +221,7 @@ Out of scope for v1. Mentioned only so the state machine doesn't need to grow aw
 - **Non-Mongo operators.** No SQL-style JOINs, no operators outside the MongoDB driver's surface.
 - **Migration tooling tie-in.** The migration factories (`dataTransform`, `createIndex`) call this builder like any other user code. The builder doesn't know about migrations.
 - **Bulk writes** (deferred — see above).
-- **`.limit(1)` literal-type preservation of `FindAndModifyCompat`.** Any `.limit(...)` clears the marker; users who want single-document semantics call `.findOneAndUpdate()` directly.
+- **`.limit(1)` literal-type preservation of `FindAndModifyEnabled`.** Any `.limit(...)` clears the marker; users who want single-document semantics call `.findOneAndUpdate()` directly.
 - **Atlas Search builder ergonomics.** The existing opaque `Record<string, unknown>` config form for `$search`/`$searchMeta`/`$vectorSearch` is preserved; no typed wrappers for Atlas Search query DSLs.
 
 # Requirements
@@ -238,8 +238,8 @@ Out of scope for v1. Mentioned only so the state machine doesn't need to grow aw
 
 ### State machine (M1)
 
-- Three concrete classes — `CollectionHandle<TContract, ModelName>`, `FilteredCollection<TContract, ModelName>`, `PipelineChain<TContract, Shape, UpdateCompat, FindAndModifyCompat>` — replace the single `PipelineBuilder` runtime class.
-- Phantom type parameters `UpdateCompat extends 'compat' | 'cleared'` and `FindAndModifyCompat extends 'compat' | 'cleared'` gate the relevant terminals on `PipelineChain`. Default on entry into `PipelineChain` from `FilteredCollection` is `('compat', 'compat')`; entry from `CollectionHandle` via a pipeline stage is also `('compat', 'compat')`.
+- Three concrete classes — `CollectionHandle<TContract, ModelName>`, `FilteredCollection<TContract, ModelName>`, `PipelineChain<TContract, Shape, UpdateEnabled, FindAndModifyEnabled>` — replace the single `PipelineBuilder` runtime class.
+- Phantom type parameters `UpdateEnabled extends 'update-ok' | 'update-cleared'` and `FindAndModifyEnabled extends 'fam-ok' | 'fam-cleared'` gate the relevant terminals on `PipelineChain`. Default on entry into `PipelineChain` from `FilteredCollection` is `('update-ok', 'fam-ok')`; entry from `CollectionHandle` via a pipeline stage is also `('update-ok', 'fam-ok')`.
 - All read-side stage methods from the existing `PipelineBuilder` are partitioned across the three classes per the diagram in the [Surface design](#surface-design) section.
 - `.match(...)` calls accumulate on `FilteredCollection`. When a terminal consumes them, they AND-fold into a single `MongoAndExpr` (or remain as multiple `$match` stages in pipeline terminals — implementation detail).
 - The marker table for pipeline-stage methods is implemented exactly as specified in [Marker semantics on `PipelineChain`](#marker-semantics-on-pipelinechain).
@@ -277,17 +277,17 @@ Out of scope for v1. Mentioned only so the state machine doesn't need to grow aw
 
 - `FilteredCollection.findOneAndUpdate(updater, opts?)` returns a `MongoQueryPlan<ReturnedRow>` whose command is `FindOneAndUpdateCommand`.
 - `FilteredCollection.findOneAndDelete(opts?)` returns a `MongoQueryPlan<ReturnedRow>` whose command is `FindOneAndDeleteCommand`.
-- `PipelineChain<…, _, 'compat'>.findOneAndUpdate(...)` / `.findOneAndDelete(...)` deconstruct the chain's leading `match` / `sort` / `skip` stages into the wire-command slots (no `limit` because `.limit` clears the marker).
+- `PipelineChain<…, _, 'fam-ok'>.findOneAndUpdate(...)` / `.findOneAndDelete(...)` deconstruct the chain's leading `match` / `sort` / `skip` stages into the wire-command slots (no `limit` because `.limit` clears the marker).
 - Terminal options: `returnDocument: 'before' | 'after'` (default `'after'`), `upsert: boolean` (default `false`).
 
 ### Upsert terminals (M3)
 
-- `CollectionHandle.upsertOne(filter, updater)`, `.upsertMany(filter, updater)` and `FilteredCollection.upsertOne(updater)`, `.upsertMany(updater)` produce `UpdateOneCommand` / `UpdateManyCommand` with `upsert: true` semantics. (If the existing AST does not have an `upsert` field on these commands, extend the AST in M3.)
+- `CollectionHandle.upsertOne(filter, updater)` and `FilteredCollection.upsertOne(updater)` produce `UpdateOneCommand` with `upsert: true` semantics. `upsertMany` is explicitly excluded (see §Upsert terminals above).
 
 ### Update-with-pipeline (M4)
 
 - The updater callback's array-return form emits `MongoUpdatePipelineStage[]` — full update-with-pipeline support (`$set`/`$addFields`, `$unset`/`$project`, `$replaceRoot`/`$replaceWith`, `$redact`).
-- `PipelineChain<…, 'compat', _>.updateMany()` / `.updateOne()` (no argument) deconstructs the chain into `(filter, pipelineSpec)` and produces an `UpdateManyCommand` / `UpdateOneCommand` with the array-form `update`.
+- `PipelineChain<…, 'update-ok', _>.updateMany()` / `.updateOne()` (no argument) deconstructs the chain into `(filter, pipelineSpec)` and produces an `UpdateManyCommand` / `UpdateOneCommand` with the array-form `update`.
 - `.merge(opts)` and `.out(coll)` on `PipelineChain` produce a `WriteTerminal` whose command is an `AggregateCommand` ending in `MongoMergeStage` / `MongoOutStage`.
 
 ### Raw-command escape hatch (M5)
@@ -321,9 +321,9 @@ Out of scope for v1. Mentioned only so the state machine doesn't need to grow aw
 ## State machine (M1)
 
 - [ ] `CollectionHandle`, `FilteredCollection`, `PipelineChain` are three separate runtime classes; their public APIs match the diagram in [Surface design](#surface-design).
-- [ ] Type test: `CollectionHandle<…>` exposes `match`, `insertOne`, `insertMany`, `updateAll`, `deleteAll`, `upsertOne`, `upsertMany`, and the pipeline-stage methods. It does **not** expose `updateMany`, `updateOne`, `deleteMany`, `deleteOne`, `findOneAndUpdate`, `findOneAndDelete`.
-- [ ] Type test: `FilteredCollection<…>` exposes `match`, `updateMany`, `updateOne`, `deleteMany`, `deleteOne`, `upsertOne`, `upsertMany`, `findOneAndUpdate`, `findOneAndDelete`, and the pipeline-stage methods. It does **not** expose `insertOne`/`insertMany`/`updateAll`/`deleteAll`.
-- [ ] Type test: `PipelineChain<S, 'compat', 'compat'>` exposes `updateMany()`, `updateOne()`, `findOneAndUpdate(...)`, `findOneAndDelete(...)`, `merge`, `out`, `build`, `aggregate`.
+- [ ] Type test: `CollectionHandle<…>` exposes `match`, `insertOne`, `insertMany`, `updateAll`, `deleteAll`, `upsertOne`, and the pipeline-stage methods. It does **not** expose `updateMany`, `updateOne`, `deleteMany`, `deleteOne`, `findOneAndUpdate`, `findOneAndDelete`.
+- [ ] Type test: `FilteredCollection<…>` exposes `match`, `updateMany`, `updateOne`, `deleteMany`, `deleteOne`, `upsertOne`, `findOneAndUpdate`, `findOneAndDelete`, and the pipeline-stage methods. It does **not** expose `insertOne`/`insertMany`/`updateAll`/`deleteAll`.
+- [ ] Type test: `PipelineChain<S, 'update-ok', 'fam-ok'>` exposes `updateMany()`, `updateOne()`, `findOneAndUpdate(...)`, `findOneAndDelete(...)`, `merge`, `out`, `build`, `aggregate`.
 - [ ] Type test: `PipelineChain<S, 'cleared', 'cleared'>` (e.g. after `.group(...)`) exposes `merge`, `out`, `build`, `aggregate` but **not** `updateMany`, `updateOne`, `findOneAndUpdate`, `findOneAndDelete`.
 - [ ] Type test: `PipelineChain<S, 'preserve', 'cleared'>` (e.g. after `.addFields(...)`) exposes `updateMany`, `updateOne` but **not** `findOneAndUpdate`, `findOneAndDelete`.
 - [ ] Type test: `PipelineChain<S, 'cleared', 'preserve'>` (e.g. after `.sort(...)` only) exposes `findOneAndUpdate`, `findOneAndDelete` but **not** `updateMany()`/`updateOne()` no-arg form.
@@ -355,7 +355,7 @@ Out of scope for v1. Mentioned only so the state machine doesn't need to grow aw
 
 - [ ] `q.from('users').match(f => f.status.eq('pending')).sort({ createdAt: 1 }).findOneAndUpdate(f => f.status.set('claimed'), { returnDocument: 'after' })` produces a `FindOneAndUpdateCommand` with the filter from `.match`, sort `{ createdAt: 1 }`, and `update: { $set: { status: 'claimed' } }`.
 - [ ] Integration test (mongo-memory-server): the find-and-modify path returns the modified document.
-- [ ] Compile error: `q.from('users').match(...).group(...).findOneAndUpdate(...)` (group clears `FindAndModifyCompat`).
+- [ ] Compile error: `q.from('users').match(...).group(...).findOneAndUpdate(...)` (group clears `FindAndModifyEnabled`).
 
 ## Upsert terminals (M3)
 
@@ -368,7 +368,7 @@ Out of scope for v1. Mentioned only so the state machine doesn't need to grow aw
 - [ ] `q.from('products').match(...).updateMany(f => [f.set('total', fn.multiply(f.price, f.qty)), f.unset('legacyTotal')])` produces an `UpdateManyCommand` whose `update` is `MongoUpdatePipelineStage[]`.
 - [ ] `q.from('products').match(...).addFields(f => ({ total: fn.multiply(f.price, f.qty) })).updateMany()` produces an equivalent command (form 2: chain consumed).
 - [ ] Integration test (mongo-memory-server): pipeline-style update with a cross-field reference executes correctly.
-- [ ] Compile error: `q.from('products').match(...).group(...).updateMany()` (group clears `UpdateCompat`).
+- [ ] Compile error: `q.from('products').match(...).group(...).updateMany()` (group clears `UpdateEnabled`).
 - [ ] `.merge({...})` and `.out('coll')` produce `AggregateCommand` plans whose final stage is `MongoMergeStage` / `MongoOutStage`.
 
 ## Raw-command escape hatch (M5)
