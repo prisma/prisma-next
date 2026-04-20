@@ -1,9 +1,8 @@
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type {
-  ControlMutationDefaultFunctionEntry,
-  ControlMutationDefaultGeneratorDescriptor,
-  PslScalarTypeDescriptor,
-} from '@prisma-next/family-sql/control';
+  ControlMutationDefaultEntry,
+  MutationDefaultGeneratorDescriptor,
+} from '@prisma-next/framework-components/control';
 import {
   builtinGeneratorRegistryMetadata,
   resolveBuiltinGeneratedColumnDescriptor,
@@ -294,28 +293,28 @@ const sqliteDefaultFunctionRegistryEntries = [
   ['ulid', { lower: lowerUlid, usageSignatures: ['ulid()'] }],
   ['nanoid', { lower: lowerNanoid, usageSignatures: ['nanoid()', 'nanoid(<2-255>)'] }],
   ['dbgenerated', { lower: lowerDbgenerated, usageSignatures: ['dbgenerated("...")'] }],
-] satisfies ReadonlyArray<readonly [string, ControlMutationDefaultFunctionEntry]>;
+] satisfies ReadonlyArray<readonly [string, ControlMutationDefaultEntry]>;
 
-const sqlitePslScalarTypeDescriptors = new Map<string, PslScalarTypeDescriptor>([
-  ['String', { codecId: SQLITE_TEXT_CODEC_ID, nativeType: 'text' }],
-  ['Boolean', { codecId: SQLITE_BOOLEAN_CODEC_ID, nativeType: 'integer' }],
-  ['Int', { codecId: SQLITE_INTEGER_CODEC_ID, nativeType: 'integer' }],
-  ['BigInt', { codecId: SQLITE_BIGINT_CODEC_ID, nativeType: 'integer' }],
-  ['Float', { codecId: SQLITE_REAL_CODEC_ID, nativeType: 'real' }],
-  ['Decimal', { codecId: SQLITE_TEXT_CODEC_ID, nativeType: 'text' }],
-  ['DateTime', { codecId: SQLITE_DATETIME_CODEC_ID, nativeType: 'text' }],
-  ['Json', { codecId: SQLITE_JSON_CODEC_ID, nativeType: 'text' }],
-  ['Bytes', { codecId: SQLITE_BLOB_CODEC_ID, nativeType: 'blob' }],
+const sqliteScalarTypeDescriptors = new Map<string, string>([
+  ['String', SQLITE_TEXT_CODEC_ID],
+  ['Boolean', SQLITE_BOOLEAN_CODEC_ID],
+  ['Int', SQLITE_INTEGER_CODEC_ID],
+  ['BigInt', SQLITE_BIGINT_CODEC_ID],
+  ['Float', SQLITE_REAL_CODEC_ID],
+  ['Decimal', SQLITE_TEXT_CODEC_ID],
+  ['DateTime', SQLITE_DATETIME_CODEC_ID],
+  ['Json', SQLITE_JSON_CODEC_ID],
+  ['Bytes', SQLITE_BLOB_CODEC_ID],
 ]);
 
 export function createSqliteDefaultFunctionRegistry(): ReadonlyMap<
   string,
-  ControlMutationDefaultFunctionEntry
+  ControlMutationDefaultEntry
 > {
   return new Map(sqliteDefaultFunctionRegistryEntries);
 }
 
-export function createSqliteMutationDefaultGeneratorDescriptors(): readonly ControlMutationDefaultGeneratorDescriptor[] {
+export function createSqliteMutationDefaultGeneratorDescriptors(): readonly MutationDefaultGeneratorDescriptor[] {
   return builtinGeneratorRegistryMetadata.map(({ id, applicableCodecIds }) => ({
     id,
     applicableCodecIds,
@@ -337,9 +336,6 @@ export function createSqliteMutationDefaultGeneratorDescriptors(): readonly Cont
   }));
 }
 
-export function createSqlitePslScalarTypeDescriptors(): ReadonlyMap<
-  string,
-  PslScalarTypeDescriptor
-> {
-  return new Map(sqlitePslScalarTypeDescriptors);
+export function createSqliteScalarTypeDescriptors(): ReadonlyMap<string, string> {
+  return new Map(sqliteScalarTypeDescriptors);
 }

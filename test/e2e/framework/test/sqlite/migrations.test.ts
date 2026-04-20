@@ -860,3 +860,201 @@ describe('SQLite Migration E2E - Destructive column changes', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// FK preservation through recreate-table
+// ---------------------------------------------------------------------------
+
+describe('SQLite Migration E2E - FK preservation through recreate-table', () => {
+  const WIDENING = { allowedOperationClasses: ['additive', 'widening'] } as const;
+
+  it('preserves FK when the child table (holder of the FK) is recreated', async () => {
+    const User = model('User', { fields: { id: int.id(), name: text } });
+    const PostV1 = model('Post', {
+      fields: {
+        id: int.id(),
+        title: text,
+        bio: text,
+        authorId: int.column('author_id'),
+      },
+    }).sql((ctx) => ({
+      foreignKeys: [
+        ctx.constraints.foreignKey(ctx.cols.authorId, ctx.constraints.ref('User', 'id'), {
+          onDelete: 'cascade',
+          index: true,
+        }),
+      ],
+    }));
+    const PostV2 = model('Post', {
+      fields: {
+        id: int.id(),
+        title: text,
+        bio: text.optional(),
+        authorId: int.column('author_id'),
+      },
+    }).sql((ctx) => ({
+      foreignKeys: [
+        ctx.constraints.foreignKey(ctx.cols.authorId, ctx.constraints.ref('User', 'id'), {
+          onDelete: 'cascade',
+          index: true,
+        }),
+      ],
+    }));
+
+    await applyMigration(
+      {
+        origin: defineContract({ ...pack, models: { User, Post: PostV1 } }),
+        destination: defineContract({ ...pack, models: { User, Post: PostV2 } }),
+        policy: WIDENING,
+        seed: async (driver) => {
+          await driver.query('INSERT INTO "User" (id, name) VALUES (?, ?)', [1, 'Alice']);
+          await driver.query('INSERT INTO "Post" (id, title, bio, author_id) VALUES (?, ?, ?, ?)', [
+            1,
+            'Post 1',
+            'original bio',
+            1,
+          ]);
+        },
+      },
+      async ({ driver, schema }) => {
+        expect(schema.tables['Post']!.foreignKeys).toHaveLength(1);
+        const fk = schema.tables['Post']!.foreignKeys[0]!;
+        expect([...fk.columns]).toEqual(['author_id']);
+        expect(fk.referencedTable).toBe('User');
+        expect([...fk.referencedColumns]).toEqual(['id']);
+        expect(fk.onDelete).toBe('cascade');
+
+        const rows = await driver.query<{ id: number; bio: string | null; author_id: number }>(
+          'SELECT id, bio, author_id FROM "Post" WHERE id = ?',
+          [1],
+        );
+        expect(rows.rows[0]).toMatchObject({ id: 1, bio: 'original bio', author_id: 1 });
+
+        await expect(
+          driver.query('INSERT INTO "Post" (id, title, author_id) VALUES (?, ?, ?)', [
+            2,
+            'Orphan',
+            999,
+          ]),
+        ).rejects.toThrow();
+
+        await driver.query('DELETE FROM "User" WHERE id = ?', [1]);
+        expect((await driver.query('SELECT * FROM "Post"')).rows).toHaveLength(0);
+      },
+    );
+  });
+
+  it('preserves FK when the parent (referenced) table is recreated', async () => {
+    const UserV1 = model('User', { fields: { id: int.id(), name: text, bio: text } });
+    const UserV2 = model('User', {
+      fields: { id: int.id(), name: text, bio: text.optional() },
+    });
+    const Post = model('Post', {
+      fields: { id: int.id(), title: text, authorId: int.column('author_id') },
+    }).sql((ctx) => ({
+      foreignKeys: [
+        ctx.constraints.foreignKey(ctx.cols.authorId, ctx.constraints.ref('User', 'id'), {
+          onDelete: 'cascade',
+          index: true,
+        }),
+      ],
+    }));
+
+    await applyMigration(
+      {
+        origin: defineContract({ ...pack, models: { User: UserV1, Post } }),
+        destination: defineContract({ ...pack, models: { User: UserV2, Post } }),
+        policy: WIDENING,
+        seed: async (driver) => {
+          await driver.query('INSERT INTO "User" (id, name, bio) VALUES (?, ?, ?)', [
+            1,
+            'Alice',
+            'bio text',
+          ]);
+          await driver.query('INSERT INTO "Post" (id, title, author_id) VALUES (?, ?, ?)', [
+            1,
+            'Post 1',
+            1,
+          ]);
+        },
+      },
+      async ({ driver }) => {
+        const users = await driver.query<{ id: number; name: string }>(
+          'SELECT id, name FROM "User"',
+        );
+        expect(users.rows).toHaveLength(1);
+        expect(users.rows[0]).toMatchObject({ id: 1, name: 'Alice' });
+
+        const posts = await driver.query<{ id: number; author_id: number }>(
+          'SELECT id, author_id FROM "Post"',
+        );
+        expect(posts.rows).toHaveLength(1);
+        expect(posts.rows[0]).toMatchObject({ id: 1, author_id: 1 });
+
+        await expect(
+          driver.query('INSERT INTO "Post" (id, title, author_id) VALUES (?, ?, ?)', [
+            2,
+            'Orphan',
+            999,
+          ]),
+        ).rejects.toThrow();
+
+        await driver.query('DELETE FROM "User" WHERE id = ?', [1]);
+        expect((await driver.query('SELECT * FROM "Post"')).rows).toHaveLength(0);
+      },
+    );
+  });
+
+  it('preserves declared indexes when the table is recreated', async () => {
+    const UserV1 = model('User', {
+      fields: { id: int.id(), email: text, name: text },
+    }).sql((ctx) => ({
+      indexes: [
+        ctx.constraints.index(ctx.cols.email, { name: 'idx_users_email' }),
+        ctx.constraints.index([ctx.cols.name, ctx.cols.email], { name: 'idx_users_name_email' }),
+      ],
+    }));
+    const UserV2 = model('User', {
+      fields: { id: int.id(), email: text, name: text.optional() },
+    }).sql((ctx) => ({
+      indexes: [
+        ctx.constraints.index(ctx.cols.email, { name: 'idx_users_email' }),
+        ctx.constraints.index([ctx.cols.name, ctx.cols.email], { name: 'idx_users_name_email' }),
+      ],
+    }));
+
+    await applyMigration(
+      {
+        origin: defineContract({ ...pack, models: { User: UserV1 } }),
+        destination: defineContract({ ...pack, models: { User: UserV2 } }),
+        policy: WIDENING,
+        seed: async (driver) => {
+          await driver.query('INSERT INTO "User" (id, email, name) VALUES (?, ?, ?)', [
+            1,
+            'alice@example.com',
+            'Alice',
+          ]);
+        },
+      },
+      async ({ driver, schema }) => {
+        const indexCols = schema.tables['User']!.indexes.map((i) => [...i.columns]);
+        expect(indexCols).toContainEqual(['email']);
+        expect(indexCols).toContainEqual(['name', 'email']);
+
+        const indexNames = (
+          await driver.query<{ name: string }>(
+            `SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'User' AND name NOT LIKE 'sqlite_%'`,
+          )
+        ).rows.map((r) => r.name);
+        expect(indexNames).toContain('idx_users_email');
+        expect(indexNames).toContain('idx_users_name_email');
+
+        const rows = await driver.query<{ id: number; email: string; name: string | null }>(
+          'SELECT id, email, name FROM "User" WHERE id = ?',
+          [1],
+        );
+        expect(rows.rows[0]).toMatchObject({ id: 1, email: 'alice@example.com', name: 'Alice' });
+      },
+    );
+  });
+});
