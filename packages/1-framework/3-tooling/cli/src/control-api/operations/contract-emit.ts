@@ -1,10 +1,10 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { basename, dirname, isAbsolute, join, resolve } from 'pathe';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
@@ -21,6 +21,14 @@ interface EmitWriteTargetState {
   nextGeneration: number;
   committedGeneration: number;
   queue: Promise<void>;
+}
+
+interface ManagedArtifactPaths {
+  readonly rootDir: string;
+  readonly generationsDir: string;
+  readonly currentLinkPath: string;
+  readonly publicJsonLinkTarget: string;
+  readonly publicDtsLinkTarget: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -80,6 +88,145 @@ function createTempArtifactPath(path: string, generation: number, phase: string)
   return join(dirname(path), `.${basename(path)}.${process.pid}.${generation}.${phase}.tmp`);
 }
 
+function getManagedArtifactPaths(
+  outputJsonPath: string,
+  outputDtsPath: string,
+): ManagedArtifactPaths {
+  const outputDir = dirname(outputJsonPath);
+  const stem = basename(outputJsonPath, '.json');
+  const rootDir = join(outputDir, `.${stem}.prisma-next-artifacts`);
+
+  return {
+    rootDir,
+    generationsDir: join(rootDir, 'generations'),
+    currentLinkPath: join(rootDir, 'current'),
+    publicJsonLinkTarget: relative(outputDir, join(rootDir, 'current', basename(outputJsonPath))),
+    publicDtsLinkTarget: relative(outputDir, join(rootDir, 'current', basename(outputDtsPath))),
+  };
+}
+
+function createManagedGenerationDirName(generation: number): string {
+  return `g-${generation}`;
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (isRecord(error) && error['code'] === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function replacePathWithSymlink(
+  path: string,
+  target: string,
+  generation: number,
+): Promise<void> {
+  const tempLinkPath = createTempArtifactPath(path, generation, 'link');
+  await symlink(target, tempLinkPath);
+  try {
+    await rename(tempLinkPath, path);
+  } finally {
+    await rm(tempLinkPath, { force: true });
+  }
+}
+
+async function ensurePublicManagedLinks({
+  outputJsonPath,
+  outputDtsPath,
+  managedPaths,
+  generation,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly managedPaths: ManagedArtifactPaths;
+  readonly generation: number;
+}): Promise<void> {
+  const jsonStat = await (async () => {
+    try {
+      return await lstat(outputJsonPath);
+    } catch (error) {
+      if (isRecord(error) && error['code'] === 'ENOENT') {
+        return undefined;
+      }
+      throw error;
+    }
+  })();
+  if (!jsonStat?.isSymbolicLink()) {
+    await replacePathWithSymlink(outputJsonPath, managedPaths.publicJsonLinkTarget, generation);
+  }
+
+  const dtsStat = await (async () => {
+    try {
+      return await lstat(outputDtsPath);
+    } catch (error) {
+      if (isRecord(error) && error['code'] === 'ENOENT') {
+        return undefined;
+      }
+      throw error;
+    }
+  })();
+  if (!dtsStat?.isSymbolicLink()) {
+    await replacePathWithSymlink(outputDtsPath, managedPaths.publicDtsLinkTarget, generation);
+  }
+}
+
+async function bootstrapManagedArtifactsFromExistingOutputs({
+  outputJsonPath,
+  outputDtsPath,
+  managedPaths,
+  generation,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly managedPaths: ManagedArtifactPaths;
+  readonly generation: number;
+}): Promise<void> {
+  if (await pathExists(managedPaths.currentLinkPath)) {
+    return;
+  }
+
+  const previousJson = await readExistingArtifact(outputJsonPath);
+  const previousDts = await readExistingArtifact(outputDtsPath);
+
+  if (previousJson === undefined && previousDts === undefined) {
+    return;
+  }
+
+  const bootstrapDir = join(managedPaths.generationsDir, 'bootstrap');
+  await mkdir(bootstrapDir, { recursive: true });
+
+  if (previousJson !== undefined) {
+    await writeFile(join(bootstrapDir, basename(outputJsonPath)), previousJson, 'utf-8');
+  }
+  if (previousDts !== undefined) {
+    await writeFile(join(bootstrapDir, basename(outputDtsPath)), previousDts, 'utf-8');
+  }
+
+  const tempCurrentPath = createTempArtifactPath(
+    managedPaths.currentLinkPath,
+    generation,
+    'current',
+  );
+  await symlink(relative(managedPaths.rootDir, bootstrapDir), tempCurrentPath);
+  try {
+    await rename(tempCurrentPath, managedPaths.currentLinkPath);
+  } finally {
+    await rm(tempCurrentPath, { force: true });
+  }
+
+  await ensurePublicManagedLinks({
+    outputJsonPath,
+    outputDtsPath,
+    managedPaths,
+    generation,
+  });
+}
+
 async function readExistingArtifact(path: string): Promise<string | undefined> {
   try {
     return await readFile(path, 'utf-8');
@@ -110,7 +257,7 @@ async function restoreArtifact(
   }
 }
 
-async function writeContractArtifacts({
+async function writePlainContractArtifacts({
   outputJsonPath,
   outputDtsPath,
   generation,
@@ -180,6 +327,123 @@ async function writeContractArtifacts({
   });
 }
 
+async function writeAtomicManagedContractArtifacts({
+  outputJsonPath,
+  outputDtsPath,
+  generation,
+  signal,
+  contractJson,
+  contractDts,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly generation: number;
+  readonly signal: AbortSignal;
+  readonly contractJson: string;
+  readonly contractDts: string;
+}): Promise<void> {
+  await queueEmitWrite(outputJsonPath, async (state) => {
+    signal.throwIfAborted();
+
+    if (generation < state.nextGeneration) {
+      return;
+    }
+
+    const managedPaths = getManagedArtifactPaths(outputJsonPath, outputDtsPath);
+    await mkdir(managedPaths.generationsDir, { recursive: true });
+    await bootstrapManagedArtifactsFromExistingOutputs({
+      outputJsonPath,
+      outputDtsPath,
+      managedPaths,
+      generation,
+    });
+
+    const generationDirName = createManagedGenerationDirName(generation);
+    const generationDir = join(managedPaths.generationsDir, generationDirName);
+    const tempGenerationDir = createTempArtifactPath(generationDir, generation, 'dir');
+    let cleanupGenerationDir = true;
+
+    try {
+      await mkdir(tempGenerationDir, { recursive: true });
+      await writeFile(join(tempGenerationDir, basename(outputJsonPath)), contractJson, 'utf-8');
+      await writeFile(join(tempGenerationDir, basename(outputDtsPath)), contractDts, 'utf-8');
+
+      signal.throwIfAborted();
+
+      if (generation < state.nextGeneration) {
+        return;
+      }
+
+      await rename(tempGenerationDir, generationDir);
+      cleanupGenerationDir = false;
+
+      const tempCurrentPath = createTempArtifactPath(
+        managedPaths.currentLinkPath,
+        generation,
+        'current',
+      );
+      await symlink(relative(managedPaths.rootDir, generationDir), tempCurrentPath);
+      try {
+        await rename(tempCurrentPath, managedPaths.currentLinkPath);
+      } finally {
+        await rm(tempCurrentPath, { force: true });
+      }
+
+      await ensurePublicManagedLinks({
+        outputJsonPath,
+        outputDtsPath,
+        managedPaths,
+        generation,
+      });
+
+      state.committedGeneration = generation;
+    } finally {
+      if (cleanupGenerationDir) {
+        await rm(tempGenerationDir, { recursive: true, force: true });
+      }
+    }
+  });
+}
+
+async function writeContractArtifacts({
+  outputJsonPath,
+  outputDtsPath,
+  generation,
+  signal,
+  contractJson,
+  contractDts,
+  managedPublication,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly generation: number;
+  readonly signal: AbortSignal;
+  readonly contractJson: string;
+  readonly contractDts: string;
+  readonly managedPublication: boolean;
+}): Promise<void> {
+  if (managedPublication) {
+    await writeAtomicManagedContractArtifacts({
+      outputJsonPath,
+      outputDtsPath,
+      generation,
+      signal,
+      contractJson,
+      contractDts,
+    });
+    return;
+  }
+
+  await writePlainContractArtifacts({
+    outputJsonPath,
+    outputDtsPath,
+    generation,
+    signal,
+    contractJson,
+    contractDts,
+  });
+}
+
 /**
  * Executes the contract emit operation.
  *
@@ -200,6 +464,9 @@ async function writeContractArtifacts({
 export async function executeContractEmit(
   options: ContractEmitOptions,
 ): Promise<ContractEmitResult> {
+  // Watch-mode callers pass a signal; publish through a shared "current" pointer
+  // so the JSON/DTS pair becomes visible as one logical update.
+  const managedPublication = options.signal !== undefined;
   const { configPath, signal = new AbortController().signal } = options;
   const unlessAborted = abortable(signal);
 
@@ -321,6 +588,7 @@ export async function executeContractEmit(
     signal,
     contractJson: emitResult.contractJson,
     contractDts: emitResult.contractDts,
+    managedPublication,
   });
 
   // Validate that contract.d.ts type imports are resolvable

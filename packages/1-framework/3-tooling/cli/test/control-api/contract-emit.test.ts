@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Contract } from '@prisma-next/contract/types';
@@ -25,6 +25,7 @@ vi.mock('node:fs/promises', async () => {
 type FsWriteFile = typeof import('node:fs/promises')['writeFile'];
 
 const mockedEmit = vi.mocked(emitFn);
+const mockedRename = vi.mocked(rename);
 const mockedWriteFile = vi.mocked(writeFile);
 
 const stubDescriptor = (kind: string, id: string) => ({
@@ -125,9 +126,13 @@ describe('executeContractEmit', () => {
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'contract-emit-'));
     mockedEmit.mockReset();
+    mockedRename.mockReset();
     mockedWriteFile.mockReset();
 
     const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    mockedRename.mockImplementation(async (...args: Parameters<typeof rename>) =>
+      actualFs.rename(...args),
+    );
     mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) =>
       actualFs.writeFile(...args),
     );
@@ -382,5 +387,72 @@ describe('executeContractEmit', () => {
 
     expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
     expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
+  });
+
+  it('does not expose split artifacts during commit steps', async () => {
+    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
+    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
+    const previousJson = JSON.stringify({ generation: 'previous' });
+    const previousDts = "export type Generation = 'previous';\n";
+    const nextJson = JSON.stringify({ generation: 'next' });
+    const nextDts = "export type Generation = 'next';\n";
+
+    await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
+    await writeFile(outputJsonPath, previousJson, 'utf-8');
+    await writeFile(outputDtsPath, previousDts, 'utf-8');
+
+    mockedEmit.mockResolvedValue({
+      storageHash: 'storage-next',
+      profileHash: 'profile-next',
+      contractJson: nextJson,
+      contractDts: nextDts,
+    });
+
+    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const snapshots: Array<{
+      readonly json: string | undefined;
+      readonly dts: string | undefined;
+      readonly to: string;
+    }> = [];
+
+    mockedRename.mockImplementation(async (...args: Parameters<typeof rename>) => {
+      const [, to] = args;
+      await actualFs.rename(...args);
+
+      let json: string | undefined;
+      let dts: string | undefined;
+
+      try {
+        json = await actualFs.readFile(outputJsonPath, 'utf-8');
+      } catch {
+        json = undefined;
+      }
+
+      try {
+        dts = await actualFs.readFile(outputDtsPath, 'utf-8');
+      } catch {
+        dts = undefined;
+      }
+
+      snapshots.push({ json, dts, to: String(to) });
+    });
+
+    await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
+      await executeContractEmit({
+        configPath: join(tmpDir, 'prisma-next.config.ts'),
+        signal: new AbortController().signal,
+      });
+    });
+
+    expect(snapshots.length).toBeGreaterThan(0);
+    for (const snapshot of snapshots) {
+      expect([
+        { json: previousJson, dts: previousDts },
+        { json: nextJson, dts: nextDts },
+      ]).toContainEqual({
+        json: snapshot.json,
+        dts: snapshot.dts,
+      });
+    }
   });
 });
