@@ -4,29 +4,51 @@
  *
  * Every call class carries the literal arguments its backing factory would
  * receive, computes a human-readable `label` in its constructor, and
- * implements two dispatch hooks:
+ * implements three polymorphic hooks:
  *
- * - `accept(visitor)` — used by `renderOps` to convert the IR to runtime
- *   `SqlMigrationPlanOperation`s via the Phase 0 pure factories. The visitor
- *   is exhaustive over the `PostgresOpFactoryCall` union, giving us compile-
- *   time coverage as the union grows.
+ * - `toOp()` — converts the IR node to a runtime `SqlMigrationPlanOperation`
+ *   by delegating to the matching pure factory in `op-factories.ts`.
  * - `renderTypeScript()` / `importRequirements()` — used by
  *   `renderCallsToTypeScript` to emit the call as a TypeScript expression
- *   inside the scaffolded `migration.ts`. Polymorphic, because
- *   `DataTransformCall` needs to recurse into its `check`/`run`
- *   `TsExpression` children uniformly.
+ *   inside the scaffolded `migration.ts`.
+ * - `accept(visitor)` — retained for future exhaustive walks.
  *
  * The abstract base and all concrete classes are package-private. External
  * consumers see only the framework-level `OpFactoryCall` interface and the
  * `PostgresOpFactoryCall` union.
  */
 
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type {
   OpFactoryCall as FrameworkOpFactoryCall,
   MigrationOperationClass,
 } from '@prisma-next/framework-components/control';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import type { ColumnSpec, ForeignKeySpec } from './op-factories';
+import {
+  addColumn,
+  addEnumValues,
+  addForeignKey,
+  addPrimaryKey,
+  addUnique,
+  alterColumnType,
+  createEnumType,
+  createIndex,
+  createTable,
+  dropColumn,
+  dropConstraint,
+  dropDefault,
+  dropEnumType,
+  dropIndex,
+  dropNotNull,
+  dropTable,
+  renameType,
+  setDefault,
+  setNotNull,
+} from './op-factories';
+import type { PostgresPlanTargetDetails } from './planner-target-details';
+
+type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
 const TARGET_MIGRATION_MODULE = '@prisma-next/target-postgres/migration';
 
@@ -58,6 +80,7 @@ abstract class PostgresOpFactoryCallNode extends TsExpression implements Framewo
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
   abstract accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R;
+  abstract toOp(): Op;
 
   importRequirements(): readonly ImportRequirement[] {
     return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
@@ -104,6 +127,10 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
     return visitor.createTable(this);
   }
 
+  toOp(): Op {
+    return createTable(this.schemaName, this.tableName, this.columns, this.primaryKey);
+  }
+
   renderTypeScript(): string {
     const args = [
       jsonToTsSource(this.schemaName),
@@ -132,6 +159,10 @@ export class DropTableCall extends PostgresOpFactoryCallNode {
 
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.dropTable(this);
+  }
+
+  toOp(): Op {
+    return dropTable(this.schemaName, this.tableName);
   }
 
   renderTypeScript(): string {
@@ -164,6 +195,10 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
     return visitor.addColumn(this);
   }
 
+  toOp(): Op {
+    return addColumn(this.schemaName, this.tableName, this.column);
+  }
+
   renderTypeScript(): string {
     return `addColumn(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.column)})`;
   }
@@ -188,6 +223,10 @@ export class DropColumnCall extends PostgresOpFactoryCallNode {
 
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.dropColumn(this);
+  }
+
+  toOp(): Op {
+    return dropColumn(this.schemaName, this.tableName, this.columnName);
   }
 
   renderTypeScript(): string {
@@ -230,6 +269,10 @@ export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
     return visitor.alterColumnType(this);
   }
 
+  toOp(): Op {
+    return alterColumnType(this.schemaName, this.tableName, this.columnName, this.options);
+  }
+
   renderTypeScript(): string {
     return `alterColumnType(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.columnName)}, ${jsonToTsSource(this.options)})`;
   }
@@ -256,6 +299,10 @@ export class SetNotNullCall extends PostgresOpFactoryCallNode {
     return visitor.setNotNull(this);
   }
 
+  toOp(): Op {
+    return setNotNull(this.schemaName, this.tableName, this.columnName);
+  }
+
   renderTypeScript(): string {
     return `setNotNull(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.columnName)})`;
   }
@@ -280,6 +327,10 @@ export class DropNotNullCall extends PostgresOpFactoryCallNode {
 
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.dropNotNull(this);
+  }
+
+  toOp(): Op {
+    return dropNotNull(this.schemaName, this.tableName, this.columnName);
   }
 
   renderTypeScript(): string {
@@ -317,6 +368,16 @@ export class SetDefaultCall extends PostgresOpFactoryCallNode {
     return visitor.setDefault(this);
   }
 
+  toOp(): Op {
+    return setDefault(
+      this.schemaName,
+      this.tableName,
+      this.columnName,
+      this.defaultSql,
+      this.operationClass,
+    );
+  }
+
   renderTypeScript(): string {
     const args = [
       jsonToTsSource(this.schemaName),
@@ -350,6 +411,10 @@ export class DropDefaultCall extends PostgresOpFactoryCallNode {
 
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.dropDefault(this);
+  }
+
+  toOp(): Op {
+    return dropDefault(this.schemaName, this.tableName, this.columnName);
   }
 
   renderTypeScript(): string {
@@ -389,6 +454,10 @@ export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
     return visitor.addPrimaryKey(this);
   }
 
+  toOp(): Op {
+    return addPrimaryKey(this.schemaName, this.tableName, this.constraintName, this.columns);
+  }
+
   renderTypeScript(): string {
     return `addPrimaryKey(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.constraintName)}, ${jsonToTsSource(this.columns)})`;
   }
@@ -422,6 +491,10 @@ export class AddUniqueCall extends PostgresOpFactoryCallNode {
     return visitor.addUnique(this);
   }
 
+  toOp(): Op {
+    return addUnique(this.schemaName, this.tableName, this.constraintName, this.columns);
+  }
+
   renderTypeScript(): string {
     return `addUnique(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.constraintName)}, ${jsonToTsSource(this.columns)})`;
   }
@@ -446,6 +519,10 @@ export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
 
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.addForeignKey(this);
+  }
+
+  toOp(): Op {
+    return addForeignKey(this.schemaName, this.tableName, this.fk);
   }
 
   renderTypeScript(): string {
@@ -479,6 +556,10 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
 
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.dropConstraint(this);
+  }
+
+  toOp(): Op {
+    return dropConstraint(this.schemaName, this.tableName, this.constraintName, this.kind);
   }
 
   renderTypeScript(): string {
@@ -526,6 +607,10 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
     return visitor.createIndex(this);
   }
 
+  toOp(): Op {
+    return createIndex(this.schemaName, this.tableName, this.indexName, this.columns);
+  }
+
   renderTypeScript(): string {
     return `createIndex(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.indexName)}, ${jsonToTsSource(this.columns)})`;
   }
@@ -550,6 +635,10 @@ export class DropIndexCall extends PostgresOpFactoryCallNode {
 
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.dropIndex(this);
+  }
+
+  toOp(): Op {
+    return dropIndex(this.schemaName, this.tableName, this.indexName);
   }
 
   renderTypeScript(): string {
@@ -582,6 +671,10 @@ export class CreateEnumTypeCall extends PostgresOpFactoryCallNode {
     return visitor.createEnumType(this);
   }
 
+  toOp(): Op {
+    return createEnumType(this.schemaName, this.typeName, this.values);
+  }
+
   renderTypeScript(): string {
     return `createEnumType(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.typeName)}, ${jsonToTsSource(this.values)})`;
   }
@@ -610,6 +703,10 @@ export class AddEnumValuesCall extends PostgresOpFactoryCallNode {
     return visitor.addEnumValues(this);
   }
 
+  toOp(): Op {
+    return addEnumValues(this.schemaName, this.typeName, this.nativeType, this.values);
+  }
+
   renderTypeScript(): string {
     return `addEnumValues(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.typeName)}, ${jsonToTsSource(this.nativeType)}, ${jsonToTsSource(this.values)})`;
   }
@@ -632,6 +729,10 @@ export class DropEnumTypeCall extends PostgresOpFactoryCallNode {
 
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.dropEnumType(this);
+  }
+
+  toOp(): Op {
+    return dropEnumType(this.schemaName, this.typeName);
   }
 
   renderTypeScript(): string {
@@ -658,6 +759,10 @@ export class RenameTypeCall extends PostgresOpFactoryCallNode {
 
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.renameType(this);
+  }
+
+  toOp(): Op {
+    return renameType(this.schemaName, this.fromName, this.toName);
   }
 
   renderTypeScript(): string {
@@ -704,6 +809,10 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
 
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.dataTransform(this);
+  }
+
+  toOp(): Op {
+    throw new Error('DataTransformCall.toOp() requires bodyToClosure wiring (F03)');
   }
 
   renderTypeScript(): string {

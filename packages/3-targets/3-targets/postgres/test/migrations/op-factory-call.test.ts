@@ -258,14 +258,14 @@ describe('renderOps', () => {
     }
   });
 
-  it('throws on DataTransformCall because Phase 1 does not emit data transforms', () => {
+  it('throws on DataTransformCall until bodyToClosure is wired', () => {
     const call = new DataTransformCall(
       'Backfill',
       new PlaceholderExpression('check'),
       new PlaceholderExpression('run'),
     );
 
-    expect(() => renderOps([call])).toThrow(/DataTransformCall lowering is Phase 2 territory/);
+    expect(() => renderOps([call])).toThrow(/bodyToClosure/);
   });
 });
 
