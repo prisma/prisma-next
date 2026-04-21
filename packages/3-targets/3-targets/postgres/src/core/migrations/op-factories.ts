@@ -16,7 +16,6 @@ import { escapeLiteral, qualifyName, quoteIdentifier } from '@prisma-next/adapte
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type {
   DataTransformOperation,
-  MigrationOperationClass,
   SerializedQueryPlan,
 } from '@prisma-next/framework-components/control';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
@@ -806,25 +805,17 @@ export function renameType(schemaName: string, fromName: string, toName: string)
 // ============================================================================
 
 /**
- * Wraps arbitrary SQL statement(s) into a single `SqlMigrationPlanOperation`.
- * Used by `liftOpToCall` for operations the planner cannot express through
- * structured call classes, and available to users for raw migration authoring.
+ * Identity factory for an already-materialized `SqlMigrationPlanOperation`.
+ *
+ * The planner uses this via `liftOpToCall` to carry ops produced by SQL
+ * family methods, codec control hooks, and component database dependencies
+ * alongside class-flow IR without reverse-engineering them. Users writing
+ * raw migrations can pass a full op shape directly — typically built by
+ * composing SQL family helpers — to author a migration that bypasses the
+ * structured call classes.
  */
-export function rawSql(
-  id: string,
-  label: string,
-  sql: string,
-  operationClass: MigrationOperationClass = 'additive',
-): Op {
-  return {
-    id,
-    label,
-    operationClass,
-    target: { id: 'postgres' },
-    precheck: [],
-    execute: [step(label, sql)],
-    postcheck: [],
-  };
+export function rawSql(op: Op): Op {
+  return op;
 }
 
 // ============================================================================

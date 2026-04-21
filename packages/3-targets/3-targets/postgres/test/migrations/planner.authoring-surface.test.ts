@@ -46,7 +46,7 @@ function makeFrameworkPlanner(): MigrationPlanner<'sql', 'postgres'> {
 
 describe('PostgresMigrationPlanner authoring surface', () => {
   describe('plan(...).plan.renderTypeScript()', () => {
-    it('throws errorPlanDoesNotSupportAuthoringSurface so the CLI surfaces a structured diagnostic', () => {
+    it('emits a class-flow migration scaffold carrying the destination storage hash', () => {
       const planner = makeFrameworkPlanner();
       const contract = createEmptyContract();
       const fromSchemaIR = contractToSchemaIRImpl(null, {
@@ -68,12 +68,12 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       }
       const success = result as MigrationPlannerSuccessResult;
 
-      expect(() => success.plan.renderTypeScript()).toThrow(
-        expect.objectContaining({
-          code: '2010',
-          meta: expect.objectContaining({ targetId: 'postgres' }),
-        }),
-      );
+      const source = success.plan.renderTypeScript();
+
+      expect(source).toContain("import { Migration } from '@prisma-next/family-sql/migration'");
+      expect(source).toContain('class M extends Migration');
+      expect(source).toContain(`from: "${coreHash('sha256:from')}"`);
+      expect(source).toContain(`to: "${contract.storage.storageHash}"`);
     });
   });
 
@@ -91,18 +91,21 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       expect(empty.destination).toEqual({ storageHash: 'sha256:to' });
     });
 
-    it('renders a descriptor-flow stub that re-exports an empty operation array', () => {
+    it('renders a class-flow stub whose describe() carries from/to and whose operations list is empty', () => {
       const planner = makeFrameworkPlanner();
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
-        fromHash: '',
-        toHash: '',
+        fromHash: 'sha256:from',
+        toHash: 'sha256:to',
       });
 
       const source = empty.renderTypeScript();
 
-      expect(source).toContain('@prisma-next/target-postgres/migration-builders');
-      expect(source).toContain('export default () => []');
+      expect(source).toContain("import { Migration } from '@prisma-next/family-sql/migration'");
+      expect(source).toContain('class M extends Migration');
+      expect(source).toContain('from: "sha256:from"');
+      expect(source).toContain('to: "sha256:to"');
+      expect(source).toContain('override get operations()');
     });
   });
 });

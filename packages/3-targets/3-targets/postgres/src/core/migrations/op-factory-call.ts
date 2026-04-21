@@ -48,7 +48,6 @@ import {
   dropIndex,
   dropNotNull,
   dropTable,
-  rawSql,
   renameType,
   setDefault,
   setNotNull,
@@ -784,24 +783,31 @@ export class RenameTypeCall extends PostgresOpFactoryCallNode {
 // Raw SQL
 // ============================================================================
 
+/**
+ * Laundered pre-built operation.
+ *
+ * Wraps an already-materialized `SqlMigrationPlanOperation` — typically one
+ * produced by a SQL-family method, a codec control hook, or a component
+ * `databaseDependencies.init` declaration — so the planner can carry it
+ * alongside class-flow IR nodes without reverse-engineering it into a
+ * structured call class. Doubles as the user-facing escape hatch for raw
+ * migrations: authors can pass a full op shape to `rawSql({...})`.
+ *
+ * `toOp()` returns the stored op unchanged. `renderTypeScript()` emits
+ * `rawSql({...})` with the op serialized as a JSON literal — round-tripping
+ * requires every field on the op to be JSON-serializable (no closures).
+ */
 export class RawSqlCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'rawSql' as const;
   readonly operationClass: MigrationOperationClass;
-  readonly id: string;
-  readonly sql: string;
   readonly label: string;
+  readonly op: Op;
 
-  constructor(
-    id: string,
-    label: string,
-    sql: string,
-    operationClass: MigrationOperationClass = 'additive',
-  ) {
+  constructor(op: Op) {
     super();
-    this.id = id;
-    this.label = label;
-    this.sql = sql;
-    this.operationClass = operationClass;
+    this.op = op;
+    this.label = op.label;
+    this.operationClass = op.operationClass;
     this.freeze();
   }
 
@@ -810,15 +816,11 @@ export class RawSqlCall extends PostgresOpFactoryCallNode {
   }
 
   toOp(): Op {
-    return rawSql(this.id, this.label, this.sql, this.operationClass);
+    return this.op;
   }
 
   renderTypeScript(): string {
-    const args = [jsonToTsSource(this.id), jsonToTsSource(this.label), jsonToTsSource(this.sql)];
-    if (this.operationClass !== 'additive') {
-      args.push(jsonToTsSource(this.operationClass));
-    }
-    return `rawSql(${args.join(', ')})`;
+    return `rawSql(${jsonToTsSource(this.op)})`;
   }
 }
 

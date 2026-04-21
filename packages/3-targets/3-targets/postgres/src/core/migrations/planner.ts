@@ -2,7 +2,6 @@ import {
   normalizeSchemaNativeType,
   parsePostgresDefault,
 } from '@prisma-next/adapter-postgres/control';
-import { errorPlanDoesNotSupportAuthoringSurface } from '@prisma-next/errors/migration';
 import type {
   CodecControlHooks,
   ComponentDatabaseDependency,
@@ -14,7 +13,6 @@ import type {
 } from '@prisma-next/family-sql/control';
 import {
   collectInitDependencies,
-  createMigrationPlan,
   extractCodecControlHooks,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
@@ -33,7 +31,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { ifDefined } from '@prisma-next/utils/defined';
 import type { ColumnSpec, ForeignKeySpec } from './op-factories';
 import {
   AddColumnCall,
@@ -43,6 +40,7 @@ import {
   CreateIndexCall,
   CreateTableCall,
   type PostgresOpFactoryCall,
+  RawSqlCall,
 } from './op-factory-call';
 import {
   buildAddColumnSql,
@@ -50,6 +48,7 @@ import {
   buildColumnTypeSql,
 } from './planner-ddl-builders';
 import { resolveIdentityValue } from './planner-identity-values';
+import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import {
   buildAddColumnOperationIdentity,
   buildAddNotNullColumnWithTemporaryDefaultOperation,
@@ -74,44 +73,22 @@ import {
   type PlanningMode,
   type PostgresPlanTargetDetails,
 } from './planner-target-details';
-import { renderOps } from './render-ops';
-import { renderDescriptorTypeScript } from './scaffolding';
 
 /**
- * Internal plan-item type: either a class-flow IR call (to be lowered via
- * `renderOps`) or a pre-built runtime op (already lowered by codec hooks,
- * dependency providers, reconciliation, or the multi-step column recipe).
+ * Lift a pre-built `SqlMigrationPlanOperation` into class-flow IR.
  *
- * The walk-schema planner accumulates a mixed array during Phase 1 — the IR
- * retarget covers the core additive paths (tables, columns, constraints,
- * indexes, FKs), while codec-hook-produced ops, dependency install arrays,
- * reconciliation, and the add-NOT-NULL-with-temporary-default recipe keep
- * producing pre-built ops until a follow-up phase retargets them too.
+ * Ops produced outside the planner's direct IR emission — by codec control
+ * hooks (`planTypeOperations`), component database dependency install
+ * arrays, the multi-step add-NOT-NULL-with-temporary-default recipe, and any
+ * other legacy/escape-hatch path — are wrapped in a `RawSqlCall` so the
+ * entire plan can flow through a single `PostgresOpFactoryCall[]` pipeline.
+ *
+ * A future pass (Path A in the project plan) will retarget those producers
+ * to emit structured call classes directly; at that point most call sites
+ * here disappear and this helper narrows to a last-resort launderer.
  */
-type PlanItem = PostgresOpFactoryCall | SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
-
-function isOpFactoryCall(item: PlanItem): item is PostgresOpFactoryCall {
-  return typeof (item as { factoryName?: unknown }).factoryName === 'string' && 'accept' in item;
-}
-
-function materializePlanItems(
-  items: readonly PlanItem[],
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
-  const calls: PostgresOpFactoryCall[] = [];
-  const out: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-  for (const item of items) {
-    if (isOpFactoryCall(item)) {
-      calls.push(item);
-    } else {
-      if (calls.length > 0) {
-        out.push(...renderOps(calls));
-        calls.length = 0;
-      }
-      out.push(item);
-    }
-  }
-  if (calls.length > 0) out.push(...renderOps(calls));
-  return out;
+function liftOpToCall(op: SqlMigrationPlanOperation<PostgresPlanTargetDetails>): RawSqlCall {
+  return new RawSqlCall(op);
 }
 
 function toColumnSpec(
@@ -166,44 +143,30 @@ export function createPostgresMigrationPlanner(
 }
 
 /**
- * Postgres planner success plan: the SQL-typed plan (so target-detail
- * typing is preserved for direct SQL callers, including this package's unit
- * tests) plus the framework-required `renderTypeScript()` stub.
- */
-export type PostgresPlanWithRender = ReturnType<
-  typeof createMigrationPlan<PostgresPlanTargetDetails>
-> & {
-  renderTypeScript(): string;
-};
-
-/**
- * Result of `PostgresMigrationPlanner.plan()`. A discriminated union that
- * satisfies both the framework's `MigrationPlannerResult` (success plan
- * carries `renderTypeScript()`) and the SQL family's typed result shape
- * (success plan is a `SqlMigrationPlan<PostgresPlanTargetDetails>`).
+ * Result of `PostgresMigrationPlanner.plan()`. A discriminated union whose
+ * success variant carries a `TypeScriptRenderablePostgresMigration` — a
+ * class-flow migration object that both the CLI (via
+ * `renderTypeScript()`) and the SQL-typed callers (via `operations`,
+ * `describe()`, etc.) consume uniformly.
  */
 export type PostgresPlanResult =
-  | { readonly kind: 'success'; readonly plan: PostgresPlanWithRender }
+  | { readonly kind: 'success'; readonly plan: TypeScriptRenderablePostgresMigration }
   | SqlPlannerFailureResult;
 
 /**
  * Postgres migration planner.
  *
- * Implements the framework's `MigrationPlanner<'sql', 'postgres'>` directly
- * — meaning it owns `emptyMigration()` and attaches the `renderTypeScript()`
- * stub to success plans (Postgres uses descriptor-flow authoring, so
- * `renderTypeScript()` throws on planner-produced plans). No external wrapper
- * is required at the descriptor level.
+ * Implements the framework's `MigrationPlanner<'sql', 'postgres'>` directly.
+ * Both `plan()` and `emptyMigration()` return a
+ * `TypeScriptRenderablePostgresMigration`: the class-flow IR
+ * (`PostgresOpFactoryCall[]`) drives both the runtime-ops view
+ * (via `renderOps`) and the `renderTypeScript()` authoring surface.
  *
  * `plan()` accepts the framework's option shape (with `contract`/`schema`
  * typed as `unknown`); SQL-typed callers may pass the more specific
  * `SqlMigrationPlannerPlanOptions`, since those structurally satisfy the
  * looser framework contract. Internally we treat options as the SQL-typed
  * superset so the existing planner logic stays identical.
- *
- * `fromHash` is accepted but ignored: Postgres is descriptor-flow and never
- * needs it (only class-flow planners like Mongo populate `describe()` from
- * `fromHash`).
  */
 export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
   constructor(private readonly config: PlannerConfig) {}
@@ -216,21 +179,17 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly schemaName?: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): PostgresPlanResult {
-    return this.planSql(options as SqlMigrationPlannerPlanOptions);
+    return this.planSql(options as SqlMigrationPlannerPlanOptions, options.fromHash ?? '');
   }
 
   emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
-    return {
-      targetId: 'postgres',
-      destination: { storageHash: context.toHash },
-      operations: [],
-      renderTypeScript(): string {
-        return renderDescriptorTypeScript([], context);
-      },
-    };
+    return new TypeScriptRenderablePostgresMigration([], {
+      from: context.fromHash,
+      to: context.toHash,
+    });
   }
 
-  private planSql(options: SqlMigrationPlannerPlanOptions): PostgresPlanResult {
+  private planSql(options: SqlMigrationPlannerPlanOptions, fromHash: string): PostgresPlanResult {
     const schemaName = options.schemaName ?? this.config.defaultSchema;
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) {
@@ -269,9 +228,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // Pre-compute constraint lookups once per schema table for O(1) checks across all builders.
     const schemaLookups = buildSchemaLookupMap(options.schema);
 
-    // Accumulate a mixed array of IR calls and pre-built ops in planner order,
-    // then materialize calls through `renderOps` in a single pass at the end.
-    const items: PlanItem[] = [
+    const calls: PostgresOpFactoryCall[] = [
       ...this.buildDatabaseDependencyOperations(options),
       ...storageTypePlan.operations,
       ...reconciliationPlan.operations,
@@ -297,25 +254,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       ...this.buildForeignKeyOperations(sortedTables, schemaLookups, schemaName),
     ];
 
-    const operations = materializePlanItems(items);
-
-    const plan = createMigrationPlan<PostgresPlanTargetDetails>({
-      targetId: 'postgres',
-      origin: null,
-      destination: {
-        storageHash: options.contract.storage.storageHash,
-        ...ifDefined('profileHash', options.contract.profileHash),
-      },
-      operations,
-    });
-
     return Object.freeze({
       kind: 'success' as const,
-      plan: Object.freeze({
-        ...plan,
-        renderTypeScript(): string {
-          throw errorPlanDoesNotSupportAuthoringSurface({ targetId: 'postgres' });
-        },
+      plan: new TypeScriptRenderablePostgresMigration(calls, {
+        from: fromHash,
+        to: options.contract.storage.storageHash,
       }),
     });
   }
@@ -335,13 +278,15 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
   /**
    * Builds migration operations from component-owned database dependencies.
-   * These operations install database-side persistence structures declared by components.
+   * These operations install database-side persistence structures declared
+   * by components. Each install op is wrapped via `liftOpToCall` so the
+   * planner output is a uniform `PostgresOpFactoryCall[]`.
    */
   private buildDatabaseDependencyOperations(
     options: PlannerOptionsWithComponents,
-  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+  ): readonly PostgresOpFactoryCall[] {
     const dependencies = this.collectDependencies(options);
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    const calls: PostgresOpFactoryCall[] = [];
     const seenDependencyIds = new Set<string>();
     const seenOperationIds = new Set<string>();
 
@@ -362,11 +307,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           continue;
         }
         seenOperationIds.add(installOp.id);
-        operations.push(installOp as SqlMigrationPlanOperation<PostgresPlanTargetDetails>);
+        calls.push(liftOpToCall(installOp as SqlMigrationPlanOperation<PostgresPlanTargetDetails>));
       }
     }
 
-    return operations;
+    return calls;
   }
 
   private buildStorageTypeOperations(
@@ -374,10 +319,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     schemaName: string,
     codecHooks: Map<string, CodecControlHooks>,
   ): {
-    readonly operations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+    readonly operations: readonly PostgresOpFactoryCall[];
     readonly conflicts: readonly SqlPlannerConflict[];
   } {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    const calls: PostgresOpFactoryCall[] = [];
     const conflicts: SqlPlannerConflict[] = [];
     const storageTypes = options.contract.storage.types ?? {};
 
@@ -405,17 +350,19 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           });
           continue;
         }
-        operations.push({
-          ...operation,
-          target: {
-            id: operation.target.id,
-            details: this.buildTargetDetails('type', typeName, schemaName),
-          },
-        });
+        calls.push(
+          liftOpToCall({
+            ...operation,
+            target: {
+              id: operation.target.id,
+              details: this.buildTargetDetails('type', typeName, schemaName),
+            },
+          }),
+        );
       }
     }
 
-    return { operations, conflicts };
+    return { operations: calls, conflicts };
   }
   private collectDependencies(
     options: PlannerOptionsWithComponents,
@@ -452,8 +399,8 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     schemaName: string,
     codecHooks: Map<string, CodecControlHooks>,
     storageTypes: Record<string, StorageTypeInstance>,
-  ): readonly PlanItem[] {
-    const items: PlanItem[] = [];
+  ): readonly PostgresOpFactoryCall[] {
+    const calls: PostgresOpFactoryCall[] = [];
     for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
       if (!schemaTable) {
@@ -464,7 +411,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         if (schemaTable.columns[columnName]) {
           continue;
         }
-        items.push(
+        calls.push(
           this.buildAddColumnItem({
             schema: schemaName,
             tableName,
@@ -479,15 +426,15 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         );
       }
     }
-    return items;
+    return calls;
   }
 
   /**
    * Most add-column flows lower to a single `AddColumnCall` IR node. The
-   * "NOT NULL without default, shared-temp-default safe" path keeps producing
-   * a pre-built multi-step op via `buildAddNotNullColumnWithTemporaryDefaultOperation`
-   * because it's a composite recipe (add nullable → backfill → SET NOT NULL
-   * → DROP DEFAULT) that doesn't map to a single `op-factories` call.
+   * NOT-NULL-without-default paths produce composite multi-step ops (either
+   * the shared-temp-default recipe or a hand-built op with a `table is
+   * empty` safety precheck); both are wrapped via `liftOpToCall` so the
+   * planner emits a uniform `PostgresOpFactoryCall[]`.
    */
   private buildAddColumnItem(options: {
     readonly schema: string;
@@ -499,7 +446,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly column: StorageColumn;
     readonly codecHooks: Map<string, CodecControlHooks>;
     readonly storageTypes: Record<string, StorageTypeInstance>;
-  }): PlanItem {
+  }): PostgresOpFactoryCall {
     const {
       schema,
       tableName,
@@ -528,15 +475,17 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       });
 
     if (canUseSharedTemporaryDefault) {
-      return buildAddNotNullColumnWithTemporaryDefaultOperation({
-        schema,
-        tableName,
-        columnName,
-        column,
-        codecHooks,
-        storageTypes,
-        temporaryDefault,
-      });
+      return liftOpToCall(
+        buildAddNotNullColumnWithTemporaryDefaultOperation({
+          schema,
+          tableName,
+          columnName,
+          column,
+          codecHooks,
+          storageTypes,
+          temporaryDefault,
+        }),
+      );
     }
 
     // Edge case: NOT-NULL-without-default where shared temp-default is unsafe.
@@ -546,7 +495,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const requiresEmptyTableCheck = needsTemporaryDefault && !canUseSharedTemporaryDefault;
     if (requiresEmptyTableCheck) {
       const qualified = qualifyTableName(schema, tableName);
-      return {
+      return liftOpToCall({
         ...buildAddColumnOperationIdentity(schema, tableName, columnName),
         operationClass: 'additive',
         precheck: [
@@ -587,7 +536,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
             }),
           },
         ],
-      };
+      });
     }
 
     return new AddColumnCall(
