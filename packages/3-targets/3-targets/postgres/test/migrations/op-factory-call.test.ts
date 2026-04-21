@@ -14,6 +14,7 @@
  *   `renderOps` and `renderTypeScript()` through `renderCallsToTypeScript`.
  */
 
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import {
   AddColumnCall,
@@ -461,7 +462,7 @@ describe('renderOps', () => {
       schema: 'public',
       objectType,
       name,
-      ...(table !== undefined ? { table } : {}),
+      ...ifDefined('table', table),
     });
     const expectations: Array<{
       id: string;
@@ -568,7 +569,7 @@ describe('renderOps', () => {
         operationClass: expected.operationClass,
         target: {
           id: 'postgres',
-          ...(expected.details !== undefined ? { details: expected.details } : {}),
+          ...ifDefined('details', expected.details),
         },
       });
     }
