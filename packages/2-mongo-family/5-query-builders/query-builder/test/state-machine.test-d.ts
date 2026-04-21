@@ -48,50 +48,52 @@ describe('state machine', () => {
     expectTypeOf(sorted).not.toExtend<FilteredCollection<TContract, 'Order'>>();
   });
 
-  it('marker table: limit() clears both markers', () => {
+  it('from(name) starts with both markers cleared', () => {
+    // `.from(...)` returns a `CollectionHandle` that extends
+    // `PipelineChain<..., 'update-cleared', 'fam-cleared'>` — the update and
+    // find-and-modify terminals inherited from `PipelineChain` are gated off
+    // by default, so a leading `.match(...)` is required before reaching them
+    // via the `FilteredCollection` overrides (see ADR 201).
+    const handle = mongoQuery<TContract>({ contractJson }).from('orders');
+    expectTypeOf<GetU<typeof handle>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
+    expectTypeOf<GetF<typeof handle>>().toEqualTypeOf<'fam-cleared' & FindAndModifyEnabled>();
+  });
+
+  it('match(...) transitions to FilteredCollection, markers remain cleared', () => {
+    // `FilteredCollection` extends `PipelineChain<..., 'update-cleared',
+    // 'fam-cleared'>` for the same reason — the write/find-and-modify
+    // terminals on `FilteredCollection` are dedicated overrides (not the
+    // marker-gated PipelineChain versions), so the initial marker state
+    // stays cleared to prevent accidental access to the PipelineChain
+    // inheritance path.
+    const filtered = mongoQuery<TContract>({ contractJson })
+      .from('orders')
+      .match(MongoFieldFilter.eq('status', 'active'));
+    expectTypeOf<GetU<typeof filtered>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
+    expectTypeOf<GetF<typeof filtered>>().toEqualTypeOf<'fam-cleared' & FindAndModifyEnabled>();
+  });
+
+  it('marker table: limit() leaves both markers cleared', () => {
     const limited = mongoQuery<TContract>({ contractJson }).from('orders').limit(1);
     expectTypeOf<GetU<typeof limited>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
     expectTypeOf<GetF<typeof limited>>().toEqualTypeOf<'fam-cleared' & FindAndModifyEnabled>();
   });
 
-  it('marker table: addFields preserves UpdateEnabled, clears FindAndModifyEnabled', () => {
+  it('marker table: sort / addFields / group all leave both markers cleared from .from()', () => {
+    const sorted = mongoQuery<TContract>({ contractJson }).from('orders').sort({ amount: -1 });
+    expectTypeOf<GetU<typeof sorted>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
+    expectTypeOf<GetF<typeof sorted>>().toEqualTypeOf<'fam-cleared' & FindAndModifyEnabled>();
+
     const added = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .addFields((f) => ({ doubled: f.amount }));
-    expectTypeOf<GetU<typeof added>>().toEqualTypeOf<'update-ok' & UpdateEnabled>();
+    expectTypeOf<GetU<typeof added>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
     expectTypeOf<GetF<typeof added>>().toEqualTypeOf<'fam-cleared' & FindAndModifyEnabled>();
-  });
 
-  it('marker table: sort preserves FindAndModifyEnabled, clears UpdateEnabled', () => {
-    const sorted = mongoQuery<TContract>({ contractJson }).from('orders').sort({ amount: -1 });
-    expectTypeOf<GetU<typeof sorted>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
-    expectTypeOf<GetF<typeof sorted>>().toEqualTypeOf<'fam-ok' & FindAndModifyEnabled>();
-  });
-
-  it('marker table: group clears both markers', () => {
     const grouped = mongoQuery<TContract>({ contractJson })
       .from('orders')
       .group((_f) => ({ _id: null }));
     expectTypeOf<GetU<typeof grouped>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
     expectTypeOf<GetF<typeof grouped>>().toEqualTypeOf<'fam-cleared' & FindAndModifyEnabled>();
-  });
-
-  // --- Leading-match prefix (ADR 201) ---
-
-  it('match* stays in the leading-match prefix and preserves UpdateEnabled', () => {
-    const twoMatches = mongoQuery<TContract>({ contractJson })
-      .from('orders')
-      .match(MongoFieldFilter.eq('status', 'active'))
-      .match(MongoFieldFilter.gt('amount', 100));
-    expectTypeOf<GetU<typeof twoMatches>>().toEqualTypeOf<'update-ok' & UpdateEnabled>();
-  });
-
-  it('match after a non-match stage clears UpdateEnabled (past leading-match prefix)', () => {
-    const pastLeading = mongoQuery<TContract>({ contractJson })
-      .from('orders')
-      .match(MongoFieldFilter.eq('status', 'active'))
-      .addFields((f) => ({ doubled: f.amount }))
-      .match(MongoFieldFilter.gt('amount', 100));
-    expectTypeOf<GetU<typeof pastLeading>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
   });
 });

@@ -4,11 +4,31 @@ import {
   UpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
+import type { PipelineChain } from '../src/builder';
 import { mongoQuery } from '../src/query';
+import type { ModelToDocShape } from '../src/types';
 import type { TContract } from './fixtures/test-contract';
 import { testContractJson } from './fixtures/test-contract';
 
 const orders = () => mongoQuery<TContract>({ contractJson: testContractJson }).from('orders');
+
+/**
+ * After A25 (`CollectionHandle`/`FilteredCollection` start with
+ * `'update-cleared' / 'fam-cleared'`), the marker-gated terminals on
+ * `PipelineChain` are no longer callable via the public surface for chains
+ * that don't stay inside the `FilteredCollection` override path. The runtime
+ * deconstruction behaviour still needs coverage though, so the tests below
+ * cast to a `PipelineChain` with the markers forced to `'fam-ok'` to reach
+ * the inherited `findOneAndUpdate`/`findOneAndDelete` and exercise the
+ * runtime validation paths directly.
+ */
+type FamReachableChain = PipelineChain<
+  TContract,
+  ModelToDocShape<TContract, 'Order'>,
+  'update-cleared',
+  'fam-ok',
+  'past-leading'
+>;
 
 describe('M3 find-and-modify and upsert terminals', () => {
   describe('FilteredCollection.findOneAndUpdate', () => {
@@ -65,10 +85,10 @@ describe('M3 find-and-modify and upsert terminals', () => {
 
   describe('PipelineChain.findOneAndUpdate (chain deconstruction)', () => {
     it('deconstructs match + sort into wire-command slots', () => {
-      const plan = orders()
+      const chain = orders()
         .match((f) => f.status.eq('new'))
-        .sort({ amount: -1 })
-        .findOneAndUpdate((f) => [f.status.set('processed')]);
+        .sort({ amount: -1 }) as unknown as FamReachableChain;
+      const plan = chain.findOneAndUpdate((f) => [f.status.set('processed')]);
       expect(plan.command).toBeInstanceOf(FindOneAndUpdateCommand);
       expect(plan.command.sort).toEqual({ amount: -1 });
       expect(plan.command.update).toEqual({ $set: { status: 'processed' } });
@@ -86,7 +106,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
       const chain = orders()
         .match((f) => f.status.eq('new'))
         .sort({ amount: 1 })
-        .sort({ amount: -1 });
+        .sort({ amount: -1 }) as unknown as FamReachableChain;
       expect(() => chain.findOneAndUpdate((f) => [f.status.set('seen')])).toThrow(
         /at most one \$sort stage/,
       );
@@ -96,7 +116,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
       const chain = orders()
         .match((f) => f.status.eq('new'))
         .sort({ amount: -1 })
-        .match((f) => f.amount.gt(10)) as unknown as ReturnType<typeof orders>;
+        .match((f) => f.amount.gt(10)) as unknown as FamReachableChain;
       expect(() => chain.findOneAndUpdate((f) => [f.status.set('bad')])).toThrow(
         /\$match\+ -> \$sort\? shape/,
       );
@@ -105,7 +125,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
     it('rejects .skip() stages outright (MongoDB findAndModify has no skip slot)', () => {
       const chain = orders()
         .match((f) => f.status.eq('new'))
-        .skip(5) as unknown as ReturnType<typeof orders>;
+        .skip(5) as unknown as FamReachableChain;
       expect(() => chain.findOneAndUpdate((f) => [f.status.set('bad')])).toThrow(
         /does not support \.skip\(\)/,
       );
@@ -114,7 +134,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
     it('throws on chains with non-deconstructable stages', () => {
       const chain = orders()
         .match((f) => f.status.eq('new'))
-        .addFields(() => ({})) as unknown as ReturnType<typeof orders>;
+        .addFields(() => ({})) as unknown as FamReachableChain;
       expect(() => chain.findOneAndUpdate((f) => [f.status.set('bad')])).toThrow(
         /\$match\+ -> \$sort\? shape/,
       );
@@ -123,10 +143,10 @@ describe('M3 find-and-modify and upsert terminals', () => {
 
   describe('PipelineChain.findOneAndDelete (chain deconstruction)', () => {
     it('deconstructs match + sort into wire-command slots', () => {
-      const plan = orders()
+      const chain = orders()
         .match((f) => f.status.eq('archived'))
-        .sort({ amount: 1 })
-        .findOneAndDelete();
+        .sort({ amount: 1 }) as unknown as FamReachableChain;
+      const plan = chain.findOneAndDelete();
       expect(plan.command).toBeInstanceOf(FindOneAndDeleteCommand);
       expect(plan.command.sort).toEqual({ amount: 1 });
     });

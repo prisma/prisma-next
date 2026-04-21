@@ -6,12 +6,27 @@ import {
   UpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
+import type { PipelineChain } from '../src/builder';
 import { mongoQuery } from '../src/query';
+import type { ModelToDocShape } from '../src/types';
 import type { UpdaterResult } from '../src/update-ops';
 import type { TContract } from './fixtures/test-contract';
 import { testContractJson } from './fixtures/test-contract';
 
 const orders = () => mongoQuery<TContract>({ contractJson: testContractJson }).from('orders');
+
+/**
+ * After A25 (`CollectionHandle`/`FilteredCollection` start with
+ * `'update-cleared' / 'fam-cleared'`), reaching the no-arg
+ * `PipelineChain.updateMany()` / `updateOne()` terminals via the public
+ * surface is no longer type-safe (the marker never recovers from the
+ * cleared initial state). The runtime behaviour of `deconstructUpdateChain`
+ * still needs coverage, so these tests cast to a `PipelineChain` with
+ * `'update-ok'` forced to reach the inherited methods directly.
+ */
+type UpdateReachableChain<
+  Shape extends ModelToDocShape<TContract, 'Order'> = ModelToDocShape<TContract, 'Order'>,
+> = PipelineChain<TContract, Shape, 'update-ok', 'fam-cleared', 'past-leading'>;
 
 describe('F3 pipeline-style updates', () => {
   describe('f.stage emitters', () => {
@@ -70,10 +85,10 @@ describe('F3 pipeline-style updates', () => {
 
   describe('no-arg PipelineChain.updateMany()', () => {
     it('deconstructs leading $match + trailing pipeline stages into UpdateManyCommand', () => {
-      const plan = orders()
+      const chain = orders()
         .match((f) => f.status.eq('new'))
-        .addFields((f) => ({ total: f.amount }))
-        .updateMany();
+        .addFields((f) => ({ total: f.amount })) as unknown as UpdateReachableChain;
+      const plan = chain.updateMany();
       expect(plan.command).toBeInstanceOf(UpdateManyCommand);
       const cmd = plan.command;
       expect(cmd.update).toHaveLength(1);
@@ -82,11 +97,11 @@ describe('F3 pipeline-style updates', () => {
     });
 
     it('AND-folds multiple $match stages in the filter', () => {
-      const plan = orders()
+      const chain = orders()
         .match((f) => f.status.eq('new'))
         .match((f) => f.amount.gt(10))
-        .addFields((f) => ({ total: f.amount }))
-        .updateMany();
+        .addFields((f) => ({ total: f.amount })) as unknown as UpdateReachableChain;
+      const plan = chain.updateMany();
       const cmd = plan.command;
       expect(cmd.filter.kind).toBe('and');
     });
@@ -94,7 +109,7 @@ describe('F3 pipeline-style updates', () => {
     it('throws without any .match() stages', () => {
       expect(() =>
         (
-          orders().addFields((f) => ({ total: f.amount })) as unknown as ReturnType<typeof orders>
+          orders().addFields((f) => ({ total: f.amount })) as unknown as UpdateReachableChain
         ).updateMany(),
       ).toThrow(/at least one .match/);
     });
@@ -103,7 +118,7 @@ describe('F3 pipeline-style updates', () => {
       const chain = orders()
         .match((f) => f.status.eq('new'))
         .sort({ amount: -1 });
-      expect(() => (chain as unknown as ReturnType<typeof orders>).updateMany()).toThrow(
+      expect(() => (chain as unknown as UpdateReachableChain).updateMany()).toThrow(
         /non-update stage/,
       );
     });
@@ -111,17 +126,17 @@ describe('F3 pipeline-style updates', () => {
     it('throws on non-update stages after $match', () => {
       const chain = orders()
         .match((f) => f.status.eq('new'))
-        .sort({ amount: -1 }) as unknown as ReturnType<typeof orders>;
+        .sort({ amount: -1 }) as unknown as UpdateReachableChain;
       expect(() => chain.updateMany()).toThrow(/non-update stage/);
     });
   });
 
   describe('no-arg PipelineChain.updateOne()', () => {
     it('maps to UpdateOneCommand', () => {
-      const plan = orders()
+      const chain = orders()
         .match((f) => f.status.eq('new'))
-        .addFields((f) => ({ total: f.amount }))
-        .updateOne();
+        .addFields((f) => ({ total: f.amount })) as unknown as UpdateReachableChain;
+      const plan = chain.updateOne();
       expect(plan.command).toBeInstanceOf(UpdateOneCommand);
     });
   });
