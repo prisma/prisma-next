@@ -25,6 +25,40 @@ describe('state-machine surface (negative type tests)', () => {
     h.deleteOne();
   });
 
+  it('CollectionHandle starts with cleared markers — bare update / find-and-modify terminals rejected', () => {
+    // A25: `CollectionHandle` extends `PipelineChain<..., 'update-cleared',
+    // 'fam-cleared'>`, so the marker-gated terminals inherited from
+    // `PipelineChain` are compile-time unreachable without a leading
+    // `.match(...)`. This matches `deconstructUpdateChain` /
+    // `deconstructFindAndModifyChain`, which throw at runtime without a
+    // leading `$match`.
+    const h = handle();
+    // @ts-expect-error — bare .updateMany() requires a leading .match(...)
+    h.updateMany();
+    // @ts-expect-error — bare .updateOne() requires a leading .match(...)
+    h.updateOne();
+    // @ts-expect-error — bare .findOneAndUpdate(...) requires a leading .match(...)
+    h.findOneAndUpdate((f) => [f.amount.inc(1)]);
+    // @ts-expect-error — bare .findOneAndDelete() requires a leading .match(...)
+    h.findOneAndDelete();
+  });
+
+  it('FilteredCollection starts with fam-cleared — sort past the override stays rejected', () => {
+    // A25: `FilteredCollection` also starts `'fam-cleared'`. The
+    // findOneAndUpdate/findOneAndDelete methods on `FilteredCollection`
+    // itself are dedicated overrides (reachable without markers), but
+    // stages that return a `PipelineChain` (like `.sort(...)`) preserve
+    // the cleared `F` marker, so the inherited find-and-modify terminals
+    // remain unreachable there. Runtime tests that want to exercise the
+    // `deconstructFindAndModifyChain` code path have to `as unknown as`
+    // to force the call (see `test/find-and-modify.test.ts`).
+    const sorted = filtered().sort({ amount: -1 });
+    // @ts-expect-error — sort-past-FilteredCollection keeps F = 'fam-cleared'
+    sorted.findOneAndUpdate((f) => [f.amount.inc(1)]);
+    // @ts-expect-error — sort-past-FilteredCollection keeps F = 'fam-cleared'
+    sorted.findOneAndDelete();
+  });
+
   it('findOneAndUpdate / findOneAndDelete unavailable after FindAndModifyEnabled-clearing stages', () => {
     // .group() clears both markers
     const grouped = handle()
