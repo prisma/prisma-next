@@ -84,9 +84,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           PRIMARY KEY ("id")
         );
 
-        ALTER TABLE "public"."user"
-        ADD CONSTRAINT "user_email_key"
-        UNIQUE ("email")"
+        ALTER TABLE "public"."user" ADD CONSTRAINT "user_email_key" UNIQUE ("email")"
       `);
     });
   });
