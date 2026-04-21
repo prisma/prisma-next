@@ -177,7 +177,7 @@ A poor fit is a builder whose chain is just progressive configuration of a singl
 
 ### Accept everything, validate at runtime
 
-Have a single `PipelineBuilder` class with every method on it. Invalid combinations throw from `.build()` when they're detected. This is where [`@prisma-next/mongo-pipeline-builder`](../../../packages/2-mongo-family/5-query-builders/query-builder/README.md) started before it was unified into the CRUD surface.
+Have a single `PipelineBuilder` class with every method on it. Invalid combinations throw from `.build()` when they're detected. This is where the Mongo builder started — as `@prisma-next/mongo-pipeline-builder`, since renamed to [`@prisma-next/mongo-query-builder`](../../../packages/2-mongo-family/5-query-builders/query-builder/README.md) — before it was unified into the CRUD surface.
 
 **Why we rejected it.** The type system contributes nothing — every illegal combination has to be caught by hand-rolled validation code inside each terminal. The list of illegal combinations grows with every new stage and every new terminal, each pair needing its own check. Error messages are runtime strings instead of compile-time structural errors, and the author finds out about the mistake at execution time rather than in the editor.
 
