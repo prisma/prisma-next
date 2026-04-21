@@ -20,19 +20,24 @@ class BackfillProductStatus extends Migration {
       dataTransform('backfill-product-status', {
         check: {
           // `status` is not part of the typed Product shape (it's the field we
-          // are backfilling), so use the callable form `f("status")` per
-          // ADR 180. Strict path validation is tracked on TML-2281.
+          // are backfilling), so use the `f.raw(...)` escape hatch — the
+          // strict callable `f("status")` would reject an unknown path per
+          // TML-2281. `f.raw` yields the full leaf operator surface with no
+          // contract validation; this is the sanctioned pattern for
+          // migration authoring where the target field is not yet part of
+          // the contract. See ADR 180 and @prisma-next/mongo-query-builder's
+          // README.
           source: () =>
             query
               .from('products')
-              .match((f) => f('status').exists(false))
+              .match((f) => f.raw('status').exists(false))
               .limit(1),
         },
         run: () =>
           query
             .from('products')
-            .match((f) => f('status').exists(false))
-            .updateMany((f) => [f('status').set('active')]),
+            .match((f) => f.raw('status').exists(false))
+            .updateMany((f) => [f.raw('status').set('active')]),
       }),
     ];
   }
