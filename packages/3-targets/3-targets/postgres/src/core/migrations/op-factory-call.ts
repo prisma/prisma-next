@@ -6,11 +6,14 @@
  * receive, computes a human-readable `label` in its constructor, and
  * implements three polymorphic hooks:
  *
- * - `toOp()` — converts the IR node to a runtime `SqlMigrationPlanOperation`
- *   by delegating to the matching pure factory in `op-factories.ts`.
- * - `renderTypeScript()` / `importRequirements()` — used by
- *   `renderCallsToTypeScript` to emit the call as a TypeScript expression
- *   inside the scaffolded `migration.ts`.
+ * - `toOp()` — converts the IR node to a runtime
+ *   `SqlMigrationPlanOperation` by delegating to the matching pure factory
+ *   in `op-factories.ts`. `DataTransformCall.toOp()` always throws
+ *   `PN-MIG-2001` because a planner-generated data transform is an
+ *   unfilled authoring stub by construction.
+ * - `renderTypeScript()` / `importRequirements()` — inherited from
+ *   `TsExpression`. Used by `renderCallsToTypeScript` to emit the call as
+ *   a TypeScript expression inside the scaffolded `migration.ts`.
  * - `accept(visitor)` — retained for future exhaustive walks.
  *
  * The abstract base and all concrete classes are package-private. External
@@ -880,28 +883,29 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
 // ============================================================================
 
 /**
- * `check` and `run` accept any `TsExpression`. `toOp()` throws
- * `PN-MIG-2001` because expression-bodied data transforms cannot be
- * lowered to runtime ops — the user must fill in the rendered
- * `migration.ts` and run it directly.
+ * A planner-generated data-transform stub. `checkSlot` and `runSlot` name
+ * the unfilled authoring slots that the rendered `migration.ts` will expose
+ * to the user via `placeholder("…")` calls. `toOp()` always throws
+ * `PN-MIG-2001`: the planner cannot lower a stubbed transform to a runtime
+ * op — the user must fill the rendered `migration.ts` and re-emit.
  */
 export class DataTransformCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dataTransform' as const;
   readonly operationClass: MigrationOperationClass;
   readonly label: string;
-  readonly check: TsExpression;
-  readonly run: TsExpression;
+  readonly checkSlot: string;
+  readonly runSlot: string;
 
   constructor(
     label: string,
-    check: TsExpression,
-    run: TsExpression,
+    checkSlot: string,
+    runSlot: string,
     operationClass: MigrationOperationClass = 'data',
   ) {
     super();
     this.label = label;
-    this.check = check;
-    this.run = run;
+    this.checkSlot = checkSlot;
+    this.runSlot = runSlot;
     this.operationClass = operationClass;
     this.freeze();
   }
@@ -915,14 +919,13 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `dataTransform(${JSON.stringify(this.label)}, () => ${this.check.renderTypeScript()}, () => ${this.run.renderTypeScript()})`;
+    return `dataTransform(${JSON.stringify(this.label)}, () => placeholder(${JSON.stringify(this.checkSlot)}), () => placeholder(${JSON.stringify(this.runSlot)}))`;
   }
 
   override importRequirements(): readonly ImportRequirement[] {
     return [
       { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName },
-      ...this.check.importRequirements(),
-      ...this.run.importRequirements(),
+      { moduleSpecifier: '@prisma-next/errors/migration', symbol: 'placeholder' },
     ];
   }
 }
