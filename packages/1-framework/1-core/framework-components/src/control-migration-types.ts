@@ -95,16 +95,6 @@ export interface MigrationOperationPolicy {
 // ============================================================================
 
 /**
- * Minimal shape for operation descriptors at the framework level.
- * Targets produce richer types; this captures just enough for the
- * framework to scaffold migration.ts files and pass descriptors through.
- */
-export interface OperationDescriptor {
-  readonly kind: string;
-  readonly [key: string]: unknown;
-}
-
-/**
  * A single migration operation for display purposes.
  * Contains only the fields needed for CLI output (tree view, JSON envelope).
  */
@@ -418,67 +408,12 @@ export interface TargetMigrationsCapability<
   ): unknown;
 
   /**
-   * Plans a migration using the descriptor-based planner.
-   * Returns operation descriptors that the caller scaffolds into a
-   * `migration.ts` file. Whether the resulting migration can be emitted
-   * end-to-end is determined at emit time (via `placeholder()` errors
-   * thrown for unfilled slots), not by the planner.
-   */
-  planWithDescriptors?(context: {
-    readonly fromContract: Contract | null;
-    readonly toContract: Contract;
-    readonly frameworkComponents?: ReadonlyArray<
-      TargetBoundComponentDescriptor<TFamilyId, TTargetId>
-    >;
-  }):
-    | {
-        readonly ok: true;
-        readonly descriptors: readonly OperationDescriptor[];
-      }
-    | {
-        readonly ok: false;
-        readonly conflicts: readonly MigrationPlannerConflict[];
-      };
-
-  /**
-   * Resolves operation descriptors into target-specific migration plan operations
-   * with SQL/DDL, prechecks, and postchecks. Called by `migration emit` to
-   * serialize migration.ts into ops.json.
-   */
-  resolveDescriptors?(
-    descriptors: readonly OperationDescriptor[],
-    context: {
-      readonly fromContract: Contract | null;
-      readonly toContract: Contract;
-      readonly schemaName?: string;
-      readonly frameworkComponents?: ReadonlyArray<
-        TargetBoundComponentDescriptor<TFamilyId, TTargetId>
-      >;
-    },
-  ): readonly MigrationPlanOperation[];
-
-  /**
-   * Optional: render a descriptor list back to a populated `migration.ts`
-   * source string.
-   *
-   * Descriptor-flow targets (e.g. Postgres) implement this so that
-   * `migration plan` can hand the user an editable authoring surface that
-   * already captures the planner's decisions. Class-flow targets do not
-   * implement it — their planner already returns a renderable plan via
-   * `MigrationPlannerSuccessResult.plan.renderTypeScript()`.
-   */
-  renderDescriptorTypeScript?(
-    descriptors: readonly OperationDescriptor[],
-    context: MigrationScaffoldContext,
-  ): string;
-
-  /**
    * Optional: in-process emit capability for class-flow migration files.
    *
-   * Targets that author `migration.ts` as an executable class (rather than
-   * an array of descriptors) implement `emit` to produce `ops.json` from
-   * the source file directly. The framework dispatches to `emit` whenever
-   * `resolveDescriptors` is not present on the target.
+   * Targets that author `migration.ts` as an executable class implement
+   * `emit` to produce `ops.json` from the source file directly. The
+   * framework dispatches to `emit` whenever the CLI needs to serialize a
+   * migration's operations for storage or display.
    *
    * The capability runs in the same Node process as the CLI:
    *  - The target dynamically imports `<dir>/migration.ts`, locates the
@@ -513,8 +448,7 @@ export interface TargetMigrationsCapability<
  *
  * Kept minimal: only the paths a target might need to compute relative imports
  * (e.g. the contract `.d.ts` import for typed-contract builders). Passed to
- * `MigrationPlanner.emptyMigration(context)` and to
- * `TargetMigrationsCapability.renderDescriptorTypeScript(descriptors, context)`.
+ * `MigrationPlanner.emptyMigration(context)`.
  */
 export interface MigrationScaffoldContext {
   /** Absolute path to the migration package directory. Used by targets to compute relative imports. */
