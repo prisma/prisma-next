@@ -4,7 +4,7 @@
  * - Every `*Call` class constructs with literal args, is frozen, computes its
  *   label, dispatches through `accept()` to the right visitor method, and
  *   emits the expected TypeScript expression + import requirements.
- * - `PlaceholderExpression` renders as `() => placeholder("slot")` and
+ * - `PlaceholderExpression` renders as bare `placeholder("slot")` and
  *   declares the matching import.
  * - `renderCallsToTypeScript` deduplicates + sorts imports across a mixed
  *   call list, and recurses into `DataTransformCall` children polymorphically.
@@ -49,7 +49,7 @@ describe('PlaceholderExpression', () => {
 
     expect(Object.isFrozen(placeholder)).toBe(true);
     expect(placeholder.slot).toBe('backfill-users');
-    expect(placeholder.renderTypeScript()).toBe('() => placeholder("backfill-users")');
+    expect(placeholder.renderTypeScript()).toBe('placeholder("backfill-users")');
   });
 
   it('requires the `placeholder` symbol from the errors-migration module', () => {
