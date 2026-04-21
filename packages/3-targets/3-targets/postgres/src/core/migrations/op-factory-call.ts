@@ -816,7 +816,7 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `dataTransform(${JSON.stringify(this.label)}, ${this.check.renderTypeScript()}, ${this.run.renderTypeScript()})`;
+    return `dataTransform(${JSON.stringify(this.label)}, () => ${this.check.renderTypeScript()}, () => ${this.run.renderTypeScript()})`;
   }
 
   override importRequirements(): readonly ImportRequirement[] {
