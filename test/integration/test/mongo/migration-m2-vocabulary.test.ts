@@ -1,5 +1,6 @@
-import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
@@ -64,7 +65,7 @@ async function planAndApply(
     contract: destination,
     schema,
     policy: ALL_POLICY,
-    fromHash: 'sha256:origin',
+    fromHash: 'sha256:00',
     frameworkComponents: [],
   });
   if (result.kind !== 'success') {
@@ -77,7 +78,9 @@ async function planAndApply(
   const serialized = JSON.parse(serializeMongoOps(ops));
   const controlDriver = await mongoControlDriver.create(replSetUri);
   try {
-    const runner = new MongoMigrationRunner(createMongoRunnerDeps(controlDriver));
+    const runner = new MongoMigrationRunner(
+      createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+    );
     const runResult = await runner.execute({
       plan: {
         targetId: 'mongo',

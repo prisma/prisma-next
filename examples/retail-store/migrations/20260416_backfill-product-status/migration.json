@@ -1,0 +1,20 @@
+{
+  "migrationId": "sha256:70ba2c212c56b904fe1188b0e864a437058ca8c7d086a08d9cdf5aa1983cb786",
+  "from": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d",
+  "to": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d",
+  "kind": "regular",
+  "labels": ["backfill-product-status"],
+  "createdAt": "2026-04-16T07:26:17.265Z",
+  "fromContract": null,
+  "toContract": {
+    "storage": {
+      "storageHash": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d"
+    }
+  },
+  "hints": {
+    "used": [],
+    "applied": [],
+    "plannerVersion": "2.0.0",
+    "planningStrategy": "class-based"
+  }
+}

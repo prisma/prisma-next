@@ -102,18 +102,29 @@ export class RawFindOneAndUpdateCommand extends MongoAstNode {
   readonly filter: Document;
   readonly update: Document | ReadonlyArray<Document>;
   readonly upsert: boolean;
+  readonly sort: Record<string, 1 | -1> | undefined;
+  /**
+   * When `undefined`, the option is omitted from the wire command and the
+   * MongoDB driver applies its documented default (return the pre-image
+   * document). Set explicitly to `'before'` or `'after'` to override.
+   */
+  readonly returnDocument: 'before' | 'after' | undefined;
 
   constructor(
     collection: string,
     filter: Document,
     update: Document | ReadonlyArray<Document>,
-    upsert: boolean,
+    upsert = false,
+    sort?: Record<string, 1 | -1>,
+    returnDocument?: 'before' | 'after',
   ) {
     super();
     this.collection = collection;
     this.filter = filter;
     this.update = update;
     this.upsert = upsert;
+    this.sort = sort;
+    this.returnDocument = returnDocument;
     this.freeze();
   }
 }
@@ -122,11 +133,13 @@ export class RawFindOneAndDeleteCommand extends MongoAstNode {
   readonly kind = 'rawFindOneAndDelete' as const;
   readonly collection: string;
   readonly filter: Document;
+  readonly sort: Record<string, 1 | -1> | undefined;
 
-  constructor(collection: string, filter: Document) {
+  constructor(collection: string, filter: Document, sort?: Record<string, 1 | -1>) {
     super();
     this.collection = collection;
     this.filter = filter;
+    this.sort = sort;
     this.freeze();
   }
 }

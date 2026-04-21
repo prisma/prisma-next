@@ -45,6 +45,8 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 019 | TypedSQL as Separate CLI | Establishes TypedSQL as out-of-tree tool that emits Plan factories | [ADR 019 - TypedSQL as Separate CLI.md](adrs/ADR%20019%20-%20TypedSQL%20as%20Separate%20CLI.md) |
 | 020 | Result Typing Rules | Defines how DSL and ORM compute result types from projections and joins | [ADR 020 - Result Typing Rules.md](adrs/ADR%20020%20-%20Result%20Typing%20Rules.md) |
 | 025 | Plan Caching Memoization | Establishes Plan caching strategy with memoization and invalidation | [ADR 025 - Plan Caching Memoization.md](adrs/ADR%20025%20-%20Plan%20Caching%20Memoization.md) |
+| 180 | Dot-path field accessor | Callable string accessor (`u("homeAddress.city")`) for value object fields and Mongo update operators; unified `FieldAccessor` used by both read and write callbacks in the Mongo query builder | [ADR 180 - Dot-path field accessor.md](adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md) |
+| 201 | State-machine pattern for typed DSL builders | Three-class state machine (`CollectionHandle` → `FilteredCollection` → `PipelineChain`) with phantom marker types gating conditional terminals; pattern used in `mongo-query-builder`, candidate for reuse in a typed SQL query builder | [ADR 201 - State-machine pattern for typed DSL builders.md](adrs/ADR%20201%20-%20State-machine%20pattern%20for%20typed%20DSL%20builders.md) |
 
 ## Runtime & Execution
 
@@ -63,6 +65,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 169 | Declared applicability for mutation default generators | Records the decision to validate generator/column compatibility via contributor-declared applicability and to assemble generator implementations via composed registries | [ADR 169 - Declared applicability for mutation default generators.md](adrs/ADR%20169%20-%20Declared%20applicability%20for%20mutation%20default%20generators.md) |
 | 160 | Plan grouping keys for multi-statement orchestration | Adds `meta.groupingKey` to correlate multiple statement executions that serve one higher-level operation | [ADR 160 - Plan grouping keys for multi-statement orchestration.md](adrs/ADR%20160%20-%20Plan%20grouping%20keys%20for%20multi-statement%20orchestration.md) |
 | 164 | Repository Layer | Defines `@prisma-next/sql-orm-client` as a multi-query orchestration surface in the extensions integrations layer | [ADR 164 - Repository Layer.md](adrs/ADR%20164%20-%20Repository%20Layer.md) |
+| 202 | Codec trait system | Semantic capability traits (`equality`, `order`, `numeric`, `textual`, `boolean`) declared on codecs and consumed by query surfaces to gate operator availability by data type | [ADR 202 - Codec trait system.md](adrs/ADR%20202%20-%20Codec%20trait%20system.md) |
 
 ## Migration System
 

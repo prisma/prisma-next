@@ -1,26 +1,15 @@
-export interface InsertOneResult {
-  readonly insertedId: unknown;
-}
-
-export interface InsertManyResult {
-  readonly insertedIds: ReadonlyArray<unknown>;
-  readonly insertedCount: number;
-}
-
-export interface UpdateOneResult {
-  readonly matchedCount: number;
-  readonly modifiedCount: number;
-}
-
-export interface UpdateManyResult {
-  readonly matchedCount: number;
-  readonly modifiedCount: number;
-}
-
-export interface DeleteOneResult {
-  readonly deletedCount: number;
-}
-
-export interface DeleteManyResult {
-  readonly deletedCount: number;
-}
+/**
+ * Re-export canonical command result types from the query layer.
+ *
+ * The result shape definitions live in `@prisma-next/mongo-query-ast`
+ * because they are part of the primitive language — the transport layer
+ * satisfies those interfaces, it does not define them.
+ */
+export type {
+  DeleteManyResult,
+  DeleteOneResult,
+  InsertManyResult,
+  InsertOneResult,
+  UpdateManyResult,
+  UpdateOneResult,
+} from '@prisma-next/mongo-query-ast/execution';

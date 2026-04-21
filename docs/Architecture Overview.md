@@ -318,7 +318,7 @@ packages/
       query-ast/         # Mongo query plan + filter AST
     5-query-builders/
       orm/               # Mongo ORM client
-      pipeline-builder/  # Mongo aggregation pipeline builder
+      query-builder/     # Mongo query builder (reads + writes + find-and-modify)
     6-transport/
       mongo-lowering/    # lowering interfaces and transport contracts
       mongo-wire/        # wire commands and result types

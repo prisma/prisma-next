@@ -1,8 +1,9 @@
+import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type {
   MigrationPlan,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
-import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
+import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import {
   MongoSchemaCollection,
   MongoSchemaIndex,
@@ -90,19 +91,22 @@ function planForContract(
 }
 
 function serializePlan(plan: MigrationPlan): MigrationPlan {
-  const serialized = JSON.parse(
-    serializeMongoOps(plan.operations as MongoMigrationPlanOperation[]),
-  );
+  const serialized = JSON.parse(serializeMongoOps(plan.operations as AnyMongoMigrationOperation[]));
+  // Accessor properties on `PlannerProducedMongoMigration` (operations, origin,
+  // destination) live on the prototype, so we can't use spread here. Rebuild a
+  // plain plan object instead.
   return {
     targetId: plan.targetId,
+    operations: serialized,
     origin: plan.origin ?? null,
     destination: plan.destination,
-    operations: serialized,
   };
 }
 
 function makeRunner() {
-  return new MongoMigrationRunner(createMongoRunnerDeps(createMongoControlDriver(db, client)));
+  return new MongoMigrationRunner(
+    createMongoRunnerDeps(createMongoControlDriver(db, client), MongoDriverImpl.fromDb(db)),
+  );
 }
 
 describe('MongoMigrationRunner', () => {
@@ -404,6 +408,428 @@ describe('MongoMigrationRunner', () => {
       .find({ type: 'ledger' })
       .toArray();
     expect(ledgerEntries).toHaveLength(1);
+  });
+});
+
+describe('MongoMigrationRunner - data transforms', () => {
+  function makeDataTransformPlan(ops: unknown[]): MigrationPlan {
+    return {
+      targetId: 'mongo',
+      operations: ops as MigrationPlanOperation[],
+      destination: { storageHash: 'sha256:dest-dt' },
+    };
+  }
+
+  function makeCheckSource(collection: string) {
+    return {
+      collection,
+      command: {
+        kind: 'rawAggregate',
+        collection,
+        pipeline: [{ $match: { status: { $exists: false } } }, { $limit: 1 }],
+      },
+      meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw', paramDescriptors: [] },
+    };
+  }
+
+  function makePrecheckObj(collection: string) {
+    return {
+      description: `Check for ${collection}`,
+      source: makeCheckSource(collection),
+      filter: { kind: 'exists', field: '_id', exists: true },
+      expect: 'exists' as const,
+    };
+  }
+
+  function makePostcheckObj(collection: string) {
+    return {
+      description: `Check for ${collection}`,
+      source: makeCheckSource(collection),
+      filter: { kind: 'exists', field: '_id', exists: true },
+      expect: 'notExists' as const,
+    };
+  }
+
+  it('executes a data transform with empty precheck (always run)', async () => {
+    await db.createCollection('users');
+
+    const op = {
+      id: 'data_transform.backfill',
+      label: 'Data transform: backfill',
+      operationClass: 'data',
+      name: 'backfill',
+      precheck: [],
+      run: [
+        {
+          collection: 'users',
+          command: {
+            kind: 'rawInsertMany',
+            collection: 'users',
+            documents: [{ name: 'Alice' }, { name: 'Bob' }],
+          },
+          meta: {
+            target: 'mongo',
+            storageHash: 'sha256:x',
+            lane: 'mongo-raw',
+            paramDescriptors: [],
+          },
+        },
+      ],
+      postcheck: [],
+    };
+
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan: makeDataTransformPlan([op]),
+      destinationContract: { storageHash: 'sha256:dest-dt' },
+      policy: { allowedOperationClasses: ['data'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.operationsExecuted).toBe(1);
+    }
+
+    const docs = await db.collection('users').find().toArray();
+    expect(docs).toHaveLength(2);
+  });
+
+  it('skips via idempotency check when postcheck query returns empty', async () => {
+    await db.createCollection('users');
+
+    const op = {
+      id: 'data_transform.backfill',
+      label: 'Data transform: backfill',
+      operationClass: 'data',
+      name: 'backfill',
+      precheck: [makePrecheckObj('users')],
+      run: [
+        {
+          collection: 'users',
+          command: {
+            kind: 'rawUpdateMany',
+            collection: 'users',
+            filter: { status: { $exists: false } },
+            update: { $set: { status: 'active' } },
+          },
+          meta: {
+            target: 'mongo',
+            storageHash: 'sha256:x',
+            lane: 'mongo-raw',
+            paramDescriptors: [],
+          },
+        },
+      ],
+      postcheck: [makePostcheckObj('users')],
+    };
+
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan: makeDataTransformPlan([op]),
+      destinationContract: { storageHash: 'sha256:dest-dt' },
+      policy: { allowedOperationClasses: ['data'] },
+      frameworkComponents: [],
+    });
+
+    // Empty collection ⇒ postcheck (`expect: 'notExists'` on docs missing
+    // `status`) is satisfied up-front, so the data transform is skipped and
+    // does not contribute to `operationsExecuted`.
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.operationsExecuted).toBe(0);
+    }
+  });
+
+  it('executes run when check query finds violations', async () => {
+    await db.createCollection('users');
+    await db.collection('users').insertMany([{ name: 'Alice' }, { name: 'Bob' }]);
+
+    const op = {
+      id: 'data_transform.backfill-status',
+      label: 'Data transform: backfill-status',
+      operationClass: 'data',
+      name: 'backfill-status',
+      precheck: [makePrecheckObj('users')],
+      run: [
+        {
+          collection: 'users',
+          command: {
+            kind: 'rawUpdateMany',
+            collection: 'users',
+            filter: { status: { $exists: false } },
+            update: { $set: { status: 'active' } },
+          },
+          meta: {
+            target: 'mongo',
+            storageHash: 'sha256:x',
+            lane: 'mongo-raw',
+            paramDescriptors: [],
+          },
+        },
+      ],
+      postcheck: [makePostcheckObj('users')],
+    };
+
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan: makeDataTransformPlan([op]),
+      destinationContract: { storageHash: 'sha256:dest-dt' },
+      policy: { allowedOperationClasses: ['data'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(true);
+
+    const docs = await db.collection('users').find().toArray();
+    expect(docs.every((d) => d['status'] === 'active')).toBe(true);
+  });
+
+  it('returns POSTCHECK_FAILED when run does not fix all violations', async () => {
+    await db.createCollection('users');
+    await db.collection('users').insertMany([{ name: 'Alice' }, { name: 'Bob' }]);
+
+    const op = {
+      id: 'data_transform.partial-fix',
+      label: 'Data transform: partial-fix',
+      operationClass: 'data',
+      name: 'partial-fix',
+      precheck: [makePrecheckObj('users')],
+      run: [
+        {
+          collection: 'users',
+          command: {
+            kind: 'rawUpdateOne',
+            collection: 'users',
+            filter: { name: 'Alice' },
+            update: { $set: { status: 'active' } },
+          },
+          meta: {
+            target: 'mongo',
+            storageHash: 'sha256:x',
+            lane: 'mongo-raw',
+            paramDescriptors: [],
+          },
+        },
+      ],
+      postcheck: [makePostcheckObj('users')],
+    };
+
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan: makeDataTransformPlan([op]),
+      destinationContract: { storageHash: 'sha256:dest-dt' },
+      policy: { allowedOperationClasses: ['data'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('POSTCHECK_FAILED');
+    }
+  });
+
+  it('returns POLICY_VIOLATION when data class not allowed', async () => {
+    const op = {
+      id: 'data_transform.test',
+      label: 'Data transform: test',
+      operationClass: 'data',
+      name: 'test',
+      precheck: [],
+      run: [],
+      postcheck: [],
+    };
+
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan: makeDataTransformPlan([op]),
+      destinationContract: { storageHash: 'sha256:dest-dt' },
+      policy: { allowedOperationClasses: ['additive'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('POLICY_VIOLATION');
+    }
+  });
+});
+
+describe('MongoMigrationRunner - E2E round-trip', () => {
+  it('serialize → deserialize → execute mixed DDL + data transform', async () => {
+    const { dataTransform } = await import('@prisma-next/target-mongo/migration');
+    const { RawUpdateManyCommand, RawAggregateCommand } = await import(
+      '@prisma-next/mongo-query-ast/execution'
+    );
+
+    const planner = new MongoMigrationPlanner();
+    const contract = makeContract({
+      orders: { indexes: [{ keys: [{ field: 'createdAt', direction: -1 }] }] },
+    });
+    const ddlResult = planner.plan({
+      contract,
+      schema: new MongoSchemaIR([]),
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      fromHash: 'sha256:00',
+      frameworkComponents: [],
+    });
+    if (ddlResult.kind !== 'success') throw new Error('Planner failed');
+
+    const dtOp = dataTransform('backfill-status', {
+      check: {
+        source: () => ({
+          collection: 'orders',
+          command: new RawAggregateCommand('orders', [
+            { $match: { status: { $exists: false } } },
+            { $limit: 1 },
+          ]),
+          meta: {
+            target: 'mongo',
+            storageHash: 'sha256:x',
+            lane: 'mongo-raw',
+            paramDescriptors: [],
+          },
+        }),
+      },
+      run: () => ({
+        collection: 'orders',
+        command: new RawUpdateManyCommand(
+          'orders',
+          { status: { $exists: false } },
+          { $set: { status: 'pending' } },
+        ),
+        meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw', paramDescriptors: [] },
+      }),
+    });
+
+    const allOps = [...ddlResult.plan.operations, dtOp] as AnyMongoMigrationOperation[];
+
+    const serializedJson = serializeMongoOps(allOps);
+
+    const plan: MigrationPlan = {
+      targetId: 'mongo',
+      operations: JSON.parse(serializedJson) as MigrationPlanOperation[],
+      destination: { storageHash: 'sha256:dest-e2e' },
+    };
+
+    // Seed a row that needs the backfill so the data transform actually runs;
+    // without seed data the postcheck (`status` exists on every doc) is
+    // trivially satisfied and the runner would skip it.
+    await db.createCollection('orders');
+    await db.collection('orders').insertOne({ ref: 'A1' });
+
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan,
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+      frameworkComponents: [],
+    });
+
+    // 1 createIndex (the planner does not emit createCollection for plain
+    // collections without options/validators) + 1 data transform that
+    // backfills the seeded row.
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.operationsExecuted).toBe(2);
+    }
+
+    const indexes = await db.collection('orders').listIndexes().toArray();
+    const createdAtIdx = indexes.find((idx) => idx['key']?.['createdAt'] === -1);
+    expect(createdAtIdx).toBeDefined();
+
+    const orders = await db.collection('orders').find().toArray();
+    expect(orders.every((o) => o['status'] === 'pending')).toBe(true);
+  });
+
+  it('retry safety: re-running completed data transform is skipped by postcheck', async () => {
+    await db.createCollection('accounts');
+    await db.collection('accounts').insertMany([{ name: 'Acme', active: true }, { name: 'Beta' }]);
+
+    const checkSource = {
+      collection: 'accounts',
+      command: {
+        kind: 'rawAggregate' as const,
+        collection: 'accounts',
+        pipeline: [{ $match: { active: { $exists: false } } }, { $limit: 1 }],
+      },
+      meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw', paramDescriptors: [] },
+    };
+
+    const op = {
+      id: 'data_transform.backfill-active',
+      label: 'Data transform: backfill-active',
+      operationClass: 'data' as const,
+      name: 'backfill-active',
+      precheck: [
+        {
+          description: 'Check for accounts',
+          source: checkSource,
+          filter: { kind: 'exists', field: '_id', exists: true },
+          expect: 'exists' as const,
+        },
+      ],
+      run: [
+        {
+          collection: 'accounts',
+          command: {
+            kind: 'rawUpdateMany' as const,
+            collection: 'accounts',
+            filter: { active: { $exists: false } },
+            update: { $set: { active: false } },
+          },
+          meta: {
+            target: 'mongo',
+            storageHash: 'sha256:x',
+            lane: 'mongo-raw',
+            paramDescriptors: [],
+          },
+        },
+      ],
+      postcheck: [
+        {
+          description: 'Check for accounts',
+          source: checkSource,
+          filter: { kind: 'exists', field: '_id', exists: true },
+          expect: 'notExists' as const,
+        },
+      ],
+    };
+
+    const plan: MigrationPlan = {
+      targetId: 'mongo',
+      operations: [op] as unknown as MigrationPlanOperation[],
+      destination: { storageHash: 'sha256:retry' },
+    };
+
+    const runner = makeRunner();
+
+    const result1 = await runner.execute({
+      plan,
+      destinationContract: { storageHash: 'sha256:retry' },
+      policy: { allowedOperationClasses: ['data'] },
+      frameworkComponents: [],
+    });
+    expect(result1.ok).toBe(true);
+
+    const docsAfterFirst = await db.collection('accounts').find().toArray();
+    expect(docsAfterFirst.every((d) => typeof d['active'] === 'boolean')).toBe(true);
+
+    await db.collection('_prisma_migrations').drop();
+
+    const result2 = await runner.execute({
+      plan,
+      destinationContract: { storageHash: 'sha256:retry' },
+      policy: { allowedOperationClasses: ['data'] },
+      frameworkComponents: [],
+    });
+    // Marker has been wiped, but the postcheck (no docs missing `active`) is
+    // already satisfied, so the runner skips the data transform without
+    // counting it as executed.
+    expect(result2.ok).toBe(true);
+    if (result2.ok) {
+      expect(result2.value.operationsExecuted).toBe(0);
+    }
   });
 });
 

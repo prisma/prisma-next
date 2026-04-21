@@ -3,6 +3,7 @@ export {
   collMod,
   createCollection,
   createIndex,
+  dataTransform,
   dropCollection,
   dropIndex,
   setValidation,

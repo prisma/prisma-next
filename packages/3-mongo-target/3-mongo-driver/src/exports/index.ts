@@ -1,1 +1,1 @@
-export { createMongoDriver } from '../mongo-driver';
+export { createMongoDriver, MongoDriverImpl } from '../mongo-driver';

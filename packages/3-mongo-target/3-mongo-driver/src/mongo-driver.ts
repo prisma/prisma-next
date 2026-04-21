@@ -20,13 +20,23 @@ import type {
 import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from './core/driver-info';
 
-class MongoDriverImpl implements MongoDriver {
+export class MongoDriverImpl implements MongoDriver {
   readonly #db: Db;
-  readonly #client: MongoClient;
+  readonly #client: MongoClient | undefined;
 
-  constructor(db: Db, client: MongoClient) {
+  private constructor(db: Db, client: MongoClient | undefined) {
     this.#db = db;
     this.#client = client;
+  }
+
+  static async fromConnection(uri: string, dbName: string): Promise<MongoDriverImpl> {
+    const client = new MongoClient(uri, { driverInfo: DRIVER_INFO });
+    await client.connect();
+    return new MongoDriverImpl(client.db(dbName), client);
+  }
+
+  static fromDb(db: Db): MongoDriverImpl {
+    return new MongoDriverImpl(db, undefined);
   }
 
   execute<Row = Record<string, unknown>>(wireCommand: AnyMongoWireCommand): AsyncIterable<Row> {
@@ -58,7 +68,7 @@ class MongoDriverImpl implements MongoDriver {
   }
 
   async close(): Promise<void> {
-    await this.#client.close();
+    await this.#client?.close();
   }
 
   async *#executeInsertOneCommand(cmd: InsertOneWireCommand): AsyncIterable<InsertOneResult> {
@@ -69,8 +79,13 @@ class MongoDriverImpl implements MongoDriver {
 
   async *#executeUpdateOneCommand(cmd: UpdateOneWireCommand): AsyncIterable<UpdateOneResult> {
     const collection = this.#db.collection(cmd.collection);
-    const result = await collection.updateOne(cmd.filter, cmd.update);
-    yield { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount };
+    const result = await collection.updateOne(cmd.filter, cmd.update, { upsert: cmd.upsert });
+    yield {
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount,
+      upsertedCount: result.upsertedCount,
+      upsertedId: result.upsertedId ?? undefined,
+    };
   }
 
   async *#executeInsertManyCommand(cmd: InsertManyWireCommand): AsyncIterable<InsertManyResult> {
@@ -82,8 +97,13 @@ class MongoDriverImpl implements MongoDriver {
 
   async *#executeUpdateManyCommand(cmd: UpdateManyWireCommand): AsyncIterable<UpdateManyResult> {
     const collection = this.#db.collection(cmd.collection);
-    const result = await collection.updateMany(cmd.filter, cmd.update);
-    yield { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount };
+    const result = await collection.updateMany(cmd.filter, cmd.update, { upsert: cmd.upsert });
+    yield {
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount,
+      upsertedCount: result.upsertedCount,
+      upsertedId: result.upsertedId ?? undefined,
+    };
   }
 
   async *#executeDeleteOneCommand(cmd: DeleteOneWireCommand): AsyncIterable<DeleteOneResult> {
@@ -103,8 +123,9 @@ class MongoDriverImpl implements MongoDriver {
   ): AsyncIterable<Record<string, unknown>> {
     const collection = this.#db.collection(cmd.collection);
     const result = await collection.findOneAndUpdate(cmd.filter, cmd.update, {
-      returnDocument: 'after',
       upsert: cmd.upsert,
+      ...(cmd.returnDocument != null ? { returnDocument: cmd.returnDocument } : {}),
+      ...(cmd.sort != null ? { sort: cmd.sort } : {}),
     });
     if (result) {
       yield result as Record<string, unknown>;
@@ -115,7 +136,9 @@ class MongoDriverImpl implements MongoDriver {
     cmd: FindOneAndDeleteWireCommand,
   ): AsyncIterable<Record<string, unknown>> {
     const collection = this.#db.collection(cmd.collection);
-    const result = await collection.findOneAndDelete(cmd.filter);
+    const result = await collection.findOneAndDelete(cmd.filter, {
+      ...(cmd.sort != null ? { sort: cmd.sort } : {}),
+    });
     if (result) {
       yield result as Record<string, unknown>;
     }
@@ -129,8 +152,5 @@ class MongoDriverImpl implements MongoDriver {
 }
 
 export async function createMongoDriver(uri: string, dbName: string): Promise<MongoDriver> {
-  const client = new MongoClient(uri, { driverInfo: DRIVER_INFO });
-  await client.connect();
-  const db = client.db(dbName);
-  return new MongoDriverImpl(db, client);
+  return MongoDriverImpl.fromConnection(uri, dbName);
 }

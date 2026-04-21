@@ -50,6 +50,16 @@ export {
   RawUpdateOneCommand,
 } from '../raw-commands';
 export type {
+  DeleteManyResult,
+  DeleteOneResult,
+  DeleteResult,
+  InsertManyResult,
+  InsertOneResult,
+  UpdateManyResult,
+  UpdateOneResult,
+  UpdateResult,
+} from '../result-types';
+export type {
   MongoDensifyRange,
   MongoFillOutput,
   MongoGroupId,

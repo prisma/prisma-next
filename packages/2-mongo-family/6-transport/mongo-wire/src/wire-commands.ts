@@ -28,11 +28,18 @@ export class UpdateOneWireCommand extends MongoWireCommand {
   readonly kind = 'updateOne' as const;
   readonly filter: Document;
   readonly update: Document | ReadonlyArray<Document>;
+  readonly upsert: boolean;
 
-  constructor(collection: string, filter: Document, update: Document | ReadonlyArray<Document>) {
+  constructor(
+    collection: string,
+    filter: Document,
+    update: Document | ReadonlyArray<Document>,
+    upsert = false,
+  ) {
     super(collection);
     this.filter = filter;
     this.update = update;
+    this.upsert = upsert;
     this.freeze();
   }
 }
@@ -63,11 +70,18 @@ export class UpdateManyWireCommand extends MongoWireCommand {
   readonly kind = 'updateMany' as const;
   readonly filter: Document;
   readonly update: Document | ReadonlyArray<Document>;
+  readonly upsert: boolean;
 
-  constructor(collection: string, filter: Document, update: Document | ReadonlyArray<Document>) {
+  constructor(
+    collection: string,
+    filter: Document,
+    update: Document | ReadonlyArray<Document>,
+    upsert = false,
+  ) {
     super(collection);
     this.filter = filter;
     this.update = update;
+    this.upsert = upsert;
     this.freeze();
   }
 }
@@ -88,17 +102,27 @@ export class FindOneAndUpdateWireCommand extends MongoWireCommand {
   readonly filter: Document;
   readonly update: Document | ReadonlyArray<Document>;
   readonly upsert: boolean;
+  readonly sort: Record<string, 1 | -1> | undefined;
+  /**
+   * When `undefined`, the option is omitted from the underlying driver
+   * call so Mongo's documented default (pre-image document) applies.
+   */
+  readonly returnDocument: 'before' | 'after' | undefined;
 
   constructor(
     collection: string,
     filter: Document,
     update: Document | ReadonlyArray<Document>,
-    upsert: boolean,
+    upsert = false,
+    sort?: Record<string, 1 | -1>,
+    returnDocument?: 'before' | 'after',
   ) {
     super(collection);
     this.filter = filter;
     this.update = update;
     this.upsert = upsert;
+    this.sort = sort;
+    this.returnDocument = returnDocument;
     this.freeze();
   }
 }
@@ -106,10 +130,12 @@ export class FindOneAndUpdateWireCommand extends MongoWireCommand {
 export class FindOneAndDeleteWireCommand extends MongoWireCommand {
   readonly kind = 'findOneAndDelete' as const;
   readonly filter: Document;
+  readonly sort: Record<string, 1 | -1> | undefined;
 
-  constructor(collection: string, filter: Document) {
+  constructor(collection: string, filter: Document, sort?: Record<string, 1 | -1>) {
     super(collection);
     this.filter = filter;
+    this.sort = sort;
     this.freeze();
   }
 }

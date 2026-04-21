@@ -118,6 +118,8 @@ describe('raw command integration', () => {
         { _id: 'pageViews' },
         { $inc: { count: 1 }, $setOnInsert: { _id: 'pageViews' } },
         true,
+        undefined,
+        'after',
       );
       const rows = await ctx.runtime.execute(rawPlan(col, upsertCmd));
       expect(rows).toHaveLength(1);

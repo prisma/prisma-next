@@ -1,5 +1,6 @@
-import { createMongoRunnerDeps } from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
 import type { Contract } from '@prisma-next/contract/types';
+import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type { MigratableTargetDescriptor } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import {
@@ -44,7 +45,10 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
       let cachedDeps: MongoRunnerDependencies | undefined;
       return {
         async execute(options) {
-          cachedDeps ??= createMongoRunnerDeps(options.driver);
+          cachedDeps ??= createMongoRunnerDeps(
+            options.driver,
+            MongoDriverImpl.fromDb(extractDb(options.driver)),
+          );
           const { driver: _, ...runnerOptions } = options;
           const runner = new MongoMigrationRunner(cachedDeps);
           return runner.execute(runnerOptions);

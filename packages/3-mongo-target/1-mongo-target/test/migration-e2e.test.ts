@@ -261,6 +261,117 @@ describe('migration file E2E', () => {
     });
   });
 
+  describe('data transform migration', () => {
+    const dataTransformMigration = [
+      `import { Migration } from '${migrationExport}';`,
+      `import { createCollection, dataTransform } from '${factoryExport}';`,
+      '',
+      'class M extends Migration {',
+      "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+      '  get operations() {',
+      '    return [',
+      '      createCollection("users"),',
+      '      dataTransform("backfill-status", {',
+      '        run: () => ({',
+      '          collection: "users",',
+      '          command: {',
+      '            kind: "rawUpdateMany" as const,',
+      '            collection: "users",',
+      '            filter: { status: { $exists: false } },',
+      '            update: { $set: { status: "active" } },',
+      '          },',
+      '          meta: { target: "mongo", storageHash: "sha256:x", lane: "mongo-raw", paramDescriptors: [] },',
+      '        }),',
+      '      }),',
+      '    ];',
+      '  }',
+      '}',
+      'export default M;',
+      '',
+      'Migration.run(import.meta.url, M);',
+    ].join('\n');
+
+    it('produces ops.json with mixed DDL and data transform operations', async () => {
+      await writeFile(join(tmpDir, 'migration.ts'), dataTransformMigration);
+
+      const result = await runFile('migration.ts');
+      expect(result.exitCode).toBe(0);
+
+      const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
+      const ops = JSON.parse(opsJson);
+
+      expect(ops).toHaveLength(2);
+
+      expect(ops[0].operationClass).toBe('additive');
+      expect(ops[0].execute[0].command.kind).toBe('createCollection');
+
+      expect(ops[1].operationClass).toBe('data');
+      expect(ops[1].name).toBe('backfill-status');
+      expect(ops[1].precheck).toHaveLength(0);
+      expect(ops[1].postcheck).toHaveLength(0);
+      expect(ops[1].run).toHaveLength(1);
+      expect(ops[1].run[0].command.kind).toBe('rawUpdateMany');
+    });
+
+    it('produces ops.json with check object', async () => {
+      const migrationWithCheck = [
+        `import { Migration } from '${migrationExport}';`,
+        `import { dataTransform } from '${factoryExport}';`,
+        '',
+        'class M extends Migration {',
+        "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+        '  get operations() {',
+        '    return [',
+        '      dataTransform("backfill-with-check", {',
+        '        check: {',
+        '          source: () => ({',
+        '            collection: "users",',
+        '            command: {',
+        '              kind: "rawAggregate" as const,',
+        '              collection: "users",',
+        '              pipeline: [{ $match: { status: { $exists: false } } }, { $limit: 1 }],',
+        '            },',
+        '            meta: { target: "mongo", storageHash: "sha256:x", lane: "mongo-raw", paramDescriptors: [] },',
+        '          }),',
+        '        },',
+        '        run: () => ({',
+        '          collection: "users",',
+        '          command: {',
+        '            kind: "rawUpdateMany" as const,',
+        '            collection: "users",',
+        '            filter: { status: { $exists: false } },',
+        '            update: { $set: { status: "active" } },',
+        '          },',
+        '          meta: { target: "mongo", storageHash: "sha256:x", lane: "mongo-raw", paramDescriptors: [] },',
+        '        }),',
+        '      }),',
+        '    ];',
+        '  }',
+        '}',
+        'export default M;',
+        '',
+        'Migration.run(import.meta.url, M);',
+      ].join('\n');
+
+      await writeFile(join(tmpDir, 'migration.ts'), migrationWithCheck);
+
+      const result = await runFile('migration.ts');
+      expect(result.exitCode).toBe(0);
+
+      const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
+      const ops = JSON.parse(opsJson);
+
+      expect(ops).toHaveLength(1);
+      const op = ops[0];
+      expect(op.operationClass).toBe('data');
+      expect(op.name).toBe('backfill-with-check');
+      expect(op.precheck).toHaveLength(1);
+      expect(op.precheck[0].source.command.kind).toBe('rawAggregate');
+      expect(op.precheck[0].expect).toBe('exists');
+      expect(op.postcheck).toHaveLength(1);
+    });
+  });
+
   describe('scaffolded migration is directly runnable', () => {
     const familyMongoDistMigrationPath = join(familyMongoRoot, 'dist/migration.mjs');
     const targetMongoDistMigrationPath = join(packageRoot, 'dist/migration.mjs');

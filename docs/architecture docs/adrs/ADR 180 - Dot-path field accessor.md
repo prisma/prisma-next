@@ -1,5 +1,7 @@
 # ADR 180 — Dot-path field accessor
 
+> **Implementation update (Mongo query builder unification).** The consolidated `FieldAccessor` shipped in `@prisma-next/mongo-query-builder` replaced the earlier `FieldProxy` and `FilterProxy` types — filter and update operators now hang off a single accessor, used by both read callbacks (`match`, `addFields`, `project`, `group`) and write callbacks (`updateMany`, `findOneAndUpdate`, etc.). The callable form `f("dot.path")` is currently permissive at the type level — paths are not validated against the contract. Type-safe path validation is tracked on [TML-2281](https://linear.app/prisma-company/issue/TML-2281).
+
 ## At a glance
 
 Querying and mutating nested value object fields through a callable string accessor. Scalar fields are direct properties on the model proxy (existing pattern); value object fields use a dot-path string that navigates into the nested structure:
@@ -45,7 +47,7 @@ db.users.where((u, fns) => fns.and(
 ))
 ```
 
-Each property (`u.email`, `u.age`) returns an `Expression` with trait-gated operators ([ADR 170](ADR%20170%20-%20Codec%20trait%20system.md)). The question is how to extend this pattern to value objects without breaking the existing API.
+Each property (`u.email`, `u.age`) returns an `Expression` with trait-gated operators ([ADR 202](ADR%20202%20-%20Codec%20trait%20system.md)). The question is how to extend this pattern to value objects without breaking the existing API.
 
 ## Problem
 
@@ -68,7 +70,7 @@ Each value object field returns a proxy with properties for its sub-fields, whic
 
 Value object access uses property chaining for navigation only, with operators as standalone functions.
 
-**Why we rejected it:** This works for built-in operators but falls apart for extension-provided operators. The trait system ([ADR 170](ADR%20170%20-%20Codec%20trait%20system.md)) gates operators by codec — a `cosineDistance` method only appears on vector-type expressions. With standalone functions, either every function is available on every type (losing type safety) or the function needs the type parameter to restrict its domain (awkward ergonomics).
+**Why we rejected it:** This works for built-in operators but falls apart for extension-provided operators. The trait system ([ADR 202](ADR%20202%20-%20Codec%20trait%20system.md)) gates operators by codec — a `cosineDistance` method only appears on vector-type expressions. With standalone functions, either every function is available on every type (losing type safety) or the function needs the type parameter to restrict its domain (awkward ergonomics).
 
 ## Decision
 
@@ -206,5 +208,5 @@ The accessor serves three roles across the API:
 ## Related
 
 - [ADR 178 — Value objects in the contract](ADR%20178%20-%20Value%20objects%20in%20the%20contract.md) — value objects as a contract concept
-- [ADR 170 — Codec trait system](ADR%20170%20-%20Codec%20trait%20system.md) — trait-gating extends to expressions returned by the dot-path accessor
+- [ADR 202 — Codec trait system](ADR%20202%20-%20Codec%20trait%20system.md) — trait-gating extends to expressions returned by the dot-path accessor
 - [ADR 179 — Union field types](ADR%20179%20-%20Union%20field%20types.md) — union types reachable through dot-paths

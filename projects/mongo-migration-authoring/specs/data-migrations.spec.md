@@ -21,10 +21,10 @@ import contractJson from './contract.json' with { type: 'json' }
 import { Migration, createCollection, setValidation, dataTransform }
   from '@prisma-next/target-mongo/migration'
 import { mongoRaw } from '@prisma-next/mongo-orm'
-import { mongoPipeline } from '@prisma-next/mongo-pipeline-builder'
+import { mongoQuery } from '@prisma-next/mongo-query-builder'
 
 const raw = mongoRaw({ contract: contractJson as Contract })
-const agg = mongoPipeline<Contract>({ contractJson })
+const agg = mongoQuery<Contract>({ contractJson })
 
 export default class BackfillStatus extends Migration {
   override get operations() {
@@ -58,7 +58,7 @@ The ordering matters: create the collection, backfill the data, *then* tighten t
 
 ## How authoring works
 
-The query builders (`mongoRaw`, `mongoPipeline`) are the existing tools for building MongoDB queries. They take a contract and produce `MongoQueryPlan` objects — static command descriptions, no database connection required.
+The query builders (`mongoRaw`, `mongoQuery`) are the existing tools for building MongoDB queries. They take a contract and produce `MongoQueryPlan` objects — static command descriptions, no database connection required.
 
 The user constructs these builders at the top of the migration file from the scaffolded contract. The `check` object and `run` closure use them to describe what the migration should do:
 
@@ -101,7 +101,7 @@ The user creates a second set of query builders from the intermediate contract a
 
 # Decisions
 
-1. **Use existing query builders, not a new abstraction.** `mongoRaw` and `mongoPipeline` already produce `MongoQueryPlan` objects from a contract. The `dataTransform` factory consumes these — no migration-specific query API is needed. A future strongly typed query builder (validating field names and operators against the contract) will slot in transparently because it produces the same `MongoQueryPlan` output.
+1. **Use existing query builders, not a new abstraction.** `mongoRaw` and `mongoQuery` already produce `MongoQueryPlan` objects from a contract. The `dataTransform` factory consumes these — no migration-specific query API is needed. A future strongly typed query builder (validating field names and operators against the contract) will slot in transparently because it produces the same `MongoQueryPlan` output.
 
 2. **Module-scoped builders, not injected callbacks.** The Postgres `dataTransform` injects a `Db<Contract>` client into callbacks because the SQL query builder needs a runtime execution context. The Mongo query builders are fully static — they need only a contract. So the user constructs them at module scope and the closures capture them via closure. Simpler, and no resolver infrastructure needed.
 
@@ -130,7 +130,7 @@ The user creates a second set of query builders from the intermediate contract a
 
 ## Non-goals
 
-- **Strongly typed Mongo query builder.** `mongoRaw` has untyped filter/update documents; `mongoPipeline` has richer typing for aggregations. A fully typed builder validating field names against the contract is future work and will plug in transparently.
+- **Strongly typed Mongo query builder.** `mongoRaw` has untyped filter/update documents; `mongoQuery` has richer typing for aggregations. A fully typed builder validating field names against the contract is future work and will plug in transparently.
 - **Planner integration.** Auto-detecting data migration needs from contract diffs and scaffolding `dataTransform` with TODO placeholders. For v1, data transforms are manually authored.
 - **Transaction/session support.** MongoDB multi-document transactions are orthogonal and can be layered on.
 - **Graph integration.** Invariant tracking, invariant-aware routing, and ledger recording of data migration names are deferred (same scope as the Postgres graph integration work).
@@ -139,7 +139,7 @@ The user creates a second set of query builders from the intermediate contract a
 
 ## Authoring
 
-- [ ] A migration file with `dataTransform` using `mongoRaw` for `run` and `mongoPipeline` for `check.source` type-checks and can be emitted
+- [ ] A migration file with `dataTransform` using `mongoRaw` for `run` and `mongoQuery` for `check.source` type-checks and can be emitted
 - [ ] The resolver calls `.build()` on `Buildable` returns from `check.source` and `run` closures
 - [ ] An unfilled `placeholder(slot)` call in a scaffolded `dataTransform` throws `PN-MIG-2001` at emit time, preventing attestation (per [`data-transform-placeholder.md`](./data-transform-placeholder.md))
 - [ ] `check` accepts the structured form `{ source, filter?, expect?, description? }` (per [`data-transform-check-unification.md`](./data-transform-check-unification.md)); omitting `check` yields an always-run operation with no precheck or postcheck. The original boolean `check: true | false` variants are superseded and not supported.
@@ -148,7 +148,7 @@ The user creates a second set of query builders from the intermediate contract a
 
 - [ ] `MongoQueryPlan` command ASTs round-trip through `JSON.stringify` → `kind`-based deserialization
 - [ ] All `RawMongoCommand` kinds are handled: `rawUpdateMany`, `rawUpdateOne`, `rawInsertOne`, `rawInsertMany`, `rawDeleteMany`, `rawDeleteOne`, `rawAggregate`, `rawFindOneAndUpdate`, `rawFindOneAndDelete`
-- [ ] Typed `aggregate` command (from `mongoPipeline`) is handled
+- [ ] Typed `aggregate` command (from `mongoQuery`) is handled
 - [ ] Deserialization validates each command shape with arktype schemas
 
 ## Execution
@@ -197,7 +197,7 @@ Since the query builders are static, `check`/`run` could accept `MongoQueryPlan`
 - DML command AST: [`packages/2-mongo-family/4-query/query-ast/src/commands.ts`](../../../packages/2-mongo-family/4-query/query-ast/src/commands.ts)
 - Raw command AST: [`packages/2-mongo-family/4-query/query-ast/src/raw-commands.ts`](../../../packages/2-mongo-family/4-query/query-ast/src/raw-commands.ts)
 - `mongoRaw`: [`packages/2-mongo-family/5-query-builders/orm/src/mongo-raw.ts`](../../../packages/2-mongo-family/5-query-builders/orm/src/mongo-raw.ts)
-- `mongoPipeline`: [`packages/2-mongo-family/5-query-builders/pipeline-builder/src/pipeline.ts`](../../../packages/2-mongo-family/5-query-builders/pipeline-builder/src/pipeline.ts)
+- `mongoQuery`: [`packages/2-mongo-family/5-query-builders/query-builder/src/query.ts`](../../../packages/2-mongo-family/5-query-builders/query-builder/src/query.ts)
 - Postgres data transform: [`packages/3-targets/3-targets/postgres/src/core/migrations/operation-descriptors.ts`](../../../packages/3-targets/3-targets/postgres/src/core/migrations/operation-descriptors.ts)
 - ADR 188 — MongoDB migration operation model
 - ADR 191 — Generic three-phase migration operation envelope

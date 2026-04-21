@@ -26,7 +26,7 @@
     "@prisma-next/runtime-executor": "workspace:*",
     "@prisma-next/mongo-contract-ts": "workspace:*",
     "@prisma-next/family-mongo": "workspace:*",
-    "@prisma-next/mongo-pipeline-builder": "workspace:*",
+    "@prisma-next/mongo-query-builder": "workspace:*",
     "@prisma-next/mongo-value": "workspace:*",
     "@prisma-next/driver-mongo": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",

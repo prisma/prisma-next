@@ -1,0 +1,464 @@
+/**
+ * Mongo migration authoring journey (CLI end-to-end).
+ *
+ * Covers the gap that no Postgres-shaped journey test exercises for MongoDB:
+ *
+ *  1. `migration plan --target mongo` from the empty contract baseline:
+ *     scaffolds a class-flow `migration.ts`, copies `contract.json` /
+ *     `contract.d.ts` next to it, and emits attested `ops.json` with the
+ *     expected `createIndex` operation(s). Asserts that `migration plan`
+ *     invokes the inline emit step on Mongo (i.e. the rendered
+ *     `migration.ts` is round-trip executable: it gets imported by
+ *     `mongoEmit`, instantiated, and its `operations` getter is read).
+ *
+ *  2. `migration new --target mongo` after a contract change: scaffolds an
+ *     empty `Migration` subclass stub for hand-authoring (with the contract
+ *     bookends populated in `describe()`) and copies the contract artifacts
+ *     into the migration directory.
+ *
+ *  3. End-to-end class-flow with a real MongoDB instance via
+ *     `MongoMemoryReplSet`: plan + apply the initial DDL, seed data,
+ *     hand-author a `dataTransform` + additive `createIndex` migration,
+ *     emit it, apply it, and verify both the structural change and the
+ *     data transformation took effect against the live database.
+ */
+
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
+import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
+import { createMigrationEmitCommand } from '@prisma-next/cli/commands/migration-emit';
+import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
+import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
+import { timeouts } from '@prisma-next/test-utils';
+import { MongoClient } from 'mongodb';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { join } from 'pathe';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  executeCommand,
+  fixtureAppDir,
+  getExitCode,
+  setupCommandMocks,
+} from '../utils/cli-test-helpers';
+
+interface JourneyCtx {
+  testDir: string;
+  configPath: string;
+  outputDir: string;
+}
+
+const FIXTURES_DIR = join(fixtureAppDir, 'fixtures/mongo-cli-journeys');
+
+interface RunResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+async function runCli(
+  command: ReturnType<typeof createMigrationPlanCommand>,
+  testDir: string,
+  args: readonly string[],
+): Promise<RunResult> {
+  const mocks = setupCommandMocks({ isTTY: true });
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(testDir);
+    try {
+      await executeCommand(command, ['--no-color', ...args]);
+      return {
+        exitCode: 0,
+        stdout: mocks.consoleOutput.join('\n'),
+        stderr: mocks.consoleErrors.join('\n'),
+      };
+    } catch (error) {
+      const exitCode = getExitCode();
+      if (exitCode == null) throw error;
+      return {
+        exitCode,
+        stdout: mocks.consoleOutput.join('\n'),
+        stderr: mocks.consoleErrors.join('\n'),
+      };
+    }
+  } finally {
+    process.chdir(originalCwd);
+    mocks.cleanup();
+  }
+}
+
+function setupMongoJourney(connectionString: string | undefined): JourneyCtx {
+  const testDir = join(
+    fixtureAppDir,
+    `test-mongo-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  mkdirSync(testDir, { recursive: true });
+  const outputDir = join(testDir, 'output');
+  mkdirSync(outputDir, { recursive: true });
+  mkdirSync(join(testDir, 'migrations'), { recursive: true });
+
+  copyFileSync(join(FIXTURES_DIR, 'contract-base.ts'), join(testDir, 'contract.ts'));
+
+  let configContent = readFileSync(join(FIXTURES_DIR, 'prisma-next.config.with-db.ts'), 'utf-8');
+  configContent = configContent.replace(
+    /\{\{DB_URL\}\}/g,
+    () => connectionString ?? 'mongodb://localhost:27017/unused',
+  );
+  const configPath = join(testDir, 'prisma-next.config.ts');
+  writeFileSync(configPath, configContent, 'utf-8');
+
+  return { testDir, configPath, outputDir };
+}
+
+function swapToAdditive(ctx: JourneyCtx): void {
+  copyFileSync(join(FIXTURES_DIR, 'contract-additive.ts'), join(ctx.testDir, 'contract.ts'));
+}
+
+async function emitContract(ctx: JourneyCtx): Promise<RunResult> {
+  return runCli(createContractEmitCommand(), ctx.testDir, ['--config', ctx.configPath]);
+}
+
+async function migrationPlan(ctx: JourneyCtx, args: readonly string[] = []): Promise<RunResult> {
+  return runCli(createMigrationPlanCommand(), ctx.testDir, ['--config', ctx.configPath, ...args]);
+}
+
+async function migrationNew(ctx: JourneyCtx, args: readonly string[] = []): Promise<RunResult> {
+  return runCli(createMigrationNewCommand(), ctx.testDir, ['--config', ctx.configPath, ...args]);
+}
+
+async function migrationEmit(ctx: JourneyCtx, args: readonly string[] = []): Promise<RunResult> {
+  return runCli(createMigrationEmitCommand(), ctx.testDir, ['--config', ctx.configPath, ...args]);
+}
+
+async function migrationApply(ctx: JourneyCtx, args: readonly string[] = []): Promise<RunResult> {
+  return runCli(createMigrationApplyCommand(), ctx.testDir, ['--config', ctx.configPath, ...args]);
+}
+
+function getLatestMigrationDir(ctx: JourneyCtx): string {
+  const dirs = readdirSync(join(ctx.testDir, 'migrations'))
+    .filter((d) => !d.startsWith('.'))
+    .sort();
+  const latest = dirs[dirs.length - 1];
+  if (!latest) throw new Error('No migration directory found');
+  return join(ctx.testDir, 'migrations', latest);
+}
+
+/**
+ * `MongoMemoryReplSet.getUri()` returns a URI without an explicit database
+ * name (and may carry query parameters such as `?replicaSet=...`). The CLI
+ * needs a connection string that points at a specific database, so splice
+ * the database name into the path component while preserving the query.
+ */
+function buildMongoUri(baseUri: string, dbName: string): string {
+  const [hostPart, query] = baseUri.split('?');
+  const trimmedHost = (hostPart ?? '').replace(/\/?$/, '/');
+  return query ? `${trimmedHost}${dbName}?${query}` : `${trimmedHost}${dbName}`;
+}
+
+function findMigrationDirBySlug(ctx: JourneyCtx, slugFragment: string): string {
+  const dirs = readdirSync(join(ctx.testDir, 'migrations'))
+    .filter((d) => !d.startsWith('.') && d.includes(slugFragment))
+    .sort();
+  const match = dirs[dirs.length - 1];
+  if (!match) {
+    throw new Error(`No migration directory found containing '${slugFragment}'`);
+  }
+  return join(ctx.testDir, 'migrations', match);
+}
+
+// Journey tests shell out to the CLI binary, which easily exceeds the
+// integration-suite default `it` timeout of 100ms.
+describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spinUpPpgDev }, () => {
+  const created = new Set<string>();
+
+  afterEach(async () => {
+    for (const dir of created) {
+      await rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    created.clear();
+  });
+
+  it('migration plan --target mongo scaffolds class-flow migration.ts, copies contract files, and emits attested ops.json', async () => {
+    const ctx = setupMongoJourney(undefined);
+    created.add(ctx.testDir);
+
+    const emit0 = await emitContract(ctx);
+    expect(emit0.exitCode, `contract emit: ${emit0.stderr}`).toBe(0);
+
+    const plan = await migrationPlan(ctx, ['--name', 'initial']);
+    expect(plan.exitCode, `migration plan: ${plan.stdout}\n${plan.stderr}`).toBe(0);
+
+    const migrationDir = getLatestMigrationDir(ctx);
+
+    const migrationTs = readFileSync(join(migrationDir, 'migration.ts'), 'utf-8');
+    expect(migrationTs).toContain(
+      "import { Migration } from '@prisma-next/family-mongo/migration'",
+    );
+    expect(migrationTs).toContain('@prisma-next/target-mongo/migration');
+    expect(migrationTs).toContain('createIndex');
+    expect(migrationTs).toContain('"users"');
+    expect(migrationTs).toContain('Migration.run(import.meta.url');
+
+    expect(readFileSync(join(migrationDir, 'contract.json'), 'utf-8')).toBe(
+      readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8'),
+    );
+    expect(readFileSync(join(migrationDir, 'contract.d.ts'), 'utf-8')).toBe(
+      readFileSync(join(ctx.outputDir, 'contract.d.ts'), 'utf-8'),
+    );
+
+    const ops = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8')) as ReadonlyArray<{
+      id: string;
+      operationClass: string;
+      kind?: string;
+    }>;
+    const opIds = ops.map((o) => o.id).sort();
+    expect(opIds.some((id) => id.startsWith('index.users.'))).toBe(true);
+    for (const op of ops) {
+      expect(op.operationClass).toBe('additive');
+    }
+
+    const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
+      migrationId: string | null;
+    };
+    expect(manifest.migrationId).toMatch(/^sha256:/);
+  });
+
+  it('migration new --target mongo scaffolds an empty Migration stub with contract files copied', async () => {
+    const ctx = setupMongoJourney(undefined);
+    created.add(ctx.testDir);
+
+    const emit0 = await emitContract(ctx);
+    expect(emit0.exitCode, `contract emit base: ${emit0.stderr}`).toBe(0);
+
+    const plan = await migrationPlan(ctx, ['--name', 'initial']);
+    expect(plan.exitCode, `seed initial migration: ${plan.stderr}`).toBe(0);
+
+    swapToAdditive(ctx);
+    const emit1 = await emitContract(ctx);
+    expect(emit1.exitCode, `contract emit additive: ${emit1.stderr}`).toBe(0);
+
+    const newResult = await migrationNew(ctx, ['--name', 'add-name-index']);
+    expect(newResult.exitCode, `migration new: ${newResult.stdout}\n${newResult.stderr}`).toBe(0);
+
+    const migrationDir = findMigrationDirBySlug(ctx, 'add_name_index');
+
+    const migrationTs = readFileSync(join(migrationDir, 'migration.ts'), 'utf-8');
+    expect(migrationTs).toContain(
+      "import { Migration } from '@prisma-next/family-mongo/migration'",
+    );
+    expect(migrationTs).toContain('class M extends Migration');
+    expect(migrationTs).toContain('describe()');
+    expect(migrationTs).toContain('get operations()');
+    expect(migrationTs).toContain('return [');
+    // Empty stub: factory imports omitted because no calls were rendered.
+    expect(migrationTs).not.toContain('@prisma-next/target-mongo/migration');
+
+    expect(readFileSync(join(migrationDir, 'contract.json'), 'utf-8')).toBe(
+      readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8'),
+    );
+    expect(readFileSync(join(migrationDir, 'contract.d.ts'), 'utf-8')).toBe(
+      readFileSync(join(ctx.outputDir, 'contract.d.ts'), 'utf-8'),
+    );
+
+    const ops = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'));
+    expect(ops).toEqual([]);
+    const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
+      migrationId: string | null;
+    };
+    expect(manifest.migrationId).toBeNull();
+  });
+});
+
+describe(
+  'Journey: Mongo migration authoring (live database)',
+  { timeout: timeouts.spinUpMongoMemoryServer },
+  () => {
+    let replSet: MongoMemoryReplSet;
+    let client: MongoClient;
+    const dbName = 'mongo_journey_test';
+    const created = new Set<string>();
+
+    beforeAll(async () => {
+      replSet = await MongoMemoryReplSet.create({
+        instanceOpts: [
+          { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+        ],
+        replSet: { count: 1, storageEngine: 'wiredTiger' },
+      });
+      client = new MongoClient(replSet.getUri());
+      await client.connect();
+    }, timeouts.spinUpMongoMemoryServer);
+
+    beforeEach(async () => {
+      await client.db(dbName).dropDatabase();
+    });
+
+    afterEach(async () => {
+      for (const dir of created) {
+        await rm(dir, { recursive: true, force: true }).catch(() => {});
+      }
+      created.clear();
+    });
+
+    afterAll(async () => {
+      await client?.close().catch(() => {});
+      await replSet?.stop().catch(() => {});
+    }, timeouts.spinUpMongoMemoryServer);
+
+    it('plans + applies initial DDL, then hand-authored dataTransform migration runs against live MongoDB', async () => {
+      const connectionString = buildMongoUri(replSet.getUri(), dbName);
+      const ctx = setupMongoJourney(connectionString);
+      created.add(ctx.testDir);
+
+      const emit0 = await emitContract(ctx);
+      expect(emit0.exitCode, `contract emit: ${emit0.stderr}`).toBe(0);
+
+      const plan0 = await migrationPlan(ctx, ['--name', 'initial']);
+      expect(plan0.exitCode, `migration plan initial: ${plan0.stdout}\n${plan0.stderr}`).toBe(0);
+
+      const apply0 = await migrationApply(ctx);
+      expect(apply0.exitCode, `migration apply initial: ${apply0.stdout}\n${apply0.stderr}`).toBe(
+        0,
+      );
+
+      const collections = await client.db(dbName).listCollections({ name: 'users' }).toArray();
+      expect(collections.map((c) => c.name)).toContain('users');
+
+      await client
+        .db(dbName)
+        .collection('users')
+        .insertMany([
+          { email: 'alice@example.com', name: 'Alice' },
+          { email: 'bob@example.com', name: 'BOB' },
+          { email: 'carol@example.com', name: 'Carol' },
+        ]);
+
+      swapToAdditive(ctx);
+      const emit1 = await emitContract(ctx);
+      expect(emit1.exitCode, `contract emit additive: ${emit1.stderr}`).toBe(0);
+
+      const newResult = await migrationNew(ctx, ['--name', 'normalize-names']);
+      expect(newResult.exitCode, `migration new: ${newResult.stdout}\n${newResult.stderr}`).toBe(0);
+
+      const migrationDir = findMigrationDirBySlug(ctx, 'normalize_names');
+      const migrationTsPath = join(migrationDir, 'migration.ts');
+      const draftManifest = JSON.parse(
+        readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
+      ) as { from: string; to: string };
+
+      // Hand-author the migration: a createIndex op (matches what the planner
+      // would emit) plus a dataTransform that lowercases the `name` field.
+      // The check finds documents whose `name` contains an uppercase letter;
+      // after the transform all names are lower-case so the check is
+      // satisfied, enabling idempotency-skip on re-apply (tested below).
+      const handAuthored = `import { Migration } from '@prisma-next/family-mongo/migration';
+import { createIndex, dataTransform } from '@prisma-next/target-mongo/migration';
+import { RawUpdateManyCommand, RawAggregateCommand } from '@prisma-next/mongo-query-ast/execution';
+
+const planMeta = {
+  target: 'mongo',
+  storageHash: 'sha256:hand-authored',
+  lane: 'mongo-raw',
+  paramDescriptors: [],
+};
+
+class M extends Migration {
+  override describe() {
+    return {
+      from: ${JSON.stringify(draftManifest.from)},
+      to: ${JSON.stringify(draftManifest.to)},
+    };
+  }
+
+  override get operations() {
+    return [
+      createIndex('users', [{ field: 'name', direction: 1 }]),
+      dataTransform('lowercase-user-name', {
+        check: {
+          source: () => ({
+            collection: 'users',
+            command: new RawAggregateCommand(
+              'users',
+              [{ $match: { name: { $regex: '[A-Z]' } } }, { $limit: 1 }],
+            ),
+            meta: { ...planMeta, lane: 'mongo-pipeline' },
+          }),
+        },
+        run: () => ({
+          collection: 'users',
+          command: new RawUpdateManyCommand(
+            'users',
+            { name: { $exists: true } },
+            [{ $set: { name: { $toLower: '$name' } } }],
+          ),
+          meta: planMeta,
+        }),
+      }),
+    ];
+  }
+}
+
+export default M;
+Migration.run(import.meta.url, M);
+`;
+      writeFileSync(migrationTsPath, handAuthored);
+
+      const emitResult = await migrationEmit(ctx, ['--dir', migrationDir]);
+      expect(
+        emitResult.exitCode,
+        `migration emit: ${emitResult.stdout}\n${emitResult.stderr}`,
+      ).toBe(0);
+
+      const ops = JSON.parse(
+        readFileSync(join(migrationDir, 'ops.json'), 'utf-8'),
+      ) as ReadonlyArray<{
+        id: string;
+        operationClass: string;
+      }>;
+      expect(ops.map((o) => o.id)).toEqual(
+        expect.arrayContaining(['data_transform.lowercase-user-name']),
+      );
+      expect(ops.some((o) => o.id.startsWith('index.users.'))).toBe(true);
+
+      const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
+        migrationId: string | null;
+      };
+      expect(manifest.migrationId).toMatch(/^sha256:/);
+
+      const apply1 = await migrationApply(ctx);
+      expect(apply1.exitCode, `migration apply additive: ${apply1.stdout}\n${apply1.stderr}`).toBe(
+        0,
+      );
+
+      const users = await client
+        .db(dbName)
+        .collection('users')
+        .find({}, { projection: { _id: 0, email: 1, name: 1 } })
+        .sort({ email: 1 })
+        .toArray();
+      expect(users).toEqual([
+        { email: 'alice@example.com', name: 'alice' },
+        { email: 'bob@example.com', name: 'bob' },
+        { email: 'carol@example.com', name: 'carol' },
+      ]);
+
+      const indexes = await client.db(dbName).collection('users').indexes();
+      expect(indexes.some((idx) => JSON.stringify(idx.key) === JSON.stringify({ name: 1 }))).toBe(
+        true,
+      );
+
+      // Re-apply: the runner postcheck sees all names are already lower-case,
+      // so the data transform is skipped. Data must be byte-identical.
+      const apply2 = await migrationApply(ctx);
+      expect(apply2.exitCode, `re-apply: ${apply2.stdout}\n${apply2.stderr}`).toBe(0);
+
+      const usersAfterReApply = await client
+        .db(dbName)
+        .collection('users')
+        .find({}, { projection: { _id: 0, email: 1, name: 1 } })
+        .sort({ email: 1 })
+        .toArray();
+      expect(usersAfterReApply).toEqual(users);
+    });
+  },
+);

@@ -157,6 +157,23 @@ describe('RawFindOneAndUpdateCommand', () => {
     expect(cmd.update).toEqual(pipelineUpdate);
   });
 
+  it('leaves returnDocument undefined when not supplied so the driver default applies', () => {
+    const cmd = new RawFindOneAndUpdateCommand('counters', filter, update, false);
+    expect(cmd.returnDocument).toBeUndefined();
+  });
+
+  it('threads an explicit returnDocument through to the command', () => {
+    const cmd = new RawFindOneAndUpdateCommand(
+      'counters',
+      filter,
+      update,
+      false,
+      undefined,
+      'after',
+    );
+    expect(cmd.returnDocument).toBe('after');
+  });
+
   it('is frozen', () => {
     expect(Object.isFrozen(new RawFindOneAndUpdateCommand('counters', filter, update, false))).toBe(
       true,

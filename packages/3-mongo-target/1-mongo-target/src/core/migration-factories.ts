@@ -1,4 +1,9 @@
-import type { MongoIndexKey } from '@prisma-next/mongo-query-ast/control';
+import type {
+  MongoDataTransformCheck,
+  MongoDataTransformOperation,
+  MongoFilterExpr,
+  MongoIndexKey,
+} from '@prisma-next/mongo-query-ast/control';
 import {
   buildIndexOpId,
   CollModCommand,
@@ -14,10 +19,73 @@ import {
   ListCollectionsCommand,
   ListIndexesCommand,
   MongoAndExpr,
+  MongoExistsExpr,
   MongoFieldFilter,
   type MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
+import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import type { CollModMeta } from './op-factory-call';
+
+interface Buildable {
+  build(): MongoQueryPlan;
+}
+
+function isBuildable(value: unknown): value is Buildable {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'build' in value &&
+    typeof (value as { build: unknown }).build === 'function'
+  );
+}
+
+function resolveQuery(value: MongoQueryPlan | Buildable): MongoQueryPlan {
+  return isBuildable(value) ? value.build() : value;
+}
+
+// Every MongoDB document carries `_id`, so `exists('_id')` is equivalent to
+// "match all". The filter AST has no identity/always-true expression.
+const MATCH_ALL_FILTER: MongoFilterExpr = MongoExistsExpr.exists('_id');
+
+export function dataTransform(
+  name: string,
+  options: {
+    check?: {
+      source: () => MongoQueryPlan | Buildable;
+      filter?: MongoFilterExpr;
+      expect?: 'exists' | 'notExists';
+      description?: string;
+    };
+    run: () => MongoQueryPlan | Buildable;
+  },
+): MongoDataTransformOperation {
+  let precheck: readonly MongoDataTransformCheck[] = [];
+  let postcheck: readonly MongoDataTransformCheck[] = [];
+
+  if (options.check) {
+    const source = resolveQuery(options.check.source());
+    const filter = options.check.filter ?? MATCH_ALL_FILTER;
+    const description = options.check.description ?? `Check for data transform: ${name}`;
+    const precheckExpect = options.check.expect ?? 'exists';
+    const postcheckExpect: 'exists' | 'notExists' =
+      precheckExpect === 'exists' ? 'notExists' : 'exists';
+
+    precheck = [{ description, source, filter, expect: precheckExpect }];
+    postcheck = [{ description, source, filter, expect: postcheckExpect }];
+  }
+
+  const run: MongoQueryPlan[] = [resolveQuery(options.run())];
+
+  return {
+    id: `data_transform.${name}`,
+    label: `Data transform: ${name}`,
+    operationClass: 'data',
+    name,
+    precheck,
+    run,
+    postcheck,
+  };
+}
 
 function formatKeys(keys: ReadonlyArray<MongoIndexKey>): string {
   return keys.map((k) => `${k.field}:${k.direction}`).join(', ');

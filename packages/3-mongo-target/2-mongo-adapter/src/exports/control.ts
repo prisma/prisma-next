@@ -6,7 +6,7 @@ export {
   createMongoControlDriver,
   type MongoControlDriverInstance,
 } from '../core/mongo-control-driver';
-export { createMongoRunnerDeps } from '../core/runner-deps';
+export { createMongoRunnerDeps, extractDb } from '../core/runner-deps';
 
 import {
   mongoBooleanCodec,

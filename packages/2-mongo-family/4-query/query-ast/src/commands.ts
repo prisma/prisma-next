@@ -23,12 +23,24 @@ export class UpdateOneCommand extends MongoAstNode {
   readonly collection: string;
   readonly filter: MongoFilterExpr;
   readonly update: MongoUpdateSpec;
+  /**
+   * When true, the wire command becomes an upsert: if no document matches
+   * `filter`, a new document is inserted, derived from the filter's
+   * equality fields plus the update spec. Defaults to false.
+   */
+  readonly upsert: boolean;
 
-  constructor(collection: string, filter: MongoFilterExpr, update: MongoUpdateSpec) {
+  constructor(
+    collection: string,
+    filter: MongoFilterExpr,
+    update: MongoUpdateSpec,
+    upsert = false,
+  ) {
     super();
     this.collection = collection;
     this.filter = filter;
     this.update = update;
+    this.upsert = upsert;
     this.freeze();
   }
 }
@@ -64,12 +76,24 @@ export class UpdateManyCommand extends MongoAstNode {
   readonly collection: string;
   readonly filter: MongoFilterExpr;
   readonly update: MongoUpdateSpec;
+  /**
+   * Upsert flag — see `UpdateOneCommand.upsert`. For `updateMany`, Mongo
+   * inserts at most one document when no match exists (driver-side
+   * constraint).
+   */
+  readonly upsert: boolean;
 
-  constructor(collection: string, filter: MongoFilterExpr, update: MongoUpdateSpec) {
+  constructor(
+    collection: string,
+    filter: MongoFilterExpr,
+    update: MongoUpdateSpec,
+    upsert = false,
+  ) {
     super();
     this.collection = collection;
     this.filter = filter;
     this.update = update;
+    this.upsert = upsert;
     this.freeze();
   }
 }
@@ -93,18 +117,24 @@ export class FindOneAndUpdateCommand extends MongoAstNode {
   readonly filter: MongoFilterExpr;
   readonly update: MongoUpdateSpec;
   readonly upsert: boolean;
+  readonly sort: Record<string, 1 | -1> | undefined;
+  readonly returnDocument: 'before' | 'after';
 
   constructor(
     collection: string,
     filter: MongoFilterExpr,
     update: MongoUpdateSpec,
-    upsert: boolean,
+    upsert = false,
+    sort?: Record<string, 1 | -1>,
+    returnDocument: 'before' | 'after' = 'after',
   ) {
     super();
     this.collection = collection;
     this.filter = filter;
     this.update = update;
     this.upsert = upsert;
+    this.sort = sort;
+    this.returnDocument = returnDocument;
     this.freeze();
   }
 }
@@ -113,11 +143,13 @@ export class FindOneAndDeleteCommand extends MongoAstNode {
   readonly kind = 'findOneAndDelete' as const;
   readonly collection: string;
   readonly filter: MongoFilterExpr;
+  readonly sort: Record<string, 1 | -1> | undefined;
 
-  constructor(collection: string, filter: MongoFilterExpr) {
+  constructor(collection: string, filter: MongoFilterExpr, sort?: Record<string, 1 | -1>) {
     super();
     this.collection = collection;
     this.filter = filter;
+    this.sort = sort;
     this.freeze();
   }
 }

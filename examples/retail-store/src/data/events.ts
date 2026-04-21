@@ -1,5 +1,5 @@
-import { acc } from '@prisma-next/mongo-pipeline-builder';
 import { MongoFieldFilter } from '@prisma-next/mongo-query-ast/execution';
+import { acc } from '@prisma-next/mongo-query-builder';
 import type { FieldInputTypes } from '../contract';
 import type { Db } from '../db';
 import { collectResults } from './execute-raw';
@@ -54,7 +54,7 @@ interface EventTypeCount {
 }
 
 export async function aggregateEventsByType(db: Db, userId: string): Promise<EventTypeCount[]> {
-  const plan = db.pipeline
+  const plan = db.query
     .from('events')
     .match(MongoFieldFilter.eq('userId', userId))
     .group((f) => ({

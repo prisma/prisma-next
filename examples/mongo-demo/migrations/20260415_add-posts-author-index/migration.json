@@ -1,8 +1,20 @@
 {
-  "migrationId": null,
+  "migrationId": "sha256:88f7e0045a24623f71193e1dbb317df91474cc9efa838616bf5d6e1a7bd76b3c",
   "from": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
   "to": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
   "kind": "regular",
   "labels": ["add-posts-author-index"],
-  "createdAt": "2026-04-15T17:17:30.570Z"
+  "createdAt": "2026-04-15T17:17:30.570Z",
+  "fromContract": null,
+  "toContract": {
+    "storage": {
+      "storageHash": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe"
+    }
+  },
+  "hints": {
+    "used": [],
+    "applied": [],
+    "plannerVersion": "2.0.0",
+    "planningStrategy": "class-based"
+  }
 }
