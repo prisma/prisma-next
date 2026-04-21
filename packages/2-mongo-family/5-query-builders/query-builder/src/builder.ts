@@ -628,14 +628,24 @@ export class PipelineChain<
    * stages (folded into the filter) and remaining stages (which must all
    * be valid pipeline-update stages). Available only when `U = 'update-ok'`.
    *
-   * Overloaded to accept an optional updater callback for subclass
-   * compatibility with `FilteredCollection.updateMany(updaterFn)`.
+   * The optional callback parameter exists for subclass-override
+   * compatibility with `FilteredCollection.updateMany(updaterFn)` — TS's
+   * strict override check requires the parent's parameter to accept at
+   * least what the child's signature does. A runtime guard throws if a
+   * callback is actually passed on a bare `PipelineChain`. Note that
+   * because nothing in the public surface transitions `U` from
+   * `'update-cleared'` (the initial state on `CollectionHandle` /
+   * `FilteredCollection`) back to `'update-ok'`, the no-arg form is
+   * reachable only via explicit type casts in internal tests — the
+   * callback-form "type hole" is therefore not reachable from user
+   * code. See `docs/architecture docs/adrs/ADR 201 - State-machine
+   * pattern for typed DSL builders.md` for the marker-transition table.
    */
   updateMany(
     this: PipelineChain<TContract, Shape, 'update-ok', F, L>,
     updaterFn?: (fields: FieldAccessor<Shape>) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult, UpdateManyCommand> {
-    if (updaterFn) {
+    if (updaterFn !== undefined) {
       throw new Error(
         'updateMany() on a PipelineChain expects no arguments — the chain itself is the update pipeline. ' +
           'To update with an operator callback, call .updateMany(fn) on a FilteredCollection (i.e. after .match()).',
@@ -648,13 +658,15 @@ export class PipelineChain<
 
   /**
    * No-arg `updateOne()`: same as `updateMany()` but maps to a single-doc
-   * update.
+   * update. Carries the same optional-callback/subclass-compat caveat
+   * documented above — the callback form is reachable only via forced
+   * casts in internal tests.
    */
   updateOne(
     this: PipelineChain<TContract, Shape, 'update-ok', F, L>,
     updaterFn?: (fields: FieldAccessor<Shape>) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult, UpdateOneCommand> {
-    if (updaterFn) {
+    if (updaterFn !== undefined) {
       throw new Error(
         'updateOne() on a PipelineChain expects no arguments — the chain itself is the update pipeline. ' +
           'To update with an operator callback, call .updateOne(fn) on a FilteredCollection (i.e. after .match()).',
@@ -669,14 +681,15 @@ export class PipelineChain<
 
   /**
    * Find a single document matching the accumulated pipeline (which must
-   * consist solely of `$match`/`$sort`/`$skip` stages) and apply
-   * `updaterFn`. Available only when `FindAndModifyEnabled` is `'fam-ok'`
-   * — stages that clear the marker make this method invisible at the type
-   * level.
+   * consist solely of leading `$match` stages followed by at most one
+   * `$sort`) and apply `updaterFn`. Available only when
+   * `FindAndModifyEnabled` is `'fam-ok'` — stages that clear the marker
+   * (including `$skip`, which MongoDB's `findAndModify` has no slot for)
+   * make this method invisible at the type level.
    *
-   * The pipeline stages are deconstructed into the wire command's `filter`,
-   * `sort`, and `skip` slots. If any non-deconstructable stage is present,
-   * a runtime error is thrown as a defensive check (the type system should
+   * The pipeline stages are deconstructed into the wire command's `filter`
+   * and `sort` slots. If any non-deconstructable stage is present, a
+   * runtime error is thrown as a defensive check (the type system should
    * prevent this).
    */
   findOneAndUpdate(
