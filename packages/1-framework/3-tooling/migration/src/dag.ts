@@ -352,36 +352,51 @@ export function detectCycles(graph: MigrationGraph): readonly string[][] {
     color.set(node, WHITE);
   }
 
-  function dfs(u: string): void {
+  // Iterative three-color DFS. A frame is (node, outgoing edges, next-index).
+  // The recursive form overflows at ~5k linear depth under Node's default
+  // stack, which is well within the size of a real migration history.
+  interface Frame {
+    node: string;
+    outgoing: readonly MigrationChainEntry[];
+    index: number;
+  }
+  const stack: Frame[] = [];
+
+  function pushFrame(u: string): void {
     color.set(u, GRAY);
-
-    const outgoing = graph.forwardChain.get(u);
-    if (outgoing) {
-      for (const edge of outgoing) {
-        const v = edge.to;
-        if (color.get(v) === GRAY) {
-          const cycle: string[] = [v];
-          let cur = u;
-          while (cur !== v) {
-            cycle.push(cur);
-            cur = parentMap.get(cur) ?? v;
-          }
-          cycle.reverse();
-          cycles.push(cycle);
-        } else if (color.get(v) === WHITE) {
-          parentMap.set(v, u);
-          dfs(v);
-        }
-      }
-    }
-
-    color.set(u, BLACK);
+    stack.push({ node: u, outgoing: graph.forwardChain.get(u) ?? [], index: 0 });
   }
 
-  for (const node of graph.nodes) {
-    if (color.get(node) === WHITE) {
-      parentMap.set(node, null);
-      dfs(node);
+  for (const root of graph.nodes) {
+    if (color.get(root) !== WHITE) continue;
+    parentMap.set(root, null);
+    pushFrame(root);
+
+    while (stack.length > 0) {
+      // biome-ignore lint/style/noNonNullAssertion: stack.length > 0 should guarantee that this cannot be undefined
+      const frame = stack[stack.length - 1]!;
+      if (frame.index >= frame.outgoing.length) {
+        color.set(frame.node, BLACK);
+        stack.pop();
+        continue;
+      }
+      // biome-ignore lint/style/noNonNullAssertion: the early-continue above guarantees frame.index < frame.outgoing.length here, so this is defined
+      const edge = frame.outgoing[frame.index++]!;
+      const v = edge.to;
+      const vColor = color.get(v);
+      if (vColor === GRAY) {
+        const cycle: string[] = [v];
+        let cur = frame.node;
+        while (cur !== v) {
+          cycle.push(cur);
+          cur = parentMap.get(cur) ?? v;
+        }
+        cycle.reverse();
+        cycles.push(cycle);
+      } else if (vColor === WHITE) {
+        parentMap.set(v, frame.node);
+        pushFrame(v);
+      }
     }
   }
 

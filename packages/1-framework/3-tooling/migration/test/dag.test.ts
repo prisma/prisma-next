@@ -12,7 +12,7 @@ import {
   reconstructGraph,
 } from '../src/dag';
 import { MigrationToolsError } from '../src/errors';
-import type { AttestedMigrationBundle } from '../src/types';
+import type { AttestedMigrationBundle, MigrationChainEntry } from '../src/types';
 import { createAttestedManifest, createTestOps } from './fixtures';
 
 let migrationCounter = 0;
@@ -285,6 +285,39 @@ describe('detectCycles', () => {
     const graph = reconstructGraph(packages);
     const cycles = detectCycles(graph);
     expect(cycles.length).toBeGreaterThan(0);
+  });
+
+  it('handles deep linear chain without stack overflow', () => {
+    const length = 20_000;
+    const nodes = new Set<string>();
+    const forwardChain = new Map<string, MigrationChainEntry[]>();
+    const reverseChain = new Map<string, MigrationChainEntry[]>();
+    const migrationById = new Map<string, MigrationChainEntry>();
+    let prev: string = E;
+    for (let i = 0; i < length; i++) {
+      const next = `h:${i}`;
+      nodes.add(prev);
+      nodes.add(next);
+      const entry: MigrationChainEntry = {
+        from: prev,
+        to: next,
+        migrationId: `mid:${i}`,
+        dirName: `m${i}`,
+        createdAt: new Date(i * 1000).toISOString(),
+        labels: [],
+      };
+      const fwd = forwardChain.get(prev);
+      if (fwd) fwd.push(entry);
+      else forwardChain.set(prev, [entry]);
+      const rev = reverseChain.get(next);
+      if (rev) rev.push(entry);
+      else reverseChain.set(next, [entry]);
+      migrationById.set(entry.migrationId, entry);
+      prev = next;
+    }
+    const graph = { nodes, forwardChain, reverseChain, migrationById };
+    expect(() => detectCycles(graph)).not.toThrow();
+    expect(detectCycles(graph)).toEqual([]);
   });
 });
 
