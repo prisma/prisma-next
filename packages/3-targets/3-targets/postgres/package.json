@@ -20,6 +20,7 @@
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
+    "@prisma-next/ts-render": "workspace:*",
     "@prisma-next/sql-builder": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-errors": "workspace:*",

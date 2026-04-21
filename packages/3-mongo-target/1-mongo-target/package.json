@@ -19,6 +19,7 @@
     "@prisma-next/errors": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
+    "@prisma-next/ts-render": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-lowering": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",

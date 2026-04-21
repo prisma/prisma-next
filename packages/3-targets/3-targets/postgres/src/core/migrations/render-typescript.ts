@@ -10,9 +10,8 @@
  */
 
 import { detectScaffoldRuntime, shebangLineFor } from '@prisma-next/migration-tools/migration-ts';
-import type { ImportRequirement } from './migration-ts-expression';
+import { type ImportRequirement, jsonToTsSource } from '@prisma-next/ts-render';
 import type { PostgresOpFactoryCall } from './op-factory-call';
-import { renderLiteral } from './render-literal';
 
 export interface RenderMigrationMeta {
   readonly from: string;
@@ -92,7 +91,7 @@ function buildDescribeMethod(meta: RenderMigrationMeta): string {
     lines.push(`      kind: ${JSON.stringify(meta.kind)},`);
   }
   if (meta.labels && meta.labels.length > 0) {
-    lines.push(`      labels: ${renderLiteral(meta.labels)},`);
+    lines.push(`      labels: ${jsonToTsSource(meta.labels)},`);
   }
   lines.push('    };');
   lines.push('  }');

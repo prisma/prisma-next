@@ -255,7 +255,7 @@ describe('renderCallsToTypeScript', () => {
     expect(output).toContain('"__proto__"');
   });
 
-  it('falls back to String() for non-standard value types', () => {
+  it('throws on non-JSON value types', () => {
     const calls = [
       new CollModCall('test', { validator: BigInt(42) } as unknown as CollModOptions, {
         id: 'test',
@@ -263,8 +263,7 @@ describe('renderCallsToTypeScript', () => {
         operationClass: 'destructive',
       }),
     ];
-    const output = renderTypeScript(calls);
-    expect(output).toContain('42');
+    expect(() => renderTypeScript(calls)).toThrow('unsupported value type');
   });
 
   it('renders null values', () => {

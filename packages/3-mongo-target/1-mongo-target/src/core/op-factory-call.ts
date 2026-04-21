@@ -14,8 +14,7 @@ import type {
   MongoSchemaIndex,
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
-import { type ImportRequirement, MigrationTsExpression } from './migration-ts-expression';
-import { renderLiteral } from './render-literal';
+import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 
 export interface CollModMeta {
   readonly id?: string;
@@ -33,7 +32,7 @@ export interface OpFactoryCallVisitor<R> {
 
 const TARGET_MIGRATION_MODULE = '@prisma-next/target-mongo/migration';
 
-abstract class OpFactoryCallNode extends MigrationTsExpression implements FrameworkOpFactoryCall {
+abstract class OpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
   abstract readonly factory: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
@@ -79,8 +78,8 @@ export class CreateIndexCall extends OpFactoryCallNode {
 
   renderTypeScript(): string {
     return this.options
-      ? `createIndex(${renderLiteral(this.collection)}, ${renderLiteral(this.keys)}, ${renderLiteral(this.options)})`
-      : `createIndex(${renderLiteral(this.collection)}, ${renderLiteral(this.keys)})`;
+      ? `createIndex(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.keys)}, ${jsonToTsSource(this.options)})`
+      : `createIndex(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.keys)})`;
   }
 }
 
@@ -104,7 +103,7 @@ export class DropIndexCall extends OpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `dropIndex(${renderLiteral(this.collection)}, ${renderLiteral(this.keys)})`;
+    return `dropIndex(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.keys)})`;
   }
 }
 
@@ -129,8 +128,8 @@ export class CreateCollectionCall extends OpFactoryCallNode {
 
   renderTypeScript(): string {
     return this.options
-      ? `createCollection(${renderLiteral(this.collection)}, ${renderLiteral(this.options)})`
-      : `createCollection(${renderLiteral(this.collection)})`;
+      ? `createCollection(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.options)})`
+      : `createCollection(${jsonToTsSource(this.collection)})`;
   }
 }
 
@@ -152,7 +151,7 @@ export class DropCollectionCall extends OpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `dropCollection(${renderLiteral(this.collection)})`;
+    return `dropCollection(${jsonToTsSource(this.collection)})`;
   }
 }
 
@@ -180,8 +179,8 @@ export class CollModCall extends OpFactoryCallNode {
 
   renderTypeScript(): string {
     return this.meta
-      ? `collMod(${renderLiteral(this.collection)}, ${renderLiteral(this.options)}, ${renderLiteral(this.meta)})`
-      : `collMod(${renderLiteral(this.collection)}, ${renderLiteral(this.options)})`;
+      ? `collMod(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.options)}, ${jsonToTsSource(this.meta)})`
+      : `collMod(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.options)})`;
   }
 }
 
