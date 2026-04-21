@@ -37,9 +37,11 @@ describe('Mongo call classes', () => {
       });
 
       expect(Object.isFrozen(call)).toBe(true);
-      expect(call.factoryName).toBe('createIndex');
-      expect(call.operationClass).toBe('additive');
-      expect(call.label).toBe('Create index on users (email:1)');
+      expect(call).toMatchObject({
+        factoryName: 'createIndex',
+        operationClass: 'additive',
+        label: 'Create index on users (email:1)',
+      });
 
       expect(call.toOp()).toEqual(
         createIndex('users', [{ field: 'email', direction: 1 }], { unique: true }),
@@ -50,9 +52,11 @@ describe('Mongo call classes', () => {
       const call = new DropIndexCall('users', [{ field: 'legacy', direction: -1 }]);
 
       expect(Object.isFrozen(call)).toBe(true);
-      expect(call.factoryName).toBe('dropIndex');
-      expect(call.operationClass).toBe('destructive');
-      expect(call.label).toBe('Drop index on users (legacy:-1)');
+      expect(call).toMatchObject({
+        factoryName: 'dropIndex',
+        operationClass: 'destructive',
+        label: 'Drop index on users (legacy:-1)',
+      });
 
       expect(call.toOp()).toEqual(dropIndex('users', [{ field: 'legacy', direction: -1 }]));
     });
@@ -61,9 +65,11 @@ describe('Mongo call classes', () => {
       const call = new CreateCollectionCall('users');
 
       expect(Object.isFrozen(call)).toBe(true);
-      expect(call.factoryName).toBe('createCollection');
-      expect(call.operationClass).toBe('additive');
-      expect(call.label).toBe('Create collection users');
+      expect(call).toMatchObject({
+        factoryName: 'createCollection',
+        operationClass: 'additive',
+        label: 'Create collection users',
+      });
 
       expect(call.toOp()).toEqual(createCollection('users'));
     });
@@ -72,9 +78,11 @@ describe('Mongo call classes', () => {
       const call = new DropCollectionCall('users');
 
       expect(Object.isFrozen(call)).toBe(true);
-      expect(call.factoryName).toBe('dropCollection');
-      expect(call.operationClass).toBe('destructive');
-      expect(call.label).toBe('Drop collection users');
+      expect(call).toMatchObject({
+        factoryName: 'dropCollection',
+        operationClass: 'destructive',
+        label: 'Drop collection users',
+      });
 
       expect(call.toOp()).toEqual(dropCollection('users'));
     });
@@ -83,9 +91,11 @@ describe('Mongo call classes', () => {
       const call = new CollModCall('users', { validator: { $jsonSchema: { type: 'object' } } });
 
       expect(Object.isFrozen(call)).toBe(true);
-      expect(call.factoryName).toBe('collMod');
-      expect(call.operationClass).toBe('destructive');
-      expect(call.label).toBe('Modify collection users');
+      expect(call).toMatchObject({
+        factoryName: 'collMod',
+        operationClass: 'destructive',
+        label: 'Modify collection users',
+      });
 
       expect(call.toOp()).toEqual(
         collMod('users', { validator: { $jsonSchema: { type: 'object' } } }),
@@ -99,8 +109,10 @@ describe('Mongo call classes', () => {
         { label: 'Tighten users validator', operationClass: 'widening' },
       );
 
-      expect(call.operationClass).toBe('widening');
-      expect(call.label).toBe('Tighten users validator');
+      expect(call).toMatchObject({
+        operationClass: 'widening',
+        label: 'Tighten users validator',
+      });
 
       expect(call.toOp()).toEqual(
         collMod(
