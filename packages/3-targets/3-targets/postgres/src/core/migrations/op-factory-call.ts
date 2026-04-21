@@ -956,3 +956,22 @@ export type PostgresOpFactoryCall =
   | CreateExtensionCall
   | CreateSchemaCall
   | DataTransformCall;
+
+/**
+ * Stable identity key for reconciliation-level dedup.
+ *
+ * Two calls whose runtime ops would share the same `id` return the same
+ * key, so a `Set<string>` can collapse them before they're emitted. The
+ * current implementation delegates to `toOp().id`, which is the
+ * authoritative identity; isolating dedup behind this helper lets a future
+ * pass replace it with an allocation-free computation directly from the
+ * call's fields without touching call sites.
+ *
+ * `DataTransformCall` intentionally has no sensible identity today — it
+ * throws `PN-MIG-2001` on `toOp()`. Reconciliation never produces one; the
+ * helper is unspecified for that variant and only meant for
+ * reconciliation-emitted calls.
+ */
+export function identityKeyFor(call: PostgresOpFactoryCall): string {
+  return call.toOp().id;
+}

@@ -20,6 +20,7 @@ import {
   DropIndexCall,
   DropNotNullCall,
   DropTableCall,
+  identityKeyFor,
   type PostgresOpFactoryCall,
   SetDefaultCall,
   SetNotNullCall,
@@ -27,7 +28,6 @@ import {
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
 import { buildExpectedFormatType } from './planner-sql-checks';
 import type { PlanningMode } from './planner-target-details';
-import { renderOps } from './render-ops';
 
 // ============================================================================
 // Public API
@@ -65,11 +65,10 @@ export function buildReconciliationPlan(options: {
     if (call) {
       // Different schema issues may produce the same runtime op id (e.g.
       // extra_unique_constraint and extra_index on the same object). Dedupe
-      // by rendering each call and keying on the runtime id.
-      const [op] = renderOps([call]);
-      invariant(op !== undefined, `renderOps returned empty for call ${call.factoryName}`);
-      if (!seenOperationIds.has(op.id)) {
-        seenOperationIds.add(op.id);
+      // by the call's stable identity key.
+      const opId = identityKeyFor(call);
+      if (!seenOperationIds.has(opId)) {
+        seenOperationIds.add(opId);
         if (options.policy.allowedOperationClasses.includes(call.operationClass)) {
           calls.push(call);
         } else {
