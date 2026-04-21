@@ -1,23 +1,24 @@
 /**
  * Planner-produced Postgres migration.
  *
- * Returned by the walk-schema planner (`PostgresMigrationPlanner.plan(...)`
- * and `emptyMigration(...)` once retargeted). Holds the class-flow IR
- * (`PostgresOpFactoryCall[]`) alongside `MigrationMeta` and exposes both
- * the runtime-ops view (`get operations`) and the TypeScript authoring view
- * (`renderTypeScript()`). Satisfies `MigrationPlanWithAuthoringSurface` so
- * the CLI can uniformly serialize any planner result back to `migration.ts`.
+ * Returned by `PostgresMigrationPlanner.plan(...)` and `emptyMigration(...)`.
+ * Holds the class-flow IR (`PostgresOpFactoryCall[]`) alongside
+ * `MigrationMeta` and exposes both the runtime-ops view (`get operations`)
+ * and the TypeScript authoring view (`renderTypeScript()`). Satisfies
+ * `MigrationPlanWithAuthoringSurface` so the CLI can uniformly serialize any
+ * planner result back to `migration.ts`.
  *
  * Extends the family-level `SqlMigration` alias rather than the target-local
  * class-flow base directly — mirrors Mongo's `PlannerProducedMongoMigration`
- * shape and keeps Phase 3 CLI wiring one step removed from target internals.
+ * shape and keeps CLI wiring one step removed from target internals.
  *
- * Behavior with placeholder-bearing plans: `renderTypeScript()` always
- * succeeds and embeds `() => placeholder("slot")` at each stub; `operations`
- * walks `renderOps`, which for Phase 1 does not emit data transforms (the
- * walk-schema planner does not produce them), so placeholder-bearing plans
- * from this planner are impossible today. Phase 2 lowers placeholders into
- * runtime ops whose closures throw `PN-MIG-2001` on invocation.
+ * Placeholder-bearing plans: `renderTypeScript()` always succeeds and embeds
+ * `() => placeholder("slot")` at each stub. `operations` dispatches each
+ * call's `toOp()`; `DataTransformCall.toOp()` throws `PN-MIG-2001` because a
+ * planner-stubbed closure cannot be lowered to a runtime op. In practice the
+ * walk-schema planner does not emit `DataTransformCall`s today, so this
+ * throw is reserved for future issue-planner integrations that author data
+ * transforms and require a user edit before execution.
  */
 
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';

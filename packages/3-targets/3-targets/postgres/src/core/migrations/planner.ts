@@ -80,12 +80,13 @@ import {
  * Ops produced outside the planner's direct IR emission — by codec control
  * hooks (`planTypeOperations`), component database dependency install
  * arrays, the multi-step add-NOT-NULL-with-temporary-default recipe, and any
- * other legacy/escape-hatch path — are wrapped in a `RawSqlCall` so the
- * entire plan can flow through a single `PostgresOpFactoryCall[]` pipeline.
+ * other raw-op escape hatch — are wrapped in a `RawSqlCall` so the entire
+ * plan can flow through a single `PostgresOpFactoryCall[]` pipeline.
  *
- * A future pass (Path A in the project plan) will retarget those producers
- * to emit structured call classes directly; at that point most call sites
- * here disappear and this helper narrows to a last-resort launderer.
+ * As upstream producers are retargeted to emit structured call classes
+ * (`CreateExtensionCall`, `CreateSchemaCall`, etc.) directly, call sites here
+ * shrink and this helper narrows to a last-resort launderer for truly opaque
+ * SQL snippets.
  */
 function liftOpToCall(op: SqlMigrationPlanOperation<PostgresPlanTargetDetails>): RawSqlCall {
   return new RawSqlCall(op);
