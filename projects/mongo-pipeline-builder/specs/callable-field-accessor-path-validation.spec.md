@@ -44,18 +44,19 @@ This ticket closes the gap: `f` becomes a generic whose path parameter is constr
 - `PathCompletions<N extends NestedDocShape, Prefix extends string = "">` — lazy ArkType-style completion union: for each key `K`, yields `${Prefix}${K}` and, when `N[K]` is nested, the prefix `${Prefix}${K}.` plus the recursive expansion. TypeScript's lazy conditional-type evaluation handles self-referential value objects (ADR 180's `NavItem.children` case). No artificial depth cap for v1.
 - `ObjectField<N extends NestedDocShape>` — marker DocField variant for non-leaf resolution: `{ readonly codecId: 'prisma/object@1'; readonly nullable: boolean; readonly fields: N }`. Consumed by `Expression<F>` to select the reduced operator surface.
 
-### Escape hatch for unvalidated paths — `f.raw("path")`
+### Escape hatch for unvalidated paths — `f.rawPath("path")`
 
 Some callers need a callable path that is intentionally _not_ validated against the contract — the canonical case is a data-backfill migration that writes to a field before the post-migration contract hash has rolled forward. Strict callable validation would reject those paths ("not assignable to parameter of type `never`") even though the runtime is fine.
 
-`FieldAccessor` exposes `raw<F extends DocField = DocField>(path: string): LeafExpression<F>` as the sanctioned escape hatch:
+`FieldAccessor` exposes `rawPath<F extends DocField = DocField>(path: string): LeafExpression<F>` as the sanctioned escape hatch:
 
 - Accepts any string; no `ValidPaths<N>` constraint.
-- Returns `LeafExpression<F>` — the full leaf operator surface (`set`, `unset`, `exists`, `inc`, `push`, …). Default `F = DocField`; callers can narrow via the explicit generic: `f.raw<StringField>("status").set("active")`.
+- Returns `LeafExpression<F>` — the full leaf operator surface (`set`, `unset`, `exists`, `inc`, `push`, …). Default `F = DocField`; callers can narrow via the explicit generic: `f.rawPath<StringField>("status").set("active")`.
 - Independent of `N`, so it remains available in the "callable disabled" state downstream of replacement stages.
 - Deliberately not an `ObjectExpression`: migration authoring is always about writing a leaf (or checking its presence), so the reduced object surface doesn't apply.
+- Named `rawPath` (not `raw`) so a user model with a top-level `raw` field still resolves `f.raw` to its field expression. Using `raw` would have silently shadowed such fields, and the callable fallback `f("raw")` is disabled downstream of replacement stages — leaving the real field inaccessible. `rawPath` also reads as exactly what it is: a raw, unvalidated path string.
 
-At runtime `f.raw(path)` uses the same `buildExpression(path)` helper as the strict callable, so the emitted filter/update nodes are byte-identical.
+At runtime `f.rawPath(path)` uses the same `buildExpression(path)` helper as the strict callable, so the emitted filter/update nodes are byte-identical.
 
 ### `FieldAccessor` signature change
 
@@ -159,11 +160,12 @@ Fixture covers the single-model case required for this ticket; array-of-value-ob
 - [ ] Callable form `f("bogus")` is a compile-time error (`@ts-expect-error`-verified).
 - [ ] Callable form `f("address.bogus")` is a compile-time error.
 - [ ] The compile error message for invalid paths surfaces the union of valid paths (constrained-generic approach), not just `Argument of type 'string' is not assignable to 'never'`.
-- [ ] `f.raw("status")` accepts an unvalidated string path and returns a `LeafExpression<DocField>` with the full leaf operator surface (`set`, `exists`, `inc`, `push`, …).
-- [ ] `f.raw` accepts paths that are not in `ValidPaths<N>` — including deeply-nested strings that don't correspond to any contract field.
-- [ ] `f.raw` remains callable when `N = Record<string, never>` (i.e. downstream of replacement stages and in the default-disabled state).
-- [ ] `f.raw<StringField>("status")` narrows the return to `LeafExpression<StringField>` via the explicit generic.
-- [ ] The retail-store `backfill-product-status` migration uses `f.raw("status")` and typechecks under `pnpm --filter retail-store typecheck`, with `examples/retail-store/tsconfig.json` now including `migrations/**/*.ts`.
+- [ ] `f.rawPath("status")` accepts an unvalidated string path and returns a `LeafExpression<DocField>` with the full leaf operator surface (`set`, `exists`, `inc`, `push`, …).
+- [ ] `f.rawPath` accepts paths that are not in `ValidPaths<N>` — including deeply-nested strings that don't correspond to any contract field.
+- [ ] `f.rawPath` remains callable when `N = Record<string, never>` (i.e. downstream of replacement stages and in the default-disabled state).
+- [ ] `f.rawPath<StringField>("status")` narrows the return to `LeafExpression<StringField>` via the explicit generic.
+- [ ] For a model with a legitimate top-level `raw` field, `f.raw` resolves to its `Expression` (via the property-form mapped type), not to the escape-hatch function. The escape hatch's name `rawPath` preserves this non-shadowing guarantee.
+- [ ] The retail-store `backfill-product-status` migration uses `f.rawPath("status")` and typechecks under `pnpm --filter retail-store typecheck`, with `examples/retail-store/tsconfig.json` now including `migrations/**/*.ts`.
 
 ### Pipeline threading
 

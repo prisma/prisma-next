@@ -83,12 +83,13 @@ describe('PipelineChain', () => {
       expect(callableStage.filter).toEqual(expectedFilter);
     });
 
-    // Runtime non-regression for the `f.raw(path)` escape hatch (TML-2281):
-    // the resulting expression must emit the same filter/update nodes as the
-    // strict callable form, just without compile-time path validation.
-    it('match via f.raw(path) emits identical nodes as the strict callable', () => {
+    // Runtime non-regression for the `f.rawPath(path)` escape hatch
+    // (TML-2281): the resulting expression must emit the same filter/update
+    // nodes as the strict callable form, just without compile-time path
+    // validation.
+    it('match via f.rawPath(path) emits identical nodes as the strict callable', () => {
       const rawPlan = createCustomersBuilder()
-        .match((f) => f.raw('status').exists(false))
+        .match((f) => f.rawPath('status').exists(false))
         .build();
       const rawStage = rawPlan.command.pipeline[0] as MongoMatchStage;
 

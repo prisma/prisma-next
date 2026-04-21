@@ -154,16 +154,16 @@ describe('ObjectExpression operator surface', () => {
   });
 });
 
-describe('FieldAccessor.raw escape hatch', () => {
+describe('FieldAccessor.rawPath escape hatch', () => {
   it('accepts an arbitrary string path without contract validation', () => {
     const f = createFieldAccessor<CustomerShape, CustomerNested>();
-    const expr = f.raw('status');
+    const expr = f.rawPath('status');
     expectTypeOf(expr).toExtend<LeafExpression<DocField>>();
   });
 
   it('returns the full leaf operator surface (set, exists, inc, …)', () => {
     const f = createFieldAccessor<CustomerShape, CustomerNested>();
-    const expr = f.raw('status');
+    const expr = f.rawPath('status');
     expectTypeOf(expr.set).toBeFunction();
     expectTypeOf(expr.unset).toBeFunction();
     expectTypeOf(expr.exists).toBeFunction();
@@ -173,26 +173,40 @@ describe('FieldAccessor.raw escape hatch', () => {
 
   it('accepts paths that are not in ValidPaths<N>', () => {
     const f = createFieldAccessor<CustomerShape, CustomerNested>();
-    // 'status' is not a valid path on Customer; `f.raw` must still accept
-    // it — that is the whole point of the escape hatch (migration authoring
-    // where the target field is not yet in the contract).
-    f.raw('status');
-    f.raw('deeply.nested.not.in.contract');
+    // 'status' is not a valid path on Customer; `f.rawPath` must still
+    // accept it — that is the whole point of the escape hatch (migration
+    // authoring where the target field is not yet in the contract).
+    f.rawPath('status');
+    f.rawPath('deeply.nested.not.in.contract');
   });
 
   it('remains available when N is empty (callable disabled)', () => {
     const f = createFieldAccessor<CustomerShape>();
     // Callable (strict) is disabled because ValidPaths<{}> = never.
-    // `f.raw` has no such dependency on N and remains usable.
-    const expr = f.raw('status');
+    // `f.rawPath` has no such dependency on N and remains usable.
+    const expr = f.rawPath('status');
     expectTypeOf(expr).toExtend<LeafExpression<DocField>>();
   });
 
   it('narrows the return via the explicit generic', () => {
     const f = createFieldAccessor<CustomerShape, CustomerNested>();
     type StringField = { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-    const expr = f.raw<StringField>('status');
+    const expr = f.rawPath<StringField>('status');
     expectTypeOf(expr).toEqualTypeOf<LeafExpression<StringField>>();
+  });
+
+  it('does not shadow a legitimate top-level `raw` field', () => {
+    // Regression test: the escape hatch is named `rawPath`, not `raw`, so a
+    // user model with a `raw` field still resolves `f.raw` to the field
+    // expression (via the mapped-type property form) rather than to the
+    // escape-hatch function.
+    type ModelWithRawField = {
+      readonly id: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+      readonly raw: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+    };
+    const f = createFieldAccessor<ModelWithRawField>();
+    expectTypeOf(f.raw).toExtend<LeafExpression<DocField>>();
+    expectTypeOf(f.raw).not.toBeFunction();
   });
 });
 
