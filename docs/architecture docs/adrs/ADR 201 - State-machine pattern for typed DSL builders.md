@@ -26,7 +26,7 @@ q.from('pending_jobs')                    // CollectionHandle
 
 Each intermediate value is a different concrete class with a different menu of methods. `CollectionHandle` can insert; `FilteredCollection` can't, but *can* do filtered writes and find-and-modify. Inside `PipelineChain`, some methods (`$merge`, `$out`, `.aggregate()`) are always available, and some (`.findOneAndUpdate(...)`, no-arg `.updateMany()`) are available only if the preceding pipeline stages can be lowered to the downstream wire command. *If a method isn't legal for the chain you've written, it doesn't exist on the receiver, so you can't call it.*
 
-This ADR is the decision record for how that works: a small state machine encoded in the type system, using three concrete classes plus a pair of phantom type parameters on the pipeline class.
+This ADR is the decision record for how that works: a small state machine encoded in the type system, using three concrete classes plus three phantom type parameters on the pipeline class — two capability markers that gate terminals, and one prefix tracker that refines when `.match(...)` still behaves as a leading filter.
 
 ## Decision
 
@@ -36,7 +36,7 @@ The chain has three qualitatively different vocabularies, so it gets three class
 
 - **`CollectionHandle<TContract, ModelName>`** — reached by `q.from(name)`. Inserts (`insertOne`, `insertMany`), unqualified writes (`updateAll`, `deleteAll`), `upsertOne(filter, updater)`. Transitions out via `.match(...)` into `FilteredCollection`, or via any pipeline-stage method into `PipelineChain`.
 - **`FilteredCollection<TContract, ModelName>`** — reached by `.match(...)` on a `CollectionHandle` (or chained match). Filtered writes (`updateMany`, `updateOne`, `deleteMany`, `deleteOne`), `upsertOne(updater)`, `findOneAndUpdate`, `findOneAndDelete`. Further `.match(...)` calls stay on `FilteredCollection` (AND-folded); any pipeline-stage method moves to `PipelineChain`.
-- **`PipelineChain<TContract, Shape, U, F>`** — reached by any pipeline-stage method on either earlier state. Pipeline stages (`.sort`, `.limit`, `.group`, `.lookup`, …), `$merge`/`$out` write terminals, and read terminals (`.build()`, `.aggregate()`). Pipeline-style writes and find-and-modify are *conditional* — available only when the phantom markers `U` and `F` are still "enabled". See § 2.
+- **`PipelineChain<TContract, Shape, U, F, L>`** — reached by any pipeline-stage method on either earlier state. Pipeline stages (`.sort`, `.limit`, `.group`, `.lookup`, …), `$merge`/`$out` write terminals, and read terminals (`.build()`, `.aggregate()`). Pipeline-style writes and find-and-modify are *conditional* — available only when the capability markers `U` and `F` are still "enabled"; `L` is a prefix tracker that conditions what a further `.match(...)` does to `U`. See § 2.
 
 The user-facing entry point `mongoQuery<Contract>({...}).from(name)` returns a `CollectionHandle`. Everything else is reached from there.
 
@@ -46,50 +46,61 @@ The user-facing entry point `mongoQuery<Contract>({...}).from(name)` returns a `
 
 Once the chain is inside `PipelineChain`, the remaining distinctions aren't whole new vocabularies — they're subsets of terminals that become illegal as specific pipeline stages accumulate. Two terminals are in this bucket:
 
-- The no-arg `.updateMany()` / `.updateOne()` form, which consumes the accumulated pipeline as an `update`-with-pipeline spec. Legal only if every prior stage is representable as an update-pipeline stage (so no `$limit`, no `$group`, no `$lookup`, …).
+- The no-arg `.updateMany()` / `.updateOne()` form, which consumes the accumulated pipeline as an `update`-with-pipeline spec. Legal only if every prior stage is representable as an update-pipeline stage (so no `$limit`, no `$group`, no `$lookup`, …) *and* every `$match` sits at the head of the pipeline — `deconstructUpdateChain` can only peel leading `$match` stages into the wire-command filter.
 - `.findOneAndUpdate(...)` / `.findOneAndDelete(...)`, which deconstructs the accumulated pipeline into the wire command's `{ filter, sort }` slots. Legal only if every prior stage fits one of those slots.
 
-Splitting `PipelineChain` into `SortedPipelineChain`, `LimitedPipelineChain`, `GroupedPipelineChain`, `SortedLimitedPipelineChain`, … is a combinatorial class explosion. Instead, `PipelineChain` stays a single class and carries two **phantom type parameters** — type parameters that never appear in a runtime value, only in the type position, used to track compile-time state:
+Splitting `PipelineChain` into `SortedPipelineChain`, `LimitedPipelineChain`, `GroupedPipelineChain`, `SortedLimitedPipelineChain`, … is a combinatorial class explosion. Instead, `PipelineChain` stays a single class and carries three **phantom type parameters** — type parameters that never appear in a runtime value, only in the type position, used to track compile-time state. Two are *capability markers* that gate the two conditional terminals above; the third is a *prefix tracker* that records whether the chain is still inside its leading-`$match` run, which changes what a further `.match(...)` does to the update marker:
 
 ```ts
 export type UpdateEnabled = 'update-ok' | 'update-cleared';
 export type FindAndModifyEnabled = 'fam-ok' | 'fam-cleared';
+export type LeadingMatch = 'leading' | 'past-leading';
 
 export class PipelineChain<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   Shape extends DocShape,
   U extends UpdateEnabled = 'update-ok',
   F extends FindAndModifyEnabled = 'fam-ok',
+  L extends LeadingMatch = 'leading',
 > {
   // Nothing uses these fields at runtime. They exist so that a hover
   // tooltip on a `PipelineChain` value shows the marker literals inline
   // ("__updateCompat: 'update-cleared'") instead of leaving the reader
-  // to decode the third and fourth generic parameters.
+  // to decode the third, fourth, and fifth generic parameters.
   declare readonly __updateCompat: U;
   declare readonly __findAndModifyCompat: F;
+  declare readonly __leadingMatch: L;
   // …
 }
 ```
 
-A stage method declares what it does to the markers directly in its return type. When a stage produces content a downstream wire command cannot lower, it **clears** the corresponding marker:
+A stage method declares what it does to the markers directly in its return type. When a stage produces content a downstream wire command cannot lower, it **clears** the corresponding capability marker; any non-`$match` stage also flips the prefix tracker to `'past-leading'`:
 
 ```ts
-// $match: pure filter, both preserved
-match(...): PipelineChain<TContract, Shape, U, F>;
+// $match: preserves FAM unconditionally and preserves the prefix tracker.
+//         UpdateEnabled is preserved only while still in the leading-$match
+//         prefix (L = 'leading'); a $match past the prefix clears it,
+//         because deconstructUpdateChain cannot peel a non-leading $match
+//         into the update wire command's filter slot.
+match(
+  ...
+): PipelineChain<TContract, Shape, L extends 'leading' ? U : 'update-cleared', F, L>;
 
-// $sort: clears update-with-pipeline (update has no per-document sort)
-//        but preserves FAM (findAndModify has a sort slot)
-sort(spec: SortSpec<Shape>): PipelineChain<TContract, Shape, 'update-cleared', F>;
+// $sort: clears update-with-pipeline (update has no per-document sort),
+//        preserves FAM (findAndModify has a sort slot), and flips L to
+//        'past-leading' so any subsequent $match clears UpdateEnabled.
+sort(spec: SortSpec<Shape>): PipelineChain<TContract, Shape, 'update-cleared', F, 'past-leading'>;
 
-// $limit: clears both. update has no per-document limit; findAndModify
-//         already implies single-document semantics, so .limit(10) before
-//         .findOneAndUpdate(...) would be ambiguous, not useful.
-limit(n: number): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared'>;
+// $limit: clears both capability markers. update has no per-document limit;
+//         findAndModify already implies single-document semantics, so
+//         .limit(10) before .findOneAndUpdate(...) would be ambiguous,
+//         not useful. Also flips L to 'past-leading'.
+limit(n: number): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'>;
 ```
 
-The conditional terminals are then a one-liner: `.findOneAndUpdate(...)` is declared as a method on `PipelineChain<_, _, _, 'fam-ok'>` only. Call it on a `'fam-cleared'` instance and TypeScript reports the method as not existing — no defensive runtime check needed.
+The conditional terminals are then a one-liner: `.findOneAndUpdate(...)` is declared as a method on `PipelineChain<_, _, _, 'fam-ok', _>` only. Call it on a `'fam-cleared'` instance and TypeScript reports the method as not existing — no defensive runtime check needed.
 
-The markers use literal string values (`'update-ok'` vs `'update-cleared'`) rather than `true` / `false` so that hover tooltips, inferred-type reveals, and error messages name the capability that was cleared. "`PipelineChain<…, 'update-cleared', 'fam-ok'>`" tells the reader what's gone; "`PipelineChain<…, false, true>`" would require them to remember which parameter position is which.
+The markers use literal string values (`'update-ok'` vs `'update-cleared'`, `'leading'` vs `'past-leading'`) rather than `true` / `false` so that hover tooltips, inferred-type reveals, and error messages name the capability that was cleared or the prefix state that's tracked. "`PipelineChain<…, 'update-cleared', 'fam-ok', 'past-leading'>`" tells the reader what's gone and where in the chain they are; "`PipelineChain<…, false, true, false>`" would require them to remember which parameter position is which.
 
 ### 3. A chain, end to end
 
@@ -98,7 +109,7 @@ Here's a real chain that went through a `.sort(...)` (clears update, preserves F
 ```ts
 q.from('pending_jobs')
   .match((f) => f.status.eq('queued'))    // FilteredCollection
-  .sort({ priority: -1, createdAt: 1 })   // PipelineChain<…, 'update-cleared', 'fam-ok'>
+  .sort({ priority: -1, createdAt: 1 })   // PipelineChain<…, 'update-cleared', 'fam-ok', 'past-leading'>
   .findOneAndUpdate(
     (f) => [f.status.set('running'), f.claimedAt.currentDate()],
     { returnDocument: 'after' },
@@ -113,34 +124,48 @@ Adding a `.limit(10)` between the sort and the terminal invalidates the chain at
 q.from('pending_jobs')
   .match((f) => f.status.eq('queued'))
   .sort({ priority: -1, createdAt: 1 })
-  .limit(10)                              // PipelineChain<…, 'update-cleared', 'fam-cleared'>
+  .limit(10)                              // PipelineChain<…, 'update-cleared', 'fam-cleared', 'past-leading'>
   .findOneAndUpdate(/* … */);
   // TS error: Property 'findOneAndUpdate' does not exist on type
-  //          'PipelineChain<…, "update-cleared", "fam-cleared">'.
+  //          'PipelineChain<…, "update-cleared", "fam-cleared", "past-leading">'.
 ```
 
 The author has to resolve the ambiguity that `.limit(10).findOneAndUpdate(...)` would encode (is the limit part of the sort-and-claim, or a safety bound?) by picking one of two options: drop `.limit(10)` and claim the single first-in-priority job, or call `.build()` and deal with the ten-candidate result imperatively.
+
+A second `.match(...)` that sits past the leading prefix likewise invalidates the no-arg update terminal — this is where the `LeadingMatch` tracker earns its keep:
+
+```ts
+q.from('orders')
+  .match((f) => f.status.eq('open'))      // FilteredCollection (still leading)
+  .sort({ total: -1 })                    // PipelineChain<…, 'update-cleared', 'fam-ok', 'past-leading'>
+  .match((f) => f.total.gt(100))          // PipelineChain<…, 'update-cleared', 'fam-ok', 'past-leading'>
+  .updateMany();                          // TS error: method absent — 'update-cleared'.
+```
+
+The second `.match(...)` cannot be folded into the update wire command's filter slot (the `$sort` sits between it and the head of the pipeline), so the type system refuses the terminal rather than letting it throw at runtime inside `deconstructUpdateChain`. A first `.match(...)` at the head of the same chain keeps `L = 'leading'` and would have left `UpdateEnabled` intact — the asymmetry the `L` parameter exists to encode.
 
 ### 4. The marker table
 
 Every pipeline-stage method's return type must match this table. It is the invariant an implementation reviewer checks against:
 
-| Stage method         | `UpdateEnabled` | `FindAndModifyEnabled` | Why                                                                                      |
-| -------------------- | --------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
-| `.match(...)`        | preserve        | preserve               | Pure filter; AND-folds into every downstream command's filter slot.                      |
-| `.sort(...)`         | clear           | preserve               | `update` has no per-document sort; `findAndModify` has a `sort` slot.                    |
-| `.skip(...)`         | clear           | clear                  | `update` has no skip; `findAndModify` has no skip slot either (aggregation-only stage).  |
-| `.limit(...)`        | clear           | clear                  | `update` has no limit; `findAndModify` already implies single-document semantics.        |
-| `.sample(...)`       | clear           | clear                  | Random-ordered; not representable as either update pipeline or find-and-modify inputs.   |
-| `.addFields(...)`    | preserve        | clear                  | Representable as update-with-pipeline `$set`; no analogue in the find-and-modify slots.  |
-| `.project(...)`      | preserve        | clear                  | Representable as update-with-pipeline projection; no analogue in find-and-modify.        |
-| `.replaceRoot(...)`  | preserve        | clear                  | Representable as update-with-pipeline `$replaceRoot`; no find-and-modify analogue.       |
-| `.redact(...)`       | preserve        | clear                  | Representable as update-with-pipeline `$redact`; no find-and-modify analogue.            |
-| `.group(...)`        | clear           | clear                  | Aggregates away per-document identity — nothing downstream can lower this.               |
-| `.lookup(...)`       | clear           | clear                  | Joins are not representable in either wire command.                                      |
-| `.unwind(...)`       | clear           | clear                  | Splits documents; not representable as either update pipeline or find-and-modify inputs. |
-| `.facet(...)`        | clear           | clear                  | Fans out the pipeline; not lowerable to either wire command.                             |
-| other shape-changing | clear           | clear                  | Default-conservative: a new stage clears both until proven representable.                |
+| Stage method         | `UpdateEnabled`             | `FindAndModifyEnabled` | `LeadingMatch` | Why                                                                                                                                                       |
+| -------------------- | --------------------------- | ---------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.match(...)`        | preserve if `L = 'leading'` | preserve               | preserve       | AND-folds into downstream command filter slots, but only while still in the leading-`$match` prefix; a `$match` past the prefix clears `UpdateEnabled`.   |
+| `.sort(...)`         | clear                       | preserve               | `past-leading` | `update` has no per-document sort; `findAndModify` has a `sort` slot.                                                                                     |
+| `.skip(...)`         | clear                       | clear                  | `past-leading` | `update` has no skip; `findAndModify` has no skip slot either (aggregation-only stage).                                                                   |
+| `.limit(...)`        | clear                       | clear                  | `past-leading` | `update` has no limit; `findAndModify` already implies single-document semantics.                                                                         |
+| `.sample(...)`       | clear                       | clear                  | `past-leading` | Random-ordered; not representable as either update pipeline or find-and-modify inputs.                                                                    |
+| `.addFields(...)`    | preserve                    | clear                  | `past-leading` | Representable as update-with-pipeline `$set`; no analogue in the find-and-modify slots.                                                                   |
+| `.project(...)`      | preserve                    | clear                  | `past-leading` | Representable as update-with-pipeline projection; no analogue in find-and-modify.                                                                         |
+| `.replaceRoot(...)`  | preserve                    | clear                  | `past-leading` | Representable as update-with-pipeline `$replaceRoot`; no find-and-modify analogue.                                                                        |
+| `.redact(...)`       | preserve                    | clear                  | `past-leading` | Representable as update-with-pipeline `$redact`; no find-and-modify analogue.                                                                             |
+| `.group(...)`        | clear                       | clear                  | `past-leading` | Aggregates away per-document identity — nothing downstream can lower this.                                                                                |
+| `.lookup(...)`       | clear                       | clear                  | `past-leading` | Joins are not representable in either wire command.                                                                                                       |
+| `.unwind(...)`       | clear                       | clear                  | `past-leading` | Splits documents; not representable as either update pipeline or find-and-modify inputs.                                                                  |
+| `.facet(...)`        | clear                       | clear                  | `past-leading` | Fans out the pipeline; not lowerable to either wire command.                                                                                              |
+| other shape-changing | clear                       | clear                  | `past-leading` | Default-conservative: a new stage clears both capability markers and leaves the leading-`$match` prefix.                                                  |
+
+`.match(...)` is the only stage that preserves `LeadingMatch`: while you're still in the leading-`$match` run, more `$match` stages keep you there; every other stage flips the tracker to `'past-leading'` and a subsequent `.match(...)` from that point on clears `UpdateEnabled`.
 
 There is no machinery that derives this table from the type system. Each method is manually annotated with its marker effects, and the table is the check the reviewer applies.
 
@@ -157,8 +182,9 @@ There is no machinery that derives this table from the type system. Each method 
 
 - **Three classes to keep in lock-step.** AND-folding of filters, builder-state cloning, and `meta`-block construction are shared across classes and have to be centralised manually. Today the shared helpers live alongside the classes (`resolveUpdaterCallback`, `matchAllFilter`, `#writeMeta` in [`state-classes.ts`](../../../packages/2-mongo-family/5-query-builders/query-builder/src/state-classes.ts) and [`builder.ts`](../../../packages/2-mongo-family/5-query-builders/query-builder/src/builder.ts)). Any new cross-state concern has to be placed deliberately.
 - **Marker-table discipline.** Adding a new pipeline-stage method requires deciding its marker effects and writing them into the return type. Get it wrong and a terminal appears or disappears incorrectly — a silent bug that only the test suite catches.
-- **Verbose return types at the declaration site.** `PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared'>` recurs. Selective aliases (e.g. `type PipelineChainAfterGroup<TC, S> = PipelineChain<TC, S, 'update-cleared', 'fam-cleared'>`) help for the high-traffic shapes; a global alias layer is overkill.
-- **Phantom parameters are load-bearing but invisible.** Without the `declare readonly __updateCompat: U;` and `__findAndModifyCompat: F;` fields, a reader staring at `PipelineChain<_, _, 'update-cleared', 'fam-ok'>` in an error message has no way to know what positions 3 and 4 encode. The hover-visibility trick is a small amount of ceremony that materially improves error legibility.
+- **Verbose return types at the declaration site.** `PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'>` recurs. Selective aliases (e.g. `type PipelineChainAfterGroup<TC, S> = PipelineChain<TC, S, 'update-cleared', 'fam-cleared', 'past-leading'>`) help for the high-traffic shapes; a global alias layer is overkill.
+- **Phantom parameters are load-bearing but invisible.** Without the `declare readonly __updateCompat: U;`, `__findAndModifyCompat: F;`, and `__leadingMatch: L;` fields, a reader staring at `PipelineChain<_, _, 'update-cleared', 'fam-ok', 'past-leading'>` in an error message has no way to know what positions 3, 4, and 5 encode. The hover-visibility trick is a small amount of ceremony that materially improves error legibility.
+- **An extra marker to justify the leading-`$match` asymmetry.** `LeadingMatch` exists only because `deconstructUpdateChain` can fold leading-`$match` stages into the wire filter but not interior ones. A reader encountering the ternary in `.match(...)`'s return type (`L extends 'leading' ? U : 'update-cleared'`) has to know *why* position matters for `$match` but not for `$sort`. The marker table is the intended reference for that rationale.
 
 ## When to use this pattern
 
@@ -191,7 +217,7 @@ Keep the single-class design, but use method overloads with conditional types to
 
 Make the whole builder a concrete-class state machine with no phantom parameters at all: `CollectionHandle`, `FilteredCollection`, `UnsortedPipeline`, `SortedPipeline`, `LimitedPipeline`, `GroupedPipeline`, `SortedLimitedPipeline`, `SortedGroupedPipeline`, …
 
-**Why we rejected it.** Combinatorial class explosion. Two markers with two states each is already four `PipelineChain` specialisations; add a third marker (we have real candidates for one, tracking write-concern-compatible vs. not) and you're at eight classes that all share 90 % of their implementation. Phantom parameters collapse the same state space into one class with a parameter per dimension — linear growth instead of exponential.
+**Why we rejected it.** Combinatorial class explosion. Three markers with two states each is already eight `PipelineChain` specialisations; add a fourth marker (we have real candidates for one, tracking write-concern-compatible vs. not) and you're at sixteen classes that all share 90 % of their implementation. Phantom parameters collapse the same state space into one class with a parameter per dimension — linear growth instead of exponential.
 
 ## Related
 
