@@ -86,7 +86,7 @@ describe('typescriptContract', () => {
       const contractPath = join(tempDir, 'contract.ts');
 
       try {
-        await writeFile(contractPath, `export const notContract = {};\n`, 'utf-8');
+        await writeFile(contractPath, 'export const notContract = {};\n', 'utf-8');
 
         const config = typescriptContractFromPath('./contract.ts');
 

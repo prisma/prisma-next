@@ -423,7 +423,9 @@ describe('validateConfig', () => {
         },
       },
     ) as Record<string, unknown>;
-    expect(() => validateConfig(createValidRawConfig({ contract: inheritedOutputContract }))).not.toThrow();
+    expect(() =>
+      validateConfig(createValidRawConfig({ contract: inheritedOutputContract })),
+    ).not.toThrow();
   });
 
   it('accepts valid optional sections', () => {

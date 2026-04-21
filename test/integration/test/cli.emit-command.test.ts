@@ -16,7 +16,6 @@ describe('emit command', () => {
   let testDir: string;
   let outputDir: string;
   let consoleOutput: string[] = [];
-  let consoleErrors: string[] = [];
   let cleanupMocks: () => void;
   let cleanupDir: () => void;
 
@@ -24,7 +23,6 @@ describe('emit command', () => {
     // Set up console and process.exit mocks
     const mocks = setupCommandMocks();
     consoleOutput = mocks.consoleOutput;
-    consoleErrors = mocks.consoleErrors;
     cleanupMocks = mocks.cleanup;
 
     // Set up test directory from fixtures
@@ -443,5 +441,4 @@ describe('emit command', () => {
       cleanupSync();
     }
   });
-
 });
