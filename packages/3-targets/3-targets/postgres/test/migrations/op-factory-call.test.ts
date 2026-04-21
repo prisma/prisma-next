@@ -476,12 +476,12 @@ describe('renderOps', () => {
         details: schemaObject('column', 'age', 'user'),
       },
       {
-        id: 'alterNullability.user.email',
+        id: 'alterNullability.setNotNull.user.email',
         operationClass: 'destructive',
         details: schemaObject('column', 'email', 'user'),
       },
       {
-        id: 'alterNullability.user.nickname',
+        id: 'alterNullability.dropNotNull.user.nickname',
         operationClass: 'widening',
         details: schemaObject('column', 'nickname', 'user'),
       },
