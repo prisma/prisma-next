@@ -182,5 +182,5 @@ Rejected because this isn't a separate kind of codec — it's an extension of co
 ## Related
 
 - [ADR 167 — Typed default literal pipeline and extensibility](ADR%20167%20-%20Typed%20default%20literal%20pipeline%20and%20extensibility.md) — the v1 design this supersedes
-- [ADR 170 — Codec trait system](ADR%20170%20-%20Codec%20trait%20system.md) — the trait system on the `Codec` interface
+- [ADR 202 — Codec trait system](ADR%20202%20-%20Codec%20trait%20system.md) — the trait system on the `Codec` interface
 - [ADR 173 — Polymorphism via discriminator and variants](ADR%20173%20-%20Polymorphism%20via%20discriminator%20and%20variants.md) — discriminator values are a motivating instance
