@@ -1,4 +1,4 @@
-# ADR 201 — Trait-targeted operation arguments
+# ADR 203 — Trait-targeted operation arguments
 
 ## Context
 
