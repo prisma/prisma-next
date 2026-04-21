@@ -38,27 +38,29 @@ export class TypeScriptRenderablePostgresMigration
 {
   readonly targetId = 'postgres' as const;
 
-  constructor(
-    private readonly calls: readonly PostgresOpFactoryCall[],
-    private readonly meta: MigrationMeta,
-  ) {
+  readonly #calls: readonly PostgresOpFactoryCall[];
+  readonly #meta: MigrationMeta;
+
+  constructor(calls: readonly PostgresOpFactoryCall[], meta: MigrationMeta) {
     super();
+    this.#calls = calls;
+    this.#meta = meta;
   }
 
   override get operations(): readonly Op[] {
-    return renderOps(this.calls);
+    return renderOps(this.#calls);
   }
 
   override describe(): MigrationMeta {
-    return this.meta;
+    return this.#meta;
   }
 
   renderTypeScript(): string {
-    return renderCallsToTypeScript(this.calls, {
-      from: this.meta.from,
-      to: this.meta.to,
-      ...ifDefined('kind', this.meta.kind),
-      ...ifDefined('labels', this.meta.labels),
+    return renderCallsToTypeScript(this.#calls, {
+      from: this.#meta.from,
+      to: this.#meta.to,
+      ...ifDefined('kind', this.#meta.kind),
+      ...ifDefined('labels', this.#meta.labels),
     });
   }
 }
