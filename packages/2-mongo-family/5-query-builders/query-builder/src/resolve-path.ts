@@ -45,20 +45,6 @@ type ContractHasValueObjects = {
   readonly valueObjects?: Record<string, { readonly fields: Record<string, unknown> }>;
 };
 
-type VOFields<
-  TContract extends ContractHasValueObjects,
-  VOName extends string,
-> = TContract extends {
-  readonly valueObjects: infer VOs extends Record<
-    string,
-    { readonly fields: Record<string, unknown> }
-  >;
-}
-  ? VOName extends keyof VOs
-    ? VOs[VOName]['fields']
-    : never
-  : never;
-
 type FieldToLeaf<F> = F extends {
   readonly type: { readonly kind: 'scalar'; readonly codecId: infer C extends string };
   readonly nullable: infer N extends boolean;
@@ -69,51 +55,86 @@ type FieldToLeaf<F> = F extends {
     : DocField;
 
 /**
- * Recursive helper: translate a `Record<string, ContractField>` (a model or
- * value-object's `fields` table) into a `NestedDocShape`. Scalar fields
- * become `DocField` leaves with their concrete `codecId` and `nullable`.
- * Value-object fields become `ObjectField<SubShape>` whose `fields`
- * payload is the recursively-resolved sub-shape.
+ * Translate a single contract field to its nested-shape form. Scalars
+ * become `DocField` leaves; value-object fields become
+ * `ObjectField<Sub>`; `many: true` stops at a leaf; anything else falls
+ * through to the opaque `DocField` base.
  *
- * `many: true` fields are treated as leaves (array element traversal is
- * out of scope for TML-2281 — path navigation stops at the array).
- *
- * Union-kind fields are treated as opaque `DocField` leaves (union
- * narrowing/traversal is deferred; see follow-up notes on ADR 180).
+ * Kept as a per-field helper (rather than a `Fields → NestedShape` helper
+ * that maps over keys internally) so the parent mapped type stays
+ * homomorphic over the model/value-object `fields` record. Homomorphic
+ * mapped types preserve the literal keys of their source object through
+ * TypeScript's intersection-collapsing machinery, which keeps
+ * `ModelNestedShape` hover output and `keyof`/indexed-access resolution
+ * concrete instead of collapsing to `{ [x: string]: … }`.
  */
-type FieldsToNested<
+type TranslateField<TContract extends ContractHasValueObjects, F> = F extends {
+  readonly many: true;
+}
+  ? FieldToLeaf<F>
+  : F extends {
+        readonly type: {
+          readonly kind: 'valueObject';
+          readonly name: infer VOName extends string;
+        };
+        readonly nullable: infer Null extends boolean;
+      }
+    ? ObjectField<VONestedShape<TContract, VOName>> & { readonly nullable: Null }
+    : F extends {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: string };
+        }
+      ? FieldToLeaf<F>
+      : DocField;
+
+/**
+ * Resolve a named value object from the contract into its own
+ * `NestedDocShape`. The mapped iteration is inlined here (not delegated
+ * to a generic helper) so that the homomorphism over
+ * `VOs[VOName]['fields']` is preserved and the hover / indexed-access
+ * surface stays concrete at instantiation time.
+ */
+type VONestedShape<
   TContract extends ContractHasValueObjects,
-  Fields extends Record<string, unknown>,
-> = {
-  readonly [K in keyof Fields & string]: Fields[K] extends { readonly many: true }
-    ? FieldToLeaf<Fields[K]>
-    : Fields[K] extends {
-          readonly type: {
-            readonly kind: 'valueObject';
-            readonly name: infer VOName extends string;
-          };
-          readonly nullable: infer Null extends boolean;
-        }
-      ? ObjectField<FieldsToNested<TContract, VOFields<TContract, VOName>>> & {
-          readonly nullable: Null;
-        }
-      : Fields[K] extends {
-            readonly type: { readonly kind: 'scalar'; readonly codecId: string };
-          }
-        ? FieldToLeaf<Fields[K]>
-        : DocField;
-};
+  VOName extends string,
+> = TContract extends {
+  readonly valueObjects: infer VOs extends Record<
+    string,
+    { readonly fields: Record<string, unknown> }
+  >;
+}
+  ? VOName extends keyof VOs
+    ? {
+        readonly [K in keyof VOs[VOName]['fields'] & string]: TranslateField<
+          TContract,
+          VOs[VOName]['fields'][K]
+        >;
+      }
+    : never
+  : never;
 
 /**
  * Build the `NestedDocShape` for a model. Scalar leaves resolve to their
  * concrete codec id; value-object fields recurse into the referenced
  * `valueObjects[VOName].fields` table, producing a tree that
  * `ResolvePath` / `ValidPaths` can walk.
+ *
+ * The mapped iteration is inlined (not hidden behind a helper type that
+ * takes `Fields` as a generic) so TypeScript recognises the mapped type
+ * as homomorphic over `TContract['models'][ModelName]['fields']`. That
+ * preserves the literal field-name keys at instantiation — without this,
+ * the intersection of `Record<string, ContractField>` and the specific
+ * literal field record collapses `keyof` to `string` and the result hover
+ * degrades to `{ readonly [x: string]: any }`.
  */
 export type ModelNestedShape<
   TContract extends MongoContract,
   ModelName extends string & keyof TContract['models'],
-> = FieldsToNested<TContract & ContractHasValueObjects, TContract['models'][ModelName]['fields']>;
+> = {
+  readonly [K in keyof TContract['models'][ModelName]['fields'] & string]: TranslateField<
+    TContract & ContractHasValueObjects,
+    TContract['models'][ModelName]['fields'][K]
+  >;
+};
 
 // ── Path walking ─────────────────────────────────────────────────────────
 

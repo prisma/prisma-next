@@ -17,6 +17,19 @@ type AddressShape = CustomerShape['address'] extends ObjectField<infer N> ? N : 
 type GeoShape = AddressShape['geo'] extends ObjectField<infer N> ? N : never;
 
 describe('ModelNestedShape', () => {
+  // Guard against the translation silently degrading to an open index
+  // signature (`{ [x: string]: any }`). An open shape would make every
+  // subsequent assertion in this file tautologically pass, since `any`
+  // is equal to anything. Must stay the first assertion in the suite so
+  // failures surface at the top of the report.
+  it('has exactly the literal field names as keys (not an open index signature)', () => {
+    expectTypeOf<keyof CustomerShape>().toEqualTypeOf<
+      '_id' | 'name' | 'address' | 'workAddress' | 'stats'
+    >();
+    type StringIsKey = string extends keyof CustomerShape ? true : false;
+    expectTypeOf<StringIsKey>().toEqualTypeOf<false>();
+  });
+
   it('translates scalar fields to leaf DocField with concrete codec and nullable', () => {
     expectTypeOf<CustomerShape['_id']>().toEqualTypeOf<{
       readonly codecId: 'mongo/objectId@1';
@@ -40,7 +53,13 @@ describe('ModelNestedShape', () => {
     expectTypeOf<WorkAddress['nullable']>().toEqualTypeOf<true>();
   });
 
-  it('recurses into nested value-object sub-shapes', () => {
+  it('recurses into nested value-object sub-shapes with literal keys', () => {
+    // Same guard as the top-level keys check, applied to the recursed
+    // sub-shape: if the VO recursion is broken, these would collapse
+    // to `string` / `any` and every descendant assertion would be vacuous.
+    expectTypeOf<keyof AddressShape>().toEqualTypeOf<'street' | 'city' | 'zip' | 'geo'>();
+    expectTypeOf<keyof GeoShape>().toEqualTypeOf<'lat' | 'lng'>();
+
     expectTypeOf<AddressShape['street']>().toEqualTypeOf<{
       readonly codecId: 'mongo/string@1';
       readonly nullable: false;
