@@ -23,7 +23,6 @@ const MigrationHintsSchema = type({
   used: 'string[]',
   applied: 'string[]',
   plannerVersion: 'string',
-  planningStrategy: 'string',
 });
 
 const MigrationManifestSchema = type({

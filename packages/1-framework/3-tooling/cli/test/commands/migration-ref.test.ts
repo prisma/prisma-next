@@ -64,7 +64,6 @@ async function writeAttestedMigration(
       used: [],
       applied: ['additive_only'],
       plannerVersion: '1.0.0',
-      planningStrategy: 'additive',
     },
     labels: [],
     createdAt: opts.timestamp.toISOString(),

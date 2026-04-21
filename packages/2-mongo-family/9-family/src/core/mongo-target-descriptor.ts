@@ -14,8 +14,6 @@ import type { MongoControlFamilyInstance } from './control-instance';
 import { mongoEmit } from './mongo-emit';
 
 /**
- * The Mongo target uses the **class-flow** migration authoring strategy.
- *
  * `migration.ts` default-exports a `Migration` subclass whose `operations`
  * getter returns the ordered list of operations and whose `describe()`
  * returns the manifest identity metadata. `MongoMigrationPlanner.plan()`
@@ -23,11 +21,6 @@ import { mongoEmit } from './mongo-emit';
  * itself back to such a file; `MongoMigrationPlanner.emptyMigration()`
  * returns the same shape for `migration new`. `migration emit` dispatches
  * to `mongoEmit`, which dynamic-imports the class and writes `ops.json`.
- *
- * The descriptor-flow hooks (`planWithDescriptors`, `resolveDescriptors`,
- * `renderDescriptorTypeScript`) are intentionally omitted — the CLI's
- * `migrationStrategy` selector routes Mongo down the class-flow path by
- * observing their absence.
  */
 export const mongoTargetDescriptor: MigratableTargetDescriptor<
   'mongo',

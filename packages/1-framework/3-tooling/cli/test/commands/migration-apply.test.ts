@@ -59,7 +59,6 @@ async function writeAttestedMigration(
       used: [],
       applied: ['additive_only'],
       plannerVersion: '1.0.0',
-      planningStrategy: 'additive',
     },
     labels: [],
     createdAt: opts.timestamp.toISOString(),
@@ -305,7 +304,7 @@ describe(
         kind: 'regular',
         fromContract: createContract(),
         toContract: createContract(),
-        hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'manual' },
+        hints: { used: [], applied: [], plannerVersion: '1.0.0' },
         labels: [],
         createdAt: new Date().toISOString(),
       };

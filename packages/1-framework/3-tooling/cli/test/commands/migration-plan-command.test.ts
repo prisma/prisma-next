@@ -88,20 +88,27 @@ function makeContractJson(storageHash: string): string {
 }
 
 function setupBaseConfig(): void {
+  const planner = {
+    plan: vi.fn().mockReturnValue({
+      kind: 'success',
+      plan: {
+        operations: [
+          { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
+        ],
+        renderTypeScript: vi.fn().mockReturnValue('// migration.ts'),
+      },
+    }),
+  };
   mocks.loadConfig.mockResolvedValue({
-    family: { familyId: 'mongo' },
+    family: { familyId: 'mongo', create: vi.fn().mockReturnValue({}) },
     target: {
       id: 'mongo',
       familyId: 'mongo',
       targetId: 'mongo',
       kind: 'target',
       migrations: {
-        planWithDescriptors: vi.fn().mockReturnValue({
-          ok: true,
-          descriptors: [{ kind: 'createTable', tableName: 'user' }],
-        }),
-        renderDescriptorTypeScript: vi.fn().mockReturnValue('// migration.ts'),
-        resolveDescriptors: vi.fn().mockReturnValue([]),
+        createPlanner: vi.fn().mockReturnValue(planner),
+        contractToSchema: vi.fn().mockReturnValue({}),
       },
     },
     adapter: { kind: 'adapter', familyId: 'mongo', targetId: 'mongo' },

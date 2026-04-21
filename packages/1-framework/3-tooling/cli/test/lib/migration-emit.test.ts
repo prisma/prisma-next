@@ -3,24 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   hasMigrationTs: vi.fn(),
-  evaluateMigrationTs: vi.fn(),
   attestMigration: vi.fn(),
-  readMigrationPackage: vi.fn(),
-  writeMigrationOps: vi.fn(),
 }));
 
 vi.mock('@prisma-next/migration-tools/migration-ts', () => ({
   hasMigrationTs: mocks.hasMigrationTs,
-  evaluateMigrationTs: mocks.evaluateMigrationTs,
 }));
 
 vi.mock('@prisma-next/migration-tools/attestation', () => ({
   attestMigration: mocks.attestMigration,
-}));
-
-vi.mock('@prisma-next/migration-tools/io', () => ({
-  readMigrationPackage: mocks.readMigrationPackage,
-  writeMigrationOps: mocks.writeMigrationOps,
 }));
 
 type EmitMigration = typeof import('../../src/lib/migration-emit')['emitMigration'];
@@ -50,10 +41,7 @@ describe('emitMigration dispatcher', () => {
   beforeEach(async () => {
     vi.resetModules();
     mocks.hasMigrationTs.mockReset();
-    mocks.evaluateMigrationTs.mockReset();
     mocks.attestMigration.mockReset();
-    mocks.readMigrationPackage.mockReset();
-    mocks.writeMigrationOps.mockReset();
 
     ({ emitMigration } = await import('../../src/lib/migration-emit'));
   });
@@ -74,32 +62,7 @@ describe('emitMigration dispatcher', () => {
     });
   });
 
-  it('routes to descriptor flow when resolveDescriptors is present', async () => {
-    mocks.hasMigrationTs.mockResolvedValue(true);
-    const resolveDescriptors = vi.fn().mockReturnValue(sampleOps);
-    mocks.evaluateMigrationTs.mockResolvedValue([{ kind: 'createTable' }]);
-    mocks.readMigrationPackage.mockResolvedValue({
-      manifest: { fromContract: null, toContract: {} },
-      ops: [],
-    });
-    mocks.writeMigrationOps.mockResolvedValue(undefined);
-    mocks.attestMigration.mockResolvedValue('sha256:desc-id');
-
-    const result = await emitMigration(
-      DIR,
-      makeCtx({ migrations: { resolveDescriptors } }) as unknown as Parameters<EmitMigration>[1],
-    );
-
-    expect(resolveDescriptors).toHaveBeenCalledWith(
-      [{ kind: 'createTable' }],
-      expect.objectContaining({ fromContract: null, toContract: {} }),
-    );
-    expect(mocks.writeMigrationOps).toHaveBeenCalledWith(DIR, sampleOps);
-    expect(mocks.attestMigration).toHaveBeenCalledWith(DIR);
-    expect(result).toEqual({ operations: sampleOps, migrationId: 'sha256:desc-id' });
-  });
-
-  it('routes to class flow when emit is present and resolveDescriptors is absent', async () => {
+  it("delegates to the target's emit capability", async () => {
     mocks.hasMigrationTs.mockResolvedValue(true);
     const emit = vi.fn().mockResolvedValue(sampleOps);
     mocks.attestMigration.mockResolvedValue('sha256:class-id');
@@ -118,30 +81,7 @@ describe('emitMigration dispatcher', () => {
     expect(result).toEqual({ operations: sampleOps, migrationId: 'sha256:class-id' });
   });
 
-  it('prefers descriptor flow when both resolveDescriptors and emit are present', async () => {
-    mocks.hasMigrationTs.mockResolvedValue(true);
-    const resolveDescriptors = vi.fn().mockReturnValue(sampleOps);
-    const emit = vi.fn();
-    mocks.evaluateMigrationTs.mockResolvedValue([]);
-    mocks.readMigrationPackage.mockResolvedValue({
-      manifest: { fromContract: null, toContract: {} },
-      ops: [],
-    });
-    mocks.writeMigrationOps.mockResolvedValue(undefined);
-    mocks.attestMigration.mockResolvedValue('sha256:desc-wins');
-
-    await emitMigration(
-      DIR,
-      makeCtx({
-        migrations: { resolveDescriptors, emit },
-      }) as unknown as Parameters<EmitMigration>[1],
-    );
-
-    expect(resolveDescriptors).toHaveBeenCalled();
-    expect(emit).not.toHaveBeenCalled();
-  });
-
-  it('throws errorTargetHasIncompleteMigrationCapabilities when neither capability is present', async () => {
+  it('throws errorTargetMigrationNotSupported when emit is not implemented', async () => {
     mocks.hasMigrationTs.mockResolvedValue(true);
 
     await expect(
@@ -150,13 +90,11 @@ describe('emitMigration dispatcher', () => {
         makeCtx({ targetId: 'test-target' }) as unknown as Parameters<EmitMigration>[1],
       ),
     ).rejects.toMatchObject({
-      code: '2011',
-      message: 'Target migrations capability is incomplete',
-      why: expect.stringContaining('implements neither `resolveDescriptors`'),
+      why: expect.stringContaining('does not implement the `emit` migrations capability'),
     });
   });
 
-  it('calls attestMigration exactly once after emit returns in class flow', async () => {
+  it('calls attestMigration exactly once after emit returns', async () => {
     mocks.hasMigrationTs.mockResolvedValue(true);
     const callOrder: string[] = [];
     const emit = vi.fn().mockImplementation(async () => {

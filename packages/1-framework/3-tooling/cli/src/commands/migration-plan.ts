@@ -17,7 +17,6 @@ import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import { emitMigration } from '../lib/migration-emit';
-import { migrationStrategy } from '../lib/migration-strategy';
 import {
   type CliErrorConflict,
   CliStructuredError,
@@ -255,8 +254,6 @@ async function executeMigrationPlanCommand(
     [config.target, config.adapter, ...(config.extensionPacks ?? [])],
   );
 
-  const strategy = migrationStrategy(migrations, config.target.targetId);
-
   // Build manifest and write migration package
   const timestamp = new Date();
   const slug = options.name ?? 'migration';
@@ -274,42 +271,38 @@ async function executeMigrationPlanCommand(
       used: [],
       applied: [],
       plannerVersion: '2.0.0',
-      planningStrategy: strategy === 'descriptor' ? 'descriptors' : 'class-based',
     },
     labels: [],
     createdAt: timestamp.toISOString(),
   };
 
-  const scaffoldContext = {
-    packageDir,
-    contractJsonPath: contractPathAbsolute,
-    fromHash,
-    toHash: toStorageHash,
-  };
-
   try {
-    let migrationTsContent: string;
     let hasPlaceholders = false;
 
-    if (strategy === 'descriptor') {
-      if (!migrations.planWithDescriptors || !migrations.renderDescriptorTypeScript) {
-        throw errorTargetMigrationNotSupported({
-          why: `Target "${config.target.targetId}" advertises descriptor flow but is missing required hooks`,
-        });
-      }
-      const descriptorResult = migrations.planWithDescriptors({
-        fromContract,
-        toContract: toContractJson,
-        frameworkComponents,
-      });
-      if (!descriptorResult.ok) {
-        return notOk(
-          errorMigrationPlanningFailed({
-            conflicts: descriptorResult.conflicts as readonly CliErrorConflict[],
-          }),
-        );
-      }
-      if (descriptorResult.descriptors.length === 0) {
+    const stack = createControlStack(config);
+    const familyInstance = config.family.create(stack);
+    const planner = migrations.createPlanner(familyInstance);
+    const fromSchema = migrations.contractToSchema(fromContract, frameworkComponents);
+    const plannerResult = planner.plan({
+      contract: toContractJson,
+      schema: fromSchema,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+      fromHash,
+      frameworkComponents,
+    });
+    if (plannerResult.kind === 'failure') {
+      return notOk(
+        errorMigrationPlanningFailed({
+          conflicts: plannerResult.conflicts as readonly CliErrorConflict[],
+        }),
+      );
+    }
+    // Accessing .operations triggers toOp() on each call. If any call
+    // is a DataTransformCall with an unfilled placeholder stub, toOp()
+    // throws PN-MIG-2001. That means there ARE operations — they just
+    // need the user to fill in the placeholder before emit can succeed.
+    try {
+      if (plannerResult.plan.operations.length === 0) {
         return notOk(
           errorMigrationPlanningFailed({
             conflicts: [
@@ -323,58 +316,14 @@ async function executeMigrationPlanCommand(
           }),
         );
       }
-      migrationTsContent = migrations.renderDescriptorTypeScript(
-        descriptorResult.descriptors,
-        scaffoldContext,
-      );
-    } else {
-      const stack = createControlStack(config);
-      const familyInstance = config.family.create(stack);
-      const planner = migrations.createPlanner(familyInstance);
-      const fromSchema = migrations.contractToSchema(fromContract, frameworkComponents);
-      const plannerResult = planner.plan({
-        contract: toContractJson,
-        schema: fromSchema,
-        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
-        fromHash,
-        fromContract,
-        frameworkComponents,
-      });
-      if (plannerResult.kind === 'failure') {
-        return notOk(
-          errorMigrationPlanningFailed({
-            conflicts: plannerResult.conflicts as readonly CliErrorConflict[],
-          }),
-        );
+    } catch (e) {
+      if (CliStructuredError.is(e) && e.domain === 'MIG' && e.code === '2001') {
+        hasPlaceholders = true;
+      } else {
+        throw e;
       }
-      // Accessing .operations triggers toOp() on each call. If any call
-      // is a DataTransformCall with an unfilled placeholder stub, toOp()
-      // throws PN-MIG-2001. That means there ARE operations — they just
-      // need the user to fill in the placeholder before emit can succeed.
-      try {
-        if (plannerResult.plan.operations.length === 0) {
-          return notOk(
-            errorMigrationPlanningFailed({
-              conflicts: [
-                {
-                  kind: 'unsupportedChange',
-                  summary:
-                    'Contract changed but planner produced no operations. ' +
-                    'This indicates unsupported or ignored changes.',
-                },
-              ],
-            }),
-          );
-        }
-      } catch (e) {
-        if (CliStructuredError.is(e) && e.domain === 'MIG' && e.code === '2001') {
-          hasPlaceholders = true;
-        } else {
-          throw e;
-        }
-      }
-      migrationTsContent = plannerResult.plan.renderTypeScript();
     }
+    const migrationTsContent = plannerResult.plan.renderTypeScript();
 
     await writeMigrationPackage(packageDir, manifest, []);
     const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);

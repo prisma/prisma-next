@@ -200,10 +200,7 @@ export interface MigrationPlannerConflict {
  * Successful planner result with the migration plan.
  *
  * The plan is typed as `MigrationPlanWithAuthoringSurface` so the CLI can
- * uniformly ask any plan to render itself to TypeScript. Targets whose
- * planners do not support that (descriptor-flow targets like Postgres)
- * supply a throwing `renderTypeScript()` stub — the CLI only calls it in
- * the class-flow branch of `migration plan`.
+ * uniformly ask any plan to render itself to TypeScript.
  */
 export interface MigrationPlannerSuccessResult {
   readonly kind: 'success';
@@ -327,10 +324,9 @@ export interface MigrationPlanner<
   /**
    * Produce an empty migration with the target's authoring conventions.
    *
-   * Used by `migration new` to scaffold a fresh `migration.ts` without the
-   * CLI needing to know whether the target uses descriptor-flow or class-flow
-   * authoring. The returned plan has no operations; its `renderTypeScript()`
-   * yields a stub the user can edit.
+   * Used by `migration new` to scaffold a fresh `migration.ts`. The
+   * returned plan has no operations; its `renderTypeScript()` yields a
+   * stub the user can edit.
    */
   emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface;
 }
