@@ -26,7 +26,7 @@ import type { SqlOperationEntry } from '@prisma-next/sql-operations';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
-import { planDescriptors } from '../core/migrations/descriptor-planner';
+import { planDescriptors } from '../core/migrations/issue-planner';
 import { resolveOperations } from '../core/migrations/operation-resolver';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
