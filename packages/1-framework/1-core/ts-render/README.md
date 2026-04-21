@@ -17,7 +17,7 @@ Two small pieces:
 
 `jsonToTsSource` is deliberately the **second** stage of a two-stage pipeline:
 
-```
+```text
 jsValue  →  codec.encodeJson  →  JsonValue  →  jsonToTsSource  →  TS source text
 ```
 
