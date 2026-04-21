@@ -98,13 +98,12 @@ export async function executeContractEmit(
     authoringContributions: stack.authoringContributions,
     codecLookup: stack.codecLookup,
     controlMutationDefaults: stack.controlMutationDefaults,
+    resolvedInputs: contractConfig.source.inputs ?? [],
   };
 
   let providerResult: Awaited<ReturnType<typeof contractConfig.source.load>>;
   try {
-    providerResult = await unlessAborted(
-      contractConfig.source.load(sourceContext, contractConfig.source.inputs ?? []),
-    );
+    providerResult = await unlessAborted(contractConfig.source.load(sourceContext));
   } catch (error) {
     if (signal.aborted || isAbortError(error)) {
       throw error;
@@ -158,7 +157,11 @@ export async function executeContractEmit(
   const enrichedIR = enrichContract(providerResult.value as Contract, frameworkComponents);
 
   familyInstance.validateContract(enrichedIR);
-  const emitResult = await unlessAborted(emit(enrichedIR, stack, config.family.emission));
+  const emitResult = await unlessAborted(
+    emit(enrichedIR, stack, config.family.emission, {
+      outputJsonPath: outputJsonPath,
+    }),
+  );
 
   // Create directory if needed and write files (both colocated)
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));

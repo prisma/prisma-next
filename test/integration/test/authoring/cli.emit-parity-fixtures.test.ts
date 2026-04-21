@@ -31,6 +31,7 @@ function sourceContextFromConfig(config: PrismaNextConfig): ContractSourceContex
     authoringContributions: stack.authoringContributions,
     codecLookup: stack.codecLookup,
     controlMutationDefaults: stack.controlMutationDefaults,
+    resolvedInputs: config.contract?.source.inputs ?? [],
   };
 }
 
@@ -100,22 +101,10 @@ describe('emit parity fixtures', () => {
             process.chdir(testSetup.testDir);
             const tsContext = sourceContextFromConfig(tsConfig);
             const pslContext = sourceContextFromConfig(pslConfig);
-            tsProviderResultFirst = await tsConfig.contract.source.load(
-              tsContext,
-              tsConfig.contract.source.inputs ?? [],
-            );
-            tsProviderResultSecond = await tsConfig.contract.source.load(
-              tsContext,
-              tsConfig.contract.source.inputs ?? [],
-            );
-            pslProviderResultFirst = await pslConfig.contract.source.load(
-              pslContext,
-              pslConfig.contract.source.inputs ?? [],
-            );
-            pslProviderResultSecond = await pslConfig.contract.source.load(
-              pslContext,
-              pslConfig.contract.source.inputs ?? [],
-            );
+            tsProviderResultFirst = await tsConfig.contract.source.load(tsContext);
+            tsProviderResultSecond = await tsConfig.contract.source.load(tsContext);
+            pslProviderResultFirst = await pslConfig.contract.source.load(pslContext);
+            pslProviderResultSecond = await pslConfig.contract.source.load(pslContext);
           } finally {
             process.chdir(originalCwd);
           }
@@ -253,10 +242,7 @@ describe('emit parity fixture diagnostics', () => {
           let sourceResult: Awaited<ReturnType<typeof pslConfig.contract.source.load>>;
           try {
             process.chdir(testSetup.testDir);
-            sourceResult = await pslConfig.contract.source.load(
-              sourceContextFromConfig(pslConfig),
-              pslConfig.contract.source.inputs ?? [],
-            );
+            sourceResult = await pslConfig.contract.source.load(sourceContextFromConfig(pslConfig));
           } finally {
             process.chdir(originalCwd);
           }

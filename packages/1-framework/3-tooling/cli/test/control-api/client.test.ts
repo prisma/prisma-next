@@ -487,7 +487,11 @@ describe('ControlClient progress emission', () => {
       await client.close();
 
       expect(result.ok).toBe(true);
-      expect(load).toHaveBeenCalledWith(expect.any(Object), ['/tmp/schema.prisma']);
+      expect(load).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resolvedInputs: ['/tmp/schema.prisma'],
+        }),
+      );
     });
 
     it('emits resolveSource and emit spans when source is a provider object', async () => {

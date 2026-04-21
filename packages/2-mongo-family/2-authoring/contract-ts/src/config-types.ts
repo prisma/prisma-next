@@ -19,8 +19,8 @@ export function typescriptContractFromPath(contractPath: string, output?: string
   return {
     source: {
       inputs: [contractPath],
-      load: async (_context, resolvedInputs) => {
-        const [absolutePath = contractPath] = resolvedInputs;
+      load: async (context) => {
+        const [absolutePath = contractPath] = context.resolvedInputs;
         const mod = await import(pathToFileURL(absolutePath).href);
         const contract: Contract = mod.default ?? mod.contract;
         return ok(contract);

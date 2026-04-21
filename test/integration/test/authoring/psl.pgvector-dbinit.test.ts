@@ -48,16 +48,14 @@ describe(
         target: postgres,
       });
 
-      const pslResult = await contractConfig.source.load(
-        {
-          composedExtensionPacks: [pgvector.id],
-          scalarTypeDescriptors: stack.scalarTypeDescriptors,
-          authoringContributions: stack.authoringContributions,
-          codecLookup: stack.codecLookup,
-          controlMutationDefaults: stack.controlMutationDefaults,
-        },
-        [schemaPath],
-      );
+      const pslResult = await contractConfig.source.load({
+        composedExtensionPacks: [pgvector.id],
+        scalarTypeDescriptors: stack.scalarTypeDescriptors,
+        authoringContributions: stack.authoringContributions,
+        codecLookup: stack.codecLookup,
+        controlMutationDefaults: stack.controlMutationDefaults,
+        resolvedInputs: [schemaPath],
+      });
       expect(pslResult.ok).toBe(true);
       if (!pslResult.ok) {
         throw new Error('expected pgvector PSL source emission to succeed');

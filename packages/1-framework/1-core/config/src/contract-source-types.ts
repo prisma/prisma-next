@@ -42,12 +42,12 @@ export interface ContractSourceContext {
   readonly authoringContributions: AssembledAuthoringContributions;
   readonly codecLookup: CodecLookup;
   readonly controlMutationDefaults: ControlMutationDefaults;
+  readonly resolvedInputs: readonly string[];
 }
 
 export interface ContractSourceProvider {
   readonly inputs?: readonly string[];
   readonly load: (
     context: ContractSourceContext,
-    resolvedInputs: readonly string[],
   ) => Promise<Result<Contract, ContractSourceDiagnostics>>;
 }

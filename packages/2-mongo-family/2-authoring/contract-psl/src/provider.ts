@@ -13,8 +13,8 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
   return {
     source: {
       inputs: [schemaPath],
-      load: async (context, resolvedInputs) => {
-        const [absoluteSchemaPath = schemaPath] = resolvedInputs;
+      load: async (context) => {
+        const [absoluteSchemaPath = schemaPath] = context.resolvedInputs;
         let schema: string;
         try {
           schema = await readFile(absoluteSchemaPath, 'utf-8');

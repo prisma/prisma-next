@@ -107,7 +107,7 @@ test('accepts contract source providers with declared inputs', () => {
     contract: {
       source: {
         inputs: ['./schema.prisma'],
-        load: async (_context, _resolvedInputs) => ok({} as never),
+        load: async (_context) => ok({} as never),
       },
     },
   };

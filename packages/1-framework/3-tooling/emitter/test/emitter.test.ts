@@ -23,6 +23,24 @@ describe('emitter', () => {
   });
 
   it(
+    'rejects non-json output paths when emit receives an output path',
+    async () => {
+      const ir = createTestContract();
+      const options: EmitStackInput = {
+        codecTypeImports: [],
+        operationTypeImports: [],
+      };
+
+      await expect(
+        emit(ir, options, mockSqlHook, {
+          outputJsonPath: '/abs/contract.ts',
+        }),
+      ).rejects.toThrow('Contract output path must end with .json');
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
     'emits contract.json and contract.d.ts',
     async () => {
       const ir = createTestContract({

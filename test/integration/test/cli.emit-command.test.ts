@@ -576,16 +576,14 @@ describe('emit command', () => {
             adapter: providerConfig.adapter,
             extensionPacks: providerConfig.extensionPacks ?? [],
           });
-          sourceResult = await contractConfig!.source.load(
-            {
-              composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
-              scalarTypeDescriptors: stack.scalarTypeDescriptors,
-              authoringContributions: stack.authoringContributions,
-              codecLookup: stack.codecLookup,
-              controlMutationDefaults: stack.controlMutationDefaults,
-            },
-            contractConfig!.source.inputs ?? [],
-          );
+          sourceResult = await contractConfig!.source.load({
+            composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+            scalarTypeDescriptors: stack.scalarTypeDescriptors,
+            authoringContributions: stack.authoringContributions,
+            codecLookup: stack.codecLookup,
+            controlMutationDefaults: stack.controlMutationDefaults,
+            resolvedInputs: contractConfig!.source.inputs ?? [],
+          });
         } finally {
           process.chdir(originalCwd);
         }

@@ -33,8 +33,8 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
   return {
     source: {
       inputs: [schemaPath],
-      load: async (context, resolvedInputs) => {
-        const [absoluteSchemaPath = schemaPath] = resolvedInputs;
+      load: async (context) => {
+        const [absoluteSchemaPath = schemaPath] = context.resolvedInputs;
         let schema: string;
         try {
           schema = await readFile(absoluteSchemaPath, 'utf-8');

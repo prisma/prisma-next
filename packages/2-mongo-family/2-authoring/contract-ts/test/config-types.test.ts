@@ -17,13 +17,14 @@ const emptyContext: ContractSourceContext = {
     defaultFunctionRegistry: new Map(),
     generatorDescriptors: [],
   },
+  resolvedInputs: [],
 };
 
 describe('typescriptContract', () => {
   it('returns provider result with contract', async () => {
     const contract = { targetFamily: 'mongo', target: 'mongo' } as unknown as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
-    const result = await config.source.load(emptyContext, []);
+    const result = await config.source.load(emptyContext);
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -57,7 +58,10 @@ describe('typescriptContract', () => {
         );
 
         const config = typescriptContractFromPath('./contract.ts');
-        const result = await config.source.load(emptyContext, [contractPath]);
+        const result = await config.source.load({
+          ...emptyContext,
+          resolvedInputs: [contractPath],
+        });
 
         expect(result.ok).toBe(true);
         if (!result.ok) {

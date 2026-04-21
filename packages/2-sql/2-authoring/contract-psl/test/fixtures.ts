@@ -172,12 +172,9 @@ export function createPostgresTestContext(
     authoringContributions: { field: {}, type: {} },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+    resolvedInputs: [],
     ...overrides,
   };
-}
-
-export function createPostgresResolvedInputs(inputs: readonly string[] = []): readonly string[] {
-  return inputs;
 }
 
 export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefaults {

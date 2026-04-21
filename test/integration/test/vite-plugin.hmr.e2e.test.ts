@@ -34,6 +34,27 @@ async function waitForFileChange(
   return false;
 }
 
+async function readJsonFileWhenReady(filePath: string, timeoutMs: number): Promise<string> {
+  const startTime = Date.now();
+  const pollIntervalMs = 50;
+  let lastError: unknown;
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      const contents = readFileSync(filePath, 'utf-8');
+      JSON.parse(contents);
+      return contents;
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Timed out waiting for valid JSON in ${filePath}`);
+}
+
 function copyFixtureFiles(
   testDir: string,
   fixtureSubdir: string,
@@ -82,7 +103,9 @@ withTempDir(({ createTempDir }) => {
         );
         expect(initialEmitSuccess).toBe(true);
 
-        const initialContract = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        const initialContract = JSON.parse(
+          await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
+        );
         expect(initialContract.storage).toMatchObject({
           tables: {
             user: {
@@ -120,7 +143,9 @@ withTempDir(({ createTempDir }) => {
         );
         expect(reEmitSuccess).toBe(true);
 
-        const updatedContract = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        const updatedContract = JSON.parse(
+          await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
+        );
         expect(updatedContract.storage).toMatchObject({
           tables: {
             user: {
@@ -164,7 +189,9 @@ withTempDir(({ createTempDir }) => {
         );
         expect(initialEmitSuccess).toBe(true);
 
-        const initialContract = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        const initialContract = JSON.parse(
+          await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
+        );
         expect(initialContract.storage).toMatchObject({
           tables: {
             user: {
@@ -193,7 +220,9 @@ withTempDir(({ createTempDir }) => {
         );
         expect(reEmitSuccess).toBe(true);
 
-        const updatedContract = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        const updatedContract = JSON.parse(
+          await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
+        );
         expect(updatedContract.storage).toMatchObject({
           tables: {
             user: {
@@ -238,7 +267,9 @@ withTempDir(({ createTempDir }) => {
         );
         expect(initialEmitSuccess).toBe(true);
 
-        const initialContract = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        const initialContract = JSON.parse(
+          await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
+        );
         expect(initialContract.storage.tables.user.columns).not.toHaveProperty('name');
 
         const { stat } = await import('node:fs/promises');
@@ -264,7 +295,9 @@ withTempDir(({ createTempDir }) => {
         );
         expect(configReEmitSuccess).toBe(true);
 
-        const contractAfterConfigChange = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        const contractAfterConfigChange = JSON.parse(
+          await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
+        );
         expect(contractAfterConfigChange.storage).toMatchObject({
           tables: {
             user: {
@@ -295,7 +328,9 @@ withTempDir(({ createTempDir }) => {
         );
         expect(altSchemaReEmitSuccess).toBe(true);
 
-        const contractAfterAltEdit = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        const contractAfterAltEdit = JSON.parse(
+          await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
+        );
         expect(contractAfterAltEdit.storage).toMatchObject({
           tables: {
             user: {

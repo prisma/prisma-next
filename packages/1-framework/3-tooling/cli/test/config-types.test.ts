@@ -197,16 +197,14 @@ describe('defineConfig', () => {
   it('builds TypeScript contract config via helper utility', async () => {
     const contract = { targetFamily: 'sql' } as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
-    const result = await config.source.load(
-      {
-        composedExtensionPacks: [],
-        scalarTypeDescriptors: new Map(),
-        authoringContributions: { field: {}, type: {} },
-        codecLookup: { get: () => undefined },
-        controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
-      },
-      [],
-    );
+    const result = await config.source.load({
+      composedExtensionPacks: [],
+      scalarTypeDescriptors: new Map(),
+      authoringContributions: { field: {}, type: {} },
+      codecLookup: { get: () => undefined },
+      controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
+      resolvedInputs: [],
+    });
 
     expect(config.output).toBe('output/contract.json');
     expect(config.source.inputs).toBeUndefined();

@@ -24,12 +24,9 @@ function createMongoTestContext(overrides?: Partial<ContractSourceContext>): Con
       defaultFunctionRegistry: new Map(),
       generatorDescriptors: [],
     },
+    resolvedInputs: [],
     ...overrides,
   };
-}
-
-function createMongoResolvedInputs(inputs: readonly string[] = []): readonly string[] {
-  return inputs;
 }
 
 describe('mongoContract provider helper', () => {
@@ -68,8 +65,7 @@ describe('mongoContract provider helper', () => {
     process.chdir(cwdDir);
     const contract = mongoContract('./schema.prisma');
     const result = await contract.source.load(
-      createMongoTestContext(),
-      createMongoResolvedInputs([schemaPath]),
+      createMongoTestContext({ resolvedInputs: [schemaPath] }),
     );
 
     expect(result.ok).toBe(true);
@@ -89,8 +85,7 @@ describe('mongoContract provider helper', () => {
     tempDirs.push(tempDir);
     const contract = mongoContract('./missing.prisma');
     const result = await contract.source.load(
-      createMongoTestContext(),
-      createMongoResolvedInputs([join(tempDir, 'missing.prisma')]),
+      createMongoTestContext({ resolvedInputs: [join(tempDir, 'missing.prisma')] }),
     );
 
     expect(result.ok).toBe(false);

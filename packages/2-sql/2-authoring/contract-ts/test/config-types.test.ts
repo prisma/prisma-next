@@ -13,13 +13,14 @@ const stubContext: ContractSourceContext = {
   authoringContributions: { field: {}, type: {} },
   codecLookup: { get: () => undefined },
   controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
+  resolvedInputs: [],
 };
 
 describe('typescriptContract', () => {
   it('returns provider result with contract', async () => {
     const contract = { targetFamily: 'sql', target: 'postgres' } as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
-    const result = await config.source.load(stubContext, []);
+    const result = await config.source.load(stubContext);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -51,7 +52,10 @@ describe('typescriptContract', () => {
         );
 
         const config = typescriptContractFromPath('./contract.ts');
-        const result = await config.source.load(stubContext, [contractPath]);
+        const result = await config.source.load({
+          ...stubContext,
+          resolvedInputs: [contractPath],
+        });
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;

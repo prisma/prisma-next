@@ -14,6 +14,10 @@ export interface EmitStackInput {
   readonly codecLookup?: CodecLookup;
 }
 
+export interface EmitOptions {
+  readonly outputJsonPath?: string;
+}
+
 export interface EmitResult {
   readonly contractJson: string;
   readonly contractDts: string;

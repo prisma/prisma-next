@@ -1,8 +1,8 @@
 import type { Char } from '@prisma-next/adapter-postgres/codec-types';
 import { describe, expect, it } from 'vitest';
-import { setupIntegrationTest } from './setup';
+import { setupIntegrationTest, timeouts } from './setup';
 
-describe('integration: mutation defaults', () => {
+describe('integration: mutation defaults', { timeout: timeouts.databaseOperation }, () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('INSERT applies execution default (generated uuid) when column is omitted', async () => {
