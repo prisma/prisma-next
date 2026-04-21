@@ -4,7 +4,7 @@
  *
  * Every call class carries the literal arguments its backing factory would
  * receive, computes a human-readable `label` in its constructor, and
- * implements three polymorphic hooks:
+ * implements two polymorphic hooks:
  *
  * - `toOp()` — converts the IR node to a runtime
  *   `SqlMigrationPlanOperation` by delegating to the matching pure factory
@@ -14,7 +14,6 @@
  * - `renderTypeScript()` / `importRequirements()` — inherited from
  *   `TsExpression`. Used by `renderCallsToTypeScript` to emit the call as
  *   a TypeScript expression inside the scaffolded `migration.ts`.
- * - `accept(visitor)` — retained for future exhaustive walks.
  *
  * The abstract base and all concrete classes are package-private. External
  * consumers see only the framework-level `OpFactoryCall` interface and the
@@ -49,37 +48,10 @@ type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
 const TARGET_MIGRATION_MODULE = '@prisma-next/target-postgres/migration';
 
-export interface PostgresOpFactoryCallVisitor<R> {
-  createTable(call: CreateTableCall): R;
-  dropTable(call: DropTableCall): R;
-  addColumn(call: AddColumnCall): R;
-  dropColumn(call: DropColumnCall): R;
-  alterColumnType(call: AlterColumnTypeCall): R;
-  setNotNull(call: SetNotNullCall): R;
-  dropNotNull(call: DropNotNullCall): R;
-  setDefault(call: SetDefaultCall): R;
-  dropDefault(call: DropDefaultCall): R;
-  addPrimaryKey(call: AddPrimaryKeyCall): R;
-  addForeignKey(call: AddForeignKeyCall): R;
-  addUnique(call: AddUniqueCall): R;
-  createIndex(call: CreateIndexCall): R;
-  dropIndex(call: DropIndexCall): R;
-  dropConstraint(call: DropConstraintCall): R;
-  createEnumType(call: CreateEnumTypeCall): R;
-  addEnumValues(call: AddEnumValuesCall): R;
-  dropEnumType(call: DropEnumTypeCall): R;
-  renameType(call: RenameTypeCall): R;
-  rawSql(call: RawSqlCall): R;
-  createExtension(call: CreateExtensionCall): R;
-  createSchema(call: CreateSchemaCall): R;
-  dataTransform(call: DataTransformCall): R;
-}
-
 abstract class PostgresOpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
   abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R;
   abstract toOp(): Op;
 
   importRequirements(): readonly ImportRequirement[] {
@@ -123,10 +95,6 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.createTable(this);
-  }
-
   toOp(): Op {
     return createTable(this.schemaName, this.tableName, this.columns, this.primaryKey);
   }
@@ -155,10 +123,6 @@ export class DropTableCall extends PostgresOpFactoryCallNode {
     this.tableName = tableName;
     this.label = `Drop table "${tableName}"`;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.dropTable(this);
   }
 
   toOp(): Op {
@@ -191,10 +155,6 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.addColumn(this);
-  }
-
   toOp(): Op {
     return addColumn(this.schemaName, this.tableName, this.column);
   }
@@ -219,10 +179,6 @@ export class DropColumnCall extends PostgresOpFactoryCallNode {
     this.columnName = columnName;
     this.label = `Drop column "${columnName}" from "${tableName}"`;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.dropColumn(this);
   }
 
   toOp(): Op {
@@ -265,10 +221,6 @@ export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.alterColumnType(this);
-  }
-
   toOp(): Op {
     return alterColumnType(this.schemaName, this.tableName, this.columnName, this.options);
   }
@@ -295,10 +247,6 @@ export class SetNotNullCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.setNotNull(this);
-  }
-
   toOp(): Op {
     return setNotNull(this.schemaName, this.tableName, this.columnName);
   }
@@ -323,10 +271,6 @@ export class DropNotNullCall extends PostgresOpFactoryCallNode {
     this.columnName = columnName;
     this.label = `Drop NOT NULL on "${tableName}"."${columnName}"`;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.dropNotNull(this);
   }
 
   toOp(): Op {
@@ -362,10 +306,6 @@ export class SetDefaultCall extends PostgresOpFactoryCallNode {
     this.operationClass = operationClass;
     this.label = `Set default on "${tableName}"."${columnName}"`;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.setDefault(this);
   }
 
   toOp(): Op {
@@ -409,10 +349,6 @@ export class DropDefaultCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.dropDefault(this);
-  }
-
   toOp(): Op {
     return dropDefault(this.schemaName, this.tableName, this.columnName);
   }
@@ -450,10 +386,6 @@ export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.addPrimaryKey(this);
-  }
-
   toOp(): Op {
     return addPrimaryKey(this.schemaName, this.tableName, this.constraintName, this.columns);
   }
@@ -487,10 +419,6 @@ export class AddUniqueCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.addUnique(this);
-  }
-
   toOp(): Op {
     return addUnique(this.schemaName, this.tableName, this.constraintName, this.columns);
   }
@@ -515,10 +443,6 @@ export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
     this.fk = fk;
     this.label = `Add foreign key "${fk.name}" on "${tableName}"`;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.addForeignKey(this);
   }
 
   toOp(): Op {
@@ -552,10 +476,6 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
     this.kind = kind;
     this.label = `Drop constraint "${constraintName}" on "${tableName}"`;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.dropConstraint(this);
   }
 
   toOp(): Op {
@@ -603,10 +523,6 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.createIndex(this);
-  }
-
   toOp(): Op {
     return createIndex(this.schemaName, this.tableName, this.indexName, this.columns);
   }
@@ -631,10 +547,6 @@ export class DropIndexCall extends PostgresOpFactoryCallNode {
     this.indexName = indexName;
     this.label = `Drop index "${indexName}"`;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.dropIndex(this);
   }
 
   toOp(): Op {
@@ -667,10 +579,6 @@ export class CreateEnumTypeCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.createEnumType(this);
-  }
-
   toOp(): Op {
     return createEnumType(this.schemaName, this.typeName, this.values);
   }
@@ -699,10 +607,6 @@ export class AddEnumValuesCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.addEnumValues(this);
-  }
-
   toOp(): Op {
     return addEnumValues(this.schemaName, this.typeName, this.nativeType, this.values);
   }
@@ -725,10 +629,6 @@ export class DropEnumTypeCall extends PostgresOpFactoryCallNode {
     this.typeName = typeName;
     this.label = `Drop enum type "${typeName}"`;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.dropEnumType(this);
   }
 
   toOp(): Op {
@@ -755,10 +655,6 @@ export class RenameTypeCall extends PostgresOpFactoryCallNode {
     this.toName = toName;
     this.label = `Rename type "${fromName}" to "${toName}"`;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.renameType(this);
   }
 
   toOp(): Op {
@@ -802,10 +698,6 @@ export class RawSqlCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.rawSql(this);
-  }
-
   toOp(): Op {
     return this.op;
   }
@@ -832,10 +724,6 @@ export class CreateExtensionCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.createExtension(this);
-  }
-
   toOp(): Op {
     return createExtension(this.extensionName);
   }
@@ -856,10 +744,6 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
     this.schemaName = schemaName;
     this.label = `Create schema "${schemaName}"`;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.createSchema(this);
   }
 
   toOp(): Op {
@@ -901,10 +785,6 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
     this.runSlot = runSlot;
     this.operationClass = operationClass;
     this.freeze();
-  }
-
-  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
-    return visitor.dataTransform(this);
   }
 
   toOp(): Op {
