@@ -27,6 +27,7 @@ import {
   CreateExtensionCall,
   CreateIndexCall,
   CreateSchemaCall,
+  CreateTableCall,
   DropColumnCall,
   DropConstraintCall,
   DropDefaultCall,
@@ -59,11 +60,7 @@ import {
   setNotNull,
 } from './operation-descriptors';
 import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
-import {
-  buildColumnDefaultSql,
-  buildColumnTypeSql,
-  renderDefaultLiteral,
-} from './planner-ddl-builders';
+import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
 import {
   type CallMigrationStrategy,
   type MigrationStrategy,
