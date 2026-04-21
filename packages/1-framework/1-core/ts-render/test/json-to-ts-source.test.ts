@@ -18,8 +18,29 @@ describe('jsonToTsSource', () => {
       expect(jsonToTsSource([1, 2, 3])).toBe('[1, 2, 3]');
     });
 
+    it('renders arrays on multiple lines when the single-line form exceeds 80 chars', () => {
+      const longString = 'x'.repeat(40);
+      expect(jsonToTsSource([longString, longString])).toBe(
+        `[\n  "${longString}",\n  "${longString}",\n]`,
+      );
+    });
+
     it('renders objects and quotes non-identifier keys', () => {
       expect(jsonToTsSource({ a: 1, 'weird-key': 2 })).toBe('{ a: 1, "weird-key": 2 }');
+    });
+
+    it('renders objects on multiple lines when the single-line form exceeds 80 chars', () => {
+      const longString = 'x'.repeat(40);
+      expect(jsonToTsSource({ a: longString, b: longString })).toBe(
+        `{\n  a: "${longString}",\n  b: "${longString}",\n}`,
+      );
+    });
+
+    it('quotes the reserved key "__proto__"', () => {
+      // A computed key is required because `{ __proto__: 1 }` in an object literal
+      // is a special syntactic form that assigns the prototype rather than creating
+      // an own property. This is the only way to produce an own `__proto__` key.
+      expect(jsonToTsSource({ ['__proto__']: 1 })).toBe('{ "__proto__": 1 }');
     });
 
     it('drops object entries whose value is undefined', () => {

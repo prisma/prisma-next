@@ -62,7 +62,7 @@ function buildImports(calls: ReadonlyArray<OpFactoryCall>): string {
 
   const lines = ["import { Migration } from '@prisma-next/family-mongo/migration';"];
   for (const moduleSpecifier of [...symbolsByModule.keys()].sort()) {
-    const symbols = [...(symbolsByModule.get(moduleSpecifier) ?? [])].sort();
+    const symbols = [...symbolsByModule.get(moduleSpecifier)!].sort();
     lines.push(`import { ${symbols.join(', ')} } from '${moduleSpecifier}';`);
   }
   return lines.join('\n');
