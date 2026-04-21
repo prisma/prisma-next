@@ -215,9 +215,11 @@ describe(
 
         await runtime.execute(plan);
 
-        const all = await usersCol().find().toArray();
-        expect(all[0]).toMatchObject({ name: 'Alice', bio: 'Alice' });
-        expect(all[1]).toMatchObject({ name: 'Bob', bio: 'Bob' });
+        const all = await usersCol().find().sort({ name: 1 }).toArray();
+        expect(all).toMatchObject([
+          { name: 'Alice', bio: 'Alice' },
+          { name: 'Bob', bio: 'Bob' },
+        ]);
       });
 
       it('traditional operator updates still work end-to-end', async () => {
