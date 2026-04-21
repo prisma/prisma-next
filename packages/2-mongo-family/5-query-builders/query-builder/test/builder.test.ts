@@ -5,6 +5,7 @@ import {
   MongoAggFieldRef,
   MongoAggOperator,
   MongoCountStage,
+  MongoExistsExpr,
   MongoFieldFilter,
   MongoGroupStage,
   MongoLimitStage,
@@ -26,6 +27,10 @@ import { testContractJson } from './fixtures/test-contract';
 
 function createOrdersBuilder() {
   return mongoQuery<TContract>({ contractJson: testContractJson }).from('orders');
+}
+
+function createCustomersBuilder() {
+  return mongoQuery<TContract>({ contractJson: testContractJson }).from('customers');
 }
 
 describe('PipelineChain', () => {
@@ -61,6 +66,36 @@ describe('PipelineChain', () => {
       const pipeline = plan.command.pipeline;
       expect(pipeline).toHaveLength(1);
       expect(pipeline[0]).toBeInstanceOf(MongoMatchStage);
+    });
+
+    // Runtime non-regression spot-check for TML-2281: the callable dot-path
+    // form must emit the exact same `MongoFieldFilter.eq('address.city', …)`
+    // node as the property form, even after `FieldAccessor` was split into
+    // conditional leaf vs. object-expression variants.
+    it('match callable dot-path emits identical MongoFieldFilter as property form', () => {
+      const callablePlan = createCustomersBuilder()
+        .match((f) => f('address.city').eq('NYC'))
+        .build();
+      const callableStage = callablePlan.command.pipeline[0] as MongoMatchStage;
+
+      const expectedFilter = MongoFieldFilter.eq('address.city', 'NYC');
+      expect(callableStage).toBeInstanceOf(MongoMatchStage);
+      expect(callableStage.filter).toEqual(expectedFilter);
+    });
+
+    // Runtime non-regression for the `f.rawPath(path)` escape hatch
+    // (TML-2281): the resulting expression must emit the same filter/update
+    // nodes as the strict callable form, just without compile-time path
+    // validation.
+    it('match via f.rawPath(path) emits identical nodes as the strict callable', () => {
+      const rawPlan = createCustomersBuilder()
+        .match((f) => f.rawPath('status').exists(false))
+        .build();
+      const rawStage = rawPlan.command.pipeline[0] as MongoMatchStage;
+
+      const expectedFilter = MongoExistsExpr.notExists('status');
+      expect(rawStage).toBeInstanceOf(MongoMatchStage);
+      expect(rawStage.filter).toEqual(expectedFilter);
     });
 
     it('sort() appends MongoSortStage', () => {

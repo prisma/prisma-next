@@ -12,6 +12,7 @@ import {
   MongoReplaceRootStage,
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
+import type { NestedDocShape, ObjectField, ResolvePath, ValidPaths } from './resolve-path';
 import type { DocField, DocShape, TypedAggExpr } from './types';
 import type { TypedUpdateOp } from './update-ops';
 import {
@@ -32,17 +33,9 @@ import {
 } from './update-ops';
 
 /**
- * The unified field accessor expression returned by `FieldAccessor` (per
- * [ADR 180](../../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md)).
- *
- * Each `Expression<F>` carries:
- *  - `node` (`MongoAggExpr`) — for use as an aggregation expression in `addFields`,
- *    `group`, `project`, etc. Drop-in replacement for the old `TypedAggExpr<F>`.
- *  - filter operators (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `nin`, `exists`)
- *    — replaces the old `FilterHandle`.
- *  - update operators (`set`, `unset`, `inc`, `mul`, `min`, `max`, `rename`,
- *    `push`, `addToSet`, `pop`, `pull`, `pullAll`, `currentDate`, `setOnInsert`)
- *    — consumed by write terminals (M2+).
+ * Operator surface for leaf (scalar) paths — today's full set: filter,
+ * update, and aggregation operators. Returned by `Expression<F>` for any
+ * `F extends DocField` that is not an `ObjectField<…>` sub-tree.
  *
  * Operator surfaces are intentionally not trait-gated by codec in this
  * revision — tracked on Linear as TML-2259 (scope extended to cover the
@@ -51,7 +44,7 @@ import {
  * surface the error. Trait-gating can be tightened in a follow-up
  * without changing the accessor's public shape.
  */
-export interface Expression<F extends DocField> extends TypedAggExpr<F> {
+export interface LeafExpression<F extends DocField> extends TypedAggExpr<F> {
   readonly _path: string;
 
   // Filter operators
@@ -87,6 +80,41 @@ export interface Expression<F extends DocField> extends TypedAggExpr<F> {
   currentDate(): TypedUpdateOp;
   setOnInsert(value: MongoValue): TypedUpdateOp;
 }
+
+/**
+ * Operator surface for non-leaf (value-object) paths — `f('address')`
+ * when `address` is a `ContractValueObject`. Intentionally minimal: the
+ * whole-value ops that make sense on a structured sub-document
+ * (`set`/`unset`/`exists`, null presence via `eq(null)`/`ne(null)`). Field-
+ * level ops belong on the constituent leaves (`f('address.city')`).
+ *
+ * The aggregation `node` is still present (`TypedAggExpr<ObjectField<N>>`)
+ * so the value object can be piped through `$addFields` /
+ * `$replaceRoot` / etc. as-is.
+ */
+export interface ObjectExpression<N extends NestedDocShape> extends TypedAggExpr<ObjectField<N>> {
+  readonly _path: string;
+
+  exists(flag?: boolean): MongoFilterExpr;
+  eq(value: null): MongoFilterExpr;
+  ne(value: null): MongoFilterExpr;
+
+  set(value: MongoValue): TypedUpdateOp;
+  unset(): TypedUpdateOp;
+}
+
+/**
+ * The unified field accessor expression returned by `FieldAccessor` (per
+ * [ADR 180](../../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md)).
+ *
+ * Resolves to `ObjectExpression<Sub>` when `F` is an `ObjectField<Sub>`
+ * (non-leaf path), otherwise to `LeafExpression<F>` (the full operator
+ * surface). The conditional is driven off the `fields` marker that
+ * `ObjectField` adds to `DocField`, so existing code that uses plain
+ * `DocField` shapes continues to resolve to `LeafExpression`.
+ */
+export type Expression<F extends DocField> =
+  F extends ObjectField<infer N> ? ObjectExpression<N> : LeafExpression<F>;
 
 /**
  * Emitters for MongoDB update-pipeline stages (`$addFields`/`$set`,
@@ -127,75 +155,114 @@ function buildStageEmitters(): StageEmitters {
 /**
  * The unified `FieldAccessor` per ADR 180.
  *
- * - Property access (`f.status`) returns an `Expression<F>` whose codec comes
- *   from the current pipeline shape `S`.
- * - Callable form (`f('address.city')`) returns an `Expression<DocField>` for
- *   arbitrary dot-paths (value-object traversal). Strict path validation
- *   against `ContractValueObject` definitions is a follow-up; v1 accepts any
- *   string.
+ * - Property access (`f.status`) returns an `Expression<F>` whose codec
+ *   comes from the current pipeline shape `S`.
+ * - Callable form (`f('address.city')`) returns an `Expression<ResolvePath<N, P>>`
+ *   where `N` is the nested shape carrying value-object sub-shapes.
+ *   Paths that don't exist in `N` are rejected with a compile-time error
+ *   (via `P extends ValidPaths<N>`). Non-leaf paths like `f('address')`
+ *   resolve to an `ObjectExpression` whose reduced surface covers the
+ *   whole-value operations (`set`, `unset`, `exists`, `eq(null)`,
+ *   `ne(null)`).
+ * - `f.rawPath('path')` is a deliberate escape hatch that skips path
+ *   validation and returns a `LeafExpression<F>` for the given string.
+ *   Intended for migration authoring where the target field is not yet
+ *   part of the typed contract (e.g. a backfill writing a newly-added
+ *   column before the contract hash rolls forward). The method name is
+ *   deliberately `rawPath` rather than `raw` so it does not shadow a
+ *   legitimate top-level `raw` field on a user model.
  * - `f.stage` exposes pipeline-style update emitters (`$set`, `$unset`,
  *   `$replaceRoot`, `$replaceWith`).
  *
- * Both forms produce compatible expressions; both can be passed to filter
- * helpers, aggregation helpers, or write terminals.
+ * When `N` is `Record<string, never>` (the default — e.g. after a
+ * replacement stage like `$group` / `$project` / `$replaceRoot`),
+ * `ValidPaths<N>` is `never` and the callable form is effectively
+ * disabled at the type level. This keeps the builder sound downstream of
+ * stages that invalidate the original document's nested-path tree.
+ * `f.rawPath(...)` remains available in that state for callers that need
+ * an explicit unvalidated path.
  */
-export type FieldAccessor<S extends DocShape> = {
+export type FieldAccessor<S extends DocShape, N extends NestedDocShape = Record<string, never>> = {
   readonly [K in keyof S & string]: Expression<S[K]>;
-} & ((path: string) => Expression<DocField>) & {
+} & (<P extends ValidPaths<N>>(path: P) => Expression<ResolvePath<N, P>>) & {
     readonly stage: StageEmitters;
+    /**
+     * Escape hatch: build a `LeafExpression<F>` for an unvalidated string
+     * path. Use only when the path is intentionally outside the typed
+     * model surface — data-migration authoring is the canonical case
+     * (e.g. backfilling a field that is not yet in the contract). Default
+     * `F` is the opaque `DocField`; callers can narrow via the explicit
+     * generic: `f.rawPath<StringField>("status").set("active")`.
+     *
+     * The method is named `rawPath` (not `raw`) so a user model with a
+     * top-level `raw` field still resolves `f.raw` to the field-expression
+     * property, not to this escape hatch. Does not participate in
+     * `ValidPaths<N>` / `ResolvePath<N, P>` — the path is passed through
+     * verbatim and no IDE autocomplete is offered.
+     */
+    rawPath<F extends DocField = DocField>(path: string): LeafExpression<F>;
   };
 
 function buildExpression<F extends DocField>(path: string): Expression<F> {
+  // The runtime object carries the full operator surface unconditionally;
+  // `ObjectExpression` is a strict subset of `LeafExpression`, so a single
+  // implementation satisfies both type-level shapes. Compile-time gating
+  // prevents misuse of leaf-only operators on object paths.
   return {
     _field: undefined as never,
     _path: path,
     node: MongoAggFieldRef.of(path),
 
-    eq: (value) => MongoFieldFilter.eq(path, value),
-    ne: (value) => MongoFieldFilter.neq(path, value),
-    gt: (value) => MongoFieldFilter.gt(path, value),
-    gte: (value) => MongoFieldFilter.gte(path, value),
-    lt: (value) => MongoFieldFilter.lt(path, value),
-    lte: (value) => MongoFieldFilter.lte(path, value),
-    in: (values) => MongoFieldFilter.in(path, values),
-    nin: (values) => MongoFieldFilter.nin(path, values),
-    exists: (flag) =>
+    eq: (value: MongoValue) => MongoFieldFilter.eq(path, value),
+    ne: (value: MongoValue) => MongoFieldFilter.neq(path, value),
+    gt: (value: MongoValue) => MongoFieldFilter.gt(path, value),
+    gte: (value: MongoValue) => MongoFieldFilter.gte(path, value),
+    lt: (value: MongoValue) => MongoFieldFilter.lt(path, value),
+    lte: (value: MongoValue) => MongoFieldFilter.lte(path, value),
+    in: (values: ReadonlyArray<MongoValue>) => MongoFieldFilter.in(path, values),
+    nin: (values: ReadonlyArray<MongoValue>) => MongoFieldFilter.nin(path, values),
+    exists: (flag?: boolean) =>
       flag === false ? MongoExistsExpr.notExists(path) : MongoExistsExpr.exists(path),
 
-    set: (value) => setOp(path, value),
+    set: (value: MongoValue) => setOp(path, value),
     unset: () => unsetOp(path),
-    rename: (newName) => renameOp(path, newName),
+    rename: (newName: string) => renameOp(path, newName),
 
-    inc: (amount) => incOp(path, amount),
-    mul: (factor) => mulOp(path, factor),
-    min: (value) => minOp(path, value),
-    max: (value) => maxOp(path, value),
+    inc: (amount: number) => incOp(path, amount),
+    mul: (factor: number) => mulOp(path, factor),
+    min: (value: MongoValue) => minOp(path, value),
+    max: (value: MongoValue) => maxOp(path, value),
 
-    push: (value) => pushOp(path, value),
-    addToSet: (value) => addToSetOp(path, value),
-    pop: (direction = 1) => popOp(path, direction),
-    pull: (value) => pullOp(path, value),
-    pullAll: (values) => pullAllOp(path, values),
+    push: (value: MongoValue) => pushOp(path, value),
+    addToSet: (value: MongoValue) => addToSetOp(path, value),
+    pop: (direction: 1 | -1 = 1) => popOp(path, direction),
+    pull: (value: MongoValue) => pullOp(path, value),
+    pullAll: (values: ReadonlyArray<MongoValue>) => pullAllOp(path, values),
 
     currentDate: () => currentDateOp(path),
-    setOnInsert: (value) => setOnInsertOp(path, value),
-  };
+    setOnInsert: (value: MongoValue) => setOnInsertOp(path, value),
+  } as unknown as Expression<F>;
 }
 
 /**
- * Construct a unified `FieldAccessor<S>` proxy. Property access creates an
- * `Expression` using the property name as the field path; callable form
- * accepts an explicit dot-path string.
+ * Construct a unified `FieldAccessor<S, N>` proxy. Property access creates
+ * an `Expression` using the property name as the field path; callable
+ * form accepts a dot-path string validated against `N` at compile time.
  *
- * The proxy target is a function so the resulting object is both callable and
- * indexable. Symbol-keyed accesses (e.g. `Symbol.toPrimitive`) return
- * `undefined` to keep accidental coercion behaviour unsurprising — matching
- * the previous `FieldProxy` / `FilterProxy` semantics.
+ * The proxy target is a function so the resulting object is both callable
+ * and indexable. Symbol-keyed accesses (e.g. `Symbol.toPrimitive`) return
+ * `undefined` to keep accidental coercion behaviour unsurprising —
+ * matching the previous `FieldProxy` / `FilterProxy` semantics.
  */
-export function createFieldAccessor<S extends DocShape>(): FieldAccessor<S> {
+export function createFieldAccessor<
+  S extends DocShape,
+  N extends NestedDocShape = Record<string, never>,
+>(): FieldAccessor<S, N> {
   const stageInstance = buildStageEmitters();
-  const callable = ((path: string) =>
-    buildExpression<DocField>(path)) as unknown as FieldAccessor<S>;
+  const callable = ((path: string) => buildExpression<DocField>(path)) as unknown as FieldAccessor<
+    S,
+    N
+  >;
   return new Proxy(callable, {
     get(target, prop, receiver) {
       if (typeof prop === 'symbol') {
@@ -203,6 +270,9 @@ export function createFieldAccessor<S extends DocShape>(): FieldAccessor<S> {
       }
       if (prop === 'stage') {
         return stageInstance;
+      }
+      if (prop === 'rawPath') {
+        return (path: string) => buildExpression<DocField>(path);
       }
       return buildExpression(prop);
     },

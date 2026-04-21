@@ -7,11 +7,24 @@ export type {
 export { acc } from '../accumulator-helpers';
 export { PipelineChain } from '../builder';
 export { fn } from '../expression-helpers';
-export type { Expression, FieldAccessor } from '../field-accessor';
+export type {
+  Expression,
+  FieldAccessor,
+  LeafExpression,
+  ObjectExpression,
+} from '../field-accessor';
 export { createFieldAccessor } from '../field-accessor';
 export type { FindAndModifyEnabled, UpdateEnabled } from '../markers';
 export type { QueryRoot } from '../query';
 export { mongoQuery } from '../query';
+export type {
+  ModelNestedShape,
+  NestedDocShape,
+  ObjectField,
+  PathCompletions,
+  ResolvePath,
+  ValidPaths,
+} from '../resolve-path';
 export { CollectionHandle, FilteredCollection } from '../state-classes';
 export type {
   ArrayField,

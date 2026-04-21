@@ -30,6 +30,7 @@ import {
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { PipelineChain } from './builder';
 import { createFieldAccessor, type FieldAccessor } from './field-accessor';
+import type { ModelNestedShape, NestedDocShape } from './resolve-path';
 import type { ModelToDocShape, ResolveRow } from './types';
 import { resolveUpdaterResult, type UpdaterResult } from './update-ops';
 
@@ -51,10 +52,11 @@ function matchAllFilter(): MongoFilterExpr {
  * operator object or a pipeline-stage array). Centralised so all write
  * terminals share the same fold / dispatch semantics.
  */
-function resolveUpdaterCallback<Shape extends ModelToDocShape<MongoContract, string>>(
-  updaterFn: (fields: FieldAccessor<Shape>) => UpdaterResult,
-): MongoUpdateSpec {
-  const accessor = createFieldAccessor<Shape>();
+function resolveUpdaterCallback<
+  Shape extends ModelToDocShape<MongoContract, string>,
+  Nested extends NestedDocShape,
+>(updaterFn: (fields: FieldAccessor<Shape, Nested>) => UpdaterResult): MongoUpdateSpec {
+  const accessor = createFieldAccessor<Shape, Nested>();
   const items = updaterFn(accessor);
   return resolveUpdaterResult(items);
 }
@@ -96,7 +98,9 @@ export class CollectionHandle<
   TContract,
   ModelToDocShape<TContract, ModelName>,
   'update-cleared',
-  'fam-cleared'
+  'fam-cleared',
+  'leading',
+  ModelNestedShape<TContract, ModelName>
 > {
   readonly #ctx: BindingContext<TContract>;
   readonly #modelName: ModelName;
@@ -130,16 +134,31 @@ export class CollectionHandle<
    */
   override match(filter: MongoFilterExpr): FilteredCollection<TContract, ModelName>;
   override match(
-    fn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => MongoFilterExpr,
+    fn: (
+      fields: FieldAccessor<
+        ModelToDocShape<TContract, ModelName>,
+        ModelNestedShape<TContract, ModelName>
+      >,
+    ) => MongoFilterExpr,
   ): FilteredCollection<TContract, ModelName>;
   override match(
     filterOrFn:
       | MongoFilterExpr
-      | ((fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => MongoFilterExpr),
+      | ((
+          fields: FieldAccessor<
+            ModelToDocShape<TContract, ModelName>,
+            ModelNestedShape<TContract, ModelName>
+          >,
+        ) => MongoFilterExpr),
   ): FilteredCollection<TContract, ModelName> {
     const resolved =
       typeof filterOrFn === 'function'
-        ? filterOrFn(createFieldAccessor<ModelToDocShape<TContract, ModelName>>())
+        ? filterOrFn(
+            createFieldAccessor<
+              ModelToDocShape<TContract, ModelName>,
+              ModelNestedShape<TContract, ModelName>
+            >(),
+          )
         : filterOrFn;
     return new FilteredCollection<TContract, ModelName>(this.#ctx, this.#modelName, [resolved]);
   }
@@ -194,9 +213,17 @@ export class CollectionHandle<
    * `.match(...).updateMany(...)` for the filtered case.
    */
   updateAll(
-    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
+    updaterFn: (
+      fields: FieldAccessor<
+        ModelToDocShape<TContract, ModelName>,
+        ModelNestedShape<TContract, ModelName>
+      >,
+    ) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult, UpdateManyCommand> {
-    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const update = resolveUpdaterCallback<
+      ModelToDocShape<TContract, ModelName>,
+      ModelNestedShape<TContract, ModelName>
+    >(updaterFn);
     const command = new UpdateManyCommand(this.#ctx.collection, matchAllFilter(), update);
     return {
       collection: this.#ctx.collection,
@@ -232,12 +259,28 @@ export class CollectionHandle<
    * spec when no match is found; otherwise updates the matched document.
    */
   upsertOne(
-    filterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => MongoFilterExpr,
-    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
+    filterFn: (
+      fields: FieldAccessor<
+        ModelToDocShape<TContract, ModelName>,
+        ModelNestedShape<TContract, ModelName>
+      >,
+    ) => MongoFilterExpr,
+    updaterFn: (
+      fields: FieldAccessor<
+        ModelToDocShape<TContract, ModelName>,
+        ModelNestedShape<TContract, ModelName>
+      >,
+    ) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult, UpdateOneCommand> {
-    const accessor = createFieldAccessor<ModelToDocShape<TContract, ModelName>>();
+    const accessor = createFieldAccessor<
+      ModelToDocShape<TContract, ModelName>,
+      ModelNestedShape<TContract, ModelName>
+    >();
     const filter = filterFn(accessor);
-    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const update = resolveUpdaterCallback<
+      ModelToDocShape<TContract, ModelName>,
+      ModelNestedShape<TContract, ModelName>
+    >(updaterFn);
     const command = new UpdateOneCommand(this.#ctx.collection, filter, update, true);
     return {
       collection: this.#ctx.collection,
@@ -278,7 +321,9 @@ export class FilteredCollection<
   TContract,
   ModelToDocShape<TContract, ModelName>,
   'update-cleared',
-  'fam-cleared'
+  'fam-cleared',
+  'leading',
+  ModelNestedShape<TContract, ModelName>
 > {
   readonly #ctx: BindingContext<TContract>;
   readonly #modelName: ModelName;
@@ -329,16 +374,31 @@ export class FilteredCollection<
    */
   override match(filter: MongoFilterExpr): FilteredCollection<TContract, ModelName>;
   override match(
-    fn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => MongoFilterExpr,
+    fn: (
+      fields: FieldAccessor<
+        ModelToDocShape<TContract, ModelName>,
+        ModelNestedShape<TContract, ModelName>
+      >,
+    ) => MongoFilterExpr,
   ): FilteredCollection<TContract, ModelName>;
   override match(
     filterOrFn:
       | MongoFilterExpr
-      | ((fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => MongoFilterExpr),
+      | ((
+          fields: FieldAccessor<
+            ModelToDocShape<TContract, ModelName>,
+            ModelNestedShape<TContract, ModelName>
+          >,
+        ) => MongoFilterExpr),
   ): FilteredCollection<TContract, ModelName> {
     const resolved =
       typeof filterOrFn === 'function'
-        ? filterOrFn(createFieldAccessor<ModelToDocShape<TContract, ModelName>>())
+        ? filterOrFn(
+            createFieldAccessor<
+              ModelToDocShape<TContract, ModelName>,
+              ModelNestedShape<TContract, ModelName>
+            >(),
+          )
         : filterOrFn;
     return new FilteredCollection<TContract, ModelName>(this.#ctx, this.#modelName, [
       ...this.#filters,
@@ -369,9 +429,17 @@ export class FilteredCollection<
    * collisions.
    */
   override updateMany(
-    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
+    updaterFn: (
+      fields: FieldAccessor<
+        ModelToDocShape<TContract, ModelName>,
+        ModelNestedShape<TContract, ModelName>
+      >,
+    ) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult, UpdateManyCommand> {
-    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const update = resolveUpdaterCallback<
+      ModelToDocShape<TContract, ModelName>,
+      ModelNestedShape<TContract, ModelName>
+    >(updaterFn);
     const command = new UpdateManyCommand(this.#ctx.collection, this.#foldedFilter(), update);
     return {
       collection: this.#ctx.collection,
@@ -387,9 +455,17 @@ export class FilteredCollection<
    * `.findOneAndUpdate(...)` terminal when ordering matters.
    */
   override updateOne(
-    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
+    updaterFn: (
+      fields: FieldAccessor<
+        ModelToDocShape<TContract, ModelName>,
+        ModelNestedShape<TContract, ModelName>
+      >,
+    ) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult, UpdateOneCommand> {
-    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const update = resolveUpdaterCallback<
+      ModelToDocShape<TContract, ModelName>,
+      ModelNestedShape<TContract, ModelName>
+    >(updaterFn);
     const command = new UpdateOneCommand(this.#ctx.collection, this.#foldedFilter(), update);
     return {
       collection: this.#ctx.collection,
@@ -432,9 +508,17 @@ export class FilteredCollection<
    * already-accumulated `.match(...)` filter chain.
    */
   upsertOne(
-    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
+    updaterFn: (
+      fields: FieldAccessor<
+        ModelToDocShape<TContract, ModelName>,
+        ModelNestedShape<TContract, ModelName>
+      >,
+    ) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult, UpdateOneCommand> {
-    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const update = resolveUpdaterCallback<
+      ModelToDocShape<TContract, ModelName>,
+      ModelNestedShape<TContract, ModelName>
+    >(updaterFn);
     const command = new UpdateOneCommand(this.#ctx.collection, this.#foldedFilter(), update, true);
     return {
       collection: this.#ctx.collection,
@@ -453,13 +537,21 @@ export class FilteredCollection<
    * stream yields the document as it was before or after the update.
    */
   override findOneAndUpdate(
-    updaterFn: (fields: FieldAccessor<ModelToDocShape<TContract, ModelName>>) => UpdaterResult,
+    updaterFn: (
+      fields: FieldAccessor<
+        ModelToDocShape<TContract, ModelName>,
+        ModelNestedShape<TContract, ModelName>
+      >,
+    ) => UpdaterResult,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
   ): MongoQueryPlan<
     ResolveRow<ModelToDocShape<TContract, ModelName>, ExtractMongoCodecTypes<TContract>> | null,
     FindOneAndUpdateCommand
   > {
-    const update = resolveUpdaterCallback<ModelToDocShape<TContract, ModelName>>(updaterFn);
+    const update = resolveUpdaterCallback<
+      ModelToDocShape<TContract, ModelName>,
+      ModelNestedShape<TContract, ModelName>
+    >(updaterFn);
     const command = new FindOneAndUpdateCommand(
       this.#ctx.collection,
       this.#foldedFilter(),

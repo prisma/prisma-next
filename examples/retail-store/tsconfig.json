@@ -20,6 +20,7 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "test/**/*.ts",
+    "migrations/**/*.ts",
     "middleware.ts",
     ".next/types/**/*.ts"
   ],
