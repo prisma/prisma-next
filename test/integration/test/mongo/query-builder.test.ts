@@ -104,14 +104,14 @@ const contractJson = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const pipeline = mongoQuery<TContract>({ contractJson });
+const query = mongoQuery<TContract>({ contractJson });
 
 function products() {
-  return pipeline.from('products');
+  return query.from('products');
 }
 
 function orders() {
-  return pipeline.from('orders');
+  return query.from('orders');
 }
 
 type Row = Record<string, unknown>;
