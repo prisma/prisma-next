@@ -103,7 +103,6 @@ export class RawFindOneAndUpdateCommand extends MongoAstNode {
   readonly update: Document | ReadonlyArray<Document>;
   readonly upsert: boolean;
   readonly sort: Record<string, 1 | -1> | undefined;
-  readonly skip: number | undefined;
   /**
    * When `undefined`, the option is omitted from the wire command and the
    * MongoDB driver applies its documented default (return the pre-image
@@ -117,7 +116,6 @@ export class RawFindOneAndUpdateCommand extends MongoAstNode {
     update: Document | ReadonlyArray<Document>,
     upsert = false,
     sort?: Record<string, 1 | -1>,
-    skip?: number,
     returnDocument?: 'before' | 'after',
   ) {
     super();
@@ -126,7 +124,6 @@ export class RawFindOneAndUpdateCommand extends MongoAstNode {
     this.update = update;
     this.upsert = upsert;
     this.sort = sort;
-    this.skip = skip;
     this.returnDocument = returnDocument;
     this.freeze();
   }
@@ -137,14 +134,12 @@ export class RawFindOneAndDeleteCommand extends MongoAstNode {
   readonly collection: string;
   readonly filter: Document;
   readonly sort: Record<string, 1 | -1> | undefined;
-  readonly skip: number | undefined;
 
-  constructor(collection: string, filter: Document, sort?: Record<string, 1 | -1>, skip?: number) {
+  constructor(collection: string, filter: Document, sort?: Record<string, 1 | -1>) {
     super();
     this.collection = collection;
     this.filter = filter;
     this.sort = sort;
-    this.skip = skip;
     this.freeze();
   }
 }

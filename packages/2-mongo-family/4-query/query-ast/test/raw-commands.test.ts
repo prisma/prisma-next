@@ -169,7 +169,6 @@ describe('RawFindOneAndUpdateCommand', () => {
       update,
       false,
       undefined,
-      undefined,
       'after',
     );
     expect(cmd.returnDocument).toBe('after');

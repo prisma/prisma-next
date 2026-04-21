@@ -103,7 +103,6 @@ export class FindOneAndUpdateWireCommand extends MongoWireCommand {
   readonly update: Document | ReadonlyArray<Document>;
   readonly upsert: boolean;
   readonly sort: Record<string, 1 | -1> | undefined;
-  readonly skip: number | undefined;
   /**
    * When `undefined`, the option is omitted from the underlying driver
    * call so Mongo's documented default (pre-image document) applies.
@@ -116,7 +115,6 @@ export class FindOneAndUpdateWireCommand extends MongoWireCommand {
     update: Document | ReadonlyArray<Document>,
     upsert = false,
     sort?: Record<string, 1 | -1>,
-    skip?: number,
     returnDocument?: 'before' | 'after',
   ) {
     super(collection);
@@ -124,7 +122,6 @@ export class FindOneAndUpdateWireCommand extends MongoWireCommand {
     this.update = update;
     this.upsert = upsert;
     this.sort = sort;
-    this.skip = skip;
     this.returnDocument = returnDocument;
     this.freeze();
   }
@@ -134,13 +131,11 @@ export class FindOneAndDeleteWireCommand extends MongoWireCommand {
   readonly kind = 'findOneAndDelete' as const;
   readonly filter: Document;
   readonly sort: Record<string, 1 | -1> | undefined;
-  readonly skip: number | undefined;
 
-  constructor(collection: string, filter: Document, sort?: Record<string, 1 | -1>, skip?: number) {
+  constructor(collection: string, filter: Document, sort?: Record<string, 1 | -1>) {
     super(collection);
     this.filter = filter;
     this.sort = sort;
-    this.skip = skip;
     this.freeze();
   }
 }
