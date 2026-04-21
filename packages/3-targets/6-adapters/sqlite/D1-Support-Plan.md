@@ -70,7 +70,9 @@ PR #341's runner wraps the entire migration in `BEGIN EXCLUSIVE … COMMIT` with
 
 The import API's execution model restores the standard SQLite recreate-table dance: `PRAGMA foreign_keys = OFF` at the top of the file, do the rebuild, `PRAGMA foreign_keys = ON` with an integrity check. Child rows with `ON DELETE CASCADE` survive parent rebuilds because FK enforcement is genuinely disabled during the DDL.
 
-This works only because the import API executes statements in a framing where `PRAGMA foreign_keys` takes effect. Empirical testing confirmed that the same PRAGMA inside `/query` (or inside a `db.batch()` on miniflare) is a no-op, cascade fires, and children are silently wiped. The first version of this plan mistakenly proposed `PRAGMA defer_foreign_keys = ON` as a workaround; testing showed `defer_foreign_keys` does not prevent cascade actions under any D1 endpoint. It is not used.
+This works only because the import API executes statements in a framing where `PRAGMA foreign_keys` takes effect. Empirical testing confirmed the split against both miniflare and a fresh remote D1 database: running the identical `PRAGMA foreign_keys = OFF` + recreate-table SQL via `wrangler d1 execute --remote --file=...` (import API path) preserved CASCADE child rows through the parent rebuild, while the same SQL via `--remote --command=...` (`/query` path) wiped them. The PRAGMA is a no-op inside `/query`'s implicit transaction wrapper; it is honored inside the import pipeline.
+
+`PRAGMA defer_foreign_keys = ON` is not an alternative — testing showed it does not prevent cascade actions under any D1 endpoint. Only `PRAGMA foreign_keys = OFF` on the import path suppresses the cascade.
 
 Consequence: the planner's full range of operations, including recreate-table of tables with incoming FK constraints of any kind (including CASCADE), is supported from day one.
 
@@ -186,7 +188,7 @@ Deferred, not rejected. If the ORM planner resolves nested-write PKs client-side
 
 ### Apply migrations via the `/query` REST endpoint
 
-Rejected. `wrangler d1 migrations apply` takes this path, and so did the first draft of this plan. Empirical testing against miniflare — and third-party reports against remote D1 — confirm that `PRAGMA foreign_keys = OFF` inside `/query`'s implicit transaction is a no-op. Recreate-table migrations with CASCADE children silently lose data. The import API avoids this by using a different server-side execution framing. Whichever endpoint Cloudflare unifies eventually, we use the one that works today.
+Rejected. `wrangler d1 migrations apply` takes this path. Empirical testing against miniflare and against remote D1 confirmed that `PRAGMA foreign_keys = OFF` inside `/query`'s implicit transaction is a no-op: recreate-table migrations with CASCADE children silently lose data. The import API avoids this by using a different server-side execution framing. Whichever endpoint Cloudflare unifies eventually, we use the one that works today.
 
 ### Follow wrangler's model exactly (no marker, no hash, no verification)
 
