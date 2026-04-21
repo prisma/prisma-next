@@ -14,7 +14,12 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
     source: {
       inputs: [schemaPath],
       load: async (context) => {
-        const [absoluteSchemaPath = schemaPath] = context.resolvedInputs;
+        const [absoluteSchemaPath] = context.resolvedInputs;
+        if (absoluteSchemaPath === undefined) {
+          throw new Error(
+            'mongoContract: context.resolvedInputs is empty. The CLI config loader should populate it positional-matched with source.inputs.',
+          );
+        }
         let schema: string;
         try {
           schema = await readFile(absoluteSchemaPath, 'utf-8');

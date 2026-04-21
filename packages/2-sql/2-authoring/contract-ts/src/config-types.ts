@@ -18,7 +18,12 @@ export function typescriptContractFromPath(contractPath: string, output?: string
     source: {
       inputs: [contractPath],
       load: async (context) => {
-        const [absolutePath = contractPath] = context.resolvedInputs;
+        const [absolutePath] = context.resolvedInputs;
+        if (absolutePath === undefined) {
+          throw new Error(
+            'typescriptContractFromPath: context.resolvedInputs is empty. The CLI config loader should populate it positional-matched with source.inputs.',
+          );
+        }
         const mod = await import(pathToFileURL(absolutePath).href);
         const contract: Contract = mod.default ?? mod.contract;
         return ok(contract);
