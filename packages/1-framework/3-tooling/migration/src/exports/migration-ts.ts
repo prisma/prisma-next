@@ -1,3 +1,3 @@
-export { evaluateMigrationTs, hasMigrationTs, writeMigrationTs } from '../migration-ts';
+export { hasMigrationTs, writeMigrationTs } from '../migration-ts';
 export type { ScaffoldRuntime } from '../runtime-detection';
 export { detectScaffoldRuntime, shebangLineFor } from '../runtime-detection';
