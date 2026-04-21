@@ -123,6 +123,31 @@ describe('config loader', () => {
   );
 
   it(
+    'rejects non-json contract outputs during config finalization',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        createValidConfig(`
+      contract: {
+        source: createSource(
+          ['./prisma/schema.prisma'],
+          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        ),
+        output: 'generated/contract.ts',
+      }`),
+        'utf-8',
+      );
+
+      await expect(loadConfig(configPath)).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        why: 'Contract output path must end with .json',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
     'loads provider config with omitted inputs and default output',
     async () => {
       const configPath = join(testDir, 'prisma-next.config.ts');

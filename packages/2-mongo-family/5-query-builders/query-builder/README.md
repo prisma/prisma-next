@@ -85,10 +85,16 @@ The general-purpose aggregation chain. Reached after calling any pipeline stage 
 
 ## Field accessor
 
-Stage callbacks receive a `FieldAccessor<Shape>` (typically named `f`):
+Stage callbacks receive a `FieldAccessor<Shape, Nested>` (typically named `f`):
 
 - **Property form** — `f.status`, `f.amount`: produces a `TypedAggExpr` bound to the field's declared type.
-- **Callable form** — `f("address.city")`: accesses nested paths. Note: the callable form does not currently validate the path against the contract at the type level.
+- **Callable form** — `f("address.city")`: type-safe dot-path traversal through the contract's model + value-object structure. Paths are validated at compile time against `ValidPaths<Nested>`, the resolved leaf's codec drives the returned expression, and IDE autocomplete surfaces the valid path union. Non-leaf paths (`f("address")`) return an `Expression<ObjectField<…>>` whose reduced operator surface exposes `set`, `unset`, `exists`, `eq(null)`, and `ne(null)` — operators that don't make sense on a whole value object (`gt`, `inc`, `push`, …) are hidden.
+
+  The callable form is disabled (at the type level) downstream of replacement stages (`project`, `group`, `replaceRoot`, …) that erase the nested structure; additive stages (`match`, `sort`, `addFields`, `lookup`, …) preserve it.
+
+- **Escape hatch** — `f.rawPath("path")`: sidesteps path validation and returns a `LeafExpression<DocField>` carrying the verbatim string path. Use when the path is intentionally outside the typed model — the canonical case is **migration authoring**, where a backfill writes to a field that is not yet in the pre-migration contract (see the retail-store example's `backfill-product-status` migration). `f.rawPath` offers the full leaf operator surface (`set`, `exists`, `inc`, `push`, …) and no IDE autocomplete. Callers can narrow the return via an explicit generic: `f.rawPath<StringField>("status").set("active")`. The method is named `rawPath` rather than `raw` so a user model with a legitimate top-level `raw` field still resolves `f.raw` to the field expression.
+
+  See [ADR 180 — Dot-path field accessor](../../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md) for the design rationale.
 
 ## Update operators
 
