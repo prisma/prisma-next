@@ -107,9 +107,9 @@ describe('reconstructGraph', () => {
 });
 
 describe('findLeaf', () => {
-  it('returns EMPTY_CONTRACT_HASH for empty graph', () => {
+  it('returns null for empty graph', () => {
     const graph = reconstructGraph([]);
-    expect(findLeaf(graph)).toBe(E);
+    expect(findLeaf(graph)).toBeNull();
   });
 
   it('returns H1 for single migration', () => {
@@ -396,6 +396,21 @@ describe('findPathWithDecision', () => {
     expect(decision).not.toBeNull();
     expect(decision!.selectedPath).toHaveLength(1);
     expect(decision!.alternativeCount).toBeGreaterThan(0);
+  });
+
+  it('does not count dead-end outgoing edges as alternatives', () => {
+    // At H1 there are two outgoing edges: one reaches H3 (shortcut), one
+    // leads to a dead-end (H_dead) that never converges back. The dead-end
+    // edge must not be counted as an alternative.
+    const packages = [
+      pkg(E, 'H1', 'm1'),
+      pkg('H1', 'H3', 'm_shortcut'),
+      pkg('H1', 'H_dead', 'm_deadend'),
+    ];
+    const graph = reconstructGraph(packages);
+    const decision = findPathWithDecision(graph, 'H1', 'H3');
+    expect(decision).not.toBeNull();
+    expect(decision!.alternativeCount).toBe(0);
   });
 
   it('output shape matches expected keys', () => {
