@@ -75,27 +75,23 @@ export async function writeMigrationPackage(
 }
 
 /**
- * Copy the destination contract artifacts (`contract.json` and the
- * colocated `contract.d.ts`) into the migration package directory so
- * authors of the scaffolded `migration.ts` can import the typed
- * contract relative to the migration directory
- * (`import type { Contract } from './contract'`).
+ * Copy a list of files into `destDir`, optionally renaming each one.
  *
- * A missing `.d.ts` is tolerated (only the `.json` is required) so the
- * helper stays usable in tests that hand-roll a bare `contract.json`.
- * A missing `contract.json` — or any other I/O failure — throws.
+ * The destination directory is created (with `recursive: true`) if it
+ * does not already exist. Each source path is copied byte-for-byte into
+ * `destDir/<destName>`; missing sources throw `ENOENT`. The helper is
+ * intentionally generic: callers own the list of files (e.g. a contract
+ * emitter's emitted output) and the naming convention (e.g. renaming
+ * the destination contract to `contract.*` and the source contract to
+ * `from-contract.*`).
  */
-export async function copyContractToMigrationDir(
-  packageDir: string,
-  contractJsonPath: string,
+export async function copyFilesWithRename(
+  destDir: string,
+  files: readonly { readonly sourcePath: string; readonly destName: string }[],
 ): Promise<void> {
-  await copyFile(contractJsonPath, join(packageDir, 'contract.json'));
-  const dtsPath = `${contractJsonPath.slice(0, -'.json'.length)}.d.ts`;
-  try {
-    await copyFile(dtsPath, join(packageDir, 'contract.d.ts'));
-  } catch (error) {
-    if (hasErrnoCode(error, 'ENOENT')) return;
-    throw error;
+  await mkdir(destDir, { recursive: true });
+  for (const file of files) {
+    await copyFile(file.sourcePath, join(destDir, file.destName));
   }
 }
 
