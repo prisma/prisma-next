@@ -82,20 +82,42 @@ describe('M3 find-and-modify and upsert terminals', () => {
       expect(plan.command.filter.kind).toBe('and');
     });
 
-    it('last-writer-wins per sort key across multiple sort stages', () => {
-      const plan = orders()
+    it('rejects multiple sort stages (canonical shape allows at most one)', () => {
+      const chain = orders()
         .match((f) => f.status.eq('new'))
         .sort({ amount: 1 })
+        .sort({ amount: -1 });
+      expect(() => chain.findOneAndUpdate((f) => [f.status.set('seen')])).toThrow(
+        /at most one \$sort stage/,
+      );
+    });
+
+    it('rejects a $match that follows a $sort (non-canonical ordering)', () => {
+      const chain = orders()
+        .match((f) => f.status.eq('new'))
         .sort({ amount: -1 })
-        .findOneAndUpdate((f) => [f.status.set('seen')]);
-      expect(plan.command.sort).toEqual({ amount: -1 });
+        .match((f) => f.amount.gt(10)) as unknown as ReturnType<typeof orders>;
+      expect(() => chain.findOneAndUpdate((f) => [f.status.set('bad')])).toThrow(
+        /\$match\+ -> \$sort\? shape/,
+      );
+    });
+
+    it('rejects .skip() stages outright (MongoDB findAndModify has no skip slot)', () => {
+      const chain = orders()
+        .match((f) => f.status.eq('new'))
+        .skip(5) as unknown as ReturnType<typeof orders>;
+      expect(() => chain.findOneAndUpdate((f) => [f.status.set('bad')])).toThrow(
+        /does not support \.skip\(\)/,
+      );
     });
 
     it('throws on chains with non-deconstructable stages', () => {
       const chain = orders()
         .match((f) => f.status.eq('new'))
         .addFields(() => ({})) as unknown as ReturnType<typeof orders>;
-      expect(() => chain.findOneAndUpdate((f) => [f.status.set('bad')])).toThrow(/\$match\/\$sort/);
+      expect(() => chain.findOneAndUpdate((f) => [f.status.set('bad')])).toThrow(
+        /\$match\+ -> \$sort\? shape/,
+      );
     });
   });
 

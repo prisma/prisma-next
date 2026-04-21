@@ -759,34 +759,60 @@ interface DeconstructedFindAndModify {
 
 /**
  * Walk the accumulated pipeline stages and extract the `filter` and `sort`
- * slots for a `findOneAndUpdate` / `findOneAndDelete` wire command. Only
- * `$match` and `$sort` stages are permitted; any other stage triggers a
- * runtime error (the type system should make this unreachable, but the
- * check is here as a defence-in-depth measure).
+ * slots for a `findOneAndUpdate` / `findOneAndDelete` wire command.
  *
- * `$skip` is accepted but silently dropped — MongoDB's `findAndModify`
- * command has no `skip` slot, so the helper cannot surface it. A follow-up
- * pass canonicalizes the accepted shape and rejects `.skip()` outright.
+ * The helper accepts exactly the canonical shape `match+ -> sort?` and
+ * nothing else:
  *
- * Multiple `$match` stages are AND-folded. Multiple `$sort` stages fold
- * last-writer-wins per key (matching Mongo's own pipeline semantics).
+ *  - one or more `$match` stages (AND-folded into a single filter),
+ *  - optionally followed by a single `$sort` stage.
+ *
+ * Anything else — a `$sort` before `$match`, multiple `$sort` stages, a
+ * `$skip` stage, or any non-`$match`/`$sort` stage — is rejected with a
+ * clear error. The type system already prevents most of these at compile
+ * time via the `FindAndModifyEnabled` marker, but the runtime check
+ * guards the escape hatches (e.g. `.pipe(...)`) and future marker gaps.
+ *
+ * `$skip` is rejected outright because MongoDB's `findAndModify` command
+ * has no skip slot; a silently-dropped skip is a latent correctness bug
+ * waiting to happen. (A02 removed skip from the typed AST for the same
+ * reason.)
  */
 function deconstructFindAndModifyChain(
   stages: ReadonlyArray<MongoPipelineStage>,
 ): DeconstructedFindAndModify {
   const matchFilters: MongoFilterExpr[] = [];
   let sort: Record<string, 1 | -1> | undefined;
+  let seenNonMatch = false;
 
   for (const stage of stages) {
     if (stage instanceof MongoMatchStage) {
+      if (seenNonMatch) {
+        throw new Error(
+          'findOneAndUpdate/findOneAndDelete requires the canonical $match+ -> $sort? shape, ' +
+            'but a $match stage was found after a $sort. Re-order the chain so every .match() ' +
+            'call precedes the .sort() call.',
+        );
+      }
       matchFilters.push(stage.filter);
     } else if (stage instanceof MongoSortStage) {
-      sort = sort ? { ...sort, ...stage.sort } : { ...stage.sort };
+      if (sort !== undefined) {
+        throw new Error(
+          'findOneAndUpdate/findOneAndDelete accepts at most one $sort stage; drop the extra ' +
+            '.sort() call or combine the keys into a single sort spec.',
+        );
+      }
+      sort = { ...stage.sort };
+      seenNonMatch = true;
     } else if (stage instanceof MongoSkipStage) {
-      // MongoDB findAndModify has no skip slot; silently drop.
+      throw new Error(
+        'findOneAndUpdate/findOneAndDelete does not support .skip() — MongoDB findAndModify ' +
+          'has no skip slot. Remove the .skip() call, or use .aggregate()/.build() if the ' +
+          'chain needs skip semantics.',
+      );
     } else {
       throw new Error(
-        'findOneAndUpdate/findOneAndDelete requires a chain of $match/$sort stages only, ' +
+        'findOneAndUpdate/findOneAndDelete requires the canonical $match+ -> $sort? shape, ' +
           `but encountered a '${stage.constructor.name}' stage. ` +
           'This is likely a bug — the type system should have prevented this chain.',
       );
