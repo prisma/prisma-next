@@ -21,7 +21,7 @@ The project is carved at the points where behavior change lands: PR 1 is pure fo
 ### Contents
 
 - Extract pure factory functions from `operation-resolver.ts` (Phase 0). No new helpers are added to `@prisma-next/errors/migration` in this phase.
-- Introduce the framework `OpFactoryCall` interface in `packages/1-framework/1-core/framework-components/src/control-migration-types.ts` and the `MigrationPlanWithAuthoringSurface` interface (Phase 1).
+- Introduce the framework-level `OpFactoryCall` interface in `packages/1-framework/1-core/framework-components/src/control-migration-types.ts` (Phase 1). `MigrationPlanWithAuthoringSurface` already exists from ADR 194 / the Mongo work and is reused unchanged.
 - Mongo IR sync (Phase 1): Mongo's `OpFactoryCallNode` gains `implements OpFactoryCall` and `extends MigrationTsExpression` (new Mongo-internal abstract, sibling of the Postgres one); each Mongo concrete call class grows `renderTypeScript()` + `importRequirements()`; Mongo's `renderCallsToTypeScript` is rewritten to walk nodes polymorphically (byte-identical output; existing Mongo snapshot tests are the regression gate). Add the Family-SQL `SqlMigration<TDetails>` alias (Phase 1).
 - Introduce the Postgres class-flow IR in `packages/3-targets/3-targets/postgres/src/core/migrations/`: the abstract `MigrationTsExpression` base (Postgres sibling of the Mongo one), the concrete `PlaceholderExpression` node, the internal `PostgresOpFactoryCallNode` base extending `MigrationTsExpression` and implementing `OpFactoryCall`, one frozen concrete call class per factory, the `PostgresOpFactoryCallVisitor<R>` interface, the `renderOps` visitor (with its local `bodyToClosure` helper), the polymorphic `renderCallsToTypeScript`, and `TypeScriptRenderablePostgresMigration` (Phase 1).
 - Retarget the walk-schema planner (`planner-reconciliation.ts` + `planner.ts`'s `buildX` helpers) to produce `PostgresOpFactoryCall[]` internally, then rendering to `SqlMigrationPlanOperation<PostgresPlanTargetDetails>[]` via `renderOps` at the tail (Phase 1).
@@ -118,7 +118,7 @@ None user-visible. `db update` now runs through the issue-based planner, but ext
 
 ### Why combine Phases 4, 5, 6
 
-Phase 4 is non-trivial absorption work, but every walk-schema branch is guided by the audit performed in PR 1 (committed at `wip/walk-schema-audit.md` or similar — not in-repo; see `specs/walk-schema-audit.spec.md`). Phases 5 and 6 are pure deletions. The risk profile is "make sure we didn't break something", not "design a new thing" — lumping them gives one well-scoped cleanup review.
+Phase 4 is non-trivial absorption work, but every walk-schema branch is guided by the audit performed in PR 1 (committed in-repo at `projects/postgres-class-flow-migrations/assets/walk-schema-audit.md`; see [`specs/walk-schema-audit.spec.md`](./specs/walk-schema-audit.spec.md)). Phases 5 and 6 are pure deletions. The risk profile is "make sure we didn't break something", not "design a new thing" — lumping them gives one well-scoped cleanup review.
 
 ### Merge gate
 

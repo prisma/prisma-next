@@ -37,7 +37,8 @@ packages/3-targets/3-targets/postgres/src/core/migrations/
 ├── op-factories.ts          # Pure createX(...literalArgs) functions
 ├── render-ops.ts            # renderOps visitor (PostgresOpFactoryCall[] → operations)
 ├── render-typescript.ts     # renderCallsToTypeScript polymorphic walk (PostgresOpFactoryCall[] → migration.ts source)
-├── planner.ts               # PostgresMigrationPlanner + TypeScriptRenderablePostgresMigration class
+├── planner-produced-postgres-migration.ts  # TypeScriptRenderablePostgresMigration concrete class
+├── planner.ts               # PostgresMigrationPlanner (thin shell post-Phase 4)
 ├── issue-planner.ts         # SchemaIssue[] → strategy chain → default mapping → PostgresOpFactoryCall[]
 ├── strategies.ts            # NOT-NULL backfill, unsafe type change, nullable tightening, enum rebuild
 ├── planner-ddl-builders.ts  # Pure SQL-string builders (unchanged, reused by factories)
@@ -173,8 +174,9 @@ Mongo and Postgres ship the same IR shape — the abstract-expression hierarchy 
 
 - `migration-ts-expression.ts` (new) — internal abstract base `MigrationTsExpression` (private; structurally identical to the Postgres sibling). Declares `renderTypeScript(): string` and `importRequirements(): readonly ImportRequirement[]`. Not exported, not referenced outside the Mongo package.
 - `op-factory-call.ts` — `OpFactoryCallNode` gains `extends MigrationTsExpression` (adding the two abstract methods) and `implements OpFactoryCall` (framework-level interface). Each of the five concrete call classes (`CreateIndexCall`, `DropIndexCall`, `CreateCollectionCall`, `DropCollectionCall`, `CollModCall`) grows `renderTypeScript()` and `importRequirements()` polymorphic methods. The `OpFactoryCallVisitor<R>` interface stays — still used by the runtime-op side (`renderOpsToMongoCommands` / `mongo-emit`).
-- `render-typescript.ts` — `renderCallsToTypeScript` switches from the existing visitor implementation to a polymorphic walk: `calls.map((c) => c.renderTypeScript())` for the body, and `calls.flatMap((c) => c.importRequirements())` + dedupe for the import block. The hand-rolled `collectFactoryNames` + `buildImports` helpers are deleted. Output format is preserved byte-for-byte — existing Mongo render-typescript snapshot tests are the regression net.
-- No change to `planner-produced-migration.ts` (Mongo's `PlannerProducedMongoMigration` is unaffected; it only wires `renderCallsToTypeScript` through). No change to `mongoEmit` or the Mongo planner.
+- `render-typescript.ts` — `renderCallsToTypeScript` switches from the existing visitor implementation to a polymorphic walk: `calls.map((c) => c.renderTypeScript())` for the body, and `calls.flatMap((c) => c.importRequirements())` + dedupe for the import block. The hand-rolled `collectFactoryNames` helper and the `renderCallVisitor` constant are deleted; the module keeps only the top-level function plus `buildImports`.
+- `render-literal.ts` (new) — the `renderLiteral` / `renderKey` helpers that previously lived inside the visitor move to a small shared utility module so each concrete call class's `renderTypeScript()` method can import them.
+- No change to `planner-produced-migration.ts` (Mongo's `PlannerProducedMongoMigration` is unaffected; it only wires `renderCallsToTypeScript` through). No change to `mongoEmit` or the Mongo planner. Output format is preserved byte-for-byte — existing Mongo render-typescript snapshot tests are the regression net.
 
 Rationale: the Postgres IR introduces the abstract-expression / polymorphic-render pattern for a concrete reason (`DataTransformCall` needs expression children, which polymorphism handles more cleanly than a second visitor). Landing the same shape in Mongo at the same time means the two targets converge rather than diverge, and the follow-up cross-target consolidation (see §"Known follow-ups") becomes a pure lift rather than a harmonize-then-lift.
 
@@ -329,7 +331,7 @@ Revert the PR. `resolveDescriptors` returns to the capability, descriptor-flow C
 
 ### Scope
 
-**Audit walk-schema logic** — done in Phase 1 as a research task (output: `wip/walk-schema-audit.md`, not committed). The audit categorizes every branch in `planner-reconciliation.ts` (798 LOC) and `planner.ts`'s `buildDatabaseDependencyOperations`, `buildStorageTypeOperations`, `buildTableOperations` by the `SchemaIssue` kind(s) it handles, and flags branches that depend on information not currently in `SchemaIssue`. The audit is the input to this phase. See `projects/postgres-class-flow-migrations/specs/walk-schema-audit.spec.md`.
+**Audit walk-schema logic** — done in Phase 1 as a research task; output lives at `projects/postgres-class-flow-migrations/assets/walk-schema-audit.md` (committed alongside the Phase 1 PR, deleted at project close-out). The audit categorizes every branch in `planner-reconciliation.ts` (798 LOC) and `planner.ts`'s `buildDatabaseDependencyOperations`, `buildStorageTypeOperations`, `buildTableOperations` by the `SchemaIssue` kind(s) it handles, and flags branches that depend on information not currently in `SchemaIssue`. The audit is the input to this phase. See [`specs/walk-schema-audit.spec.md`](./specs/walk-schema-audit.spec.md).
 
 **Absorb**: for each walk-schema branch identified by the audit, either extend an existing strategy, add a new strategy, or extend the default mapping in `issue-planner.ts`. Branches that depend on information not currently in `SchemaIssue[]` require a local extension to `verifySqlSchema`'s output shape — a minor, localized contract change, not a planner bypass. Each such extension lands in its own commit for reviewability.
 
@@ -462,7 +464,7 @@ No Mongo planner change, no Mongo factory change, no change to rendered migratio
 | Risk | Primary phase | Mitigation |
 |---|---|---|
 | Regenerated example migration reconstructs the wrong schema | 3, 4 | Runner's post-apply `verifySqlSchema` fails the apply; per-example apply/verify in Phase 3's PR catches this before merge |
-| Walk-schema → call-class mapping completeness | 1 | Phase 1 starts with a walk-schema audit (output: `wip/walk-schema-audit.md`) that categorizes every `buildX` helper by the call classes it needs to construct. The audit is also input to Phase 4 |
+| Walk-schema → call-class mapping completeness | 1 | Phase 1 starts with a walk-schema audit (committed at `projects/postgres-class-flow-migrations/assets/walk-schema-audit.md`) that categorizes every `buildX` helper by the call classes it needs to construct. The audit is also input to Phase 4 |
 | Strategy exhaustiveness regression | 2 | Rewrite existing strategy tests against the new `OpFactoryCall` emission; per-strategy apply/verify tests that run the emitted recipe against a fresh Postgres and assert the runner accepts it, for each of the four data-safety scenarios |
 | Walk-schema absorption misses a corner | 4 | `db update` integration tests guard external behavior; audit from Phase 1 is the checklist for Phase 4; pin strategy ordering with unit tests |
 | Visitor drift (new factory, visitor not updated) | all | `satisfies PostgresOpFactoryCallVisitor<R>` on every visitor → compile-time error |
