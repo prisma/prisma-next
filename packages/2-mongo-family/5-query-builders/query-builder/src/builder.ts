@@ -55,7 +55,7 @@ import {
   UpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import { createFieldAccessor, type Expression, type FieldAccessor } from './field-accessor';
-import type { FindAndModifyEnabled, UpdateEnabled } from './markers';
+import type { FindAndModifyEnabled, LeadingMatch, UpdateEnabled } from './markers';
 import type {
   DocField,
   DocShape,
@@ -105,9 +105,11 @@ export class PipelineChain<
   Shape extends DocShape,
   U extends UpdateEnabled = 'update-ok',
   F extends FindAndModifyEnabled = 'fam-ok',
+  L extends LeadingMatch = 'leading',
 > {
   declare readonly __updateCompat: U;
   declare readonly __findAndModifyCompat: F;
+  declare readonly __leadingMatch: L;
 
   readonly #contract: TContract;
   readonly #state: PipelineChainState;
@@ -121,8 +123,9 @@ export class PipelineChain<
     NewShape extends DocShape,
     NewU extends UpdateEnabled,
     NewF extends FindAndModifyEnabled,
-  >(stage: MongoPipelineStage): PipelineChain<TContract, NewShape, NewU, NewF> {
-    return new PipelineChain<TContract, NewShape, NewU, NewF>(this.#contract, {
+    NewL extends LeadingMatch = 'past-leading',
+  >(stage: MongoPipelineStage): PipelineChain<TContract, NewShape, NewU, NewF, NewL> {
+    return new PipelineChain<TContract, NewShape, NewU, NewF, NewL>(this.#contract, {
       ...this.#state,
       stages: [...this.#state.stages, stage],
     });
@@ -140,26 +143,36 @@ export class PipelineChain<
   // --- Identity stages ---
 
   /**
-   * `$match`. Both markers preserved — the filter does not mutate documents
-   * and is representable in every consuming wire command's `filter` slot.
+   * `$match`. `FindAndModifyEnabled` is always preserved. `UpdateEnabled` is
+   * preserved only while the chain is still in the leading-`$match` prefix
+   * (`L = 'leading'`); a `$match` that follows any non-`$match` stage
+   * transitions to `L = 'past-leading'` and clears `UpdateEnabled`, since
+   * `deconstructUpdateChain` can only peel leading `$match` stages into the
+   * wire-command filter.
    */
-  match(filter: MongoFilterExpr): PipelineChain<TContract, Shape, U, F>;
+  match(
+    filter: MongoFilterExpr,
+  ): PipelineChain<TContract, Shape, L extends 'leading' ? U : 'update-cleared', F, L>;
   match(
     fn: (fields: FieldAccessor<Shape>) => MongoFilterExpr,
-  ): PipelineChain<TContract, Shape, U, F>;
+  ): PipelineChain<TContract, Shape, L extends 'leading' ? U : 'update-cleared', F, L>;
   match(
     filterOrFn: MongoFilterExpr | ((fields: FieldAccessor<Shape>) => MongoFilterExpr),
-  ): PipelineChain<TContract, Shape, U, F> {
+  ): PipelineChain<TContract, Shape, L extends 'leading' ? U : 'update-cleared', F, L> {
     const filter =
       typeof filterOrFn === 'function' ? filterOrFn(createFieldAccessor<Shape>()) : filterOrFn;
-    return this.#withStage<Shape, U, F>(new MongoMatchStage(filter));
+    return this.#withStage<Shape, L extends 'leading' ? U : 'update-cleared', F, L>(
+      new MongoMatchStage(filter),
+    );
   }
 
   /**
    * `$sort`. Clears `UpdateEnabled` (`update` has no per-document sort) but
    * preserves `FindAndModifyEnabled` (`findAndModify` has a `sort` slot).
    */
-  sort(spec: SortSpec<Shape>): PipelineChain<TContract, Shape, 'update-cleared', F> {
+  sort(
+    spec: SortSpec<Shape>,
+  ): PipelineChain<TContract, Shape, 'update-cleared', F, 'past-leading'> {
     return this.#withStage<Shape, 'update-cleared', F>(
       new MongoSortStage(spec as Record<string, 1 | -1>),
     );
@@ -170,7 +183,9 @@ export class PipelineChain<
    * wire command, and `findAndModify` already implies single-document
    * semantics (so `.limit(...)` adds no meaning, only ambiguity).
    */
-  limit(n: number): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared'> {
+  limit(
+    n: number,
+  ): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<Shape, 'update-cleared', 'fam-cleared'>(new MongoLimitStage(n));
   }
 
@@ -178,11 +193,13 @@ export class PipelineChain<
    * `$skip`. Clears `UpdateEnabled`; preserved for `findAndModify` (which has
    * a `skip` slot).
    */
-  skip(n: number): PipelineChain<TContract, Shape, 'update-cleared', F> {
+  skip(n: number): PipelineChain<TContract, Shape, 'update-cleared', F, 'past-leading'> {
     return this.#withStage<Shape, 'update-cleared', F>(new MongoSkipStage(n));
   }
 
-  sample(n: number): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared'> {
+  sample(
+    n: number,
+  ): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<Shape, 'update-cleared', 'fam-cleared'>(new MongoSampleStage(n));
   }
 
@@ -195,7 +212,13 @@ export class PipelineChain<
    */
   addFields<NewFields extends Record<string, TypedAggExpr<DocField>>>(
     fn: (fields: FieldAccessor<Shape>) => NewFields,
-  ): PipelineChain<TContract, Shape & ExtractDocShape<NewFields>, U, 'fam-cleared'> {
+  ): PipelineChain<
+    TContract,
+    Shape & ExtractDocShape<NewFields>,
+    U,
+    'fam-cleared',
+    'past-leading'
+  > {
     const accessor = createFieldAccessor<Shape>();
     const newFields = fn(accessor);
     const exprRecord: Record<string, MongoAggExpr> = {};
@@ -220,7 +243,8 @@ export class PipelineChain<
     TContract,
     Shape & Record<As, { readonly codecId: 'mongo/array@1'; readonly nullable: false }>,
     'update-cleared',
-    'fam-cleared'
+    'fam-cleared',
+    'past-leading'
   > {
     const contract = this.#contract as MongoContract;
     const modelName = contract.roots[options.from];
@@ -254,12 +278,15 @@ export class PipelineChain<
     TContract,
     Pick<Shape, K | ('_id' extends keyof Shape ? '_id' : never)>,
     U,
-    'fam-cleared'
+    'fam-cleared',
+    'past-leading'
   >;
   project<Spec extends Record<string, 1 | TypedAggExpr<DocField>>>(
     fn: (fields: FieldAccessor<Shape>) => Spec,
-  ): PipelineChain<TContract, ProjectedShape<Shape, Spec>, U, 'fam-cleared'>;
-  project(...args: unknown[]): PipelineChain<TContract, DocShape, U, 'fam-cleared'> {
+  ): PipelineChain<TContract, ProjectedShape<Shape, Spec>, U, 'fam-cleared', 'past-leading'>;
+  project(
+    ...args: unknown[]
+  ): PipelineChain<TContract, DocShape, U, 'fam-cleared', 'past-leading'> {
     if (args.length === 1 && typeof args[0] === 'function') {
       const fn = args[0] as (
         fields: FieldAccessor<Shape>,
@@ -288,7 +315,13 @@ export class PipelineChain<
   unwind<K extends keyof Shape & string>(
     field: K,
     options?: { preserveNullAndEmptyArrays?: boolean },
-  ): PipelineChain<TContract, UnwoundShape<Shape, K>, 'update-cleared', 'fam-cleared'> {
+  ): PipelineChain<
+    TContract,
+    UnwoundShape<Shape, K>,
+    'update-cleared',
+    'fam-cleared',
+    'past-leading'
+  > {
     return this.#withStage<UnwoundShape<Shape, K>, 'update-cleared', 'fam-cleared'>(
       new MongoUnwindStage(`$${field}`, options?.preserveNullAndEmptyArrays ?? false),
     );
@@ -302,7 +335,13 @@ export class PipelineChain<
    */
   group<Spec extends GroupSpec>(
     fn: (fields: FieldAccessor<Shape>) => Spec,
-  ): PipelineChain<TContract, GroupedDocShape<Spec>, 'update-cleared', 'fam-cleared'> {
+  ): PipelineChain<
+    TContract,
+    GroupedDocShape<Spec>,
+    'update-cleared',
+    'fam-cleared',
+    'past-leading'
+  > {
     const accessor = createFieldAccessor<Shape>();
     const spec = fn(accessor);
     const { _id: groupIdExpr, ...rest } = spec;
@@ -330,7 +369,7 @@ export class PipelineChain<
    */
   replaceRoot<NewShape extends DocShape>(
     fn: (fields: FieldAccessor<Shape>) => Expression<DocField> | TypedAggExpr<DocField>,
-  ): PipelineChain<TContract, NewShape, U, 'fam-cleared'> {
+  ): PipelineChain<TContract, NewShape, U, 'fam-cleared', 'past-leading'> {
     const accessor = createFieldAccessor<Shape>();
     const expr = fn(accessor);
     return this.#withStage<NewShape, U, 'fam-cleared'>(new MongoReplaceRootStage(expr.node));
@@ -342,7 +381,8 @@ export class PipelineChain<
     TContract,
     Record<Field, { readonly codecId: 'mongo/double@1'; readonly nullable: false }>,
     'update-cleared',
-    'fam-cleared'
+    'fam-cleared',
+    'past-leading'
   > {
     return this.#withStage(new MongoCountStage(field));
   }
@@ -356,7 +396,8 @@ export class PipelineChain<
       count: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
     },
     'update-cleared',
-    'fam-cleared'
+    'fam-cleared',
+    'past-leading'
   > {
     const accessor = createFieldAccessor<Shape>();
     const expr = fn(accessor);
@@ -370,7 +411,7 @@ export class PipelineChain<
    */
   redact(
     fn: (fields: FieldAccessor<Shape>) => Expression<DocField> | TypedAggExpr<DocField>,
-  ): PipelineChain<TContract, Shape, U, 'fam-cleared'> {
+  ): PipelineChain<TContract, Shape, U, 'fam-cleared', 'past-leading'> {
     const accessor = createFieldAccessor<Shape>();
     const expr = fn(accessor);
     return this.#withStage<Shape, U, 'fam-cleared'>(new MongoRedactStage(expr.node));
@@ -427,7 +468,7 @@ export class PipelineChain<
   unionWith(
     collection: string,
     pipeline?: ReadonlyArray<MongoPipelineStage>,
-  ): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared'> {
+  ): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<Shape, 'update-cleared', 'fam-cleared'>(
       new MongoUnionWithStage(collection, pipeline),
     );
@@ -440,7 +481,7 @@ export class PipelineChain<
     boundaries: ReadonlyArray<unknown>;
     default_?: unknown;
     output?: Record<string, MongoAggAccumulator>;
-  }): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared'> {
+  }): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<DocShape, 'update-cleared', 'fam-cleared'>(
       new MongoBucketStage(options),
     );
@@ -451,7 +492,7 @@ export class PipelineChain<
     buckets: number;
     output?: Record<string, MongoAggAccumulator>;
     granularity?: string;
-  }): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared'> {
+  }): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<DocShape, 'update-cleared', 'fam-cleared'>(
       new MongoBucketAutoStage(options),
     );
@@ -469,7 +510,7 @@ export class PipelineChain<
     key?: string;
     distanceMultiplier?: number;
     includeLocs?: string;
-  }): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared'> {
+  }): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<DocShape, 'update-cleared', 'fam-cleared'>(
       new MongoGeoNearStage(options),
     );
@@ -479,7 +520,7 @@ export class PipelineChain<
 
   facet(
     facets: Record<string, ReadonlyArray<MongoPipelineStage>>,
-  ): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared'> {
+  ): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<DocShape, 'update-cleared', 'fam-cleared'>(new MongoFacetStage(facets));
   }
 
@@ -494,7 +535,7 @@ export class PipelineChain<
     maxDepth?: number;
     depthField?: string;
     restrictSearchWithMatch?: MongoFilterExpr;
-  }): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared'> {
+  }): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<DocShape, 'update-cleared', 'fam-cleared'>(
       new MongoGraphLookupStage(options),
     );
@@ -506,7 +547,7 @@ export class PipelineChain<
     partitionBy?: MongoAggExpr;
     sortBy?: Record<string, 1 | -1>;
     output: Record<string, MongoWindowField>;
-  }): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared'> {
+  }): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<DocShape, 'update-cleared', 'fam-cleared'>(
       new MongoSetWindowFieldsStage(options),
     );
@@ -516,7 +557,7 @@ export class PipelineChain<
     field: string;
     partitionByFields?: ReadonlyArray<string>;
     range: MongoDensifyRange;
-  }): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared'> {
+  }): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<Shape, 'update-cleared', 'fam-cleared'>(new MongoDensifyStage(options));
   }
 
@@ -525,7 +566,7 @@ export class PipelineChain<
     partitionByFields?: ReadonlyArray<string>;
     sortBy?: Record<string, 1 | -1>;
     output: Record<string, MongoFillOutput>;
-  }): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared'> {
+  }): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<Shape, 'update-cleared', 'fam-cleared'>(new MongoFillStage(options));
   }
 
@@ -534,7 +575,7 @@ export class PipelineChain<
   search(
     config: Record<string, unknown>,
     index?: string,
-  ): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared'> {
+  ): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<Shape, 'update-cleared', 'fam-cleared'>(
       new MongoSearchStage(config, index),
     );
@@ -543,7 +584,7 @@ export class PipelineChain<
   searchMeta(
     config: Record<string, unknown>,
     index?: string,
-  ): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared'> {
+  ): PipelineChain<TContract, DocShape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<DocShape, 'update-cleared', 'fam-cleared'>(
       new MongoSearchMetaStage(config, index),
     );
@@ -556,7 +597,7 @@ export class PipelineChain<
     numCandidates: number;
     limit: number;
     filter?: Record<string, unknown>;
-  }): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared'> {
+  }): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<Shape, 'update-cleared', 'fam-cleared'>(
       new MongoVectorSearchStage(options),
     );
@@ -564,13 +605,15 @@ export class PipelineChain<
 
   // --- Escape hatch ---
 
-  pipe(stage: MongoPipelineStage): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared'>;
+  pipe(
+    stage: MongoPipelineStage,
+  ): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'>;
   pipe<NewShape extends DocShape>(
     stage: MongoPipelineStage,
-  ): PipelineChain<TContract, NewShape, 'update-cleared', 'fam-cleared'>;
+  ): PipelineChain<TContract, NewShape, 'update-cleared', 'fam-cleared', 'past-leading'>;
   pipe<NewShape extends DocShape = Shape>(
     stage: MongoPipelineStage,
-  ): PipelineChain<TContract, NewShape, 'update-cleared', 'fam-cleared'> {
+  ): PipelineChain<TContract, NewShape, 'update-cleared', 'fam-cleared', 'past-leading'> {
     return this.#withStage<NewShape, 'update-cleared', 'fam-cleared'>(stage);
   }
 
@@ -585,7 +628,7 @@ export class PipelineChain<
    * compatibility with `FilteredCollection.updateMany(updaterFn)`.
    */
   updateMany(
-    this: PipelineChain<TContract, Shape, 'update-ok', F>,
+    this: PipelineChain<TContract, Shape, 'update-ok', F, L>,
     updaterFn?: (fields: FieldAccessor<Shape>) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult, UpdateManyCommand> {
     if (updaterFn) {
@@ -604,7 +647,7 @@ export class PipelineChain<
    * update.
    */
   updateOne(
-    this: PipelineChain<TContract, Shape, 'update-ok', F>,
+    this: PipelineChain<TContract, Shape, 'update-ok', F, L>,
     updaterFn?: (fields: FieldAccessor<Shape>) => UpdaterResult,
   ): MongoQueryPlan<UpdateResult, UpdateOneCommand> {
     if (updaterFn) {
@@ -633,7 +676,7 @@ export class PipelineChain<
    * prevent this).
    */
   findOneAndUpdate(
-    this: PipelineChain<TContract, Shape, U, 'fam-ok'>,
+    this: PipelineChain<TContract, Shape, U, 'fam-ok', L>,
     updaterFn: (fields: FieldAccessor<Shape>) => UpdaterResult,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
   ): MongoQueryPlan<
@@ -666,7 +709,7 @@ export class PipelineChain<
    * Same marker gating and deconstruction as `findOneAndUpdate`.
    */
   findOneAndDelete(
-    this: PipelineChain<TContract, Shape, U, 'fam-ok'>,
+    this: PipelineChain<TContract, Shape, U, 'fam-ok', L>,
   ): MongoQueryPlan<
     ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null,
     FindOneAndDeleteCommand

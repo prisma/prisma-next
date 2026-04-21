@@ -91,6 +91,20 @@ describe('state-machine surface (negative type tests)', () => {
     sorted.updateMany();
     // @ts-expect-error — sort clears UpdateEnabled
     sorted.updateOne();
+
+    // .match(...).addFields(...).match(...) — the second .match() sits past
+    // the leading-match prefix. `deconstructUpdateChain` only peels *leading*
+    // `$match` stages into the wire-command filter, so the chain must clear
+    // UpdateEnabled at the type level to stop the no-arg write terminals
+    // compiling (even though each individual stage preserves UpdateEnabled).
+    const pastLeadingMatch = handle()
+      .match(MongoFieldFilter.eq('status', 'new'))
+      .addFields((f) => ({ doubled: f.amount }))
+      .match(MongoFieldFilter.gt('amount', 100));
+    // @ts-expect-error — match past the leading-match prefix clears UpdateEnabled
+    pastLeadingMatch.updateMany();
+    // @ts-expect-error — match past the leading-match prefix clears UpdateEnabled
+    pastLeadingMatch.updateOne();
   });
 
   it('FilteredCollection does not expose insert / unqualified-write terminals', () => {

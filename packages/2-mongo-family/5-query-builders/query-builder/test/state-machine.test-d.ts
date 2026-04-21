@@ -14,10 +14,10 @@ const contractJson = {} as unknown;
  * without having to reconstruct the full `Shape` parameter at the call site.
  */
 type GetU<T> =
-  T extends PipelineChain<infer _TContract, infer _Shape, infer U, infer _F> ? U : never;
+  T extends PipelineChain<infer _TContract, infer _Shape, infer U, infer _F, infer _L> ? U : never;
 
 type GetF<T> =
-  T extends PipelineChain<infer _TContract, infer _Shape, infer _U, infer F> ? F : never;
+  T extends PipelineChain<infer _TContract, infer _Shape, infer _U, infer F, infer _L> ? F : never;
 
 describe('state machine', () => {
   it('from(name) returns CollectionHandle (root state) inheriting PipelineChain', () => {
@@ -74,5 +74,24 @@ describe('state machine', () => {
       .group((_f) => ({ _id: null }));
     expectTypeOf<GetU<typeof grouped>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
     expectTypeOf<GetF<typeof grouped>>().toEqualTypeOf<'fam-cleared' & FindAndModifyEnabled>();
+  });
+
+  // --- Leading-match prefix (ADR 201) ---
+
+  it('match* stays in the leading-match prefix and preserves UpdateEnabled', () => {
+    const twoMatches = mongoQuery<TContract>({ contractJson })
+      .from('orders')
+      .match(MongoFieldFilter.eq('status', 'active'))
+      .match(MongoFieldFilter.gt('amount', 100));
+    expectTypeOf<GetU<typeof twoMatches>>().toEqualTypeOf<'update-ok' & UpdateEnabled>();
+  });
+
+  it('match after a non-match stage clears UpdateEnabled (past leading-match prefix)', () => {
+    const pastLeading = mongoQuery<TContract>({ contractJson })
+      .from('orders')
+      .match(MongoFieldFilter.eq('status', 'active'))
+      .addFields((f) => ({ doubled: f.amount }))
+      .match(MongoFieldFilter.gt('amount', 100));
+    expectTypeOf<GetU<typeof pastLeading>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
   });
 });
