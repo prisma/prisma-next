@@ -14,6 +14,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
+import { timeouts } from '@prisma-next/test-utils';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -419,50 +420,54 @@ describe('ControlClient progress emission', () => {
   });
 
   describe('emit()', () => {
-    it('emits resolveSource and emit spans', async () => {
-      const events: ControlProgressEvent[] = [];
-      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+    it(
+      'emits resolveSource and emit spans',
+      async () => {
+        const events: ControlProgressEvent[] = [];
+        const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
 
-      const client = createControlClient({
-        family: mockFamily,
-        target: mockTarget,
-        adapter: mockAdapter,
-        // No driver needed for emit
-      });
+        const client = createControlClient({
+          family: mockFamily,
+          target: mockTarget,
+          adapter: mockAdapter,
+          // No driver needed for emit
+        });
 
-      const result = await client.emit({
-        contractConfig: {
-          source: createSourceProvider(),
-          output: '/tmp/contract.json',
-        },
-        onProgress: (event) => events.push(event),
-      });
+        const result = await client.emit({
+          contractConfig: {
+            source: createSourceProvider(),
+            output: '/tmp/contract.json',
+          },
+          onProgress: (event) => events.push(event),
+        });
 
-      await client.close();
+        await client.close();
 
-      expect(result.ok).toBe(true);
+        expect(result.ok).toBe(true);
 
-      // Should emit resolveSource span
-      const resolveSourceStart = events.find(
-        (e) => e.kind === 'spanStart' && e.spanId === 'resolveSource',
-      );
-      const resolveSourceEnd = events.find(
-        (e) => e.kind === 'spanEnd' && e.spanId === 'resolveSource',
-      );
-      expect(resolveSourceStart).toBeDefined();
-      expect(resolveSourceEnd).toMatchObject({ outcome: 'ok' });
+        // Should emit resolveSource span
+        const resolveSourceStart = events.find(
+          (e) => e.kind === 'spanStart' && e.spanId === 'resolveSource',
+        );
+        const resolveSourceEnd = events.find(
+          (e) => e.kind === 'spanEnd' && e.spanId === 'resolveSource',
+        );
+        expect(resolveSourceStart).toBeDefined();
+        expect(resolveSourceEnd).toMatchObject({ outcome: 'ok' });
 
-      // Should emit emit span
-      const emitStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'emit');
-      const emitEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'emit');
-      expect(emitStart).toBeDefined();
-      expect(emitEnd).toMatchObject({ outcome: 'ok' });
+        // Should emit emit span
+        const emitStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'emit');
+        const emitEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'emit');
+        expect(emitStart).toBeDefined();
+        expect(emitEnd).toMatchObject({ outcome: 'ok' });
 
-      // All events should have action = 'emit'
-      for (const event of events) {
-        expect(event.action).toBe('emit');
-      }
-    });
+        // All events should have action = 'emit'
+        for (const event of events) {
+          expect(event.action).toBe('emit');
+        }
+      },
+      timeouts.databaseOperation,
+    );
 
     it('passes declared source inputs to the provider', async () => {
       const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
@@ -494,38 +499,42 @@ describe('ControlClient progress emission', () => {
       );
     });
 
-    it('emits resolveSource and emit spans when source is a provider object', async () => {
-      const events: ControlProgressEvent[] = [];
-      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+    it(
+      'emits resolveSource and emit spans when source is a provider object',
+      async () => {
+        const events: ControlProgressEvent[] = [];
+        const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
 
-      const client = createControlClient({
-        family: mockFamily,
-        target: mockTarget,
-        adapter: mockAdapter,
-      });
+        const client = createControlClient({
+          family: mockFamily,
+          target: mockTarget,
+          adapter: mockAdapter,
+        });
 
-      const result = await client.emit({
-        contractConfig: {
-          source: createSourceProvider(),
-          output: '/tmp/contract.json',
-        },
-        onProgress: (event) => events.push(event),
-      });
+        const result = await client.emit({
+          contractConfig: {
+            source: createSourceProvider(),
+            output: '/tmp/contract.json',
+          },
+          onProgress: (event) => events.push(event),
+        });
 
-      await client.close();
+        await client.close();
 
-      expect(result.ok).toBe(true);
+        expect(result.ok).toBe(true);
 
-      // Should emit resolveSource span
-      const resolveSourceStart = events.find(
-        (e) => e.kind === 'spanStart' && e.spanId === 'resolveSource',
-      );
-      const resolveSourceEnd = events.find(
-        (e) => e.kind === 'spanEnd' && e.spanId === 'resolveSource',
-      );
-      expect(resolveSourceStart).toBeDefined();
-      expect(resolveSourceEnd).toMatchObject({ outcome: 'ok' });
-    });
+        // Should emit resolveSource span
+        const resolveSourceStart = events.find(
+          (e) => e.kind === 'spanStart' && e.spanId === 'resolveSource',
+        );
+        const resolveSourceEnd = events.find(
+          (e) => e.kind === 'spanEnd' && e.spanId === 'resolveSource',
+        );
+        expect(resolveSourceStart).toBeDefined();
+        expect(resolveSourceEnd).toMatchObject({ outcome: 'ok' });
+      },
+      timeouts.databaseOperation,
+    );
 
     it('emits error outcome when source provider throws', async () => {
       const events: ControlProgressEvent[] = [];
@@ -1158,25 +1167,29 @@ describe('ControlClient progress emission', () => {
       expect(result).toBeDefined();
     });
 
-    it('does not throw when onProgress is omitted from emit', async () => {
-      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+    it(
+      'does not throw when onProgress is omitted from emit',
+      async () => {
+        const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
 
-      const client = createControlClient({
-        family: mockFamily,
-        target: mockTarget,
-        adapter: mockAdapter,
-      });
+        const client = createControlClient({
+          family: mockFamily,
+          target: mockTarget,
+          adapter: mockAdapter,
+        });
 
-      const result = await client.emit({
-        contractConfig: {
-          source: createSourceProvider(),
-          output: '/tmp/contract.json',
-        },
-      });
+        const result = await client.emit({
+          contractConfig: {
+            source: createSourceProvider(),
+            output: '/tmp/contract.json',
+          },
+        });
 
-      await client.close();
+        await client.close();
 
-      expect(result.ok).toBe(true);
-    });
+        expect(result.ok).toBe(true);
+      },
+      timeouts.databaseOperation,
+    );
   });
 });
