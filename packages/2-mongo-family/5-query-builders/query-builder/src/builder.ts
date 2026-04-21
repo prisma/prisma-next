@@ -246,7 +246,7 @@ export class PipelineChain<
     'fam-cleared',
     'past-leading'
   > {
-    const contract = this.#contract as MongoContract;
+    const contract: MongoContract = this.#contract;
     const modelName = contract.roots[options.from];
     if (!modelName) {
       const validRoots = Object.keys(contract.roots).join(', ');
