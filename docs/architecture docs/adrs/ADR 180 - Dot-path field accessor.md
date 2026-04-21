@@ -1,5 +1,7 @@
 # ADR 180 — Dot-path field accessor
 
+> **Implementation update (Mongo query builder unification).** The consolidated `FieldAccessor` shipped in `@prisma-next/mongo-query-builder` replaced the earlier `FieldProxy` and `FilterProxy` types — filter and update operators now hang off a single accessor, used by both read callbacks (`match`, `addFields`, `project`, `group`) and write callbacks (`updateMany`, `findOneAndUpdate`, etc.). The callable form `f("dot.path")` is currently permissive at the type level — paths are not validated against the contract. Type-safe path validation is tracked on [TML-2281](https://linear.app/prisma-company/issue/TML-2281).
+
 ## At a glance
 
 Querying and mutating nested value object fields through a callable string accessor. Scalar fields are direct properties on the model proxy (existing pattern); value object fields use a dot-path string that navigates into the nested structure:
