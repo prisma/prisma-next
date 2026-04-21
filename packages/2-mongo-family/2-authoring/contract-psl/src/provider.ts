@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig } from '@prisma-next/config/config-types';
-import { createPathBackedSource } from '@prisma-next/config/config-types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -12,9 +11,10 @@ export interface MongoContractOptions {
 
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
   return {
-    source: createPathBackedSource(
-      schemaPath,
-      async ({ inputPath: schemaPath, absoluteInputPath: absoluteSchemaPath }, context) => {
+    source: {
+      inputs: [schemaPath],
+      load: async (context, resolvedInputs) => {
+        const [absoluteSchemaPath = schemaPath] = resolvedInputs;
         let schema: string;
         try {
           schema = await readFile(absoluteSchemaPath, 'utf-8');
@@ -49,7 +49,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
 
         return ok(interpreted.value);
       },
-    ),
+    },
     ...ifDefined('output', options?.output),
   };
 }

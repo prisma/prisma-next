@@ -1,8 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { errorContractConfigMissing } from '@prisma-next/errors/control';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { dirname, isAbsolute, join, relative, resolve } from 'pathe';
+import { dirname, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type { EmitFailure } from '../control-api/types';
@@ -135,19 +136,17 @@ async function executeContractEmitCommand(
       }),
     );
   }
-  if (!contractConfig.output.endsWith('.json')) {
+  let outputPaths: ReturnType<typeof getEmittedArtifactPaths>;
+  try {
+    outputPaths = getEmittedArtifactPaths(contractConfig.output);
+  } catch (error) {
     return notOk(
       errorContractConfigMissing({
-        why: 'Contract config output path must end with .json (e.g., "src/prisma/contract.json")',
+        why: error instanceof Error ? error.message : String(error),
       }),
     );
   }
-  const configDir = options.config ? dirname(resolve(options.config)) : process.cwd();
-  const outputJsonPath = isAbsolute(contractConfig.output)
-    ? contractConfig.output
-    : join(configDir, contractConfig.output);
-  // Colocate .d.ts with .json (contract.json → contract.d.ts)
-  const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
+  const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = outputPaths;
 
   // Output header to stderr (decoration)
   if (!flags.json && !flags.quiet) {
@@ -183,7 +182,6 @@ async function executeContractEmitCommand(
     const result = await client.emit({
       contractConfig: {
         source: contractConfig.source,
-        configDir,
         output: outputJsonPath,
       },
       onProgress,

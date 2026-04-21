@@ -1130,7 +1130,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Error Handling**: Uses structured errors (`CliStructuredError`), Result pattern, and `process.exit()`. Commands return `Result<T, CliStructuredError>`, process results with `handleResult()`, and call `process.exit(exitCode)` directly. See `.cursor/rules/cli-error-handling.mdc` for details.
 - Loads the user's config module (`prisma-next.config.ts`)
 - Resolves contract from provider:
-  - Calls `config.contract.source.load(context, environment)` and expects `Result<Contract, ContractSourceDiagnostics>`
+  - Calls `config.contract.source.load(context, resolvedInputs)` and expects `Result<Contract, ContractSourceDiagnostics>`
   - Source-specific parsing/loading stays inside providers
   - Provider diagnostics are surfaced as actionable CLI failures
   - Throws error if `config.contract` is missing

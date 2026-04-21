@@ -3,14 +3,13 @@ import type { ContractConfig } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok } from '@prisma-next/utils/result';
-import { isAbsolute, resolve } from 'pathe';
 
 // This helper stays family-agnostic and intentionally accepts the base Contract shape even when
 // re-exported from a Mongo-specific package.
 export function typescriptContract(contract: Contract, output?: string): ContractConfig {
   return {
     source: {
-      load: async (_context, _environment) => ok(contract),
+      load: async () => ok(contract),
     },
     ...ifDefined('output', output),
   };
@@ -20,10 +19,8 @@ export function typescriptContractFromPath(contractPath: string, output?: string
   return {
     source: {
       inputs: [contractPath],
-      load: async (_context, environment) => {
-        const absolutePath = isAbsolute(contractPath)
-          ? contractPath
-          : resolve(environment.configDir, contractPath);
+      load: async (_context, resolvedInputs) => {
+        const [absolutePath = contractPath] = resolvedInputs;
         const mod = await import(pathToFileURL(absolutePath).href);
         const contract: Contract = mod.default ?? mod.contract;
         return ok(contract);

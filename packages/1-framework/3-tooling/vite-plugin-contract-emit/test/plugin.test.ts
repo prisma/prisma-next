@@ -1,5 +1,6 @@
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import { executeContractEmit } from '@prisma-next/cli/control-api';
+import { resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prismaVitePlugin } from '../src/plugin';
 
@@ -27,6 +28,10 @@ const unusedContractLoad: NonNullable<LoadedConfig['contract']>['source']['load'
   throw new Error('unused in tests');
 };
 
+function toAbsolutePath(path: string): string {
+  return resolve('/project', path);
+}
+
 function createLoadedConfig({
   inputs = undefined as SourceInputs,
   output = 'src/prisma/contract.json',
@@ -37,10 +42,12 @@ function createLoadedConfig({
   return {
     contract: {
       source: {
-        ...(inputs === undefined ? {} : { inputs }),
+        ...(inputs === undefined
+          ? {}
+          : { inputs: inputs.map((input) => toAbsolutePath(input)) as SourceInputs }),
         load: unusedContractLoad,
       },
-      output,
+      output: toAbsolutePath(output),
     },
   } as LoadedConfig;
 }

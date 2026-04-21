@@ -2,13 +2,26 @@ import type { TypesImportSpec } from '@prisma-next/framework-components/emission
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
-import { emit } from '../src/exports';
+import { emit, getEmittedArtifactPaths } from '../src/exports';
 import { createMockSpi } from './mock-spi';
 import { createTestContract } from './utils';
 
 const mockSqlHook = createMockSpi();
 
 describe('emitter', () => {
+  it('derives colocated artifact paths from contract.json output', () => {
+    expect(getEmittedArtifactPaths('/abs/contract.json')).toEqual({
+      jsonPath: '/abs/contract.json',
+      dtsPath: '/abs/contract.d.ts',
+    });
+  });
+
+  it('rejects non-json output paths when deriving artifact paths', () => {
+    expect(() => getEmittedArtifactPaths('/abs/contract.ts')).toThrow(
+      'Contract output path must end with .json',
+    );
+  });
+
   it(
     'emits contract.json and contract.d.ts',
     async () => {
@@ -182,23 +195,27 @@ describe('emitter', () => {
     expect(result.contractDts).toBeDefined();
   });
 
-  it('omits sources from emitted contract artifact', async () => {
-    const ir = createTestContract({
-      sources: {
-        schema: { sourceId: 'schema.prisma' },
-      },
-    });
+  it(
+    'omits sources from emitted contract artifact',
+    async () => {
+      const ir = createTestContract({
+        sources: {
+          schema: { sourceId: 'schema.prisma' },
+        },
+      });
 
-    const options: EmitStackInput = {
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
+      const options: EmitStackInput = {
+        codecTypeImports: [],
+        operationTypeImports: [],
+        extensionIds: [],
+      };
 
-    const result = await emit(ir, options, mockSqlHook);
-    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
-    expect(contractJson).not.toHaveProperty('sources');
-  });
+      const result = await emit(ir, options, mockSqlHook);
+      const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
+      expect(contractJson).not.toHaveProperty('sources');
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('accepts meta keys when family validation allows them', async () => {
     const ir = createTestContract({

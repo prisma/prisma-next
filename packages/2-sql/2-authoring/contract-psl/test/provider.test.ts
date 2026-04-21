@@ -4,8 +4,8 @@ import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
 import {
+  createPostgresResolvedInputs,
   createPostgresTestContext,
-  createPostgresTestEnvironment,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
   postgresTarget,
@@ -51,7 +51,7 @@ describe('prismaContract provider helper', () => {
       expect(contract.source.inputs).toEqual(['./schema.prisma']);
       const result = await contract.source.load(
         createPostgresTestContext(),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([schemaPath]),
       );
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -86,7 +86,7 @@ describe('prismaContract provider helper', () => {
       const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source.load(
         createPostgresTestContext(),
-        createPostgresTestEnvironment({ configDir }),
+        createPostgresResolvedInputs([schemaPath]),
       );
 
       expect(result.ok).toBe(true);
@@ -125,7 +125,7 @@ model Post {
       const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source.load(
         createPostgresTestContext(),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([schemaPath]),
       );
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -171,7 +171,7 @@ model Post {
       const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source.load(
         createPostgresTestContext(),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([schemaPath]),
       );
 
       expect(result.ok).toBe(false);
@@ -216,7 +216,7 @@ model Post {
       const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source.load(
         createPostgresTestContext(),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([schemaPath]),
       );
 
       expect(result.ok).toBe(false);
@@ -257,7 +257,7 @@ model Post {
       const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source.load(
         createPostgresTestContext(),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([schemaPath]),
       );
 
       expect(result.ok).toBe(false);
@@ -301,7 +301,7 @@ model Post {
           composedExtensionPacks: ['pgvector'],
           authoringContributions: pgvectorAuthoringContributions,
         }),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([schemaPath]),
       );
 
       expect(result.ok).toBe(true);
@@ -370,7 +370,7 @@ model Document {
           composedExtensionPacks: ['pgvector'],
           authoringContributions: pgvectorAuthoringContributions,
         }),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([schemaPath]),
       );
 
       expect(result.ok).toBe(false);
@@ -411,7 +411,7 @@ model Document {
       const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source.load(
         createPostgresTestContext(),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([schemaPath]),
       );
 
       expect(result.ok).toBe(true);
@@ -471,7 +471,7 @@ model Document {
       const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source.load(
         createPostgresTestContext(),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([schemaPath]),
       );
 
       expect(result.ok).toBe(false);
@@ -517,7 +517,7 @@ model Document {
             generatorDescriptors: [],
           },
         }),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([schemaPath]),
       );
 
       expect(result.ok).toBe(false);
@@ -553,7 +553,10 @@ model Document {
         },
       });
 
-      const result = await contract.source.load(brokenContext, createPostgresTestEnvironment());
+      const result = await contract.source.load(
+        brokenContext,
+        createPostgresResolvedInputs([schemaPath]),
+      );
       expect(result.ok).toBe(false);
       if (result.ok) return;
       expect(result.failure.diagnostics).toEqual(
@@ -575,7 +578,7 @@ model Document {
       const contract = prismaContract('./missing.prisma', baseOptions);
       const result = await contract.source.load(
         createPostgresTestContext(),
-        createPostgresTestEnvironment(),
+        createPostgresResolvedInputs([join(tempDir, 'missing.prisma')]),
       );
 
       expect(result.ok).toBe(false);

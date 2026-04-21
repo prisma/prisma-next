@@ -56,7 +56,7 @@ describe(
           codecLookup: stack.codecLookup,
           controlMutationDefaults: stack.controlMutationDefaults,
         },
-        { configDir: testDir },
+        [schemaPath],
       );
       expect(pslResult.ok).toBe(true);
       if (!pslResult.ok) {

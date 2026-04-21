@@ -70,7 +70,7 @@ describe('config loader', () => {
   );
 
   it(
-    'loads explicit provider paths alongside config',
+    'resolves explicit provider paths alongside config',
     async () => {
       const configPath = join(testDir, 'prisma-next.config.ts');
       writeFileSync(
@@ -88,10 +88,10 @@ describe('config loader', () => {
 
       const config = await loadConfig(configPath);
 
-      expect(config.contract?.output).toBe('generated/contract.json');
+      expect(config.contract?.output).toBe(join(testDir, 'generated/contract.json'));
       expect(config.contract?.source.inputs).toEqual([
-        './prisma/schema.prisma',
-        './prisma/schema.patch',
+        join(testDir, 'prisma/schema.prisma'),
+        join(testDir, 'prisma/schema.patch'),
       ]);
     },
     timeouts.typeScriptCompilation,

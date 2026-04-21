@@ -1,10 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
-import { emit } from '@prisma-next/emitter';
+import { emit, getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { dirname, isAbsolute, join, resolve } from 'pathe';
+import { dirname } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
@@ -72,11 +72,6 @@ export async function executeContractEmit(
       why: 'Contract config must have output path. This should not happen if defineConfig() was used.',
     });
   }
-  if (!contractConfig.output.endsWith('.json')) {
-    throw errorContractConfigMissing({
-      why: 'Contract config output path must end with .json (e.g., "src/prisma/contract.json")',
-    });
-  }
 
   // Validate source exists and is callable
   if (typeof contractConfig.source?.load !== 'function') {
@@ -85,14 +80,15 @@ export async function executeContractEmit(
     });
   }
 
-  // Normalize configPath and resolve artifact paths relative to config file directory
-  const normalizedConfigPath = resolve(configPath);
-  const configDir = dirname(normalizedConfigPath);
-  const outputJsonPath = isAbsolute(contractConfig.output)
-    ? contractConfig.output
-    : join(configDir, contractConfig.output);
-  // Colocate .d.ts with .json (contract.json → contract.d.ts)
-  const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
+  let outputPaths: ReturnType<typeof getEmittedArtifactPaths>;
+  try {
+    outputPaths = getEmittedArtifactPaths(contractConfig.output);
+  } catch (error) {
+    throw errorContractConfigMissing({
+      why: error instanceof Error ? error.message : String(error),
+    });
+  }
+  const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = outputPaths;
 
   const stack = createControlStack(config);
 
@@ -106,7 +102,9 @@ export async function executeContractEmit(
 
   let providerResult: Awaited<ReturnType<typeof contractConfig.source.load>>;
   try {
-    providerResult = await unlessAborted(contractConfig.source.load(sourceContext, { configDir }));
+    providerResult = await unlessAborted(
+      contractConfig.source.load(sourceContext, contractConfig.source.inputs ?? []),
+    );
   } catch (error) {
     if (signal.aborted || isAbortError(error)) {
       throw error;

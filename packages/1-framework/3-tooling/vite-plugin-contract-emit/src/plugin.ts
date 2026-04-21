@@ -1,7 +1,8 @@
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
 import { executeContractEmit } from '@prisma-next/cli/control-api';
-import { dirname, extname, resolve } from 'pathe';
+import { getEmittedArtifactPaths } from '@prisma-next/emitter';
+import { extname, resolve } from 'pathe';
 import type { Plugin, ViteDevServer } from 'vite';
 import type { PrismaVitePluginOptions } from './types';
 
@@ -172,15 +173,8 @@ export function prismaVitePlugin(
     if (contractOutput === undefined) {
       return new Set();
     }
-    const configDir = dirname(absoluteConfigPath);
-    const outputJsonPath = resolve(configDir, contractOutput);
-    const outputFiles = new Set<string>([outputJsonPath]);
-
-    if (outputJsonPath.endsWith('.json')) {
-      outputFiles.add(`${outputJsonPath.slice(0, -5)}.d.ts`);
-    }
-
-    return outputFiles;
+    const { jsonPath, dtsPath } = getEmittedArtifactPaths(contractOutput);
+    return new Set<string>([jsonPath, dtsPath]);
   }
 
   function isModuleGraphRoot(filePath: string): boolean {
@@ -249,16 +243,13 @@ export function prismaVitePlugin(
       }
 
       const files = new Set<string>([absoluteConfigPath]);
-      const configDir = dirname(absoluteConfigPath);
       const inputs = contract.source.inputs ?? [];
       for (const outputFile of resolveContractOutputFiles(contract.output)) {
         ignoredOutputFiles.add(outputFile);
       }
 
       const moduleGraphRoots = [absoluteConfigPath];
-      const resolvedInputs = inputs.map((input) => resolve(configDir, input));
-
-      for (const input of resolvedInputs) {
+      for (const input of inputs) {
         if (!ignoredOutputFiles.has(input)) {
           files.add(input);
         }

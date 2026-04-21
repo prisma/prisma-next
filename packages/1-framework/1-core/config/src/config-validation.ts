@@ -1,24 +1,8 @@
-import { normalize } from 'node:path';
 import type { PrismaNextConfig } from './config-types';
 import { ConfigValidationError } from './errors';
 
 function throwValidation(field: string, why?: string): never {
   throw new ConfigValidationError(field, why);
-}
-
-function normalizePathForComparison(path: string): string {
-  return normalize(path).replaceAll('\\', '/');
-}
-
-function getEmittedArtifactPaths(output: string): Set<string> {
-  const normalizedOutput = normalizePathForComparison(output);
-  const emittedArtifacts = new Set<string>([normalizedOutput]);
-
-  if (normalizedOutput.endsWith('.json')) {
-    emittedArtifacts.add(`${normalizedOutput.slice(0, -5)}.d.ts`);
-  }
-
-  return emittedArtifacts;
 }
 
 function validateContractConfig(contract: Record<string, unknown>): void {
@@ -62,20 +46,6 @@ function validateContractConfig(contract: Record<string, unknown>): void {
   const output = contract['output'];
   if (output !== undefined && typeof output !== 'string') {
     throwValidation('contract.output', 'Config.contract.output must be a string when provided');
-  }
-
-  if (typeof output === 'string' && Array.isArray(inputs)) {
-    const emittedArtifactPaths = getEmittedArtifactPaths(output);
-
-    for (const input of inputs) {
-      if (typeof input !== 'string') continue;
-      if (emittedArtifactPaths.has(normalizePathForComparison(input))) {
-        throwValidation(
-          'contract.source.inputs[]',
-          'Config.contract.source.inputs must not include emitted artifact paths derived from contract.output',
-        );
-      }
-    }
   }
 }
 

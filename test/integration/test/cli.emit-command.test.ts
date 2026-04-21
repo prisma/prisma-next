@@ -584,7 +584,7 @@ describe('emit command', () => {
               codecLookup: stack.codecLookup,
               controlMutationDefaults: stack.controlMutationDefaults,
             },
-            { configDir: testDirPsl },
+            contractConfig!.source.inputs ?? [],
           );
         } finally {
           process.chdir(originalCwd);

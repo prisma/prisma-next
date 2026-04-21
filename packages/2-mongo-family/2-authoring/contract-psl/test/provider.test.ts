@@ -1,9 +1,6 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import type {
-  ContractSourceContext,
-  ContractSourceEnvironment,
-} from '@prisma-next/config/config-types';
+import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -31,13 +28,8 @@ function createMongoTestContext(overrides?: Partial<ContractSourceContext>): Con
   };
 }
 
-function createMongoTestEnvironment(
-  overrides?: Partial<ContractSourceEnvironment>,
-): ContractSourceEnvironment {
-  return {
-    configDir: process.cwd(),
-    ...overrides,
-  };
+function createMongoResolvedInputs(inputs: readonly string[] = []): readonly string[] {
+  return inputs;
 }
 
 describe('mongoContract provider helper', () => {
@@ -77,7 +69,7 @@ describe('mongoContract provider helper', () => {
     const contract = mongoContract('./schema.prisma');
     const result = await contract.source.load(
       createMongoTestContext(),
-      createMongoTestEnvironment({ configDir }),
+      createMongoResolvedInputs([schemaPath]),
     );
 
     expect(result.ok).toBe(true);
@@ -98,7 +90,7 @@ describe('mongoContract provider helper', () => {
     const contract = mongoContract('./missing.prisma');
     const result = await contract.source.load(
       createMongoTestContext(),
-      createMongoTestEnvironment({ configDir: tempDir }),
+      createMongoResolvedInputs([join(tempDir, 'missing.prisma')]),
     );
 
     expect(result.ok).toBe(false);

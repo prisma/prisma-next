@@ -1,10 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
-import type {
-  ContractSourceContext,
-  ContractSourceEnvironment,
-} from '@prisma-next/cli/config-types';
+import type { ContractSourceContext } from '@prisma-next/cli/config-types';
 import { emit } from '@prisma-next/emitter';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
@@ -35,21 +32,11 @@ function buildSourceContext(stack: ControlStack): ContractSourceContext {
   };
 }
 
-function buildSourceEnvironment(configPath: string): ContractSourceEnvironment {
-  return {
-    configDir: dirname(configPath),
-  };
-}
-
 const resolveContract = async (
   source: NonNullable<Awaited<ReturnType<typeof loadConfig>>['contract']>['source'],
   stack: ControlStack,
-  configPath: string,
 ) => {
-  const sourceResult = await source.load(
-    buildSourceContext(stack),
-    buildSourceEnvironment(configPath),
-  );
+  const sourceResult = await source.load(buildSourceContext(stack), source.inputs ?? []);
   if (!sourceResult.ok) {
     throw new Error(sourceResult.failure.summary);
   }
@@ -82,7 +69,7 @@ describe('emitContract API', () => {
 
       const contractConfig = config.contract;
       const stack = buildControlStack(config);
-      const contractRaw = await resolveContract(contractConfig.source, stack, configPath);
+      const contractRaw = await resolveContract(contractConfig.source, stack);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -128,7 +115,7 @@ describe('emitContract API', () => {
 
       const contractConfig = config.contract;
       const stack = buildControlStack(config);
-      const contractRaw = await resolveContract(contractConfig.source, stack, configPath);
+      const contractRaw = await resolveContract(contractConfig.source, stack);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -168,7 +155,7 @@ describe('emitContract API', () => {
 
         const contractConfig = config.contract;
         const stack = buildControlStack(config);
-        const contractRaw = await resolveContract(contractConfig.source, stack, customConfigPath);
+        const contractRaw = await resolveContract(contractConfig.source, stack);
 
         if (!contractConfig.output) {
           throw new Error('Contract config must have output path');
@@ -201,7 +188,7 @@ describe('emitContract API', () => {
 
       const contractConfig = config.contract;
       const stack = buildControlStack(config);
-      const contractRaw = await resolveContract(contractConfig.source, stack, configPath);
+      const contractRaw = await resolveContract(contractConfig.source, stack);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -225,7 +212,7 @@ describe('emitContract API', () => {
 
       const contractConfig = config.contract;
       const stack = buildControlStack(config);
-      const contractRaw = await resolveContract(contractConfig.source, stack, configPath);
+      const contractRaw = await resolveContract(contractConfig.source, stack);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');

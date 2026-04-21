@@ -8,6 +8,7 @@ import {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { loadConfig as loadConfigC12 } from 'c12';
 import { dirname, resolve } from 'pathe';
+import { finalizeConfig } from './config-path-validation';
 
 async function loadValidatedConfig(configPath?: string): Promise<PrismaNextConfig> {
   const cwd = process.cwd();
@@ -36,7 +37,8 @@ async function loadValidatedConfig(configPath?: string): Promise<PrismaNextConfi
   // Validate config structure
   validateConfig(result.config);
 
-  return result.config;
+  const loadedConfigDir = result.configFile ? dirname(result.configFile) : configCwd;
+  return finalizeConfig(result.config, loadedConfigDir);
 }
 
 /**

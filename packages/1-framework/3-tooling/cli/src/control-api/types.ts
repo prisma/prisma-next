@@ -250,10 +250,6 @@ export interface EmitContractConfig {
    */
   readonly source: ContractSourceProvider;
   /**
-   * Directory that contains the loaded config file.
-   */
-  readonly configDir: string;
-  /**
    * Output path for contract.json.
    * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
    */

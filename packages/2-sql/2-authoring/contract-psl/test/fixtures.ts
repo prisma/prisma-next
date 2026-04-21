@@ -1,7 +1,4 @@
-import type {
-  ContractSourceContext,
-  ContractSourceEnvironment,
-} from '@prisma-next/config/config-types';
+import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
@@ -179,13 +176,8 @@ export function createPostgresTestContext(
   };
 }
 
-export function createPostgresTestEnvironment(
-  overrides?: Partial<ContractSourceEnvironment>,
-): ContractSourceEnvironment {
-  return {
-    configDir: process.cwd(),
-    ...overrides,
-  };
+export function createPostgresResolvedInputs(inputs: readonly string[] = []): readonly string[] {
+  return inputs;
 }
 
 export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefaults {

@@ -2,10 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import mongoAdapter from '@prisma-next/adapter-mongo/control';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import type {
-  ContractSourceContext,
-  ContractSourceEnvironment,
-} from '@prisma-next/cli/config-types';
+import type { ContractSourceContext } from '@prisma-next/cli/config-types';
 import { enrichContract } from '@prisma-next/cli/control-api';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/emitter';
@@ -54,10 +51,6 @@ const mongoSourceContext: ContractSourceContext = {
   authoringContributions: mongoStack.authoringContributions,
   codecLookup: mongoStack.codecLookup,
   controlMutationDefaults: mongoStack.controlMutationDefaults,
-};
-
-const sourceEnvironment: ContractSourceEnvironment = {
-  configDir: fixtureRootDir,
 };
 
 type FixtureName = 'postgres' | 'mongo';
@@ -152,7 +145,9 @@ describe('side-by-side contract examples', () => {
         target: postgres,
       });
 
-      const providerResult = await provider.source.load(sqlSourceContext, sourceEnvironment);
+      const providerResult = await provider.source.load(sqlSourceContext, [
+        fixtureCase.contractPslPath,
+      ]);
       expect(providerResult.ok).toBe(true);
       if (!providerResult.ok) {
         throw new Error(providerResult.failure.summary);
@@ -214,7 +209,9 @@ describe('side-by-side contract examples', () => {
 
       const fixture = await loadFixture(fixtureCase);
       const provider = mongoContract(fixtureCase.contractPslPath);
-      const providerResult = await provider.source.load(mongoSourceContext, sourceEnvironment);
+      const providerResult = await provider.source.load(mongoSourceContext, [
+        fixtureCase.contractPslPath,
+      ]);
       expect(providerResult.ok).toBe(true);
       if (!providerResult.ok) {
         throw new Error(providerResult.failure.summary);

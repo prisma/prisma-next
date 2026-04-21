@@ -2,11 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { loadConfig } from '@prisma-next/cli/config-loader';
-import type {
-  ContractSourceContext,
-  ContractSourceEnvironment,
-  PrismaNextConfig,
-} from '@prisma-next/cli/config-types';
+import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/cli/config-types';
 import { enrichContract } from '@prisma-next/cli/control-api';
 import { emit } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
@@ -35,12 +31,6 @@ function sourceContextFromConfig(config: PrismaNextConfig): ContractSourceContex
     authoringContributions: stack.authoringContributions,
     codecLookup: stack.codecLookup,
     controlMutationDefaults: stack.controlMutationDefaults,
-  };
-}
-
-function sourceEnvironmentFromCwd(): ContractSourceEnvironment {
-  return {
-    configDir: process.cwd(),
   };
 }
 
@@ -110,22 +100,21 @@ describe('emit parity fixtures', () => {
             process.chdir(testSetup.testDir);
             const tsContext = sourceContextFromConfig(tsConfig);
             const pslContext = sourceContextFromConfig(pslConfig);
-            const sourceEnvironment = sourceEnvironmentFromCwd();
             tsProviderResultFirst = await tsConfig.contract.source.load(
               tsContext,
-              sourceEnvironment,
+              tsConfig.contract.source.inputs ?? [],
             );
             tsProviderResultSecond = await tsConfig.contract.source.load(
               tsContext,
-              sourceEnvironment,
+              tsConfig.contract.source.inputs ?? [],
             );
             pslProviderResultFirst = await pslConfig.contract.source.load(
               pslContext,
-              sourceEnvironment,
+              pslConfig.contract.source.inputs ?? [],
             );
             pslProviderResultSecond = await pslConfig.contract.source.load(
               pslContext,
-              sourceEnvironment,
+              pslConfig.contract.source.inputs ?? [],
             );
           } finally {
             process.chdir(originalCwd);
@@ -266,7 +255,7 @@ describe('emit parity fixture diagnostics', () => {
             process.chdir(testSetup.testDir);
             sourceResult = await pslConfig.contract.source.load(
               sourceContextFromConfig(pslConfig),
-              sourceEnvironmentFromCwd(),
+              pslConfig.contract.source.inputs ?? [],
             );
           } finally {
             process.chdir(originalCwd);

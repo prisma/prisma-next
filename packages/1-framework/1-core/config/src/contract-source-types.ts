@@ -1,4 +1,3 @@
-import { isAbsolute, resolve } from 'node:path';
 import type { Contract } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
@@ -45,43 +44,10 @@ export interface ContractSourceContext {
   readonly controlMutationDefaults: ControlMutationDefaults;
 }
 
-export interface ContractSourceEnvironment {
-  readonly configDir: string;
-}
-
 export interface ContractSourceProvider {
   readonly inputs?: readonly string[];
   readonly load: (
     context: ContractSourceContext,
-    environment: ContractSourceEnvironment,
+    resolvedInputs: readonly string[],
   ) => Promise<Result<Contract, ContractSourceDiagnostics>>;
-}
-
-export interface PathBackedContractSourceInput {
-  readonly inputPath: string;
-  readonly absoluteInputPath: string;
-}
-
-export function createPathBackedSource(
-  inputPath: string,
-  load: (
-    input: PathBackedContractSourceInput,
-    context: ContractSourceContext,
-    environment: ContractSourceEnvironment,
-  ) => Promise<Result<Contract, ContractSourceDiagnostics>>,
-): ContractSourceProvider {
-  return {
-    inputs: [inputPath],
-    load: (context, environment) =>
-      load(
-        {
-          inputPath,
-          absoluteInputPath: isAbsolute(inputPath)
-            ? inputPath
-            : resolve(environment.configDir, inputPath),
-        },
-        context,
-        environment,
-      ),
-  };
 }

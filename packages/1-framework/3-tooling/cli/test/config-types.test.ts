@@ -205,7 +205,7 @@ describe('defineConfig', () => {
         codecLookup: { get: () => undefined },
         controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
       },
-      { configDir: process.cwd() },
+      [],
     );
 
     expect(config.output).toBe('output/contract.json');
