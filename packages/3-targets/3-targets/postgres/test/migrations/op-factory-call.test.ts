@@ -4,10 +4,12 @@
  * - Every `*Call` class constructs with literal args, is frozen, computes its
  *   label, dispatches through `accept()` to the right visitor method, and
  *   emits the expected TypeScript expression + import requirements.
- * - `PlaceholderExpression` renders as bare `placeholder("slot")` and
- *   declares the matching import.
+ * - `DataTransformCall` renders its body as `() => placeholder("slot")`
+ *   closures around the authored slot names and always throws
+ *   `PN-MIG-2001` from `toOp()` because the planner can only emit
+ *   unfilled stubs.
  * - `renderCallsToTypeScript` deduplicates + sorts imports across a mixed
- *   call list, and recurses into `DataTransformCall` children polymorphically.
+ *   call list.
  * - `TypeScriptRenderablePostgresMigration` routes `operations` through
  *   `renderOps` and `renderTypeScript()` through `renderCallsToTypeScript`.
  */
@@ -36,30 +38,11 @@ import {
   SetDefaultCall,
   SetNotNullCall,
 } from '../../src/core/migrations/op-factory-call';
-import { PlaceholderExpression } from '../../src/core/migrations/placeholder-expression';
 import { TypeScriptRenderablePostgresMigration } from '../../src/core/migrations/planner-produced-postgres-migration';
 import { renderOps } from '../../src/core/migrations/render-ops';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
-
-describe('PlaceholderExpression', () => {
-  it('is frozen and renders as a placeholder arrow call with the slot name quoted', () => {
-    const placeholder = new PlaceholderExpression('backfill-users');
-
-    expect(Object.isFrozen(placeholder)).toBe(true);
-    expect(placeholder.slot).toBe('backfill-users');
-    expect(placeholder.renderTypeScript()).toBe('placeholder("backfill-users")');
-  });
-
-  it('requires the `placeholder` symbol from the errors-migration module', () => {
-    const placeholder = new PlaceholderExpression('slot');
-
-    expect(placeholder.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/errors/migration', symbol: 'placeholder' },
-    ]);
-  });
-});
 
 describe('Postgres call classes', () => {
   describe('construction + dispatch', () => {
@@ -81,13 +64,11 @@ describe('Postgres call classes', () => {
       expect(visitor.createTable).toHaveBeenCalledWith(call);
     });
 
-    it('DataTransformCall exposes its check/run expressions and carries a caller-supplied operationClass', () => {
-      const check = new PlaceholderExpression('slot-check');
-      const run = new PlaceholderExpression('slot-run');
-      const call = new DataTransformCall('Backfill', check, run, 'widening');
+    it('DataTransformCall carries its slot names and a caller-supplied operationClass', () => {
+      const call = new DataTransformCall('Backfill', 'slot-check', 'slot-run', 'widening');
 
-      expect(call.check).toBe(check);
-      expect(call.run).toBe(run);
+      expect(call.checkSlot).toBe('slot-check');
+      expect(call.runSlot).toBe('slot-run');
       expect(call.operationClass).toBe('widening');
 
       const visitor = makeDispatchSpy();
@@ -133,19 +114,14 @@ describe('Postgres call classes', () => {
       );
     });
 
-    it('DataTransformCall renders children inline and concatenates their import requirements', () => {
-      const call = new DataTransformCall(
-        'Backfill',
-        new PlaceholderExpression('check'),
-        new PlaceholderExpression('run'),
-      );
+    it('DataTransformCall renders slots as placeholder closures and imports both factory + placeholder', () => {
+      const call = new DataTransformCall('Backfill', 'check', 'run');
 
       expect(call.renderTypeScript()).toBe(
         'dataTransform("Backfill", () => placeholder("check"), () => placeholder("run"))',
       );
       expect(call.importRequirements()).toEqual([
         { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'dataTransform' },
-        { moduleSpecifier: '@prisma-next/errors/migration', symbol: 'placeholder' },
         { moduleSpecifier: '@prisma-next/errors/migration', symbol: 'placeholder' },
       ]);
     });
@@ -182,14 +158,8 @@ describe('renderCallsToTypeScript', () => {
     expect(source).toContain('createIndex(');
   });
 
-  it('emits DataTransformCall children in-line and contributes the placeholder import', () => {
-    const calls = [
-      new DataTransformCall(
-        'Backfill user emails',
-        new PlaceholderExpression('check-emails'),
-        new PlaceholderExpression('run-emails'),
-      ),
-    ];
+  it('emits DataTransformCall slots as placeholder closures and contributes the placeholder import', () => {
+    const calls = [new DataTransformCall('Backfill user emails', 'check-emails', 'run-emails')];
 
     const source = renderCallsToTypeScript(calls, META);
 
@@ -258,12 +228,8 @@ describe('renderOps', () => {
     }
   });
 
-  it('throws PN-MIG-2001 on DataTransformCall with placeholder bodies', () => {
-    const call = new DataTransformCall(
-      'Backfill',
-      new PlaceholderExpression('check'),
-      new PlaceholderExpression('run'),
-    );
+  it('throws PN-MIG-2001 on DataTransformCall (always an unfilled stub at plan time)', () => {
+    const call = new DataTransformCall('Backfill', 'check', 'run');
 
     expect(() => renderOps([call])).toThrow(/Unfilled migration placeholder/);
   });
