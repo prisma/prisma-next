@@ -16,6 +16,7 @@ import { escapeLiteral, qualifyName, quoteIdentifier } from '@prisma-next/adapte
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type {
   DataTransformOperation,
+  MigrationOperationClass,
   SerializedQueryPlan,
 } from '@prisma-next/framework-components/control';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
@@ -801,16 +802,77 @@ export function renameType(schemaName: string, fromName: string, toName: string)
 }
 
 // ============================================================================
-// Data transform
+// Raw SQL
 // ============================================================================
 
 /**
- * `check` and `run` are already-lowered `SerializedQueryPlan`s (or the
- * degenerate boolean form for `check`). The wrapper in `operation-resolver.ts`
- * handles closure invocation and `lowerSqlPlan` before calling this factory.
- *
- * In Phase 1 a sibling variant will accept closures that render to TypeScript
- * source; that's the `MigrationTsExpression` machinery and does not live here.
+ * Wraps arbitrary SQL statement(s) into a single `SqlMigrationPlanOperation`.
+ * Used by `liftOpToCall` for operations the planner cannot express through
+ * structured call classes, and available to users for raw migration authoring.
+ */
+export function rawSql(
+  id: string,
+  label: string,
+  sql: string,
+  operationClass: MigrationOperationClass = 'additive',
+): Op {
+  return {
+    id,
+    label,
+    operationClass,
+    target: { id: 'postgres' },
+    precheck: [],
+    execute: [step(label, sql)],
+    postcheck: [],
+  };
+}
+
+// ============================================================================
+// Database dependencies (structured DDL)
+// ============================================================================
+
+export function createExtension(extensionName: string): Op {
+  return {
+    id: `extension.${extensionName}`,
+    label: `Create extension "${extensionName}"`,
+    operationClass: 'additive',
+    target: { id: 'postgres' },
+    precheck: [],
+    execute: [
+      step(
+        `Create extension "${extensionName}"`,
+        `CREATE EXTENSION IF NOT EXISTS ${quoteIdentifier(extensionName)}`,
+      ),
+    ],
+    postcheck: [],
+  };
+}
+
+export function createSchema(schemaName: string): Op {
+  return {
+    id: `schema.${schemaName}`,
+    label: `Create schema "${schemaName}"`,
+    operationClass: 'additive',
+    target: { id: 'postgres' },
+    precheck: [],
+    execute: [
+      step(
+        `Create schema "${schemaName}"`,
+        `CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(schemaName)}`,
+      ),
+    ],
+    postcheck: [],
+  };
+}
+
+// ============================================================================
+// Data transform (descriptor-flow)
+// ============================================================================
+
+/**
+ * Creates a serialized data transform operation from pre-serialized query
+ * plans. The descriptor resolver in `operation-resolver.ts` handles closure
+ * invocation and `lowerSqlPlan` before calling this factory.
  */
 export function createDataTransform(options: {
   readonly name: string;

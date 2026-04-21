@@ -50,6 +50,7 @@
   ],
   "exports": {
     "./control": "./dist/control.mjs",
+    "./migration": "./dist/migration.mjs",
     "./migration-builders": "./dist/migration-builders.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",

@@ -315,6 +315,9 @@ function makeDispatchSpy(): PostgresOpFactoryCallVisitor<void> {
     addEnumValues: vi.fn(),
     dropEnumType: vi.fn(),
     renameType: vi.fn(),
+    rawSql: vi.fn(),
+    createExtension: vi.fn(),
+    createSchema: vi.fn(),
     dataTransform: vi.fn(),
   };
 }
