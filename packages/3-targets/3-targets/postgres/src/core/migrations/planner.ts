@@ -31,6 +31,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -679,8 +680,8 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
             table: foreignKey.references.table,
             columns: foreignKey.references.columns,
           },
-          ...(foreignKey.onDelete !== undefined && { onDelete: foreignKey.onDelete }),
-          ...(foreignKey.onUpdate !== undefined && { onUpdate: foreignKey.onUpdate }),
+          ...ifDefined('onDelete', foreignKey.onDelete),
+          ...ifDefined('onUpdate', foreignKey.onUpdate),
         };
         calls.push(new AddForeignKeyCall(schemaName, tableName, fkSpec));
       }
