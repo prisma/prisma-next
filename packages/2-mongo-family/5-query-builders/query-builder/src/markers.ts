@@ -6,8 +6,9 @@
  * `FindAndModifyEnabled`   — gates `.findOneAndUpdate(...)` / `.findOneAndDelete(...)`
  *                            (deconstruct pipeline into the wire command's filter/sort/skip slots).
  *
- * Each pipeline-stage method either preserves or clears these markers per the
- * marker table in the spec (see `query-builder-unification.spec.md`).
+ * Each pipeline-stage method either preserves or clears these markers per
+ * the marker table (and rationale per row) in
+ * `docs/architecture docs/adrs/ADR 201 - State-machine pattern for typed DSL builders.md`.
  *
  * The markers exist only at the type level; nothing reads them at runtime.
  * Value literals are self-identifying so the two slots are distinguishable in
