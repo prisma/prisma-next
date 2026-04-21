@@ -25,7 +25,7 @@ This file is the single consolidated plan for the project. It covers the origina
 | F3 — Pipeline-style updates | Done |
 | F4 — `mongo-memory-server` integration sweep | Done |
 | F5 — Retail-store example conversion | **Outstanding** — PR [#349](https://github.com/prisma/prisma-next/pull/349) has merged; ready to execute |
-| F6 — Close-out (docs migration + retire project folder) | **Outstanding** |
+| F6 — Close-out (docs migration + retire project folder) | F6.1 + F6.2 done; F6.3–F6.5 outstanding (awaiting project-folder deletion) |
 | PR-355 code-review items #1–13 | Done |
 | PR-355 code-review item #14 (close-out) | Rolled into F6 |
 
@@ -213,16 +213,16 @@ The 430-line spec is mostly project-history (problem, milestone-by-milestone req
 - The terminals taxonomy (insert / unqualified / filtered / find-and-modify / upsert / pipeline-update / `$merge`-`$out` / raw).
 - The relationship between the unified field accessor and ADR 180.
 
-- [ ] F6.1.1 — Update the `Aggregation pipelines` section (line 177-ish): drop the stale "*A type-safe pipeline builder ... is a future goal*" sentence; replace with a paragraph noting the typed builder shipped, pointing at the package README for the surface and at the new state-machine ADR for the rationale.
-- [ ] F6.1.2 — Update the `Package layout` block (line ~268): call out `query-builder/` separately from `orm/` under `5-query-builders/`, with a one-line description of each.
-- [ ] F6.1.3 — Add a brief `Query builder` subsection under `## ORM` (or as its own top-level `## Query builder` section if it grows): conceptual summary of the three-state machine + marker pattern, terminals taxonomy, link to the package README for the practical "how to use it" content. Aim for ~50–80 lines, not a re-paste of the spec.
-- [ ] F6.1.4 — Update the `References` section to link the new ADR (F6.2) and the package README.
+- [x] F6.1.1 — Update the `Aggregation pipelines` section: dropped the stale "*A type-safe pipeline builder ... is a future goal*" sentence; replaced with a paragraph noting the typed builder shipped and linking to `## Query builder` below.
+- [x] F6.1.2 — Update the `Package layout` block: `5-query-builders/` now lists `query-builder/` and `orm/` as peer surfaces, each with a one-line description.
+- [x] F6.1.3 — Added a top-level `## Query builder` section (between `## ORM` and `## Execution pipeline`) — conceptual summary of the three-state machine, marker pattern (with the full marker table), terminals taxonomy, and the `FieldAccessor` callback shape. Links out to the package README for usage.
+- [x] F6.1.4 — References section links ADR 201 and the `@prisma-next/mongo-query-builder` package README. The `## Open questions` section was deleted; its only unique entry (discriminator values as untyped strings) was dropped as adequately covered elsewhere, and the "resolved"-annotated bullets were removed.
 
 #### F6.2 — ADRs
 
-- [ ] F6.2.1 — Draft **ADR 201 — Three-class state-machine builder pattern with phantom marker types** (next number; verify by reading `docs/architecture docs/ADR-INDEX.md`). Narrow scope: documents the pattern as used in `mongo-query-builder`, with a worked example and an explicit "candidate for reuse" note (e.g., for a future SQL query builder). Status: Accepted. Estimated length: ~150 lines including the worked example.
-- [ ] F6.2.2 — Add an addendum to [ADR 180](../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md) (or revision section, per the ADR template's conventions): note (a) the consolidated `FieldAccessor` replaced both `FieldProxy` and `FilterProxy` during the unification, and (b) the callable form `f("dot.path")` is currently permissive — type-safe path validation is tracked on [TML-2281](https://linear.app/prisma-company/issue/TML-2281).
-- [ ] F6.2.3 — Update `docs/architecture docs/ADR-INDEX.md` to list ADR 201.
+- [x] F6.2.1 — **ADR 201 — State-machine pattern for typed DSL builders** drafted. Status: Accepted. Documents the three-class pattern with phantom marker types as used in `mongo-query-builder`, includes a worked example (`.limit(...).findOneAndUpdate(...)` rejected at compile time), and spells out the preconditions for reuse in other typed DSL builders.
+- [x] F6.2.2 — ADR 180 gained a top-of-doc "Implementation update" blockquote noting the consolidated `FieldAccessor` replaced `FieldProxy` / `FilterProxy` and that the callable `f("dot.path")` is permissive (TML-2281 tracks tightening).
+- [x] F6.2.3 — `docs/architecture docs/ADR-INDEX.md` gained entries for ADR 180 (previously missing), ADR 201, and ADR 202. ADR 202 is the duplicate-numbered "Codec trait system" ADR renumbered from its collision with the "Pack-provided type constructors" ADR (also 170 on disk); all inbound references updated.
 
 #### F6.3 — Verify external references
 
