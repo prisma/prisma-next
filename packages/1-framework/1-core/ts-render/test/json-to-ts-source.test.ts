@@ -21,6 +21,11 @@ describe('jsonToTsSource', () => {
     it('renders objects and quotes non-identifier keys', () => {
       expect(jsonToTsSource({ a: 1, 'weird-key': 2 })).toBe('{ a: 1, "weird-key": 2 }');
     });
+
+    it('drops object entries whose value is undefined', () => {
+      expect(jsonToTsSource({ a: undefined })).toBe('{}');
+      expect(jsonToTsSource({ a: 1, b: undefined })).toBe('{ a: 1 }');
+    });
   });
 
   describe('non-JSON inputs bounds', () => {
