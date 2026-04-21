@@ -169,7 +169,6 @@ function buildAttestedManifest(
       used: [],
       applied: [],
       plannerVersion: '2.0.0',
-      planningStrategy: 'class-based',
     },
     ...ifDefined('authorship', existing?.authorship),
   };

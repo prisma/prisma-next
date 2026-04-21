@@ -38,7 +38,6 @@ function makeManifest(): MigrationManifest {
       used: [],
       applied: [],
       plannerVersion: '2.0.0',
-      planningStrategy: 'descriptors',
     },
     labels: [],
     createdAt: '2026-01-01T00:00:00.000Z',

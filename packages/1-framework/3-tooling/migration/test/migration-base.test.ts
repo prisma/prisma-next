@@ -127,7 +127,6 @@ describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
     expect(manifest.hints).toMatchObject({
       used: [],
       applied: [],
-      planningStrategy: 'class-based',
     });
   });
 
@@ -143,7 +142,6 @@ describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
         used: ['idx_a'],
         applied: ['additive_only'],
         plannerVersion: '2.0.0',
-        planningStrategy: 'descriptors',
       },
       labels: ['scaffolded'],
       createdAt: '2026-01-15T10:00:00.000Z',

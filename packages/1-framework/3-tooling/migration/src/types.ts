@@ -5,7 +5,6 @@ export interface MigrationHints {
   readonly used: readonly string[];
   readonly applied: readonly string[];
   readonly plannerVersion: string;
-  readonly planningStrategy: string;
 }
 
 /**

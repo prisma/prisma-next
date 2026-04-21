@@ -2,8 +2,7 @@
  * `migration new` — scaffolds a migration package with a `migration.ts` file
  * for manual authoring.
  *
- * Both descriptor-flow (Postgres) and class-flow (Mongo) targets go through
- * the same path here: the planner's `emptyMigration(context)` returns a
+ * The planner's `emptyMigration(context)` returns a
  * `MigrationPlanWithAuthoringSurface`, whose `renderTypeScript()` produces
  * the target-appropriate empty stub. The CLI writes the returned source
  * verbatim.
@@ -191,7 +190,6 @@ async function executeMigrationNewCommand(
       used: [],
       applied: [],
       plannerVersion: '1.0.0',
-      planningStrategy: 'manual',
     },
     labels: [],
     createdAt: timestamp.toISOString(),

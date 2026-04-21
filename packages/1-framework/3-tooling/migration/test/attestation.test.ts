@@ -97,7 +97,6 @@ describe('computeMigrationId', () => {
         used: [],
         applied: ['additive_only'],
         plannerVersion: '0.0.1',
-        planningStrategy: 'additive',
       },
     });
     const m2 = createTestManifest({
@@ -105,28 +104,6 @@ describe('computeMigrationId', () => {
         used: [],
         applied: ['additive_only'],
         plannerVersion: '9.9.9',
-        planningStrategy: 'additive',
-      },
-    });
-    expect(computeMigrationId(m1, ops)).toBe(computeMigrationId(m2, ops));
-  });
-
-  it('is unchanged when manifest.hints.planningStrategy is mutated', () => {
-    const ops = createTestOps();
-    const m1 = createTestManifest({
-      hints: {
-        used: [],
-        applied: ['additive_only'],
-        plannerVersion: '0.0.1',
-        planningStrategy: 'additive',
-      },
-    });
-    const m2 = createTestManifest({
-      hints: {
-        used: [],
-        applied: ['additive_only'],
-        plannerVersion: '0.0.1',
-        planningStrategy: 'diff',
       },
     });
     expect(computeMigrationId(m1, ops)).toBe(computeMigrationId(m2, ops));
