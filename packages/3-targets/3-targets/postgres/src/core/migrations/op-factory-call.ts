@@ -293,19 +293,26 @@ export class DropNotNullCall extends PostgresOpFactoryCallNode {
 
 export class SetDefaultCall extends PostgresOpFactoryCallNode {
   readonly factory = 'setDefault' as const;
-  readonly operationClass = 'additive' as const;
+  readonly operationClass: 'additive' | 'widening';
   readonly schemaName: string;
   readonly tableName: string;
   readonly columnName: string;
   readonly defaultSql: string;
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string, columnName: string, defaultSql: string) {
+  constructor(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+    defaultSql: string,
+    operationClass: 'additive' | 'widening' = 'additive',
+  ) {
     super();
     this.schemaName = schemaName;
     this.tableName = tableName;
     this.columnName = columnName;
     this.defaultSql = defaultSql;
+    this.operationClass = operationClass;
     this.label = `Set default on "${tableName}"."${columnName}"`;
     this.freeze();
   }
@@ -315,7 +322,16 @@ export class SetDefaultCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `setDefault(${renderLiteral(this.schemaName)}, ${renderLiteral(this.tableName)}, ${renderLiteral(this.columnName)}, ${renderLiteral(this.defaultSql)})`;
+    const args = [
+      renderLiteral(this.schemaName),
+      renderLiteral(this.tableName),
+      renderLiteral(this.columnName),
+      renderLiteral(this.defaultSql),
+    ];
+    if (this.operationClass !== 'additive') {
+      args.push(renderLiteral(this.operationClass));
+    }
+    return `setDefault(${args.join(', ')})`;
   }
 }
 
@@ -447,13 +463,20 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
   readonly schemaName: string;
   readonly tableName: string;
   readonly constraintName: string;
+  readonly kind: 'foreignKey' | 'unique' | 'primaryKey';
   readonly label: string;
 
-  constructor(schemaName: string, tableName: string, constraintName: string) {
+  constructor(
+    schemaName: string,
+    tableName: string,
+    constraintName: string,
+    kind: 'foreignKey' | 'unique' | 'primaryKey' = 'unique',
+  ) {
     super();
     this.schemaName = schemaName;
     this.tableName = tableName;
     this.constraintName = constraintName;
+    this.kind = kind;
     this.label = `Drop constraint "${constraintName}" on "${tableName}"`;
     this.freeze();
   }
@@ -463,7 +486,15 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `dropConstraint(${renderLiteral(this.schemaName)}, ${renderLiteral(this.tableName)}, ${renderLiteral(this.constraintName)})`;
+    const args = [
+      renderLiteral(this.schemaName),
+      renderLiteral(this.tableName),
+      renderLiteral(this.constraintName),
+    ];
+    if (this.kind !== 'unique') {
+      args.push(renderLiteral(this.kind));
+    }
+    return `dropConstraint(${args.join(', ')})`;
   }
 }
 

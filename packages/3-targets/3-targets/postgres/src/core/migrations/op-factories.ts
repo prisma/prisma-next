@@ -21,6 +21,7 @@ import type {
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
+  columnDefaultExistsCheck,
   columnExistsCheck,
   columnNullabilityCheck,
   columnTypeCheck,
@@ -403,18 +404,24 @@ export function dropNotNull(schemaName: string, tableName: string, columnName: s
  * `defaultSql` is the full `DEFAULT …` clause as produced by
  * `buildColumnDefaultSql` — e.g. `"DEFAULT 42"`,
  * `"DEFAULT (CURRENT_TIMESTAMP)"`, or `"DEFAULT nextval('seq'::regclass)"`.
+ *
+ * `operationClass` defaults to `'additive'` (setting a default on a column
+ * that currently has none). The reconciliation planner passes `'widening'`
+ * when the column already has a different default — policy enforcement
+ * treats that as a widening change rather than an additive one.
  */
 export function setDefault(
   schemaName: string,
   tableName: string,
   columnName: string,
   defaultSql: string,
+  operationClass: 'additive' | 'widening' = 'additive',
 ): Op {
   const qualified = qualifyTableName(schemaName, tableName);
   return {
     id: `setDefault.${tableName}.${columnName}`,
     label: `Set default on "${tableName}"."${columnName}"`,
-    operationClass: 'additive',
+    operationClass,
     target: targetDetails('column', columnName, schemaName, tableName),
     precheck: [
       step(
@@ -425,10 +432,20 @@ export function setDefault(
     execute: [
       step(
         `set default on "${columnName}"`,
-        `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} ${defaultSql}`,
+        `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} SET ${defaultSql}`,
       ),
     ],
-    postcheck: [],
+    postcheck: [
+      step(
+        `verify column "${columnName}" has a default`,
+        columnDefaultExistsCheck({
+          schema: schemaName,
+          table: tableName,
+          column: columnName,
+          exists: true,
+        }),
+      ),
+    ],
   };
 }
 
@@ -451,7 +468,17 @@ export function dropDefault(schemaName: string, tableName: string, columnName: s
         `ALTER TABLE ${qualified} ALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
       ),
     ],
-    postcheck: [],
+    postcheck: [
+      step(
+        `verify column "${columnName}" has no default`,
+        columnDefaultExistsCheck({
+          schema: schemaName,
+          table: tableName,
+          column: columnName,
+          exists: false,
+        }),
+      ),
+    ],
   };
 }
 
@@ -568,13 +595,25 @@ export function addForeignKey(schemaName: string, tableName: string, fk: Foreign
   };
 }
 
-export function dropConstraint(schemaName: string, tableName: string, constraintName: string): Op {
+/**
+ * `kind` feeds the operation's `target.details.objectType`. Descriptor-flow
+ * does not carry kind information in its drop-constraint descriptor, so the
+ * default is `'unique'`. The reconciliation planner passes the correct kind
+ * (`'foreignKey'`, `'primaryKey'`, or `'unique'`) based on the `SchemaIssue`
+ * that produced the drop.
+ */
+export function dropConstraint(
+  schemaName: string,
+  tableName: string,
+  constraintName: string,
+  kind: 'foreignKey' | 'unique' | 'primaryKey' = 'unique',
+): Op {
   const qualified = qualifyTableName(schemaName, tableName);
   return {
     id: `dropConstraint.${tableName}.${constraintName}`,
     label: `Drop constraint "${constraintName}" on "${tableName}"`,
     operationClass: 'destructive',
-    target: targetDetails('unique', constraintName, schemaName, tableName),
+    target: targetDetails(kind, constraintName, schemaName, tableName),
     precheck: [
       step(
         `ensure constraint "${constraintName}" exists`,
