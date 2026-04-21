@@ -7,7 +7,28 @@ import {
   errorNoTarget,
   errorSameSourceAndTarget,
 } from './errors';
+import { bfs } from './graph-ops';
 import type { AttestedMigrationBundle, MigrationChainEntry, MigrationGraph } from './types';
+
+/** Forward-edge neighbours for BFS: edge `e` from `n` visits `e.to` next. */
+function forwardNeighbours(graph: MigrationGraph, node: string) {
+  return (graph.forwardChain.get(node) ?? []).map((edge) => ({ next: edge.to, edge }));
+}
+
+/** Reverse-edge neighbours for BFS: edge `e` from `n` visits `e.from` next. */
+function reverseNeighbours(graph: MigrationGraph, node: string) {
+  return (graph.reverseChain.get(node) ?? []).map((edge) => ({ next: edge.from, edge }));
+}
+
+function appendEdge(
+  map: Map<string, MigrationChainEntry[]>,
+  key: string,
+  entry: MigrationChainEntry,
+): void {
+  const bucket = map.get(key);
+  if (bucket) bucket.push(entry);
+  else map.set(key, [entry]);
+}
 
 export function reconstructGraph(packages: readonly AttestedMigrationBundle[]): MigrationGraph {
   const nodes = new Set<string>();
@@ -41,23 +62,18 @@ export function reconstructGraph(packages: readonly AttestedMigrationBundle[]): 
       migrationById.set(migration.migrationId, migration);
     }
 
-    const fwd = forwardChain.get(from);
-    if (fwd) {
-      fwd.push(migration);
-    } else {
-      forwardChain.set(from, [migration]);
-    }
-
-    const rev = reverseChain.get(to);
-    if (rev) {
-      rev.push(migration);
-    } else {
-      reverseChain.set(to, [migration]);
-    }
+    appendEdge(forwardChain, from, migration);
+    appendEdge(reverseChain, to, migration);
   }
 
   return { nodes, forwardChain, reverseChain, migrationById };
 }
+
+// ---------------------------------------------------------------------------
+// Deterministic tie-breaking for BFS neighbour order.
+// Used by `findPath` and `findPathWithDecision` only; not a general-purpose
+// utility. Ordering: label priority → createdAt → to → migrationId.
+// ---------------------------------------------------------------------------
 
 const LABEL_PRIORITY: Record<string, number> = { main: 0, default: 1, feature: 2 };
 
@@ -70,16 +86,25 @@ function labelPriority(labels: readonly string[]): number {
   return best;
 }
 
+function compareTieBreak(a: MigrationChainEntry, b: MigrationChainEntry): number {
+  const lp = labelPriority(a.labels) - labelPriority(b.labels);
+  if (lp !== 0) return lp;
+  const ca = a.createdAt.localeCompare(b.createdAt);
+  if (ca !== 0) return ca;
+  const tc = a.to.localeCompare(b.to);
+  if (tc !== 0) return tc;
+  return (a.migrationId ?? '').localeCompare(b.migrationId ?? '');
+}
+
 function sortedNeighbors(edges: readonly MigrationChainEntry[]): readonly MigrationChainEntry[] {
-  return [...edges].sort((a, b) => {
-    const lp = labelPriority(a.labels) - labelPriority(b.labels);
-    if (lp !== 0) return lp;
-    const ca = a.createdAt.localeCompare(b.createdAt);
-    if (ca !== 0) return ca;
-    const tc = a.to.localeCompare(b.to);
-    if (tc !== 0) return tc;
-    return (a.migrationId ?? '').localeCompare(b.migrationId ?? '');
-  });
+  return [...edges].sort(compareTieBreak);
+}
+
+/** Ordering adapter for `bfs` — sorts `{next, edge}` pairs by tie-break. */
+function bfsOrdering(
+  items: readonly { next: string; edge: MigrationChainEntry }[],
+): readonly { next: string; edge: MigrationChainEntry }[] {
+  return items.slice().sort((a, b) => compareTieBreak(a.edge, b.edge));
 }
 
 /**
@@ -97,42 +122,38 @@ export function findPath(
 ): readonly MigrationChainEntry[] | null {
   if (fromHash === toHash) return [];
 
-  const visited = new Set<string>();
-  const parent = new Map<string, { node: string; edge: MigrationChainEntry }>();
-  const queue: string[] = [fromHash];
-  visited.add(fromHash);
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (current === undefined) break;
-
-    if (current === toHash) {
+  const parents = new Map<string, { parent: string; edge: MigrationChainEntry }>();
+  for (const step of bfs([fromHash], (n) => forwardNeighbours(graph, n), bfsOrdering)) {
+    if (step.parent !== null && step.incomingEdge !== null) {
+      parents.set(step.node, { parent: step.parent, edge: step.incomingEdge });
+    }
+    if (step.node === toHash) {
       const path: MigrationChainEntry[] = [];
-      let node = toHash;
-      let entry = parent.get(node);
-      while (entry) {
-        const { node: prev, edge } = entry;
-        path.push(edge);
-        node = prev;
-        entry = parent.get(node);
+      let cur = toHash;
+      let p = parents.get(cur);
+      while (p) {
+        path.push(p.edge);
+        cur = p.parent;
+        p = parents.get(cur);
       }
       path.reverse();
       return path;
     }
-
-    const outgoing = graph.forwardChain.get(current);
-    if (!outgoing) continue;
-
-    for (const edge of sortedNeighbors(outgoing)) {
-      if (!visited.has(edge.to)) {
-        visited.add(edge.to);
-        parent.set(edge.to, { node: current, edge });
-        queue.push(edge.to);
-      }
-    }
   }
 
   return null;
+}
+
+/**
+ * Reverse-BFS from `toHash` over `reverseChain` to collect every node from
+ * which `toHash` is reachable (inclusive of `toHash` itself).
+ */
+function collectNodesReachingTarget(graph: MigrationGraph, toHash: string): Set<string> {
+  const reached = new Set<string>();
+  for (const step of bfs([toHash], (n) => reverseNeighbours(graph, n))) {
+    reached.add(step.node);
+  }
+  return reached;
 }
 
 export interface PathDecision {
@@ -168,16 +189,18 @@ export function findPathWithDecision(
   const path = findPath(graph, fromHash, toHash);
   if (!path) return null;
 
+  // Single reverse BFS marks every node from which `toHash` is reachable.
+  // Replaces a per-edge `findPath(e.to, toHash)` call inside the loop below,
+  // which made the whole function O(|path| · (V + E)) instead of O(V + E).
+  const reachesTarget = collectNodesReachingTarget(graph, toHash);
+
   const tieBreakReasons: string[] = [];
   let alternativeCount = 0;
 
   for (const edge of path) {
     const outgoing = graph.forwardChain.get(edge.from);
     if (outgoing && outgoing.length > 1) {
-      const reachable = outgoing.filter((e) => {
-        const pathFromE = findPath(graph, e.to, toHash);
-        return pathFromE !== null || e.to === toHash;
-      });
+      const reachable = outgoing.filter((e) => reachesTarget.has(e.to));
       if (reachable.length > 1) {
         alternativeCount += reachable.length - 1;
         const sorted = sortedNeighbors(reachable);
@@ -213,17 +236,8 @@ function findDivergencePoint(
 ): string {
   const ancestorSets = leaves.map((leaf) => {
     const ancestors = new Set<string>();
-    const queue = [leaf];
-    while (queue.length > 0) {
-      const current = queue.shift() as string;
-      if (ancestors.has(current)) continue;
-      ancestors.add(current);
-      const incoming = graph.reverseChain.get(current);
-      if (incoming) {
-        for (const edge of incoming) {
-          queue.push(edge.from);
-        }
-      }
+    for (const step of bfs([leaf], (n) => reverseNeighbours(graph, n))) {
+      ancestors.add(step.node);
     }
     return ancestors;
   });
@@ -250,40 +264,26 @@ function findDivergencePoint(
  * `fromHash` via forward edges.
  */
 export function findReachableLeaves(graph: MigrationGraph, fromHash: string): readonly string[] {
-  const visited = new Set<string>();
-  const queue: string[] = [fromHash];
-  visited.add(fromHash);
   const leaves: string[] = [];
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (current === undefined) break;
-    const outgoing = graph.forwardChain.get(current);
-
-    if (!outgoing || outgoing.length === 0) {
-      leaves.push(current);
-    } else {
-      for (const edge of outgoing) {
-        if (!visited.has(edge.to)) {
-          visited.add(edge.to);
-          queue.push(edge.to);
-        }
-      }
+  for (const step of bfs([fromHash], (n) => forwardNeighbours(graph, n))) {
+    if (!graph.forwardChain.get(step.node)?.length) {
+      leaves.push(step.node);
     }
   }
-
   return leaves;
 }
 
 /**
  * Find the target contract hash of the migration graph reachable from
- * EMPTY_CONTRACT_HASH. Throws NO_INITIAL_MIGRATION if the graph has
- * nodes but none originate from the empty hash.
- * Throws AMBIGUOUS_TARGET if multiple branch tips exist.
+ * EMPTY_CONTRACT_HASH. Returns `null` for a graph that has no target
+ * state (either empty, or containing only the root with no outgoing
+ * edges). Throws NO_INITIAL_MIGRATION if the graph has nodes but none
+ * originate from the empty hash, and AMBIGUOUS_TARGET if multiple
+ * branch tips exist.
  */
-export function findLeaf(graph: MigrationGraph): string {
+export function findLeaf(graph: MigrationGraph): string | null {
   if (graph.nodes.size === 0) {
-    return EMPTY_CONTRACT_HASH;
+    return null;
   }
 
   if (!graph.nodes.has(EMPTY_CONTRACT_HASH)) {
@@ -297,7 +297,7 @@ export function findLeaf(graph: MigrationGraph): string {
     if (reachable.length > 0) {
       throw errorNoTarget(reachable);
     }
-    return EMPTY_CONTRACT_HASH;
+    return null;
   }
 
   if (leaves.length > 1) {
@@ -312,8 +312,8 @@ export function findLeaf(graph: MigrationGraph): string {
     throw errorAmbiguousTarget(leaves, { divergencePoint, branches });
   }
 
-  const leaf = leaves[0];
-  return leaf !== undefined ? leaf : EMPTY_CONTRACT_HASH;
+  // biome-ignore lint/style/noNonNullAssertion: leaves.length is neither 0 nor >1 per the branches above, so exactly one leaf remains
+  return leaves[0]!;
 }
 
 /**
@@ -322,21 +322,11 @@ export function findLeaf(graph: MigrationGraph): string {
  * Throws AMBIGUOUS_TARGET if the graph has multiple branch tips.
  */
 export function findLatestMigration(graph: MigrationGraph): MigrationChainEntry | null {
-  if (graph.nodes.size === 0) {
-    return null;
-  }
-
   const leafHash = findLeaf(graph);
-  if (leafHash === EMPTY_CONTRACT_HASH) {
-    return null;
-  }
+  if (leafHash === null) return null;
 
   const path = findPath(graph, EMPTY_CONTRACT_HASH, leafHash);
-  if (!path || path.length === 0) {
-    return null;
-  }
-
-  return path[path.length - 1] ?? null;
+  return path?.at(-1) ?? null;
 }
 
 export function detectCycles(graph: MigrationGraph): readonly string[][] {
@@ -353,8 +343,6 @@ export function detectCycles(graph: MigrationGraph): readonly string[][] {
   }
 
   // Iterative three-color DFS. A frame is (node, outgoing edges, next-index).
-  // The recursive form overflows at ~5k linear depth under Node's default
-  // stack, which is well within the size of a real migration history.
   interface Frame {
     node: string;
     outgoing: readonly MigrationChainEntry[];
@@ -425,23 +413,8 @@ export function detectOrphans(graph: MigrationGraph): readonly MigrationChainEnt
     }
   }
 
-  const queue = [...startNodes];
-  for (const hash of queue) {
-    reachable.add(hash);
-  }
-
-  while (queue.length > 0) {
-    const node = queue.shift();
-    if (node === undefined) break;
-    const outgoing = graph.forwardChain.get(node);
-    if (!outgoing) continue;
-
-    for (const migration of outgoing) {
-      if (!reachable.has(migration.to)) {
-        reachable.add(migration.to);
-        queue.push(migration.to);
-      }
-    }
+  for (const step of bfs(startNodes, (n) => forwardNeighbours(graph, n))) {
+    reachable.add(step.node);
   }
 
   const orphans: MigrationChainEntry[] = [];

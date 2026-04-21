@@ -108,7 +108,7 @@ describe(
       const leaf = findLeaf(graph);
 
       const markerHash = EMPTY_CONTRACT_HASH;
-      const path = findPath(graph, markerHash, leaf);
+      const path = findPath(graph, markerHash, leaf!);
 
       expect(path).not.toBeNull();
       expect(path).toHaveLength(1);
@@ -168,12 +168,12 @@ describe(
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
-      const path = findPath(graph, 'sha256:hash-a', leaf);
+      const path = findPath(graph, 'sha256:hash-a', leaf!);
       expect(path).toHaveLength(1);
       expect(path![0]!.from).toBe('sha256:hash-a');
       expect(path![0]!.to).toBe('sha256:hash-b');
 
-      const fullPath = findPath(graph, EMPTY_CONTRACT_HASH, leaf);
+      const fullPath = findPath(graph, EMPTY_CONTRACT_HASH, leaf!);
       expect(fullPath).toHaveLength(2);
       expect(fullPath![0]!.to).toBe('sha256:hash-a');
       expect(fullPath![1]!.to).toBe('sha256:hash-b');
@@ -255,7 +255,7 @@ describe(
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
-      const path = findPath(graph, 'sha256:hash-a', leaf);
+      const path = findPath(graph, 'sha256:hash-a', leaf!);
       expect(path).toHaveLength(0);
     });
 
@@ -279,7 +279,7 @@ describe(
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
-      const path = findPath(graph, 'sha256:unknown-hash', leaf);
+      const path = findPath(graph, 'sha256:unknown-hash', leaf!);
       expect(path).toBeNull();
     });
 
@@ -322,7 +322,7 @@ describe(
       const leaf = findLeaf(graph);
       expect(leaf).toBe('sha256:hash-a');
 
-      const path = findPath(graph, EMPTY_CONTRACT_HASH, leaf);
+      const path = findPath(graph, EMPTY_CONTRACT_HASH, leaf!);
       expect(path).toHaveLength(1);
     });
 
@@ -379,7 +379,7 @@ describe(
       const leaf = findLeaf(graph);
 
       const corruptedMarkerHash = EMPTY_CONTRACT_HASH;
-      const path = findPath(graph, corruptedMarkerHash, leaf);
+      const path = findPath(graph, corruptedMarkerHash, leaf!);
       expect(path).toHaveLength(2);
     });
 
@@ -415,7 +415,7 @@ describe(
       const attested = packages.filter(isAttested);
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
-      const path = findPath(graph, EMPTY_CONTRACT_HASH, leaf)!;
+      const path = findPath(graph, EMPTY_CONTRACT_HASH, leaf!)!;
 
       expect(path).toHaveLength(2);
 
