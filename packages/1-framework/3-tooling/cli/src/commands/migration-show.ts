@@ -137,7 +137,7 @@ async function executeMigrationShowCommand(
           return notOk(
             errorRuntime('No attested migrations found', {
               why: `All migrations in ${migrationsRelative} are drafts (migrationId: null)`,
-              fix: 'Run `prisma-next migration emit --dir <path>` to attest a draft migration.',
+              fix: 'Run `node <migrations-dir>/<migration-dir>/migration.ts` to self-emit and attest a draft migration.',
             }),
           );
         }

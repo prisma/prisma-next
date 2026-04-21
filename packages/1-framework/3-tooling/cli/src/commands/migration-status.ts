@@ -460,7 +460,7 @@ async function executeMigrationStatusCommand(
       severity: 'warn',
       message: `${drafts.length} draft migration(s) found: ${drafts.map((d) => d.dirName).join(', ')}`,
       hints: [
-        "Run 'prisma-next migration emit --dir <path>' to attest draft migrations before applying",
+        "Run 'node <migration-dir>/migration.ts' to self-emit and attest each draft before applying",
       ],
     });
   }

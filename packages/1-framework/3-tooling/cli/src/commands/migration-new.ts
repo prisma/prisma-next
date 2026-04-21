@@ -263,8 +263,8 @@ export function createMigrationNewCommand(): Command {
     command,
     'Scaffold a new migration for manual authoring',
     'Creates a migration package with a migration.ts file for manual authoring.\n' +
-      'Write operation descriptors and data transforms in migration.ts, then run\n' +
-      '`migration emit` to resolve and attest the package.',
+      'Write the migration body in migration.ts, then run the file with Node\n' +
+      '(`node migration.ts`) to self-emit ops.json and attest the package.',
   );
   setCommandExamples(command, [
     'prisma-next migration new --name split-name',
@@ -298,7 +298,7 @@ export function createMigrationNewCommand(): Command {
           ui.output(`  from: ${value.from}`);
           ui.output(`  to:   ${value.to}`);
           ui.output(
-            `\nEdit migration.ts, then run \`prisma-next migration emit --dir "${value.dir}"\` to attest.`,
+            `\nEdit migration.ts, then run it directly (\`node "${value.dir}/migration.ts"\`) to self-emit and attest.`,
           );
         }
       });
