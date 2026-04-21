@@ -15,7 +15,7 @@ import { createControlStack } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
-  copyContractToMigrationDir,
+  copyFilesWithRename,
   formatMigrationDirName,
   readMigrationsDir,
   writeMigrationPackage,
@@ -116,6 +116,11 @@ async function executeMigrationNewCommand(
 
   let fromContract: Contract | null = null;
   let fromHash: string = EMPTY_CONTRACT_HASH;
+  // TODO(#356): replace the sibling-`.d.ts` expedient below with the
+  // contract emitter's `files()` API once that PR lands, so we can
+  // declare the source-contract artifacts the same way as the
+  // destination-contract artifacts.
+  let fromContractSourceDir: string | null = null;
 
   try {
     const packages = await readMigrationsDir(migrationsDir);
@@ -136,6 +141,7 @@ async function executeMigrationNewCommand(
         }
         fromHash = match.manifest.to;
         fromContract = match.manifest.toContract;
+        fromContractSourceDir = match.dirPath;
       } else {
         const latestMigration = findLatestMigration(graph);
         if (latestMigration) {
@@ -145,6 +151,7 @@ async function executeMigrationNewCommand(
           );
           if (leafPkg) {
             fromContract = leafPkg.manifest.toContract;
+            fromContractSourceDir = leafPkg.dirPath;
           }
         }
       }
@@ -210,7 +217,25 @@ async function executeMigrationNewCommand(
     ]);
 
     await writeMigrationPackage(packageDir, manifest, []);
-    await copyContractToMigrationDir(packageDir, contractPathAbsolute);
+    // TODO(#356): the emitter should own the list of contract artifacts to
+    // copy — for now we rely on the sibling `.d.ts` convention.
+    const contractDtsAbsolute = `${contractPathAbsolute.slice(0, -'.json'.length)}.d.ts`;
+    await copyFilesWithRename(packageDir, [
+      { sourcePath: contractPathAbsolute, destName: 'contract.json' },
+      { sourcePath: contractDtsAbsolute, destName: 'contract.d.ts' },
+    ]);
+    if (fromContractSourceDir !== null) {
+      await copyFilesWithRename(packageDir, [
+        {
+          sourcePath: join(fromContractSourceDir, 'contract.json'),
+          destName: 'from-contract.json',
+        },
+        {
+          sourcePath: join(fromContractSourceDir, 'contract.d.ts'),
+          destName: 'from-contract.d.ts',
+        },
+      ]);
+    }
 
     const stack = createControlStack(config);
     const familyInstance = config.family.create(stack);
