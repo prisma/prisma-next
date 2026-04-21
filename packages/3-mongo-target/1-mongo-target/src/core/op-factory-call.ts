@@ -1,4 +1,7 @@
-import type { MigrationOperationClass } from '@prisma-next/framework-components/control';
+import type {
+  OpFactoryCall as FrameworkOpFactoryCall,
+  MigrationOperationClass,
+} from '@prisma-next/framework-components/control';
 import type {
   CollModOptions,
   CreateCollectionOptions,
@@ -26,7 +29,7 @@ export interface OpFactoryCallVisitor<R> {
   collMod(call: CollModCall): R;
 }
 
-abstract class OpFactoryCallNode {
+abstract class OpFactoryCallNode implements FrameworkOpFactoryCall {
   abstract readonly factory: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
