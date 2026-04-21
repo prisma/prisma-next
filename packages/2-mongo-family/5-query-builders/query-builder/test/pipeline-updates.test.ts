@@ -7,6 +7,7 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { mongoQuery } from '../src/query';
+import type { UpdaterResult } from '../src/update-ops';
 import type { TContract } from './fixtures/test-contract';
 import { testContractJson } from './fixtures/test-contract';
 
@@ -56,8 +57,13 @@ describe('F3 pipeline-style updates', () => {
       expect(() =>
         orders()
           .match((f) => f.status.eq('new'))
-          // biome-ignore lint/suspicious/noExplicitAny: deliberately mixing types to test runtime guard
-          .updateMany((f) => [f.status.set('done'), f.stage.set({ total: f.amount.node })] as any),
+          .updateMany(
+            (f) =>
+              [
+                f.status.set('done'),
+                f.stage.set({ total: f.amount.node }),
+              ] as unknown as UpdaterResult,
+          ),
       ).toThrow(/Cannot mix/);
     });
   });
@@ -86,18 +92,20 @@ describe('F3 pipeline-style updates', () => {
     });
 
     it('throws without any .match() stages', () => {
-      // biome-ignore lint/suspicious/noExplicitAny: bypassing type system to test runtime guard
-      expect(() => (orders().addFields((f) => ({ total: f.amount })) as any).updateMany()).toThrow(
-        /at least one .match/,
-      );
+      expect(() =>
+        (
+          orders().addFields((f) => ({ total: f.amount })) as unknown as ReturnType<typeof orders>
+        ).updateMany(),
+      ).toThrow(/at least one .match/);
     });
 
     it('throws on non-update stages forced via cast (defensive runtime check)', () => {
       const chain = orders()
         .match((f) => f.status.eq('new'))
         .sort({ amount: -1 });
-      // biome-ignore lint/suspicious/noExplicitAny: bypassing type system to test runtime guard
-      expect(() => (chain as any).updateMany()).toThrow(/non-update stage/);
+      expect(() => (chain as unknown as ReturnType<typeof orders>).updateMany()).toThrow(
+        /non-update stage/,
+      );
     });
 
     it('throws on non-update stages after $match', () => {
