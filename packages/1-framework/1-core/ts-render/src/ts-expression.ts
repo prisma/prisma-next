@@ -3,10 +3,17 @@
  * source file. Each node in an IR declares which symbols it needs from which
  * modules; the top-level renderer deduplicates across nodes and emits one
  * `import { a, b, c } from "…"` line per module.
+ *
+ * `kind` defaults to `"named"` (e.g. `import { a } from "m"`). Setting it to
+ * `"default"` emits `import a from "m"`. `attributes`, if provided, emits an
+ * import attributes clause (`with { type: "json" }`) verbatim — required for
+ * JSON module imports in the rendered scaffolds.
  */
 export interface ImportRequirement {
   readonly moduleSpecifier: string;
   readonly symbol: string;
+  readonly kind?: 'named' | 'default';
+  readonly attributes?: Readonly<Record<string, string>>;
 }
 
 /**
