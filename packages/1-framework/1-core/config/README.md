@@ -42,7 +42,7 @@ const config = defineConfig({
   contract: {
     source: {
       inputs: ['./prisma/schema.prisma'],
-      load: async (_context, _resolvedInputs) =>
+      load: async (_context) =>
         /* Result<Contract, ContractSourceDiagnostics> */ null as never,
     },
   },
