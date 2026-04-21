@@ -1,24 +1,25 @@
 export {
   addColumn,
-  addEnumValues,
+  alterColumnType,
+  dropColumn,
+  dropDefault,
+  dropNotNull,
+  setDefault,
+  setNotNull,
+} from '../core/migrations/operations/columns';
+export {
   addForeignKey,
   addPrimaryKey,
   addUnique,
-  alterColumnType,
-  createEnumType,
-  createExtension,
-  createIndex,
-  createSchema,
-  createTable,
-  dropColumn,
   dropConstraint,
-  dropDefault,
+} from '../core/migrations/operations/constraints';
+export { createExtension, createSchema } from '../core/migrations/operations/dependencies';
+export {
+  addEnumValues,
+  createEnumType,
   dropEnumType,
-  dropIndex,
-  dropNotNull,
-  dropTable,
-  rawSql,
   renameType,
-  setDefault,
-  setNotNull,
-} from '../core/migrations/op-factories';
+} from '../core/migrations/operations/enums';
+export { createIndex, dropIndex } from '../core/migrations/operations/indexes';
+export { rawSql } from '../core/migrations/operations/raw';
+export { createTable, dropTable } from '../core/migrations/operations/tables';

@@ -31,7 +31,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import type { ColumnSpec, ForeignKeySpec } from './op-factories';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -42,6 +41,7 @@ import {
   type PostgresOpFactoryCall,
   RawSqlCall,
 } from './op-factory-call';
+import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
 import {
   buildAddColumnSql,
   buildColumnDefaultSql,

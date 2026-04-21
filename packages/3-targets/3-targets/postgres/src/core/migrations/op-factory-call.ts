@@ -1,6 +1,6 @@
 /**
- * Postgres class-flow IR: one concrete `*Call` class per pure factory in
- * `op-factories.ts`, plus a shared `PostgresOpFactoryCallNode` abstract base.
+ * Postgres class-flow IR: one concrete `*Call` class per pure factory under
+ * `operations/`, plus a shared `PostgresOpFactoryCallNode` abstract base.
  *
  * Every call class carries the literal arguments its backing factory would
  * receive, computes a human-readable `label` in its constructor, and
@@ -8,7 +8,7 @@
  *
  * - `toOp()` — converts the IR node to a runtime
  *   `SqlMigrationPlanOperation` by delegating to the matching pure factory
- *   in `op-factories.ts`. `DataTransformCall.toOp()` always throws
+ *   under `operations/`. `DataTransformCall.toOp()` always throws
  *   `PN-MIG-2001` because a planner-generated data transform is an
  *   unfilled authoring stub by construction.
  * - `renderTypeScript()` / `importRequirements()` — inherited from
@@ -28,30 +28,21 @@ import type {
   MigrationOperationClass,
 } from '@prisma-next/framework-components/control';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
-import type { ColumnSpec, ForeignKeySpec } from './op-factories';
 import {
   addColumn,
-  addEnumValues,
-  addForeignKey,
-  addPrimaryKey,
-  addUnique,
   alterColumnType,
-  createEnumType,
-  createExtension,
-  createIndex,
-  createSchema,
-  createTable,
   dropColumn,
-  dropConstraint,
   dropDefault,
-  dropEnumType,
-  dropIndex,
   dropNotNull,
-  dropTable,
-  renameType,
   setDefault,
   setNotNull,
-} from './op-factories';
+} from './operations/columns';
+import { addForeignKey, addPrimaryKey, addUnique, dropConstraint } from './operations/constraints';
+import { createExtension, createSchema } from './operations/dependencies';
+import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
+import { createIndex, dropIndex } from './operations/indexes';
+import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
+import { createTable, dropTable } from './operations/tables';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
