@@ -141,6 +141,18 @@ export interface SqlMigrationPlanOperationStep {
   readonly meta?: AnyRecord;
 }
 
+/**
+ * Minimal shape every SQL-family target must conform to for its per-operation
+ * `target.details` payload. Each SQL operation addresses a named database
+ * object in some schema; targets (Postgres, MySQL, SQLite, …) extend this
+ * shape with their own fields (e.g. Postgres adds `objectType` and optional
+ * `table`).
+ */
+export interface SqlPlanTargetDetails {
+  readonly schema: string;
+  readonly name: string;
+}
+
 export interface SqlMigrationPlanOperationTarget<TTargetDetails> {
   readonly id: string;
   readonly details?: TTargetDetails;

@@ -62,6 +62,7 @@ export type {
   SqlPlannerFailureResult,
   SqlPlannerResult,
   SqlPlannerSuccessResult,
+  SqlPlanTargetDetails,
   StorageTypePlanResult,
 } from '../core/migrations/types';
 export { collectInitDependencies, isDatabaseDependencyProvider } from '../core/migrations/types';
