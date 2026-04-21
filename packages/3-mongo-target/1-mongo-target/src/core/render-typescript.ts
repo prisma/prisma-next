@@ -61,8 +61,10 @@ function buildImports(calls: ReadonlyArray<OpFactoryCall>): string {
   }
 
   const lines = ["import { Migration } from '@prisma-next/family-mongo/migration';"];
-  for (const moduleSpecifier of [...symbolsByModule.keys()].sort()) {
-    const symbols = [...symbolsByModule.get(moduleSpecifier)!].sort();
+  // Maps preserve insertion order. Modules appear in the order the first call
+  // requiring them is processed, and we emit symbols sorted within each module.
+  for (const [moduleSpecifier, symbolSet] of symbolsByModule) {
+    const symbols = [...symbolSet].sort();
     lines.push(`import { ${symbols.join(', ')} } from '${moduleSpecifier}';`);
   }
   return lines.join('\n');
