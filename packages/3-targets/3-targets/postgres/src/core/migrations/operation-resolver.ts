@@ -6,8 +6,8 @@
  * Each `resolveX(descriptor, context)` is a thin wrapper that performs the
  * context-dependent materialization (contract lookup, codec expansion, schema
  * qualification, default rendering) and then calls the corresponding pure
- * `createX` factory. This is the descriptor-flow bridge; walk-schema and
- * class-flow paths call the pure factories directly (Phase 1+).
+ * `createX` factory. This is the descriptor-flow bridge; the class-flow
+ * walk-schema and reconciliation paths call the pure factories directly.
  */
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
@@ -24,6 +24,7 @@ import type {
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { lowerSqlPlan } from '@prisma-next/sql-runtime';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type ColumnSpec,
   addColumn as createAddColumn,
@@ -239,8 +240,8 @@ function resolveAddForeignKey(
       table: fk.references.table,
       columns: fk.references.columns,
     },
-    ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
-    ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
+    ...ifDefined('onDelete', fk.onDelete),
+    ...ifDefined('onUpdate', fk.onUpdate),
   };
   return createAddForeignKey(ctx.schemaName, desc.table, spec);
 }
