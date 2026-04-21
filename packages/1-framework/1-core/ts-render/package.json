@@ -6,7 +6,8 @@
   "description": "TypeScript source-text rendering utilities: JSON-to-TS literal printer and abstract expression base class",
   "scripts": {
     "build": "tsdown",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
