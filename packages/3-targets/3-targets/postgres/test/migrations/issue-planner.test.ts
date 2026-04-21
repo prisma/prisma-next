@@ -48,7 +48,9 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [{ kind: 'missing_table', table: 'user' }];
+      const issues: SchemaIssue[] = [
+        { kind: 'missing_table', table: 'user', message: 'Table "user" is missing' },
+      ];
 
       const result = planIssues({
         ...defaultCtx,
@@ -85,7 +87,14 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [{ kind: 'missing_column', table: 'user', column: 'status' }];
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_column',
+          table: 'user',
+          column: 'status',
+          message: 'Column "status" is missing',
+        },
+      ];
 
       const result = planIssues({
         ...defaultCtx,
@@ -119,7 +128,14 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [{ kind: 'missing_column', table: 'user', column: 'status' }];
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_column',
+          table: 'user',
+          column: 'status',
+          message: 'Column "status" is missing',
+        },
+      ];
 
       const result = planIssues({
         ...defaultCtx,
@@ -133,7 +149,7 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
       const dtCall = result.value.calls[1]!;
       expect(dtCall.factoryName).toBe('dataTransform');
-      expect(() => dtCall.toOp()).toThrow(/placeholder/i);
+      expect(() => dtCall.toOp()).toThrow(expect.objectContaining({ code: '2001', domain: 'MIG' }));
     });
   });
 
@@ -174,6 +190,7 @@ describe('planIssues', () => {
           column: 'email',
           expected: 'NOT NULL',
           actual: 'NULL',
+          message: 'Column "email" nullability mismatch: expected NOT NULL, got NULL',
         },
       ];
 
@@ -225,7 +242,14 @@ describe('planIssues', () => {
         },
       });
       const issues: SchemaIssue[] = [
-        { kind: 'type_mismatch', table: 'user', column: 'age', expected: 'int8', actual: 'int4' },
+        {
+          kind: 'type_mismatch',
+          table: 'user',
+          column: 'age',
+          expected: 'int8',
+          actual: 'int4',
+          message: 'Type mismatch on "age"',
+        },
       ];
 
       const result = planIssues({
@@ -273,7 +297,14 @@ describe('planIssues', () => {
         },
       });
       const issues: SchemaIssue[] = [
-        { kind: 'type_mismatch', table: 'user', column: 'age', expected: 'text', actual: 'int4' },
+        {
+          kind: 'type_mismatch',
+          table: 'user',
+          column: 'age',
+          expected: 'text',
+          actual: 'int4',
+          message: 'Type mismatch on "age"',
+        },
       ];
 
       const result = planIssues({
@@ -319,10 +350,9 @@ describe('planIssues', () => {
         {
           kind: 'enum_values_changed',
           typeName: 'status',
-          expected: 'active, inactive, archived',
-          actual: 'active, inactive',
           addedValues: ['archived'],
           removedValues: [],
+          message: 'Enum "status" values changed',
         },
       ];
 
@@ -398,10 +428,9 @@ describe('planIssues', () => {
         {
           kind: 'enum_values_changed',
           typeName: 'status',
-          expected: 'active',
-          actual: 'active, inactive',
           addedValues: [],
           removedValues: ['inactive'],
+          message: 'Enum "status" values changed',
         },
       ];
 
@@ -423,6 +452,50 @@ describe('planIssues', () => {
     });
   });
 
+  describe('strategies override', () => {
+    it('bypasses data-safety strategies when strategies: [] is passed', () => {
+      const toContract = makeContract({
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      });
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_column',
+          table: 'user',
+          column: 'status',
+          message: 'Column "status" is missing',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+        strategies: [],
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      const calls = result.value.calls;
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toMatchObject({ factoryName: 'addColumn' });
+      expect(calls.some((c) => c.factoryName === 'dataTransform')).toBe(false);
+      expect(calls.some((c) => c.factoryName === 'setNotNull')).toBe(false);
+    });
+  });
+
   describe('renderTypeScript round-trip', () => {
     it('renders calls to valid TypeScript', () => {
       const toContract = makeContract({
@@ -439,7 +512,14 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [{ kind: 'missing_column', table: 'user', column: 'status' }];
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_column',
+          table: 'user',
+          column: 'status',
+          message: 'Column "status" is missing',
+        },
+      ];
 
       const result = planIssues({
         ...defaultCtx,
