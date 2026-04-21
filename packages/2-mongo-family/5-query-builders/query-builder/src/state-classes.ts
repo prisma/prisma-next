@@ -455,7 +455,6 @@ export class FilteredCollection<
       update,
       opts.upsert ?? false,
       undefined,
-      undefined,
       opts.returnDocument ?? 'after',
     );
     return {

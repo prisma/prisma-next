@@ -64,15 +64,13 @@ describe('M3 find-and-modify and upsert terminals', () => {
   });
 
   describe('PipelineChain.findOneAndUpdate (chain deconstruction)', () => {
-    it('deconstructs match + sort + skip into wire-command slots', () => {
+    it('deconstructs match + sort into wire-command slots', () => {
       const plan = orders()
         .match((f) => f.status.eq('new'))
         .sort({ amount: -1 })
-        .skip(5)
         .findOneAndUpdate((f) => [f.status.set('processed')]);
       expect(plan.command).toBeInstanceOf(FindOneAndUpdateCommand);
       expect(plan.command.sort).toEqual({ amount: -1 });
-      expect(plan.command.skip).toBe(5);
       expect(plan.command.update).toEqual({ $set: { status: 'processed' } });
     });
 
@@ -97,9 +95,7 @@ describe('M3 find-and-modify and upsert terminals', () => {
       const chain = orders()
         .match((f) => f.status.eq('new'))
         .addFields(() => ({})) as unknown as ReturnType<typeof orders>;
-      expect(() => chain.findOneAndUpdate((f) => [f.status.set('bad')])).toThrow(
-        /\$match\/\$sort\/\$skip/,
-      );
+      expect(() => chain.findOneAndUpdate((f) => [f.status.set('bad')])).toThrow(/\$match\/\$sort/);
     });
   });
 

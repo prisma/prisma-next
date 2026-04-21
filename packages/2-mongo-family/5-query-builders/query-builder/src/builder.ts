@@ -640,7 +640,7 @@ export class PipelineChain<
     ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null,
     FindOneAndUpdateCommand
   > {
-    const { filter, sort, skip } = deconstructFindAndModifyChain(this.#state.stages);
+    const { filter, sort } = deconstructFindAndModifyChain(this.#state.stages);
     const accessor = createFieldAccessor<Shape>();
     const items = updaterFn(accessor);
     const update = resolveUpdaterResult(items);
@@ -650,7 +650,6 @@ export class PipelineChain<
       update,
       opts.upsert ?? false,
       sort,
-      skip,
       opts.returnDocument ?? 'after',
     );
     const meta: PlanMeta = {
@@ -672,8 +671,8 @@ export class PipelineChain<
     ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null,
     FindOneAndDeleteCommand
   > {
-    const { filter, sort, skip } = deconstructFindAndModifyChain(this.#state.stages);
-    const command = new FindOneAndDeleteCommand(this.#state.collection, filter, sort, skip);
+    const { filter, sort } = deconstructFindAndModifyChain(this.#state.stages);
+    const command = new FindOneAndDeleteCommand(this.#state.collection, filter, sort);
     const meta: PlanMeta = {
       target: 'mongo',
       storageHash: this.#state.storageHash,
@@ -713,26 +712,27 @@ export class PipelineChain<
 interface DeconstructedFindAndModify {
   filter: MongoFilterExpr;
   sort: Record<string, 1 | -1> | undefined;
-  skip: number | undefined;
 }
 
 /**
- * Walk the accumulated pipeline stages and extract the `filter`, `sort`,
- * and `skip` slots for a `findOneAndUpdate` / `findOneAndDelete` wire
- * command. Only `$match`, `$sort`, and `$skip` stages are permitted; any
- * other stage triggers a runtime error (the type system should make this
- * unreachable, but the check is here as a defence-in-depth measure).
+ * Walk the accumulated pipeline stages and extract the `filter` and `sort`
+ * slots for a `findOneAndUpdate` / `findOneAndDelete` wire command. Only
+ * `$match` and `$sort` stages are permitted; any other stage triggers a
+ * runtime error (the type system should make this unreachable, but the
+ * check is here as a defence-in-depth measure).
+ *
+ * `$skip` is accepted but silently dropped — MongoDB's `findAndModify`
+ * command has no `skip` slot, so the helper cannot surface it. A follow-up
+ * pass canonicalizes the accepted shape and rejects `.skip()` outright.
  *
  * Multiple `$match` stages are AND-folded. Multiple `$sort` stages fold
  * last-writer-wins per key (matching Mongo's own pipeline semantics).
- * The largest `$skip` value wins.
  */
 function deconstructFindAndModifyChain(
   stages: ReadonlyArray<MongoPipelineStage>,
 ): DeconstructedFindAndModify {
   const matchFilters: MongoFilterExpr[] = [];
   let sort: Record<string, 1 | -1> | undefined;
-  let skip: number | undefined;
 
   for (const stage of stages) {
     if (stage instanceof MongoMatchStage) {
@@ -740,10 +740,10 @@ function deconstructFindAndModifyChain(
     } else if (stage instanceof MongoSortStage) {
       sort = sort ? { ...sort, ...stage.sort } : { ...stage.sort };
     } else if (stage instanceof MongoSkipStage) {
-      skip = skip != null ? Math.max(skip, stage.skip) : stage.skip;
+      // MongoDB findAndModify has no skip slot; silently drop.
     } else {
       throw new Error(
-        'findOneAndUpdate/findOneAndDelete requires a chain of $match/$sort/$skip stages only, ' +
+        'findOneAndUpdate/findOneAndDelete requires a chain of $match/$sort stages only, ' +
           `but encountered a '${stage.constructor.name}' stage. ` +
           'This is likely a bug — the type system should have prevented this chain.',
       );
@@ -759,7 +759,7 @@ function deconstructFindAndModifyChain(
   }
   const filter: MongoFilterExpr = matchFilters.length === 1 ? first : MongoAndExpr.of(matchFilters);
 
-  return { filter, sort, skip };
+  return { filter, sort };
 }
 
 interface DeconstructedUpdate {

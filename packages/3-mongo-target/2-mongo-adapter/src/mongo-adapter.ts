@@ -87,7 +87,7 @@ class MongoAdapterImpl implements MongoAdapter {
           this.#lowerUpdate(command.update),
           command.upsert,
           command.sort,
-          command.skip,
+          undefined,
           command.returnDocument,
         );
       case 'findOneAndDelete':
@@ -95,7 +95,6 @@ class MongoAdapterImpl implements MongoAdapter {
           command.collection,
           lowerFilter(command.filter),
           command.sort,
-          command.skip,
         );
       case 'aggregate':
         return new AggregateWireCommand(command.collection, lowerPipeline(command.pipeline));
