@@ -1,4 +1,4 @@
-import { type ImportRequirement, MigrationTsExpression } from './migration-ts-expression';
+import { type ImportRequirement, TsExpression } from '@prisma-next/ts-render';
 
 /**
  * A planner-generated stub for a `dataTransform` `check` or `run` body.
@@ -15,7 +15,7 @@ import { type ImportRequirement, MigrationTsExpression } from './migration-ts-ex
  * Package-private. Always an immediate child of a `DataTransformCall` — it
  * is not a member of the `PostgresOpFactoryCall` union.
  */
-export class PlaceholderExpression extends MigrationTsExpression {
+export class PlaceholderExpression extends TsExpression {
   readonly slot: string;
 
   constructor(slot: string) {
