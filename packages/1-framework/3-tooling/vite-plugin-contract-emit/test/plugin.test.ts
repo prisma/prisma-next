@@ -351,6 +351,21 @@ describe('prismaVitePlugin', () => {
       );
     });
 
+    it('loads config once on startup before the initial emit', async () => {
+      const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'silent' });
+      const mockServer = createMockServer();
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      expect(mockedLoadConfig).toHaveBeenCalledTimes(1);
+    });
+
     it('registers cleanup hooks for server close', async () => {
       const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'silent' });
       const mockServer = createMockServer();
@@ -413,7 +428,7 @@ describe('prismaVitePlugin', () => {
         expect.stringContaining('/project/prisma-next.config.ts'),
       );
       expect(consoleErrorSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining('Failed to resolve watched files:'),
+        expect.stringContaining('Contract emit failed'),
       );
     });
 

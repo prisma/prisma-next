@@ -86,8 +86,10 @@ export interface PrismaNextConfig<
   };
 }
 
+const ContractSourceInputSchema = type('string');
+
 export const ContractSourceProviderSchema = type({
-  'inputs?': 'string[]',
+  'inputs?': ContractSourceInputSchema.array(),
   load: 'Function',
 });
 

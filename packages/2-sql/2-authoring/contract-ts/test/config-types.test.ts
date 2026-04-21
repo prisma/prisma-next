@@ -70,4 +70,28 @@ describe('typescriptContract', () => {
     },
     timeouts.typeScriptCompilation,
   );
+
+  it(
+    'throws when the module exports neither default nor contract',
+    async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'sql-contract-ts-'));
+      const contractPath = join(tempDir, 'contract.ts');
+
+      try {
+        await writeFile(contractPath, `export const notContract = {};\n`, 'utf-8');
+
+        const config = typescriptContractFromPath('./contract.ts');
+
+        await expect(
+          config.source.load({
+            ...stubContext,
+            resolvedInputs: [contractPath],
+          }),
+        ).rejects.toThrow(/has no "default" or "contract" export/);
+      } finally {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    },
+    timeouts.typeScriptCompilation,
+  );
 });

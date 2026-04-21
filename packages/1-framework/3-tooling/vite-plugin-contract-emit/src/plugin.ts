@@ -98,7 +98,11 @@ export function prismaVitePlugin(
     }
   }
 
-  async function emitContract(): Promise<ContractEmitResult | null> {
+  async function emitContract({
+    refreshWatchedFiles = true,
+  }: {
+    refreshWatchedFiles?: boolean;
+  } = {}): Promise<ContractEmitResult | null> {
     const requestId = ++emitRequestId;
 
     // Cancel any in-flight emit
@@ -109,7 +113,7 @@ export function prismaVitePlugin(
     const signal = currentAbortController.signal;
 
     try {
-      if (server) {
+      if (server && refreshWatchedFiles) {
         await updateWatchedFiles(server);
       }
 
@@ -411,7 +415,7 @@ export function prismaVitePlugin(
       }
 
       // Initial emit on server start
-      await emitContract();
+      await emitContract({ refreshWatchedFiles: false });
     },
 
     handleHotUpdate(ctx) {

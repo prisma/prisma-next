@@ -14,6 +14,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -39,7 +40,7 @@ function createSourceProvider(
   inputs?: readonly string[],
 ): ContractSourceProvider {
   return {
-    ...(inputs ? { inputs } : {}),
+    ...ifDefined('inputs', inputs),
     load,
   };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { setupIntegrationTest, timeouts } from './setup';
 
-describe('integration: ilike (adapter operation)', () => {
+describe('integration: ilike (adapter operation)', { timeout: timeouts.databaseOperation }, () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('ilike filters case-insensitively in WHERE', async () => {

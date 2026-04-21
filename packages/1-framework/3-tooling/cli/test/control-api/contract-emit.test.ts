@@ -69,7 +69,7 @@ describe('executeContractEmit', () => {
     );
   });
 
-  it('throws when contract source is not callable', async () => {
+  it('throws when contract source is not a valid provider object', async () => {
     await withMockedConfig(
       mockConfigWithContract({
         source: { invalid: true },
