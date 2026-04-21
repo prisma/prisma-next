@@ -91,9 +91,14 @@ export interface Expression<F extends DocField> extends TypedAggExpr<F> {
 /**
  * Emitters for MongoDB update-pipeline stages (`$addFields`/`$set`,
  * `$project`/`$unset`, `$replaceRoot`/`$replaceWith`). These return
- * `MongoUpdatePipelineStage` nodes that can be mixed into the updater
- * callback alongside `TypedUpdateOp` values when the pipeline-style
- * update form is desired.
+ * `MongoUpdatePipelineStage` nodes and let an updater callback express
+ * the pipeline-form update as an alternative to the typed-operator form.
+ *
+ * The two forms are mutually exclusive per updater call: `resolveUpdaterResult`
+ * rejects arrays that mix `TypedUpdateOp` and `MongoUpdatePipelineStage`
+ * entries with a clear error — an updater callback must return either all
+ * typed ops or all pipeline stages. Pick the form that matches the update
+ * you want and commit to it for that call site.
  *
  * Accessible via `f.stage` on the `FieldAccessor`.
  */
