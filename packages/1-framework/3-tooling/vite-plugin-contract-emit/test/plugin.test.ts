@@ -416,6 +416,58 @@ describe('prismaVitePlugin', () => {
         expect.stringContaining('Failed to resolve watched files:'),
       );
     });
+
+    it('keeps existing watched dependencies while config loading falls back', async () => {
+      let shouldFailLoad = false;
+      mockedLoadConfig.mockImplementation(async () => {
+        if (shouldFailLoad) {
+          throw new Error('config load failed');
+        }
+        return createLoadedConfig({ inputs: undefined });
+      });
+
+      const plugin = prismaVitePlugin('prisma-next.config.ts', {
+        logLevel: 'silent',
+        debounceMs: 100,
+      });
+      const mockServer = createMockServer();
+
+      applyModuleGraph(mockServer, {
+        '/project/prisma-next.config.ts': {
+          imports: ['/project/config-shared.ts'],
+        },
+        '/project/config-shared.ts': {},
+      });
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      mockedExecuteContractEmit.mockClear();
+      mockServer.watcher.add.mockClear();
+      mockServer.watcher.unwatch.mockClear();
+
+      shouldFailLoad = true;
+
+      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
+      handleHotUpdate({ file: '/project/config-shared.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+      expect(mockServer.watcher.unwatch).not.toHaveBeenCalledWith('/project/config-shared.ts');
+
+      mockedExecuteContractEmit.mockClear();
+      shouldFailLoad = false;
+
+      handleHotUpdate({ file: '/project/config-shared.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('handleHotUpdate', () => {

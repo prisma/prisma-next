@@ -238,6 +238,8 @@ export function prismaVitePlugin(
   }
 
   async function resolveWatchedFiles(viteServer: ViteDevServer): Promise<Set<string>> {
+    const previousWatchedFiles = new Set(watchedFiles);
+    const previousIgnoredOutputFiles = new Set(ignoredOutputFiles);
     ignoredOutputFiles.clear();
 
     try {
@@ -273,12 +275,21 @@ export function prismaVitePlugin(
 
       return files;
     } catch (error) {
+      if (previousIgnoredOutputFiles.size > 0) {
+        for (const outputFile of previousIgnoredOutputFiles) {
+          ignoredOutputFiles.add(outputFile);
+        }
+      }
       if (!didWarnConfigWatchFallback) {
         didWarnConfigWatchFallback = true;
         const reason = error instanceof Error ? ` ${error.message}` : '';
         logWarning(
           `Watching only ${absoluteConfigPath} because Prisma Next config inputs could not be resolved.${reason} Contract watch coverage is partial.`,
         );
+      }
+      if (previousWatchedFiles.size > 0) {
+        previousWatchedFiles.add(absoluteConfigPath);
+        return previousWatchedFiles;
       }
       return new Set([absoluteConfigPath]);
     }
