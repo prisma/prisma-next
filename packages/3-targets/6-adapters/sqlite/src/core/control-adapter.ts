@@ -12,7 +12,6 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { sqliteAdapterDescriptorMeta } from './descriptor-meta';
 
 // PRAGMA result row types
 type PragmaTableInfoRow = {
@@ -258,12 +257,3 @@ export function parseSqliteDefault(
 export function normalizeSqliteNativeType(nativeType: string): string {
   return nativeType.trim().toLowerCase();
 }
-
-const sqliteControlAdapterDescriptor = {
-  ...sqliteAdapterDescriptorMeta,
-  create(_stack): SqlControlAdapter<'sqlite'> {
-    return new SqliteControlAdapter();
-  },
-};
-
-export default sqliteControlAdapterDescriptor;
