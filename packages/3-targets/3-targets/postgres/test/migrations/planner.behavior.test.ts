@@ -81,8 +81,8 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       'table.post',
       'column.user.email',
       'unique.user.user_email_key',
-      'index.user.user_email_idx',
       'index.post.post_userId_idx',
+      'index.user.user_email_idx',
       'foreignKey.post.post_userId_fkey',
     ]);
   });
