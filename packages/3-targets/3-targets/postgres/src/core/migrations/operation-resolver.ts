@@ -11,6 +11,7 @@
  */
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { qualifyName } from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
@@ -401,8 +402,6 @@ function resolveDataTransform(
     run: desc.run.flatMap((input) => resolvePlanInput(input, db, toContract)),
   });
 }
-
-import { qualifyName } from '@prisma-next/adapter-postgres/control';
 
 /**
  * Resolves an array of operation descriptors into SqlMigrationPlanOperation objects.
