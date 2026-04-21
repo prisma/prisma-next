@@ -25,7 +25,7 @@ This file is the single consolidated plan for the project. It covers the origina
 | F3 — Pipeline-style updates | Done |
 | F4 — `mongo-memory-server` integration sweep | Done |
 | F5 — Retail-store example conversion | **Outstanding** — PR [#349](https://github.com/prisma/prisma-next/pull/349) has merged; ready to execute |
-| F6 — Close-out (docs migration + retire project folder) | F6.1 + F6.2 done; F6.3–F6.5 outstanding (awaiting project-folder deletion) |
+| F6 — Close-out (docs migration + retire project folder) | F6.1 + F6.2 + F6.3 done; F6.4 + F6.5 outstanding (project-folder deletion + final verification) |
 | PR-355 code-review items #1–13 | Done |
 | PR-355 code-review item #14 (close-out) | Rolled into F6 |
 
@@ -226,7 +226,12 @@ The 430-line spec is mostly project-history (problem, milestone-by-milestone req
 
 #### F6.3 — Verify external references
 
-- [ ] F6.3.1 — `rg -n 'projects/mongo-pipeline-builder' .` and confirm all hits are inside `projects/mongo-pipeline-builder/` (gets deleted in F6.4) or under `wip/` (gitignored). If any external hit appears, replace with the canonical `docs/` link from F6.1 or delete the reference if no longer load-bearing.
+- [x] F6.3.1 — `rg -n 'projects/mongo-pipeline-builder' .` ran clean: all hits for the folder path are inside the folder itself. Five JSDoc references to `query-builder-unification.spec.md` lived in `packages/2-mongo-family/` source files; each was rerouted to a long-lived home:
+  - `builder.ts`, `markers.ts` → ADR 201 (canonical marker table with rationale).
+  - `commands.ts` (Open Item #1, resolved in favour of "extend existing") → dangling pointer removed; the self-contained rationale on `UpdateOneCommand.upsert` kept.
+  - `state-classes.ts` (Open Item #2, still open) → rewritten inline so the JSDoc describes the two candidate representations and the current interim encoding without depending on the spec.
+  - `field-accessor.ts` (Open Item #4, trait-gating) → points at Linear ticket TML-2259.
+  - ADR 201's own mention of `@prisma-next/mongo-pipeline-builder` in its `## Alternatives considered` section is a historical package-name reference, not a file-path reference; it stays.
 
 #### F6.4 — Delete the project folder
 
