@@ -18,7 +18,7 @@
  * `PostgresOpFactoryCall` union.
  */
 
-import { placeholder } from '@prisma-next/errors/migration';
+import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type {
   OpFactoryCall as FrameworkOpFactoryCall,
@@ -34,7 +34,9 @@ import {
   addUnique,
   alterColumnType,
   createEnumType,
+  createExtension,
   createIndex,
+  createSchema,
   createTable,
   dropColumn,
   dropConstraint,
@@ -43,28 +45,16 @@ import {
   dropIndex,
   dropNotNull,
   dropTable,
+  rawSql,
   renameType,
   setDefault,
   setNotNull,
 } from './op-factories';
-import { PlaceholderExpression } from './placeholder-expression';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
 const TARGET_MIGRATION_MODULE = '@prisma-next/target-postgres/migration';
-
-/**
- * Converts a `TsExpression` body into a closure for runtime use.
- * `PlaceholderExpression` yields a closure that throws `PN-MIG-2001`
- * when invoked — the designed failure mode for unfilled slots.
- */
-function bodyToClosure(expr: TsExpression): () => never {
-  if (expr instanceof PlaceholderExpression) {
-    return () => placeholder(expr.slot);
-  }
-  throw new Error(`bodyToClosure: unsupported TsExpression variant: ${expr.constructor.name}`);
-}
 
 export interface PostgresOpFactoryCallVisitor<R> {
   createTable(call: CreateTableCall): R;
@@ -86,6 +76,9 @@ export interface PostgresOpFactoryCallVisitor<R> {
   addEnumValues(call: AddEnumValuesCall): R;
   dropEnumType(call: DropEnumTypeCall): R;
   renameType(call: RenameTypeCall): R;
+  rawSql(call: RawSqlCall): R;
+  createExtension(call: CreateExtensionCall): R;
+  createSchema(call: CreateSchemaCall): R;
   dataTransform(call: DataTransformCall): R;
 }
 
@@ -785,17 +778,112 @@ export class RenameTypeCall extends PostgresOpFactoryCallNode {
 }
 
 // ============================================================================
+// Raw SQL
+// ============================================================================
+
+export class RawSqlCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'rawSql' as const;
+  readonly operationClass: MigrationOperationClass;
+  readonly id: string;
+  readonly sql: string;
+  readonly label: string;
+
+  constructor(
+    id: string,
+    label: string,
+    sql: string,
+    operationClass: MigrationOperationClass = 'additive',
+  ) {
+    super();
+    this.id = id;
+    this.label = label;
+    this.sql = sql;
+    this.operationClass = operationClass;
+    this.freeze();
+  }
+
+  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
+    return visitor.rawSql(this);
+  }
+
+  toOp(): Op {
+    return rawSql(this.id, this.label, this.sql, this.operationClass);
+  }
+
+  renderTypeScript(): string {
+    const args = [jsonToTsSource(this.id), jsonToTsSource(this.label), jsonToTsSource(this.sql)];
+    if (this.operationClass !== 'additive') {
+      args.push(jsonToTsSource(this.operationClass));
+    }
+    return `rawSql(${args.join(', ')})`;
+  }
+}
+
+// ============================================================================
+// Database dependencies (structured DDL)
+// ============================================================================
+
+export class CreateExtensionCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'createExtension' as const;
+  readonly operationClass = 'additive' as const;
+  readonly extensionName: string;
+  readonly label: string;
+
+  constructor(extensionName: string) {
+    super();
+    this.extensionName = extensionName;
+    this.label = `Create extension "${extensionName}"`;
+    this.freeze();
+  }
+
+  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
+    return visitor.createExtension(this);
+  }
+
+  toOp(): Op {
+    return createExtension(this.extensionName);
+  }
+
+  renderTypeScript(): string {
+    return `createExtension(${jsonToTsSource(this.extensionName)})`;
+  }
+}
+
+export class CreateSchemaCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'createSchema' as const;
+  readonly operationClass = 'additive' as const;
+  readonly schemaName: string;
+  readonly label: string;
+
+  constructor(schemaName: string) {
+    super();
+    this.schemaName = schemaName;
+    this.label = `Create schema "${schemaName}"`;
+    this.freeze();
+  }
+
+  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
+    return visitor.createSchema(this);
+  }
+
+  toOp(): Op {
+    return createSchema(this.schemaName);
+  }
+
+  renderTypeScript(): string {
+    return `createSchema(${jsonToTsSource(this.schemaName)})`;
+  }
+}
+
+// ============================================================================
 // Data transform
 // ============================================================================
 
 /**
- * `check` and `run` accept any `TsExpression` — today that's
- * `PlaceholderExpression`, tomorrow it could be e.g. a pre-computed closure
- * expression. `toOp()` converts each body via `bodyToClosure`; anything it
- * doesn't recognize surfaces as a planner bug.
- *
- * When either body is a `PlaceholderExpression`, `toOp()` throws
- * `PN-MIG-2001` — the designed failure mode for unfilled slots.
+ * `check` and `run` accept any `TsExpression`. `toOp()` throws
+ * `PN-MIG-2001` because expression-bodied data transforms cannot be
+ * lowered to runtime ops — the user must fill in the rendered
+ * `migration.ts` and run it directly.
  */
 export class DataTransformCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dataTransform' as const;
@@ -823,9 +911,7 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
   }
 
   toOp(): Op {
-    // Both calls throw for PlaceholderExpression bodies (PN-MIG-2001).
-    // Future non-placeholder expressions would produce ops instead of throwing.
-    return bodyToClosure(this.check)();
+    throw errorUnfilledPlaceholder(this.label);
   }
 
   renderTypeScript(): string {
@@ -861,4 +947,7 @@ export type PostgresOpFactoryCall =
   | AddEnumValuesCall
   | DropEnumTypeCall
   | RenameTypeCall
+  | RawSqlCall
+  | CreateExtensionCall
+  | CreateSchemaCall
   | DataTransformCall;
