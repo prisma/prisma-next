@@ -1,7 +1,8 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { CliStructuredError } from '@prisma-next/errors/control';
-import { type MigrationManifest, writeMigrationPackage } from '@prisma-next/migration-tools/io';
+import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
+import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { postgresEmit } from '../../src/core/migrations/postgres-emit';
