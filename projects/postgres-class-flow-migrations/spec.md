@@ -75,7 +75,7 @@ We make three decisions that govern the rest of this spec:
 
 2. **The issue-based diff architecture is preserved.** Today's descriptor planner (`SchemaIssue[]` → strategy chain → pattern-matched scaffolding) is retained and retargeted to emit `OpFactoryCall[]` directly. This is the feature that produces data-safe `dataTransform` stubs when `migration plan` encounters a schema change that can't be auto-applied (NOT-NULL backfill, unsafe type change, nullable tightening, enum value removal). Losing it would be a functional regression over descriptor-flow.
 
-3. **The IR contract is a framework-level interface; consumers depend on the interface, not on a class hierarchy.** `OpFactoryCall` is an interface (`{ factory, operationClass, label }`) exported from `framework-components`. Concrete call classes (`CreateTableCall`, `DataTransformCall`, …) implement the interface; type positions in renderer signatures, planner returns, and visitor inputs use the interface or a target-specific union of concrete classes — never a base class. No `SqlOpFactoryCallBase` or analogous base class ships.
+3. **The IR contract is a framework-level interface; consumers depend on the interface, not on a class hierarchy.** `OpFactoryCall` is an interface (`{ factory, operationClass, label }`) exported from `framework-components`. Concrete call classes (`CreateTableCall`, `DataTransformCall`, …) implement the interface; type positions in renderer signatures, planner returns, and visitor inputs use the interface or a target-specific union of concrete classes. The Postgres target may use an internal abstract base class for visitor plumbing — mirroring Mongo's `OpFactoryCallNode` (`packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts`) — provided that base class lives inside the Postgres package, is not exported, is not referenced in any cross-package signature, and is not referenced from any non-Postgres consumer. The visible contract for every other package is the framework-level `OpFactoryCall` interface; no SQL-family base class ships.
 
    The renderable-migration wrapper is a Postgres-specific concrete class for now (`TypeScriptRenderablePostgresMigration`) implementing the existing `MigrationPlanWithAuthoringSurface<TOp>` interface (ADR 194). It is structurally identical to Mongo's equivalent and is a candidate for consolidation into a framework-level `TypeScriptRenderableMigration<TCall, TOp>` in a follow-up project (see Open Question 6).
 
@@ -114,8 +114,8 @@ The developer runs `migration plan --target postgres` after modifying the contra
 - **R2.5** All context-dependent materialization (codec expansion, default rendering, extension ordering, schema qualification, contract lookup) happens during `OpFactoryCall` construction. By the time a call exists it carries only literal arguments plus planner-derived `operationClass` / `label` (per ADR 195).
 - **R2.6** Schema qualification is non-optional — every DDL call carries `schemaName` as a literal field. Factories reject calls without it.
 - **R2.7** The planner returns a `TypeScriptRenderablePostgresMigration` — a Postgres-specific concrete class extending `Migration<SqlMigrationPlanOperation<PostgresPlanTargetDetails>>` and implementing `MigrationPlanWithAuthoringSurface`. It holds `readonly calls: readonly PostgresOpFactoryCall[]` plus injected renderer functions, delegates `operations` to a `renderOps` visitor, and implements `renderTypeScript()` via a `renderCallsToTypeScript` visitor. No SQL-family base class is involved; the class is a sibling of Mongo's `PlannerProducedMongoMigration` and is structurally a candidate for framework-level consolidation in a follow-up.
-- **R2.8** `renderCallsToTypeScript(calls, meta)` emits a complete `migration.ts`: shebang, imports from `@prisma-next/family-sql/migration` and `@prisma-next/target-postgres/migration`, contract snapshot import, optional `sql(contract)` binding for data-transform closures, `class M extends Migration`, `Migration.run(import.meta.url, M)`. Stub `DataTransformCall` instances render with `placeholder()` closures (per ADR 200) rather than executable code.
-- **R2.9** `renderOps(calls)` visits each call, dispatching to the corresponding pure factory function. `DataTransformCall` with `stub: true` is refused by `renderOps` with a planner error — parity with the descriptor resolver's treatment of `TODO`.
+- **R2.8** `renderCallsToTypeScript(calls, meta)` emits a complete `migration.ts`: shebang, imports from `@prisma-next/family-sql/migration` and `@prisma-next/target-postgres/migration`, contract snapshot import, optional `sql(contract)` binding for data-transform closures, `class M extends Migration`, `Migration.run(import.meta.url, M)`. `DataTransformCall` instances whose `check` or `run` is a placeholder closure (per ADR 200) render as `() => placeholder("slot")` rather than executable code; the slot string is preserved end-to-end from planner construction through rendering.
+- **R2.9** `renderOps(calls)` visits each call, dispatching to the corresponding pure factory function. `DataTransformCall` whose `check` or `run` is a placeholder closure surfaces a `PN-MIG-2001` (`errorUnfilledPlaceholder`) error when the closure is invoked — parity with the descriptor resolver's treatment of `TODO`. The "is this a stub?" predicate is "is `check` or `run` a placeholder closure?", carried by a closure-attached tag rather than a separate `stub: boolean` flag on the call class.
 - **R2.10** The planner is a single pipeline: no parallel walk-schema planner remains. `planner-reconciliation.ts` is deleted by end of project; `planner.ts` is either deleted or reduced to a thin `PostgresMigrationPlanner` shell.
 
 ### Step 3 — User edits `migration.ts`
@@ -135,12 +135,12 @@ The developer runs `migration apply`. The CLI reads `ops.json`, validates agains
 **Requirements:**
 
 - **R4.1** `SqlMigrationPlanOperation<PostgresPlanTargetDetails>` shape is unchanged: `{ id, label, operationClass, target, precheck, execute, postcheck }` with step content `{ sql: string, description, meta? }`.
-- **R4.2** `ops.json` and `migration.json` wire formats are byte-for-byte compatible with the descriptor-flow output for the same logical migration. Existing attested example migrations produce the same `migrationId` (ADR 199) after re-scaffolding under class-flow.
+- **R4.2** `ops.json` and `migration.json` wire formats (schemas, field names, attestation shape) are unchanged. `migrationId` is still computed by the existing `computeMigrationId` (ADR 199). The *values* in re-scaffolded example migrations may differ from what's committed today — byte-identity is not a goal; see §Non-functional requirements.
 - **R4.3** Runner and driver code are not modified.
 
 ## Non-functional requirements
 
-- **migrationId stability.** Every example migration's `migrationId` stays identical across the transition. `migrationId` is a function of the operation hash and the source-storage hash (ADR 199); both are unchanged by a source-only refactor. A pre-merge script (see plan.md) verifies this byte-for-byte.
+- **Schema equivalence, not byte-identical `ops.json`.** The goal of this project is that every existing example migration continues to produce the schema its target contract expects, not that `ops.json` bytes or `migrationId` hashes stay identical. The Postgres runner's post-apply `verifySqlSchema` check already guarantees schema-shape equivalence before it commits the migration (ADR 199 background); we rely on that rather than on byte equality. Phase 3 re-scaffolds example migrations, and their regenerated `ops.json` / `migrationId` values may differ from what's committed today — that's expected. The gate for Phase 3 is "each regenerated example migration applies successfully and the runner's post-apply verify passes", exercised per-example at PR time, not an `ops.json` diff.
 - **Type-safe exhaustiveness.** Both renderers and any planner-side dispatch over `OpFactoryCall` use the visitor interface so new factories are compile-time forcing functions.
 - **No new runtime surface.** No new telemetry, no new security surface, no new operational cost. This is an authoring-tooling refactor.
 
@@ -166,7 +166,7 @@ Organized around the same four flow steps.
 ### Step 3 — Edit surface
 
 - [ ] Every Postgres factory is a pure function: no import of `OperationResolverContext`, no import of codec hooks, no `contract` parameter, no `db` handle.
-- [ ] `framework-components` exports an `OpFactoryCall` interface (`{ factory, operationClass, label }`). No abstract base class is shipped at framework or family level; concrete call classes implement the interface directly.
+- [ ] `framework-components` exports an `OpFactoryCall` interface (`{ factory, operationClass, label }`). No abstract base class is shipped at framework or family level. Postgres may use an internal abstract base class (mirroring Mongo's `OpFactoryCallNode`) for visitor `accept()` plumbing, but that base class is not exported and is not referenced from any non-Postgres consumer.
 - [ ] `@prisma-next/target-postgres/migration` exports the full factory surface (R3.1), the `PostgresOpFactoryCall` discriminated union with one frozen class per factory (each implementing `OpFactoryCall`), the `PostgresOpFactoryCallVisitor<R>` interface, and `renderOps` / `renderCallsToTypeScript` visitors.
 - [ ] `TypeScriptRenderablePostgresMigration` is a concrete class implementing `MigrationPlanWithAuthoringSurface<SqlMigrationPlanOperation<PostgresPlanTargetDetails>>`. No SQL-family base class is involved.
 - [ ] Schema qualification is a non-optional constructor argument on every DDL call class.
@@ -175,7 +175,7 @@ Organized around the same four flow steps.
 
 ### Step 4 — Apply
 
-- [ ] All existing Postgres example migrations (`examples/**/migrations/`) produce the same `migrationId` after re-scaffolding as before.
+- [ ] Every Postgres example migration (`examples/**/migrations/`) is re-scaffolded under class-flow, and each one applies successfully against a fresh Postgres with the runner's post-apply `verifySqlSchema` check passing. `migrationId` may change.
 - [ ] A new live-database e2e test exercises `createTable + dataTransform + addColumn` against a Postgres container and verifies idempotency on re-apply (mirroring the Mongo coverage in PR #349).
 - [ ] `SqlMigrationPlanOperation` step content remains `{ sql: string, description, meta? }`.
 
@@ -187,7 +187,7 @@ Organized around the same four flow steps.
 - [ ] `TargetMigrationsCapability.planWithDescriptors`, `resolveDescriptors`, `renderDescriptorTypeScript`, and `emit` methods are deleted from the framework interface.
 - [ ] `migration emit` CLI command is deleted.
 - [ ] `postgresEmit` and `mongoEmit` source files are deleted.
-- [ ] `hints.planningStrategy` is removed from the manifest writer; `migrationId` values on existing example migrations are unchanged.
+- [ ] `hints.planningStrategy` is removed from the manifest writer. Re-scaffolded example migrations' `migrationId` values may differ from their previous values; the per-example apply/verify in Phase 3 is the acceptance gate, not `migrationId` equality.
 
 ### Cross-cutting
 
@@ -201,7 +201,7 @@ Organized around the same four flow steps.
 
 2. **`CreateExtensionCall` ownership.** Today `resolveCreateDependency` expands one descriptor into multiple ops (create extension, create schema, etc.). In the new model each becomes its own `OpFactoryCall`. Does `createExtension` live under `@prisma-next/target-postgres/migration`, or graduate to `@prisma-next/family-sql/migration`? **Default assumption:** Postgres-specific; family-level lifting happens when a second SQL target needs it.
 
-3. **Re-scaffolding existing attested example migrations.** `migrationId` must stay stable (ADR 199: hash of ops + source-storage). Should we write a one-off migration tool, or re-scaffold from scratch and rely on the byte-level attestation check? **Default assumption:** no tool — re-scaffold, verify byte-identical `ops.json`, ship.
+3. **Re-scaffolding existing attested example migrations.** Resolved. Re-scaffold from scratch; let `migrationId` change; rely on the runner's post-apply `verifySqlSchema` check (exercised per-example in Phase 3's PR) to confirm each regenerated migration still reconstructs the target schema. No one-off migration tool, no byte-equality check.
 
 4. **`migration emit` downstream consumers.** Is `migration emit` called by any external documentation, scripts, or CI fixtures outside this repo? **Default assumption:** internal-only; deletion is non-breaking.
 
