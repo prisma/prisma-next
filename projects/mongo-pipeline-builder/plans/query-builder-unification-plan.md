@@ -24,7 +24,7 @@ This file is the single consolidated plan for the project. It covers the origina
 | F2 — `PipelineChain` find-and-modify terminals | Done |
 | F3 — Pipeline-style updates | Done |
 | F4 — `mongo-memory-server` integration sweep | Done |
-| F5 — Retail-store example conversion | **Outstanding** — blocked on PR [#349](https://github.com/prisma/prisma-next/pull/349) merging |
+| F5 — Retail-store example conversion | **Outstanding** — PR [#349](https://github.com/prisma/prisma-next/pull/349) has merged; ready to execute |
 | F6 — Close-out (docs migration + retire project folder) | **Outstanding** |
 | PR-355 code-review items #1–13 | Done |
 | PR-355 code-review item #14 (close-out) | Rolled into F6 |
@@ -45,8 +45,15 @@ This file is the single consolidated plan for the project. It covers the origina
 ## Branching strategy
 
 - M0–M5 and F1–F4 have landed on `main` (or on the current PR [#355](https://github.com/prisma/prisma-next/pull/355) branch awaiting merge). F5 and F6 are the only unmerged work.
+- PR [#349](https://github.com/prisma/prisma-next/pull/349) has merged to `main`; this branch was rebased on top of it. F5 is now unblocked.
+- Both F5 and F6 land on the same `tml-2267-query-builder-unification` branch in three sequential commits (one per milestone slice) so the entire project ships in one PR.
 - F6 (close-out) lands last because it deletes `projects/mongo-pipeline-builder/`, which the earlier milestones reference.
-- F5 lands only after PR [#349](https://github.com/prisma/prisma-next/pull/349) is merged. If [#349](https://github.com/prisma/prisma-next/pull/349) merges before F5 is ready, F5 stays a separate PR; otherwise F5 can fold into F6.
+
+**Commit shape:**
+
+1. `feat(retail-store): convert backfill-product-status migration to typed mongoQuery` (F5)
+2. `docs(mongo-family): incorporate query-builder design into subsystem doc + ADRs` (F6.1 + F6.2)
+3. `chore(projects): retire mongo-pipeline-builder project folder` (F6.3 + F6.4 + F6.5)
 
 ---
 
@@ -156,21 +163,81 @@ Carry `sort` / `skip` / `returnDocument` through the find-and-modify command cha
 
 ### F5 — Retail-store example conversion — **OUTSTANDING** 🟡
 
-Blocked on PR [#349](https://github.com/prisma/prisma-next/pull/349) landing on `main` (the migration framework this ports onto comes from that branch).
+Convert `examples/retail-store/migrations/20260416_backfill-product-status` end-to-end onto the typed query builder. Both the `check` source (currently typed) and the `run` body (currently a hand-built `RawUpdateManyCommand`) move to `mongoQuery`, so the example becomes a showcase of the unified surface rather than a half-converted artefact.
 
-- [ ] F5.1 — Confirm PR [#349](https://github.com/prisma/prisma-next/pull/349) is merged to `main` and the example's `dataTransform` API is in place. If not yet merged, defer this milestone.
-- [ ] F5.2 — Convert `examples/retail-store/migrations/20260416_backfill-product-status` to call `mongoQuery(...).from(...).match(...).updateMany(...)`. Verify the resulting `MongoQueryPlan` shape is consumed unchanged by `dataTransform.run`.
-- [ ] F5.3 — Update inline docs in the example to reference `mongoQuery` instead of the old `mongoPipeline` helper.
+After the rebase, the migration's current import of `mongoPipeline` from `@prisma-next/mongo-pipeline-builder` is **broken** (the package was renamed in M0). F5 fixes that by converting rather than just renaming.
+
+**Today's shape (broken after rebase):**
+
+```typescript
+const pipeline = mongoPipeline<Contract>({ contractJson });
+// check.source: pipeline.from('products').match(MongoExistsExpr.notExists('status')).limit(1)
+// run: { collection, command: new RawUpdateManyCommand('products', { status: { $exists: false } }, { $set: { status: 'active' } }), meta }
+```
+
+**Target shape:**
+
+```typescript
+const query = mongoQuery<Contract>({ contractJson });
+// check.source: query.from('products').match(f => f.status.exists(false)).limit(1)
+// run: query.from('products').match(f => f.status.exists(false)).updateMany(f => [f.status.set('active')])
+```
+
+- [x] F5.1 — Confirm PR [#349](https://github.com/prisma/prisma-next/pull/349) merged and the branch is rebased. (Done.)
+- [ ] F5.2 — Convert `migration.ts`:
+  - Swap `mongoPipeline` → `mongoQuery` and rename the local from `pipeline` to `query`.
+  - Replace the `check.source` `match(MongoExistsExpr.notExists('status'))` with the typed accessor: `match((f) => f.status.exists(false))`.
+  - Replace the `run` body's `RawUpdateManyCommand` with `query.from('products').match((f) => f.status.exists(false)).updateMany((f) => [f.status.set('active')])`. The returned `MongoQueryPlan` is the same `{ collection, command, meta }` shape `dataTransform.run` already consumes — verify no adapter is needed.
+  - Drop now-unused imports (`mongoPipeline`, `MongoExistsExpr`, `RawUpdateManyCommand`).
+  - Drop the hand-built `meta` block; the plans returned by `mongoQuery` carry their own `meta` with `lane: 'mongo-query'` (post-PR-355 lane collapse).
+- [ ] F5.3 — Re-emit the migration's `ops.json` via the migration's emit path. Let `migration.json#migrationId` re-hash. Confirm the new `ops.json` records `kind: 'updateMany'` (typed) instead of `kind: 'rawUpdateMany'`, and that `meta.lane` is `'mongo-query'` everywhere.
+- [ ] F5.4 — `rg -n 'mongoPipeline' examples/retail-store/` to confirm no remaining references in inline docs or comments. Update any stragglers.
+- [ ] F5.5 — Run `pnpm -F @prisma-next/example-retail-store test` (or whatever the package is named) to confirm the example's tests pass against the converted migration.
 
 ### F6 — Close-out — **OUTSTANDING** 🟡
 
-Migrate the long-lived design content out of the project folder, mark the project as superseded, scrub inbound references, and delete the folder. Absorbs PR-355 code-review item #14.
+Migrate the long-lived design content out of the project folder, draft the supporting ADRs, scrub inbound references, and delete the folder. Absorbs PR-355 code-review item #14.
 
-- [ ] F6.1 — Migrate design content from `projects/mongo-pipeline-builder/specs/query-builder-unification.spec.md` (and the original `spec.md` where still relevant) into the MongoDB Family subsystem doc under `docs/architecture docs/`. Decide whether the state-machine pattern + unified accessor warrant new ADRs. Leading candidates: (a) a brief ADR documenting the three-class state-machine pattern for reuse by the SQL builder; (b) a tightening of [ADR 180](../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md) reflecting the consolidated accessor. Lean: yes to both, brief.
-- [ ] F6.2 — Update `projects/mongo-pipeline-builder/spec.md` and `plan.md` to mark this work as completed and superseding the original read-side scope. (These files get deleted in F6.4; F6.2 is for the historical record up to that point.)
-- [ ] F6.3 — Strip repo-wide references to `projects/mongo-pipeline-builder/**`: `rg -n 'projects/mongo-pipeline-builder' .` and replace each hit with the canonical `docs/` link from F6.1, or delete the reference if it's no longer load-bearing.
-- [ ] F6.4 — Delete `projects/mongo-pipeline-builder/`. Verify `rg -n 'mongo-pipeline-builder' .` returns no results except lockfiles / generated artefacts that rebuild on next install.
-- [ ] F6.5 — Final check: `pnpm lint:deps`, `pnpm -r typecheck`, and the full `pnpm -r test` sweep all pass.
+**Skipped:** the original F6.2 (mark `spec.md` / `plan.md` as superseded) is dropped — it's busywork for state we delete two tasks later. Git history preserves the project's evolution.
+
+**All inbound references to `projects/mongo-pipeline-builder/**` already live inside the folder itself**, so F6.3 is essentially a verification step rather than a substantive scrub. (The only external mentions are in `wip/reviews/...`, which is `.gitignore`d.)
+
+#### F6.1 — Migrate design content into the MongoDB Family subsystem doc
+
+Target file: [`docs/architecture docs/subsystems/10. MongoDB Family.md`](../../../docs/architecture%20docs/subsystems/10.%20MongoDB%20Family.md).
+
+The 430-line spec is mostly project-history (problem, milestone-by-milestone requirements, security/cost/observability sections). The long-lived content to migrate is conceptual:
+
+- The three-state machine (CollectionHandle → FilteredCollection → PipelineChain) and per-state method-sets.
+- The marker table (which pipeline stages clear/preserve `UpdateEnabled` / `FindAndModifyEnabled`).
+- The terminals taxonomy (insert / unqualified / filtered / find-and-modify / upsert / pipeline-update / `$merge`-`$out` / raw).
+- The relationship between the unified field accessor and ADR 180.
+
+- [ ] F6.1.1 — Update the `Aggregation pipelines` section (line 177-ish): drop the stale "*A type-safe pipeline builder ... is a future goal*" sentence; replace with a paragraph noting the typed builder shipped, pointing at the package README for the surface and at the new state-machine ADR for the rationale.
+- [ ] F6.1.2 — Update the `Package layout` block (line ~268): call out `query-builder/` separately from `orm/` under `5-query-builders/`, with a one-line description of each.
+- [ ] F6.1.3 — Add a brief `Query builder` subsection under `## ORM` (or as its own top-level `## Query builder` section if it grows): conceptual summary of the three-state machine + marker pattern, terminals taxonomy, link to the package README for the practical "how to use it" content. Aim for ~50–80 lines, not a re-paste of the spec.
+- [ ] F6.1.4 — Update the `References` section to link the new ADR (F6.2) and the package README.
+
+#### F6.2 — ADRs
+
+- [ ] F6.2.1 — Draft **ADR 201 — Three-class state-machine builder pattern with phantom marker types** (next number; verify by reading `docs/architecture docs/ADR-INDEX.md`). Narrow scope: documents the pattern as used in `mongo-query-builder`, with a worked example and an explicit "candidate for reuse" note (e.g., for a future SQL query builder). Status: Accepted. Estimated length: ~150 lines including the worked example.
+- [ ] F6.2.2 — Add an addendum to [ADR 180](../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md) (or revision section, per the ADR template's conventions): note (a) the consolidated `FieldAccessor` replaced both `FieldProxy` and `FilterProxy` during the unification, and (b) the callable form `f("dot.path")` is currently permissive — type-safe path validation is tracked on [TML-2281](https://linear.app/prisma-company/issue/TML-2281).
+- [ ] F6.2.3 — Update `docs/architecture docs/ADR-INDEX.md` to list ADR 201.
+
+#### F6.3 — Verify external references
+
+- [ ] F6.3.1 — `rg -n 'projects/mongo-pipeline-builder' .` and confirm all hits are inside `projects/mongo-pipeline-builder/` (gets deleted in F6.4) or under `wip/` (gitignored). If any external hit appears, replace with the canonical `docs/` link from F6.1 or delete the reference if no longer load-bearing.
+
+#### F6.4 — Delete the project folder
+
+- [ ] F6.4.1 — `rm -rf projects/mongo-pipeline-builder/`.
+- [ ] F6.4.2 — `rg -n 'mongo-pipeline-builder' .` and confirm no results remain except lockfiles or generated artefacts that rebuild on next install.
+
+#### F6.5 — Final verification
+
+- [ ] F6.5.1 — `pnpm lint:deps` clean.
+- [ ] F6.5.2 — `pnpm -r typecheck` clean.
+- [ ] F6.5.3 — `pnpm -r test` clean.
 
 ### Close-out checks
 
@@ -221,10 +288,15 @@ Migrate the long-lived design content out of the project folder, mark the projec
 
 ## Open Items
 
-Resolved items omitted. Remaining:
+All open items have been resolved. See the resolved list below.
 
-1. **ADR scope for the state-machine pattern** (F6.1) — narrow ADR documenting the three-class + phantom-marker pattern used here, vs. a wider ADR positioning it as the recommended approach for any future builder (SQL, etc.). Lean: narrow now, widen if/when the SQL builder picks it up.
-2. **F5 ↔ F6 ordering** — if PR [#349](https://github.com/prisma/prisma-next/pull/349) is still unmerged when F6 is ready, F6 may ship first to avoid blocking the close-out. In that case F5 becomes a tiny standalone PR after [#349](https://github.com/prisma/prisma-next/pull/349) lands.
+### Resolved
+
+- **ADR scope for the state-machine pattern** (F6.2) — narrow ADR (ADR 201) documenting the three-class + phantom-marker pattern as used in `mongo-query-builder`, with an explicit "candidate for reuse" note for the future SQL query builder.
+- **ADR 180 scope** (F6.2) — addendum on ADR 180 noting the consolidated accessor and the TML-2281 callable-form follow-up, rather than a separate ADR.
+- **F5 ↔ F6 ordering** — PR [#349](https://github.com/prisma/prisma-next/pull/349) merged before this branch was ready for F5/F6, so both ship sequentially on this branch in one PR (F5 commit → F6 docs commit → F6 deletion commit).
+- **F5 conversion depth** — full conversion: both `check.source` and `run` move to `mongoQuery`, so the example showcases the unified surface end-to-end.
+- **F6.2 (mark as superseded)** — skipped; busywork for state deleted in F6.4. Git history preserves the project's evolution.
 
 ### Resolved during M0–M5 + F1–F4
 
