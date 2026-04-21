@@ -1,4 +1,5 @@
 export {
+  errorDataTransformContractMismatch,
   errorMigrationFileMissing,
   errorMigrationInvalidDefaultExport,
   errorMigrationPlanNotArray,
