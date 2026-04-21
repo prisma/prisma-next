@@ -32,14 +32,123 @@ export interface OpFactoryCall {
 
 Exported through the existing `framework-components/control` entrypoint. No abstract base class at framework level. No changes to existing framework interfaces. Adding `OpFactoryCall` is a pure addition.
 
-### Mongo retrofit
+### Mongo IR sync
 
-Mongo's existing `OpFactoryCallNode` (in `packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts`) declares `factory`, `operationClass`, and `label` — the exact three members of the new framework interface. Retrofit is a two-line change:
+Mongo and Postgres ship the same IR shape. The abstract-expression hierarchy introduced for Postgres later in this phase (`MigrationTsExpression`, polymorphic `renderTypeScript()` / `importRequirements()`) is applied to Mongo here so the two targets don't drift. Mongo's planner doesn't emit `dataTransform`, so `PlaceholderExpression` has no Mongo counterpart — the hierarchy stays open to future variants. No change to Mongo's rendered output (byte-identical), no change to Mongo's planner.
+
+**1. Framework interface retrofit.**
+
+Mongo's existing `OpFactoryCallNode` (in `packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts`) already declares `factory`, `operationClass`, and `label` — the exact three members of the new framework interface:
 
 1. Import `OpFactoryCall` from `@prisma-next/framework-components/control`.
 2. Add `implements OpFactoryCall` to the `OpFactoryCallNode` abstract class declaration.
 
-All five concrete Mongo call classes (`CreateIndexCall`, `DropIndexCall`, `CreateCollectionCall`, `DropCollectionCall`, `CollModCall`) inherit interface satisfaction from the base class — no per-class changes. No behavior change, no new tests needed beyond confirming `pnpm -r typecheck` still passes.
+All five concrete Mongo call classes inherit interface satisfaction from the base — no per-class changes for this step.
+
+**2. Mongo-internal `MigrationTsExpression` (new file).**
+
+`packages/3-mongo-target/1-mongo-target/src/core/migration-ts-expression.ts` — structurally identical to the Postgres sibling added later in this phase:
+
+```ts
+export interface ImportRequirement {
+  readonly moduleSpecifier: string;
+  readonly symbol: string;
+}
+
+export abstract class MigrationTsExpression {
+  abstract renderTypeScript(): string;
+  abstract importRequirements(): readonly ImportRequirement[];
+}
+```
+
+Not exported from the package. Not referenced in any cross-package signature. The two sibling copies of this class (Mongo's and Postgres's) are the target of the cross-target consolidation follow-up called out in `plan.md` — they're intentionally duplicated here to keep each target's internals self-contained until the lift lands.
+
+**3. `OpFactoryCallNode` extends `MigrationTsExpression`.**
+
+```ts
+import { MigrationTsExpression, type ImportRequirement } from './migration-ts-expression';
+
+abstract class OpFactoryCallNode extends MigrationTsExpression implements OpFactoryCall {
+  abstract readonly factory: string;
+  abstract readonly operationClass: MigrationOperationClass;
+  abstract readonly label: string;
+  abstract accept<R>(visitor: OpFactoryCallVisitor<R>): R;
+  // inherited abstracts from MigrationTsExpression:
+  // abstract renderTypeScript(): string;
+  // abstract importRequirements(): readonly ImportRequirement[];
+
+  protected freeze(): void {
+    Object.freeze(this);
+  }
+}
+```
+
+`OpFactoryCallVisitor<R>` stays. It's still used by the runtime-op side (wherever Mongo's IR-to-command dispatch currently lives); only the TypeScript renderer moves to polymorphism.
+
+**4. Concrete call classes implement `renderTypeScript()` and `importRequirements()`.**
+
+Each of the five classes (`CreateIndexCall`, `DropIndexCall`, `CreateCollectionCall`, `DropCollectionCall`, `CollModCall`) gains two new methods whose output exactly matches what the existing `renderCallVisitor` + `collectFactoryNames` path produces today. Example:
+
+```ts
+export class CreateIndexCall extends OpFactoryCallNode {
+  readonly factory = 'createIndex' as const;
+  // ... existing fields ...
+
+  renderTypeScript(): string {
+    return this.options
+      ? `createIndex(${renderLiteral(this.collection)}, ${renderLiteral(this.keys)}, ${renderLiteral(this.options)})`
+      : `createIndex(${renderLiteral(this.collection)}, ${renderLiteral(this.keys)})`;
+  }
+
+  importRequirements(): readonly ImportRequirement[] {
+    return [{ moduleSpecifier: '@prisma-next/target-mongo/migration', symbol: 'createIndex' }];
+  }
+
+  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
+    return visitor.createIndex(this);
+  }
+}
+```
+
+The `renderLiteral` / `renderKey` helpers currently in `render-typescript.ts` move to a small shared utility (e.g. `packages/3-mongo-target/1-mongo-target/src/core/render-literal.ts`) so the per-class `renderTypeScript()` methods can import them. This keeps the split between "how to render a value literal" (shared helper) and "how to render a call" (per-class method).
+
+**5. `renderCallsToTypeScript` goes polymorphic.**
+
+In `packages/3-mongo-target/1-mongo-target/src/core/render-typescript.ts`:
+
+```ts
+export function renderCallsToTypeScript(
+  calls: ReadonlyArray<OpFactoryCall>,
+  meta: RenderMigrationMeta,
+): string {
+  const imports = buildImports(calls);
+  const operationsBody = calls.map((c) => c.renderTypeScript()).join(',\n');
+  // ... existing class / describe / default-export wiring unchanged ...
+}
+
+function buildImports(calls: ReadonlyArray<OpFactoryCall>): string {
+  const requirements = calls.flatMap((c) => c.importRequirements());
+  // Always-present base import:
+  const perModule = new Map<string, Set<string>>([
+    ['@prisma-next/family-mongo/migration', new Set(['Migration'])],
+  ]);
+  for (const req of requirements) {
+    if (!perModule.has(req.moduleSpecifier)) perModule.set(req.moduleSpecifier, new Set());
+    perModule.get(req.moduleSpecifier)!.add(req.symbol);
+  }
+  return [...perModule.entries()]
+    .map(([mod, symbols]) => `import { ${[...symbols].sort().join(', ')} } from '${mod}';`)
+    .join('\n');
+}
+```
+
+Deleted: the `renderCallVisitor` constant and the hand-rolled `collectFactoryNames` helper. The `OpFactoryCallVisitor<R>` interface is retained (still used by the runtime-op side).
+
+**6. No other Mongo changes.**
+
+`planner-produced-migration.ts`, the Mongo planner, `mongoEmit`, and all Mongo CLI wiring are untouched. Only the IR and the TS renderer change.
+
+**Regression net.** Mongo's existing `render-typescript` unit / snapshot tests are the correctness gate — the polymorphic rewrite must produce byte-identical output to the pre-change visitor implementation. New per-class unit tests for `renderTypeScript()` and `importRequirements()` land alongside. `pnpm -r typecheck` and the Mongo test suite cover the rest.
 
 ### Family-SQL `Migration` alias
 
@@ -427,7 +536,13 @@ No changes to `packages/3-targets/3-targets/postgres/src/exports/control.ts` in 
 ## Acceptance criteria
 
 - [ ] `OpFactoryCall` interface exported from `framework-components/control`.
-- [ ] Mongo's `OpFactoryCallNode` abstract class declares `implements OpFactoryCall`; `pnpm -r typecheck` passes without additional per-class changes.
+- [ ] Mongo's `OpFactoryCallNode` abstract class declares `implements OpFactoryCall` and `extends MigrationTsExpression`.
+- [ ] Mongo's new `packages/3-mongo-target/1-mongo-target/src/core/migration-ts-expression.ts` defines `MigrationTsExpression` and `ImportRequirement`; the file is not re-exported (verify via `rg "MigrationTsExpression" packages/3-mongo-target/1-mongo-target/src/exports/` returns zero matches).
+- [ ] All five Mongo concrete call classes (`CreateIndexCall`, `DropIndexCall`, `CreateCollectionCall`, `DropCollectionCall`, `CollModCall`) implement `renderTypeScript()` and `importRequirements()`.
+- [ ] Mongo's `renderCallsToTypeScript` is rewritten to call `c.renderTypeScript()` / `c.importRequirements()` polymorphically; the `renderCallVisitor` const and `collectFactoryNames` helper are deleted.
+- [ ] Mongo's `OpFactoryCallVisitor<R>` interface is retained (still used by the runtime-op side).
+- [ ] Mongo's `render-typescript.test.ts` (and any snapshot tests) pass byte-identically after the rewrite.
+- [ ] New per-class Mongo unit tests for `renderTypeScript()` and `importRequirements()` land alongside.
 - [ ] Family-SQL `Migration` alias exists (implementation in `packages/2-sql/9-family/src/core/sql-migration.ts`, one-line re-export in `packages/2-sql/9-family/src/exports/migration.ts`) and is re-exported by `@prisma-next/target-postgres/migration`.
 - [ ] `migration-ts-expression.ts`, `placeholder-expression.ts`, `op-factory-call.ts`, `render-ops.ts`, `render-typescript.ts`, `planner-produced-postgres-migration.ts` all exist under `packages/3-targets/3-targets/postgres/src/core/migrations/`.
 - [ ] `MigrationTsExpression` and `PostgresOpFactoryCallNode` are not exported (verify via `rg "MigrationTsExpression|PostgresOpFactoryCallNode" packages/3-targets/3-targets/postgres/src/exports/` returning zero matches).
@@ -457,7 +572,8 @@ No changes to `packages/3-targets/3-targets/postgres/src/exports/control.ts` in 
 - No issue-planner changes. `descriptor-planner.ts`, `planner-strategies.ts` are untouched.
 - No changes to `migrationStrategy` or `migration plan`.
 - No CLI changes.
-- No cross-target generic `TypeScriptRenderableMigration` lift. Mongo's class stays separate (see plan.md §"Known follow-ups").
+- No cross-target generic `TypeScriptRenderableMigration` lift. Mongo's concrete class stays separate from Postgres's. The `MigrationTsExpression` / `ImportRequirement` duplication between the two targets is intentional here; it is the target of the cross-target consolidation follow-up (see `plan.md` §"Known follow-ups").
+- No change to Mongo's rendered migration.ts output (byte-identical). No change to Mongo's planner, `mongoEmit`, or CLI wiring.
 
 ## Risks
 
@@ -467,7 +583,7 @@ No changes to `packages/3-targets/3-targets/postgres/src/exports/control.ts` in 
 
 ## Estimate
 
-4–5 days. 1 day framework+family lift + call-class skeleton, 2 days walk-schema retargeting, 1 day renderers + tests, 0.5–1 day for integration test pass and label-parity fixes.
+5–6 days. 1 day framework+family lift + call-class skeleton, 2 days walk-schema retargeting, 1 day renderers + tests, 0.5–1 day integration test pass and label-parity fixes, 0.5–1 day Mongo IR sync (mechanical; `MigrationTsExpression` + polymorphic renderer rewrite, gated by Mongo's existing snapshot tests).
 
 ## References
 

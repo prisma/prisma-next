@@ -79,6 +79,8 @@ We make three decisions that govern the rest of this spec:
 
    Within Postgres, two such internal base classes serve the IR. `PostgresOpFactoryCallNode` is the abstract base for concrete call classes (visitor `accept()` plus the `OpFactoryCall` slots). Its own parent, `MigrationTsExpression`, is an abstract base for anything renderable as a TypeScript expression — `PostgresOpFactoryCallNode` itself, plus `PlaceholderExpression` (the AST node for a scaffolded `dataTransform` body). `MigrationTsExpression` defines two polymorphic members used by the TypeScript renderer: `renderTypeScript(): string` and `importRequirements(): readonly ImportRequirement[]`. Both base classes are package-private; consumers outside the Postgres package see only `OpFactoryCall` and the `PostgresOpFactoryCall` union of concrete classes.
 
+   Mongo receives the same IR shape in this project. Its existing `OpFactoryCallNode` gains `implements OpFactoryCall` (framework interface) and `extends MigrationTsExpression` (a Mongo-internal sibling of the Postgres abstract, structurally identical, also package-private). Each Mongo concrete call class implements the polymorphic `renderTypeScript()` / `importRequirements()` methods, and Mongo's `renderCallsToTypeScript` is rewritten to walk nodes polymorphically — no change to Mongo's rendered output. `PlaceholderExpression` has no Mongo counterpart; Mongo's planner doesn't emit `dataTransform`. Keeping Mongo and Postgres byte-compatible at the IR layer means the follow-up cross-target consolidation (Open Question 6) is a pure lift rather than a harmonize-then-lift.
+
    The renderable-migration wrapper is a Postgres-specific concrete class for now (`TypeScriptRenderablePostgresMigration`) implementing the existing `MigrationPlanWithAuthoringSurface<TOp>` interface (ADR 194). It is structurally identical to Mongo's equivalent and is a candidate for consolidation into a framework-level `TypeScriptRenderableMigration<TCall, TOp>` in a follow-up project (see Open Question 6).
 
 ## Non-goals
@@ -87,7 +89,7 @@ We make three decisions that govern the rest of this spec:
 - **Changing step content from `sql: string` to an AST.** Per ADR 191, each family chooses its step content shape; Postgres's `{ sql: string, description, meta? }` stays. A structured AST for cross-SQL DDL rendering is a separate project if we ever want it.
 - **Runner or driver changes.** Out of scope. Class-flow is an authoring-surface refactor; the execute path is unchanged.
 - **A friendlier DSL surface for authoring.** Factories accept fully-materialized literal arguments. Sugar layers (inline column shorthands, column builders) are out of scope; they can be layered on later if desired.
-- **MongoDB changes.** Only two Mongo-side deletions happen here: `mongoEmit` and `TargetMigrationsCapability.emit`, because those are cross-cutting framework deletions that land at the same time as their Postgres counterparts.
+- **MongoDB functional changes.** Mongo's planner, factories, CLI wiring, and rendered migration.ts output are untouched (byte-identical). The Mongo-side changes in scope are structural-only: a Phase 1 IR sync (`implements OpFactoryCall`, `extends MigrationTsExpression`, per-class polymorphic render methods, `renderCallsToTypeScript` rewritten to be polymorphic) so Mongo and Postgres share the same IR shape, and two Phase 6 deletions (`mongoEmit`, `TargetMigrationsCapability.emit`) that land with their Postgres counterparts.
 
 ## End-to-end execution flow
 
@@ -198,7 +200,7 @@ Organized around the same four flow steps.
 
 - [ ] `pnpm -r typecheck` passes across the monorepo.
 - [ ] `pnpm -r lint` passes.
-- [ ] No regression in Mongo migration e2e tests.
+- [ ] No regression in Mongo migration e2e tests (rendered migration.ts output is byte-identical after the Mongo IR sync; Mongo's existing `render-typescript` snapshot tests are the gate).
 
 ## Open questions
 
@@ -212,7 +214,7 @@ Organized around the same four flow steps.
 
 5. **Dev-push (`db update`) strategy set.** The strategy architecture accommodates a separate strategy list for destructive dev-push behavior. Does this project deliver that set, or only the data-safe `migrationPlanStrategies`? **Default assumption:** only the data-safe set. The existing `db update` path stays functional through the transition and is folded into the issue-based planner during the planner-collapse phase; a dedicated dev-push strategy set is a follow-up.
 
-6. **Cross-target consolidation of `TypeScriptRenderableMigration`.** `TypeScriptRenderablePostgresMigration` and Mongo's `PlannerProducedMongoMigration` are structurally identical: both hold `OpFactoryCall[]`, both inject `renderOps` / `renderCallsToTypeScript` visitors, both implement `MigrationPlanWithAuthoringSurface`. A framework-level `TypeScriptRenderableMigration<TCall extends OpFactoryCall, TOp>` would let each target alias the generic. **Default assumption (and known follow-up):** defer until the second class-flow target lands. Lifting an abstraction with one concrete consumer is premature; lifting with two is justified. The follow-up project also renames `PlannerProducedMongoMigration` to `TypeScriptRenderableMongoMigration` for naming parity. The follow-up is purely structural — no behavior change, no ADR change.
+6. **Cross-target consolidation of the IR and renderable-migration class.** Once this project lands, Mongo and Postgres share the same IR shape at the leaves — `MigrationTsExpression`, `ImportRequirement`, polymorphic `renderTypeScript()` / `importRequirements()`, the `OpFactoryCall` framework interface — but each target still keeps its own package-private copies of `MigrationTsExpression` / `ImportRequirement` and its own `TypeScriptRenderableXMigration` concrete class. The structural duplication is intentional until both targets exist with the full hierarchy. **Default assumption (and known follow-up):** defer the lift. The follow-up project lifts `MigrationTsExpression`, `ImportRequirement`, and a generic `TypeScriptRenderableMigration<TCall extends OpFactoryCall, TOp>` into `framework-components`, retrofits both targets, and optionally renames `PlannerProducedMongoMigration` to `TypeScriptRenderableMongoMigration` for naming parity. The follow-up is purely structural — no behavior change, no ADR change. The Phase 1 Mongo IR sync in this project is designed so the sibling hierarchies are byte-compatible at lift time, making the follow-up a pure de-duplication.
 
 ## References
 
