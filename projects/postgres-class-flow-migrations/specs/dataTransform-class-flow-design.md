@@ -8,7 +8,7 @@
 - **Collapse `check` and `run` to one closure type** — `() => SqlQueryPlan | Buildable`. No `boolean` form. `check` is optional (`undefined` means "no check"); if present it must be a closure. *Conscious divergence from Mongo*: Mongo's `check` is `{ source: () => plan, filter?, expect?, description? }` and derives both a precheck and a postcheck from the same source. Postgres's first-cut surface keeps `check` as a single closure; if we later want precheck/postcheck semantics with auto-inverted filters we can expand the type without breaking the closure form (e.g. accept `() => plan | { source, expect }`).
 - **New `PN-MIG-2005` for the contract-hash mismatch** — `errorDataTransformContractMismatch` in `@prisma-next/errors/migration`. Sits next to `errorUnfilledPlaceholder` (`PN-MIG-2001`) and the other authoring-time errors. *Not* `runtimeError('PLAN.HASH_MISMATCH', ...)` — that lives in `SqlFamilyAdapter.validatePlan` and produces `PN-RUN-*`, which is the wrong namespace when the error is surfaced at migration-authoring time (user looks it up → runtime docs, not migration docs). The two checks are semantically different: `validatePlan` rejects a plan at runtime execution; `dataTransform` rejects a plan at migration authoring. Type-level enforcement via a contract-typed `SqlQueryPlan<C, _Row>` remains a desirable follow-up.
 - **Contract import modelled as a normal `ImportRequirement`** on `DataTransformCall` — no scaffolder preamble special-case. Requires extending `ImportRequirement` to support default imports + import attributes.
-- **Contract artifacts copied into the migration dir, Mongo-parity** — we already have `copyContractToMigrationDir(packageDir, contractJsonPath)` copying `contract.json` + `contract.d.ts`. Extend it (or add a sibling helper) to also copy the *previous* contract artifacts as `from-contract.json` / `from-contract.d.ts`.
+- **Contract artifacts copied into the migration dir, Mongo-parity, via a generic copy helper** — `copyContractToMigrationDir` (`packages/1-framework/3-tooling/migration/src/io.ts`) is over-specialized: it hard-codes the `contract.json` + `contract.d.ts` pair and would have to grow more hard-coded knowledge to cover the source contract. Replace it with a generic "copy these files, optionally with rename" operation and call it once per contract (destination → `contract.*`, source → `from-contract.*`). The emitter from [PR #356](https://github.com/prisma/prisma-next/pull/356) provides the file list per contract directly, so the caller doesn't need to know which extensions live next to the `.json`.
 - **Attestation stays untouched** — per ADR 199 ("Storage-only migration identity"), attestation deliberately strips `fromContract` / `toContract` from the manifest envelope and anchors the identity via the storage-hash bookends already present in the envelope. `contract.json` / `from-contract.json` are convenience copies of data that's already hashed elsewhere — they MUST NOT be folded into `migrationId`.
 
 ## Changes from v1 (still in effect)
@@ -87,15 +87,28 @@ class M extends Migration {
 
 ### Contract available at module load
 
-The rendered migration needs `contract` importable at module scope. We do this Mongo-parity, via the existing `copyContractToMigrationDir(packageDir, contractJsonPath)` helper:
+The rendered migration needs `contract` importable at module scope. We do this Mongo-parity: copy the contract's emitted artifacts into the migration dir. Both contracts (destination and source) get copied, so the migration package is fully self-contained.
 
-- `packages/1-framework/3-tooling/migration/src/io.ts` already exposes `copyContractToMigrationDir`, which copies the destination contract's `contract.json` + colocated `contract.d.ts` into the migration package dir. The CLI invokes it from `migration new` and `migration plan`.
-- **Same pattern, extended**: when preparing a migration directory we copy *both* contract pairs:
-  - `contract.json` + `contract.d.ts` — the destination (`toContract`) artifacts, as today
-  - `from-contract.json` + `from-contract.d.ts` — the source (`fromContract`) artifacts, new
-- Rendered `migration.ts` imports the destination contract via `import contract from './contract.json' with { type: 'json' }`. The `from-contract.*` pair is provided for future needs (e.g. diff-aware authoring, pre-migration data inspection) and for parity with Mongo's migration-package contents.
+- Replace `copyContractToMigrationDir` with a generic copy helper in `packages/1-framework/3-tooling/migration/src/io.ts`. Proposed shape (bikeshedded in review):
 
-Implementation: extend `copyContractToMigrationDir` to accept an optional `fromContractJsonPath` and copy the second pair under `from-contract.*` names, or add a thin sibling helper `copyFromContractToMigrationDir`. Either way, callers in `cli/src/commands/migration-new.ts` and `cli/src/commands/migration-plan.ts` get a one-line addition to hand in `manifest.fromContract`'s on-disk path.
+  ```ts
+  export async function copyFilesWithRename(
+    destDir: string,
+    files: readonly { readonly sourcePath: string; readonly destName: string }[],
+  ): Promise<void>;
+  ```
+
+  The existing "destination contract" callers go from one specialized function call to a three-line `copyFilesWithRename(dir, [{ sourcePath: contract.json, destName: 'contract.json' }, { sourcePath: contract.d.ts, destName: 'contract.d.ts' }])` (or similar). ENOENT on any input throws; no tolerance for missing optional siblings (that logic moves to the caller if still needed).
+
+- The callers (`cli/src/commands/migration-new.ts`, `cli/src/commands/migration-plan.ts`) invoke the helper **twice**:
+  1. once for the destination contract — rename to `contract.*`
+  2. once for the source contract — rename to `from-contract.*`
+
+  The list of files per contract comes from the emitter (post-[PR #356](https://github.com/prisma/prisma-next/pull/356) the emitter exposes a `files(): readonly string[]` or equivalent on its output). No hard-coded `.json` / `.d.ts` knowledge in the copy helper.
+
+- Rendered `migration.ts` imports the destination contract via `import contract from './contract.json' with { type: 'json' }`. The `from-contract.*` pair is provided for future needs (diff-aware authoring, pre-migration data inspection) and for parity with Mongo's migration-package contents.
+
+- If the source contract is semantically absent (first migration of a project, no prior state), skip the second copy — no synthesized empty files.
 
 ## Signatures
 
@@ -320,12 +333,23 @@ No scaffolder preamble special-case. Every migration that contains at least one 
 
 ## Writing `contract.json` alongside `migration.ts`
 
-Mongo-parity, via the existing `copyContractToMigrationDir` helper (`packages/1-framework/3-tooling/migration/src/io.ts`). Already wired from `migration new` and `migration plan` — they just hand in the on-disk path to the destination contract's `contract.json`, and the helper copies it (plus its sibling `contract.d.ts`) into the migration package dir under canonical names (`contract.json`, `contract.d.ts`).
+Mongo-parity, but via a **generic copy helper** rather than a specialized one. The existing `copyContractToMigrationDir` hard-codes knowledge of the `contract.json` + `contract.d.ts` pair; that specialization would only grow if we bolted `fromContractJsonPath` onto it. Replace it with a narrower primitive.
 
-**Addition for this PR**: also copy the source (`fromContract`) artifacts as `from-contract.json` / `from-contract.d.ts`. The shape of the extension can be either:
+**Helper** (in `packages/1-framework/3-tooling/migration/src/io.ts`):
 
-- Option 1 (preferred): extend `copyContractToMigrationDir` with an optional `fromContractJsonPath` parameter; copy the source pair under `from-contract.*` when provided.
-- Option 2: add a sibling helper `copyFromContractToMigrationDir(packageDir, fromContractJsonPath)` with identical shape.
+```ts
+export async function copyFilesWithRename(
+  destDir: string,
+  files: readonly { readonly sourcePath: string; readonly destName: string }[],
+): Promise<void>;
+```
+
+No knowledge of `.json` / `.d.ts` siblings; no knowledge of what "contract artifacts" are. Missing source paths throw ENOENT. The existing callers of `copyContractToMigrationDir` migrate to this shape in a pure refactor.
+
+**Callers** (`cli/src/commands/migration-new.ts`, `cli/src/commands/migration-plan.ts`) invoke it twice:
+
+1. **Destination contract** → rename to `contract.*`. Source file list comes from the emitter (post-[PR #356](https://github.com/prisma/prisma-next/pull/356) the emitter exposes its emitted files directly; pre-#356 the caller reconstructs the list from the known `contract.output` + sibling `.d.ts` convention — document this as a short-lived expedient if #356 hasn't landed by the time this PR is implemented).
+2. **Source contract** → rename to `from-contract.*`. Skipped entirely if the source contract is semantically absent (first migration of a project).
 
 On disk, the final migration package for a class-flow migration looks like:
 
@@ -352,8 +376,8 @@ migrations/<timestamp>_<name>/
 - **modify**: `packages/1-framework/1-core/ts-render/src/<renderer>.ts` (emit default imports + import attributes; reject conflicting attribute sets on the same module)
 - **modify**: `packages/3-targets/3-targets/postgres/src/core/migrations/render-typescript.ts` (no special case for contract; just consume the richer `ImportRequirement`)
 - **modify**: `packages/3-targets/3-targets/postgres/src/core/migrations/operation-resolver.ts` (inline the `DataTransformOperation` construction — Option A above)
-- **modify**: `packages/1-framework/3-tooling/migration/src/io.ts` (`copyContractToMigrationDir` — extend with optional `fromContractJsonPath`, or add `copyFromContractToMigrationDir`)
-- **modify**: `packages/1-framework/3-tooling/cli/src/commands/migration-new.ts` and `migration-plan.ts` — pass the source contract path alongside the destination contract path
+- **replace**: `packages/1-framework/3-tooling/migration/src/io.ts` — remove `copyContractToMigrationDir`, add a generic `copyFilesWithRename(destDir, files)` (or similarly-shaped) helper. Callers provide the source paths and desired destination filenames; the helper has no knowledge of `contract.json` or sibling `.d.ts` files.
+- **modify**: `packages/1-framework/3-tooling/cli/src/commands/migration-new.ts` and `migration-plan.ts` — invoke the generic helper twice: once with the destination contract's file list (renamed to `contract.*`), once with the source contract's file list (renamed to `from-contract.*`, skipped if absent). Source file list comes from the emitter's post-#356 files API.
 - **new structured error**: `errorDataTransformContractMismatch` (`PN-MIG-2005`) in `packages/1-framework/1-core/errors/src/migration.ts`, re-exported via `exports/migration.ts`
 - **new test**: `packages/3-targets/3-targets/postgres/test/migrations/operations/data-transform.test.ts`
 - **new/extended tests**: `packages/1-framework/1-core/ts-render/test/*` for default imports + import attributes + attribute-conflict error
@@ -384,10 +408,11 @@ migrations/<timestamp>_<name>/
    - Rendered stub contains `import contract from "./contract.json" with { type: "json" };` when the plan includes any `DataTransformCall`, and omits it otherwise.
    - Rendered output for `DataTransformCall` matches the new `dataTransform(contract, ..., { check, run })` shape.
 
-5. **Migration-dir preparation** (extended `io.test.ts`)
-   - `copyContractToMigrationDir` copies destination `contract.json` + `contract.d.ts` as today.
-   - When passed a source contract path (or via `copyFromContractToMigrationDir`), also copies `from-contract.json` + `from-contract.d.ts`.
-   - Missing `from-contract.d.ts` tolerated (parity with existing `.d.ts` handling); missing `from-contract.json` throws.
+5. **Migration-dir preparation** (rewritten `io.test.ts`)
+   - `copyFilesWithRename(destDir, files)` copies each entry in `files` to `destDir/<destName>`, preserving contents byte-for-byte.
+   - Missing source path throws (ENOENT).
+   - Destination directory is created if it doesn't exist (unless the current semantics require it pre-existing — match whatever `copyContractToMigrationDir` did here, since callers rely on it).
+   - Call-site integration (in `migration-new`/`migration-plan` command tests): destination contract copied under `contract.*`; source contract copied under `from-contract.*`; when source contract is absent, no `from-contract.*` files appear.
 
 6. **Attestation** (existing `attestation.test.ts`)
    - Add a regression asserting that adding/removing `contract.json` or `from-contract.json` from the migration dir does not change the computed `migrationId`. Anchors the ADR-199 invariant explicitly against the new artifacts.
@@ -402,13 +427,17 @@ migrations/<timestamp>_<name>/
 9. **E2E** (`cli-journeys/data-transform.e2e.test.ts`)
    - Un-skip (F02) — verify filled migration emits, applies against live Postgres, passes verify.
 
-## Open questions
+## Resolved decisions
 
-1. **`ImportRequirement` extension shape** — `{ kind, attributes }` as two new optional fields, as sketched above? Or a discriminated union `NamedImport | DefaultImport`? Both work; the inline-optional variant is mechanically smaller.
-2. **`copyContractToMigrationDir` extension** — extend the existing helper with an optional `fromContractJsonPath`, or add a sibling `copyFromContractToMigrationDir`? (Preference: extend — fewer entry points.)
-3. **Combined `import contract, { something } from "./contract"` lines** — if anything ever needs a named import from `./contract.json` (type-only doesn't apply to JSON modules), do we combine with the default, or keep a separate line? Only matters if this case ever arises; current scope uses only the default import.
-4. **F02 (live-DB e2e) scope** — un-skip now, or keep skipped and document? Depends on whether the CI live-DB harness is already green on `main`.
-5. **Follow-up Linear ticket** — worth cutting one right now for type-level contract-hash enforcement (`SqlQueryPlan<C, _Row>`), so the v3 runtime check doesn't linger as the permanent safety net?
+Formerly "open questions", all resolved before implementation began:
+
+1. **`ImportRequirement` extension shape** — go with two new optional fields `{ kind?: 'named' | 'default'; attributes?: Readonly<Record<string, string>> }`. Simpler than a discriminated union; existing call sites stay unchanged.
+2. **`copyContractToMigrationDir` — replace with a generic file-copy, not a specialized extension**. The current helper is already over-specialized; bolting a `fromContractJsonPath` argument onto it doubles down on that shape. Replace it with a thin, generic copy operation and call it once per contract (destination + source). The emitter post-[PR #356](https://github.com/prisma/prisma-next/pull/356) returns a *list of files* per contract, so the caller iterates that list and copies it verbatim into the migration dir — no special knowledge of `.json` + `.d.ts` pairings baked into the helper. The rename convention (`contract.*` for destination, `from-contract.*` for source) lives in the caller, not the helper.
+3. **Combined `import contract, { something } from "./contract"` lines** — no preference; pick whichever falls out naturally from the renderer implementation. Current scope uses only the default import, so this is forward-compat wiggle room. Lock the chosen shape in via a renderer test.
+4. **F02 (live-DB e2e) scope** — un-skip in this PR. PR 2's merge gate in [`pr-plan.md`](../pr-plan.md) already requires "All CLI journey e2e pass — their fixtures and assertions get updated as part of this PR", so this finding is in-scope for PR 2 and not deferred.
+5. **Follow-up Linear ticket for type-level contract-hash enforcement** — filed as [TML-2291](https://linear.app/prisma-company/issue/TML-2291/class-flow-datatransform-type-level-contract-hash-enforcement-via) under the "Optional cleanup & refactoring" milestone of WS4. The runtime check stays as the safety net until that lands.
+
+The design above and below has been updated throughout to reflect these decisions.
 
 ## Non-goals
 
@@ -441,8 +470,8 @@ Ship small, intent-driven commits (`.claude/skills/commit-as-you-go/SKILL.md` /`
 
 1. **Errors package**: add `errorDataTransformContractMismatch` (`PN-MIG-2005`) to `packages/1-framework/1-core/errors/src/migration.ts`, re-export from `exports/migration.ts`, add the unit test in `test/migration.test.ts`. Isolated; shippable alone.
 2. **Extend `ImportRequirement`**: optional `kind` + `attributes` on the interface in `packages/1-framework/1-core/ts-render/src/ts-expression.ts`; teach the renderer to emit default imports and import attributes, and to reject conflicting attribute sets on the same module. Ship with new/extended `ts-render` tests.
-3. **Extend `copyContractToMigrationDir`**: optional `fromContractJsonPath` parameter in `packages/1-framework/3-tooling/migration/src/io.ts` that copies `from-contract.json` / `from-contract.d.ts`. Extend `test/io.test.ts`.
-4. **Wire CLI callers**: `cli/src/commands/migration-new.ts` and `migration-plan.ts` pass the source contract path. The source contract's on-disk path comes from workspace config (`contract.output`) — same resolution the `toContract` path uses today. If `fromContract` is semantically absent (e.g. first migration of a project), skip the `from-contract.*` copy (don't synthesize empty files).
+3. **Replace `copyContractToMigrationDir` with generic `copyFilesWithRename`** in `packages/1-framework/3-tooling/migration/src/io.ts`. Rewrite `test/io.test.ts` for the new shape. Update existing callers of `copyContractToMigrationDir` to the new helper (pure refactor for those callsites — semantics unchanged).
+4. **Wire CLI callers**: `cli/src/commands/migration-new.ts` and `migration-plan.ts` invoke `copyFilesWithRename` twice — once per contract, with the desired rename (`contract.*` / `from-contract.*`). Source and destination contract file lists come from the emitter's post-#356 files API. If `fromContract` is semantically absent (first migration of a project), skip the second call; don't synthesize empty files.
 5. **Replace `operations/data-transform.ts`**: delete the existing file's contents, reuse the filename with the consolidated factory described above, export from `src/exports/migration.ts`.
 6. **Update `DataTransformCall`**: in `op-factory-call.ts`, rewrite `renderTypeScript()` to the new four-argument shape, extend `importRequirements()` to declare the `contract` default import with `{ type: 'json' }` attributes. `toOp()` is unchanged.
 7. **Inline descriptor-flow resolver**: inline the `DataTransformOperation` construction in `operation-resolver.ts::resolveDataTransform` (Option A). Delete any helper imports that are now dead.
