@@ -1,6 +1,6 @@
 # Postgres class-flow migrations — Plan
 
-This plan describes how we execute the [spec](./spec.md) — the phases, their ordering rationale, the risks, and the acceptance gates.
+This plan describes how we execute the [spec](./spec.md) — the phases, their ordering rationale, the risks, and the acceptance gates. See [`pr-plan.md`](./pr-plan.md) for how the phases map onto pull requests.
 
 ## Detailed task specs
 
