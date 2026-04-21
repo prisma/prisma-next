@@ -1,7 +1,7 @@
 /**
  * Resolves thin operation descriptors into SqlMigrationPlanOperation objects
  * by looking up contract types and delegating to the pure factories in
- * `op-factories.ts`.
+ * the per-kind modules under `operations/`.
  *
  * Each `resolveX(descriptor, context)` is a thin wrapper that performs the
  * context-dependent materialization (contract lookup, codec expansion, schema
@@ -25,30 +25,6 @@ import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-c
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { lowerSqlPlan } from '@prisma-next/sql-runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
-import {
-  type ColumnSpec,
-  addColumn as createAddColumn,
-  addEnumValues as createAddEnumValues,
-  addForeignKey as createAddForeignKey,
-  addPrimaryKey as createAddPrimaryKey,
-  addUnique as createAddUnique,
-  alterColumnType as createAlterColumnType,
-  createEnumType as createCreateEnumType,
-  createIndex as createCreateIndex,
-  createTable as createCreateTable,
-  createDataTransform,
-  dropColumn as createDropColumn,
-  dropConstraint as createDropConstraint,
-  dropDefault as createDropDefault,
-  dropEnumType as createDropEnumType,
-  dropIndex as createDropIndex,
-  dropNotNull as createDropNotNull,
-  dropTable as createDropTable,
-  renameType as createRenameType,
-  setDefault as createSetDefault,
-  setNotNull as createSetNotNull,
-  type ForeignKeySpec,
-} from './op-factories';
 import type {
   AddColumnDescriptor,
   AddEnumValuesDescriptor,
@@ -73,6 +49,37 @@ import type {
   SetDefaultDescriptor,
   SetNotNullDescriptor,
 } from './operation-descriptors';
+import {
+  addColumn as createAddColumn,
+  alterColumnType as createAlterColumnType,
+  dropColumn as createDropColumn,
+  dropDefault as createDropDefault,
+  dropNotNull as createDropNotNull,
+  setDefault as createSetDefault,
+  setNotNull as createSetNotNull,
+} from './operations/columns';
+import {
+  addForeignKey as createAddForeignKey,
+  addPrimaryKey as createAddPrimaryKey,
+  addUnique as createAddUnique,
+  dropConstraint as createDropConstraint,
+} from './operations/constraints';
+import { createDataTransform } from './operations/data-transform';
+import {
+  addEnumValues as createAddEnumValues,
+  createEnumType as createCreateEnumType,
+  dropEnumType as createDropEnumType,
+  renameType as createRenameType,
+} from './operations/enums';
+import {
+  createIndex as createCreateIndex,
+  dropIndex as createDropIndex,
+} from './operations/indexes';
+import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
+import {
+  createTable as createCreateTable,
+  dropTable as createDropTable,
+} from './operations/tables';
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
 import { buildExpectedFormatType } from './planner-sql-checks';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
