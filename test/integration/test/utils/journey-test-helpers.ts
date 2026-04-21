@@ -6,7 +6,9 @@
  * so journey tests stay concise and readable.
  */
 
+import { execFile } from 'node:child_process';
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createContractInferCommand } from '@prisma-next/cli/commands/contract-infer';
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
@@ -15,7 +17,6 @@ import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
-import { createMigrationEmitCommand } from '@prisma-next/cli/commands/migration-emit';
 import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
 import { createMigrationRefCommand } from '@prisma-next/cli/commands/migration-ref';
@@ -23,8 +24,12 @@ import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import type { Command } from 'commander';
-import { join } from 'pathe';
+import { join, resolve } from 'pathe';
 import { afterAll, beforeAll } from 'vitest';
+
+const execFileAsync = promisify(execFile);
+const TSX_BIN = resolve(import.meta.dirname, '../../../../node_modules/.bin/tsx');
+
 import { executeCommand, getExitCode, setupCommandMocks } from './cli-test-helpers';
 
 // ---------------------------------------------------------------------------
@@ -380,11 +385,41 @@ export async function runMigrationShow(
   return runCommand(createMigrationShowCommand(), ctx, extraArgs);
 }
 
+/**
+ * Self-emits a migration package by running its `migration.ts` directly with
+ * `tsx`. The migration.ts invokes `Migration.run(import.meta.url, …)`, which
+ * serializes the class's `operations` to `ops.json` and attests
+ * `migration.json` in the package directory.
+ *
+ * Accepts a trailing `--dir <path>` pair (relative to `ctx.testDir`) to stay
+ * source-compatible with the old `migration emit --dir` callsites. Any other
+ * arguments are forwarded to the spawned process so tests can pass flags like
+ * `--dry-run`.
+ */
 export async function runMigrationEmit(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
-  return runCommandRaw(createMigrationEmitCommand(), ctx.testDir, extraArgs);
+  const args = [...extraArgs];
+  const dirIdx = args.indexOf('--dir');
+  if (dirIdx < 0 || dirIdx === args.length - 1) {
+    throw new Error(
+      'runMigrationEmit requires `--dir <migration-dir>` so we know which migration.ts to execute',
+    );
+  }
+  const relDir = args[dirIdx + 1]!;
+  args.splice(dirIdx, 2);
+
+  const migrationTs = join(ctx.testDir, relDir, 'migration.ts');
+  try {
+    const { stdout, stderr } = await execFileAsync(TSX_BIN, [migrationTs, ...args], {
+      cwd: ctx.testDir,
+    });
+    return { exitCode: 0, stdout, stderr };
+  } catch (error) {
+    const e = error as { stdout?: string; stderr?: string; code?: number };
+    return { exitCode: e.code ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
+  }
 }
 
 export async function runMigrationRef(

@@ -69,8 +69,8 @@ export function errorDataTransformContractMismatch(options: {
 
 /**
  * `migration.ts` was expected at the given package directory but could not be
- * located. Thrown by `emitMigration` (and, as a belt-and-suspenders, by
- * class-flow `emit` capabilities) when the file is missing.
+ * located. Thrown when consumers attempt to read a migration package that is
+ * missing its source file.
  */
 export function errorMigrationFileMissing(dir: string): CliStructuredError {
   return new CliStructuredError('2002', 'migration.ts not found', {
