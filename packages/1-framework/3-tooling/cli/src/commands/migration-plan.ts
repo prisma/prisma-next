@@ -4,7 +4,7 @@ import { createControlStack } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration } from '@prisma-next/migration-tools/dag';
 import {
-  copyContractToMigrationDir,
+  copyFilesWithRename,
   formatMigrationDirName,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
@@ -172,6 +172,11 @@ async function executeMigrationPlanCommand(
   // Read existing migrations and determine "from" contract
   let fromContract: Contract | null = null;
   let fromHash: string = EMPTY_CONTRACT_HASH;
+  // TODO(#356): replace the sibling-`.d.ts` expedient below with the
+  // contract emitter's `files()` API once that PR lands, so we can
+  // declare the source-contract artifacts the same way as the
+  // destination-contract artifacts.
+  let fromContractSourceDir: string | null = null;
 
   try {
     const { attested: bundles, drafts, graph } = await loadAllBundles(migrationsDir);
@@ -205,6 +210,7 @@ async function executeMigrationPlanCommand(
       }
       fromHash = resolved.value.manifest.to;
       fromContract = resolved.value.manifest.toContract;
+      fromContractSourceDir = resolved.value.dirPath;
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
@@ -212,6 +218,7 @@ async function executeMigrationPlanCommand(
         const leafPkg = bundles.find((p) => p.manifest.migrationId === latestMigration.migrationId);
         if (leafPkg) {
           fromContract = leafPkg.manifest.toContract;
+          fromContractSourceDir = leafPkg.dirPath;
         }
       }
     }
@@ -372,7 +379,27 @@ async function executeMigrationPlanCommand(
     }
 
     await writeMigrationPackage(packageDir, manifest, []);
-    await copyContractToMigrationDir(packageDir, contractPathAbsolute);
+    // TODO(#356): the emitter should own the list of contract artifacts to
+    // copy — for now we rely on the sibling `.d.ts` convention for the
+    // destination contract and reuse the prior migration's copied
+    // artifacts for the source contract.
+    const contractDtsAbsolute = `${contractPathAbsolute.slice(0, -'.json'.length)}.d.ts`;
+    await copyFilesWithRename(packageDir, [
+      { sourcePath: contractPathAbsolute, destName: 'contract.json' },
+      { sourcePath: contractDtsAbsolute, destName: 'contract.d.ts' },
+    ]);
+    if (fromContractSourceDir !== null) {
+      await copyFilesWithRename(packageDir, [
+        {
+          sourcePath: join(fromContractSourceDir, 'contract.json'),
+          destName: 'from-contract.json',
+        },
+        {
+          sourcePath: join(fromContractSourceDir, 'contract.d.ts'),
+          destName: 'from-contract.d.ts',
+        },
+      ]);
+    }
     await writeMigrationTs(packageDir, migrationTsContent);
 
     if (hasPlaceholders) {
