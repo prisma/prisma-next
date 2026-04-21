@@ -89,7 +89,13 @@ const renderVisitor: PostgresOpFactoryCallVisitor<Op> = {
     return dropNotNull(call.schemaName, call.tableName, call.columnName);
   },
   setDefault(call: SetDefaultCall): Op {
-    return setDefault(call.schemaName, call.tableName, call.columnName, call.defaultSql);
+    return setDefault(
+      call.schemaName,
+      call.tableName,
+      call.columnName,
+      call.defaultSql,
+      call.operationClass,
+    );
   },
   dropDefault(call: DropDefaultCall): Op {
     return dropDefault(call.schemaName, call.tableName, call.columnName);
@@ -110,7 +116,7 @@ const renderVisitor: PostgresOpFactoryCallVisitor<Op> = {
     return dropIndex(call.schemaName, call.tableName, call.indexName);
   },
   dropConstraint(call: DropConstraintCall): Op {
-    return dropConstraint(call.schemaName, call.tableName, call.constraintName);
+    return dropConstraint(call.schemaName, call.tableName, call.constraintName, call.kind);
   },
   createEnumType(call: CreateEnumTypeCall): Op {
     return createEnumType(call.schemaName, call.typeName, call.values);
