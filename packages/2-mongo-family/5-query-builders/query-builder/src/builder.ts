@@ -190,11 +190,15 @@ export class PipelineChain<
   }
 
   /**
-   * `$skip`. Clears `UpdateEnabled`; preserved for `findAndModify` (which has
-   * a `skip` slot).
+   * `$skip`. Clears both markers — MongoDB's `findAndModify` wire command
+   * has no `skip` slot, so `deconstructFindAndModifyChain` rejects any
+   * `$skip` at runtime; keeping the marker `fam-cleared` makes the type
+   * system reflect the same constraint (see ADR 201 marker table).
    */
-  skip(n: number): PipelineChain<TContract, Shape, 'update-cleared', F, 'past-leading'> {
-    return this.#withStage<Shape, 'update-cleared', F>(new MongoSkipStage(n));
+  skip(
+    n: number,
+  ): PipelineChain<TContract, Shape, 'update-cleared', 'fam-cleared', 'past-leading'> {
+    return this.#withStage<Shape, 'update-cleared', 'fam-cleared'>(new MongoSkipStage(n));
   }
 
   sample(

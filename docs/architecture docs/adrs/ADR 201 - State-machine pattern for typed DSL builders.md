@@ -47,7 +47,7 @@ The user-facing entry point `mongoQuery<Contract>({...}).from(name)` returns a `
 Once the chain is inside `PipelineChain`, the remaining distinctions aren't whole new vocabularies — they're subsets of terminals that become illegal as specific pipeline stages accumulate. Two terminals are in this bucket:
 
 - The no-arg `.updateMany()` / `.updateOne()` form, which consumes the accumulated pipeline as an `update`-with-pipeline spec. Legal only if every prior stage is representable as an update-pipeline stage (so no `$limit`, no `$group`, no `$lookup`, …).
-- `.findOneAndUpdate(...)` / `.findOneAndDelete(...)`, which deconstructs the accumulated pipeline into the wire command's `{ filter, sort, skip }` slots. Legal only if every prior stage fits one of those slots.
+- `.findOneAndUpdate(...)` / `.findOneAndDelete(...)`, which deconstructs the accumulated pipeline into the wire command's `{ filter, sort }` slots. Legal only if every prior stage fits one of those slots.
 
 Splitting `PipelineChain` into `SortedPipelineChain`, `LimitedPipelineChain`, `GroupedPipelineChain`, `SortedLimitedPipelineChain`, … is a combinatorial class explosion. Instead, `PipelineChain` stays a single class and carries two **phantom type parameters** — type parameters that never appear in a runtime value, only in the type position, used to track compile-time state:
 
@@ -129,7 +129,7 @@ Every pipeline-stage method's return type must match this table. It is the invar
 | -------------------- | --------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
 | `.match(...)`        | preserve        | preserve               | Pure filter; AND-folds into every downstream command's filter slot.                      |
 | `.sort(...)`         | clear           | preserve               | `update` has no per-document sort; `findAndModify` has a `sort` slot.                    |
-| `.skip(...)`         | clear           | preserve               | `update` has no skip; `findAndModify` has a `skip` slot.                                 |
+| `.skip(...)`         | clear           | clear                  | `update` has no skip; `findAndModify` has no skip slot either (aggregation-only stage).  |
 | `.limit(...)`        | clear           | clear                  | `update` has no limit; `findAndModify` already implies single-document semantics.        |
 | `.sample(...)`       | clear           | clear                  | Random-ordered; not representable as either update pipeline or find-and-modify inputs.   |
 | `.addFields(...)`    | preserve        | clear                  | Representable as update-with-pipeline `$set`; no analogue in the find-and-modify slots.  |
