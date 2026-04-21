@@ -254,10 +254,10 @@ type OpMatchesField<Op, CodecId extends string, CT extends Record<string, unknow
 }
   ? Self extends { readonly codecId: CodecId }
     ? true
-    : Self extends { readonly traits: infer RequiredTraits extends string }
+    : Self extends { readonly traits: infer RequiredTraits extends readonly string[] }
       ? CodecId extends keyof CT
         ? CT[CodecId] extends { readonly traits: infer FieldTraits }
-          ? RequiredTraits extends FieldTraits
+          ? [RequiredTraits[number]] extends [FieldTraits]
             ? true
             : false
           : false

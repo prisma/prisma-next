@@ -14,7 +14,7 @@ export type Expand<T> = { [K in keyof T]: T[K] } & unknown;
 export type EmptyRow = Record<never, ScopeField>;
 
 export type ScopeField = { codecId: string; nullable: boolean };
-export type TraitField = { traits: string; nullable: boolean };
+export type TraitField = { traits: readonly string[]; nullable: boolean };
 export type FieldSpec = ScopeField | TraitField;
 export type ScopeTable = Record<string, ScopeField>;
 

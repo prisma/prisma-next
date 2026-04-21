@@ -57,6 +57,42 @@ describe('OperationRegistry', () => {
     );
   });
 
+  it('throws when an arg has neither codecId nor traits', () => {
+    const registry = createOperationRegistry();
+
+    expect(() =>
+      registry.register(
+        descriptor('bad', {
+          args: [{ nullable: false }],
+        }),
+      ),
+    ).toThrow('Operation "bad" arg[0] has neither codecId nor traits');
+  });
+
+  it('throws when an arg has both codecId and traits', () => {
+    const registry = createOperationRegistry();
+
+    expect(() =>
+      registry.register(
+        descriptor('bad', {
+          args: [{ codecId: 'pg/text@1', traits: ['textual'], nullable: false }],
+        }),
+      ),
+    ).toThrow('Operation "bad" arg[0] has both codecId and traits');
+  });
+
+  it('accepts trait-only arg', () => {
+    const registry = createOperationRegistry();
+
+    expect(() =>
+      registry.register(
+        descriptor('fine', {
+          args: [{ traits: ['textual'], nullable: false }],
+        }),
+      ),
+    ).not.toThrow();
+  });
+
   it('strips method from stored entry', () => {
     const registry = createOperationRegistry();
     registry.register(descriptor('cosineDistance'));

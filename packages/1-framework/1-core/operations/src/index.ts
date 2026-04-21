@@ -33,6 +33,18 @@ export function createOperationRegistry<
       if (descriptor.method in operations) {
         throw new Error(`Operation "${descriptor.method}" is already registered`);
       }
+      descriptor.args.forEach((arg, i) => {
+        const hasCodecId = arg.codecId !== undefined;
+        const hasTraits = arg.traits !== undefined && arg.traits.length > 0;
+        if (!hasCodecId && !hasTraits) {
+          throw new Error(
+            `Operation "${descriptor.method}" arg[${i}] has neither codecId nor traits`,
+          );
+        }
+        if (hasCodecId && hasTraits) {
+          throw new Error(`Operation "${descriptor.method}" arg[${i}] has both codecId and traits`);
+        }
+      });
       const { method: _method, ...entry } = descriptor;
       // OperationDescriptor<T> = T & { method }, so stripping method yields T.
       // TypeScript can't prove Omit<T & { method }, 'method'> = T for generic T.

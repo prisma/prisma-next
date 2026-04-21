@@ -169,7 +169,7 @@ export type OperationTypesOf<T> = [T] extends [never]
 
 export type QueryOperationArgSpec = {
   readonly codecId?: string;
-  readonly traits?: CodecTrait;
+  readonly traits?: readonly CodecTrait[];
   readonly nullable: boolean;
 };
 

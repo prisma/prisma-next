@@ -69,10 +69,10 @@ export type OrderByScope<
 
 type CodecIdsWithTrait<
   CT extends Record<string, { readonly input: unknown }>,
-  Trait extends string,
+  RequiredTraits extends readonly string[],
 > = {
   [K in keyof CT & string]: CT[K] extends { readonly traits: infer T }
-    ? Trait extends T
+    ? [RequiredTraits[number]] extends [T]
       ? K
       : never
     : never;
@@ -84,7 +84,7 @@ type ResolveExtArg<Arg, CT extends Record<string, { readonly input: unknown }>> 
 }
   ? ExpressionOrValue<{ codecId: CId; nullable: N }, CT>
   : Arg extends {
-        readonly traits: infer T extends string;
+        readonly traits: infer T extends readonly string[];
         readonly nullable: infer N extends boolean;
       }
     ? ExpressionOrValue<{ codecId: CodecIdsWithTrait<CT, T>; nullable: N }, CT>

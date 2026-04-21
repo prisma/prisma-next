@@ -41,6 +41,8 @@ type RelationPredicateInput<TContract extends Contract<SqlStorage>, ModelName ex
   | ((model: ModelAccessor<TContract, ModelName>) => AnyExpression)
   | Record<string, unknown>;
 
+type NamedOp = readonly [name: string, entry: SqlOperationEntry];
+
 export function createModelAccessor<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
@@ -53,9 +55,9 @@ export function createModelAccessor<
     RelationMeta
   >;
 
-  const opsByCodecId = new Map<string, [string, SqlOperationEntry][]>();
+  const opsByCodecId = new Map<string, NamedOp[]>();
 
-  function registerOp(codecId: string, op: [string, SqlOperationEntry]) {
+  function registerOp(codecId: string, op: NamedOp) {
     let existing = opsByCodecId.get(codecId);
     if (!existing) {
       existing = [];
@@ -66,7 +68,7 @@ export function createModelAccessor<
 
   for (const [name, entry] of Object.entries(context.queryOperations.entries())) {
     const self = entry.args[0];
-    const op: [string, SqlOperationEntry] = [name, entry];
+    const op: NamedOp = [name, entry];
     if (self?.codecId) {
       registerOp(self.codecId, op);
     } else if (self?.traits) {
@@ -125,7 +127,7 @@ function createScalarFieldAccessor(
   columnName: string,
   codecId: string | undefined,
   traits: readonly string[],
-  operations: ReadonlyArray<[string, SqlOperationEntry]>,
+  operations: readonly NamedOp[],
   context: ExecutionContext,
 ): Partial<ComparisonMethodFns<unknown>> {
   const column = ColumnRef.of(tableName, columnName);

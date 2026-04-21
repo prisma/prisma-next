@@ -1,3 +1,4 @@
+import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
@@ -521,6 +522,43 @@ describe('createModelAccessor', () => {
       expect(order.dir).toBe('asc');
       expect(order.expr.kind).toBe('operation');
       expect((order.expr as OperationExpr).method).toBe('cosineDistance');
+    });
+
+    it('attaches trait-targeted op only when codec traits are a superset of required traits', () => {
+      const queryOperations = createSqlOperationRegistry();
+      queryOperations.register({
+        method: 'synthetic',
+        args: [{ traits: ['equality', 'textual'], nullable: false }],
+        returns: { codecId: 'pg/bool@1', nullable: false },
+        lowering: { targetFamily: 'sql', strategy: 'function', template: 'SYNTHETIC({{self}})' },
+      });
+
+      const codecs = createCodecRegistry();
+      for (const [id, traits] of Object.entries({
+        'pg/text@1': ['equality', 'textual'],
+        'pg/int4@1': ['equality'],
+        'pg/bool@1': ['equality', 'boolean'],
+      } as Record<string, readonly CodecTrait[]>)) {
+        codecs.register(
+          codec({
+            typeId: id,
+            targetTypes: [],
+            traits,
+            encode: (v: unknown) => v,
+            decode: (v: unknown) => v,
+          }),
+        );
+      }
+
+      const ctx = { ...context, queryOperations, codecs };
+      const user = createModelAccessor(ctx, 'User');
+      const post = createModelAccessor(ctx, 'Post');
+
+      const name = user['name'] as unknown as Record<string, unknown>;
+      expect(typeof name['synthetic']).toBe('function');
+
+      const views = post['views'] as unknown as Record<string, unknown>;
+      expect(views['synthetic']).toBeUndefined();
     });
   });
 });
