@@ -1,5 +1,11 @@
 /**
- * Integration tests for `operation-resolver.ts`.
+ * Integration tests for `operation-resolver.ts` — transient regression coverage.
+ *
+ * After Phase 3's capability flip, `resolveDescriptors` is no longer registered on
+ * the Postgres `TargetMigrationsCapability`. These tests now call `resolveOperations`
+ * directly to guard against regressions in the descriptor resolver while it still
+ * ships in the module. Once the descriptor flow is deleted in a later phase, this
+ * file goes with it.
  *
  * The descriptor pipeline (`planDescriptors` → `resolveOperations`) is otherwise
  * uncovered by integration tests — the legacy planner integration tests bypass

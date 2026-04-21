@@ -1,14 +1,27 @@
 /**
- * Descriptor-based migration planner.
+ * Issue-based migration planner.
  *
- * Takes schema issues (from verifySqlSchema) and emits PostgresMigrationOpDescriptor[].
+ * Takes schema issues (from verifySqlSchema) and maps them to migration ops.
  * Migration strategies consume issues they recognize and produce specialized op
  * sequences (e.g., NOT NULL backfill → addColumn(nullable) + dataTransform + setNotNull).
- * Remaining issues get default descriptor mapping.
+ * Remaining issues get default mapping.
  *
- * This planner does NOT produce SqlMigrationPlanOperation — that's the resolver's job.
- * The separation means the same descriptors work for both planner-generated and
- * user-authored migrations.
+ * This module currently hosts two parallel pipelines during the class-flow transition:
+ *
+ * - `planDescriptors` — the original path returning `PostgresMigrationOpDescriptor[]`.
+ *   Still consumed by descriptor-flow regression tests and the `resolveOperations`
+ *   path; scheduled for deletion in a later phase once the walk-schema planner is
+ *   gone. `planDescriptors` does NOT produce `SqlMigrationPlanOperation` — that's
+ *   the resolver's job.
+ *
+ * - `planIssues` — the class-flow path returning `PostgresOpFactoryCall[]`. This is
+ *   what `PostgresMigrationPlanner` will consume once the walk-schema planner is
+ *   removed. For data-safety strategies, `DataTransformCall` wraps `placeholder(...)`
+ *   stubs so the user must hand-edit `migration.ts` before `migration emit` succeeds.
+ *
+ * Both pipelines apply the same issue ordering (dep → drop → table → column → alter →
+ * constraint) and share the strategy-chain-then-default-mapping shape, so behavior
+ * differences between them are localized to the per-strategy call sites.
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -31,7 +44,6 @@ import {
   DropColumnCall,
   DropConstraintCall,
   DropDefaultCall,
-  DropEnumTypeCall,
   DropIndexCall,
   DropNotNullCall,
   DropTableCall,
@@ -839,13 +851,13 @@ function mapIssueToCall(
             };
             return ok([new AddForeignKeyCall(schemaName, issue.table, fkSpec)]);
           }
-          return ok([
-            new AddForeignKeyCall(schemaName, issue.table, {
-              name: fkName,
-              columns,
-              references: { table: '', columns: [] },
-            }),
-          ]);
+          return notOk(
+            issueConflict(
+              'foreignKeyConflict',
+              `Foreign key on "${issue.table}" (${columns.join(', ')}) referenced in issue but not found in destination contract`,
+              { table: issue.table },
+            ),
+          );
         }
       }
       return notOk(
@@ -947,8 +959,15 @@ function classifyCall(
     case 'createIndex':
     case 'addForeignKey':
       return 'constraint';
-    default:
+    case 'dataTransform':
+    case 'rawSql':
       return 'alter';
+    default: {
+      const _exhaustive: never = call;
+      throw new Error(
+        `Unhandled call in classifyCall: ${(_exhaustive as PostgresOpFactoryCall).factoryName}`,
+      );
+    }
   }
 }
 

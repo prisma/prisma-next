@@ -1,19 +1,12 @@
 /**
- * Descriptor planner scenario tests.
+ * Descriptor planner scenario tests — transient regression coverage.
  *
- * Tests the full planWithDescriptors path: contractToSchemaIR → verifySqlSchema → planDescriptors.
- * Each test builds a from-contract (or null) and a to-contract, runs the planner,
- * and asserts the descriptors produced.
- *
- * See descriptor-planner.scenarios.md for the full scenario list.
- */
-
-/**
- * Descriptor planner scenario tests.
- *
- * Tests the full planWithDescriptors path: contractToSchemaIR → verifySqlSchema → planDescriptors.
- * Each test builds a from-contract (or null) and a to-contract, runs the planner,
- * and asserts the descriptors produced.
+ * After Phase 3's capability flip, `planWithDescriptors` is no longer registered
+ * on the Postgres `TargetMigrationsCapability`. These tests now hand-assemble the
+ * descriptor pipeline (`contractToSchemaIR` → `verifySqlSchema` → `planDescriptors`
+ * called directly) to guard against regressions in `planDescriptors` and the
+ * descriptor strategies while they still ship in the module. Once the descriptor
+ * flow is deleted in a later phase, this file goes with it.
  *
  * See descriptor-planner.scenarios.md for the full scenario list.
  */
