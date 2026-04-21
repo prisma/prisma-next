@@ -6,10 +6,10 @@
  * no codec hooks, no `db` handle. All context-dependent materialization happens
  * in the thin `resolveX` wrappers in `operation-resolver.ts`.
  *
- * Phase 0 constraint: factories never import `@prisma-next/framework-components`,
- * `@prisma-next/contract`, or depend on `OperationResolverContext`. In Phase 1
- * these factories become the 1:1 backing implementations for `OpFactoryCall`
- * classes.
+ * Purity constraint: factories never import `@prisma-next/contract` or depend
+ * on `OperationResolverContext`. They are the 1:1 backing implementations for
+ * the `OpFactoryCall` classes in `op-factory-call.ts`, and are also the shared
+ * authoring entry points for class-flow `migration.ts` files.
  */
 
 import { escapeLiteral, qualifyName, quoteIdentifier } from '@prisma-next/adapter-postgres/control';
