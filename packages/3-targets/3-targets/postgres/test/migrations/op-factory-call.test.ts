@@ -258,14 +258,14 @@ describe('renderOps', () => {
     }
   });
 
-  it('throws on DataTransformCall until bodyToClosure is wired', () => {
+  it('throws PN-MIG-2001 on DataTransformCall with placeholder bodies', () => {
     const call = new DataTransformCall(
       'Backfill',
       new PlaceholderExpression('check'),
       new PlaceholderExpression('run'),
     );
 
-    expect(() => renderOps([call])).toThrow(/bodyToClosure/);
+    expect(() => renderOps([call])).toThrow(/Unfilled migration placeholder/);
   });
 });
 

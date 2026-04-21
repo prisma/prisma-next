@@ -18,6 +18,7 @@
  * `PostgresOpFactoryCall` union.
  */
 
+import { placeholder } from '@prisma-next/errors/migration';
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type {
   OpFactoryCall as FrameworkOpFactoryCall,
@@ -46,11 +47,24 @@ import {
   setDefault,
   setNotNull,
 } from './op-factories';
+import { PlaceholderExpression } from './placeholder-expression';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
 const TARGET_MIGRATION_MODULE = '@prisma-next/target-postgres/migration';
+
+/**
+ * Converts a `TsExpression` body into a closure for runtime use.
+ * `PlaceholderExpression` yields a closure that throws `PN-MIG-2001`
+ * when invoked — the designed failure mode for unfilled slots.
+ */
+function bodyToClosure(expr: TsExpression): () => never {
+  if (expr instanceof PlaceholderExpression) {
+    return () => placeholder(expr.slot);
+  }
+  throw new Error(`bodyToClosure: unsupported TsExpression variant: ${expr.constructor.name}`);
+}
 
 export interface PostgresOpFactoryCallVisitor<R> {
   createTable(call: CreateTableCall): R;
@@ -777,14 +791,11 @@ export class RenameTypeCall extends PostgresOpFactoryCallNode {
 /**
  * `check` and `run` accept any `TsExpression` — today that's
  * `PlaceholderExpression`, tomorrow it could be e.g. a pre-computed closure
- * expression. `renderOps` narrows via `bodyToClosure`; anything it doesn't
- * recognize surfaces as a planner bug.
+ * expression. `toOp()` converts each body via `bodyToClosure`; anything it
+ * doesn't recognize surfaces as a planner bug.
  *
- * Phase 1 scope: the walk-schema planner never constructs a
- * `DataTransformCall`. It ships here so the IR is structurally complete
- * (and so Phase 2 can plug data transforms into the issue-planner retarget
- * without reshaping the union). `renderOps.dataTransform` is stubbed —
- * see `render-ops.ts`.
+ * When either body is a `PlaceholderExpression`, `toOp()` throws
+ * `PN-MIG-2001` — the designed failure mode for unfilled slots.
  */
 export class DataTransformCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'dataTransform' as const;
@@ -812,7 +823,9 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
   }
 
   toOp(): Op {
-    throw new Error('DataTransformCall.toOp() requires bodyToClosure wiring (F03)');
+    // Both calls throw for PlaceholderExpression bodies (PN-MIG-2001).
+    // Future non-placeholder expressions would produce ops instead of throwing.
+    return bodyToClosure(this.check)();
   }
 
   renderTypeScript(): string {
