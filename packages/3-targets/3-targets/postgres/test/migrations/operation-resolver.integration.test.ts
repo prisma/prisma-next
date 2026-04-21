@@ -16,15 +16,23 @@ import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
-import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
+import {
+  collectInitDependencies,
+  extractCodecControlHooks,
+  type SqlMigrationPlanOperation,
+} from '@prisma-next/family-sql/control';
+import { MigrationDescriptorArraySchema } from '@prisma-next/family-sql/operation-descriptors';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   DataTransformOperation,
   OperationDescriptor,
 } from '@prisma-next/framework-components/control';
+import { sql } from '@prisma-next/sql-builder/runtime';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { type } from 'arktype';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { resolveOperations } from '../../src/core/migrations/operation-resolver';
 import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner-target-details';
 import postgresTargetDescriptor from '../../src/exports/control';
 import {
@@ -103,10 +111,25 @@ function contract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
 }
 
 function resolve(descriptors: OperationDescriptor[], toContract: Contract<SqlStorage>) {
-  return postgresTargetDescriptor.migrations!.resolveDescriptors!(descriptors, {
-    fromContract: null,
+  const validated = MigrationDescriptorArraySchema([...descriptors]);
+  if (validated instanceof type.errors) {
+    throw new Error(`Invalid migration descriptors:\n${validated.summary}`);
+  }
+  const codecHooks = extractCodecControlHooks(frameworkComponents);
+  const dependencies = collectInitDependencies(frameworkComponents);
+  const db = sql({
+    context: {
+      contract: toContract,
+      queryOperations: { entries: () => ({}) },
+      applyMutationDefaults: () => [],
+    } as never,
+  });
+  return resolveOperations(validated, {
     toContract,
-    frameworkComponents,
+    schemaName: 'public',
+    codecHooks,
+    dependencies,
+    db,
   });
 }
 
