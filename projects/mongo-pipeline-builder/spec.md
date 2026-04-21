@@ -22,6 +22,7 @@ The core technical challenge is **tracking how the document shape transforms thr
 | **M4: Pipeline builder with shape tracking** | [TML-2211](https://linear.app/prisma-company/issue/TML-2211) | **In progress** |
 | M5: Remaining stages, pipeline-style updates | [TML-2212](https://linear.app/prisma-company/issue/TML-2212) | To-do |
 | Follow-up: Complete expression helpers | [TML-2217](https://linear.app/prisma-company/issue/TML-2217) | ✅ Complete |
+| Follow-up: Type-safe callable field accessor dot-paths | [TML-2281](https://linear.app/prisma-company/issue/TML-2281) — [spec](specs/callable-field-accessor-path-validation.spec.md) · [plan](plans/callable-field-accessor-path-validation-plan.md) | ✅ Complete |
 
 # Requirements
 
@@ -140,6 +141,7 @@ No change from existing Mongo data access patterns. The pipeline builder produce
 # References
 
 - [Pipeline builder task plan](plans/pipeline-builder-plan.md) — detailed design for TML-2211
+- [Callable field accessor path validation spec](specs/callable-field-accessor-path-validation.spec.md) and [plan](plans/callable-field-accessor-path-validation-plan.md) — TML-2281
 - [ADR 183 — Aggregation pipeline only, never find API](../../docs/architecture%20docs/adrs/ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md)
 - [ADR 180 — Dot-path field accessor](../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md)
 - [SQL query builder](../../packages/2-sql/4-lanes/sql-builder/) — precedent for fluent API, immutable state, `ScopeField`/`ResolveRow`
