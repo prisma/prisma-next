@@ -2626,6 +2626,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/framework-components
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../../1-framework/3-tooling/migration
       '@prisma-next/sql-builder':
         specifier: workspace:*
         version: link:../../../2-sql/4-lanes/sql-builder
