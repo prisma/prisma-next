@@ -159,7 +159,7 @@ Phase 0 is a behavior-preserving internal refactor. Revert the PR if tests fail.
 **Framework lift** (`packages/1-framework/1-core/framework-components/src/control-migration-types.ts`):
 
 - Add `OpFactoryCall` interface: `{ readonly factory: string; readonly operationClass: MigrationOperationClass; readonly label: string }`. Re-exported through `framework-components`'s control entrypoint. No abstract base class at framework or family level.
-- Rationale: the structural shape is identical across targets (Mongo, Postgres, anything future). Lifting now means consumer-facing type positions (renderer signatures, planner returns, visitor inputs) reference a single framework-level interface rather than a target-specific or family-specific abstraction. Mongo's existing concrete call classes are not retrofitted in this project — they already happen to satisfy the interface structurally; the explicit `implements OpFactoryCall` annotation is a follow-up item bundled with the broader cross-target consolidation.
+- Rationale: the structural shape is identical across targets (Mongo, Postgres, anything future). Lifting now means consumer-facing type positions (renderer signatures, planner returns, visitor inputs) reference a single framework-level interface rather than a target-specific or family-specific abstraction. Mongo's existing `OpFactoryCallNode` abstract base class is retrofitted with an explicit `implements OpFactoryCall` annotation as part of Phase 1 — a two-line change (one import + one annotation) that all five Mongo concrete call classes inherit without further edits.
 
 **Family-SQL abstractions** (`packages/2-sql/9-family`):
 
@@ -461,9 +461,8 @@ The follow-up:
 1. Lift a `TypeScriptRenderableMigration<TCall extends OpFactoryCall, TOp>` generic class into `framework-components`.
 2. Retrofit Mongo: `class PlannerProducedMongoMigration extends TypeScriptRenderableMigration<MongoOpFactoryCall, MongoMigrationPlanOperation>` (or a type alias). Rename to `TypeScriptRenderableMongoMigration` for naming parity.
 3. Retrofit Postgres: same treatment for `TypeScriptRenderablePostgresMigration`.
-4. Add explicit `implements OpFactoryCall` annotations on Mongo's existing concrete call classes (currently they satisfy the interface structurally without an explicit annotation).
 
-This is a purely structural refactor — no behavior change, no ADR change, no `migrationId` impact. It's deferred until both targets exist because lifting an abstraction with one concrete consumer is premature; lifting with two is justified.
+This is a purely structural refactor — no behavior change, no ADR change. It's deferred until both targets exist because lifting an abstraction with one concrete consumer is premature; lifting with two is justified. (Note: the `implements OpFactoryCall` annotation on Mongo's `OpFactoryCallNode` is *not* part of this follow-up — it's folded into Phase 1 of this project, where the interface is introduced.)
 
 ## References
 
