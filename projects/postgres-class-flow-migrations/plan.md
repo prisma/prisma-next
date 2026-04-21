@@ -519,6 +519,22 @@ Scheduled before a second SQL target (SQLite) lands so we don't ship two op-firs
 
 `projects/postgres-class-flow-migrations/assets/walk-schema-audit.md` per `specs/walk-schema-audit.spec.md` is a pending deliverable used to guide Phase 4 (planner collapse). Phase 1 shipped the class-flow IR without the audit because the shipped walk-schema retarget uses `liftOpToCall` as a universal bridge rather than per-branch call-class construction; the audit is only required as input to Phase 4 and can be produced as its opening task.
 
+### Ergonomic `rawSql(...)` for hand-authored migrations (PR #359 re-review, R3)
+
+Today `rawSql(op)` is an identity function over a full `SqlMigrationPlanOperation<PostgresPlanTargetDetails>`. That shape is exactly what the planner's `liftOpToCall` bridge needs — it already has a complete op to wrap — but it is verbose for a user writing a hand-coded migration that only needs a single `ALTER TABLE …` escape hatch: every field (`id`, `label`, `operationClass`, `target`, `precheck`, `execute`, `postcheck`) is required boilerplate.
+
+Follow-up (Phase 2/3 authoring-surface polish): add an ergonomic overload / companion factory that accepts the common hand-authored shape, e.g.
+
+```ts
+rawSql({
+  sql: 'ALTER TABLE "public"."user" ALTER COLUMN "role" SET STORAGE PLAIN',
+  label: 'Tighten user.role storage',
+  operationClass: 'widening',
+});
+```
+
+and derives the rest (`id` from a stable hash of `sql + label`, `target` defaulting to the migration's schema, empty `precheck`/`postcheck`). The existing full-op signature remains for the planner's laundering use. Not a blocker for Phase 1 — the current shape is correct, just verbose.
+
 ## References
 
 - Spec: [`spec.md`](./spec.md)
