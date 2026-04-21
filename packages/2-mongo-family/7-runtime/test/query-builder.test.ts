@@ -132,7 +132,7 @@ describe('pipeline builder integration', () => {
         .limit(2)
         .build();
 
-      expect(plan.meta.lane).toBe('mongo-pipeline');
+      expect(plan.meta.lane).toBe('mongo-query');
       const rows = await ctx.runtime.execute(plan);
       expect(rows).toHaveLength(2);
 
