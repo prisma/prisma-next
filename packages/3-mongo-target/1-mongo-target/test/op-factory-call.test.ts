@@ -2,9 +2,8 @@
  * Per-class unit coverage for the Mongo class-flow IR:
  *
  * - Every `*Call` class constructs with literal args, is frozen, computes its
- *   label + operationClass, dispatches through `accept()` to the right
- *   visitor method, and emits the expected TypeScript expression + import
- *   requirements.
+ *   label + operationClass, lowers to the matching runtime op via `toOp()`,
+ *   and emits the expected TypeScript expression + import requirements.
  * - Import requirements always reference `@prisma-next/target-mongo/migration`
  *   and the factory's own symbol — a regression guard against accidentally
  *   widening the import surface.
@@ -14,19 +13,25 @@
  *   minimal.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import {
+  collMod,
+  createCollection,
+  createIndex,
+  dropCollection,
+  dropIndex,
+} from '../src/core/migration-factories';
 import {
   CollModCall,
   CreateCollectionCall,
   CreateIndexCall,
   DropCollectionCall,
   DropIndexCall,
-  type OpFactoryCallVisitor,
 } from '../src/core/op-factory-call';
 
 describe('Mongo call classes', () => {
-  describe('construction + dispatch', () => {
-    it('CreateIndexCall freezes, labels from collection + keys, and dispatches createIndex', () => {
+  describe('construction + toOp parity', () => {
+    it('CreateIndexCall freezes, labels from collection + keys, and lowers to createIndex(...)', () => {
       const call = new CreateIndexCall('users', [{ field: 'email', direction: 1 }], {
         unique: true,
       });
@@ -36,12 +41,12 @@ describe('Mongo call classes', () => {
       expect(call.operationClass).toBe('additive');
       expect(call.label).toBe('Create index on users (email:1)');
 
-      const visitor = makeDispatchSpy();
-      call.accept(visitor);
-      expect(visitor.createIndex).toHaveBeenCalledWith(call);
+      expect(call.toOp()).toEqual(
+        createIndex('users', [{ field: 'email', direction: 1 }], { unique: true }),
+      );
     });
 
-    it('DropIndexCall freezes, labels destructively, and dispatches dropIndex', () => {
+    it('DropIndexCall freezes, labels destructively, and lowers to dropIndex(...)', () => {
       const call = new DropIndexCall('users', [{ field: 'legacy', direction: -1 }]);
 
       expect(Object.isFrozen(call)).toBe(true);
@@ -49,12 +54,10 @@ describe('Mongo call classes', () => {
       expect(call.operationClass).toBe('destructive');
       expect(call.label).toBe('Drop index on users (legacy:-1)');
 
-      const visitor = makeDispatchSpy();
-      call.accept(visitor);
-      expect(visitor.dropIndex).toHaveBeenCalledWith(call);
+      expect(call.toOp()).toEqual(dropIndex('users', [{ field: 'legacy', direction: -1 }]));
     });
 
-    it('CreateCollectionCall freezes, labels additively, and dispatches createCollection', () => {
+    it('CreateCollectionCall freezes, labels additively, and lowers to createCollection(...)', () => {
       const call = new CreateCollectionCall('users');
 
       expect(Object.isFrozen(call)).toBe(true);
@@ -62,12 +65,10 @@ describe('Mongo call classes', () => {
       expect(call.operationClass).toBe('additive');
       expect(call.label).toBe('Create collection users');
 
-      const visitor = makeDispatchSpy();
-      call.accept(visitor);
-      expect(visitor.createCollection).toHaveBeenCalledWith(call);
+      expect(call.toOp()).toEqual(createCollection('users'));
     });
 
-    it('DropCollectionCall freezes, labels destructively, and dispatches dropCollection', () => {
+    it('DropCollectionCall freezes, labels destructively, and lowers to dropCollection(...)', () => {
       const call = new DropCollectionCall('users');
 
       expect(Object.isFrozen(call)).toBe(true);
@@ -75,12 +76,10 @@ describe('Mongo call classes', () => {
       expect(call.operationClass).toBe('destructive');
       expect(call.label).toBe('Drop collection users');
 
-      const visitor = makeDispatchSpy();
-      call.accept(visitor);
-      expect(visitor.dropCollection).toHaveBeenCalledWith(call);
+      expect(call.toOp()).toEqual(dropCollection('users'));
     });
 
-    it('CollModCall defaults operationClass to destructive and uses a default label', () => {
+    it('CollModCall defaults operationClass to destructive, uses a default label, and lowers to collMod(...)', () => {
       const call = new CollModCall('users', { validator: { $jsonSchema: { type: 'object' } } });
 
       expect(Object.isFrozen(call)).toBe(true);
@@ -88,12 +87,12 @@ describe('Mongo call classes', () => {
       expect(call.operationClass).toBe('destructive');
       expect(call.label).toBe('Modify collection users');
 
-      const visitor = makeDispatchSpy();
-      call.accept(visitor);
-      expect(visitor.collMod).toHaveBeenCalledWith(call);
+      expect(call.toOp()).toEqual(
+        collMod('users', { validator: { $jsonSchema: { type: 'object' } } }),
+      );
     });
 
-    it('CollModCall honors caller-supplied meta.label and meta.operationClass', () => {
+    it('CollModCall honors caller-supplied meta.label and meta.operationClass and passes meta through toOp', () => {
       const call = new CollModCall(
         'users',
         { validator: { $jsonSchema: { type: 'object' } } },
@@ -102,6 +101,14 @@ describe('Mongo call classes', () => {
 
       expect(call.operationClass).toBe('widening');
       expect(call.label).toBe('Tighten users validator');
+
+      expect(call.toOp()).toEqual(
+        collMod(
+          'users',
+          { validator: { $jsonSchema: { type: 'object' } } },
+          { label: 'Tighten users validator', operationClass: 'widening' },
+        ),
+      );
     });
   });
 
@@ -188,13 +195,3 @@ describe('Mongo call classes', () => {
     });
   });
 });
-
-function makeDispatchSpy(): OpFactoryCallVisitor<void> {
-  return {
-    createIndex: vi.fn(),
-    dropIndex: vi.fn(),
-    createCollection: vi.fn(),
-    dropCollection: vi.fn(),
-    collMod: vi.fn(),
-  };
-}
