@@ -1,8 +1,17 @@
 # Task spec — Phase 1: Walk-schema planner → class-flow IR
 
+> **Post-implementation note (PR #359 review):** this spec was authored before the IR and renderer machinery was implemented. The shipped shape diverges from the original design in a few ways captured at the top here; the body below preserves the original design narrative for context. Where the two disagree, the shipped code is authoritative.
+>
+> - The `OpFactoryCall` interface field is named `factoryName`, not `factory` (W02). `factoryName` is a string label suitable for diagnostics; it is not a function reference.
+> - There is no `MigrationTsExpression` abstract in either target. `TsExpression`, `ImportRequirement`, and `jsonToTsSource` (renamed from `renderLiteral`) live in a shared framework package `@prisma-next/framework-ts-render` and are extended by both Postgres and Mongo (W04+W05).
+> - There is no `PlaceholderExpression` AST node. `DataTransformCall` accepts `checkSlot` / `runSlot` strings directly; its `renderTypeScript()` wraps each slot as `() => placeholder("slot")` at the call site; its `toOp()` always throws `errorUnfilledPlaceholder(label)` (`PN-MIG-2001`) (W07 + user simplification).
+> - Lowering a call to a runtime op is polymorphic, not visitor-based. `PostgresOpFactoryCallNode` declares `abstract toOp(): SqlMigrationPlanOperation<PostgresPlanTargetDetails>`; each concrete class delegates to its pure factory. `renderOps(calls)` is now `calls.map(c => c.toOp())` (W10). The `PostgresOpFactoryCallVisitor<R>` interface has been removed.
+> - Pure factories live under `src/core/migrations/operations/{tables,columns,indexes,constraints,enums,dependencies,data-transform,raw}.ts` rather than a monolithic `op-factories.ts` (W06).
+> - The factory inventory gained `rawSql`, `createExtension`, and `createSchema` (F05/F06). `rawSql` wraps a pre-built op verbatim; `liftOpToCall(op)` in `planner.ts` dispatches structured ops to `CreateExtensionCall` / `CreateSchemaCall` / etc., falling back to `RawSqlCall` so every planner emission becomes a call-IR node without the op-first machinery leaking into the IR.
+
 ## Summary
 
-Introduce the class-flow IR (`OpFactoryCall` interface + Postgres concrete call classes + visitor interface + two renderers + renderable-migration class) and retarget the **walk-schema planner** (`createPostgresMigrationPlanner.plan()` in `planner.ts` and `planner-reconciliation.ts`) to build `PostgresOpFactoryCall[]` internally. The planner's existing `MigrationPlannerResult` output shape is unchanged; `renderOps` is invoked at the tail of `plan()` to produce the same `SqlMigrationPlanOperation[]` the planner emits today.
+Introduce the class-flow IR (`OpFactoryCall` interface + Postgres concrete call classes + polymorphic rendering + renderable-migration class) and retarget the **walk-schema planner** (`createPostgresMigrationPlanner.plan()` in `planner.ts` and `planner-reconciliation.ts`) to build `PostgresOpFactoryCall[]` internally. The planner's existing `MigrationPlannerResult` output shape is unchanged; `renderOps` is invoked at the tail of `plan()` to produce the same `SqlMigrationPlanOperation[]` the planner emits today.
 
 `migration plan` is untouched. The issue planner is untouched. `db update` is the live integration coverage for the new path.
 

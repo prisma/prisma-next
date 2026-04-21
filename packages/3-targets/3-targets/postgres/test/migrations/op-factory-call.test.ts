@@ -563,7 +563,10 @@ describe('renderOps', () => {
       id: 'raw.identity',
       label: 'raw identity',
       operationClass: 'widening' as const,
-      target: { id: 'postgres' as const, details: { schema: 'x', objectType: 'table', name: 't' } },
+      target: {
+        id: 'postgres' as const,
+        details: { schema: 'x', objectType: 'table' as const, name: 't' },
+      },
       precheck: [],
       execute: [{ description: 'do', sql: 'SELECT 1' }],
       postcheck: [],

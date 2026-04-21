@@ -28,17 +28,28 @@ By the end of the project, the framework gains an `OpFactoryCall` interface and 
 
 ```
 packages/1-framework/1-core/framework-components/src/
-└── control-migration-types.ts  # + OpFactoryCall interface { factory, operationClass, label }
+└── control-migration-types.ts  # + OpFactoryCall interface { factoryName, operationClass, label }
+
+packages/1-framework/1-core/framework-ts-render/src/
+├── ts-expression.ts         # abstract TsExpression (renderTypeScript + importRequirements)
+├── import-requirement.ts    # ImportRequirement shape
+└── json-to-ts-source.ts     # jsonToTsSource (JsonValue → TS literal expression)
 
 packages/3-targets/3-targets/postgres/src/core/migrations/
-├── migration-ts-expression.ts  # abstract MigrationTsExpression (internal)
-├── placeholder-expression.ts   # PlaceholderExpression (scaffolded dataTransform body)
-├── op-factory-call.ts       # PostgresOpFactoryCall concrete classes (each implements OpFactoryCall) + visitor interface
-├── op-factories.ts          # Pure createX(...literalArgs) functions
-├── render-ops.ts            # renderOps visitor (PostgresOpFactoryCall[] → operations)
+├── op-factory-call.ts       # PostgresOpFactoryCallNode (abstract, internal) + concrete *Call classes
+├── operations/              # Pure factories, thematically grouped
+│   ├── tables.ts
+│   ├── columns.ts
+│   ├── indexes.ts
+│   ├── constraints.ts
+│   ├── enums.ts
+│   ├── dependencies.ts      # createExtension, createSchema
+│   ├── data-transform.ts
+│   └── raw.ts               # rawSql
+├── render-ops.ts            # renderOps(calls) = calls.map(c => c.toOp())
 ├── render-typescript.ts     # renderCallsToTypeScript polymorphic walk (PostgresOpFactoryCall[] → migration.ts source)
 ├── planner-produced-postgres-migration.ts  # TypeScriptRenderablePostgresMigration concrete class
-├── planner.ts               # PostgresMigrationPlanner (thin shell post-Phase 4)
+├── planner.ts               # PostgresMigrationPlanner (thin shell post-Phase 4) + liftOpToCall dispatcher
 ├── issue-planner.ts         # SchemaIssue[] → strategy chain → default mapping → PostgresOpFactoryCall[]
 ├── strategies.ts            # NOT-NULL backfill, unsafe type change, nullable tightening, enum rebuild
 ├── planner-ddl-builders.ts  # Pure SQL-string builders (unchanged, reused by factories)
@@ -49,7 +60,11 @@ packages/3-targets/3-targets/postgres/src/core/migrations/
 └── scaffolding.ts           # Only non-descriptor scaffolding helpers remain
 ```
 
-No SQL-family base class is added for the IR: `family-sql` ships no `SqlOpFactoryCallBase` and no `PlannerProducedSqlMigration`. The `OpFactoryCall` interface is lifted directly to the framework so any future target (SQL or otherwise) can reuse it without going through a family layer. (What family-SQL *does* ship is a thin `SqlMigration<TDetails>` alias that binds `Migration`'s `TOp` to `SqlMigrationPlanOperation<TDetails>` — a convenience for target-side concrete migration classes; see Phase 1.) The Postgres target uses two internal abstract base classes inside `core/migrations/` to share plumbing across the concrete call classes. The outer one, `MigrationTsExpression`, is the root of the TypeScript-renderable AST (`renderTypeScript()` + `importRequirements()`) and is also extended by `PlaceholderExpression`, the scaffolded `dataTransform` body. The inner one, `PostgresOpFactoryCallNode`, adds the visitor `accept()` plus the `OpFactoryCall` slots. Both are private to the Postgres package: not exported, not referenced in cross-package signatures, not visible to non-Postgres consumers. Mongo receives a structurally identical hierarchy in Phase 1 (its existing `OpFactoryCallNode` is extended to `implements OpFactoryCall` and `extends MigrationTsExpression`, with its own package-private `MigrationTsExpression`) so the two targets stay aligned; cross-target lift of these abstractions to the framework is a known follow-up.
+No SQL-family base class is added for the IR: `family-sql` ships no `SqlOpFactoryCallBase` and no `PlannerProducedSqlMigration`. The `OpFactoryCall` interface is lifted directly to the framework so any future target (SQL or otherwise) can reuse it without going through a family layer. (What family-SQL *does* ship is a thin `SqlMigration<TDetails extends SqlPlanTargetDetails>` alias that binds `Migration`'s `TOp` to `SqlMigrationPlanOperation<TDetails>` — a convenience for target-side concrete migration classes; see Phase 1.)
+
+TypeScript rendering primitives (`TsExpression`, `ImportRequirement`, `jsonToTsSource`) are factored into a shared framework package `@prisma-next/framework-ts-render` and consumed by both targets (W04+W05). Each target additionally uses one internal abstract call-node base inside its own `core/` to share plumbing across the concrete call classes: Postgres's `PostgresOpFactoryCallNode` (declaring `abstract toOp()` — W10) and Mongo's `OpFactoryCallNode`. Both bases extend `TsExpression` and implement `OpFactoryCall`. Neither is exported; both are private to their target package.
+
+`DataTransformCall` accepts `checkSlot` / `runSlot` strings directly. Its `renderTypeScript()` emits `() => placeholder("slot")` at the call site; its `toOp()` always throws `errorUnfilledPlaceholder(label)` (`PN-MIG-2001`) — a plan carrying a `DataTransformCall` is, by construction, an unfilled stub that only has TypeScript. Real (non-placeholder) data-transform execution happens at migration runtime through the pure `dataTransform` factory when the user runs the authored `migration.ts`. There is no standalone `PlaceholderExpression` AST node in the shipped implementation (W07 + user simplification).
 
 **Deleted**: `descriptor-planner.ts`, `operation-descriptors.ts`, `operation-resolver.ts`, `planner-reconciliation.ts`, `renderDescriptorTypeScript` from `scaffolding.ts`.
 
@@ -475,22 +490,34 @@ No Mongo planner change, no Mongo factory change, no change to rendered migratio
 
 These items are explicitly out of scope for this project but fall out naturally once it lands. Each is a self-contained future PR.
 
-### Cross-target consolidation of the IR and renderable-migration class
+### Cross-target consolidation of the renderable-migration class
 
-Once Postgres ships, the codebase has two structurally identical IR / rendering stacks across Mongo and Postgres:
+The PR #359 review shipped `TsExpression`, `ImportRequirement`, and `jsonToTsSource` in a shared framework package `@prisma-next/framework-ts-render` consumed by both targets, so the expression-level duplication is already resolved. What remains:
 
-- `MigrationTsExpression` abstract base (one copy per target, package-private).
-- `ImportRequirement` shape (one copy per target).
-- `OpFactoryCallNode` / `PostgresOpFactoryCallNode` abstract that extends `MigrationTsExpression` and implements the framework-level `OpFactoryCall` interface.
-- `TypeScriptRenderableXMigration` concrete class that extends `Migration<TOp>`, implements `MigrationPlanWithAuthoringSurface<TOp>`, holds `readonly calls`, and delegates `operations` and `renderTypeScript()` to injected / imported renderers.
+- Each target still keeps its own `TypeScriptRenderableXMigration` concrete class (Mongo's `PlannerProducedMongoMigration`, Postgres's `TypeScriptRenderablePostgresMigration`).
 
-The follow-up lifts these into `framework-components`:
+The follow-up lifts a generic `TypeScriptRenderableMigration<TCall extends OpFactoryCall, TOp>` into `framework-components` and retrofits both targets to extend it. Optional alias types preserve existing names. This is purely structural — no behavior change, no ADR change.
 
-1. Lift `MigrationTsExpression` and `ImportRequirement` to the framework. Each target re-exports / extends from the framework instead of maintaining a private copy.
-2. Lift a `TypeScriptRenderableMigration<TCall extends OpFactoryCall, TOp>` generic class. Retrofit Mongo (`PlannerProducedMongoMigration` → `TypeScriptRenderableMongoMigration`) and Postgres (`TypeScriptRenderablePostgresMigration`) to extend it. Optional alias types preserve existing names.
-3. Consider whether `PlaceholderExpression` belongs in the framework (it's Postgres-only today, but Mongo or a future target may adopt planner-emitted `dataTransform`-like operations).
+### Family-API retarget to emit call IR directly (Path A)
 
-This is a purely structural refactor — no behavior change, no ADR change. It's deferred until both targets have the full abstract-expression hierarchy so the lift is a true de-duplication rather than an up-front guess at the right shape. The Phase 1 Mongo IR sync in this project is designed so the Mongo and Postgres hierarchies are byte-compatible at lift time.
+Today, two planner producers reach the Postgres call-IR indirectly:
+
+- Storage-type codec hooks (`planTypeOperations`) return `SqlMigrationPlanOperation<PostgresPlanTargetDetails>[]`.
+- `ComponentDatabaseDependency.install` returns ops for extension / schema creation.
+
+`planner.ts`'s `liftOpToCall(op)` dispatcher bridges these op streams into `PostgresOpFactoryCall[]`, reaching `CreateExtensionCall` / `CreateSchemaCall` / `CreateEnumTypeCall` / `AddEnumValuesCall` for recognized `op.target.details.objectType` values and falling back to `RawSqlCall(op)` for everything else. The bridge is sound but leaks op-first machinery into the IR.
+
+**Path A**: teach the family APIs (`planTypeOperations`, `ComponentDatabaseDependency.install`) to return call IR directly. Specifically:
+
+1. Change `planTypeOperations` on `PostgresTypeSpec` to return `PostgresOpFactoryCall[]` (or a framework-generic equivalent).
+2. Change `ComponentDatabaseDependency.install` similarly.
+3. Delete `liftOpToCall`. Drop `RawSqlCall`'s `toOp()` passthrough path for planner-internal sources; `RawSqlCall` continues to exist as a user-facing escape hatch for hand-authored raw migrations.
+
+Scheduled before a second SQL target (SQLite) lands so we don't ship two op-first family APIs.
+
+### Phase 1 walk-schema audit artifact
+
+`projects/postgres-class-flow-migrations/assets/walk-schema-audit.md` per `specs/walk-schema-audit.spec.md` is a pending deliverable used to guide Phase 4 (planner collapse). Phase 1 shipped the class-flow IR without the audit because the shipped walk-schema retarget uses `liftOpToCall` as a universal bridge rather than per-branch call-class construction; the audit is only required as input to Phase 4 and can be produced as its opening task.
 
 ## References
 
