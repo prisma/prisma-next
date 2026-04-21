@@ -526,7 +526,7 @@ Structurally identical to Mongo's `PlannerProducedMongoMigration` modulo the tar
 - `planner.ts` accumulator: every `private buildX` method returns `PostgresOpFactoryCall[]` instead of `SqlMigrationPlanOperation[]`.
 - `planner-reconciliation.ts` accumulator: same — `buildReconciliationPlan` now produces `PostgresOpFactoryCall[]`.
 - `PostgresMigrationPlanner.plan()` concatenates the call arrays and runs them through `renderOps` at the tail to produce its existing `MigrationPlannerResult` — the shape of the result is unchanged.
-- Every construction site that today calls a `resolveX` wrapper is changed to construct the corresponding concrete call class. The Phase 0 audit from `assets/walk-schema-audit.md` is the checklist: every row's "Corresponding `OpFactoryCall` class(es)" column is a construction site that must be touched.
+- Every construction site that today calls a `resolveX` wrapper is changed to construct the corresponding concrete call class. The walk-schema audit at `assets/walk-schema-audit.md` (produced as the first research task of this phase — see §Prerequisites) is the checklist: every row's "Corresponding `OpFactoryCall` class(es)" column is a construction site that must be touched.
 - `emptyMigration()` now returns `new TypeScriptRenderablePostgresMigration([], meta)` with a real `renderTypeScript()`. (Not reached by `migration new` in Phase 1 because strategy selector is still descriptor-flow; reached by unit tests.)
 
 ### Capability wiring
