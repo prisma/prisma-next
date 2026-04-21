@@ -3,7 +3,8 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { format } from 'prettier';
-import type { EmitResult, EmitStackInput } from './emit-types';
+import { getEmittedArtifactPaths } from './artifact-paths';
+import type { EmitOptions, EmitResult, EmitStackInput } from './emit-types';
 import { generateContractDts } from './generate-contract-dts';
 
 const SCHEMA_VERSION = '1';
@@ -12,7 +13,12 @@ export async function emit(
   contract: Contract,
   stack: EmitStackInput,
   targetFamily: EmissionSpi,
+  options?: EmitOptions,
 ): Promise<EmitResult> {
+  if (options?.outputJsonPath !== undefined) {
+    getEmittedArtifactPaths(options.outputJsonPath);
+  }
+
   const { codecTypeImports, operationTypeImports, queryOperationTypeImports } = stack;
 
   const { storageHash } = contract.storage;
