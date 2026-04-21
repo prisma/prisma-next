@@ -28,48 +28,65 @@ Prisma Next separates `family → target → adapter → driver`. For D1 we add 
 ### What's new for D1
 
 - A driver package (`@prisma-next/driver-sqlite-d1` or similar, in `packages/3-targets/7-drivers/sqlite-d1/`) exporting both a runtime driver and a control driver.
-- A D1-specific migration runner. PR #341's runner cannot execute on D1 because it relies on interactive reads inside a `BEGIN EXCLUSIVE` transaction. The new runner reshapes the lifecycle around D1's atomic-batch primitive.
+- A D1-specific migration runner. PR #341's runner cannot execute on D1 because it relies on interactive reads inside a `BEGIN EXCLUSIVE` transaction. The new runner reshapes the lifecycle around D1's import API, which accepts a self-contained SQL file and runs it atomically server-side.
 - New capability declarations on the driver side to gate runtime operations that require interactive transactions.
 - An assertion-based gate in the ORM that checks this capability at mutation entry points and throws a typed error for unsupported operations on D1.
 
 ## Migration Strategy
 
-### Control driver: REST API
+### Control driver: two REST paths
 
-Migrations are driven from the Node-based CLI, which has no Workers runtime. The control driver therefore uses Cloudflare's D1 REST API: `POST /accounts/:id/d1/database/:db/query` with an API token. The existing `ControlDriverInstance` surface (`query(sql, params) → Promise<{rows}>` + `close()`) maps cleanly onto a single HTTP POST per query. Connection credentials (account ID, database UUID, API token) come through the same config-and-flag mechanism as other drivers' connection strings.
+Migrations are driven from the Node-based CLI, which has no Workers runtime. The control driver uses two distinct Cloudflare D1 REST API paths, chosen per operation:
 
-**Trade-off accepted**: HTTP round-trip latency per query. Migrations are latency-tolerant — a few hundred milliseconds per statement is fine for a command the operator runs occasionally. Runtime queries are on the fast path and use the Workers binding instead.
+**`POST /accounts/:id/d1/database/:db/query`** — single-statement queries with request/response semantics. Used for schema introspection, marker reads, and all non-migration control-plane work. Simple, one round-trip per query.
 
-### Runner reshape: single atomic batch
+**`POST /accounts/:id/d1/database/:db/import`** — asynchronous SQL-file ingestion. The CLI uploads the migration SQL to a pre-signed R2 URL (returned by the D1 `init` call), tells D1 to ingest, and polls for completion. This path executes statements sequentially server-side with a different transaction-framing model than `/query`: in particular, `PRAGMA foreign_keys = OFF` takes effect and applies to subsequent statements in the same import. The import pipeline is atomic-on-failure — per wrangler's own comment, *"if the execution fails to complete, your DB will return to its original state and you can safely retry"* — which preserves marker/ledger integrity.
 
-PR #341's runner wraps the entire migration in `BEGIN EXCLUSIVE … COMMIT`, inside which it performs interactive reads — postcheck-first idempotency skips, precheck/postcheck verification per operation, mid-transaction schema introspection, marker reads that inform conditional upserts. D1 supports neither interactive transactions (over REST or binding) nor holding a session across requests. The pattern doesn't translate.
+Wrangler exposes the same split without naming it. `wrangler d1 migrations apply` uses `/query` and silently loses data on recreate-table with CASCADE children. `wrangler d1 execute --file=migration.sql` uses the import API and does not. Prisma Next uses the import API from the start for migration application and avoids the trap.
 
-The D1 runner reshapes the lifecycle into two phases around D1's atomic-batch primitive:
+Credentials: the same API token works for both endpoints. R2 upload uses the pre-signed URL D1 returns, so no separate R2 credentials are needed.
 
-1. **Pre-batch reads**: introspect current schema, read the marker, compute which operations to skip based on their postchecks, check origin-hash compatibility. These are non-atomic individual queries. If any check aborts the migration, no state has changed.
-2. **Atomic batch**: one D1 batch submission containing, in order — `PRAGMA defer_foreign_keys = ON`, control-table creation (idempotent), each non-skipped operation's DDL, an inline foreign-key integrity assertion (`SELECT CASE WHEN EXISTS(SELECT 1 FROM pragma_foreign_key_check) THEN RAISE(ABORT, ...) END`), the marker upsert via `INSERT … ON CONFLICT DO UPDATE` with a hash-CAS guard, the ledger insert. Atomicity: D1 rolls back the entire batch on any statement failure.
+**Trade-off accepted**: the import API is multi-round-trip (init → upload → ingest → poll). Migrations are latency-tolerant, so this is fine. Non-migration reads stay on `/query` because they don't need the import path's semantics and latency would matter more per-call.
 
-Wrangler's D1 migrations follow essentially this pattern — a single atomic submission containing DDL and ledger writes — with no pre-batch phase and no marker. Prisma Next preserves the marker and the origin-destination hash integrity where possible, giving up only the tightest integrity properties (see schema verification below).
+### Runner shape: pre-import reads → import submission → done
 
-### Foreign-key handling: `defer_foreign_keys` instead of toggling `foreign_keys`
+PR #341's runner wraps the entire migration in `BEGIN EXCLUSIVE … COMMIT` with interactive reads inside. D1's import API is not interactive — you submit a SQL file and poll for outcome. The lifecycle restructures into:
 
-PR #341 toggles `PRAGMA foreign_keys` OFF/ON around the transaction because that PRAGMA is a no-op inside a transaction, and the SQLite recreate-table pattern would cascade-delete child rows when a referenced parent is dropped. On D1 we can't toggle outside any transaction (the batch is the transaction). Instead the batch starts with `PRAGMA defer_foreign_keys = ON`, which is transaction-scoped and defers FK enforcement to commit time. FK integrity is validated via an inline assertion over `pragma_foreign_key_check` — if any violation exists, the assertion raises and the batch aborts.
+1. **Pre-import reads** (via `/query`): introspect current schema, read the marker, compute which operations to skip based on their postchecks, verify origin-hash compatibility. Non-atomic reads. If any check aborts the migration, no state has changed.
+2. **Import submission**: construct a single SQL file containing, in order —
+   - `PRAGMA foreign_keys = OFF;`
+   - Control-table creation (idempotent): `CREATE TABLE IF NOT EXISTS _prisma_marker` / `_prisma_ledger`
+   - Each non-skipped operation's DDL, including recreate-table operations for tables with incoming CASCADE FKs
+   - `PRAGMA foreign_keys = ON;` followed by an inline assertion over `pragma_foreign_key_check` that raises on violations
+   - Marker-version CAS: conditional `UPDATE _prisma_marker SET … WHERE storage_hash = :expected_origin`, guarded by a `changes()`-based assertion that raises on zero-row updates
+   - Marker upsert via `INSERT … ON CONFLICT DO UPDATE`
+   - Ledger insert
+  
+   Submit to `/import`. The import pipeline runs the file atomically end-to-end: any failed statement triggers a full rollback to the pre-import state, so DDL and marker/ledger updates are atomic with each other.
 
-This is cleaner than the toggle-PRAGMA dance; it may be worth adopting in the native-SQLite runner too as a follow-up, but that's out of scope here.
+3. **Post-import**: nothing. Schema verification is dropped (see below).
+
+### Foreign-key handling via the import API
+
+The import API's execution model restores the standard SQLite recreate-table dance: `PRAGMA foreign_keys = OFF` at the top of the file, do the rebuild, `PRAGMA foreign_keys = ON` with an integrity check. Child rows with `ON DELETE CASCADE` survive parent rebuilds because FK enforcement is genuinely disabled during the DDL.
+
+This works only because the import API executes statements in a framing where `PRAGMA foreign_keys` takes effect. Empirical testing confirmed that the same PRAGMA inside `/query` (or inside a `db.batch()` on miniflare) is a no-op, cascade fires, and children are silently wiped. The first version of this plan mistakenly proposed `PRAGMA defer_foreign_keys = ON` as a workaround; testing showed `defer_foreign_keys` does not prevent cascade actions under any D1 endpoint. It is not used.
+
+Consequence: the planner's full range of operations, including recreate-table of tables with incoming FK constraints of any kind (including CASCADE), is supported from day one.
 
 ### Concurrency: marker-version CAS instead of `BEGIN EXCLUSIVE`
 
-The native SQLite runner uses `BEGIN EXCLUSIVE` to prevent two concurrent migrators from racing. D1 offers no equivalent lock primitive (REST is stateless; binding batches are short-lived).
+The native SQLite runner uses `BEGIN EXCLUSIVE` to prevent two concurrent migrators from racing. D1 offers no equivalent lock primitive — REST is stateless, binding batches are short-lived, and the import API has no session affinity.
 
-The D1 runner replaces exclusive locking with optimistic concurrency on the marker row. The pre-batch phase reads the marker's current storage-hash. The atomic batch includes a conditional `UPDATE _prisma_marker SET … WHERE storage_hash = :expected_origin` — if the hash has moved since we read it, zero rows are affected and a follow-up assertion raises via `RAISE(ABORT)`. The effect is compare-and-swap: two concurrent migrators cannot both succeed; the loser sees a CAS failure and can re-plan against the new state.
+The D1 runner replaces exclusive locking with optimistic concurrency on the marker row. The pre-import phase reads the marker's current storage-hash. The imported SQL file includes a conditional `UPDATE _prisma_marker SET … WHERE storage_hash = :expected_origin` — if the hash has moved since we read it, zero rows are affected and a follow-up assertion `SELECT CASE WHEN changes() = 0 THEN RAISE(ABORT, 'marker CAS failure') END` aborts the import. The import pipeline's atomic rollback then reverts everything. Two concurrent migrators cannot both succeed; the loser sees a CAS failure and can re-plan against the new state.
 
-This is weaker than exclusive locking in one respect: two migrators might both enter the pre-batch phase, both do full introspection, and one of them does throwaway work before the CAS fails. In practice that's fine — migrations are human-triggered from a CLI, and "both migrators independently try to apply the same plan" is a rare operational event, not a hot contention path.
+This is weaker than exclusive locking in one respect: two migrators might both enter the pre-import phase, both do full introspection, and one of them does throwaway work before the CAS fails. In practice that's fine — migrations are human-triggered from a CLI, and "both migrators independently try to apply the same plan" is a rare operational event, not a hot contention path.
 
 ### Schema verification: dropped
 
 PR #341's runner verifies the post-DDL schema against the contract inside the transaction: introspect the live database, compare it against the contract, fail the migration if they diverge. This defends against planner bugs — a missing `NOT NULL`, a wrong type affinity, an index on the wrong column set — before marking the migration successful.
 
-On D1, this verification cannot happen atomically with the DDL. **D1 migrations do not perform schema verification.** A migration is considered successful if the atomic batch executes without SQL errors and the foreign-key integrity assertion passes. Planner bugs may leak to runtime and surface there instead of at migration time.
+On D1, verification cannot happen atomically with the DDL — the import API is fire-and-poll, not interactive, so re-introspecting the live schema and comparing against the contract can only happen after the import has committed. **D1 migrations do not perform schema verification.** A migration is considered successful if the imported SQL file executes without errors and the foreign-key integrity assertion passes. Planner bugs may leak to runtime and surface there instead of at migration time.
 
 This is the same model wrangler has used for D1 migrations since launch, and matches how most SQLite migration tooling operates. The loss relative to PR #341 is real but localized: the planner is already well-covered by unit tests, and the ORM's type-level contract checks catch many schema mismatches before a query even runs. Both alternatives for restoring verification (post-commit with a status column; pre-batch simulation) were considered and rejected — see the alternatives section.
 
@@ -167,19 +184,25 @@ On top of that, the simulator carries a permanent maintenance tax: every new pla
 
 Deferred, not rejected. If the ORM planner resolves nested-write PKs client-side (CUIDs, UUIDs) before constructing statements, all inserts can ship in one batch with the FK relationships pre-resolved — no need to read RETURNING mid-transaction. This unlocks nested writes on D1 without interactive transactions. The cost is that the planner must support client-generated PKs end-to-end, which is a cross-cutting feature touching contract authoring, codec generation, and mutation planning. It's the right long-term answer; for the first D1 release we gate nested writes and revisit once the planner supports this.
 
+### Apply migrations via the `/query` REST endpoint
+
+Rejected. `wrangler d1 migrations apply` takes this path, and so did the first draft of this plan. Empirical testing against miniflare — and third-party reports against remote D1 — confirm that `PRAGMA foreign_keys = OFF` inside `/query`'s implicit transaction is a no-op. Recreate-table migrations with CASCADE children silently lose data. The import API avoids this by using a different server-side execution framing. Whichever endpoint Cloudflare unifies eventually, we use the one that works today.
+
 ### Follow wrangler's model exactly (no marker, no hash, no verification)
 
-Rejected. Wrangler's migrations are hand-authored SQL with no schema-of-record to verify against — the user is the source of truth. Prisma Next has a contract as the declared schema-of-record; discarding the marker and origin/destination hashes would surrender a meaningful correctness property independent of verification. Wrangler's single-batch atomicity *is* adopted; its lack of marker and hash integrity is not.
+Rejected. Wrangler's migrations are hand-authored SQL with no schema-of-record to verify against — the user is the source of truth. Prisma Next has a contract as the declared schema-of-record; discarding the marker and origin/destination hashes would surrender a meaningful correctness property independent of verification. Wrangler's use of the import API *is* adopted; its lack of marker and hash integrity is not.
 
 ### Advisory lock via a lease-row pattern
 
-Rejected for this release, might revisit. The idea: before the atomic batch, INSERT a row into a `_prisma_migration_lease` table with a TTL; on batch failure, the lease expires and another migrator can proceed. This adds a layer of concurrency protection on top of marker CAS. For CLI-triggered human-paced migrations, marker CAS alone is sufficient, and the lease-row pattern adds operational complexity (stale leases, clock skew, cleanup) that isn't justified by the risk profile.
+Rejected for this release, might revisit. The idea: before submitting the import, INSERT a row into a `_prisma_migration_lease` table with a TTL; on import failure, the lease expires and another migrator can proceed. This adds a layer of concurrency protection on top of marker CAS. For CLI-triggered human-paced migrations, marker CAS alone is sufficient, and the lease-row pattern adds operational complexity (stale leases, clock skew, cleanup) that isn't justified by the risk profile.
 
 ## Open Questions
 
-- **Per-table introspection parallelism on REST.** PR #341's control adapter comments that synchronous `node:sqlite` reads don't benefit from `Promise.all`. On D1 REST the opposite is true — parallelizing per-table PRAGMA reads can meaningfully cut migration time for large schemas. The control adapter may need either a configuration flag or a driver-hint mechanism to choose strategy.
-- **D1 REST batch atomicity semantics.** Cloudflare docs document atomic-on-failure for the Workers binding `batch()` explicitly, but the REST `/query` endpoint's batch semantics are less explicit. Before shipping, verify empirically that a multi-statement POST rolls back fully on any statement failure.
-- **Credentials config shape.** REST needs account ID, database UUID, and API token; binding needs a binding name. The config-loader mechanism should accept both shapes cleanly without forcing users to duplicate configuration between dev and prod.
+- **Import API atomicity under mid-file failures.** Wrangler's comment states that failed imports return the database to its original state. Verify empirically that this covers *every* failure class we care about: syntax errors, `RAISE(ABORT)` raised by our assertions (FK check, marker CAS), and FK-integrity violations surfaced by `PRAGMA foreign_key_check`. If any of these are treated as "partial success," the marker/ledger integrity invariant fails.
+- **Import API error granularity.** When the import fails, does the response tell us *which* statement failed and what the SQL error was, or only that the import failed? The CLI's error messages depend on this — we want to surface "operation X's DDL failed with message Y," not "the import failed."
+- **Import API size limits.** Migrations are generally small, but the R2 upload step has per-object limits. Confirm no migration shape we reasonably expect hits them.
+- **Per-table introspection parallelism on `/query`.** PR #341's control adapter comments that synchronous `node:sqlite` reads don't benefit from `Promise.all`. On D1 `/query` the opposite is true — parallelizing per-table PRAGMA reads can meaningfully cut pre-import time for large schemas. The control adapter may need either a configuration flag or a driver-hint mechanism to choose strategy.
+- **Credentials config shape.** `/query` and `/import` both need account ID, database UUID, and API token; the Workers binding needs a binding name. The config-loader mechanism should accept both REST and binding shapes cleanly without forcing users to duplicate configuration between dev and prod.
 - **Error-envelope mapping for D1.** D1's REST and binding surfaces return different error shapes than native SQLite's. The driver needs an error mapping table that surfaces comparable `RuntimeError` codes so ORM-level error handling stays consistent.
 
 ## Non-Goals
