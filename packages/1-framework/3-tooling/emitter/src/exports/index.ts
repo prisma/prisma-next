@@ -1,3 +1,5 @@
+export type { EmittedArtifactPaths } from '../artifact-paths';
+export { getEmittedArtifactPaths } from '../artifact-paths';
 export {
   deduplicateImports,
   generateCodecTypeIntersection,

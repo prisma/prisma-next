@@ -5,6 +5,50 @@ function throwValidation(field: string, why?: string): never {
   throw new ConfigValidationError(field, why);
 }
 
+function validateContractConfig(contract: Record<string, unknown>): void {
+  if (!Object.hasOwn(contract, 'source')) {
+    throwValidation(
+      'contract.source',
+      'Config.contract.source is required when contract is provided',
+    );
+  }
+
+  const source = contract['source'];
+  if (!source || typeof source !== 'object') {
+    throwValidation('contract.source', 'Config.contract.source must be a provider object');
+  }
+
+  const sourceConfig = source as Record<string, unknown>;
+  const inputs = sourceConfig['inputs'];
+
+  if (inputs !== undefined) {
+    if (!Array.isArray(inputs)) {
+      throwValidation(
+        'contract.source.inputs',
+        'Config.contract.source.inputs must be an array of strings when provided',
+      );
+    }
+
+    for (const input of inputs) {
+      if (typeof input !== 'string') {
+        throwValidation(
+          'contract.source.inputs[]',
+          'Config.contract.source.inputs must contain only strings',
+        );
+      }
+    }
+  }
+
+  if (typeof sourceConfig['load'] !== 'function') {
+    throwValidation('contract.source.load', 'Config.contract.source.load must be a function');
+  }
+
+  const output = contract['output'];
+  if (output !== undefined && typeof output !== 'string') {
+    throwValidation('contract.output', 'Config.contract.output must be a string when provided');
+  }
+}
+
 /**
  * Validates that the config has the required structure.
  * This is pure validation logic with no file I/O or CLI awareness.
@@ -221,19 +265,6 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
     if (!contract || typeof contract !== 'object') {
       throwValidation('contract', 'Config.contract must be an object');
     }
-    if (!Object.hasOwn(contract, 'source')) {
-      throwValidation(
-        'contract.source',
-        'Config.contract.source is required when contract is provided',
-      );
-    }
-
-    if (typeof contract['source'] !== 'function') {
-      throwValidation('contract.source', 'Config.contract.source must be a provider function');
-    }
-
-    if (contract['output'] !== undefined && typeof contract['output'] !== 'string') {
-      throwValidation('contract.output', 'Config.contract.output must be a string when provided');
-    }
+    validateContractConfig(contract);
   }
 }

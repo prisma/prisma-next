@@ -12,7 +12,9 @@ export default defineConfig({
   adapter: postgresAdapter,
   extensionPacks: [pgvector],
   contract: {
-    source: async () => ok(contract),
+    source: {
+      load: async () => ok(contract),
+    },
     output: 'generated/contract.json',
   },
 });

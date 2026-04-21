@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { setupIntegrationTest } from './setup';
+import { setupIntegrationTest, timeouts } from './setup';
 
-describe('integration: SELECT', () => {
+describe('integration: SELECT', { timeout: timeouts.databaseOperation }, () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('basic column projection returns correct rows', async () => {

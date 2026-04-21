@@ -172,6 +172,7 @@ export function createPostgresTestContext(
     authoringContributions: { field: {}, type: {} },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+    resolvedInputs: [],
     ...overrides,
   };
 }

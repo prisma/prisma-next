@@ -42,8 +42,12 @@ export interface ContractSourceContext {
   readonly authoringContributions: AssembledAuthoringContributions;
   readonly codecLookup: CodecLookup;
   readonly controlMutationDefaults: ControlMutationDefaults;
+  readonly resolvedInputs: readonly string[];
 }
 
-export type ContractSourceProvider = (
-  context: ContractSourceContext,
-) => Promise<Result<Contract, ContractSourceDiagnostics>>;
+export interface ContractSourceProvider {
+  readonly inputs?: readonly string[];
+  readonly load: (
+    context: ContractSourceContext,
+  ) => Promise<Result<Contract, ContractSourceDiagnostics>>;
+}

@@ -1,4 +1,3 @@
-import { dirname, resolve } from 'node:path';
 import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { ConfigValidationError, validateConfig } from '@prisma-next/config/config-validation';
 import {
@@ -6,7 +5,41 @@ import {
   errorConfigValidation,
   errorUnexpected,
 } from '@prisma-next/errors/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { loadConfig as loadConfigC12 } from 'c12';
+import { dirname, resolve } from 'pathe';
+import { finalizeConfig } from './config-path-validation';
+
+async function loadValidatedConfig(configPath?: string): Promise<PrismaNextConfig> {
+  const cwd = process.cwd();
+  const resolvedConfigPath = configPath ? resolve(cwd, configPath) : undefined;
+  const configCwd = resolvedConfigPath ? dirname(resolvedConfigPath) : cwd;
+
+  const result = await loadConfigC12<PrismaNextConfig>({
+    name: 'prisma-next',
+    ...ifDefined('configFile', resolvedConfigPath),
+    cwd: configCwd,
+  });
+
+  // When a specific config file was requested, verify it was actually loaded
+  // (c12 falls back to searching by name if the specified file doesn't exist)
+  if (resolvedConfigPath && result.configFile !== resolvedConfigPath) {
+    throw errorConfigFileNotFound(resolvedConfigPath);
+  }
+
+  // Check if config is missing or empty (c12 may return empty object when file doesn't exist)
+  if (!result.config || Object.keys(result.config).length === 0) {
+    // Use c12's configFile if available, otherwise use explicit configPath, otherwise omit path
+    const displayPath = result.configFile || resolvedConfigPath || configPath;
+    throw errorConfigFileNotFound(displayPath);
+  }
+
+  // Validate config structure
+  validateConfig(result.config);
+
+  const loadedConfigDir = result.configFile ? dirname(result.configFile) : configCwd;
+  return finalizeConfig(result.config, loadedConfigDir);
+}
 
 /**
  * Loads the Prisma Next config from a TypeScript file.
@@ -19,34 +52,7 @@ import { loadConfig as loadConfigC12 } from 'c12';
  */
 export async function loadConfig(configPath?: string): Promise<PrismaNextConfig> {
   try {
-    const cwd = process.cwd();
-    // Resolve config path to absolute path and set cwd to config directory when path is provided
-    const resolvedConfigPath = configPath ? resolve(cwd, configPath) : undefined;
-    const configCwd = resolvedConfigPath ? dirname(resolvedConfigPath) : cwd;
-
-    const result = await loadConfigC12<PrismaNextConfig>({
-      name: 'prisma-next',
-      ...(resolvedConfigPath ? { configFile: resolvedConfigPath } : {}),
-      cwd: configCwd,
-    });
-
-    // When a specific config file was requested, verify it was actually loaded
-    // (c12 falls back to searching by name if the specified file doesn't exist)
-    if (resolvedConfigPath && result.configFile !== resolvedConfigPath) {
-      throw errorConfigFileNotFound(resolvedConfigPath);
-    }
-
-    // Check if config is missing or empty (c12 may return empty object when file doesn't exist)
-    if (!result.config || Object.keys(result.config).length === 0) {
-      // Use c12's configFile if available, otherwise use explicit configPath, otherwise omit path
-      const displayPath = result.configFile || resolvedConfigPath || configPath;
-      throw errorConfigFileNotFound(displayPath);
-    }
-
-    // Validate config structure
-    validateConfig(result.config);
-
-    return result.config;
+    return await loadValidatedConfig(configPath);
   } catch (error) {
     if (error instanceof ConfigValidationError) {
       throw errorConfigValidation(error.field, {

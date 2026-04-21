@@ -1,18 +1,31 @@
-import { resolve } from 'node:path';
+import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
 import { executeContractEmit } from '@prisma-next/cli/control-api';
+import { getEmittedArtifactPaths } from '@prisma-next/emitter';
+import { extname, resolve } from 'pathe';
 import type { Plugin, ViteDevServer } from 'vite';
 import type { PrismaVitePluginOptions } from './types';
 
 const PLUGIN_NAME = 'prisma-vite-plugin-contract-emit';
 const DEFAULT_DEBOUNCE_MS = 150;
 const DEFAULT_CONFIG_PATH = 'prisma-next.config.ts';
+const MODULE_GRAPH_EXTENSIONS = new Set([
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.ts',
+  '.tsx',
+  '.mts',
+  '.cts',
+]);
 
 /**
  * Creates a Vite plugin that automatically emits Prisma Next contract artifacts.
  *
- * The plugin watches the config file and its transitive dependencies, re-emitting
- * contract artifacts on changes with debounce and "last change wins" semantics.
+ * The plugin resolves watched files from contract source provider metadata,
+ * re-emitting contract artifacts on changes with debounce and "last change wins"
+ * semantics.
  *
  * @param configPath - Path to prisma-next.config.ts (relative or absolute). Defaults to 'prisma-next.config.ts'
  * @param options - Optional plugin configuration
@@ -43,6 +56,9 @@ export function prismaVitePlugin(
 
   let absoluteConfigPath: string;
   const watchedFiles = new Set<string>();
+  // Vite watches the project root, so writes to emitted artifacts can still surface as change
+  // events even when those files are excluded from watchedFiles.
+  const ignoredOutputFiles = new Set<string>();
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let currentAbortController: AbortController | null = null;
   let server: ViteDevServer | null = null;
@@ -63,6 +79,19 @@ export function prismaVitePlugin(
     }
   }
 
+  function handleTrackedFileChange(file: string) {
+    const normalized = resolve(file);
+    if (ignoredOutputFiles.has(normalized)) {
+      log(`Ignoring emitted artifact update: ${normalized}`, 'debug');
+      return;
+    }
+
+    if (watchedFiles.has(normalized)) {
+      log(`Detected change: ${normalized}`, 'debug');
+      scheduleEmit();
+    }
+  }
+
   async function emitContract(): Promise<ContractEmitResult | null> {
     const requestId = ++emitRequestId;
 
@@ -74,6 +103,10 @@ export function prismaVitePlugin(
     const signal = currentAbortController.signal;
 
     try {
+      if (server) {
+        await updateWatchedFiles(server);
+      }
+
       const result = await executeContractEmit({
         configPath: absoluteConfigPath,
         signal,
@@ -89,9 +122,7 @@ export function prismaVitePlugin(
       log(`  → ${result.files.json}`, 'debug');
       log(`  → ${result.files.dts}`, 'debug');
 
-      // Update watched files to include any new transitive dependencies
       if (server) {
-        await updateWatchedFiles(server);
         server.ws.send({ type: 'full-reload' });
       }
 
@@ -138,16 +169,40 @@ export function prismaVitePlugin(
     }, debounceMs);
   }
 
-  async function collectWatchedFiles(viteServer: ViteDevServer): Promise<Set<string>> {
+  function resolveContractOutputFiles(contractOutput: string | undefined): Set<string> {
+    if (contractOutput === undefined) {
+      return new Set();
+    }
+    const { jsonPath, dtsPath } = getEmittedArtifactPaths(contractOutput);
+    return new Set<string>([jsonPath, dtsPath]);
+  }
+
+  function isModuleGraphRoot(filePath: string): boolean {
+    return MODULE_GRAPH_EXTENSIONS.has(extname(filePath));
+  }
+
+  async function collectModuleGraphFiles(
+    viteServer: ViteDevServer,
+    roots: readonly string[],
+  ): Promise<Set<string>> {
     const files = new Set<string>();
+    const uniqueRoots = [...new Set(roots)];
+
+    for (const root of uniqueRoots) {
+      try {
+        await viteServer.ssrLoadModule(root);
+      } catch (error) {
+        if (root === absoluteConfigPath) {
+          logError('Failed to load config module graph root:', error);
+        } else {
+          log(`Skipped module-graph root after load failure: ${root}`, 'debug');
+        }
+      }
+    }
 
     try {
-      // Load the config module through Vite's SSR loader to populate the module graph
-      await viteServer.ssrLoadModule(absoluteConfigPath);
-
-      // Crawl the module graph starting from the config file
       const visited = new Set<string>();
-      const queue = [absoluteConfigPath];
+      const queue = [...uniqueRoots];
 
       while (queue.length > 0) {
         const current = queue.shift();
@@ -171,15 +226,53 @@ export function prismaVitePlugin(
       }
     } catch (error) {
       logError('Failed to collect watched files:', error);
-      // At minimum, watch the config file itself
-      files.add(absoluteConfigPath);
     }
 
     return files;
   }
 
+  async function resolveWatchedFiles(viteServer: ViteDevServer): Promise<Set<string>> {
+    ignoredOutputFiles.clear();
+
+    try {
+      const config = await loadConfig(absoluteConfigPath);
+      const contract = config.contract;
+
+      if (!contract) {
+        return new Set([absoluteConfigPath]);
+      }
+
+      const files = new Set<string>([absoluteConfigPath]);
+      const inputs = contract.source.inputs ?? [];
+      for (const outputFile of resolveContractOutputFiles(contract.output)) {
+        ignoredOutputFiles.add(outputFile);
+      }
+
+      const moduleGraphRoots = [absoluteConfigPath];
+      for (const input of inputs) {
+        if (!ignoredOutputFiles.has(input)) {
+          files.add(input);
+        }
+        if (isModuleGraphRoot(input)) {
+          moduleGraphRoots.push(input);
+        }
+      }
+
+      for (const file of await collectModuleGraphFiles(viteServer, moduleGraphRoots)) {
+        if (!ignoredOutputFiles.has(file)) {
+          files.add(file);
+        }
+      }
+
+      return files;
+    } catch (error) {
+      logError('Failed to resolve watched files:', error);
+      return new Set([absoluteConfigPath]);
+    }
+  }
+
   async function updateWatchedFiles(viteServer: ViteDevServer): Promise<void> {
-    const newWatchedFiles = await collectWatchedFiles(viteServer);
+    const newWatchedFiles = await resolveWatchedFiles(viteServer);
 
     // Find files to add and remove
     const toAdd: string[] = [];
@@ -227,6 +320,9 @@ export function prismaVitePlugin(
 
     async configureServer(viteServer) {
       server = viteServer;
+      const onTrackedWatcherEvent = (file: string) => {
+        handleTrackedFileChange(file);
+      };
 
       // Register close hook to clean up timers and abort in-flight work
       const cleanup = () => {
@@ -238,6 +334,10 @@ export function prismaVitePlugin(
           currentAbortController.abort();
           currentAbortController = null;
         }
+        viteServer.watcher.off?.('change', onTrackedWatcherEvent);
+        viteServer.watcher.off?.('add', onTrackedWatcherEvent);
+        viteServer.watcher.off?.('unlink', onTrackedWatcherEvent);
+        ignoredOutputFiles.clear();
         server = null;
         watchedFiles.clear();
         log('Server closed, cleaned up resources', 'debug');
@@ -246,9 +346,14 @@ export function prismaVitePlugin(
       // Register cleanup on server close via httpServer or watcher
       viteServer.httpServer?.on('close', cleanup);
       viteServer.watcher?.on?.('close', cleanup);
+      viteServer.watcher.on('change', onTrackedWatcherEvent);
+      viteServer.watcher.on('add', onTrackedWatcherEvent);
+      viteServer.watcher.on('unlink', onTrackedWatcherEvent);
 
-      // Collect files to watch from the module graph
-      for (const file of await collectWatchedFiles(viteServer)) {
+      const initialWatchedFiles = await resolveWatchedFiles(viteServer);
+
+      // Collect files to watch from provider metadata
+      for (const file of initialWatchedFiles) {
         watchedFiles.add(file);
       }
 
@@ -285,11 +390,7 @@ export function prismaVitePlugin(
     },
 
     handleHotUpdate(ctx) {
-      // Check if the changed file is one we're watching
-      if (watchedFiles.has(ctx.file)) {
-        log(`Detected change: ${ctx.file}`, 'debug');
-        scheduleEmit();
-      }
+      handleTrackedFileChange(ctx.file);
     },
   };
 }

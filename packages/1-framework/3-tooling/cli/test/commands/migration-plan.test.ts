@@ -14,6 +14,7 @@ import {
 } from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { isAttested } from '@prisma-next/migration-tools/types';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { resolveBundleByPrefix } from '../../src/commands/migration-plan';
 
@@ -128,90 +129,100 @@ describe('migration plan — core flow', () => {
     expect(leaf).toBe(toStorageHash);
   });
 
-  it('builds incremental migration chain', async () => {
-    const tempDir = await createTempDir('incremental');
-    const migrationsDir = join(tempDir, 'migrations');
-    await mkdir(migrationsDir, { recursive: true });
+  it(
+    'builds incremental migration chain',
+    async () => {
+      const tempDir = await createTempDir('incremental');
+      const migrationsDir = join(tempDir, 'migrations');
+      await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+      const contractA = createSqlContract({
+        storage: {
+          tables: {
+            user: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+            },
+          },
         },
-      },
-    });
-    const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
-          post: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+      });
+      const contractB = createSqlContract({
+        storage: {
+          tables: {
+            user: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+            },
+            post: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+            },
+          },
         },
-      },
-    });
+      });
 
-    // First migration: empty -> A
-    const dir1 = formatMigrationDirName(new Date(2026, 0, 1, 10, 0), 'add_user');
-    const path1 = join(migrationsDir, dir1);
-    await writeMigrationPackage(
-      path1,
-      {
-        from: EMPTY_CONTRACT_HASH,
-        to: 'sha256:hash-a',
-        migrationId: null,
-        kind: 'regular',
-        fromContract: null,
-        toContract: contractA,
-        hints: {
-          used: [],
-          applied: ['additive_only'],
-          plannerVersion: '1.0.0',
-          planningStrategy: 'additive',
+      // First migration: empty -> A
+      const dir1 = formatMigrationDirName(new Date(2026, 0, 1, 10, 0), 'add_user');
+      const path1 = join(migrationsDir, dir1);
+      await writeMigrationPackage(
+        path1,
+        {
+          from: EMPTY_CONTRACT_HASH,
+          to: 'sha256:hash-a',
+          migrationId: null,
+          kind: 'regular',
+          fromContract: null,
+          toContract: contractA,
+          hints: {
+            used: [],
+            applied: ['additive_only'],
+            plannerVersion: '1.0.0',
+            planningStrategy: 'additive',
+          },
+          labels: [],
+          createdAt: new Date().toISOString(),
         },
-        labels: [],
-        createdAt: new Date().toISOString(),
-      },
-      [createTableOp('user')],
-    );
-    await attestMigration(path1);
+        [createTableOp('user')],
+      );
+      await attestMigration(path1);
 
-    // Second migration: A -> B
-    const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
-    const path2 = join(migrationsDir, dir2);
-    await writeMigrationPackage(
-      path2,
-      {
-        from: 'sha256:hash-a',
-        to: 'sha256:hash-b',
-        migrationId: null,
-        kind: 'regular',
-        fromContract: contractA,
-        toContract: contractB,
-        hints: {
-          used: [],
-          applied: ['additive_only'],
-          plannerVersion: '1.0.0',
-          planningStrategy: 'additive',
+      // Second migration: A -> B
+      const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
+      const path2 = join(migrationsDir, dir2);
+      await writeMigrationPackage(
+        path2,
+        {
+          from: 'sha256:hash-a',
+          to: 'sha256:hash-b',
+          migrationId: null,
+          kind: 'regular',
+          fromContract: contractA,
+          toContract: contractB,
+          hints: {
+            used: [],
+            applied: ['additive_only'],
+            plannerVersion: '1.0.0',
+            planningStrategy: 'additive',
+          },
+          labels: [],
+          createdAt: new Date().toISOString(),
         },
-        labels: [],
-        createdAt: new Date().toISOString(),
-      },
-      [createTableOp('post')],
-    );
-    await attestMigration(path2);
+        [createTableOp('post')],
+      );
+      await attestMigration(path2);
 
-    // Verify migration chain
-    const packages = await readMigrationsDir(migrationsDir);
-    expect(packages).toHaveLength(2);
+      // Verify migration chain
+      const packages = await readMigrationsDir(migrationsDir);
+      expect(packages).toHaveLength(2);
 
-    const graph = reconstructGraph(packages.filter(isAttested));
-    const leaf = findLeaf(graph);
-    expect(leaf).toBe('sha256:hash-b');
+      const graph = reconstructGraph(packages.filter(isAttested));
+      const leaf = findLeaf(graph);
+      expect(leaf).toBe('sha256:hash-b');
 
-    // Verify chain: first migration's `to` === second migration's `from`
-    const pkg1 = packages.find((p) => p.manifest.to === 'sha256:hash-a')!;
-    const pkg2 = packages.find((p) => p.manifest.to === 'sha256:hash-b')!;
-    expect(pkg1.manifest.to).toBe(pkg2.manifest.from);
-  });
+      // Verify chain: first migration's `to` === second migration's `from`
+      const pkg1 = packages.find((p) => p.manifest.to === 'sha256:hash-a')!;
+      const pkg2 = packages.find((p) => p.manifest.to === 'sha256:hash-b')!;
+      expect(pkg1.manifest.to).toBe(pkg2.manifest.from);
+    },
+    timeouts.databaseOperation,
+  );
 
   it('detects missing contract.json', async () => {
     const tempDir = await createTempDir('missing-contract');
@@ -315,58 +326,62 @@ describe('--from hash lookup', () => {
     }
   });
 
-  it('rejects ambiguous prefix matching multiple migrations', async () => {
-    const tempDir = await createTempDir('prefix-ambiguous');
-    const migrationsDir = join(tempDir, 'migrations');
-    await mkdir(migrationsDir, { recursive: true });
+  it(
+    'rejects ambiguous prefix matching multiple migrations',
+    async () => {
+      const tempDir = await createTempDir('prefix-ambiguous');
+      const migrationsDir = join(tempDir, 'migrations');
+      await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createContract();
-    const contractB = createContract();
+      const contractA = createContract();
+      const contractB = createContract();
 
-    // Two migrations whose `to` hashes share a prefix
-    const dir1 = formatMigrationDirName(new Date(2026, 0, 1), 'first');
-    await writeMigrationPackage(
-      join(migrationsDir, dir1),
-      {
-        from: EMPTY_CONTRACT_HASH,
-        to: 'sha256:abc111',
-        migrationId: null,
-        kind: 'regular',
-        fromContract: null,
-        toContract: contractA,
-        hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
-        labels: [],
-        createdAt: new Date().toISOString(),
-      },
-      [],
-    );
-    await attestMigration(join(migrationsDir, dir1));
+      // Two migrations whose `to` hashes share a prefix
+      const dir1 = formatMigrationDirName(new Date(2026, 0, 1), 'first');
+      await writeMigrationPackage(
+        join(migrationsDir, dir1),
+        {
+          from: EMPTY_CONTRACT_HASH,
+          to: 'sha256:abc111',
+          migrationId: null,
+          kind: 'regular',
+          fromContract: null,
+          toContract: contractA,
+          hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
+          labels: [],
+          createdAt: new Date().toISOString(),
+        },
+        [],
+      );
+      await attestMigration(join(migrationsDir, dir1));
 
-    const dir2 = formatMigrationDirName(new Date(2026, 0, 2), 'second');
-    await writeMigrationPackage(
-      join(migrationsDir, dir2),
-      {
-        from: 'sha256:abc111',
-        to: 'sha256:abc222',
-        migrationId: null,
-        kind: 'regular',
-        fromContract: contractA,
-        toContract: contractB,
-        hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
-        labels: [],
-        createdAt: new Date().toISOString(),
-      },
-      [],
-    );
-    await attestMigration(join(migrationsDir, dir2));
+      const dir2 = formatMigrationDirName(new Date(2026, 0, 2), 'second');
+      await writeMigrationPackage(
+        join(migrationsDir, dir2),
+        {
+          from: 'sha256:abc111',
+          to: 'sha256:abc222',
+          migrationId: null,
+          kind: 'regular',
+          fromContract: contractA,
+          toContract: contractB,
+          hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
+          labels: [],
+          createdAt: new Date().toISOString(),
+        },
+        [],
+      );
+      await attestMigration(join(migrationsDir, dir2));
 
-    const packages = await readMigrationsDir(migrationsDir);
-    const result = resolveBundleByPrefix(packages, 'sha256:abc');
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.failure).toEqual({ reason: 'ambiguous', count: 2 });
-    }
-  });
+      const packages = await readMigrationsDir(migrationsDir);
+      const result = resolveBundleByPrefix(packages, 'sha256:abc');
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure).toEqual({ reason: 'ambiguous', count: 2 });
+      }
+    },
+    timeouts.databaseOperation,
+  );
 });
 
 describe('MigrationToolsError mapping', () => {

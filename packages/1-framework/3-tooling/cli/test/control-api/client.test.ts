@@ -1,3 +1,4 @@
+import type { ContractSourceProvider } from '@prisma-next/config/config-types';
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { EmitResult } from '@prisma-next/emitter';
@@ -32,6 +33,16 @@ import { createControlClient } from '../../src/control-api/client';
 import type { ControlProgressEvent } from '../../src/control-api/types';
 
 const mockEmit = vi.mocked(emitFn);
+
+function createSourceProvider(
+  load: ContractSourceProvider['load'] = async () => ok({ test: true } as unknown as Contract),
+  inputs?: readonly string[],
+): ContractSourceProvider {
+  return {
+    ...(inputs ? { inputs } : {}),
+    load,
+  };
+}
 
 function createMockComponents() {
   const mockDriver = {
@@ -421,7 +432,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          sourceProvider: async () => ok({ test: true } as unknown as Contract),
+          source: createSourceProvider(),
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -453,7 +464,37 @@ describe('ControlClient progress emission', () => {
       }
     });
 
-    it('emits resolveSource and emit spans when source is a function', async () => {
+    it('passes declared source inputs to the provider', async () => {
+      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+      const load = vi.fn<ContractSourceProvider['load']>(async () =>
+        ok({ test: true } as unknown as Contract),
+      );
+      const source = createSourceProvider(load, ['/tmp/schema.prisma']);
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+      });
+
+      const result = await client.emit({
+        contractConfig: {
+          source,
+          output: '/tmp/contract.json',
+        },
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(true);
+      expect(load).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resolvedInputs: ['/tmp/schema.prisma'],
+        }),
+      );
+    });
+
+    it('emits resolveSource and emit spans when source is a provider object', async () => {
       const events: ControlProgressEvent[] = [];
       const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
 
@@ -465,7 +506,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          sourceProvider: async () => ok({ test: true } as unknown as Contract),
+          source: createSourceProvider(),
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -486,7 +527,7 @@ describe('ControlClient progress emission', () => {
       expect(resolveSourceEnd).toMatchObject({ outcome: 'ok' });
     });
 
-    it('emits error outcome when source function throws', async () => {
+    it('emits error outcome when source provider throws', async () => {
       const events: ControlProgressEvent[] = [];
       const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
 
@@ -498,9 +539,9 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          sourceProvider: async () => {
+          source: createSourceProvider(async () => {
             throw new Error('Source load error');
-          },
+          }),
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -539,7 +580,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          sourceProvider: async () =>
+          source: createSourceProvider(async () =>
             notOk({
               summary: 'Provider failed',
               diagnostics: [
@@ -550,6 +591,7 @@ describe('ControlClient progress emission', () => {
                 },
               ],
             }),
+          ),
           output: '/tmp/contract.json',
         },
       });
@@ -578,7 +620,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          sourceProvider: async () => ok({ test: true } as unknown as Contract),
+          source: createSourceProvider(),
           output: '/tmp/contract.json',
         },
         onProgress: (event) => events.push(event),
@@ -1127,7 +1169,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          sourceProvider: async () => ok({ test: true } as unknown as Contract),
+          source: createSourceProvider(),
           output: '/tmp/contract.json',
         },
       });

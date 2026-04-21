@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { setupIntegrationTest } from './setup';
+import { setupIntegrationTest, timeouts } from './setup';
 
 describe('integration: ilike (adapter operation)', () => {
   const { db, runtime } = setupIntegrationTest();
@@ -26,7 +26,7 @@ describe('integration: ilike (adapter operation)', () => {
   });
 });
 
-describe('integration: extension functions', () => {
+describe('integration: extension functions', { timeout: timeouts.databaseOperation }, () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('cosineDistance computes distance for identical vectors', async () => {

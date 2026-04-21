@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { setupIntegrationTest } from './setup';
+import { setupIntegrationTest, timeouts } from './setup';
 
-describe('integration: DISTINCT', () => {
+describe('integration: DISTINCT', { timeout: timeouts.databaseOperation }, () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('DISTINCT removes duplicate rows', async () => {

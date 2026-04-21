@@ -19,7 +19,7 @@ describe('config loader', () => {
     }
   }, timeouts.typeScriptCompilation);
 
-  const createValidConfig = () => {
+  const createValidConfig = (extraProps = '') => {
     return `const mockHook = {
       id: 'sql',
       generateStorageType: () => '{}',
@@ -29,6 +29,10 @@ describe('config loader', () => {
       getTypeMapsExpression: () => 'never',
       getContractWrapper: () => '',
     };
+    const createSource = (inputs, load) => ({
+      ...(inputs === undefined ? {} : { inputs }),
+      load,
+    });
     export default {
       family: {
         kind: 'family',
@@ -47,7 +51,7 @@ describe('config loader', () => {
       target: { kind: 'target', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-target', version: '0.0.1' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
       adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-adapter', version: '0.0.1' }, create: () => ({ familyId: 'sql', targetId: 'postgres' }) },
       driver: { kind: 'driver', familyId: 'sql', targetId: 'postgres', id: 'postgres', version: '0.0.1', manifest: { packageName: '@prisma-next/postgres-driver', version: '0.0.1' }, create: async () => ({ targetId: 'postgres', query: async () => ({ rows: [] }), close: async () => {} }) },
-      extensionPacks: [],
+      extensionPacks: [],${extraProps}
     };`;
   };
 
@@ -61,6 +65,107 @@ describe('config loader', () => {
       expect(config).toBeDefined();
       expect(config.family).toBeDefined();
       expect(config.family.familyId).toBe('sql');
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'resolves explicit provider paths alongside config',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        createValidConfig(`
+      contract: {
+        source: createSource(
+          ['./prisma/schema.prisma', './prisma/schema.patch'],
+          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        ),
+        output: 'generated/contract.json',
+      }`),
+        'utf-8',
+      );
+
+      const config = await loadConfig(configPath);
+
+      expect(config.contract?.output).toBe(join(testDir, 'generated/contract.json'));
+      expect(config.contract?.source.inputs).toEqual([
+        join(testDir, 'prisma/schema.prisma'),
+        join(testDir, 'prisma/schema.patch'),
+      ]);
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'rejects emitted artifact paths in provider inputs',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        createValidConfig(`
+      contract: {
+        source: createSource(
+          ['./prisma/schema.prisma', './generated/contract.json', './generated/contract.d.ts'],
+          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        ),
+        output: 'generated/contract.json',
+      }`),
+        'utf-8',
+      );
+
+      await expect(loadConfig(configPath)).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        why: 'Config.contract.source.inputs must not include emitted artifact paths derived from contract.output',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'rejects non-json contract outputs during config finalization',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        createValidConfig(`
+      contract: {
+        source: createSource(
+          ['./prisma/schema.prisma'],
+          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        ),
+        output: 'generated/contract.ts',
+      }`),
+        'utf-8',
+      );
+
+      await expect(loadConfig(configPath)).rejects.toMatchObject({
+        name: 'CliStructuredError',
+        why: 'Contract output path must end with .json',
+      });
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'loads provider config with omitted inputs',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        createValidConfig(`
+      contract: {
+        source: createSource(
+          undefined,
+          async () => ({ ok: true, value: { targetFamily: 'sql' } }),
+        ),
+      }`),
+        'utf-8',
+      );
+
+      const config = await loadConfig(configPath);
+
+      expect(config.contract?.source.inputs).toBeUndefined();
     },
     timeouts.typeScriptCompilation,
   );

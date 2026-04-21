@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { setupIntegrationTest } from './setup';
+import { setupIntegrationTest, timeouts } from './setup';
 
-describe('integration: execution methods', () => {
+describe('integration: execution methods', { timeout: timeouts.databaseOperation }, () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('executes plan and returns rows', async () => {

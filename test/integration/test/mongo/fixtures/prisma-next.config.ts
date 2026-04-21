@@ -10,7 +10,9 @@ export default defineConfig({
   target: mongoTargetDescriptor,
   adapter: mongoAdapter,
   contract: {
-    source: async () => ok(contract as Contract),
+    source: {
+      load: async () => ok(contract as Contract),
+    },
     output: 'generated/contract.json',
   },
 });
