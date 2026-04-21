@@ -58,8 +58,90 @@ export type TestContract = MongoContract & {
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'users' };
     };
+    /**
+     * Fixture for value-object dot-path traversal (TML-2281). `address` is a
+     * non-nullable `Address`, `workAddress` is a nullable `Address`, and
+     * `stats` is a non-nullable `Stats`. `Address.geo` is itself a `GeoPoint`
+     * value object, giving us a two-level nested path (`address.geo.lat`).
+     */
+    readonly Customer: {
+      readonly fields: {
+        readonly _id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+          readonly nullable: false;
+        };
+        readonly name: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: false;
+        };
+        readonly address: {
+          readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+          readonly nullable: false;
+        };
+        readonly workAddress: {
+          readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+          readonly nullable: true;
+        };
+        readonly stats: {
+          readonly type: { readonly kind: 'valueObject'; readonly name: 'Stats' };
+          readonly nullable: false;
+        };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: { readonly collection: 'customers' };
+    };
   };
-  readonly roots: { readonly orders: 'Order'; readonly users: 'User' };
+  readonly valueObjects: {
+    readonly Address: {
+      readonly fields: {
+        readonly street: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: false;
+        };
+        readonly city: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: false;
+        };
+        readonly zip: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: true;
+        };
+        readonly geo: {
+          readonly type: { readonly kind: 'valueObject'; readonly name: 'GeoPoint' };
+          readonly nullable: false;
+        };
+      };
+    };
+    readonly GeoPoint: {
+      readonly fields: {
+        readonly lat: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
+          readonly nullable: false;
+        };
+        readonly lng: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
+          readonly nullable: false;
+        };
+      };
+    };
+    readonly Stats: {
+      readonly fields: {
+        readonly visits: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
+          readonly nullable: false;
+        };
+        readonly lastSeen: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/date@1' };
+          readonly nullable: true;
+        };
+      };
+    };
+  };
+  readonly roots: {
+    readonly orders: 'Order';
+    readonly users: 'User';
+    readonly customers: 'Customer';
+  };
 };
 
 export type TestCodecTypes = {
@@ -78,7 +160,7 @@ export type TContract = MongoContractWithTypeMaps<TestContract, TestTypeMaps>;
 export const testContractJson = {
   target: 'mongo',
   targetFamily: 'mongo',
-  roots: { orders: 'Order', users: 'User' },
+  roots: { orders: 'Order', users: 'User', customers: 'Customer' },
   models: {
     Order: {
       fields: {
@@ -102,8 +184,44 @@ export const testContractJson = {
       relations: {},
       storage: { collection: 'users' },
     },
+    Customer: {
+      fields: {
+        _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+        name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+        address: { type: { kind: 'valueObject', name: 'Address' }, nullable: false },
+        workAddress: { type: { kind: 'valueObject', name: 'Address' }, nullable: true },
+        stats: { type: { kind: 'valueObject', name: 'Stats' }, nullable: false },
+      },
+      relations: {},
+      storage: { collection: 'customers' },
+    },
   },
-  storage: { storageHash: 'test-hash', collections: { orders: {}, users: {} } },
+  valueObjects: {
+    Address: {
+      fields: {
+        street: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+        city: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+        zip: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: true },
+        geo: { type: { kind: 'valueObject', name: 'GeoPoint' }, nullable: false },
+      },
+    },
+    GeoPoint: {
+      fields: {
+        lat: { type: { kind: 'scalar', codecId: 'mongo/double@1' }, nullable: false },
+        lng: { type: { kind: 'scalar', codecId: 'mongo/double@1' }, nullable: false },
+      },
+    },
+    Stats: {
+      fields: {
+        visits: { type: { kind: 'scalar', codecId: 'mongo/double@1' }, nullable: false },
+        lastSeen: { type: { kind: 'scalar', codecId: 'mongo/date@1' }, nullable: true },
+      },
+    },
+  },
+  storage: {
+    storageHash: 'test-hash',
+    collections: { orders: {}, users: {}, customers: {} },
+  },
   capabilities: {},
   extensionPacks: {},
   profileHash: 'test-profile',

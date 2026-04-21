@@ -85,10 +85,14 @@ The general-purpose aggregation chain. Reached after calling any pipeline stage 
 
 ## Field accessor
 
-Stage callbacks receive a `FieldAccessor<Shape>` (typically named `f`):
+Stage callbacks receive a `FieldAccessor<Shape, Nested>` (typically named `f`):
 
 - **Property form** — `f.status`, `f.amount`: produces a `TypedAggExpr` bound to the field's declared type.
-- **Callable form** — `f("address.city")`: accesses nested paths. Note: the callable form does not currently validate the path against the contract at the type level.
+- **Callable form** — `f("address.city")`: type-safe dot-path traversal through the contract's model + value-object structure. Paths are validated at compile time against `ValidPaths<Nested>`, the resolved leaf's codec drives the returned expression, and IDE autocomplete surfaces the valid path union. Non-leaf paths (`f("address")`) return an `Expression<ObjectField<…>>` whose reduced operator surface exposes `set`, `unset`, `exists`, `eq(null)`, and `ne(null)` — operators that don't make sense on a whole value object (`gt`, `inc`, `push`, …) are hidden.
+
+  The callable form is disabled (at the type level) downstream of replacement stages (`project`, `group`, `replaceRoot`, …) that erase the nested structure; additive stages (`match`, `sort`, `addFields`, `lookup`, …) preserve it.
+
+  See [ADR 180 — Dot-path field accessor](../../../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md) for the design rationale.
 
 ## Update operators
 
