@@ -161,7 +161,7 @@ Carry `sort` / `skip` / `returnDocument` through the find-and-modify command cha
 - [x] F4.4 — M4 coverage (`f.stage.set` pipeline update, traditional-operator update, `$merge`, `$out`).
 - [x] F4.5 — 14 integration tests pass in `examples/mongo-demo/test/query-builder-writes.test.ts`.
 
-### F5 — Retail-store example conversion — **OUTSTANDING** 🟡
+### F5 — Retail-store example conversion — **DONE** ✅
 
 Convert `examples/retail-store/migrations/20260416_backfill-product-status` end-to-end onto the typed query builder. Both the `check` source (currently typed) and the `run` body (currently a hand-built `RawUpdateManyCommand`) move to `mongoQuery`, so the example becomes a showcase of the unified surface rather than a half-converted artefact.
 
@@ -184,15 +184,15 @@ const query = mongoQuery<Contract>({ contractJson });
 ```
 
 - [x] F5.1 — Confirm PR [#349](https://github.com/prisma/prisma-next/pull/349) merged and the branch is rebased. (Done.)
-- [ ] F5.2 — Convert `migration.ts`:
-  - Swap `mongoPipeline` → `mongoQuery` and rename the local from `pipeline` to `query`.
-  - Replace the `check.source` `match(MongoExistsExpr.notExists('status'))` with the typed accessor: `match((f) => f.status.exists(false))`.
-  - Replace the `run` body's `RawUpdateManyCommand` with `query.from('products').match((f) => f.status.exists(false)).updateMany((f) => [f.status.set('active')])`. The returned `MongoQueryPlan` is the same `{ collection, command, meta }` shape `dataTransform.run` already consumes — verify no adapter is needed.
-  - Drop now-unused imports (`mongoPipeline`, `MongoExistsExpr`, `RawUpdateManyCommand`).
-  - Drop the hand-built `meta` block; the plans returned by `mongoQuery` carry their own `meta` with `lane: 'mongo-query'` (post-PR-355 lane collapse).
-- [ ] F5.3 — Re-emit the migration's `ops.json` via the migration's emit path. Let `migration.json#migrationId` re-hash. Confirm the new `ops.json` records `kind: 'updateMany'` (typed) instead of `kind: 'rawUpdateMany'`, and that `meta.lane` is `'mongo-query'` everywhere.
-- [ ] F5.4 — `rg -n 'mongoPipeline' examples/retail-store/` to confirm no remaining references in inline docs or comments. Update any stragglers.
-- [ ] F5.5 — Run `pnpm -F @prisma-next/example-retail-store test` (or whatever the package is named) to confirm the example's tests pass against the converted migration.
+- [x] F5.2 — Converted `migration.ts`:
+  - Swapped `mongoPipeline` → `mongoQuery` and renamed the local from `pipeline` to `query`.
+  - Replaced the `check.source` `match(MongoExistsExpr.notExists('status'))` with the unified accessor: `match((f) => f('status').exists(false))`. Used the **callable form** `f('status')` rather than the property form `f.status` because `status` is the field being backfilled and is not present on the typed `Product` shape — strict path validation is tracked on TML-2281 (per ADR 180).
+  - Replaced the `run` body's `RawUpdateManyCommand` with `query.from('products').match((f) => f('status').exists(false)).updateMany((f) => [f('status').set('active')])`. The terminal returns a `MongoQueryPlan` whose `{ collection, command, meta }` shape `dataTransform.run` consumes directly — no adapter needed.
+  - Dropped the now-unused imports (`mongoPipeline`, `MongoExistsExpr`, `RawUpdateManyCommand`) and the `validateMongoContract` import (no longer needed since `meta` is no longer hand-built).
+  - Dropped the hand-built `meta` block; the plans returned by `mongoQuery` carry their own `meta` with `lane: 'mongo-query'` (post-PR-355 lane collapse).
+- [x] F5.3 — Re-emitted `ops.json` and `migration.json` via `pnpm exec tsx migrations/20260416_backfill-product-status/migration.ts` (the `Migration.run` self-emit shebang). `migrationId` re-hashed from `sha256:8fac97a3…` → `sha256:70ba2c21…`; `ops.json` now records `kind: 'updateMany'` (typed) and `meta.lane: 'mongo-query'` everywhere.
+- [x] F5.4 — `rg -n 'mongoPipeline' examples/retail-store/` returns no matches; nothing in comments or docs to update.
+- [x] F5.5 — `pnpm -C examples/retail-store test` — 12 files, 54 tests pass against the converted migration.
 
 ### F6 — Close-out — **OUTSTANDING** 🟡
 
