@@ -22,13 +22,17 @@ function buildControlStack(config: Awaited<ReturnType<typeof loadConfig>>) {
   });
 }
 
-function buildSourceContext(stack: ControlStack): ContractSourceContext {
+function buildSourceContext(
+  stack: ControlStack,
+  resolvedInputs: readonly string[] = [],
+): ContractSourceContext {
   return {
     composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
     scalarTypeDescriptors: stack.scalarTypeDescriptors,
     authoringContributions: stack.authoringContributions,
     codecLookup: stack.codecLookup,
     controlMutationDefaults: stack.controlMutationDefaults,
+    resolvedInputs,
   };
 }
 
@@ -36,7 +40,7 @@ const resolveContract = async (
   source: NonNullable<Awaited<ReturnType<typeof loadConfig>>['contract']>['source'],
   stack: ControlStack,
 ) => {
-  const sourceResult = await source(buildSourceContext(stack));
+  const sourceResult = await source.load(buildSourceContext(stack, source.inputs ?? []));
   if (!sourceResult.ok) {
     throw new Error(sourceResult.failure.summary);
   }

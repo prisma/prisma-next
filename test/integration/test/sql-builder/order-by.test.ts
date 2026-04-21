@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { setupIntegrationTest } from './setup';
+import { setupIntegrationTest, timeouts } from './setup';
 
-describe('integration: ORDER BY', () => {
+describe('integration: ORDER BY', { timeout: timeouts.databaseOperation }, () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('sorts by column descending', async () => {

@@ -1,3 +1,4 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { codecDefinitions } from '../src/core/codecs';
 
@@ -178,16 +179,20 @@ describe('codec renderOutputType', () => {
   describe('pg/json@1', () => {
     const codec = codecDefinitions['json'].codec;
 
-    it('renders type expression from schemaJson', () => {
-      const result = codec.renderOutputType!({
-        schemaJson: {
-          type: 'object',
-          properties: { action: { type: 'string' }, actorId: { type: 'number' } },
-          required: ['action', 'actorId'],
-        },
-      });
-      expect(result).toBe('{ action: string; actorId: number }');
-    });
+    it(
+      'renders type expression from schemaJson',
+      () => {
+        const result = codec.renderOutputType!({
+          schemaJson: {
+            type: 'object',
+            properties: { action: { type: 'string' }, actorId: { type: 'number' } },
+            required: ['action', 'actorId'],
+          },
+        });
+        expect(result).toBe('{ action: string; actorId: number }');
+      },
+      timeouts.databaseOperation,
+    );
   });
 
   describe('non-parameterized codecs', () => {

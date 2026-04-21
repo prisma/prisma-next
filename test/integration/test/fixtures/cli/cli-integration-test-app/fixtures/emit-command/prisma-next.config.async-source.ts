@@ -12,9 +12,12 @@ export default defineConfig({
   driver: postgresDriver,
   extensionPacks: [],
   contract: {
-    source: async () => {
-      const { contract } = await import('./contract');
-      return ok(contract);
+    source: {
+      inputs: ['./contract.ts'],
+      load: async () => {
+        const { contract } = await import('./contract');
+        return ok(contract);
+      },
     },
     output: '{{OUTPUT_DIR}}/contract.json',
   },

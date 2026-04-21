@@ -14,7 +14,9 @@ export default defineConfig({
   driver: postgresDriver,
   extensionPacks: [],
   contract: {
-    source: async () => ({ ok: true, value: contract }),
+    source: {
+      load: async () => ({ ok: true, value: contract }),
+    },
     output: 'src/prisma/contract.json',
   },
   db: {

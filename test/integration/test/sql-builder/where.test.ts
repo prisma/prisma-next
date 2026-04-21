@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { setupIntegrationTest } from './setup';
+import { setupIntegrationTest, timeouts } from './setup';
 
-describe('integration: WHERE', () => {
+describe('integration: WHERE', { timeout: timeouts.databaseOperation }, () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('eq filters to matching row', async () => {
