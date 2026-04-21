@@ -11,9 +11,10 @@ export default defineConfig({
   driver: mongoDriver,
   extensionPacks: [],
   contract: {
-    source: async () => ({ ok: true as const, value: contract }),
+    source: {
+      load: async () => ({ ok: true as const, value: contract }),
+    },
     output: 'output/contract.json',
-    types: 'output/contract.d.ts',
   },
   db: {
     connection: '{{DB_URL}}',
