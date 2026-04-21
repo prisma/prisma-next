@@ -114,7 +114,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
     expect(result.plan.operations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: 'alterNullability.user.email',
+          id: 'alterNullability.dropNotNull.user.email',
           operationClass: 'widening',
         }),
       ]),

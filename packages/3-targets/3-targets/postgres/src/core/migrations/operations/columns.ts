@@ -135,7 +135,7 @@ export function alterColumnType(
 export function setNotNull(schemaName: string, tableName: string, columnName: string): Op {
   const qualified = qualifyTableName(schemaName, tableName);
   return {
-    id: `alterNullability.${tableName}.${columnName}`,
+    id: `alterNullability.setNotNull.${tableName}.${columnName}`,
     label: `Set NOT NULL on "${tableName}"."${columnName}"`,
     operationClass: 'destructive',
     target: targetDetails('column', columnName, schemaName, tableName),
@@ -172,7 +172,7 @@ export function setNotNull(schemaName: string, tableName: string, columnName: st
 export function dropNotNull(schemaName: string, tableName: string, columnName: string): Op {
   const qualified = qualifyTableName(schemaName, tableName);
   return {
-    id: `alterNullability.${tableName}.${columnName}`,
+    id: `alterNullability.dropNotNull.${tableName}.${columnName}`,
     label: `Drop NOT NULL on "${tableName}"."${columnName}"`,
     operationClass: 'widening',
     target: targetDetails('column', columnName, schemaName, tableName),

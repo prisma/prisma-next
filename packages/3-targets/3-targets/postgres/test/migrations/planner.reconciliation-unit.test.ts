@@ -310,7 +310,7 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations).toHaveLength(1);
       expect(result.operations[0]).toMatchObject({
-        id: 'alterNullability.user.bio',
+        id: 'alterNullability.dropNotNull.user.bio',
         operationClass: 'widening',
       });
       expect(result.operations[0]!.execute[0]!.sql).toContain('DROP NOT NULL');
@@ -330,7 +330,7 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations).toHaveLength(1);
       expect(result.operations[0]).toMatchObject({
-        id: 'alterNullability.user.email',
+        id: 'alterNullability.setNotNull.user.email',
         operationClass: 'destructive',
       });
       expect(result.operations[0]!.execute[0]!.sql).toContain('SET NOT NULL');
@@ -886,7 +886,7 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations.map((op) => op.id)).toEqual([
         'dropTable.legacy_audit',
-        'alterNullability.user.bio',
+        'alterNullability.dropNotNull.user.bio',
       ]);
     });
   });
