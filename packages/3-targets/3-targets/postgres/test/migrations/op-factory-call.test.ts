@@ -368,9 +368,13 @@ describe('renderCallsToTypeScript', () => {
 
     expect(source).toContain("import { Migration } from '@prisma-next/family-sql/migration';");
     // Per-factory imports collapsed under a single target-postgres line, sorted.
-    expect(source).toContain(
+    // Asserted as an exact-length array so a stray duplicate import line fails here.
+    const targetPostgresImports = source
+      .split('\n')
+      .filter((line) => line.includes("from '@prisma-next/target-postgres/migration';"));
+    expect(targetPostgresImports).toEqual([
       "import { addColumn, createIndex, createTable, dropTable } from '@prisma-next/target-postgres/migration';",
-    );
+    ]);
     // Each call appears once in the operations body.
     expect(source).toContain('createTable(');
     expect(source).toContain('dropTable(');
