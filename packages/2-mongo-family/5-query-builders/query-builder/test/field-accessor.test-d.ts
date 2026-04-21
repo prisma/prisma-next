@@ -154,6 +154,48 @@ describe('ObjectExpression operator surface', () => {
   });
 });
 
+describe('FieldAccessor.raw escape hatch', () => {
+  it('accepts an arbitrary string path without contract validation', () => {
+    const f = createFieldAccessor<CustomerShape, CustomerNested>();
+    const expr = f.raw('status');
+    expectTypeOf(expr).toExtend<LeafExpression<DocField>>();
+  });
+
+  it('returns the full leaf operator surface (set, exists, inc, …)', () => {
+    const f = createFieldAccessor<CustomerShape, CustomerNested>();
+    const expr = f.raw('status');
+    expectTypeOf(expr.set).toBeFunction();
+    expectTypeOf(expr.unset).toBeFunction();
+    expectTypeOf(expr.exists).toBeFunction();
+    expectTypeOf(expr.inc).toBeFunction();
+    expectTypeOf(expr.push).toBeFunction();
+  });
+
+  it('accepts paths that are not in ValidPaths<N>', () => {
+    const f = createFieldAccessor<CustomerShape, CustomerNested>();
+    // 'status' is not a valid path on Customer; `f.raw` must still accept
+    // it — that is the whole point of the escape hatch (migration authoring
+    // where the target field is not yet in the contract).
+    f.raw('status');
+    f.raw('deeply.nested.not.in.contract');
+  });
+
+  it('remains available when N is empty (callable disabled)', () => {
+    const f = createFieldAccessor<CustomerShape>();
+    // Callable (strict) is disabled because ValidPaths<{}> = never.
+    // `f.raw` has no such dependency on N and remains usable.
+    const expr = f.raw('status');
+    expectTypeOf(expr).toExtend<LeafExpression<DocField>>();
+  });
+
+  it('narrows the return via the explicit generic', () => {
+    const f = createFieldAccessor<CustomerShape, CustomerNested>();
+    type StringField = { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+    const expr = f.raw<StringField>('status');
+    expectTypeOf(expr).toEqualTypeOf<LeafExpression<StringField>>();
+  });
+});
+
 describe('Pipeline integration — N threading', () => {
   it('CollectionHandle.match callback allows callable dot-path access', () => {
     const p = mongoQuery<TContract>({ contractJson });

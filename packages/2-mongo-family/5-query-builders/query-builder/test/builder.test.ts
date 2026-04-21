@@ -5,6 +5,7 @@ import {
   MongoAggFieldRef,
   MongoAggOperator,
   MongoCountStage,
+  MongoExistsExpr,
   MongoFieldFilter,
   MongoGroupStage,
   MongoLimitStage,
@@ -80,6 +81,20 @@ describe('PipelineChain', () => {
       const expectedFilter = MongoFieldFilter.eq('address.city', 'NYC');
       expect(callableStage).toBeInstanceOf(MongoMatchStage);
       expect(callableStage.filter).toEqual(expectedFilter);
+    });
+
+    // Runtime non-regression for the `f.raw(path)` escape hatch (TML-2281):
+    // the resulting expression must emit the same filter/update nodes as the
+    // strict callable form, just without compile-time path validation.
+    it('match via f.raw(path) emits identical nodes as the strict callable', () => {
+      const rawPlan = createCustomersBuilder()
+        .match((f) => f.raw('status').exists(false))
+        .build();
+      const rawStage = rawPlan.command.pipeline[0] as MongoMatchStage;
+
+      const expectedFilter = MongoExistsExpr.notExists('status');
+      expect(rawStage).toBeInstanceOf(MongoMatchStage);
+      expect(rawStage.filter).toEqual(expectedFilter);
     });
 
     it('sort() appends MongoSortStage', () => {

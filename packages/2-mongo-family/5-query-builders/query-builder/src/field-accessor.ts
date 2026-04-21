@@ -164,6 +164,11 @@ function buildStageEmitters(): StageEmitters {
  *   resolve to an `ObjectExpression` whose reduced surface covers the
  *   whole-value operations (`set`, `unset`, `exists`, `eq(null)`,
  *   `ne(null)`).
+ * - `f.raw('path')` is a deliberate escape hatch that skips path
+ *   validation and returns a `LeafExpression<F>` for the given string.
+ *   Intended for migration authoring where the target field is not yet
+ *   part of the typed contract (e.g. a backfill writing a newly-added
+ *   column before the contract hash rolls forward).
  * - `f.stage` exposes pipeline-style update emitters (`$set`, `$unset`,
  *   `$replaceRoot`, `$replaceWith`).
  *
@@ -172,11 +177,25 @@ function buildStageEmitters(): StageEmitters {
  * `ValidPaths<N>` is `never` and the callable form is effectively
  * disabled at the type level. This keeps the builder sound downstream of
  * stages that invalidate the original document's nested-path tree.
+ * `f.raw(...)` remains available in that state for callers that need an
+ * explicit unvalidated path.
  */
 export type FieldAccessor<S extends DocShape, N extends NestedDocShape = Record<string, never>> = {
   readonly [K in keyof S & string]: Expression<S[K]>;
 } & (<P extends ValidPaths<N>>(path: P) => Expression<ResolvePath<N, P>>) & {
     readonly stage: StageEmitters;
+    /**
+     * Escape hatch: build a `LeafExpression<F>` for an unvalidated string
+     * path. Use only when the path is intentionally outside the typed
+     * model surface — data-migration authoring is the canonical case
+     * (e.g. backfilling a field that is not yet in the contract). Default
+     * `F` is the opaque `DocField`; callers can narrow via the explicit
+     * generic: `f.raw<StringField>("status").set("active")`.
+     *
+     * Does not participate in `ValidPaths<N>` / `ResolvePath<N, P>` — the
+     * path is passed through verbatim and no IDE autocomplete is offered.
+     */
+    raw<F extends DocField = DocField>(path: string): LeafExpression<F>;
   };
 
 function buildExpression<F extends DocField>(path: string): Expression<F> {
@@ -246,6 +265,9 @@ export function createFieldAccessor<
       }
       if (prop === 'stage') {
         return stageInstance;
+      }
+      if (prop === 'raw') {
+        return (path: string) => buildExpression<DocField>(path);
       }
       return buildExpression(prop);
     },

@@ -92,6 +92,8 @@ Stage callbacks receive a `FieldAccessor<Shape, Nested>` (typically named `f`):
 
   The callable form is disabled (at the type level) downstream of replacement stages (`project`, `group`, `replaceRoot`, …) that erase the nested structure; additive stages (`match`, `sort`, `addFields`, `lookup`, …) preserve it.
 
+- **Escape hatch** — `f.raw("path")`: sidesteps path validation and returns a `LeafExpression<DocField>` carrying the verbatim string path. Use when the path is intentionally outside the typed model — the canonical case is **migration authoring**, where a backfill writes to a field that is not yet in the pre-migration contract (see the retail-store example's `backfill-product-status` migration). `f.raw` offers the full leaf operator surface (`set`, `exists`, `inc`, `push`, …) and no IDE autocomplete. Callers can narrow the return via an explicit generic: `f.raw<StringField>("status").set("active")`.
+
   See [ADR 180 — Dot-path field accessor](../../../../../docs/architecture%20docs/adrs/ADR%20180%20-%20Dot-path%20field%20accessor.md) for the design rationale.
 
 ## Update operators
