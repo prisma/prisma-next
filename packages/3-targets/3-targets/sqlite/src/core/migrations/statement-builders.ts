@@ -5,7 +5,7 @@ export interface SqlStatement {
 
 export const ensureMarkerTableStatement: SqlStatement = {
   sql: `CREATE TABLE IF NOT EXISTS _prisma_marker (
-    id INTEGER PRIMARY KEY DEFAULT 1,
+    id INTEGER PRIMARY KEY CHECK (id = 1),
     core_hash TEXT NOT NULL,
     profile_hash TEXT NOT NULL,
     contract_json TEXT,
