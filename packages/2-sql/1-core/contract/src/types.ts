@@ -1,4 +1,5 @@
 import type { ColumnDefault, StorageBase } from '@prisma-next/contract/types';
+import type { CodecTrait } from '@prisma-next/framework-components/codec';
 
 /**
  * A column definition in storage.
@@ -166,8 +167,14 @@ export type OperationTypesOf<T> = [T] extends [never]
       : Record<string, never>
     : Record<string, never>;
 
+export type QueryOperationArgSpec = {
+  readonly codecId?: string;
+  readonly traits?: readonly CodecTrait[];
+  readonly nullable: boolean;
+};
+
 export type QueryOperationTypeEntry = {
-  readonly args: readonly { readonly codecId: string; readonly nullable: boolean }[];
+  readonly args: readonly QueryOperationArgSpec[];
   readonly returns: { readonly codecId: string; readonly nullable: boolean };
 };
 

@@ -1,6 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { setupIntegrationTest, timeouts } from './setup';
 
+describe('integration: ilike (adapter operation)', () => {
+  const { db, runtime } = setupIntegrationTest();
+
+  it('ilike filters case-insensitively in WHERE', async () => {
+    const rows = await runtime().execute(
+      db()
+        .users.select('id', 'name')
+        .where((f, fns) => fns.ilike(f.name, '%alice%'))
+        .build(),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.name).toBe('Alice');
+  });
+
+  it('ilike returns no rows when pattern does not match', async () => {
+    const rows = await runtime().execute(
+      db()
+        .users.select('id')
+        .where((f, fns) => fns.ilike(f.name, '%zzz%'))
+        .build(),
+    );
+    expect(rows).toHaveLength(0);
+  });
+});
+
 describe('integration: extension functions', { timeout: timeouts.databaseOperation }, () => {
   const { db, runtime } = setupIntegrationTest();
 

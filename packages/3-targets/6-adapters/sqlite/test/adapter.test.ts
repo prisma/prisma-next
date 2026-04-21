@@ -416,14 +416,6 @@ describe('SQLite adapter', () => {
       expect(sql).toContain('= ?');
     });
 
-    it('throws on ILIKE (not supported by SQLite)', () => {
-      const ast = SelectAst.from(TableSource.named('user'))
-        .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
-        .withWhere(BinaryExpr.ilike(ColumnRef.of('user', 'email'), ParamRef.of('%test%')));
-
-      expect(() => adapter.lower(ast, { contract })).toThrow('SQLite does not support ILIKE');
-    });
-
     it('throws on unsupported AST node kind', () => {
       const unsupported = {
         kind: 'unsupported',

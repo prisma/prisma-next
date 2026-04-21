@@ -83,8 +83,30 @@ describe('extension ops return ComparisonMethods with return-codec traits', () =
     expectTypeOf<CosineDistanceResult>().not.toHaveProperty('like');
   });
 
-  test('cosineDistance result does not expose ilike (textual-only)', () => {
+  test('cosineDistance result does not expose ilike (extension op, not comparison method)', () => {
     expectTypeOf<CosineDistanceResult>().not.toHaveProperty('ilike');
+  });
+});
+
+describe('ilike extension operation on text fields', () => {
+  test('text field exposes ilike', () => {
+    expectTypeOf<PostAccessor['title']>().toHaveProperty('ilike');
+  });
+
+  test('ilike returns AnyExpression (predicate)', () => {
+    type IlikeFn = PostAccessor['title']['ilike'];
+    expectTypeOf<IlikeFn>().toBeFunction();
+    expectTypeOf<ReturnType<IlikeFn>>().toExtend<
+      import('@prisma-next/sql-relational-core/ast').AnyExpression
+    >();
+  });
+
+  test('numeric field does not expose ilike', () => {
+    expectTypeOf<PostAccessor['views']>().not.toHaveProperty('ilike');
+  });
+
+  test('vector field does not expose ilike', () => {
+    expectTypeOf<PostAccessor['embedding']>().not.toHaveProperty('ilike');
   });
 });
 

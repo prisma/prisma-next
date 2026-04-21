@@ -1,5 +1,6 @@
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { expectTypeOf, test } from 'vitest';
+import type { BooleanCodecType, Expression } from '../../src/expression';
 import { db } from './preamble';
 
 test('extension function in select expression', () => {
@@ -27,4 +28,21 @@ test('extension function composed with builtins in where', () => {
     .build();
 
   expectTypeOf(filtered).toEqualTypeOf<SqlQueryPlan<{ id: number; title: string }>>();
+});
+
+test('ilike filters text fields in where', () => {
+  const filtered = db.users
+    .select('id', 'name')
+    .where((f, fns) => fns.ilike(f.name, '%alice%'))
+    .build();
+
+  expectTypeOf(filtered).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
+});
+
+test('ilike returns boolean expression', () => {
+  db.users.select('id').where((f, fns) => {
+    const result = fns.ilike(f.name, '%test%');
+    expectTypeOf(result).toExtend<Expression<BooleanCodecType>>();
+    return result;
+  });
 });

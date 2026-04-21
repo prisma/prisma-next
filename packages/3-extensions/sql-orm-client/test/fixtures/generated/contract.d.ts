@@ -16,6 +16,7 @@ import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
 import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
 import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
+import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
 import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
 import type {
@@ -39,7 +40,7 @@ export type ProfileHash =
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type OperationTypes = PgVectorOperationTypes;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = PgVectorQueryOperationTypes;
+export type QueryOperationTypes = PgAdapterQueryOps & PgVectorQueryOperationTypes;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
