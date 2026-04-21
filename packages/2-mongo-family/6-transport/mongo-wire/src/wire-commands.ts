@@ -104,7 +104,11 @@ export class FindOneAndUpdateWireCommand extends MongoWireCommand {
   readonly upsert: boolean;
   readonly sort: Record<string, 1 | -1> | undefined;
   readonly skip: number | undefined;
-  readonly returnDocument: 'before' | 'after';
+  /**
+   * When `undefined`, the option is omitted from the underlying driver
+   * call so Mongo's documented default (pre-image document) applies.
+   */
+  readonly returnDocument: 'before' | 'after' | undefined;
 
   constructor(
     collection: string,
@@ -113,7 +117,7 @@ export class FindOneAndUpdateWireCommand extends MongoWireCommand {
     upsert = false,
     sort?: Record<string, 1 | -1>,
     skip?: number,
-    returnDocument: 'before' | 'after' = 'after',
+    returnDocument?: 'before' | 'after',
   ) {
     super(collection);
     this.filter = filter;

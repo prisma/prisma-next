@@ -104,7 +104,12 @@ export class RawFindOneAndUpdateCommand extends MongoAstNode {
   readonly upsert: boolean;
   readonly sort: Record<string, 1 | -1> | undefined;
   readonly skip: number | undefined;
-  readonly returnDocument: 'before' | 'after';
+  /**
+   * When `undefined`, the option is omitted from the wire command and the
+   * MongoDB driver applies its documented default (return the pre-image
+   * document). Set explicitly to `'before'` or `'after'` to override.
+   */
+  readonly returnDocument: 'before' | 'after' | undefined;
 
   constructor(
     collection: string,
@@ -113,7 +118,7 @@ export class RawFindOneAndUpdateCommand extends MongoAstNode {
     upsert = false,
     sort?: Record<string, 1 | -1>,
     skip?: number,
-    returnDocument: 'before' | 'after' = 'after',
+    returnDocument?: 'before' | 'after',
   ) {
     super();
     this.collection = collection;

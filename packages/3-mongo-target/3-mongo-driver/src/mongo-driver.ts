@@ -123,8 +123,8 @@ export class MongoDriverImpl implements MongoDriver {
   ): AsyncIterable<Record<string, unknown>> {
     const collection = this.#db.collection(cmd.collection);
     const result = await collection.findOneAndUpdate(cmd.filter, cmd.update, {
-      returnDocument: cmd.returnDocument,
       upsert: cmd.upsert,
+      ...(cmd.returnDocument != null ? { returnDocument: cmd.returnDocument } : {}),
       ...(cmd.sort != null ? { sort: cmd.sort } : {}),
     });
     if (result) {

@@ -171,7 +171,7 @@ describe('MongoDriver', () => {
   describe('findOneAndUpdate', () => {
     const col = 'driver_find_update';
 
-    it('updates and returns the modified document', async () => {
+    it('updates and returns the modified document when returnDocument=after', async () => {
       const driver = await createMongoDriver(connectionUri, dbName);
       try {
         const db = seedClient.db(dbName);
@@ -183,6 +183,9 @@ describe('MongoDriver', () => {
           { name: 'Grace' },
           { $set: { age: 31 } },
           false,
+          undefined,
+          undefined,
+          'after',
         );
         const rows = await collect(driver.execute(cmd));
         expect(rows).toHaveLength(1);
@@ -192,7 +195,7 @@ describe('MongoDriver', () => {
       }
     });
 
-    it('upserts when document does not exist', async () => {
+    it('upserts and returns the inserted document when returnDocument=after', async () => {
       const driver = await createMongoDriver(connectionUri, dbName);
       try {
         const db = seedClient.db(dbName);
@@ -203,6 +206,9 @@ describe('MongoDriver', () => {
           { name: 'Heidi' },
           { $set: { age: 25 } },
           true,
+          undefined,
+          undefined,
+          'after',
         );
         const rows = await collect(driver.execute(cmd));
         expect(rows).toHaveLength(1);
