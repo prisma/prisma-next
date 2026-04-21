@@ -6,6 +6,11 @@ import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 
 describe('defineConfig', () => {
+  const createSourceProvider = (inputs: readonly string[] | undefined = undefined) => ({
+    ...(!inputs ? {} : { inputs }),
+    load: async () => ok({ targetFamily: 'sql' } as Contract),
+  });
+
   const mockHook = {
     id: 'sql',
     generateStorageType: () => '{}',
@@ -109,11 +114,10 @@ describe('defineConfig', () => {
   });
 
   it('normalizes contract config with default output', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
-        source: sourceProvider,
+        source: createSourceProvider(),
       },
     };
 
@@ -122,21 +126,33 @@ describe('defineConfig', () => {
   });
 
   it('normalizes contract config with custom output', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
-        source: sourceProvider,
+        source: createSourceProvider(['./schema.prisma']),
         output: 'custom/contract.json',
       },
     };
 
     const result = defineConfig(config);
     expect(result.contract?.output).toBe('custom/contract.json');
+    expect(result.contract?.source.inputs).toEqual(['./schema.prisma']);
   });
 
-  it('validates contract source accepts provider function', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
+  it('preserves omitted contract inputs', () => {
+    const config: PrismaNextConfig = {
+      ...baseConfig,
+      contract: {
+        source: createSourceProvider(),
+      },
+    };
+
+    const result = defineConfig(config);
+    expect(result.contract?.source.inputs).toBeUndefined();
+  });
+
+  it('validates contract source accepts provider objects', () => {
+    const sourceProvider = createSourceProvider();
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
@@ -148,7 +164,7 @@ describe('defineConfig', () => {
     expect(result.contract?.source).toBe(sourceProvider);
   });
 
-  it('throws when source is not a provider function', () => {
+  it('throws when source is not a provider object', () => {
     const config = {
       ...baseConfig,
       contract: {
@@ -156,9 +172,7 @@ describe('defineConfig', () => {
       },
     } as unknown as PrismaNextConfig;
 
-    expect(() => defineConfig(config)).toThrow(
-      'Config.contract.source must be a provider function',
-    );
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
   });
 
   it('throws error on invalid config structure', () => {
@@ -177,23 +191,23 @@ describe('defineConfig', () => {
       },
     } as unknown as PrismaNextConfig;
 
-    expect(() => defineConfig(config)).toThrow(
-      'Config.contract.source must be a provider function',
-    );
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
   });
 
   it('builds TypeScript contract config via helper utility', async () => {
     const contract = { targetFamily: 'sql' } as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
-    const result = await config.source({
+    const result = await config.source.load({
       composedExtensionPacks: [],
       scalarTypeDescriptors: new Map(),
       authoringContributions: { field: {}, type: {} },
       codecLookup: { get: () => undefined },
       controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
+      resolvedInputs: [],
     });
 
     expect(config.output).toBe('output/contract.json');
+    expect(config.source.inputs).toBeUndefined();
     expect(result.ok).toBe(true);
     expect(result.assertOk()).toBe(contract);
   });

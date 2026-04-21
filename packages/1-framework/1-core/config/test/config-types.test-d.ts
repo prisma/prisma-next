@@ -7,8 +7,10 @@ import type {
   ControlFamilyInstance,
   ControlTargetDescriptor,
 } from '@prisma-next/framework-components/control';
+import { ok } from '@prisma-next/utils/result';
 import { expectTypeOf, test } from 'vitest';
 import { defineConfig, type PrismaNextConfig } from '../src/config-types';
+import type { ContractSourceProvider } from '../src/contract-source-types';
 
 const mockHook = {
   id: 'sql',
@@ -95,6 +97,24 @@ test('accepts compatible control descriptors', () => {
 
   const result = defineConfig(config);
   expectTypeOf(result).toExtend<PrismaNextConfig<'sql', 'postgres'>>();
+});
+
+test('accepts contract source providers with declared inputs', () => {
+  const config: PrismaNextConfig<'sql', 'postgres'> = {
+    family: sqlFamilyDescriptor,
+    target: postgresTargetDescriptor,
+    adapter: postgresAdapterDescriptor,
+    contract: {
+      source: {
+        inputs: ['./schema.prisma'],
+        load: async (_context) => ok({} as never),
+      },
+    },
+  };
+
+  const result = defineConfig(config);
+  expectTypeOf(result.contract!.source.inputs).toEqualTypeOf<readonly string[] | undefined>();
+  expectTypeOf(result.contract!.source.load).toEqualTypeOf<ContractSourceProvider['load']>();
 });
 
 test('rejects mismatched target in target descriptor', () => {

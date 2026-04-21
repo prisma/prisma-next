@@ -20,6 +20,13 @@ const mockHook = {
     `export type Contract = ${base} & { typeMaps: ${tm} };`,
 };
 
+function createSourceProvider(overrides: Record<string, unknown> = {}) {
+  return {
+    load: async () => ok({ targetFamily: 'sql' } as Contract),
+    ...overrides,
+  };
+}
+
 function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextConfig {
   return {
     family: {
@@ -319,7 +326,7 @@ describe('validateConfig', () => {
     expectFieldError(createValidRawConfig({ contract: 'invalid' }), 'contract');
     expectFieldError(createValidRawConfig({ contract: {} }), 'contract.source');
     const inheritedSourceContract = Object.create({
-      source: async () => ok({ targetFamily: 'sql' } as Contract),
+      source: createSourceProvider(),
     }) as Record<string, unknown>;
     expectFieldError(
       createValidRawConfig({ contract: inheritedSourceContract }),
@@ -327,14 +334,48 @@ describe('validateConfig', () => {
     );
     expectFieldError(
       createValidRawConfig({
-        contract: { source: { kind: 'psl', schemaPath: './schema.prisma' } },
+        contract: {
+          source: {
+            inputs: 123,
+            load: async () => ok({ targetFamily: 'sql' } as Contract),
+          },
+        },
       }),
-      'contract.source',
+      'contract.source.inputs',
     );
     expectFieldError(
       createValidRawConfig({
         contract: {
-          source: async () => ok({ targetFamily: 'sql' } as Contract),
+          source: {
+            inputs: ['valid', 123],
+            load: async () => ok({ targetFamily: 'sql' } as Contract),
+          },
+        },
+      }),
+      'contract.source.inputs[]',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
+          source: {},
+        },
+      }),
+      'contract.source.load',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
+          source: {
+            load: 'invalid',
+          },
+        },
+      }),
+      'contract.source.load',
+    );
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
+          source: createSourceProvider(),
           output: 123,
         },
       }),
@@ -356,7 +397,7 @@ describe('validateConfig', () => {
         },
       ],
       contract: {
-        source: async () => ok({ targetFamily: 'sql' } as Contract),
+        source: createSourceProvider(),
         output: 'src/prisma/contract.json',
       },
     });
@@ -410,10 +451,9 @@ describe('defineConfig', () => {
   });
 
   it('applies default output path when contract output is missing', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
     const config = createValidConfig({
       contract: {
-        source: sourceProvider,
+        source: createSourceProvider(),
       },
     });
 
@@ -421,11 +461,24 @@ describe('defineConfig', () => {
     expect(result.contract?.output).toBe('src/prisma/contract.json');
   });
 
-  it('preserves custom output path', () => {
-    const sourceProvider = async () => ok({ targetFamily: 'sql' } as Contract);
+  it('preserves source provider metadata', () => {
     const config = createValidConfig({
       contract: {
-        source: sourceProvider,
+        source: createSourceProvider({
+          inputs: ['./schema.prisma'],
+        }),
+      },
+    });
+
+    const result = defineConfig(config);
+    expect(result.contract).toBeDefined();
+    expect(result.contract?.source.inputs).toEqual(['./schema.prisma']);
+  });
+
+  it('preserves custom output path', () => {
+    const config = createValidConfig({
+      contract: {
+        source: createSourceProvider(),
         output: 'custom/contract.json',
       },
     });
@@ -434,16 +487,14 @@ describe('defineConfig', () => {
     expect(result.contract?.output).toBe('custom/contract.json');
   });
 
-  it('throws when contract source is not a function', () => {
+  it('throws when contract source is not a provider object', () => {
     const config = createValidConfig({
       contract: {
         source: 'invalid',
       },
     }) as unknown as PrismaNextConfig;
 
-    expect(() => defineConfig(config)).toThrow(
-      'Config.contract.source must be a provider function',
-    );
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
   });
 
   it('throws for invalid top-level shape', () => {
