@@ -412,7 +412,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           continue;
         }
         calls.push(
-          this.buildAddColumnItem({
+          ...this.buildAddColumnItem({
             schema: schemaName,
             tableName,
             table,
@@ -430,11 +430,25 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
   }
 
   /**
-   * Most add-column flows lower to a single `AddColumnCall` IR node. The
-   * NOT-NULL-without-default paths produce composite multi-step ops (either
-   * the shared-temp-default recipe or a hand-built op with a `table is
-   * empty` safety precheck); both are wrapped via `liftOpToCall` so the
-   * planner emits a uniform `PostgresOpFactoryCall[]`.
+   * Add-column flows fall into three shapes, all expressed as
+   * `PostgresOpFactoryCall[]` so the overall plan is a single flat IR
+   * stream:
+   *
+   *  - Default: one `AddColumnCall`.
+   *  - NOT-NULL + no default, shared-temp-default safe: one `RawSqlCall`
+   *    wrapping the atomic composite op produced by
+   *    `buildAddNotNullColumnWithTemporaryDefaultOperation` (add nullable
+   *    → backfill → `SET NOT NULL` → `DROP DEFAULT`). Splitting the steps
+   *    into per-call subclasses would replace a single op's atomic
+   *    precheck/postcheck pair with four separate op boundaries, changing
+   *    execution semantics, so the composite is laundered as one op.
+   *  - NOT-NULL + no default, unsafe (requires empty-table check): one
+   *    `RawSqlCall` wrapping the hand-built op carrying the extra
+   *    `tableIsEmptyCheck` guard that the plain `AddColumnCall` factory
+   *    does not emit.
+   *
+   * Returning an array keeps the signature amenable to future
+   * decomposition if/when the recipe is split into structured calls.
    */
   private buildAddColumnItem(options: {
     readonly schema: string;
@@ -446,7 +460,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly column: StorageColumn;
     readonly codecHooks: Map<string, CodecControlHooks>;
     readonly storageTypes: Record<string, StorageTypeInstance>;
-  }): PostgresOpFactoryCall {
+  }): readonly PostgresOpFactoryCall[] {
     const {
       schema,
       tableName,
@@ -475,17 +489,19 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       });
 
     if (canUseSharedTemporaryDefault) {
-      return liftOpToCall(
-        buildAddNotNullColumnWithTemporaryDefaultOperation({
-          schema,
-          tableName,
-          columnName,
-          column,
-          codecHooks,
-          storageTypes,
-          temporaryDefault,
-        }),
-      );
+      return [
+        liftOpToCall(
+          buildAddNotNullColumnWithTemporaryDefaultOperation({
+            schema,
+            tableName,
+            columnName,
+            column,
+            codecHooks,
+            storageTypes,
+            temporaryDefault,
+          }),
+        ),
+      ];
     }
 
     // Edge case: NOT-NULL-without-default where shared temp-default is unsafe.
@@ -495,55 +511,64 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const requiresEmptyTableCheck = needsTemporaryDefault && !canUseSharedTemporaryDefault;
     if (requiresEmptyTableCheck) {
       const qualified = qualifyTableName(schema, tableName);
-      return liftOpToCall({
-        ...buildAddColumnOperationIdentity(schema, tableName, columnName),
-        operationClass: 'additive',
-        precheck: [
-          {
-            description: `ensure column "${columnName}" is missing`,
-            sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
-          },
-          {
-            description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
-            sql: tableIsEmptyCheck(qualified),
-          },
-        ],
-        execute: [
-          {
-            description: `add column "${columnName}"`,
-            sql: buildAddColumnSql(
-              qualified,
-              columnName,
-              column,
-              codecHooks,
-              undefined,
-              storageTypes,
-            ),
-          },
-        ],
-        postcheck: [
-          {
-            description: `verify column "${columnName}" exists`,
-            sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
-          },
-          {
-            description: `verify column "${columnName}" is NOT NULL`,
-            sql: columnNullabilityCheck({
-              schema,
-              table: tableName,
-              column: columnName,
-              nullable: false,
-            }),
-          },
-        ],
-      });
+      return [
+        liftOpToCall({
+          ...buildAddColumnOperationIdentity(schema, tableName, columnName),
+          operationClass: 'additive',
+          precheck: [
+            {
+              description: `ensure column "${columnName}" is missing`,
+              sql: columnExistsCheck({
+                schema,
+                table: tableName,
+                column: columnName,
+                exists: false,
+              }),
+            },
+            {
+              description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
+              sql: tableIsEmptyCheck(qualified),
+            },
+          ],
+          execute: [
+            {
+              description: `add column "${columnName}"`,
+              sql: buildAddColumnSql(
+                qualified,
+                columnName,
+                column,
+                codecHooks,
+                undefined,
+                storageTypes,
+              ),
+            },
+          ],
+          postcheck: [
+            {
+              description: `verify column "${columnName}" exists`,
+              sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
+            },
+            {
+              description: `verify column "${columnName}" is NOT NULL`,
+              sql: columnNullabilityCheck({
+                schema,
+                table: tableName,
+                column: columnName,
+                nullable: false,
+              }),
+            },
+          ],
+        }),
+      ];
     }
 
-    return new AddColumnCall(
-      schema,
-      tableName,
-      toColumnSpec(columnName, column, codecHooks, storageTypes),
-    );
+    return [
+      new AddColumnCall(
+        schema,
+        tableName,
+        toColumnSpec(columnName, column, codecHooks, storageTypes),
+      ),
+    ];
   }
 
   private buildPrimaryKeyOperations(
